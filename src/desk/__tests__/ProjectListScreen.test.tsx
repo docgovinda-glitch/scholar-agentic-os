@@ -166,7 +166,7 @@ describe("the search bar & delete confirmation modal", () => {
     expect(screen.getByPlaceholderText("Search projects...")).toBeInTheDocument();
 
     // Consolidated transparent AI prompt bar on main dashboard
-    const promptInput = screen.getByPlaceholderText(/Paste your assignment brief, research topic, or essay question/i);
+    const promptInput = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i);
     expect(promptInput).toBeInTheDocument();
     expect(promptInput).toHaveClass("bg-transparent");
   });
@@ -454,7 +454,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
 
     // Consolidated transparent AI prompt bar immediately below cards
-    const promptBar = screen.getByPlaceholderText(/Paste your assignment brief, research topic, or essay question/i);
+    const promptBar = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i);
     expect(promptBar).toBeInTheDocument();
 
     // Projects section, secondary search, and progress cards are purged from main canvas
@@ -548,28 +548,26 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(mainCanvas.className).not.toContain("bg-[var(--bg-canvas)]");
 
     // 2. Shared Container Alignment
-    const promptInput = screen.getByPlaceholderText(/Paste your assignment brief, research topic, or essay question/i);
+    const promptInput = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i);
     const promptForm = promptInput.closest("form")!;
-    const promptContainer = promptForm.parentElement!;
-    const sharedParent = promptContainer.parentElement!;
+    const sharedParent = promptForm.parentElement!;
 
     expect(sharedParent.className).toContain("w-full");
     expect(sharedParent.className).toContain("max-w-4xl");
     expect(sharedParent.className).toContain("mx-auto");
     expect(sharedParent.className).toContain("flex-col");
+    expect(sharedParent.className).toContain("gap-6");
 
-    // 3. Spacing mt-10
-    expect(promptContainer.className).toContain("mt-10");
-
-    // 4. Shadow & Border Fix on prompt bar
-    expect(promptForm.className).toContain("border-white/10");
+    // 3. Shadow & Border Fix on prompt bar
+    expect(promptForm.className).toContain("border-neutral-200");
+    expect(promptForm.className).toContain("dark:border-white/10");
     expect(promptForm.className).toContain("dark:bg-[#1C1C1E]");
     expect(promptForm.className).toContain("shadow-sm");
     expect(promptForm.className).not.toContain("shadow-lg");
     expect(promptForm.className).not.toContain("shadow-xl");
     expect(promptForm.className).not.toContain("drop-shadow");
 
-    // 5. Input width w-full
+    // 4. Input width w-full
     expect(promptInput.className).toContain("w-full");
   });
 });
@@ -967,19 +965,28 @@ describe("distinct academic format USPs & specs", () => {
     expect(card.querySelector(".lucide-edit")).toBeNull();
   });
 
-  it("supports auto-expanding prompt bar with file upload, chips, and keyboard submit", async () => {
+  it("supports auto-expanding prompt bar with file upload, drag-and-drop, paste, chips, backspace removal, and keyboard submit", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const promptTextarea = screen.getByPlaceholderText(/Paste your assignment brief, research topic, or essay question/i) as HTMLTextAreaElement;
+    const promptTextarea = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i) as HTMLTextAreaElement;
     expect(promptTextarea).toBeInTheDocument();
+    const promptForm = promptTextarea.closest("form")!;
+
+    // No duplicate "Ask & Actions" box
+    expect(screen.queryByText("Ask & Actions")).not.toBeInTheDocument();
 
     // Paperclip button & file input
-    const uploadBtn = screen.getByRole("button", { name: /Upload files/i });
+    const uploadBtn = screen.getByRole("button", { name: /Attach files or images/i });
     expect(uploadBtn).toBeInTheDocument();
     const fileInput = screen.getByLabelText("File upload") as HTMLInputElement;
     expect(fileInput).toBeInTheDocument();
-    expect(fileInput.accept).toBe(".pdf,.doc,.docx,.txt");
+    expect(fileInput.accept).toBe(".pdf,.doc,.docx,.txt,image/*");
+
+    // Tooltip relative positioning
+    const paperclipTooltip = uploadBtn.parentElement?.querySelector("span");
+    expect(paperclipTooltip?.className).toContain("bottom-full");
+    expect(paperclipTooltip?.className).toContain("mb-2");
 
     // Simulate file attachment
     const testFile = new File(["syllabus content"], "syllabus_brief.pdf", { type: "application/pdf" });
@@ -989,11 +996,44 @@ describe("distinct academic format USPs & specs", () => {
     const chip = await screen.findByText("syllabus_brief.pdf");
     expect(chip).toBeInTheDocument();
 
-    // Remove chip button
-    const removeBtn = screen.getByRole("button", { name: /Remove syllabus_brief.pdf/i });
+    // Drag and drop interaction
+    fireEvent.dragOver(promptForm);
+    expect(promptForm.className).toContain("border-blue-500");
+    fireEvent.dragLeave(promptForm);
+    expect(promptForm.className).not.toContain("border-blue-500");
+
+    const droppedFile = new File(["chart data"], "data_chart.png", { type: "image/png" });
+    fireEvent.drop(promptForm, {
+      dataTransfer: { files: [droppedFile] },
+    });
+    expect(await screen.findByText("data_chart.png")).toBeInTheDocument();
+
+    // Clipboard paste interaction
+    const pastedFile = new File(["rubric doc"], "marking_rubric.docx", {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    fireEvent.paste(promptTextarea, {
+      clipboardData: {
+        items: [
+          {
+            kind: "file",
+            getAsFile: () => pastedFile,
+          },
+        ],
+      },
+    });
+    expect(await screen.findByText("marking_rubric.docx")).toBeInTheDocument();
+
+    // Backspace removes last attachment when input is empty
+    expect(promptTextarea.value).toBe("");
+    fireEvent.keyDown(promptTextarea, { key: "Backspace" });
+    expect(screen.queryByText("marking_rubric.docx")).not.toBeInTheDocument();
+
+    // Remove chip via X button
+    const removeBtn = screen.getByRole("button", { name: /Remove data_chart.png/i });
     expect(removeBtn).toBeInTheDocument();
     fireEvent.click(removeBtn);
-    expect(screen.queryByText("syllabus_brief.pdf")).not.toBeInTheDocument();
+    expect(screen.queryByText("data_chart.png")).not.toBeInTheDocument();
 
     // Type into textarea and submit with Enter
     fireEvent.change(promptTextarea, { target: { value: "Investigate CRISPR off-target effects" } });

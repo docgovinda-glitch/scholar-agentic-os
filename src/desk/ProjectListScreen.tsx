@@ -41,6 +41,10 @@ import {
 import { getCloudProvider } from "../config/providerCatalog";
 import { loadUserAiSettings } from "../services/userAiSettings";
 
+export interface Attachment {
+  file: File;
+  previewUrl?: string;
+}
 
 /** Curated 4 essential academic formats */
 export const FORMAT_TILES = [
@@ -713,7 +717,6 @@ export default function ProjectListScreen({
 
   const [activeProviderLabel, setActiveProviderLabel] = useState<string>("Ready");
   const [previewFormatId, setPreviewFormatId] = useState<string | null>(null);
-  const [isPromptSuggestionsOpen, setIsPromptSuggestionsOpen] = useState(false);
 
   useEffect(() => {
     if (!userEmail) {
@@ -798,27 +801,38 @@ export default function ProjectListScreen({
   const guideInputRef = useRef<HTMLInputElement | null>(null);
   const guideTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const guideFileInputRef = useRef<HTMLInputElement | null>(null);
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Auto-grow textarea logic for modern prompt bar
+  // Auto-resize textarea
   useEffect(() => {
     if (guideTextareaRef.current) {
       guideTextareaRef.current.style.height = "auto";
-      guideTextareaRef.current.style.height = `${Math.min(guideTextareaRef.current.scrollHeight, 208)}px`;
+      guideTextareaRef.current.style.height = `${Math.min(guideTextareaRef.current.scrollHeight, 220)}px`;
     }
   }, [guideInput]);
 
-  const promptMatchingProjects = useMemo(() => {
-    if (!projects || !guideInput.trim()) return [];
-    const q = guideInput.toLowerCase().trim();
-    return projects
-      .filter((p) => {
-        const title = (p.answers?.title || "").toLowerCase();
-        const outputType = (p.outputTypeId || "").toLowerCase();
-        return title.includes(q) || outputType.includes(q);
-      })
-      .slice(0, 3);
-  }, [projects, guideInput]);
+  const addFiles = useCallback((files: File[]) => {
+    const formatted = files.map((file) => ({
+      file,
+      previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+    }));
+    setAttachments((prev) => [...prev, ...formatted]);
+  }, []);
+
+  const removeAttachment = useCallback((index: number) => {
+    setAttachments((prev) => {
+      const target = prev[index];
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((_, i) => i !== index);
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      attachments.forEach((a) => a.previewUrl && URL.revokeObjectURL(a.previewUrl));
+    };
+  }, [attachments]);
 
   const scrollToAssistant = useCallback(() => {
     setMobileMenuOpen(false);
@@ -864,7 +878,7 @@ export default function ProjectListScreen({
 
   async function handleSendGuideMessage(textToSend?: string, filesToSend?: File[]) {
     const rawQuery = (textToSend !== undefined ? textToSend : guideInput).trim();
-    const currentFiles = filesToSend !== undefined ? filesToSend : attachedFiles;
+    const currentFiles = filesToSend !== undefined ? filesToSend : attachments.map((a) => a.file);
     if (!rawQuery && currentFiles.length === 0) return;
 
     const filePrefix =
@@ -882,7 +896,8 @@ export default function ProjectListScreen({
 
     setGuideMessages((prev) => [...prev, userMsg]);
     setGuideInput("");
-    setAttachedFiles([]);
+    attachments.forEach((a) => a.previewUrl && URL.revokeObjectURL(a.previewUrl));
+    setAttachments([]);
     if (guideTextareaRef.current) guideTextareaRef.current.style.height = "auto";
     setIsGuideThinking(true);
 
@@ -968,6 +983,43 @@ Keep your response concise, helpful, and academically grounded.`;
       setIsGuideThinking(false);
     }
   }
+
+  const handleSubmitPrompt = useCallback(() => {
+    if (!guideInput.trim() && attachments.length === 0) return;
+    setIsAiSidebarOpen(true);
+    handleSendGuideMessage(guideInput, attachments.map((a) => a.file));
+    setGuideInput("");
+    attachments.forEach((a) => a.previewUrl && URL.revokeObjectURL(a.previewUrl));
+    setAttachments([]);
+    if (guideTextareaRef.current) guideTextareaRef.current.style.height = "auto";
+  }, [guideInput, attachments]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmitPrompt();
+    } else if (e.key === "Backspace" && guideInput === "" && attachments.length > 0) {
+      removeAttachment(attachments.length - 1);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const newFiles: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].kind === "file") {
+        const file = items[i].getAsFile();
+        if (file) newFiles.push(file);
+      }
+    }
+
+    if (newFiles.length > 0) {
+      e.preventDefault();
+      addFiles(newFiles);
+    }
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -1630,7 +1682,7 @@ Keep your response concise, helpful, and academically grounded.`;
               onCancel={() => setChoosing(false)}
             />
           ) : (
-            <div className="w-full max-w-4xl mx-auto flex flex-col">
+            <div className="w-full max-w-4xl mx-auto flex flex-col gap-6">
               {/* 4 Academic Workspace Cards Grid */}
               <div className="w-full">
                 <div className={`grid w-full gap-4 transition-all duration-300 ${
@@ -1777,112 +1829,106 @@ Keep your response concise, helpful, and academically grounded.`;
                 </div>
               </div>
 
-              {/* Main AI Prompt Bar — Consolidated immediately below 4 template cards with mt-10 */}
-              <div className="mt-10 w-full relative">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (guideInput.trim() || attachedFiles.length > 0) {
-                      setIsPromptSuggestionsOpen(false);
-                      setIsAiSidebarOpen(true);
-                      handleSendGuideMessage(guideInput, attachedFiles);
-                      setAttachedFiles([]);
-                      if (guideTextareaRef.current) guideTextareaRef.current.style.height = "auto";
-                    }
-                  }}
-                  className="w-full max-w-4xl mx-auto rounded-2xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 p-3 shadow-sm focus-within:border-neutral-300 dark:focus-within:border-white/20 transition-all"
-                >
-                  {/* File Attachment Chips */}
-                  {attachedFiles.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-2 px-1">
-                      {attachedFiles.map((file, i) => (
-                        <span
-                          key={i}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/5 text-[12px] text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-white/5"
-                        >
-                          <FileText className="w-3.5 h-3.5 flex-shrink-0" />
-                          <span className="max-w-[140px] truncate">{file.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                            className="text-neutral-400 hover:text-neutral-600 dark:hover:text-white cursor-pointer ml-0.5"
-                            aria-label={`Remove ${file.name}`}
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Auto-growing Textarea */}
-                  <textarea
-                    ref={guideTextareaRef}
-                    rows={1}
-                    value={guideInput}
-                    onChange={(e) => {
-                      setGuideInput(e.target.value);
-                      setIsPromptSuggestionsOpen(true);
-                    }}
-                    onFocus={() => {
-                      if (guideInput.trim().length >= 2) setIsPromptSuggestionsOpen(true);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") {
-                        setIsPromptSuggestionsOpen(false);
-                      }
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        if (guideInput.trim() || attachedFiles.length > 0) {
-                          setIsPromptSuggestionsOpen(false);
-                          setIsAiSidebarOpen(true);
-                          handleSendGuideMessage(guideInput, attachedFiles);
-                          setAttachedFiles([]);
-                          if (guideTextareaRef.current) guideTextareaRef.current.style.height = "auto";
-                        }
-                      }
-                    }}
-                    placeholder="Paste your assignment brief, research topic, or essay question..."
-                    style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                    className="w-full bg-transparent text-[14px] text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none resize-none px-2 py-1 max-h-52 overflow-y-auto leading-relaxed prompt-bare-input"
-                  />
-
-                  {/* Action Row */}
-                  <div className="flex items-center justify-between pt-2 px-1">
-                    <div>
-                      <input
-                        type="file"
-                        multiple
-                        ref={guideFileInputRef}
-                        onChange={(e) => {
-                          if (e.target.files) {
-                            setAttachedFiles((prev) => [...prev, ...Array.from(e.target.files || [])]);
-                          }
-                        }}
-                        className="hidden"
-                        accept=".pdf,.doc,.docx,.txt"
-                        aria-label="File upload"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => guideFileInputRef.current?.click()}
-                        className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                        title="Upload assignment brief or rubric (.pdf, .doc, .docx, .txt)"
-                        aria-label="Upload files"
+              {/* Main AI Prompt Bar — Consolidated immediately below 4 template cards */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSubmitPrompt();
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  if (e.dataTransfer.files?.length) {
+                    addFiles(Array.from(e.dataTransfer.files));
+                  }
+                }}
+                className={`relative w-full rounded-2xl bg-white dark:bg-[#1C1C1E] border transition-all duration-200 shadow-sm ${
+                  isDragging
+                    ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/5"
+                    : "border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/20"
+                }`}
+              >
+                {/* File Previews */}
+                {attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-3 pb-0">
+                    {attachments.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="relative group flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-[12px]"
                       >
-                        <Paperclip className="w-4 h-4" />
-                      </button>
-                    </div>
+                        {item.previewUrl ? (
+                          <img src={item.previewUrl} alt="preview" className="w-5 h-5 object-cover rounded" />
+                        ) : (
+                          <FileText className="w-4 h-4 text-neutral-500 flex-shrink-0" />
+                        )}
+                        <span className="max-w-[130px] truncate text-neutral-800 dark:text-neutral-200 font-medium">
+                          {item.file.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(idx)}
+                          className="text-neutral-400 hover:text-neutral-700 dark:hover:text-white transition-colors ml-1 cursor-pointer"
+                          aria-label={`Remove ${item.file.name}`}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
+                {/* Auto-expanding Input Area */}
+                <textarea
+                  ref={guideTextareaRef}
+                  rows={1}
+                  value={guideInput}
+                  onChange={(e) => setGuideInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
+                  placeholder="Paste text, drop files/images, or draft research instructions..."
+                  style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
+                  className="w-full bg-transparent px-4 pt-3.5 pb-2 text-[14px] text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none resize-none max-h-[220px] overflow-y-auto leading-relaxed prompt-bare-input"
+                />
+
+                {/* Bottom Controls Bar */}
+                <div className="flex items-center justify-between px-3 pb-3 pt-1">
+                  <div className="relative group">
+                    <input
+                      type="file"
+                      multiple
+                      ref={guideFileInputRef}
+                      onChange={(e) => {
+                        if (e.target.files) {
+                          addFiles(Array.from(e.target.files));
+                        }
+                      }}
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.txt,image/*"
+                      aria-label="File upload"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => guideFileInputRef.current?.click()}
+                      className="p-2 rounded-xl text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                      aria-label="Attach files or images"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </button>
+                    <span className="hidden group-hover:block absolute bottom-full mb-2 left-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
+                      Upload files or images (.pdf, .docx, images)
+                    </span>
+                  </div>
+
+                  <div className="relative group">
                     <button
                       type="submit"
-                      disabled={(!guideInput.trim() && attachedFiles.length === 0) || isGuideThinking}
-                      className={`p-2 rounded-xl transition-all duration-200 cursor-pointer flex items-center justify-center ${
-                        (guideInput.trim() || attachedFiles.length > 0) && !isGuideThinking
-                          ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-90 shadow-sm"
-                          : "bg-neutral-200 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed opacity-30"
-                      }`}
-                      title="Send message"
+                      disabled={(!guideInput.trim() && attachments.length === 0) || isGuideThinking}
+                      className="p-2 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 disabled:opacity-25 disabled:cursor-not-allowed hover:opacity-90 transition-all cursor-pointer flex items-center justify-center"
                       aria-label="Send message"
                     >
                       {isGuideThinking ? (
@@ -1891,67 +1937,12 @@ Keep your response concise, helpful, and academically grounded.`;
                         <ArrowUp className="w-4 h-4 stroke-[2.5]" />
                       )}
                     </button>
+                    <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
+                      Send message (Enter)
+                    </span>
                   </div>
-                </form>
-
-                {/* Instant Suggestions & Matching Projects Popover */}
-                {guideInput.trim().length >= 2 && isPromptSuggestionsOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 rounded-2xl shadow-2xl z-30 p-2 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 max-h-80 overflow-y-auto">
-                    {/* Matching Projects */}
-                    {promptMatchingProjects.length > 0 && (
-                      <div className="mb-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 px-3 py-1 block">
-                          Matching Projects ({promptMatchingProjects.length})
-                        </span>
-                        {promptMatchingProjects.map((p) => (
-                          <button
-                            key={p.projectId}
-                            type="button"
-                            onClick={() => {
-                              setIsPromptSuggestionsOpen(false);
-                              onOpen(p.projectId);
-                            }}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-left hover:bg-white/5 transition-colors cursor-pointer group"
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="w-6 h-6 rounded-lg bg-neutral-800 flex items-center justify-center shrink-0">
-                                <FormatIcon id={p.outputTypeId} className="w-3.5 h-3.5" />
-                              </span>
-                              <span className="text-xs font-medium text-neutral-200 truncate group-hover:text-blue-400">
-                                {p.answers?.title || "Untitled Project"}
-                              </span>
-                            </div>
-                            <span className="text-[11px] text-neutral-400 group-hover:text-neutral-200 shrink-0 font-medium">
-                              Open →
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Platform Action Suggestions */}
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 px-3 py-1 block">
-                        Ask & Actions
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsPromptSuggestionsOpen(false);
-                          setIsAiSidebarOpen(true);
-                          handleSendGuideMessage();
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left hover:bg-white/5 transition-colors cursor-pointer"
-                      >
-                        <span className="text-xs text-neutral-300 truncate">
-                          Ask Scholar: <strong className="text-white font-medium">"{guideInput}"</strong>
-                        </span>
-                        <span className="text-[11px] text-blue-400 font-medium shrink-0 ml-2">Submit ↗</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+                </div>
+              </form>
             </div>
           )}
         </div>

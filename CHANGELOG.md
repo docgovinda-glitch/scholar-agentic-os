@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-24
 
+### Added & Refactored (Unified Prompt Bar: Drag-and-Drop, Clipboard Paste, Strict Alignment & De-duplication)
+- **De-duplication & Clean Dashboard Layout (`src/desk/ProjectListScreen.tsx`)**:
+  - Removed duplicate "ASK & ACTIONS" secondary card and matching projects popover below the prompt bar, establishing the prompt bar as the sole interaction point on the dashboard.
+  - Wrapped 4-card template grid and prompt bar inside shared `<div className="w-full max-w-4xl mx-auto flex flex-col gap-6">` container, guaranteeing flush left/right margin alignment and consistent 24px vertical separation.
+  - Fixed tooltip detachment: bound tooltips relatively (`group-hover:block absolute bottom-full mb-2`) to avoid floating across cards above.
+- **ChatGPT & Gemini Drag-and-Drop, Clipboard Paste & Keyboard Shortcuts (`src/desk/ProjectListScreen.tsx`)**:
+  - Integrated native clipboard file paste (`Cmd+V` / `Ctrl+V`) directly into textarea, detecting pasted documents and images.
+  - Added native drag-and-drop support with active highlight styling (`border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/5`) upon file hover.
+  - Added thumbnail image preview rendering for pasted/dropped images via object URLs with automatic cleanup on submit/unmount.
+  - Supported `Backspace` to delete the last attached file when input text is empty.
+  - Expanded file input format support to `.pdf,.doc,.docx,.txt,image/*`.
+- **Test Suite Updates (`src/desk/__tests__/ProjectListScreen.test.tsx`)**:
+  - Updated placeholder matchers to `"Paste text, drop files/images, or draft research instructions..."`.
+  - Added unit test cases for drag-and-drop file ingestion, active border highlight, clipboard file paste, backspace deletion, relative tooltip positioning, and absence of duplicate "Ask & Actions" box.
+
 ### Added & Refactored (Actionable Template Card Guidance, Pen Icon Removal & ChatGPT/Gemini-Style Prompt Bar)
 - **Removal of Pen/Edit Icons (`src/desk/regions/Header.tsx`, `src/desk/ProjectListScreen.tsx`)**:
   - Removed decorative pencil/edit SVG icon buttons from workspace header and action areas, focusing user attention directly on readable titles and clean, distinct category glyphs.
