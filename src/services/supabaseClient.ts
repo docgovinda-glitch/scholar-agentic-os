@@ -63,7 +63,36 @@ export function getSupabaseClient(): SupabaseClient {
   }
   if (!client) {
     const url = resolveSupabaseUrl() || (rawUrl as string);
-    client = createClient(url, SUPABASE_ANON_KEY as string);
+
+    const clientOptions: any = {
+      realtime: {
+        timeout: 15000,
+        reconnectAfterMs: (tries: number) => Math.min(1000 * 2 ** Math.min(tries, 5), 30000),
+      },
+    };
+
+    // If running in browser and the REST base was rewritten to /api/supabase proxy,
+    // route Realtime WebSockets directly to the native Supabase host so the browser
+    // opens a native WSS connection to *.supabase.co rather than attempting to upgrade
+    // through the Express HTTP reverse proxy.
+    if (typeof window !== "undefined" && typeof WebSocket !== "undefined" && rawUrl && rawUrl.startsWith("http")) {
+      const rawWsOrigin = rawUrl.replace(/^http/i, "ws").replace(/\/+$/, "");
+
+      class DirectSupabaseWebSocket extends WebSocket {
+        constructor(address: string | URL, protocols?: string | string[]) {
+          let addressStr = address.toString();
+          if (addressStr.includes("/api/supabase")) {
+            const currentOriginWs = `${window.location.origin.replace(/^http/i, "ws")}/api/supabase`;
+            addressStr = addressStr.replace(currentOriginWs, rawWsOrigin);
+          }
+          super(addressStr, protocols);
+        }
+      }
+
+      clientOptions.realtime.transport = DirectSupabaseWebSocket;
+    }
+
+    client = createClient(url, SUPABASE_ANON_KEY as string, clientOptions);
   }
   return client;
 }

@@ -48,6 +48,17 @@ export function registerSupabaseProxy(app: Express): void {
     // req.url inside app.use('/api/supabase') has /api/supabase stripped by Express
     const subpath = req.url || "/";
 
+    // If an incoming request requests a WebSocket upgrade, standard Express HTTP middleware
+    // cannot switch protocols. Return a 426 Upgrade Required with clean guidance instead of forwarding
+    // a truncated HTTP GET request to Supabase that triggers upstream 500 errors.
+    if (req.headers.upgrade && String(req.headers.upgrade).toLowerCase() === "websocket") {
+      res.status(426).json({
+        error: "Upgrade Required",
+        message: "WebSocket connections must connect directly to Supabase Realtime endpoint",
+      });
+      return;
+    }
+
     // Clone and sanitize incoming headers
     const forwardedHeaders: Record<string, string | string[] | undefined> = {
       ...req.headers,

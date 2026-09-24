@@ -137,10 +137,16 @@ export function ResearchProvider({
           load();
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          if (import.meta.env.DEV) {
+            console.warn(`[Realtime Sync] Project sync channel ${status}: ${err?.message || "connection error"}. Gracefully using REST.`);
+          }
+        }
+      });
 
     return () => {
-      channel.unsubscribe();
+      client.removeChannel(channel).catch(() => {});
     };
   }, [projectId, load]);
 
