@@ -355,4 +355,125 @@ describe("Stage 11: External Research (ExternalResearchStage)", () => {
       expect(onAdvance).toHaveBeenCalledWith("source_approval_external");
     });
   });
+
+  it("filters discovered papers by multi-lens evidentiary role tabs", async () => {
+    render(
+      <ExternalResearchStage
+        stage="external_research"
+        projectId="proj-ext-110"
+        project={mockProject}
+      />
+    );
+
+    // Initial state shows both
+    expect(screen.getByText(/Adaptive Consensus Reconfiguration Under Byzantine Adversaries/i)).toBeInTheDocument();
+    expect(screen.getByText(/Quantifying Asymmetric Network Delays in Modern Cloud Datacenters/i)).toBeInTheDocument();
+
+    // Click Benchmark tab
+    const benchmarkBtn = screen.getByRole("button", { name: /🏆 Benchmark/i });
+    fireEvent.click(benchmarkBtn);
+
+    expect(screen.getByText(/Adaptive Consensus Reconfiguration Under Byzantine Adversaries/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Quantifying Asymmetric Network Delays in Modern Cloud Datacenters/i)).not.toBeInTheDocument();
+
+    // Click Empirical tab
+    const empiricalBtn = screen.getByRole("button", { name: /🔬 Empirical/i });
+    fireEvent.click(empiricalBtn);
+
+    expect(screen.queryByText(/Adaptive Consensus Reconfiguration Under Byzantine Adversaries/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Quantifying Asymmetric Network Delays in Modern Cloud Datacenters/i)).toBeInTheDocument();
+
+    // Click All Roles tab
+    const allRolesBtn = screen.getByRole("button", { name: /All Roles/i });
+    fireEvent.click(allRolesBtn);
+
+    expect(screen.getByText(/Adaptive Consensus Reconfiguration Under Byzantine Adversaries/i)).toBeInTheDocument();
+    expect(screen.getByText(/Quantifying Asymmetric Network Delays in Modern Cloud Datacenters/i)).toBeInTheDocument();
+  });
+
+  it("appends suggested keywords to the search query on chip click", async () => {
+    render(
+      <ExternalResearchStage
+        stage="external_research"
+        projectId="proj-ext-110"
+        project={mockProject}
+      />
+    );
+
+    const queryInput = screen.getByPlaceholderText(/e\.g\. Byzantine fault tolerance WAN/i) as HTMLInputElement;
+    const initialQuery = queryInput.value;
+
+    const chips = screen.getAllByTestId(/^keyword-chip-/);
+    expect(chips.length).toBeGreaterThanOrEqual(1);
+
+    fireEvent.click(chips[0]);
+    expect(queryInput.value.length).toBeGreaterThan(initialQuery.length);
+  });
+
+  it("copies APA and BibTeX citations to clipboard with user feedback", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    render(
+      <ExternalResearchStage
+        stage="external_research"
+        projectId="proj-ext-110"
+        project={mockProject}
+      />
+    );
+
+    const apaButtons = screen.getAllByRole("button", { name: /📋 Copy APA/i });
+    fireEvent.click(apaButtons[0]);
+
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalled();
+      expect(writeTextMock.mock.calls[0][0]).toContain("Balasubramanian");
+      expect(screen.getByText(/✓ Copied APA/i)).toBeInTheDocument();
+    });
+
+    const bibtexButtons = screen.getAllByRole("button", { name: /📜 BibTeX/i });
+    fireEvent.click(bibtexButtons[0]);
+
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledTimes(2);
+      expect(writeTextMock.mock.calls[1][0]).toContain("@article{");
+      expect(screen.getByText(/✓ Copied BibTeX/i)).toBeInTheDocument();
+    });
+  });
+
+  it("supports batch paper selection and batch exclusion", async () => {
+    render(
+      <ExternalResearchStage
+        stage="external_research"
+        projectId="proj-ext-110"
+        project={mockProject}
+      />
+    );
+
+    const checkboxes = screen.getAllByTitle(/Select paper for batch actions/i);
+    expect(checkboxes.length).toBe(2);
+
+    // Select the first checkbox
+    fireEvent.click(checkboxes[0]);
+
+    // Batch Exclude button should appear with count 1
+    const batchExcludeBtn = screen.getByRole("button", { name: /Batch Exclude \(1\)/i });
+    expect(batchExcludeBtn).toBeInTheDocument();
+
+    fireEvent.click(batchExcludeBtn);
+
+    await waitFor(() => {
+      expect(api.saveIntakeAnswers).toHaveBeenCalled();
+      const savedPayload = (api.saveIntakeAnswers as any).mock.calls[0][1];
+      expect(savedPayload.pending_external_sources).not.toContain(
+        "Adaptive Consensus Reconfiguration Under Byzantine Adversaries"
+      );
+      expect(screen.getByText(/Excluded 1 papers from discovery ledger/i)).toBeInTheDocument();
+    });
+  });
 });
+

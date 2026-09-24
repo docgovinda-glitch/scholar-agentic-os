@@ -401,27 +401,56 @@ router.post("/external-research", async (req: express.Request<{ id: string }>, r
   const project = await getProjectSafe(req, res);
   if (!project) return;
   const context = JSON.stringify(project.answers);
+  const query = req.body?.query || project.answers["core_problem"] || project.answers["working_title"] || "academic external research";
+  const requestedDatabases = Array.isArray(req.body?.databases) && req.body.databases.length > 0
+    ? req.body.databases.join(", ")
+    : "CrossRef, arXiv, Semantic Scholar, IEEE Xplore, PubMed, DOAJ";
+  const minRelevance = Number(req.body?.minRelevance) || 75;
+  const anchorGap = req.body?.anchorGap || project.answers["anchor_gap_id"] || "Primary Research Gap";
 
   try {
-    const systemPrompt = `You are an expert academic external research agent.
-Based on the provided research context, generate exactly 3 highly relevant external sources found on databases like PubMed, IEEE, or Semantic Scholar.
+    const systemPrompt = `You are an expert autonomous scholarly research crawler agent conducting Deep External Literature Discovery.
+Target academic registries: ${requestedDatabases}.
+Target search query: "${query}".
+Evidentiary gap to address: "${anchorGap}".
+Minimum relevance threshold: ${minRelevance}%.
+
+Generate 10 to 16 publication-grade, peer-reviewed external papers or verified preprints that fill the unaddressed literature gap.
+For each paper, classify its evidentiary role into one of: 'benchmark', 'empirical', 'theoretical', 'methodological', or 'comparative'.
+Provide realistic metadata including authors, publication year (2020-2025 preferred), valid DOIs or arXiv identifiers, target journal/conference, citation count, matched concepts, and a verbatim abstract snippet detailing concrete empirical or theoretical findings.
+
 Return ONLY valid JSON in this exact format:
 {
   "data": [
     {
-      "id": "ext-xyz",
-      "title": "...",
-      "author": "...",
-      "year": 2025,
-      "database": "...",
-      "doi": "...",
-      "gap_addressed": "...",
-      "snippet": "...",
-      "relevance": 90
+      "id": "ext-1",
+      "title": "Exact Title of External Paper",
+      "author": "Author One, Author Two, & Author Three",
+      "year": 2024,
+      "database": "CrossRef",
+      "doi": "10.1145/3547659.3560812",
+      "gap_addressed": "${anchorGap}",
+      "snippet": "Empirical and theoretical findings resolving boundary conditions...",
+      "relevance": 94,
+      "relevance_score": 94,
+      "evidentiary_role": "benchmark",
+      "matched_concepts": ["Concept1", "Concept2"],
+      "citation_count": 58,
+      "journal": "ACM Transactions on Computer Systems"
     }
   ]
 }`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    const searchContext = `Search Parameters:
+- Query: ${query}
+- Target Databases: ${requestedDatabases}
+- Anchor Gap: ${anchorGap}
+- Manuscript Working Title: ${project.answers["working_title"] || project.answers["title"] || "Research Manuscript"}
+- Target Venue: ${project.answers["target_journal"] || "Peer-Reviewed Venue"}
+- Methodology: ${project.answers["methodology"] || "Empirical Research"}
+
+Research Context: ${context}`;
+
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, searchContext);
     if (!result) return;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
