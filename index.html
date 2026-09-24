@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark" data-theme="dark" style="background-color: #171717; color: #e5e5e5;">
+<html lang="en" class="dark" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <!-- `maximum-scale=1.0, user-scalable=no` removed: it blocked pinch-zoom
@@ -23,12 +23,16 @@
       rel="stylesheet"
     />
 
-    <!-- Enforce unified dark mode before first paint -->
+    <!-- Theme pre-paint hydration -->
     <script>
       try {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        document.documentElement.classList.add('dark');
-        localStorage.setItem('scholar-theme', 'dark');
+        var t = localStorage.getItem('scholar-theme') || localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+        if (t === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
       } catch (e) {
         document.documentElement.setAttribute('data-theme', 'dark');
         document.documentElement.classList.add('dark');

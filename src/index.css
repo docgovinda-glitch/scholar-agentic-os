@@ -410,8 +410,8 @@
 html, body, #root {
   height: auto !important;
   min-height: 100% !important;
-  background-color: #171717;
-  color: #ECECEC;
+  background-color: var(--surface-canvas);
+  color: var(--text-primary);
 }
 
 body {
