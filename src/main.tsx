@@ -48,12 +48,14 @@ if (typeof document !== 'undefined') {
 void warmServer();
 
 // Ensure all environments serve fresh assets by unregistering any stale Service Worker and clearing cache storage
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    for (const registration of registrations) {
-      registration.unregister();
-    }
-  });
+if (typeof window !== 'undefined') {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister();
+      }
+    });
+  }
   if ('caches' in window) {
     caches.keys().then((names) => {
       for (const name of names) {
@@ -61,6 +63,12 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       }
     });
   }
+
+  // Intercept stale Vite dynamic import chunk errors caused by new deployments
+  // and automatically reload the latest assets seamlessly.
+  window.addEventListener('vite:preloadError', () => {
+    window.location.reload();
+  });
 }
 
 import ErrorBoundary from './components/ErrorBoundary.tsx';
