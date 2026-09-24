@@ -51,5 +51,24 @@ export function registerSearchRoutes(app: express.Application) {
     });
   }));
 
+  // Multi-Portal Scholarly Harvester Route (harvests across OpenAlex, CrossRef, DOAJ, DataCite, arXiv)
+  router.post("/multi-portal", asyncRoute(async (req, res) => {
+    const { query, workingTitle, researchArea, maxResults = 50 } = req.body || {};
+    const effectiveQuery = (query || workingTitle || researchArea || "").trim();
+    if (!effectiveQuery) {
+      return res.status(400).json({ error: "Missing required search query or working title" });
+    }
+
+    try {
+      const { discoverMultiPortalSources } = await import("../src/discovery/discovery.ts");
+      const drafts = await discoverMultiPortalSources(effectiveQuery, Math.max(50, Number(maxResults) || 50));
+      res.json({ success: true, count: drafts.length, sources: drafts });
+    } catch (err) {
+      res.status(502).json({ error: `Multi-portal discovery failed: ${err instanceof Error ? err.message : String(err)}` });
+    }
+  }));
+
   app.use("/api/search", router);
+  app.use("/api/discovery", router);
 }
+

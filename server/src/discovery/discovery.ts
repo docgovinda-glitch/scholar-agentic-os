@@ -167,3 +167,148 @@ export async function discoverOpenAlexSources(query: string, maxResults = 10): P
     };
   });
 }
+export async function discoverCrossrefSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {
+  const params = new URLSearchParams({ query, rows: String(maxResults), sort: "relevance" });
+  let res: Response;
+  try {
+    res = await fetch(`https://api.crossref.org/works?${params.toString()}`, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "ScholarCore/2.0 (mailto:scholar-core@users.noreply.github.com)",
+      },
+    });
+  } catch (err) {
+    throw new Error(`CrossRef request failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  if (!res.ok) {
+    throw new Error(`CrossRef ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
+  }
+  const parsed = (await res.json()) as { message?: { items?: any[] } };
+  return (parsed.message?.items ?? []).map((item) => {
+    const doi = item.DOI ? item.DOI.replace(/^https?:\/\/doi\.org\//, "") : undefined;
+    const venue = Array.isArray(item["container-title"]) ? item["container-title"][0] : item["container-title"];
+    const title = Array.isArray(item.title) ? item.title[0] : item.title || "Untitled";
+    const authors = Array.isArray(item.author)
+      ? item.author.map((a: any) => (a.given && a.family ? `${a.family}, ${a.given}` : a.name || a.family || "")).filter(Boolean)
+      : [];
+    const year = item.published?.["date-parts"]?.[0]?.[0] || item.created?.["date-parts"]?.[0]?.[0];
+
+    return {
+      title,
+      authors,
+      url: item.URL || (doi ? `https://doi.org/${doi}` : undefined),
+      ...(doi ? { doi } : {}),
+      ...(venue ? { venue } : {}),
+      ...(year ? { year: Number(year) } : {}),
+      discoveredVia: "crossref" as const,
+      sourceType: "scholarly" as const,
+      authorityTier: "A" as const,
+    };
+  });
+}
+
+export async function discoverDoajSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {
+  let res: Response;
+  try {
+    res = await fetch(`https://doaj.org/api/search/articles/${encodeURIComponent(query)}?pageSize=${maxResults}`);
+  } catch (err) {
+    throw new Error(`DOAJ request failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  if (!res.ok) {
+    throw new Error(`DOAJ ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
+  }
+  const parsed = (await res.json()) as { results?: any[] };
+  return (parsed.results ?? []).map((item) => {
+    const bib = item.bibjson || {};
+    const doiObj = Array.isArray(bib.identifier) ? bib.identifier.find((i: any) => i.type === "doi") : undefined;
+    const doi = doiObj?.id ? doiObj.id.replace(/^https?:\/\/doi\.org\//, "") : undefined;
+    const authors = Array.isArray(bib.author) ? bib.author.map((a: any) => a.name).filter(Boolean) : [];
+    const venue = bib.journal?.title;
+    const link = Array.isArray(bib.link) ? bib.link.find((l: any) => l.type === "fulltext")?.url : undefined;
+
+    return {
+      title: bib.title || "Untitled Open Access Work",
+      authors,
+      url: link || (doi ? `https://doi.org/${doi}` : undefined),
+      ...(doi ? { doi } : {}),
+      ...(venue ? { venue } : {}),
+      ...(bib.year ? { year: Number(bib.year) } : {}),
+      discoveredVia: "doaj" as const,
+      sourceType: "scholarly" as const,
+      authorityTier: "A" as const,
+    };
+  });
+}
+
+export async function discoverDataCiteSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {
+  let res: Response;
+  try {
+    res = await fetch(`https://api.datacite.org/dois?query=${encodeURIComponent(query)}&page[size]=${maxResults}`);
+  } catch (err) {
+    throw new Error(`DataCite request failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  if (!res.ok) {
+    throw new Error(`DataCite ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
+  }
+  const parsed = (await res.json()) as { data?: any[] };
+  return (parsed.data ?? []).map((item) => {
+    const attrs = item.attributes || {};
+    const doi = attrs.doi ? attrs.doi.replace(/^https?:\/\/doi\.org\//, "") : undefined;
+    const title = Array.isArray(attrs.titles) ? attrs.titles[0]?.title : "DataCite Resource";
+    const authors = Array.isArray(attrs.creators) ? attrs.creators.map((c: any) => c.name).filter(Boolean) : [];
+    const venue = attrs.publisher;
+
+    return {
+      title,
+      authors,
+      url: doi ? `https://doi.org/${doi}` : undefined,
+      ...(doi ? { doi } : {}),
+      ...(venue ? { venue } : {}),
+      ...(attrs.publicationYear ? { year: Number(attrs.publicationYear) } : {}),
+      discoveredVia: "datacite" as const,
+      sourceType: "scholarly" as const,
+      authorityTier: "B" as const,
+    };
+  });
+}
+
+export async function discoverMultiPortalSources(query: string, maxResults = 50): Promise<DiscoveredSourceDraft[]> {
+  const perPortalLimit = Math.max(15, Math.ceil(maxResults / 3));
+
+  const portalPromises = [
+    discoverOpenAlexSources(query, perPortalLimit).catch(() => [] as DiscoveredSourceDraft[]),
+    discoverCrossrefSources(query, perPortalLimit).catch(() => [] as DiscoveredSourceDraft[]),
+    discoverDoajSources(query, Math.min(20, perPortalLimit)).catch(() => [] as DiscoveredSourceDraft[]),
+    discoverDataCiteSources(query, Math.min(20, perPortalLimit)).catch(() => [] as DiscoveredSourceDraft[]),
+    discoverArxivSources(query, Math.min(20, perPortalLimit)).catch(() => [] as DiscoveredSourceDraft[]),
+  ];
+
+  const results = await Promise.allSettled(portalPromises);
+  const candidates: DiscoveredSourceDraft[] = [];
+
+  for (const r of results) {
+    if (r.status === "fulfilled" && Array.isArray(r.value)) {
+      candidates.push(...r.value);
+    }
+  }
+
+  // Deduplicate by DOI and normalized title
+  const seenDois = new Set<string>();
+  const seenTitles = new Set<string>();
+  const deduplicated: DiscoveredSourceDraft[] = [];
+
+  for (const item of candidates) {
+    const cleanDoi = item.doi ? item.doi.toLowerCase().trim() : null;
+    const normTitle = (item.title || "").toLowerCase().replace(/[\W_]+/g, " ").trim();
+
+    if (cleanDoi && seenDois.has(cleanDoi)) continue;
+    if (normTitle && seenTitles.has(normTitle)) continue;
+
+    if (cleanDoi) seenDois.add(cleanDoi);
+    if (normTitle) seenTitles.add(normTitle);
+
+    deduplicated.push(item);
+  }
+
+  return deduplicated.slice(0, maxResults);
+}

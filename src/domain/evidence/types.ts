@@ -30,7 +30,19 @@ export type SourceType = "scholarly" | "official" | "web" | "media" | "user_prov
 /** A (never-invented) authority tier: A = primary/official/peer-reviewed, D = unverified/low-authority. Assigned from what discovery actually observed (a .gov domain, a preprint host, etc.), never guessed for a source discovery can't classify. */
 export type AuthorityTier = "A" | "B" | "C" | "D";
 
-export type DiscoveryMethod = "arxiv" | "web_search" | "openalex" | "user_upload" | "vault" | "manual";
+export type DiscoveryMethod =
+  | "arxiv"
+  | "web_search"
+  | "openalex"
+  | "crossref"
+  | "doaj"
+  | "datacite"
+  | "europepmc"
+  | "multi_portal"
+  | "user_upload"
+  | "vault"
+  | "manual";
+
 
 import type { CanonicalReference } from "../../citation_compliance/model/reference";
 import type { CitationStatus } from "../../services/vaultContents";
