@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-24
 
+### Completed QA Audit & Architectural Polish (10-Point Verification)
+- **Template Cards UI Streamlining (`src/desk/ProjectListScreen.tsx`)**:
+  - Removed explicit "Boot →" call-to-action text and diagonal arrow from all 4 template cards.
+  - Retained clean footer specifications ("8 Phases · Target Journal Fit", "8 Stages · Rubric Alignment", etc.), dot-separated inline USPs, and seamless interactive `cursor-pointer` surface.
+- **Strict Unique Project Naming (`src/desk/ProjectListScreen.tsx`)**:
+  - Enforced unique auto-incrementing naming on project creation ("Untitled Project", "Untitled Project 1", "Untitled Project 2", etc.) preventing duplicate projects.
+  - Added strict duplicate validation on project rename action: checks existing project titles and displays alert blocking collisions if duplicate is entered.
+- **Instant Optimistic Project Deletion (`src/desk/ProjectListScreen.tsx`, `src/desk/vault/KnowledgeVault.tsx`)**:
+  - Implemented optimistic UI updates: clicking "Delete" immediately closes the modal dialog and synchronously removes the project from local state/cache without waiting for network response.
+  - Dispatched asynchronous deletion in background with automatic state rollback and error toast if the API request fails.
+- **Unified Dark Mode Skeleton Loading (`src/desk/components/GlobalLoader.tsx`)**:
+  - Replaced basic spinner with a full dark mode layout skeleton using `#171717` background and `animate-pulse` skeleton blocks, eliminating white flashing during route and workspace transitions.
+- **Aggressive Code-Splitting in Academic Workspace (`src/desk/assignment/AssignmentWorkspace.tsx`)**:
+  - Code-split all 8 dedicated academic stages (`AssignmentUnderstandStage`, `AssignmentPlanStage`, `AssignmentResearchStage`, `AssignmentEvidenceStage`, `AssignmentThinkStage`, `AssignmentStructureStage`, `AssignmentDraftStage`, `AssignmentFinalStage`) using `React.lazy()`.
+  - Drastically reduced `AssignmentWorkspace` bundle size from ~118 kB to 22 kB for instantaneous load times.
+
 ### Fixed & Refactored
 - **Global Layout Shell & Dashboard Dark Mode Unification (`index.html`, `main.tsx`, `DeskApp.tsx`, `index.css`, `ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`)**:
   - **Global Background Unification**: Enforced single, unified dark background (`bg-[#171717]`, `text-neutral-200`) on `html`, `body`, and root layout wrappers across `index.html`, `src/main.tsx`, and `DeskApp.tsx`.

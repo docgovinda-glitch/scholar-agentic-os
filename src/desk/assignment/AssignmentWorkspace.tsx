@@ -4,25 +4,15 @@ import { AssignmentProvider, useAssignmentWorkspace } from "./AssignmentContext"
 import AssignmentStageNavigation from "./components/AssignmentStageNavigation";
 
 // Aggressive code-splitting with React.lazy
-const SocraticTutor = React.lazy(() =>
-  import("./components/AssignmentAiTutorPanel").then((mod) => ({
-    default: (mod as any).SocraticTutor || mod.default,
-  }))
-);
-
-const AssignmentForm = React.lazy(() =>
-  import("./stages/AssignmentUnderstandStage").then((mod) => ({
-    default: (mod as any).AssignmentForm || mod.default,
-  }))
-);
-
-import AssignmentPlanStage from "./stages/AssignmentPlanStage";
-import AssignmentResearchStage from "./stages/AssignmentResearchStage";
-import AssignmentEvidenceStage from "./stages/AssignmentEvidenceStage";
-import AssignmentThinkStage from "./stages/AssignmentThinkStage";
-import AssignmentStructureStage from "./stages/AssignmentStructureStage";
-import AssignmentDraftStage from "./stages/AssignmentDraftStage";
-import AssignmentFinalStage from "./stages/AssignmentFinalStage";
+const SocraticTutor = React.lazy(() => import("./components/AssignmentAiTutorPanel"));
+const AssignmentUnderstandStage = React.lazy(() => import("./stages/AssignmentUnderstandStage"));
+const AssignmentPlanStage = React.lazy(() => import("./stages/AssignmentPlanStage"));
+const AssignmentResearchStage = React.lazy(() => import("./stages/AssignmentResearchStage"));
+const AssignmentEvidenceStage = React.lazy(() => import("./stages/AssignmentEvidenceStage"));
+const AssignmentThinkStage = React.lazy(() => import("./stages/AssignmentThinkStage"));
+const AssignmentStructureStage = React.lazy(() => import("./stages/AssignmentStructureStage"));
+const AssignmentDraftStage = React.lazy(() => import("./stages/AssignmentDraftStage"));
+const AssignmentFinalStage = React.lazy(() => import("./stages/AssignmentFinalStage"));
 
 // Subtle dark-mode skeleton placeholders
 export function PhaseNavSkeleton() {
@@ -187,7 +177,7 @@ function AssignmentWorkspaceInner({
   const renderActiveStage = () => {
     switch (currentStage) {
       case "understand":
-        return <AssignmentForm />;
+        return <AssignmentUnderstandStage />;
       case "plan":
         return <AssignmentPlanStage />;
       case "research":
@@ -203,7 +193,7 @@ function AssignmentWorkspaceInner({
       case "final":
         return <AssignmentFinalStage />;
       default:
-        return <AssignmentForm />;
+        return <AssignmentUnderstandStage />;
     }
   };
 

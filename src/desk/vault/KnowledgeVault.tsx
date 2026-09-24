@@ -168,19 +168,26 @@ export default function KnowledgeVault({
     return { total, drafting, intake, avgProgress, totalGates, gatesVerified };
   }, [projects]);
 
-  // Delete project
+  // Delete project (optimistic update)
   const handleConfirmDelete = async () => {
     if (!projectToDelete) return;
-    setIsDeleting(true);
+    const targetProject = projectToDelete;
+    const previousProjects = projects;
+
+    // Immediately close modal and update local state
+    setProjectToDelete(null);
+    setProjects((prev) => (prev ? prev.filter((p) => p.projectId !== targetProject.projectId) : []));
+
     try {
-      await deleteProject(projectToDelete.projectId);
-      setProjects((prev) => prev ? prev.filter((p) => p.projectId !== projectToDelete.projectId) : []);
-      setProjectToDelete(null);
+      if (!targetProject.projectId.startsWith("demo-")) {
+        await deleteProject(targetProject.projectId);
+      }
     } catch (err: unknown) {
+      console.error("Failed to delete project:", err);
+      // Rollback on failure
+      setProjects(previousProjects);
       const msg = err instanceof Error ? err.message : "Failed to delete project";
       alert(`Could not delete project: ${msg}`);
-    } finally {
-      setIsDeleting(false);
     }
   };
 

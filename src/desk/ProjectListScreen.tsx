@@ -509,6 +509,8 @@ export default function ProjectListScreen({
     setActiveView("projects");
   }, [location.pathname, navigate]);
 
+  const [projects, setProjects] = useState<ProjectView[] | null>(null);
+
   const handleCreate = useCallback(async (outputTypeId: string) => {
     if (!userEmail) {
       const tile = FORMAT_TILES.find((t) => t.id === outputTypeId);
@@ -521,15 +523,27 @@ export default function ProjectListScreen({
     setError(null);
     try {
       const project = await createProject(outputTypeId);
+      // Auto-assign unique default project title (Untitled Project, Untitled Project 1, ...)
+      const existingTitles = new Set((projects || []).map((p) => (p.answers?.title || "").trim().toLowerCase()));
+      let defaultTitle = "Untitled Project";
+      let counter = 1;
+      while (existingTitles.has(defaultTitle.toLowerCase())) {
+        defaultTitle = `Untitled Project ${counter}`;
+        counter++;
+      }
+      await saveIntakeAnswers(project.projectId, { title: defaultTitle }).catch(() => {});
+      if (project.answers) {
+        project.answers.title = defaultTitle;
+      } else {
+        project.answers = { title: defaultTitle };
+      }
       onOpen(project.projectId);
     } catch (e) {
       setError((e as Error).message);
       setCreating(false);
       setCreatingFormatId(null);
     }
-  }, [userEmail, creating, openAuth, onOpen]);
-
-  const [projects, setProjects] = useState<ProjectView[] | null>(null);
+  }, [userEmail, creating, openAuth, onOpen, projects]);
   const [types, setTypes] = useState<OutputTypeSummary[] | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [welcomeVisible, setWelcomeVisible] = useState(() => showWelcome ?? false);
@@ -883,6 +897,16 @@ Keep your response concise, helpful, and academically grounded.`;
       const newTitle = window.prompt("Rename research project:", item.title);
       if (newTitle && newTitle.trim() && newTitle.trim() !== item.title && item.projectId) {
         const trimmed = newTitle.trim();
+        // Check for duplicate title against other existing projects
+        const isDuplicate = (projects || []).some(
+          (p) =>
+            p.projectId !== item.projectId &&
+            (p.answers?.title || "").trim().toLowerCase() === trimmed.toLowerCase()
+        );
+        if (isDuplicate) {
+          alert(`A project with the name "${trimmed}" already exists. Please choose a unique name.`);
+          return;
+        }
         saveIntakeAnswers(item.projectId, { title: trimmed })
           .then(() => {
             setProjects((curr) =>
@@ -922,26 +946,30 @@ Keep your response concise, helpful, and academically grounded.`;
   }
 
   async function handleConfirmDelete() {
-    if (!projectToDelete || deletingId) return;
+    if (!projectToDelete) return;
     const targetId = projectToDelete.projectId;
-    setDeletingId(targetId);
-    setError(null);
+    const previousProjects = projects;
 
+    // 1. Instantly close the modal dialog without delay
+    setProjectToDelete(null);
+
+    // 2. Instantly filter the project out of the local state
+    setProjects((curr) => (curr ? curr.filter((p) => p.projectId !== targetId) : []));
+
+    // 3. Perform backend deletion asynchronously
     try {
       if (!targetId.startsWith("demo-")) {
         await deleteProject(targetId);
       }
-      setProjects((curr) => (curr ? curr.filter((p) => p.projectId !== targetId) : []));
-      setProjectToDelete(null);
       // Re-sync project list with server in background
       listProjects()
         .then((r) => setProjects(r.items))
         .catch(() => {});
     } catch (e) {
       console.error("Failed to delete project:", e);
-      setError((e as Error).message || "Could not delete project. Please try again.");
-    } finally {
-      setDeletingId(null);
+      // Rollback on failure
+      setProjects(previousProjects);
+      setError((e as Error).message || "Failed to delete project. Please try again.");
     }
   }
 
@@ -1532,11 +1560,6 @@ Keep your response concise, helpful, and academically grounded.`;
                               >
                                 i
                               </span>
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 group-hover:text-neutral-200 transition-colors">
-                                <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7V17" />
-                                </svg>
-                              </div>
                             </div>
                           </div>
                           <h3 className="text-base font-bold tracking-tight text-neutral-100 leading-snug">
@@ -1548,9 +1571,6 @@ Keep your response concise, helpful, and academically grounded.`;
                         </div>
                         <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2 text-xs text-neutral-400 font-sans">
                           <span className="font-medium text-neutral-400 truncate">{tile.footer}</span>
-                          <span className="font-semibold text-neutral-300 group-hover:text-neutral-100 group-hover:translate-x-0.5 transition-all flex-shrink-0 whitespace-nowrap">
-                            Boot →
-                          </span>
                         </div>
 
                         {/* Interactive Stages & Methodology Blueprint Overlay */}
