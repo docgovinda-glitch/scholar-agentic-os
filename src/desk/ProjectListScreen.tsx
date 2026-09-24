@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createProject, listOutputTypes, listProjects, deleteProject, saveIntakeAnswers, executeAgenticLLM } from "./api";
 import {
@@ -36,6 +36,7 @@ import {
   FileText,
   Sun,
   Moon,
+  Paperclip,
 } from "lucide-react";
 import { getCloudProvider } from "../config/providerCatalog";
 import { loadUserAiSettings } from "../services/userAiSettings";
@@ -47,41 +48,45 @@ export const FORMAT_TILES = [
     id: "OT-01",
     label: "Coursework & Essays",
     title: "Coursework & Essays",
+    guidance: "Guides you through thesis formulation, marking rubric alignment, critical argument synthesis, and citation formatting.",
+    specs: "Structured Outline · Rubric Matched · 800 – 4,000 words",
+    footer: "Structured Outline · Rubric Matched · 800 – 4,000 words",
     usp: "Marking Rubric Alignment · Argument Synthesis",
-    specs: "800 – 4,000 words",
-    features: "Marking Rubric Alignment · Argument Synthesis",
-    footer: "800 – 4,000 words",
-    budget: "800 – 4,000 words",
+    features: "Structured Outline · Rubric Matched · 800 – 4,000 words",
+    budget: "Structured Outline · Rubric Matched · 800 – 4,000 words",
   },
   {
     id: "OT-10",
     label: "Journal Article",
     title: "Journal Article",
+    guidance: "Structures formal IMRaD manuscripts with deep literature synthesis, methodology validation, and peer-review readiness.",
+    specs: "IMRaD Architecture · Peer Review · 4,000 – 10,000 words",
+    footer: "IMRaD Architecture · Peer Review · 4,000 – 10,000 words",
     usp: "Peer-Review Standard · IMRaD Methodology",
-    specs: "4,000 – 10,000 words",
-    features: "Peer-Review Standard · IMRaD Methodology",
-    footer: "4,000 – 10,000 words",
-    budget: "4,000 – 10,000 words",
+    features: "IMRaD Architecture · Peer Review · 4,000 – 10,000 words",
+    budget: "IMRaD Architecture · Peer Review · 4,000 – 10,000 words",
   },
   {
     id: "OT-19",
     label: "Research Proposal",
     title: "Research Proposal",
+    guidance: "Guides research question definition, literature gap identification, theoretical frameworks, and methodology design.",
+    specs: "Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words",
+    footer: "Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words",
     usp: "Literature Gap Analysis · Ethical Frameworks",
-    specs: "3,000 – 15,000 words",
-    features: "Literature Gap Analysis · Ethical Frameworks",
-    footer: "3,000 – 15,000 words",
-    budget: "3,000 – 15,000 words",
+    features: "Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words",
+    budget: "Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words",
   },
   {
     id: "OT-22",
     label: "Slides & Keynotes",
     title: "Slides & Keynotes",
+    guidance: "Converts academic papers into visual presentation slides with scripted speaker notes and executive takeaways.",
+    specs: "Slide Deck Outline · Scripted Speaker Notes · 10 – 35 slides",
+    footer: "Slide Deck Outline · Scripted Speaker Notes · 10 – 35 slides",
     usp: "Speaker Notes Scripting · Visual Layouts",
-    specs: "10 – 35 slides",
-    features: "Speaker Notes Scripting · Visual Layouts",
-    footer: "10 – 35 slides",
-    budget: "10 – 35 slides",
+    features: "Slide Deck Outline · Scripted Speaker Notes · 10 – 35 slides",
+    budget: "Slide Deck Outline · Scripted Speaker Notes · 10 – 35 slides",
   },
 ];
 
@@ -791,6 +796,17 @@ export default function ProjectListScreen({
   const [isGuideThinking, setIsGuideThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const guideInputRef = useRef<HTMLInputElement | null>(null);
+  const guideTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const guideFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+
+  // Auto-grow textarea logic for modern prompt bar
+  useEffect(() => {
+    if (guideTextareaRef.current) {
+      guideTextareaRef.current.style.height = "auto";
+      guideTextareaRef.current.style.height = `${Math.min(guideTextareaRef.current.scrollHeight, 208)}px`;
+    }
+  }, [guideInput]);
 
   const promptMatchingProjects = useMemo(() => {
     if (!projects || !guideInput.trim()) return [];
@@ -846,9 +862,16 @@ export default function ProjectListScreen({
     }
   }
 
-  async function handleSendGuideMessage(textToSend?: string) {
-    const query = (textToSend !== undefined ? textToSend : guideInput).trim();
-    if (!query) return;
+  async function handleSendGuideMessage(textToSend?: string, filesToSend?: File[]) {
+    const rawQuery = (textToSend !== undefined ? textToSend : guideInput).trim();
+    const currentFiles = filesToSend !== undefined ? filesToSend : attachedFiles;
+    if (!rawQuery && currentFiles.length === 0) return;
+
+    const filePrefix =
+      currentFiles.length > 0
+        ? `[Attached: ${currentFiles.map((f) => f.name).join(", ")}]\n\n`
+        : "";
+    const query = filePrefix + rawQuery;
 
     const userMsg: WebsiteAssistantMessage = {
       id: `user-${Date.now()}`,
@@ -859,6 +882,8 @@ export default function ProjectListScreen({
 
     setGuideMessages((prev) => [...prev, userMsg]);
     setGuideInput("");
+    setAttachedFiles([]);
+    if (guideTextareaRef.current) guideTextareaRef.current.style.height = "auto";
     setIsGuideThinking(true);
 
     try {
@@ -1631,7 +1656,7 @@ Keep your response concise, helpful, and academically grounded.`;
                           handleCreate(tile.id);
                         }}
                         disabled={isOtherBooting}
-                        className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-xs hover:shadow cursor-pointer flex flex-col justify-between h-56 text-left relative ${
+                        className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-xs hover:shadow cursor-pointer flex flex-col justify-between min-h-[16rem] h-64 text-left relative ${
                           isOtherBooting
                             ? "opacity-50 cursor-not-allowed"
                             : isBootingThis
@@ -1671,28 +1696,25 @@ Keep your response concise, helpful, and academically grounded.`;
                           </div>
                         </div>
 
-                        {/* Middle Content: Title & Scoped USP */}
-                        <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-center">
+                        {/* Middle Content: Title & Actionable Workflow Guidance */}
+                        <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-start">
                           <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
                             {tile.label}
                           </h3>
-                          <p className="text-[12px] leading-relaxed font-normal text-neutral-500 dark:text-neutral-400 mt-1.5 line-clamp-2">
-                            {uspParts.length === 2 ? (
-                              <>
-                                <span>{uspParts[0]}</span>
-                                <span className="mx-1 text-neutral-400 dark:text-neutral-500 opacity-60">·</span>
-                                <span>{uspParts[1]}</span>
-                              </>
-                            ) : (
-                              tile.usp
-                            )}
+                          <p className="text-[12px] leading-relaxed font-normal text-neutral-500 dark:text-neutral-400 mt-2 line-clamp-3">
+                            {tile.guidance}
                           </p>
                         </div>
 
-                        {/* Bottom Row: Divider & Spec Limit */}
-                        <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between gap-2 text-[12px] text-neutral-500 dark:text-neutral-400 font-sans">
+                        {/* Bottom Row: Divider & Actionable Deliverables Spec */}
+                        <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between gap-2 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans">
                           <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">
-                            {tile.specs || tile.footer}
+                            {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
+                              <React.Fragment key={idx}>
+                                {idx > 0 && <span className="mx-1 text-neutral-400 dark:text-neutral-500 opacity-60">·</span>}
+                                <span>{part}</span>
+                              </React.Fragment>
+                            ))}
                           </span>
                         </div>
 
@@ -1760,29 +1782,43 @@ Keep your response concise, helpful, and academically grounded.`;
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (guideInput.trim()) {
+                    if (guideInput.trim() || attachedFiles.length > 0) {
                       setIsPromptSuggestionsOpen(false);
                       setIsAiSidebarOpen(true);
-                      handleSendGuideMessage();
-                      setTimeout(() => guideInputRef.current?.focus(), 300);
+                      handleSendGuideMessage(guideInput, attachedFiles);
+                      setAttachedFiles([]);
+                      if (guideTextareaRef.current) guideTextareaRef.current.style.height = "auto";
                     }
                   }}
-                  className="flex items-center gap-3 w-full rounded-full bg-neutral-100/90 dark:bg-white/5 border border-neutral-200 dark:border-white/10 shadow-sm px-4 py-3 transition-all duration-200 focus-within:border-neutral-400 dark:focus-within:border-white/20 focus-within:shadow-sm"
+                  className="w-full max-w-4xl mx-auto rounded-2xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 p-3 shadow-sm focus-within:border-neutral-300 dark:focus-within:border-white/20 transition-all"
                 >
-                  {/* Left: Attachment / Plus button */}
-                  <button
-                    type="button"
-                    title="Attach file"
-                    aria-label="Attach file"
-                    className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
+                  {/* File Attachment Chips */}
+                  {attachedFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2 px-1">
+                      {attachedFiles.map((file, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/5 text-[12px] text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-white/5"
+                        >
+                          <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span className="max-w-[140px] truncate">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                            className="text-neutral-400 hover:text-neutral-600 dark:hover:text-white cursor-pointer ml-0.5"
+                            aria-label={`Remove ${file.name}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
-                  {/* Center: Transparent flexible input */}
-                  <input
-                    ref={guideInputRef}
-                    type="text"
+                  {/* Auto-growing Textarea */}
+                  <textarea
+                    ref={guideTextareaRef}
+                    rows={1}
                     value={guideInput}
                     onChange={(e) => {
                       setGuideInput(e.target.value);
@@ -1797,37 +1833,65 @@ Keep your response concise, helpful, and academically grounded.`;
                       }
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        if (guideInput.trim()) {
+                        if (guideInput.trim() || attachedFiles.length > 0) {
                           setIsPromptSuggestionsOpen(false);
                           setIsAiSidebarOpen(true);
-                          handleSendGuideMessage();
-                          setTimeout(() => guideInputRef.current?.focus(), 300);
+                          handleSendGuideMessage(guideInput, attachedFiles);
+                          setAttachedFiles([]);
+                          if (guideTextareaRef.current) guideTextareaRef.current.style.height = "auto";
                         }
                       }
                     }}
-                    placeholder="Draft a Research Proposal, analyze data, or search projects..."
+                    placeholder="Paste your assignment brief, research topic, or essay question..."
                     style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                    className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none prompt-bare-input"
+                    className="w-full bg-transparent text-[14px] text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none resize-none px-2 py-1 max-h-52 overflow-y-auto leading-relaxed prompt-bare-input"
                   />
 
-                  {/* Right: Solid circular submit button */}
-                  <button
-                    type="submit"
-                    title="Send"
-                    aria-label="Send message"
-                    disabled={!guideInput.trim() || isGuideThinking}
-                    className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
-                      guideInput.trim() && !isGuideThinking
-                        ? "bg-neutral-900 dark:bg-white text-white dark:text-gray-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-sm"
-                        : "bg-neutral-200 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-                    }`}
-                  >
-                    {isGuideThinking ? (
-                      <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <ArrowUp className="w-4 h-4 stroke-[2.5]" />
-                    )}
-                  </button>
+                  {/* Action Row */}
+                  <div className="flex items-center justify-between pt-2 px-1">
+                    <div>
+                      <input
+                        type="file"
+                        multiple
+                        ref={guideFileInputRef}
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            setAttachedFiles((prev) => [...prev, ...Array.from(e.target.files || [])]);
+                          }
+                        }}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.txt"
+                        aria-label="File upload"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => guideFileInputRef.current?.click()}
+                        className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                        title="Upload assignment brief or rubric (.pdf, .doc, .docx, .txt)"
+                        aria-label="Upload files"
+                      >
+                        <Paperclip className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={(!guideInput.trim() && attachedFiles.length === 0) || isGuideThinking}
+                      className={`p-2 rounded-xl transition-all duration-200 cursor-pointer flex items-center justify-center ${
+                        (guideInput.trim() || attachedFiles.length > 0) && !isGuideThinking
+                          ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-90 shadow-sm"
+                          : "bg-neutral-200 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed opacity-30"
+                      }`}
+                      title="Send message"
+                      aria-label="Send message"
+                    >
+                      {isGuideThinking ? (
+                        <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                      )}
+                    </button>
+                  </div>
                 </form>
 
                 {/* Instant Suggestions & Matching Projects Popover */}
@@ -2329,19 +2393,18 @@ function ChooseOutputType({
                       {tile.label}
                     </h3>
                     <p className="text-[12px] leading-relaxed font-normal text-neutral-500 dark:text-neutral-400 mt-1.5 line-clamp-2">
-                      {uspParts.length === 2 ? (
-                        <>
-                          <span>{uspParts[0]}</span>
-                          <span className="mx-1 text-neutral-400 dark:text-neutral-500 opacity-60">·</span>
-                          <span>{uspParts[1]}</span>
-                        </>
-                      ) : (
-                        tile.usp
-                      )}
+                      {tile.guidance || tile.usp}
                     </p>
                   </div>
                   <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between gap-2 text-[12px] text-neutral-500 dark:text-neutral-400 font-sans">
-                    <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">{tile.specs || tile.footer}</span>
+                    <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">
+                      {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
+                        <Fragment key={idx}>
+                          {idx > 0 && <span className="mx-1 text-neutral-400 dark:text-neutral-500 opacity-60">·</span>}
+                          <span>{part}</span>
+                        </Fragment>
+                      ))}
+                    </span>
                     <span className="font-semibold text-neutral-700 dark:text-neutral-300">Select</span>
                   </div>
                 </div>

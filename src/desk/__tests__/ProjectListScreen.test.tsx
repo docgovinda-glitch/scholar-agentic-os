@@ -166,7 +166,7 @@ describe("the search bar & delete confirmation modal", () => {
     expect(screen.getByPlaceholderText("Search projects...")).toBeInTheDocument();
 
     // Consolidated transparent AI prompt bar on main dashboard
-    const promptInput = screen.getByPlaceholderText(/Draft a Research Proposal, analyze data, or search projects.../i);
+    const promptInput = screen.getByPlaceholderText(/Paste your assignment brief, research topic, or essay question/i);
     expect(promptInput).toBeInTheDocument();
     expect(promptInput).toHaveClass("bg-transparent");
   });
@@ -454,7 +454,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
 
     // Consolidated transparent AI prompt bar immediately below cards
-    const promptBar = screen.getByPlaceholderText(/Draft a Research Proposal, analyze data, or search projects.../i);
+    const promptBar = screen.getByPlaceholderText(/Paste your assignment brief, research topic, or essay question/i);
     expect(promptBar).toBeInTheDocument();
 
     // Projects section, secondary search, and progress cards are purged from main canvas
@@ -548,7 +548,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(mainCanvas.className).not.toContain("bg-[var(--bg-canvas)]");
 
     // 2. Shared Container Alignment
-    const promptInput = screen.getByPlaceholderText(/Draft a Research Proposal, analyze data, or search projects/i);
+    const promptInput = screen.getByPlaceholderText(/Paste your assignment brief, research topic, or essay question/i);
     const promptForm = promptInput.closest("form")!;
     const promptContainer = promptForm.parentElement!;
     const sharedParent = promptContainer.parentElement!;
@@ -563,7 +563,7 @@ describe("landing workspace hero & academic workspace cards", () => {
 
     // 4. Shadow & Border Fix on prompt bar
     expect(promptForm.className).toContain("border-white/10");
-    expect(promptForm.className).toContain("bg-white/5");
+    expect(promptForm.className).toContain("dark:bg-[#1C1C1E]");
     expect(promptForm.className).toContain("shadow-sm");
     expect(promptForm.className).not.toContain("shadow-lg");
     expect(promptForm.className).not.toContain("shadow-xl");
@@ -905,32 +905,44 @@ describe("ghost project deletion & strict unique project naming", () => {
 });
 
 describe("distinct academic format USPs & specs", () => {
-  it("renders distinct 2-part USPs and spec limits for all 4 academic formats on the dashboard", async () => {
+  it("renders step-by-step workflow guidance and academic deliverables for all 4 academic formats on the dashboard", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     // 1. Coursework & Essays
     expect(screen.getByRole("heading", { name: "Coursework & Essays" })).toBeInTheDocument();
-    expect(screen.getByText("Marking Rubric Alignment")).toBeInTheDocument();
-    expect(screen.getByText("Argument Synthesis")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Guides you through thesis formulation, marking rubric alignment, critical argument synthesis, and citation formatting\./i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("Structured Outline")).toBeInTheDocument();
+    expect(screen.getByText("Rubric Matched")).toBeInTheDocument();
     expect(screen.getByText("800 – 4,000 words")).toBeInTheDocument();
 
     // 2. Journal Article
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
-    expect(screen.getByText("Peer-Review Standard")).toBeInTheDocument();
-    expect(screen.getByText("IMRaD Methodology")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Structures formal IMRaD manuscripts with deep literature synthesis, methodology validation, and peer-review readiness\./i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("IMRaD Architecture")).toBeInTheDocument();
+    expect(screen.getByText("Peer Review")).toBeInTheDocument();
     expect(screen.getByText("4,000 – 10,000 words")).toBeInTheDocument();
 
     // 3. Research Proposal
     expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
-    expect(screen.getByText("Literature Gap Analysis")).toBeInTheDocument();
-    expect(screen.getByText("Ethical Frameworks")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Guides research question definition, literature gap identification, theoretical frameworks, and methodology design\./i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("Gap Analysis")).toBeInTheDocument();
+    expect(screen.getByText("Ethics & Methodology")).toBeInTheDocument();
     expect(screen.getByText("3,000 – 15,000 words")).toBeInTheDocument();
 
     // 4. Slides & Keynotes
     expect(screen.getByRole("heading", { name: "Slides & Keynotes" })).toBeInTheDocument();
-    expect(screen.getByText("Speaker Notes Scripting")).toBeInTheDocument();
-    expect(screen.getByText("Visual Layouts")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Converts academic papers into visual presentation slides with scripted speaker notes and executive takeaways\./i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("Slide Deck Outline")).toBeInTheDocument();
+    expect(screen.getByText("Scripted Speaker Notes")).toBeInTheDocument();
     expect(screen.getByText("10 – 35 slides")).toBeInTheDocument();
   });
 
@@ -943,6 +955,51 @@ describe("distinct academic format USPs & specs", () => {
     const dot = card.querySelector(".opacity-60");
     expect(dot).toBeInTheDocument();
     expect(dot?.textContent).toBe("·");
+  });
+
+  it("does not render pen, pencil, or edit icons on dashboard cards", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const essayHeading = screen.getByRole("heading", { name: "Coursework & Essays" });
+    const card = essayHeading.closest("button")!;
+    expect(card.querySelector(".lucide-pencil")).toBeNull();
+    expect(card.querySelector(".lucide-edit")).toBeNull();
+  });
+
+  it("supports auto-expanding prompt bar with file upload, chips, and keyboard submit", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const promptTextarea = screen.getByPlaceholderText(/Paste your assignment brief, research topic, or essay question/i) as HTMLTextAreaElement;
+    expect(promptTextarea).toBeInTheDocument();
+
+    // Paperclip button & file input
+    const uploadBtn = screen.getByRole("button", { name: /Upload files/i });
+    expect(uploadBtn).toBeInTheDocument();
+    const fileInput = screen.getByLabelText("File upload") as HTMLInputElement;
+    expect(fileInput).toBeInTheDocument();
+    expect(fileInput.accept).toBe(".pdf,.doc,.docx,.txt");
+
+    // Simulate file attachment
+    const testFile = new File(["syllabus content"], "syllabus_brief.pdf", { type: "application/pdf" });
+    fireEvent.change(fileInput, { target: { files: [testFile] } });
+
+    // Expect attachment chip to appear
+    const chip = await screen.findByText("syllabus_brief.pdf");
+    expect(chip).toBeInTheDocument();
+
+    // Remove chip button
+    const removeBtn = screen.getByRole("button", { name: /Remove syllabus_brief.pdf/i });
+    expect(removeBtn).toBeInTheDocument();
+    fireEvent.click(removeBtn);
+    expect(screen.queryByText("syllabus_brief.pdf")).not.toBeInTheDocument();
+
+    // Type into textarea and submit with Enter
+    fireEvent.change(promptTextarea, { target: { value: "Investigate CRISPR off-target effects" } });
+    fireEvent.keyDown(promptTextarea, { key: "Enter", shiftKey: false });
+    // Textarea clears on send
+    expect(promptTextarea.value).toBe("");
   });
 });
 

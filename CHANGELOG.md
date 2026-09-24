@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-24
 
+### Added & Refactored (Actionable Template Card Guidance, Pen Icon Removal & ChatGPT/Gemini-Style Prompt Bar)
+- **Removal of Pen/Edit Icons (`src/desk/regions/Header.tsx`, `src/desk/ProjectListScreen.tsx`)**:
+  - Removed decorative pencil/edit SVG icon buttons from workspace header and action areas, focusing user attention directly on readable titles and clean, distinct category glyphs.
+  - Turned the project title in `Header.tsx` into a direct, accessible click-to-rename target with underline hover cues.
+- **Actionable Template Card Workflow Guidance (`src/desk/ProjectListScreen.tsx`)**:
+  - Replaced isolated raw word counts with rich, step-by-step workflow guidance micro-copy and comprehensive academic deliverable specs across all 4 template cards:
+    1. **Coursework & Essays:** "Guides you through thesis formulation, marking rubric alignment, critical argument synthesis, and citation formatting." · `Structured Outline · Rubric Matched · 800 – 4,000 words`.
+    2. **Journal Article:** "Structures formal IMRaD manuscripts with deep literature synthesis, methodology validation, and peer-review readiness." · `IMRaD Architecture · Peer Review · 4,000 – 10,000 words`.
+    3. **Research Proposal:** "Guides research question definition, literature gap identification, theoretical frameworks, and methodology design." · `Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words`.
+    4. **Slides & Keynotes:** "Converts academic papers into visual presentation slides with scripted speaker notes and executive takeaways." · `Slide Deck Outline · Scripted Speaker Notes · 10 – 35 slides`.
+  - Pinned 3-part deliverable specs to card footers with centered middle-dot separators (`opacity-60`).
+- **Dynamic ChatGPT/Gemini-Style Auto-Expanding Prompt Bar (`src/desk/ProjectListScreen.tsx`)**:
+  - Replaced single-line input with an auto-resizing textarea that expands dynamically from ~48px up to `max-h-52` (~200px) with smooth scrolling.
+  - Implemented standard conversational AI keyboard interactions (`Enter` submits query/files, `Shift + Enter` inserts multiline breaks).
+  - Integrated file attachment capabilities with a bottom-left `Paperclip` button connected to a hidden file input accepting `.pdf,.doc,.docx,.txt`.
+  - Rendered dismissible chip/pill previews with file name, `FileText` icon, and remove `X` button.
+  - Aligned prompt bar outer container flush with the 4-card template grid (`max-w-4xl mx-auto`).
+- **Test Suite Updates (`src/desk/__tests__/ProjectListScreen.test.tsx`)**:
+  - Updated all dashboard prompt bar placeholder assertions and dark mode styling.
+  - Added unit tests for actionable workflow guidance, 3-part deliverable specs, absence of pen/pencil icons, and full prompt bar file attachment/removal/keyboard submit flows.
+
 ### Added & Refactored (Distinct Academic Template USPs & Spec Limits)
 - **Distinct Academic Template USPs (`src/desk/ProjectListScreen.tsx`, `src/desk/__tests__/ProjectListScreen.test.tsx`)**:
   - Integrated tailored, Apple/Airbnb-style 2-part USP micro-copy and clean spec limits across all 4 main dashboard template cards and the format selection modal:
