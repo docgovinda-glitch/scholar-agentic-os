@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-24
 
+### Added & Refactored (Bottom-Anchored Dashboard Layout: ChatGPT & Google Gemini Architecture)
+- **Bottom-Anchored Viewport Structure (`src/desk/ProjectListScreen.tsx`)**:
+  - Restructured main page wrapper into a full-height flex column (`h-screen overflow-hidden`) with a scrollable center viewport and a bottom-docked prompt interaction area, matching the layout architecture of ChatGPT and Google Gemini.
+  - Placed the 4 academic workspace template cards gracefully in the center scrollable viewport with a subtle workspace welcome header (`"Where will your research begin?"` and `"Select an academic deliverable or paste your assignment guidelines below."`).
+  - Docked the unified prompt container toward the bottom with an Apple-style upward gradient fade (`bg-gradient-to-t from-white via-white to-transparent dark:from-[#171717] dark:via-[#171717] dark:to-transparent`), pinned `max-w-4xl mx-auto` horizontal container alignment, and institutional rubric verification disclaimer footer (`"Scholar Core Socratic Engine · Verify citations against official institutional rubrics."`).
+- **Test Suite Alignment (`src/desk/__tests__/ProjectListScreen.test.tsx`)**:
+  - Updated main container layout assertions to test `overflow-hidden` and `scholar-scrollbar`.
+  - Added test verifications for the centered workspace heading, subheading, bottom-docked prompt container parent alignment (`items-center max-w-4xl mx-auto`), and disclaimer footer.
+
 ### Added & Refactored (Unified Prompt Bar: Drag-and-Drop, Clipboard Paste, Strict Alignment & De-duplication)
 - **De-duplication & Clean Dashboard Layout (`src/desk/ProjectListScreen.tsx`)**:
   - Removed duplicate "ASK & ACTIONS" secondary card and matching projects popover below the prompt bar, establishing the prompt bar as the sole interaction point on the dashboard.

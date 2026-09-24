@@ -349,7 +349,7 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     expect(aside).toHaveClass("flex-shrink-0");
     // custom agentic scrollbar and scroll container on main
     expect(main).toHaveClass("scholar-scrollbar");
-    expect(main).toHaveClass("overflow-y-auto");
+    expect(main).toHaveClass("overflow-hidden");
 
     // Click toggle button in the top-left of the main header to collapse
     const toggleBtn = screen.getByRole("button", { name: "Toggle sidebar" });
@@ -538,7 +538,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(presentationCard.innerHTML).toContain("dark:bg-teal-500/10");
   });
 
-  it("enforces shared max-w-4xl container, mt-10 gap, flat border-white/10 styling, w-full input, and dark canvas", async () => {
+  it("enforces shared max-w-4xl container, bottom-anchored prompt container, flat border-white/10 styling, w-full input, and dark canvas", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
@@ -547,7 +547,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(mainCanvas.className).toContain("bg-[#171717]");
     expect(mainCanvas.className).not.toContain("bg-[var(--bg-canvas)]");
 
-    // 2. Shared Container Alignment
+    // 2. Shared Container Alignment & Bottom Docking
     const promptInput = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i);
     const promptForm = promptInput.closest("form")!;
     const sharedParent = promptForm.parentElement!;
@@ -556,9 +556,14 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(sharedParent.className).toContain("max-w-4xl");
     expect(sharedParent.className).toContain("mx-auto");
     expect(sharedParent.className).toContain("flex-col");
-    expect(sharedParent.className).toContain("gap-6");
+    expect(sharedParent.className).toContain("items-center");
 
-    // 3. Shadow & Border Fix on prompt bar
+    // 3. Welcome workspace heading and disclaimer footer
+    expect(screen.getByRole("heading", { name: "Where will your research begin?" })).toBeInTheDocument();
+    expect(screen.getByText("Select an academic deliverable or paste your assignment guidelines below.")).toBeInTheDocument();
+    expect(screen.getByText("Scholar Core Socratic Engine · Verify citations against official institutional rubrics.")).toBeInTheDocument();
+
+    // 4. Shadow & Border Fix on prompt bar
     expect(promptForm.className).toContain("border-neutral-200");
     expect(promptForm.className).toContain("dark:border-white/10");
     expect(promptForm.className).toContain("dark:bg-[#1C1C1E]");
@@ -567,7 +572,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(promptForm.className).not.toContain("shadow-xl");
     expect(promptForm.className).not.toContain("drop-shadow");
 
-    // 4. Input width w-full
+    // 5. Input width w-full
     expect(promptInput.className).toContain("w-full");
   });
 });

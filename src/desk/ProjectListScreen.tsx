@@ -1533,9 +1533,9 @@ Keep your response concise, helpful, and academically grounded.`;
       </aside>
 
       {/* Main Content Area (Center Pane) */}
-      <main className="flex-1 h-full overflow-y-auto bg-[#FAFAFA] dark:bg-[#171717] text-neutral-900 dark:text-white scholar-scrollbar relative flex flex-col transition-all duration-300 ease-in-out">
+      <main className="flex-1 flex flex-col h-screen w-full bg-white dark:bg-[#171717] overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out">
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
-        <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-[#FAFAFA]/85 dark:bg-[#171717]/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10">
+        <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-white/85 dark:bg-[#171717]/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
           <div className="flex items-center gap-3">
             {/* Mobile Drawer Trigger Button */}
             <button
@@ -1632,321 +1632,344 @@ Keep your response concise, helpful, and academically grounded.`;
               onSectionChange={onAiAccessSectionChange}
             />
           </div>
+        ) : choosing ? (
+          <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-y-auto scholar-scrollbar">
+            <div className="w-full max-w-4xl my-auto py-6">
+              <ChooseOutputType
+                types={types}
+                creating={creating}
+                onPick={handleCreate}
+                onCancel={() => setChoosing(false)}
+              />
+            </div>
+          </div>
         ) : (
-          /* Centered Reading Column */
-          <div className="max-w-4xl mx-auto px-6 pt-8 pb-28 w-full flex-1">
-          {/* Onboarding welcome banner */}
-          {welcomeVisible && (
-            <div
-              role="status"
-              className="mb-8 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] p-5 flex items-start justify-between gap-4 shadow-sm"
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-gray-100 text-neutral-900 dark:text-gray-900 flex items-center justify-center flex-shrink-0 shadow-xs">
-                  <ScholarCoreLogo size="sm" className="text-neutral-900 dark:text-gray-900" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-neutral-900 dark:text-gray-100 font-sans">Welcome to your Scholar Workspace</p>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 font-normal leading-relaxed font-sans">
-                    Select an academic workspace to begin, or upload reference PDFs to your Vault.
-                  </p>
-                </div>
-              </div>
-              <button
-                aria-label="Dismiss"
-                onClick={() => setWelcomeVisible(false)}
-                className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-700 dark:hover:text-gray-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          )}
-
-          {/* Error Alert */}
-          {error && (
-            <div className="mb-8 rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-3.5 text-red-400 text-xs font-medium flex items-center gap-3">
-              <svg className="w-4 h-4 flex-shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <span className="font-semibold font-sans">{error}</span>
-            </div>
-          )}
-
-          {choosing ? (
-            <ChooseOutputType
-              types={types}
-              creating={creating}
-              onPick={handleCreate}
-              onCancel={() => setChoosing(false)}
-            />
-          ) : (
-            <div className="w-full max-w-4xl mx-auto flex flex-col gap-6">
-              {/* 4 Academic Workspace Cards Grid */}
-              <div className="w-full">
-                <div className={`grid w-full gap-4 transition-all duration-300 ${
-                  isAiSidebarOpen
-                    ? "grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4"
-                    : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
-                }`}>
-                  {FORMAT_TILES.map((tile) => {
-                    const isBootingThis = creatingFormatId === tile.id;
-                    const isOtherBooting = creating && !isBootingThis;
-                    const tileTheme = getFormatTileTheme(tile.id);
-                    const uspParts = tile.usp ? tile.usp.split(" · ") : [];
-                    return (
-                      <button
-                        key={tile.id}
-                        type="button"
-                        onClick={() => {
-                          if (creating) return;
-                          if (!userEmail) {
-                            openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
-                            return;
-                          }
-                          handleCreate(tile.id);
-                        }}
-                        disabled={isOtherBooting}
-                        className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-xs hover:shadow cursor-pointer flex flex-col justify-between min-h-[16rem] h-64 text-left relative ${
-                          isOtherBooting
-                            ? "opacity-50 cursor-not-allowed"
-                            : isBootingThis
-                            ? "ring-2 ring-neutral-400 dark:ring-white/20 cursor-wait"
-                            : ""
-                        }`}
-                      >
-                        {/* Top Row: Icon & Info indicator */}
-                        <div className="flex items-center justify-between w-full">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
-                            {isBootingThis ? (
-                              <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <FormatIcon id={tile.id} className="w-4 h-4" />
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.stopPropagation();
-                                  setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
-                                }
-                              }}
-                              className="w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-serif italic font-bold"
-                              title="View methodology & stages blueprint"
-                              aria-label={`View stages blueprint for ${tile.label}`}
-                            >
-                              i
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Middle Content: Title & Actionable Workflow Guidance */}
-                        <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-start">
-                          <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
-                            {tile.label}
-                          </h3>
-                          <p className="text-[12px] leading-relaxed font-normal text-neutral-500 dark:text-neutral-400 mt-2 line-clamp-3">
-                            {tile.guidance}
-                          </p>
-                        </div>
-
-                        {/* Bottom Row: Divider & Actionable Deliverables Spec */}
-                        <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between gap-2 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans">
-                          <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">
-                            {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
-                              <React.Fragment key={idx}>
-                                {idx > 0 && <span className="mx-1 text-neutral-400 dark:text-neutral-500 opacity-60">·</span>}
-                                <span>{part}</span>
-                              </React.Fragment>
-                            ))}
-                          </span>
-                        </div>
-
-                        {/* Interactive Stages & Methodology Blueprint Overlay */}
-                        {previewFormatId === tile.id && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute inset-0 bg-white dark:bg-[#1C1C1E] rounded-2xl p-4 z-20 flex flex-col justify-between border border-neutral-200 dark:border-white/10 shadow-xl animate-in fade-in zoom-in-95 duration-150 text-left"
-                          >
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <span className={`text-[11px] font-bold uppercase tracking-wider ${tileTheme.accentText}`}>
-                                  {tile.label} • Blueprint
-                                </span>
-                                <span
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={() => setPreviewFormatId(null)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") setPreviewFormatId(null);
-                                  }}
-                                  className="w-5 h-5 rounded-full flex items-center justify-center text-gray-400 hover:text-white cursor-pointer"
-                                  aria-label="Close preview"
-                                >
-                                  ✕
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-neutral-400 mb-2 leading-tight">
-                                {STAGE_BREAKDOWNS[tile.id]?.highlights}
-                              </p>
-                              <div className="space-y-1">
-                                {STAGE_BREAKDOWNS[tile.id]?.phases.map((ph, phIdx) => (
-                                  <div key={phIdx} className="text-[11px] font-medium text-neutral-200 flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                                    <span className="truncate">{ph}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="pt-2 border-t border-white/10 flex items-center justify-between">
-                              <span className="text-[10px] text-slate-400">{tile.budget}</span>
-                              <span
-                                onClick={() => {
-                                  if (!userEmail) {
-                                    openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
-                                    return;
-                                  }
-                                  handleCreate(tile.id);
-                                }}
-                                className="text-[11px] font-bold text-blue-400 hover:underline cursor-pointer"
-                              >
-                                Boot Workspace →
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Main AI Prompt Bar — Consolidated immediately below 4 template cards */}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSubmitPrompt();
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragging(true);
-                }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setIsDragging(false);
-                  if (e.dataTransfer.files?.length) {
-                    addFiles(Array.from(e.dataTransfer.files));
-                  }
-                }}
-                className={`relative w-full rounded-2xl bg-white dark:bg-[#1C1C1E] border transition-all duration-200 shadow-sm ${
-                  isDragging
-                    ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/5"
-                    : "border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/20"
-                }`}
-              >
-                {/* File Previews */}
-                {attachments.length > 0 && (
-                  <div className="flex flex-wrap gap-2 p-3 pb-0">
-                    {attachments.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="relative group flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-[12px]"
-                      >
-                        {item.previewUrl ? (
-                          <img src={item.previewUrl} alt="preview" className="w-5 h-5 object-cover rounded" />
-                        ) : (
-                          <FileText className="w-4 h-4 text-neutral-500 flex-shrink-0" />
-                        )}
-                        <span className="max-w-[130px] truncate text-neutral-800 dark:text-neutral-200 font-medium">
-                          {item.file.name}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeAttachment(idx)}
-                          className="text-neutral-400 hover:text-neutral-700 dark:hover:text-white transition-colors ml-1 cursor-pointer"
-                          aria-label={`Remove ${item.file.name}`}
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+          <>
+            {/* Scrollable / Flexible Center Area */}
+            <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-y-auto scholar-scrollbar">
+              <div className="w-full max-w-4xl flex flex-col items-center gap-6 my-auto pb-4">
+                {/* Onboarding welcome banner */}
+                {welcomeVisible && (
+                  <div
+                    role="status"
+                    className="w-full rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] p-5 flex items-start justify-between gap-4 shadow-sm"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-gray-100 text-neutral-900 dark:text-gray-900 flex items-center justify-center flex-shrink-0 shadow-xs">
+                        <ScholarCoreLogo size="sm" className="text-neutral-900 dark:text-gray-900" />
                       </div>
-                    ))}
+                      <div>
+                        <p className="text-sm font-bold text-neutral-900 dark:text-gray-100 font-sans">Welcome to your Scholar Workspace</p>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 font-normal leading-relaxed font-sans">
+                          Select an academic workspace to begin, or upload reference PDFs to your Vault.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      aria-label="Dismiss"
+                      onClick={() => setWelcomeVisible(false)}
+                      className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-700 dark:hover:text-gray-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
                 )}
 
-                {/* Auto-expanding Input Area */}
-                <textarea
-                  ref={guideTextareaRef}
-                  rows={1}
-                  value={guideInput}
-                  onChange={(e) => setGuideInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  onPaste={handlePaste}
-                  placeholder="Paste text, drop files/images, or draft research instructions..."
-                  style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                  className="w-full bg-transparent px-4 pt-3.5 pb-2 text-[14px] text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none resize-none max-h-[220px] overflow-y-auto leading-relaxed prompt-bare-input"
-                />
-
-                {/* Bottom Controls Bar */}
-                <div className="flex items-center justify-between px-3 pb-3 pt-1">
-                  <div className="relative group">
-                    <input
-                      type="file"
-                      multiple
-                      ref={guideFileInputRef}
-                      onChange={(e) => {
-                        if (e.target.files) {
-                          addFiles(Array.from(e.target.files));
-                        }
-                      }}
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.txt,image/*"
-                      aria-label="File upload"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => guideFileInputRef.current?.click()}
-                      className="p-2 rounded-xl text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                      aria-label="Attach files or images"
-                    >
-                      <Paperclip className="w-4 h-4" />
-                    </button>
-                    <span className="hidden group-hover:block absolute bottom-full mb-2 left-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
-                      Upload files or images (.pdf, .docx, images)
-                    </span>
+                {/* Error Alert */}
+                {error && (
+                  <div className="w-full rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-3.5 text-red-400 text-xs font-medium flex items-center gap-3">
+                    <svg className="w-4 h-4 flex-shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span className="font-semibold font-sans">{error}</span>
                   </div>
+                )}
 
-                  <div className="relative group">
-                    <button
-                      type="submit"
-                      disabled={(!guideInput.trim() && attachments.length === 0) || isGuideThinking}
-                      className="p-2 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 disabled:opacity-25 disabled:cursor-not-allowed hover:opacity-90 transition-all cursor-pointer flex items-center justify-center"
-                      aria-label="Send message"
-                    >
-                      {isGuideThinking ? (
-                        <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <ArrowUp className="w-4 h-4 stroke-[2.5]" />
-                      )}
-                    </button>
-                    <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
-                      Send message (Enter)
-                    </span>
+                {/* Subtle Welcome / Workspace Heading */}
+                <div className="text-center mb-2">
+                  <h1 className="text-2xl font-semibold text-neutral-900 dark:text-white tracking-tight">
+                    Where will your research begin?
+                  </h1>
+                  <p className="text-[13px] text-neutral-500 mt-1">
+                    Select an academic deliverable or paste your assignment guidelines below.
+                  </p>
+                </div>
+
+                {/* 4-Card Template Grid (Resting gracefully above the bottom input) */}
+                <div className="w-full">
+                  <div className={`grid w-full gap-4 transition-all duration-300 ${
+                    isAiSidebarOpen
+                      ? "grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4"
+                      : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+                  }`}>
+                    {FORMAT_TILES.map((tile) => {
+                      const isBootingThis = creatingFormatId === tile.id;
+                      const isOtherBooting = creating && !isBootingThis;
+                      const tileTheme = getFormatTileTheme(tile.id);
+                      return (
+                        <button
+                          key={tile.id}
+                          type="button"
+                          onClick={() => {
+                            if (creating) return;
+                            if (!userEmail) {
+                              openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
+                              return;
+                            }
+                            handleCreate(tile.id);
+                          }}
+                          disabled={isOtherBooting}
+                          className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-xs hover:shadow cursor-pointer flex flex-col justify-between min-h-[16rem] h-64 text-left relative ${
+                            isOtherBooting
+                              ? "opacity-50 cursor-not-allowed"
+                              : isBootingThis
+                              ? "ring-2 ring-neutral-400 dark:ring-white/20 cursor-wait"
+                              : ""
+                          }`}
+                        >
+                          {/* Top Row: Icon & Info indicator */}
+                          <div className="flex items-center justify-between w-full">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
+                              {isBootingThis ? (
+                                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <FormatIcon id={tile.id} className="w-4 h-4" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.stopPropagation();
+                                    setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
+                                  }
+                                }}
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-serif italic font-bold"
+                                title="View methodology & stages blueprint"
+                                aria-label={`View stages blueprint for ${tile.label}`}
+                              >
+                                i
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Middle Content: Title & Actionable Workflow Guidance */}
+                          <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-start">
+                            <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
+                              {tile.label}
+                            </h3>
+                            <p className="text-[12px] leading-relaxed font-normal text-neutral-500 dark:text-neutral-400 mt-2 line-clamp-3">
+                              {tile.guidance}
+                            </p>
+                          </div>
+
+                          {/* Bottom Row: Divider & Actionable Deliverables Spec */}
+                          <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between gap-2 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans">
+                            <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">
+                              {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
+                                <React.Fragment key={idx}>
+                                  {idx > 0 && <span className="mx-1 text-neutral-400 dark:text-neutral-500 opacity-60">·</span>}
+                                  <span>{part}</span>
+                                </React.Fragment>
+                              ))}
+                            </span>
+                          </div>
+
+                          {/* Interactive Stages & Methodology Blueprint Overlay */}
+                          {previewFormatId === tile.id && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute inset-0 bg-white dark:bg-[#1C1C1E] rounded-2xl p-4 z-20 flex flex-col justify-between border border-neutral-200 dark:border-white/10 shadow-xl animate-in fade-in zoom-in-95 duration-150 text-left"
+                            >
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className={`text-[11px] font-bold uppercase tracking-wider ${tileTheme.accentText}`}>
+                                    {tile.label} • Blueprint
+                                  </span>
+                                  <span
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => setPreviewFormatId(null)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" || e.key === " ") setPreviewFormatId(null);
+                                    }}
+                                    className="w-5 h-5 rounded-full flex items-center justify-center text-gray-400 hover:text-white cursor-pointer"
+                                    aria-label="Close preview"
+                                  >
+                                    ✕
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-neutral-400 mb-2 leading-tight">
+                                  {STAGE_BREAKDOWNS[tile.id]?.highlights}
+                                </p>
+                                <div className="space-y-1">
+                                  {STAGE_BREAKDOWNS[tile.id]?.phases.map((ph, phIdx) => (
+                                    <div key={phIdx} className="text-[11px] font-medium text-neutral-200 flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                                      <span className="truncate">{ph}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+                                <span className="text-[10px] text-slate-400">{tile.budget}</span>
+                                <span
+                                  onClick={() => {
+                                    if (!userEmail) {
+                                      openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
+                                      return;
+                                    }
+                                    handleCreate(tile.id);
+                                  }}
+                                  className="text-[11px] font-bold text-blue-400 hover:underline cursor-pointer"
+                                >
+                                  Boot Workspace →
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              </form>
+              </div>
             </div>
-          )}
-        </div>
-      )}
+
+            {/* Bottom Docked Input Area (Gemini / ChatGPT Style) */}
+            <div className="w-full pb-6 pt-2 px-4 bg-gradient-to-t from-white via-white to-transparent dark:from-[#171717] dark:via-[#171717] dark:to-transparent shrink-0">
+              <div className="w-full max-w-4xl mx-auto flex flex-col items-center">
+                {/* Main AI Prompt Bar */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSubmitPrompt();
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    if (e.dataTransfer.files?.length) {
+                      addFiles(Array.from(e.dataTransfer.files));
+                    }
+                  }}
+                  className={`relative w-full rounded-2xl bg-white dark:bg-[#1C1C1E] border transition-all duration-200 shadow-sm ${
+                    isDragging
+                      ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/5"
+                      : "border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/20"
+                  }`}
+                >
+                  {/* File Previews */}
+                  {attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 p-3 pb-0">
+                      {attachments.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="relative group flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-[12px]"
+                        >
+                          {item.previewUrl ? (
+                            <img src={item.previewUrl} alt="preview" className="w-5 h-5 object-cover rounded" />
+                          ) : (
+                            <FileText className="w-4 h-4 text-neutral-500 flex-shrink-0" />
+                          )}
+                          <span className="max-w-[130px] truncate text-neutral-800 dark:text-neutral-200 font-medium">
+                            {item.file.name}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeAttachment(idx)}
+                            className="text-neutral-400 hover:text-neutral-700 dark:hover:text-white transition-colors ml-1 cursor-pointer"
+                            aria-label={`Remove ${item.file.name}`}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Auto-expanding Input Area */}
+                  <textarea
+                    ref={guideTextareaRef}
+                    rows={1}
+                    value={guideInput}
+                    onChange={(e) => setGuideInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onPaste={handlePaste}
+                    placeholder="Paste text, drop files/images, or draft research instructions..."
+                    style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
+                    className="w-full bg-transparent px-4 pt-3.5 pb-2 text-[14px] text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none resize-none max-h-[220px] overflow-y-auto leading-relaxed prompt-bare-input"
+                  />
+
+                  {/* Bottom Controls Bar */}
+                  <div className="flex items-center justify-between px-3 pb-3 pt-1">
+                    <div className="relative group">
+                      <input
+                        type="file"
+                        multiple
+                        ref={guideFileInputRef}
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            addFiles(Array.from(e.target.files));
+                          }
+                        }}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.txt,image/*"
+                        aria-label="File upload"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => guideFileInputRef.current?.click()}
+                        className="p-2 rounded-xl text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                        aria-label="Attach files or images"
+                      >
+                        <Paperclip className="w-4 h-4" />
+                      </button>
+                      <span className="hidden group-hover:block absolute bottom-full mb-2 left-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
+                        Upload files or images (.pdf, .docx, images)
+                      </span>
+                    </div>
+
+                    <div className="relative group">
+                      <button
+                        type="submit"
+                        disabled={(!guideInput.trim() && attachments.length === 0) || isGuideThinking}
+                        className="p-2 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 disabled:opacity-25 disabled:cursor-not-allowed hover:opacity-90 transition-all cursor-pointer flex items-center justify-center"
+                        aria-label="Send message"
+                      >
+                        {isGuideThinking ? (
+                          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                        )}
+                      </button>
+                      <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
+                        Send message (Enter)
+                      </span>
+                    </div>
+                  </div>
+                </form>
+
+                {/* Disclaimer Footer */}
+                <p className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-2 text-center">
+                  Scholar Core Socratic Engine · Verify citations against official institutional rubrics.
+                </p>
+              </div>
+            </div>
+          </>
+        )}
       </main>
 
       {/* Secondary View (Right Panel): Module 3.2 AI Assistant Sidebar (w-96) */}
