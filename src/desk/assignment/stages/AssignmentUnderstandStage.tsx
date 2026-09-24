@@ -32,6 +32,7 @@ export default function AssignmentUnderstandStage() {
     analysis,
     setAnalysis,
     advanceStage,
+    ensurePersisted,
   } = useAssignmentWorkspace();
 
   const courseName = project?.answers?.["course_name"] || "";
@@ -84,7 +85,8 @@ export default function AssignmentUnderstandStage() {
     });
 
     try {
-      const response = await authedJsonFetch(`/api/projects/${projectId}/assignment/analyze`, "POST", {
+      const targetProjectId = await ensurePersisted();
+      const response = await authedJsonFetch(`/api/projects/${targetProjectId}/assignment/analyze`, "POST", {
         question: localQuestion,
         assignmentType: localType,
         academicLevel: localLevel,
@@ -125,7 +127,8 @@ export default function AssignmentUnderstandStage() {
     formData.append("file", file);
 
     try {
-      const res = await authedFetch(`/api/projects/${projectId}/parse-file`, {
+      const targetProjectId = await ensurePersisted();
+      const res = await authedFetch(`/api/projects/${targetProjectId}/parse-file`, {
         method: "POST",
         body: formData,
       });

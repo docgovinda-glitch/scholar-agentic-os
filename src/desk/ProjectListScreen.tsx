@@ -907,19 +907,25 @@ Keep your response concise, helpful, and academically grounded.`;
           alert(`A project with the name "${trimmed}" already exists. Please choose a unique name.`);
           return;
         }
-        saveIntakeAnswers(item.projectId, { title: trimmed })
-          .then(() => {
-            setProjects((curr) =>
-              curr
-                ? curr.map((p) =>
-                    p.projectId === item.projectId
-                      ? { ...p, answers: { ...p.answers, title: trimmed } }
-                      : p
-                  )
-                : []
-            );
-          })
-          .catch(() => {});
+        // Optimistic UI for Recents: update local React state instantly for a snappy UX
+        const previousProjects = projects;
+        setProjects((curr) =>
+          curr
+            ? curr.map((p) =>
+                p.projectId === item.projectId
+                  ? { ...p, answers: { ...p.answers, title: trimmed } }
+                  : p
+              )
+            : []
+        );
+
+        // Handle backend database operations asynchronously in the background
+        saveIntakeAnswers(item.projectId, { title: trimmed }).catch((err) => {
+          console.error("Failed to rename project:", err);
+          // Rollback on failure
+          setProjects(previousProjects);
+          setError((err as Error).message || "Failed to rename project. Please try again.");
+        });
       }
     } else if (action === "add-to-project") {
       if (item.projectId) {
@@ -1565,9 +1571,6 @@ Keep your response concise, helpful, and academically grounded.`;
                           <h3 className="text-base font-bold tracking-tight text-neutral-100 leading-snug">
                             {tile.label}
                           </h3>
-                          <p className="text-[11px] sm:text-xs text-neutral-400 font-normal truncate mt-1">
-                            {tile.features}
-                          </p>
                         </div>
                         <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2 text-xs text-neutral-400 font-sans">
                           <span className="font-medium text-neutral-400 truncate">{tile.footer}</span>
@@ -2204,9 +2207,6 @@ function ChooseOutputType({
                     <h3 className="text-base font-bold tracking-tight text-neutral-100 leading-snug">
                       {tile.label}
                     </h3>
-                    <p className="text-[11px] sm:text-xs text-neutral-400 font-normal truncate mt-1">
-                      {tile.features}
-                    </p>
                   </div>
                   <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2 text-xs text-neutral-400 font-sans">
                     <span className="font-medium text-neutral-400 truncate">{tile.footer}</span>

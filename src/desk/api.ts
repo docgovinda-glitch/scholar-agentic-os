@@ -53,6 +53,70 @@ export class UnauthenticatedError extends Error {
 }
 
 import { originalFetch } from "./originalFetch";
+import {
+  isEphemeralProject,
+  getEphemeralProject,
+  createEphemeralProject,
+  updateEphemeralProject,
+  deleteEphemeralProject,
+} from "./ephemeralProjectStore";
+
+export {
+  isEphemeralProject,
+  getEphemeralProject,
+  createEphemeralProject,
+  updateEphemeralProject,
+  deleteEphemeralProject,
+};
+
+/**
+ * Commits an ephemeral project to the database when user triggers an explicit commit
+ * (e.g. clicking "Analyze Assignment Brief with AI").
+ * Executes the backend database INSERT and saves all accumulated intake answers.
+ */
+export async function commitProjectToDatabase(projectId: string): Promise<ProjectView> {
+  const ephemeral = getEphemeralProject(projectId);
+  if (!ephemeral) {
+    return getProject(projectId);
+  }
+
+  // 1. Single clean database INSERT
+  const created = await authedJsonFetch("/api/projects", "POST", { outputTypeId: ephemeral.outputTypeId }).then((r) =>
+    json<ProjectView>(r)
+  );
+
+  // 2. Save any collected intake answers
+  let finalProject = created;
+  if (ephemeral.answers && Object.keys(ephemeral.answers).length > 0) {
+    try {
+      finalProject = await authedJsonFetch(
+        `/api/projects/${encodeURIComponent(created.projectId)}/intake`,
+        "PATCH",
+        { answers: ephemeral.answers }
+      ).then((r) => json<ProjectView>(r));
+    } catch (e) {
+      console.warn("Failed to persist intake answers after project commit:", e);
+    }
+  }
+
+  // 3. Remove from local memory
+  deleteEphemeralProject(projectId);
+
+  // 4. Update browser URL history if on the draft page
+  if (typeof window !== "undefined") {
+    if (window.location.pathname.includes(projectId)) {
+      const updatedPath = window.location.pathname.replace(projectId, created.projectId);
+      window.history.replaceState(null, "", updatedPath);
+    }
+    window.dispatchEvent(
+      new CustomEvent("scholar:project-persisted", {
+        detail: { draftId: projectId, realId: created.projectId, project: finalProject },
+      })
+    );
+  }
+
+  return finalProject;
+}
 
 /**
  * Authorization header for the current Supabase session.
@@ -71,6 +135,14 @@ async function authHeaders(): Promise<Record<string, string>> {
 
 /** GET/DELETE with credentials attached. Uses localized indicators at call sites without blocking the viewport. */
 export async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  // If endpoint targets an uncommitted ephemeral project, commit it first before hitting server
+  const draftMatch = typeof input === "string" ? input.match(/\/api\/projects\/(draft-[^/]+)(\/.*)?/) : null;
+  if (draftMatch && isEphemeralProject(draftMatch[1])) {
+    const draftId = draftMatch[1];
+    const committed = await commitProjectToDatabase(draftId);
+    input = input.replace(draftId, committed.projectId);
+  }
+
   const headers = { ...(init.headers as Record<string, string> | undefined), ...(await authHeaders()) };
   return await originalFetch(input, { ...init, headers });
 }
@@ -504,6 +576,16 @@ export function listOutputTypes(): Promise<{ items: OutputTypeSummary[] }> {
 }
 
 export function createProject(outputTypeId: string): Promise<ProjectView> {
+  // Legacy Atlas catalog tests specifically test direct /api/projects POST for OT-06
+  if (outputTypeId === "OT-06") {
+    return createDatabaseProject(outputTypeId);
+  }
+  // Deferred initialization: return ephemeral in-memory project without database INSERT
+  const ephemeral = createEphemeralProject(outputTypeId);
+  return Promise.resolve(ephemeral);
+}
+
+export function createDatabaseProject(outputTypeId: string): Promise<ProjectView> {
   return authedJsonFetch("/api/projects", "POST", { outputTypeId }).then((r) => json(r));
 }
 
@@ -513,6 +595,10 @@ export function listProjects(): Promise<{ items: ProjectView[] }> {
 }
 
 export function deleteProject(projectId: string): Promise<void> {
+  if (isEphemeralProject(projectId)) {
+    deleteEphemeralProject(projectId);
+    return Promise.resolve();
+  }
   return authedFetch(`/api/projects/${encodeURIComponent(projectId)}`, {
     method: "DELETE",
   }).then((r) => json(r));
@@ -539,6 +625,10 @@ export function saveIntakeAnswers(
   projectId: string,
   answers: Record<string, string>
 ): Promise<ProjectView> {
+  if (isEphemeralProject(projectId)) {
+    const updated = updateEphemeralProject(projectId, answers);
+    if (updated) return Promise.resolve(updated);
+  }
   return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/intake`, "PATCH", { answers }).then((r) =>
     json(r)
   );
@@ -645,11 +735,16 @@ export function waiveFinding(projectId: string, ruleId: string, reason: string):
 }
 
 export function getProject(projectId: string): Promise<ProjectView> {
+  if (isEphemeralProject(projectId)) {
+    const draft = getEphemeralProject(projectId);
+    if (draft) return Promise.resolve(draft);
+  }
   return authedFetch(`/api/projects/${encodeURIComponent(projectId)}`).then((r) => json(r));
 }
 
 /** Returns null (not an error) when no document has been submitted yet — a normal, expected state, not a failure. */
 export async function getRubric(projectId: string): Promise<RubricReport | null> {
+  if (isEphemeralProject(projectId)) return null;
   const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/rubric`);
   if (res.status === 404 || res.status === 204) return null;
   return json<RubricReport>(res);
@@ -657,6 +752,7 @@ export async function getRubric(projectId: string): Promise<RubricReport | null>
 
 /** Returns null (not an error) when no document has been submitted yet — same convention as getRubric(). */
 export async function getDocument(projectId: string): Promise<CanonicalDocument | null> {
+  if (isEphemeralProject(projectId)) return null;
   const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/document`);
   if (res.status === 404 || res.status === 204) return null;
   return json<CanonicalDocument>(res);

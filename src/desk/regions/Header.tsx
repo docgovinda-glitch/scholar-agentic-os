@@ -35,7 +35,7 @@ export default function Header({
   onToggleRail?: () => void;
   userEmail?: string | null;
 }) {
-  const current = project.gates.find((g) => g.status !== "signed_off") ?? project.gates[project.gates.length - 1];
+  const current = project.gates?.find((g) => g.status !== "signed_off") ?? project.gates?.[project.gates.length - 1];
   const [searchOpen, setSearchOpen] = useState(false);
 
   return (
@@ -74,9 +74,11 @@ export default function Header({
       <span className="max-w-xs truncate text-[color:var(--text-secondary)]" title={project.projectId}>
         {outputTypeLabel}
       </span>
-      <span className="ml-2 rounded-full border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)] px-2 py-0.5 text-xs text-[color:var(--accent)]">
-        {current.gate} {current.name}
-      </span>
+      {current && (
+        <span className="ml-2 rounded-full border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)] px-2 py-0.5 text-xs text-[color:var(--accent)]">
+          {current.gate} {current.name}
+        </span>
+      )}
       <div className="ml-auto flex items-center gap-3 text-xs text-[color:var(--text-muted)]">
         <button
           type="button"

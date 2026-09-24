@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-24
 
+### Added & Refactored (Targeted UX Decluttering & Deferred Database Initialization)
+- **Targeted Dashboard Template Cards UX Decluttering (`src/desk/ProjectListScreen.tsx`)**:
+  - Removed redundant subtext ("Zero Hallucination · Verified Citations · Zero Errors") from the 4 primary dashboard template cards and format selection modal to eliminate visual noise.
+  - Strictly preserved card dimensions, hover effects, base layout, iconography, blueprint modals, and footer specifications.
+- **Deferred Project Initialization & Database Bloat Fix (`src/desk/ephemeralProjectStore.ts`, `src/desk/api.ts`, `src/desk/assignment/*`)**:
+  - Eliminated the "Untitled Project" bug where clicking "+ New Project" or workspace template cards immediately wrote blank rows to the remote database.
+  - Implemented in-memory `EphemeralProjectStore` with session persistence so newly created projects exist strictly in local memory.
+  - Deferred database INSERT until the user explicitly commits data (e.g. clicking "Analyze Assignment Brief with AI" in `AssignmentUnderstandStage` or uploading a brief).
+  - Wired auto-commit interceptor in `authedFetch`/`authedJsonFetch` ensuring seamless transitions from draft to persisted database IDs without breaking downstream workflows.
+- **Optimistic UI for Recents Rename (`src/desk/ProjectListScreen.tsx`)**:
+  - Refactored sidebar Recents project rename action to instantly update local React state for a snappy, zero-latency UX.
+  - Dispatched background database sync via `saveIntakeAnswers` with automatic rollback to previous state and error notification on failure.
+- **Header Gate Safety (`src/desk/regions/Header.tsx`)**:
+  - Added safe optional chaining for project gate summaries, preventing uncaught runtime exceptions during shell transitions.
+
 ### Completed QA Audit & Architectural Polish (10-Point Verification)
 - **Template Cards UI Streamlining (`src/desk/ProjectListScreen.tsx`)**:
   - Removed explicit "Boot →" call-to-action text and diagonal arrow from all 4 template cards.

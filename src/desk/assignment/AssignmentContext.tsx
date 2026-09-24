@@ -1,6 +1,16 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo } from "react";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../types";
-import { getDocument, getOutputTypeSpec, getProject, getRubric, saveIntakeAnswers, authedJsonFetch, UnauthenticatedError } from "../api";
+import {
+  getDocument,
+  getOutputTypeSpec,
+  getProject,
+  getRubric,
+  saveIntakeAnswers,
+  commitProjectToDatabase,
+  isEphemeralProject,
+  authedJsonFetch,
+  UnauthenticatedError,
+} from "../api";
 import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
 import type {
   AssignmentStage,
@@ -87,6 +97,7 @@ interface AssignmentContextValue {
 
   // Save Answers Helper
   saveAnswers: (updates: Record<string, any>) => Promise<void>;
+  ensurePersisted: () => Promise<string>;
 }
 
 const AssignmentContext = createContext<AssignmentContextValue | null>(null);
@@ -110,12 +121,40 @@ export function AssignmentProvider({
   onStageChangeCallback: (stage: AssignmentStage, options?: { replace?: boolean }) => void;
   children: ReactNode;
 }) {
+  const [activeProjectId, setActiveProjectId] = useState(projectId);
   const [project, setProject] = useState<ProjectView | null>(null);
   const [document, setDocument] = useState<CanonicalDocument | null>(null);
   const [rubric, setRubric] = useState<RubricReport | null>(null);
   const [outputType, setOutputType] = useState<OutputTypeSpec | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setActiveProjectId(projectId);
+  }, [projectId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPersisted = (e: Event) => {
+      const custom = e as CustomEvent<{ draftId: string; realId: string; project: ProjectView }>;
+      if (custom.detail && custom.detail.draftId === activeProjectId) {
+        setActiveProjectId(custom.detail.realId);
+        setProject(custom.detail.project);
+      }
+    };
+    window.addEventListener("scholar:project-persisted", onPersisted);
+    return () => window.removeEventListener("scholar:project-persisted", onPersisted);
+  }, [activeProjectId]);
+
+  const ensurePersisted = useCallback(async (): Promise<string> => {
+    if (!isEphemeralProject(activeProjectId)) {
+      return activeProjectId;
+    }
+    const realProject = await commitProjectToDatabase(activeProjectId);
+    setActiveProjectId(realProject.projectId);
+    setProject(realProject);
+    return realProject.projectId;
+  }, [activeProjectId]);
 
   // Active stage
   const currentStage: AssignmentStage = initialStage ?? "understand";
@@ -131,9 +170,9 @@ export function AssignmentProvider({
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const proj = await getProject(projectId);
+      const proj = await getProject(activeProjectId);
       const [rub, doc] = proj.hasDocument
-        ? await Promise.all([getRubric(projectId), getDocument(projectId)])
+        ? await Promise.all([getRubric(activeProjectId), getDocument(activeProjectId)])
         : [null, null];
       setProject(proj);
       setDocument(doc);
@@ -170,7 +209,7 @@ export function AssignmentProvider({
     } finally {
       setIsLoading(false);
     }
-  }, [projectId, onStageChangeCallback, initialStage]);
+  }, [activeProjectId, onStageChangeCallback, initialStage]);
 
   useEffect(() => {
     load();
@@ -183,12 +222,12 @@ export function AssignmentProvider({
       const merged = { ...project.answers, ...updates };
       setProject((prev) => (prev ? { ...prev, answers: merged } : null));
       try {
-        await saveIntakeAnswers(projectId, merged);
+        await saveIntakeAnswers(activeProjectId, merged);
       } catch (err) {
         console.error("Failed to persist assignment answers:", err);
       }
     },
-    [project, projectId]
+    [project, activeProjectId]
   );
 
   // Stage Navigation
@@ -536,7 +575,8 @@ export function AssignmentProvider({
   return (
     <AssignmentContext.Provider
       value={{
-        projectId,
+        projectId: activeProjectId,
+        ensurePersisted,
         project,
         document,
         rubric,
