@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createProject, listOutputTypes, listProjects, deleteProject, saveIntakeAnswers, executeAgenticLLM } from "./api";
+import {
+  isDuplicateProjectTitle,
+  getNextUntitledProjectTitle,
+  findReusableEmptyProject,
+} from "./projectNaming";
+
 import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
 import { syncActiveSessionToRegistry } from "../services/auth/multiAccountService";
@@ -512,6 +518,42 @@ export default function ProjectListScreen({
   }, [location.pathname, navigate]);
 
   const [projects, setProjects] = useState<ProjectView[] | null>(null);
+  const deletedProjectIdsRef = useRef<Set<string>>(new Set());
+
+  // Initialize from sessionStorage to prevent zombie project resurrection across fast reloads/nav
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem("scholar_deleted_project_ids");
+      if (stored) {
+        const arr = JSON.parse(stored);
+        if (Array.isArray(arr)) {
+          arr.forEach((id) => deletedProjectIdsRef.current.add(id));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const markProjectAsDeleted = useCallback((id: string) => {
+    deletedProjectIdsRef.current.add(id);
+    try {
+      const arr = Array.from(deletedProjectIdsRef.current);
+      sessionStorage.setItem("scholar_deleted_project_ids", JSON.stringify(arr));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const unmarkProjectAsDeleted = useCallback((id: string) => {
+    deletedProjectIdsRef.current.delete(id);
+    try {
+      const arr = Array.from(deletedProjectIdsRef.current);
+      sessionStorage.setItem("scholar_deleted_project_ids", JSON.stringify(arr));
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const handleCreate = useCallback(async (outputTypeId: string) => {
     if (!userEmail) {
@@ -520,20 +562,23 @@ export default function ProjectListScreen({
       return;
     }
     if (creating) return;
+
+    // Check if an existing zero-content draft of this format exists to reuse and prevent project bloat
+    const reusable = findReusableEmptyProject(projects || [], outputTypeId);
+    if (reusable && reusable.projectId) {
+      onOpen(reusable.projectId);
+      return;
+    }
+
     setCreating(true);
     setCreatingFormatId(outputTypeId);
     setError(null);
     try {
       const project = await createProject(outputTypeId);
       // Auto-assign unique default project title (Untitled Project, Untitled Project 1, ...)
-      const existingTitles = new Set((projects || []).map((p) => (p.answers?.title || "").trim().toLowerCase()));
-      let defaultTitle = "Untitled Project";
-      let counter = 1;
-      while (existingTitles.has(defaultTitle.toLowerCase())) {
-        defaultTitle = `Untitled Project ${counter}`;
-        counter++;
-      }
-      await saveIntakeAnswers(project.projectId, { title: defaultTitle }).catch(() => {});
+      const defaultTitle = getNextUntitledProjectTitle(projects || []);
+      await Promise.resolve(saveIntakeAnswers(project.projectId, { title: defaultTitle })).catch(() => {});
+
       if (project.answers) {
         project.answers.title = defaultTitle;
       } else {
@@ -546,6 +591,7 @@ export default function ProjectListScreen({
       setCreatingFormatId(null);
     }
   }, [userEmail, creating, openAuth, onOpen, projects]);
+
   const [types, setTypes] = useState<OutputTypeSummary[] | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [welcomeVisible, setWelcomeVisible] = useState(() => showWelcome ?? false);
@@ -678,11 +724,15 @@ export default function ProjectListScreen({
       return;
     }
     listProjects()
-      .then((r) => setProjects(r.items))
+      .then((r) => {
+        const deleted = deletedProjectIdsRef.current;
+        setProjects(r.items.filter((p) => !deleted.has(p.projectId)));
+      })
       .catch(() => {
         setProjects([]);
       });
   }, [userEmail]);
+
 
   useEffect(() => {
     load();
@@ -942,13 +992,8 @@ Keep your response concise, helpful, and academically grounded.`;
       const newTitle = window.prompt("Rename research project:", item.title);
       if (newTitle && newTitle.trim() && newTitle.trim() !== item.title && item.projectId) {
         const trimmed = newTitle.trim();
-        // Check for duplicate title against other existing projects
-        const isDuplicate = (projects || []).some(
-          (p) =>
-            p.projectId !== item.projectId &&
-            (p.answers?.title || "").trim().toLowerCase() === trimmed.toLowerCase()
-        );
-        if (isDuplicate) {
+        // Check for duplicate title against other existing projects (case-insensitive)
+        if (isDuplicateProjectTitle(trimmed, item.projectId, projects || [])) {
           alert(`A project with the name "${trimmed}" already exists. Please choose a unique name.`);
           return;
         }
@@ -1004,25 +1049,30 @@ Keep your response concise, helpful, and academically grounded.`;
     // 1. Instantly close the modal dialog without delay
     setProjectToDelete(null);
 
-    // 2. Instantly filter the project out of the local state
+    // 2. Mark project as deleted immediately to prevent race conditions & ghost resurrection
+    markProjectAsDeleted(targetId);
+
+    // 3. Instantly filter the project out of the local state
     setProjects((curr) => (curr ? curr.filter((p) => p.projectId !== targetId) : []));
 
-    // 3. Perform backend deletion asynchronously
+    // 4. Perform backend deletion
     try {
       if (!targetId.startsWith("demo-")) {
         await deleteProject(targetId);
       }
-      // Re-sync project list with server in background
-      listProjects()
-        .then((r) => setProjects(r.items))
-        .catch(() => {});
+      // Re-sync project list with server in background, filtering out any deleted IDs
+      const res = await listProjects();
+      const deleted = deletedProjectIdsRef.current;
+      setProjects(res.items.filter((p) => !deleted.has(p.projectId)));
     } catch (e) {
       console.error("Failed to delete project:", e);
       // Rollback on failure
+      unmarkProjectAsDeleted(targetId);
       setProjects(previousProjects);
       setError((e as Error).message || "Failed to delete project. Please try again.");
     }
   }
+
 
   // Close delete modal on Escape key
   useEffect(() => {

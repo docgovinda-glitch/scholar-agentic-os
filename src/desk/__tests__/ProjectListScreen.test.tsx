@@ -6,7 +6,7 @@
 // now select-then-confirm rather than one click per option, since a bare
 // <select> has no equivalent to "click this card to create it".
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, within, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -774,4 +774,136 @@ describe("day/night mode toggle & seamless transition", () => {
     vi.useRealTimers();
   });
 });
+
+describe("ghost project deletion & strict unique project naming", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("prevents zombie project resurrection after deletion even if listProjects returns stale data", async () => {
+    listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
+    deleteProject.mockResolvedValue({ success: true, id: "proj-101" });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    // Wait for project to appear in recents
+    await screen.findByText(SAMPLE_PROJECT.answers.title);
+
+    // Click more options -> Delete -> Confirm Delete
+    const moreBtn = await screen.findByRole("button", { name: "More options" });
+    fireEvent.click(moreBtn);
+
+    const deleteBtn = screen.getByRole("button", { name: /^Delete$/i });
+    fireEvent.click(deleteBtn);
+
+    const confirmDeleteBtn = screen.getByRole("button", { name: "Delete" });
+    fireEvent.click(confirmDeleteBtn);
+
+    await waitFor(() => expect(deleteProject).toHaveBeenCalled());
+    const deletedId = deleteProject.mock.calls[0][0];
+    expect(sessionStorage.getItem("scholar_deleted_project_ids")).toContain(deletedId);
+
+    // Even if listProjects returns the deleted project (stale cache / race condition)
+    listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
+    cleanup();
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    // The project must NOT reappear in recents
+    expect(screen.queryByText("Autonomous AI Agents in Medicine")).not.toBeInTheDocument();
+  });
+
+  it("enforces strict case-insensitive unique naming on project rename", async () => {
+    const projectA = { ...SAMPLE_PROJECT, projectId: "p-1", answers: { title: "Neural Dynamics" } };
+    const projectB = { ...SAMPLE_PROJECT, projectId: "p-2", answers: { title: "Quantum Simulation" } };
+    listProjects.mockResolvedValue({ items: [projectA, projectB] });
+
+    const alertMock = vi.spyOn(window, "alert").mockImplementation(() => {});
+    const promptMock = vi.spyOn(window, "prompt").mockReturnValue("  quantum simulation  ");
+
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    await screen.findByText("Neural Dynamics");
+
+    const moreButtons = await screen.findAllByRole("button", { name: "More options" });
+    fireEvent.click(moreButtons[0]); // More options for Project A
+
+    const renameBtn = screen.getByRole("button", { name: /^Rename$/i });
+    fireEvent.click(renameBtn);
+
+    // Alert should have triggered warning of duplicate
+    expect(alertMock).toHaveBeenCalledWith(expect.stringContaining("already exists"));
+    // saveIntakeAnswers should NOT have been called with duplicate title
+    expect(saveIntakeAnswers).not.toHaveBeenCalledWith("p-1", { title: "quantum simulation" });
+
+    alertMock.mockRestore();
+    promptMock.mockRestore();
+  });
+
+  it("reuses existing zero-content Untitled Project draft instead of creating a duplicate", async () => {
+    const emptyDraft = {
+      projectId: "proj-empty-draft",
+      outputTypeId: "OT-01",
+      answers: { title: "Untitled Project" },
+      hasDocument: false,
+      intakeCompleteness: 0,
+      authors: [],
+      gates: [],
+    };
+    listProjects.mockResolvedValue({ items: [emptyDraft] });
+    const onOpen = vi.fn();
+
+    renderScreen(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
+
+    // Wait for existing project to load in Recents
+    await screen.findByText("Untitled Project");
+
+    // Click Coursework & Essays tile directly on dashboard
+    const essayHeading = screen.getByRole("heading", { name: "Coursework & Essays" });
+    const essayCard = essayHeading.closest("button");
+    expect(essayCard).toBeInTheDocument();
+
+    fireEvent.click(essayCard!);
+
+    // Should NOT call createProject; should reuse and focus the existing draft
+    expect(createProject).not.toHaveBeenCalled();
+    expect(onOpen).toHaveBeenCalledWith("proj-empty-draft");
+  });
+
+  it("auto-increments Untitled Project title when existing untitled project has content", async () => {
+    const activeDraft = {
+      projectId: "proj-active",
+      outputTypeId: "OT-01",
+      answers: { title: "Untitled Project" },
+      hasDocument: true,
+      intakeCompleteness: 0.8,
+      authors: [],
+      gates: [],
+    };
+    listProjects.mockResolvedValue({ items: [activeDraft] });
+    createProject.mockResolvedValue({ projectId: "proj-new-unique" });
+    const onOpen = vi.fn();
+
+    renderScreen(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
+
+    // Wait for existing project to load in Recents
+    await screen.findByText("Untitled Project");
+
+    // Click Coursework & Essays tile directly on dashboard
+    const essayHeading = screen.getByRole("heading", { name: "Coursework & Essays" });
+    const essayCard = essayHeading.closest("button");
+    expect(essayCard).toBeInTheDocument();
+
+    fireEvent.click(essayCard!);
+
+    // Should call createProject because existing draft has content
+    await waitFor(() => expect(createProject).toHaveBeenCalledWith("OT-01"));
+    // Should auto-assign incremented title "Untitled Project 1"
+    await waitFor(() =>
+      expect(saveIntakeAnswers).toHaveBeenCalledWith("proj-new-unique", { title: "Untitled Project 1" })
+    );
+    await waitFor(() => expect(onOpen).toHaveBeenCalledWith("proj-new-unique"));
+  });
+});
+
+
+
 

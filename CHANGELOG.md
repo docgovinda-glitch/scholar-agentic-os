@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-24
 
+### Fixed & Enforced (Zombie Project Deletion Glitch & Strict Unique Project Naming)
+- **Database Cascade Deletion (`supabase/migrations/20260924180000_project_cascade_delete.sql`)**:
+  - Enforced `ON DELETE CASCADE` across all 13 child foreign keys referencing `public.projects(project_id)` (phases, prompts, assignment briefs, drafts, citations, knowledge assets, research artifacts).
+  - Implemented atomic `handle_project_delete_cascade()` function and `BEFORE DELETE ON public.projects` trigger to proactively clean up child relations before hard deletion.
+  - Configured RLS delete policy `projects_delete_owner` granting full cascade deletion authority to the project owner.
+- **Client Cache Synchronization & Storage Cleanup (`src/desk/api.ts`, `src/services/offline/indexedDbStorage.ts`)**:
+  - Added `cleanupProjectStorage(projectId)` to purge orphaned localStorage and sessionStorage keys upon deletion.
+  - Added `deleteCachedProject` and `removePendingMutationsForProject` to IndexedDB storage to eliminate offline cache resurrection.
+  - Hardened `deleteProject` in `api.ts` to invalidate in-memory ephemeral store, client storage, offline IDB caches, direct Supabase hard deletion, and backend REST route.
+- **Cross-Route Tombstone Filtering (`src/desk/ProjectListScreen.tsx`, `src/desk/vault/KnowledgeVault.tsx`)**:
+  - Tracked deleted project IDs in `sessionStorage` (`scholar_deleted_project_ids`) and synchronous in-memory sets (`deletedProjectIdsRef`).
+  - Filtered deleted project IDs at initial fetch, load, and background revalidation, preventing stale network or cache data from resurrecting deleted projects on page refresh or navigation.
+- **Strict Unique Project Naming (`src/desk/projectNaming.ts`, `src/desk/regions/Header.tsx`, `src/desk/DeskShell.tsx`)**:
+  - Implemented centralized `projectNaming.ts` utility module with `isDuplicateProjectTitle`, `getNextUntitledProjectTitle`, and `findReusableEmptyProject`.
+  - Added case-insensitive title validation on rename from both sidebar popover menu and workspace header (`DeskShell` / `Header`), preventing name collisions and showing error toast.
+  - Added empty draft reuse: clicking "+ New Project" or template cards focuses existing zero-content "Untitled Project" instead of spawning duplicate empty files.
+  - Added auto-increment fallback for untitled drafts (`"Untitled Project 1"`, `"Untitled Project 2"`, etc.) when existing untitled projects contain content.
+
 ### Fixed & Refactored (Day/Night Cross-Fade Transition, Palette Baseline & Dashboard Alignment)
 - **Day/Night Mode Toggle & Seamless Cross-Fade (`src/desk/ProjectListScreen.tsx`, `src/index.css`)**:
   - Restored interactive theme switching on the sidebar footer button with instant zero-latency transition and Apple-grade cross-fade (`180ms cubic-bezier(0.16, 1, 0.3, 1)`) scoped strictly to `background-color`, `border-color`, and `color`.

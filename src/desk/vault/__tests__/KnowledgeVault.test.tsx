@@ -63,6 +63,7 @@ const SAMPLE_PROJECTS: ProjectView[] = [
 
 describe("KnowledgeVault component", () => {
   beforeEach(() => {
+    sessionStorage.clear();
     listProjects.mockResolvedValue({ items: SAMPLE_PROJECTS });
     listOutputTypes.mockResolvedValue({
       items: [
@@ -71,6 +72,7 @@ describe("KnowledgeVault component", () => {
       ],
     });
   });
+
 
   afterEach(() => {
     cleanup();

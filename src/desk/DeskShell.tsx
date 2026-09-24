@@ -1,7 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
-import { getDocument, getOutputTypeSpec, getProject, getRubric, resolveCitations, submitDocument, UnauthenticatedError } from "./api";
+import {
+  getDocument,
+  getOutputTypeSpec,
+  getProject,
+  getRubric,
+  listProjects,
+  resolveCitations,
+  saveIntakeAnswers,
+  submitDocument,
+  UnauthenticatedError,
+} from "./api";
+import { isDuplicateProjectTitle } from "./projectNaming";
 import { plainTextToDocument } from "./plainTextToDocument";
 import Header from "./regions/Header";
+
 import Rail from "./regions/Rail";
 import Primary from "./regions/Primary";
 import Aside from "./regions/Aside";
@@ -152,6 +164,36 @@ export default function DeskShell({
     globalThis.document?.getElementById(blockId)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  const handleRenameProject = useCallback(async (newTitle: string) => {
+    const trimmed = newTitle.trim();
+    if (!trimmed || !project) return;
+    if (trimmed === (project.answers?.title || "").trim()) return;
+
+    try {
+      const { items } = await listProjects();
+      if (isDuplicateProjectTitle(trimmed, project.projectId, items)) {
+        alert(`A project with the name "${trimmed}" already exists. Please choose a unique name.`);
+        return;
+      }
+    } catch {
+      // Non-fatal if listProjects fails
+    }
+
+    const previous = project;
+    setProject({
+      ...project,
+      answers: { ...project.answers, title: trimmed },
+    });
+
+    try {
+      await saveIntakeAnswers(projectId, { title: trimmed });
+    } catch (err) {
+      console.error("Failed to rename project from header:", err);
+      setProject(previous);
+      alert((err as Error).message || "Failed to rename project.");
+    }
+  }, [project, projectId]);
+
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[color:var(--surface-canvas)] p-6 text-center">
@@ -185,14 +227,17 @@ export default function DeskShell({
   return (
     <div className="h-screen flex flex-col bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
       <Header
+
         project={project}
         outputTypeLabel={outputType?.label ?? project.outputTypeId}
         onClose={onClose}
         onOpenAccountSettings={onOpenAccountSettings}
         onOpenVault={onOpenVault}
         onOpenAiAccess={onOpenAiAccess}
+        onRenameProject={handleRenameProject}
         userEmail={session.status === "signed-in" ? session.email : null}
       />
+
       <nav aria-label="Project view" className="flex gap-1 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4">
         {(["definition", "requirements", "document", "evidence", "manuscript", "progress", "submissions"] as const).map((v) => (
           <button
