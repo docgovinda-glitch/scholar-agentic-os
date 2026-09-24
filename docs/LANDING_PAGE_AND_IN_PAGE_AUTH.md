@@ -8,9 +8,12 @@ This document specifies the direct landing page architecture, in-page authentica
 
 ## 1. Core Architectural Requirements
 
-1. **Direct Landing Command Center**:
+1. **Direct Landing Command Center & Bottom-Anchored Architecture**:
    - Visitors navigating to `https://scholar.gkshah.com.np/` (or `/`, `/signin`, `/signup`) immediately land on the full academic command center workspace (`ProjectListScreen.tsx`) without full-page redirects away to separate auth walls.
-   - The primary canvas displays the hero inquiry (*"What would you like to write today?"*), the 4 curated workspace format cards (*Assignment*, *Journal Article*, *Research Proposal*, *Presentation*), and the active project registry (`Active Projects 0 of 0`) with the empty-state card.
+   - **ChatGPT & Google Gemini Layout Alignment**:
+     - The main workspace utilizes full viewport height (`h-screen overflow-hidden`) with a scrollable center viewport and a bottom-docked prompt interaction area.
+     - **Centered Workspace Gallery**: The 4 curated academic deliverable template cards (*Coursework & Essays*, *Journal Article*, *Research Proposal*, *Slides & Keynotes*) sit comfortably centered in the viewport above the input area, preceded by the workspace inquiry (*"Where will your research begin?"* and *"Select an academic deliverable or paste your assignment guidelines below."*).
+     - **Bottom-Docked Unified Prompt Area**: Docked at the bottom of the viewport with an Apple-style upward gradient fade (`bg-gradient-to-t from-white via-white to-transparent dark:from-[#171717] dark:via-[#171717] dark:to-transparent`), pinned `max-w-4xl mx-auto` horizontal container alignment, auto-growing input with drag-and-drop/clipboard paste, and an institutional rubric verification disclaimer footer (*"Scholar Core Socratic Engine · Verify citations against official institutional rubrics."*).
 
 2. **In-Page Authentication ("Sign In on This Page Only")**:
    - Directly re-wires the canonical, production-engineered screens (`SignInScreen`, `SignUpScreen`, `ForgotScreen`, `RegisteredScreen`, `ResendVerificationScreen`) inside `EmbeddedAuthModal` without code or schema duplication.
