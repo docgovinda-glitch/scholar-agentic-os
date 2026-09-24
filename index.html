@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark" data-theme="dark" style="background-color: #171717; color: #e5e5e5;">
   <head>
     <meta charset="UTF-8" />
     <!-- `maximum-scale=1.0, user-scalable=no` removed: it blocked pinch-zoom
@@ -12,10 +12,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Scholar Agentic OS</title>
 
-    <!-- Matches the browser chrome to the app surface in both themes.
-         Values are --surface-canvas from src/index.css. -->
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F7F5F0" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#191816" />
+    <!-- Matches the browser chrome to the app surface in dark theme. -->
+    <meta name="theme-color" content="#171717" />
 
     <!-- Typography: Plus Jakarta Sans, Inter & Manrope for warm, modern Airbnb-inspired typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -25,20 +23,16 @@
       rel="stylesheet"
     />
 
-    <!-- Resolve an explicit theme choice before first paint.
-         The stylesheet already follows `prefers-color-scheme`, so this matters
-         only when the user has overridden that: without it, someone who chose
-         dark on a light-default system sees a white flash on every load.
-         Inline and synchronous by necessity — a deferred script runs after
-         first paint, which is precisely the flash being avoided. Wrapped in
-         try/catch because localStorage throws in Safari private mode. -->
+    <!-- Enforce unified dark mode before first paint -->
     <script>
       try {
-        var t = localStorage.getItem('scholar-theme');
-        if (t === 'dark' || t === 'light') {
-          document.documentElement.setAttribute('data-theme', t);
-        }
-      } catch (e) {}
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('scholar-theme', 'dark');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.classList.add('dark');
+      }
     </script>
 
     <!-- Web App / PWA Support -->
@@ -46,10 +40,10 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <!-- Keep the Apple-prefixed version for iOS Safari standalone mode -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ScholarAgentic" />
   </head>
-  <body>
+  <body class="bg-[#171717] text-neutral-200 antialiased" style="background-color: #171717; color: #e5e5e5;">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

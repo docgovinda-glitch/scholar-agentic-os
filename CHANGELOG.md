@@ -5,7 +5,16 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-23
+## [Unreleased] - 2026-09-24
+
+### Fixed & Refactored
+- **Global Layout Shell & Dashboard Dark Mode Unification (`index.html`, `main.tsx`, `DeskApp.tsx`, `index.css`, `ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`)**:
+  - **Global Background Unification**: Enforced single, unified dark background (`bg-[#171717]`, `text-neutral-200`) on `html`, `body`, and root layout wrappers across `index.html`, `src/main.tsx`, and `DeskApp.tsx`.
+  - **Left Sidebar Elevation & Contrast Fix**: Stripped all `bg-white`, `bg-[#F8F9FA]`, and `text-black` from left sidebar navigation panes. Applied elevated dark gray `bg-[#1C1C1E]` with `border-r border-white/10`, and ensured all text uses `text-neutral-300` or `text-neutral-400`.
+  - **Elevated Template Card Backgrounds**: Converted dashboard template cards from flat canvas background to visible elevated `bg-white/5` with `border border-white/10` and `hover:border-white/20` so they cleanly pop off the `#171717` canvas.
+  - **Text Contrast & Typography Hierarchy**: Updated typography inside template cards and prompt bar: primary titles and input text use `text-neutral-100`, descriptions and specs use `text-neutral-400`.
+  - **Global Dark Mode Enforcement**: Configured theme system and root boot script to strictly enforce `'dark'` mode globally (`data-theme="dark"`, `class="dark"`, `localStorage.scholar-theme = "dark"`), preventing split-UI states from component-level or stored overrides.
+  - **Modal & Drawer Dark Harmonization**: Updated AI Assistant drawer, Delete Project modal, and Format Selection tiles to consistent `bg-[#1C1C1E]`, `border-white/10`, and high-contrast typography.
 
 ### Added
 - **Academic Assignment Workspace UI Clutter Purge, Dark Mode Unification & Aggressive Code-Splitting (`src/desk/assignment/*`)**:

@@ -548,49 +548,27 @@ export default function ProjectListScreen({
     }
   }, [location.pathname, location.search, openAuth]);
 
-  // Theme toggle state: Sand & Snow Day mode vs True-Dark Night mode
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof document !== "undefined") {
-      const current = document.documentElement.getAttribute("data-theme");
-      if (current === "dark" || current === "light") return current;
-      try {
-        const stored = localStorage.getItem("scholar-theme");
-        if (stored === "dark" || stored === "light") return stored;
-      } catch {}
-      if (typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-        return "dark";
-      }
-    }
-    return "light";
-  });
+  // Strictly enforce unified dark mode across all environments
+  const [theme] = useState<"light" | "dark">("dark");
 
   const toggleTheme = useCallback(() => {
-    setTheme((curr) => {
-      const next = curr === "dark" ? "light" : "dark";
-      if (typeof document !== "undefined") {
-        document.documentElement.setAttribute("data-theme", next);
-        document.documentElement.classList.toggle("dark", next === "dark");
-      }
-      try {
-        localStorage.setItem("scholar-theme", next);
-      } catch {}
-      return next;
-    });
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", "dark");
+      document.documentElement.classList.add("dark");
+    }
+    try {
+      localStorage.setItem("scholar-theme", "dark");
+    } catch {}
   }, []);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    const observer = new MutationObserver(() => {
-      const val = document.documentElement.getAttribute("data-theme");
-      if (val === "dark" || val === "light") {
-        setTheme(val);
-        document.documentElement.classList.toggle("dark", val === "dark");
-      }
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => observer.disconnect();
-  }, [theme]);
+    document.documentElement.classList.add("dark");
+    document.documentElement.setAttribute("data-theme", "dark");
+    try {
+      localStorage.setItem("scholar-theme", "dark");
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if (showWelcome) onWelcomeSeen?.();
@@ -998,7 +976,7 @@ Keep your response concise, helpful, and academically grounded.`;
   }
 
   return (
-    <div className="h-screen w-full flex overflow-hidden bg-[#171717] text-neutral-100 font-sans selection:bg-neutral-100 selection:text-[#171717]">
+    <div className="h-screen w-full flex overflow-hidden bg-[#171717] text-neutral-200 font-sans selection:bg-neutral-100 selection:text-[#171717]">
       {/* Mobile Backdrop Overlay */}
       {mobileMenuOpen && (
         <div
@@ -1010,7 +988,7 @@ Keep your response concise, helpful, and academically grounded.`;
 
       {/* Left Sidebar (Navigation Pane) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-slate-200/80 dark:border-neutral-800 bg-[#F8F9FA] dark:bg-[#121212] flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-white/10 bg-[#1C1C1E] text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
           mobileMenuOpen
             ? "translate-x-0 w-[260px] shadow-2xl"
             : "-translate-x-full md:translate-x-0 " + (isSidebarOpen ? "w-[260px]" : "w-0 border-r-0 overflow-hidden")
@@ -1019,7 +997,7 @@ Keep your response concise, helpful, and academically grounded.`;
         {/* Top Section */}
         <div className="flex flex-col flex-shrink-0 w-[260px]">
           {/* Logo & Close/Collapse Header */}
-          <div className="p-4 pb-3 flex items-center justify-between border-b border-slate-200/80 dark:border-neutral-800">
+          <div className="p-4 pb-3 flex items-center justify-between border-b border-white/10">
             <Link
               to="/"
               onClick={() => {
@@ -1032,14 +1010,14 @@ Keep your response concise, helpful, and academically grounded.`;
               title="Scholar Core Home"
               aria-label="Scholar Core Home"
             >
-              <div className="w-9 h-9 rounded-xl bg-[var(--bg-button-primary)] text-[var(--text-button)] flex items-center justify-center flex-shrink-0 shadow-xs">
-                <ScholarCoreLogo size="md" className="text-[var(--text-button)]" />
+              <div className="w-9 h-9 rounded-xl bg-white text-neutral-900 flex items-center justify-center flex-shrink-0 shadow-xs">
+                <ScholarCoreLogo size="md" className="text-neutral-900" />
               </div>
               <div className="flex flex-col min-w-0 justify-center">
-                <span className="font-extrabold text-sm tracking-tight text-[var(--text-primary)] leading-tight truncate font-sans">
+                <span className="font-extrabold text-sm tracking-tight text-neutral-100 leading-tight truncate font-sans">
                   Scholar Core
                 </span>
-                <span className="text-[10px] font-medium text-[var(--text-secondary)] mt-0.5 tracking-normal font-sans">
+                <span className="text-[10px] font-medium text-neutral-400 mt-0.5 tracking-normal font-sans">
                   Workspace
                 </span>
               </div>
@@ -1049,7 +1027,7 @@ Keep your response concise, helpful, and academically grounded.`;
             <button
               type="button"
               onClick={() => setIsSidebarOpen(false)}
-              className="hidden md:flex p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer"
+              className="hidden md:flex p-1.5 rounded-lg text-neutral-400 hover:text-neutral-200 hover:bg-white/5 transition-colors cursor-pointer"
               title="Collapse sidebar"
               aria-label="Collapse sidebar"
             >
@@ -1062,7 +1040,7 @@ Keep your response concise, helpful, and academically grounded.`;
             <button
               type="button"
               onClick={() => setMobileMenuOpen(false)}
-              className="md:hidden p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer"
+              className="md:hidden p-1.5 rounded-lg text-neutral-400 hover:text-neutral-200 hover:bg-white/5 transition-colors cursor-pointer"
               title="Close navigation"
               aria-label="Close navigation"
             >
@@ -1085,21 +1063,21 @@ Keep your response concise, helpful, and academically grounded.`;
                 }
                 setChoosing(true);
               }}
-              className="w-full py-2.5 px-6 rounded-full text-xs font-medium bg-[var(--bg-button-primary)] text-[var(--text-button)] hover:opacity-90 active:scale-95 transition-transform flex items-center justify-center gap-2 cursor-pointer shadow-sm group font-sans mb-3"
+              className="w-full py-2.5 px-6 rounded-full text-xs font-semibold bg-white text-neutral-900 hover:bg-neutral-200 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group font-sans mb-3"
             >
               <span className="text-base font-bold leading-none">+</span>
               <span>New Project</span>
             </button>
 
             <div className="relative group cursor-text mb-4">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors pointer-events-none" />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400 group-hover:text-neutral-200 transition-colors pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full bg-transparent border border-gray-200 dark:border-neutral-800 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-100 dark:focus:ring-neutral-700 transition-all cursor-text text-[var(--text-primary)] placeholder-gray-400"
+                className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 transition-all cursor-text text-neutral-200 placeholder-neutral-400"
               />
             </div>
           </div>
@@ -1123,11 +1101,11 @@ Keep your response concise, helpful, and academically grounded.`;
               aria-label="Knowledge Vault"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
                 activeView === "vault"
-                  ? "bg-gray-200/80 dark:bg-neutral-800 text-gray-900 dark:text-white font-semibold"
-                  : "hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-300"
+                  ? "bg-white/10 text-neutral-100 font-semibold"
+                  : "hover:bg-white/5 text-neutral-400 hover:text-neutral-200"
               }`}
             >
-              <Database className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
+              <Database className="h-4 w-4 text-neutral-400 group-hover:text-neutral-200 flex-shrink-0" />
               <span>Knowledge Vault</span>
             </button>
 
@@ -1145,11 +1123,11 @@ Keep your response concise, helpful, and academically grounded.`;
               aria-label="Manage AI Access"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
                 activeView === "ai-access"
-                  ? "bg-gray-200/80 dark:bg-neutral-800 text-gray-900 dark:text-white font-semibold"
-                  : "hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-300"
+                  ? "bg-white/10 text-neutral-100 font-semibold"
+                  : "hover:bg-white/5 text-neutral-400 hover:text-neutral-200"
               }`}
             >
-              <Sliders className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
+              <Sliders className="h-4 w-4 text-neutral-400 group-hover:text-neutral-200 flex-shrink-0" />
               <span>AI Access</span>
             </button>
 
@@ -1169,11 +1147,11 @@ Keep your response concise, helpful, and academically grounded.`;
               aria-label="Ask Scholar"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
                 isAiSidebarOpen
-                  ? "bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 font-semibold"
-                  : "hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-300"
+                  ? "bg-white/10 text-neutral-100 font-semibold"
+                  : "hover:bg-white/5 text-neutral-400 hover:text-neutral-200"
               }`}
             >
-              <MessageSquare className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
+              <MessageSquare className="h-4 w-4 text-neutral-400 group-hover:text-neutral-200 flex-shrink-0" />
               <span>Ask Scholar</span>
             </button>
           </div>
@@ -1220,7 +1198,7 @@ Keep your response concise, helpful, and academically grounded.`;
                             e.stopPropagation();
                             setActiveRecentMenuId((prev) => (prev === item.id ? null : item.id));
                           }}
-                          className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-white/10 text-neutral-500 hover:text-neutral-300 flex-shrink-0 ${
+                          className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-white/10 text-neutral-400 hover:text-neutral-200 flex-shrink-0 ${
                             isMenuOpen ? "!opacity-100" : ""
                           }`}
                         >
@@ -1234,13 +1212,13 @@ Keep your response concise, helpful, and academically grounded.`;
                           ref={recentMenuRef}
                           className={`absolute ${
                             isNearBottom ? "bottom-full mb-1" : "top-full mt-1"
-                          } right-0 z-50 shadow-xl rounded-xl bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-neutral-800 p-1 min-w-[180px] animate-in fade-in duration-150`}
+                          } right-0 z-50 shadow-xl rounded-xl bg-[#1C1C1E] border border-white/10 p-1 min-w-[180px] animate-in fade-in duration-150 text-neutral-300`}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button
                             type="button"
                             onClick={() => handleRecentAction("share", item)}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-neutral-300 hover:bg-white/5 hover:text-neutral-100 cursor-pointer text-left"
                           >
                             <Share2 className="w-4 h-4 flex-shrink-0" />
                             <span>Share</span>
@@ -1248,7 +1226,7 @@ Keep your response concise, helpful, and academically grounded.`;
                           <button
                             type="button"
                             onClick={() => handleRecentAction("pin", item)}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-neutral-300 hover:bg-white/5 hover:text-neutral-100 cursor-pointer text-left"
                           >
                             <Pin className="w-4 h-4 flex-shrink-0" />
                             <span>{isPinned ? "Unpin" : "Pin"}</span>
@@ -1256,7 +1234,7 @@ Keep your response concise, helpful, and academically grounded.`;
                           <button
                             type="button"
                             onClick={() => handleRecentAction("rename", item)}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-neutral-300 hover:bg-white/5 hover:text-neutral-100 cursor-pointer text-left"
                           >
                             <Pencil className="w-4 h-4 flex-shrink-0" />
                             <span>Rename</span>
@@ -1264,7 +1242,7 @@ Keep your response concise, helpful, and academically grounded.`;
                           <button
                             type="button"
                             onClick={() => handleRecentAction("add-to-project", item)}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-neutral-300 hover:bg-white/5 hover:text-neutral-100 cursor-pointer text-left"
                           >
                             <FolderPlus className="w-4 h-4 flex-shrink-0" />
                             <span>Add to Project</span>
@@ -1272,7 +1250,7 @@ Keep your response concise, helpful, and academically grounded.`;
                           <button
                             type="button"
                             onClick={() => handleRecentAction("delete", item)}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer text-left"
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-red-400 hover:bg-red-500/10 cursor-pointer text-left"
                           >
                             <Trash2 className="w-4 h-4 flex-shrink-0" />
                             <span>Delete</span>
@@ -1288,7 +1266,7 @@ Keep your response concise, helpful, and academically grounded.`;
         </div>
 
         {/* Bottom Section */}
-        <div className="flex-shrink-0 p-3 border-t border-[var(--border-subtle)] flex flex-col gap-2 w-[260px]">
+        <div className="flex-shrink-0 p-3 border-t border-white/10 flex flex-col gap-2 w-[260px] bg-[#1C1C1E]">
           {/* Action Row: Settings Navigation Item + Minimal Icon-Only Theme Toggle */}
           <div className="flex items-center justify-between gap-1.5">
             {onOpenAccountSettings && (
@@ -1299,9 +1277,9 @@ Keep your response concise, helpful, and academically grounded.`;
                   onOpenAccountSettings();
                 }}
                 aria-label="Settings"
-                className="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-tight text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer text-left group font-sans"
+                className="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-tight text-neutral-400 hover:text-neutral-200 hover:bg-white/5 transition-colors cursor-pointer text-left group font-sans"
               >
-                <svg className="w-4 h-4 flex-shrink-0 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                <svg className="w-4 h-4 flex-shrink-0 text-neutral-400 group-hover:text-neutral-200 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
@@ -1315,14 +1293,14 @@ Keep your response concise, helpful, and academically grounded.`;
               onClick={toggleTheme}
               aria-label={`Switch to ${theme === "dark" ? "Day" : "Night"} mode`}
               title={`Switch to ${theme === "dark" ? "Day (Sand & Snow)" : "Night (ChatGPT)"} mode`}
-              className="p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 border border-[var(--border-subtle)] transition-all cursor-pointer flex-shrink-0"
+              className="p-2 rounded-xl text-neutral-400 hover:text-neutral-200 hover:bg-white/5 border border-white/10 transition-all cursor-pointer flex-shrink-0"
             >
               {theme === "dark" ? (
                 <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
               ) : (
-                <svg className="w-4 h-4 text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                 </svg>
               )}
@@ -1343,7 +1321,7 @@ Keep your response concise, helpful, and academically grounded.`;
       </aside>
 
       {/* Main Content Area (Center Pane) */}
-      <main className="flex-1 h-full overflow-y-auto bg-[#171717] text-neutral-100 scholar-scrollbar relative flex flex-col transition-all duration-300 ease-in-out">
+      <main className="flex-1 h-full overflow-y-auto bg-[#171717] text-neutral-200 scholar-scrollbar relative flex flex-col transition-all duration-300 ease-in-out">
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
         <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-[#171717]/85 backdrop-blur-md border-b border-white/10">
           <div className="flex items-center gap-3">
@@ -1351,7 +1329,7 @@ Keep your response concise, helpful, and academically grounded.`;
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 shadow-[var(--shadow-card)] cursor-pointer"
+              className="md:hidden p-2 rounded-xl border border-white/10 bg-white/5 text-neutral-300 hover:bg-white/10 cursor-pointer"
               aria-label="Open navigation"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -1363,7 +1341,7 @@ Keep your response concise, helpful, and academically grounded.`;
             <button
               type="button"
               onClick={() => setIsSidebarOpen((prev) => !prev)}
-              className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 text-xs font-medium shadow-[var(--shadow-card)] cursor-pointer transition-all animate-in fade-in"
+              className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-white/10 bg-white/5 text-neutral-300 hover:bg-white/10 text-xs font-medium cursor-pointer transition-all animate-in fade-in"
               title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
               aria-label={isSidebarOpen ? "Toggle sidebar" : "Expand sidebar"}
             >
@@ -1390,7 +1368,7 @@ Keep your response concise, helpful, and academically grounded.`;
                   if (onOpenAiAccess) onOpenAiAccess();
                   else setActiveView("ai-access");
                 }}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer shadow-2xs"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 cursor-pointer shadow-2xs"
                 title="AI Access Settings • Click to configure"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -1401,7 +1379,7 @@ Keep your response concise, helpful, and academically grounded.`;
               <button
                 type="button"
                 onClick={() => openAuth("signin", "Sign in to configure your personal AI provider.")}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-slate-600 dark:text-neutral-300 hover:bg-slate-50 dark:hover:bg-neutral-800 cursor-pointer shadow-2xs"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border border-white/10 bg-white/5 text-neutral-300 hover:bg-white/10 cursor-pointer shadow-2xs"
                 title="Sign in to access AI"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
@@ -1415,7 +1393,7 @@ Keep your response concise, helpful, and academically grounded.`;
                 type="button"
                 onClick={() => setIsAiSidebarOpen((prev) => !prev)}
                 title="Ask Scholar"
-                className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-neutral-800 border-gray-200/90 dark:border-neutral-800 text-amber-500/90 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 animate-in fade-in zoom-in-95 duration-150"
+                className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white/5 hover:bg-white/10 border-white/10 text-amber-400 hover:text-amber-300 animate-in fade-in zoom-in-95 duration-150"
                 aria-label="Toggle Scholar Core AI Assistant"
               >
                 <Lightbulb className="w-5 h-5 stroke-[1.8]" />
@@ -1517,11 +1495,11 @@ Keep your response concise, helpful, and academically grounded.`;
                           handleCreate(tile.id);
                         }}
                         disabled={isOtherBooting}
-                        className={`group bg-[#171717] dark:bg-[#171717] border border-white/10 dark:border-neutral-800 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:hover:shadow-neutral-900/50 cursor-pointer flex flex-col justify-between h-full text-left relative ${
+                        className={`group bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer flex flex-col justify-between h-full text-left relative ${
                           isOtherBooting
                             ? "opacity-50 cursor-not-allowed"
                             : isBootingThis
-                            ? "ring-2 ring-gray-100 cursor-wait"
+                            ? "ring-2 ring-white/20 cursor-wait"
                             : ""
                         }`}
                       >
@@ -1548,20 +1526,20 @@ Keep your response concise, helpful, and academically grounded.`;
                                     setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
                                   }
                                 }}
-                                className="w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-colors cursor-pointer text-xs font-serif italic font-bold"
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-200 hover:bg-white/5 transition-colors cursor-pointer text-xs font-serif italic font-bold"
                                 title="View methodology & stages blueprint"
                                 aria-label={`View stages blueprint for ${tile.label}`}
                               >
                                 i
                               </span>
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-neutral-500 group-hover:text-slate-200 transition-colors">
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 group-hover:text-neutral-200 transition-colors">
                                 <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7V17" />
                                 </svg>
                               </div>
                             </div>
                           </div>
-                          <h3 className="text-base font-bold tracking-tight text-gray-100 leading-snug">
+                          <h3 className="text-base font-bold tracking-tight text-neutral-100 leading-snug">
                             {tile.label}
                           </h3>
                           <p className="text-[11px] sm:text-xs text-neutral-400 font-normal truncate mt-1">
@@ -1570,7 +1548,7 @@ Keep your response concise, helpful, and academically grounded.`;
                         </div>
                         <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2 text-xs text-neutral-400 font-sans">
                           <span className="font-medium text-neutral-400 truncate">{tile.footer}</span>
-                          <span className="font-semibold text-gray-300 group-hover:text-white group-hover:translate-x-0.5 transition-all flex-shrink-0 whitespace-nowrap">
+                          <span className="font-semibold text-neutral-300 group-hover:text-neutral-100 group-hover:translate-x-0.5 transition-all flex-shrink-0 whitespace-nowrap">
                             Boot →
                           </span>
                         </div>
@@ -1579,7 +1557,7 @@ Keep your response concise, helpful, and academically grounded.`;
                         {previewFormatId === tile.id && (
                           <div
                             onClick={(e) => e.stopPropagation()}
-                            className="absolute inset-0 bg-[#171717] rounded-2xl p-4 z-20 flex flex-col justify-between border border-white/10 shadow-xl animate-in fade-in zoom-in-95 duration-150 text-left"
+                            className="absolute inset-0 bg-[#1C1C1E] rounded-2xl p-4 z-20 flex flex-col justify-between border border-white/10 shadow-xl animate-in fade-in zoom-in-95 duration-150 text-left"
                           >
                             <div>
                               <div className="flex items-center justify-between mb-2">
@@ -1686,7 +1664,7 @@ Keep your response concise, helpful, and academically grounded.`;
                     }}
                     placeholder="Draft a Research Proposal, analyze data, or search projects..."
                     style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                    className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-100 placeholder:text-neutral-500 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none prompt-bare-input"
+                    className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-100 placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none prompt-bare-input"
                   />
 
                   {/* Right: Solid circular submit button */}
@@ -1775,7 +1753,7 @@ Keep your response concise, helpful, and academically grounded.`;
 
       {/* Secondary View (Right Panel): Module 3.2 AI Assistant Sidebar (w-96) */}
       <aside
-        className={`h-full bg-white dark:bg-[#151515] shadow-[-4px_0_24px_rgba(0,0,0,0.06)] border-l border-slate-200/80 dark:border-neutral-800 flex flex-col transition-all duration-300 ease-in-out shrink-0 z-30 ${
+        className={`h-full bg-[#1C1C1E] text-neutral-300 shadow-2xl border-l border-white/10 flex flex-col transition-all duration-300 ease-in-out shrink-0 z-30 ${
           isAiSidebarOpen ? "w-full sm:w-96 max-w-[calc(100vw-2rem)] translate-x-0" : "w-0 translate-x-full overflow-hidden border-none"
         }`}
         aria-hidden={!isAiSidebarOpen}
@@ -1783,19 +1761,19 @@ Keep your response concise, helpful, and academically grounded.`;
         {isAiSidebarOpen && (
           <div className="h-full flex flex-col w-full sm:w-96">
             {/* Sidebar Header */}
-            <header className="p-5 border-b border-gray-100 dark:border-neutral-800 flex items-center justify-between shrink-0 bg-white dark:bg-[#151515]">
+            <header className="p-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#1C1C1E]">
               <div className="flex items-center gap-2.5">
                 <ScholarCoreLogo size="sm" withText={false} />
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">
+                    <h2 className="text-base font-bold text-neutral-100 tracking-tight">
                       Ask Scholar
                     </h2>
-                    <span className="text-[10px] bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded-full font-medium border border-sky-100 dark:border-sky-900/50">
+                    <span className="text-[10px] bg-sky-950/50 text-sky-300 px-1.5 py-0.5 rounded-full font-medium border border-sky-900/50">
                       Guide
                     </span>
                   </div>
-                  <p className="text-[11px] text-gray-500 dark:text-neutral-400">
+                  <p className="text-[11px] text-neutral-400">
                     How can I help you with your research today?
                   </p>
                 </div>
@@ -1804,7 +1782,7 @@ Keep your response concise, helpful, and academically grounded.`;
               <button
                 type="button"
                 onClick={() => setIsAiSidebarOpen(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+                className="p-1.5 text-neutral-400 hover:text-neutral-200 rounded-full hover:bg-white/10 transition cursor-pointer"
                 title="Close Assistant"
                 aria-label="Close Assistant"
               >
@@ -1813,13 +1791,13 @@ Keep your response concise, helpful, and academically grounded.`;
             </header>
 
             {/* Horizontally Scrolling Pill Row (Module 3.3) */}
-            <div className="overflow-x-auto scrollbar-hide flex gap-2 px-5 py-3 border-b border-gray-100/80 dark:border-neutral-800/80 shrink-0 bg-slate-50/50 dark:bg-neutral-900/30">
+            <div className="overflow-x-auto scrollbar-hide flex gap-2 px-5 py-3 border-b border-white/10 shrink-0 bg-[#171717]/50">
               {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => handleSendGuideMessage(faq.question)}
-                  className="rounded-full bg-white dark:bg-neutral-800 border border-gray-200/80 dark:border-neutral-700 text-gray-700 dark:text-neutral-200 px-3 py-1.5 text-xs whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-neutral-700 hover:border-gray-300 transition-colors shadow-2xs shrink-0"
+                  className="rounded-full bg-white/5 border border-white/10 text-neutral-300 px-3 py-1.5 text-xs whitespace-nowrap cursor-pointer hover:bg-white/10 hover:border-white/20 transition-colors shadow-2xs shrink-0"
                 >
                   {faq.shortLabel}
                 </button>
@@ -1833,13 +1811,13 @@ Keep your response concise, helpful, and academically grounded.`;
                   key={msg.id}
                   className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
                 >
-                  <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-gray-400">
+                  <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-neutral-500">
                     {msg.sender === "assistant" ? (
                       <>
                         <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
                           <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
                         </div>
-                        <span className="font-medium text-gray-600 dark:text-neutral-300">Scholar Core</span>
+                        <span className="font-medium text-neutral-300">Scholar Core</span>
                       </>
                     ) : (
                       <span>You</span>
@@ -1851,8 +1829,8 @@ Keep your response concise, helpful, and academically grounded.`;
                   <div
                     className={`rounded-2xl px-4 py-3 max-w-[88%] leading-relaxed ${
                       msg.sender === "user"
-                        ? "bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs rounded-tr-xs"
-                        : "bg-gray-50 dark:bg-neutral-800/80 border border-gray-100 dark:border-neutral-700/60 text-gray-800 dark:text-neutral-200 rounded-tl-xs shadow-2xs"
+                        ? "bg-white text-neutral-900 shadow-xs rounded-tr-xs"
+                        : "bg-white/5 border border-white/10 text-neutral-200 rounded-tl-xs shadow-2xs"
                     }`}
                   >
                     {msg.sender === "assistant" ? renderFormattedGuideText(msg.text) : (
@@ -1861,11 +1839,11 @@ Keep your response concise, helpful, and academically grounded.`;
 
                     {/* Quick Action Deep-Links */}
                     {msg.action && (
-                      <div className="mt-3 pt-2.5 border-t border-gray-200/60 dark:border-neutral-700/60">
+                      <div className="mt-3 pt-2.5 border-t border-white/10">
                         <button
                           type="button"
                           onClick={() => handleAssistantAction(msg.action!)}
-                          className="inline-flex items-center gap-1 text-[11px] bg-white dark:bg-neutral-700 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-2.5 py-1 rounded-md hover:bg-blue-50 dark:hover:bg-neutral-600 transition font-medium cursor-pointer"
+                          className="inline-flex items-center gap-1 text-[11px] bg-white/10 text-blue-300 border border-blue-500/30 px-2.5 py-1 rounded-md hover:bg-white/15 transition font-medium cursor-pointer"
                         >
                           <span>{msg.action.label}</span>
                         </button>
@@ -1876,7 +1854,7 @@ Keep your response concise, helpful, and academically grounded.`;
               ))}
 
               {isGuideThinking && (
-                <div className="flex items-center gap-2 text-xs text-gray-400 p-2">
+                <div className="flex items-center gap-2 text-xs text-neutral-400 p-2">
                   <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
                     <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
                   </div>
@@ -1886,15 +1864,15 @@ Keep your response concise, helpful, and academically grounded.`;
             </div>
 
             {/* Pinned Floating Input Component (Module 3.4) */}
-            <div className="p-4 bg-white/95 dark:bg-[#151515]/95 backdrop-blur-md border-t border-gray-100 dark:border-neutral-800 shrink-0">
+            <div className="p-4 bg-[#1C1C1E]/95 backdrop-blur-md border-t border-white/10 shrink-0">
               <div className="flex items-center justify-between px-2 mb-2">
-                <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-neutral-400">
+                <div className="flex items-center gap-1.5 text-[11px] text-neutral-400">
                   <ScholarCoreLogo size="sm" withText={false} />
                   <span>Ask Scholar</span>
                   {userEmail ? (
                     <span className="text-green-500 font-bold">• AI Ready</span>
                   ) : (
-                    <span className="text-sky-600 dark:text-sky-400 font-medium">• Platform Guide</span>
+                    <span className="text-sky-400 font-medium">• Platform Guide</span>
                   )}
                 </div>
                 <button
@@ -1910,7 +1888,7 @@ Keep your response concise, helpful, and academically grounded.`;
                       },
                     ])
                   }
-                  className="text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex items-center gap-1 cursor-pointer"
+                  className="text-[11px] text-neutral-400 hover:text-neutral-200 flex items-center gap-1 cursor-pointer"
                   title="Reset conversation"
                 >
                   <RotateCcw className="w-3 h-3" />
@@ -1924,11 +1902,11 @@ Keep your response concise, helpful, and academically grounded.`;
                   e.preventDefault();
                   handleSendGuideMessage();
                 }}
-                className="flex items-center gap-2.5 rounded-full bg-white dark:bg-neutral-800 px-4 py-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-gray-200 dark:border-neutral-700 focus-within:border-blue-300 focus-within:shadow-[0_4px_24px_rgba(59,130,246,0.12)] transition-all"
+                className="flex items-center gap-2.5 rounded-full bg-white/5 px-4 py-2.5 shadow-sm border border-white/10 focus-within:border-white/20 transition-all"
               >
                 <button
                   type="button"
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition cursor-pointer p-1"
+                  className="text-neutral-400 hover:text-neutral-200 transition cursor-pointer p-1"
                   title="Attach reference source"
                 >
                   <Plus className="w-4 h-4" />
@@ -1941,7 +1919,7 @@ Keep your response concise, helpful, and academically grounded.`;
                   onChange={(e) => setGuideInput(e.target.value)}
                   placeholder="Ask anything, search projects, or type a command..."
                   style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                  className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-xs sm:text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 shadow-none focus:shadow-none prompt-bare-input"
+                  className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-xs sm:text-sm text-neutral-100 placeholder:text-neutral-400 shadow-none focus:shadow-none prompt-bare-input"
                 />
 
                 <button
@@ -1949,8 +1927,8 @@ Keep your response concise, helpful, and academically grounded.`;
                   disabled={!guideInput.trim() || isGuideThinking}
                   className={`rounded-full p-2 flex items-center justify-center transition ${
                     guideInput.trim() && !isGuideThinking
-                      ? "bg-black text-white dark:bg-white dark:text-black hover:opacity-80 cursor-pointer"
-                      : "bg-gray-100 dark:bg-neutral-700 text-gray-400 cursor-not-allowed"
+                      ? "bg-white text-neutral-900 hover:bg-neutral-200 cursor-pointer shadow-xs"
+                      : "bg-white/5 text-neutral-500 cursor-not-allowed"
                   }`}
                   title="Send question"
                   aria-label="Send question"
@@ -1969,21 +1947,21 @@ Keep your response concise, helpful, and academically grounded.`;
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
           onClick={() => !deletingId && setProjectToDelete(null)}
         >
           <div
-            className="w-full max-w-md rounded-3xl bg-white dark:bg-[#171717] border border-gray-200 dark:border-neutral-800 p-7 shadow-2xl relative text-left animate-in zoom-in-95 duration-150"
+            className="w-full max-w-md rounded-3xl bg-[#1C1C1E] border border-white/10 p-7 shadow-2xl relative text-left animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Title */}
-            <h3 id="delete-modal-title" className="text-xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight mb-2.5 font-sans">
+            <h3 id="delete-modal-title" className="text-xl font-extrabold text-neutral-100 tracking-tight mb-2.5 font-sans">
               Delete Project
             </h3>
 
             {/* Sub-label */}
-            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-7 font-normal font-sans">
-              Are you sure you want to delete <span className="font-semibold text-gray-900 dark:text-gray-100">"{getProjectTitle(projectToDelete)}"</span>? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone.
+            <p className="text-sm text-neutral-400 leading-relaxed mb-7 font-normal font-sans">
+              Are you sure you want to delete <span className="font-semibold text-neutral-100">"{getProjectTitle(projectToDelete)}"</span>? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone.
             </p>
 
             {/* Action Buttons */}
@@ -1992,7 +1970,7 @@ Keep your response concise, helpful, and academically grounded.`;
                 type="button"
                 disabled={deletingId !== null}
                 onClick={() => setProjectToDelete(null)}
-                className="px-5 py-2.5 rounded-full text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-700 border border-gray-200 dark:border-neutral-700 transition-all cursor-pointer disabled:opacity-50 font-sans"
+                className="px-5 py-2.5 rounded-full text-sm font-medium text-neutral-300 bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer disabled:opacity-50 font-sans"
               >
                 Cancel
               </button>
@@ -2001,7 +1979,7 @@ Keep your response concise, helpful, and academically grounded.`;
                 type="button"
                 disabled={deletingId !== null}
                 onClick={handleConfirmDelete}
-                className="px-5 py-2.5 rounded-full text-sm font-bold text-[#E60023] hover:text-[#AD081B] bg-[#FFEBEF] dark:bg-[#E60023]/15 hover:bg-[#FFD6DE] dark:hover:bg-[#E60023]/25 transition-all cursor-pointer disabled:opacity-50 font-sans flex items-center justify-center"
+                className="px-5 py-2.5 rounded-full text-sm font-bold text-[#E60023] hover:text-[#AD081B] bg-[#E60023]/15 hover:bg-[#E60023]/25 transition-all cursor-pointer disabled:opacity-50 font-sans flex items-center justify-center"
               >
                 {deletingId ? (
                   <>
@@ -2131,7 +2109,7 @@ function ChooseOutputType({
     <div className="max-w-6xl mx-auto py-6 animate-fade-in font-sans">
       <button
         onClick={onCancel}
-        className="mb-8 inline-flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-all px-4 py-2 rounded-full bg-white dark:bg-[#171717] border border-gray-200 dark:border-neutral-800 shadow-sm cursor-pointer font-sans"
+        className="mb-8 inline-flex items-center gap-2 text-xs font-medium text-neutral-400 hover:text-neutral-100 transition-all px-4 py-2 rounded-full bg-[#1C1C1E] border border-white/10 shadow-sm cursor-pointer font-sans"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -2140,14 +2118,14 @@ function ChooseOutputType({
       </button>
 
       <div className="mb-8">
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-50 font-sans mb-1.5">
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-100 font-sans mb-1.5">
           Select Output Format
         </h2>
       </div>
 
       {!types ? (
-        <div className="flex items-center justify-center py-20 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] rounded-2xl shadow-sm">
-          <div className="w-8 h-8 border-2 border-gray-900 dark:border-gray-100 border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center justify-center py-20 border border-white/10 bg-[#1C1C1E] rounded-2xl shadow-sm">
+          <div className="w-8 h-8 border-2 border-white/40 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <div className="space-y-6">
@@ -2186,9 +2164,9 @@ function ChooseOutputType({
                   key={tile.id}
                   onClick={() => setSelected(tile.id)}
                   onDoubleClick={() => onPick(tile.id)}
-                  className={`group bg-white dark:bg-[#171717] border border-gray-200/80 dark:border-neutral-800 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer flex flex-col justify-between h-full text-left relative ${
+                  className={`group bg-white/5 border border-white/10 hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer flex flex-col justify-between h-full text-left relative ${
                     isSelected
-                      ? "ring-2 ring-gray-900 dark:ring-gray-100 border-gray-900 dark:border-gray-100"
+                      ? "ring-2 ring-white/30 border-white/30"
                       : ""
                   }`}
                 >
@@ -2197,22 +2175,22 @@ function ChooseOutputType({
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
                         <FormatIcon id={tile.id} className="w-4 h-4" />
                       </div>
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-gray-400 dark:text-neutral-500 group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 group-hover:text-neutral-100 transition-colors">
                         <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7V17" />
                         </svg>
                       </div>
                     </div>
-                    <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-gray-100 leading-snug">
+                    <h3 className="text-base font-bold tracking-tight text-neutral-100 leading-snug">
                       {tile.label}
                     </h3>
-                    <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-normal truncate mt-1">
+                    <p className="text-[11px] sm:text-xs text-neutral-400 font-normal truncate mt-1">
                       {tile.features}
                     </p>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-gray-100 dark:border-neutral-800/80 flex items-center justify-between gap-2 text-xs text-gray-400 dark:text-neutral-400 font-sans">
-                    <span className="font-medium text-gray-500 dark:text-neutral-400 truncate">{tile.footer}</span>
-                    <span className="font-semibold text-gray-700 dark:text-gray-300">Select</span>
+                  <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2 text-xs text-neutral-400 font-sans">
+                    <span className="font-medium text-neutral-400 truncate">{tile.footer}</span>
+                    <span className="font-semibold text-neutral-300">Select</span>
                   </div>
                 </div>
               );
@@ -2220,11 +2198,11 @@ function ChooseOutputType({
           </div>
 
           {/* Action Bar */}
-          <div className="pt-4 border-t border-gray-200 dark:border-neutral-800 flex items-center justify-end font-sans">
+          <div className="pt-4 border-t border-white/10 flex items-center justify-end font-sans">
             <button
               onClick={() => onPick(selected)}
               disabled={!selected || creating}
-              className="w-full sm:w-auto rounded-full bg-gray-900 dark:bg-gray-100 px-6 py-2.5 text-xs font-medium text-white dark:text-gray-900 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-transform active:scale-95 font-sans"
+              className="w-full sm:w-auto rounded-full bg-white px-6 py-2.5 text-xs font-semibold text-neutral-900 hover:bg-neutral-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-transform active:scale-95 font-sans"
             >
               {creating ? (
                 <>
@@ -2243,7 +2221,7 @@ function ChooseOutputType({
       )}
 
       {/* Footer info banner */}
-      <footer className="mt-12 py-4 px-4 text-center text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-neutral-800 font-sans">
+      <footer className="mt-12 py-4 px-4 text-center text-xs text-neutral-400 border-t border-white/10 font-sans">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 font-normal">
           <span className="flex items-center gap-1.5">
             <strong className="font-semibold text-gray-900 dark:text-gray-100">Projects</strong>

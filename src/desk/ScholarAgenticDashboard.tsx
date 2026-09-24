@@ -155,17 +155,17 @@ export default function ScholarAgenticDashboard() {
 
   return (
     // Phase 2: Root Layout (Full-screen flex container persistent shell)
-    <div className="flex h-screen w-full overflow-hidden bg-slate-50 font-sans text-gray-800 antialiased selection:bg-blue-100 selection:text-blue-900">
+    <div className="flex h-screen w-full overflow-hidden bg-[#171717] font-sans text-neutral-200 antialiased selection:bg-neutral-100 selection:text-[#171717]">
       
       {/* Left Sidebar Navigation Component */}
       <aside
-        className={`h-full flex flex-col justify-between border-r border-gray-200/80 bg-[#F8F9FA] flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
+        className={`h-full flex flex-col justify-between border-r border-white/10 bg-[#1C1C1E] text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
           isLeftSidebarOpen ? "w-[260px]" : "w-0 border-r-0 overflow-hidden"
         }`}
       >
         <div className="flex flex-col flex-shrink-0 w-[260px]">
           {/* Logo Header */}
-          <div className="p-4 pb-3 flex items-center justify-between border-b border-gray-200/80">
+          <div className="p-4 pb-3 flex items-center justify-between border-b border-white/10">
             <Link
               to="/"
               onClick={() => setActiveView("projects")}
@@ -173,14 +173,14 @@ export default function ScholarAgenticDashboard() {
               title="Scholar Core Home"
               aria-label="Scholar Core Home"
             >
-              <div className="w-9 h-9 rounded-xl bg-gray-900 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
-                <ScholarCoreLogo size="md" className="text-white" />
+              <div className="w-9 h-9 rounded-xl bg-white text-neutral-900 flex items-center justify-center flex-shrink-0 shadow-xs">
+                <ScholarCoreLogo size="md" className="text-neutral-900" />
               </div>
               <div className="flex flex-col min-w-0 justify-center">
-                <span className="font-extrabold text-sm tracking-tight text-gray-900 leading-tight truncate">
+                <span className="font-extrabold text-sm tracking-tight text-neutral-100 leading-tight truncate">
                   Scholar Core
                 </span>
-                <span className="text-[10px] font-medium text-gray-500 mt-0.5 tracking-normal">
+                <span className="text-[10px] font-medium text-neutral-400 mt-0.5 tracking-normal">
                   Workspace
                 </span>
               </div>
@@ -189,7 +189,7 @@ export default function ScholarAgenticDashboard() {
             <button
               type="button"
               onClick={() => setIsLeftSidebarOpen(false)}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-200 hover:bg-white/5 transition-colors cursor-pointer"
               title="Collapse sidebar"
               aria-label="Collapse sidebar"
             >
@@ -204,21 +204,21 @@ export default function ScholarAgenticDashboard() {
             <button
               type="button"
               onClick={() => setActiveView("projects")}
-              className="w-full py-2.5 px-6 rounded-full text-xs font-medium bg-gray-900 text-white hover:opacity-90 active:scale-95 transition-transform flex items-center justify-center gap-2 cursor-pointer shadow-sm group mb-3"
+              className="w-full py-2.5 px-6 rounded-full text-xs font-semibold bg-white text-neutral-900 hover:bg-neutral-200 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group mb-3"
             >
               <span className="text-base font-bold leading-none">+</span>
               <span>New Project</span>
             </button>
 
             <div className="relative group cursor-text mb-4">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors pointer-events-none" />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400 group-hover:text-neutral-200 transition-colors pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full bg-transparent border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-100 transition-all cursor-text text-gray-800 placeholder-gray-400"
+                className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 transition-all cursor-text text-neutral-200 placeholder-neutral-400"
               />
             </div>
           </div>
@@ -231,11 +231,11 @@ export default function ScholarAgenticDashboard() {
               aria-label="Knowledge Vault"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group ${
                 activeView === "vault"
-                  ? "bg-gray-200/80 text-gray-900 font-semibold"
-                  : "hover:bg-gray-100 text-gray-700"
+                  ? "bg-white/10 text-neutral-100 font-semibold"
+                  : "hover:bg-white/5 text-neutral-400 hover:text-neutral-200"
               }`}
             >
-              <Database className="h-4 w-4 text-gray-500 group-hover:text-gray-700 flex-shrink-0" />
+              <Database className="h-4 w-4 text-neutral-400 group-hover:text-neutral-200 flex-shrink-0" />
               <span>Knowledge Vault</span>
             </button>
 
@@ -245,11 +245,11 @@ export default function ScholarAgenticDashboard() {
               aria-label="AI Access"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group ${
                 activeView === "ai-access"
-                  ? "bg-gray-200/80 text-gray-900 font-semibold"
-                  : "hover:bg-gray-100 text-gray-700"
+                  ? "bg-white/10 text-neutral-100 font-semibold"
+                  : "hover:bg-white/5 text-neutral-400 hover:text-neutral-200"
               }`}
             >
-              <Sliders className="h-4 w-4 text-gray-500 group-hover:text-gray-700 flex-shrink-0" />
+              <Sliders className="h-4 w-4 text-neutral-400 group-hover:text-neutral-200 flex-shrink-0" />
               <span>AI Access</span>
             </button>
 
@@ -260,11 +260,11 @@ export default function ScholarAgenticDashboard() {
               aria-label="Ask Scholar"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group ${
                 isSidebarOpen
-                  ? "bg-blue-50 text-blue-800"
-                  : "hover:bg-gray-100 text-gray-700"
+                  ? "bg-white/10 text-neutral-100 font-semibold"
+                  : "hover:bg-white/5 text-neutral-400 hover:text-neutral-200"
               }`}
             >
-              <MessageSquare className="h-4 w-4 text-gray-500 group-hover:text-gray-700 flex-shrink-0" />
+              <MessageSquare className="h-4 w-4 text-neutral-400 group-hover:text-neutral-200 flex-shrink-0" />
               <span>Ask Scholar</span>
             </button>
           </div>
@@ -309,7 +309,7 @@ export default function ScholarAgenticDashboard() {
 
                   {isMenuOpen && (
                     <div
-                      className="absolute right-2 top-8 z-50 w-44 rounded-xl bg-white border border-gray-200/90 shadow-lg py-1.5 text-xs text-gray-700 animate-in fade-in zoom-in-95 duration-100"
+                      className="absolute right-2 top-8 z-50 w-44 rounded-xl bg-[#1C1C1E] border border-white/10 shadow-xl py-1.5 text-xs text-neutral-300 animate-in fade-in zoom-in-95 duration-100"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
@@ -320,32 +320,32 @@ export default function ScholarAgenticDashboard() {
                           );
                           setActiveRecentMenuId(null);
                         }}
-                        className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 text-left font-medium"
+                        className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-white/5 hover:text-neutral-100 text-left font-medium"
                       >
-                        <Pin className="w-3.5 h-3.5 text-gray-500" />
+                        <Pin className="w-3.5 h-3.5 text-neutral-400" />
                         <span>{isPinned ? "Unpin" : "Pin"}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setActiveRecentMenuId(null)}
-                        className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 text-left font-medium"
+                        className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-white/5 hover:text-neutral-100 text-left font-medium"
                       >
-                        <Share2 className="w-3.5 h-3.5 text-gray-500" />
+                        <Share2 className="w-3.5 h-3.5 text-neutral-400" />
                         <span>Share</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setActiveRecentMenuId(null)}
-                        className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 text-left font-medium"
+                        className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-white/5 hover:text-neutral-100 text-left font-medium"
                       >
-                        <Pencil className="w-3.5 h-3.5 text-gray-500" />
+                        <Pencil className="w-3.5 h-3.5 text-neutral-400" />
                         <span>Rename</span>
                       </button>
-                      <div className="my-1 border-t border-gray-100" />
+                      <div className="my-1 border-t border-white/10" />
                       <button
                         type="button"
                         onClick={() => setActiveRecentMenuId(null)}
-                        className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-red-50 text-red-600 text-left font-medium"
+                        className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-red-500/10 text-red-400 text-left font-medium"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         <span>Delete</span>
@@ -359,27 +359,27 @@ export default function ScholarAgenticDashboard() {
         </div>
 
         {/* Bottom User Area */}
-        <div className="p-3 border-t border-gray-200/80 text-xs text-gray-500 flex items-center justify-between">
+        <div className="p-3 border-t border-white/10 text-xs text-neutral-400 bg-[#1C1C1E] flex items-center justify-between">
           <div className="flex items-center gap-2 truncate">
             <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
               S
             </div>
-            <span className="truncate font-medium text-gray-700">scholar@gkshah.com.np</span>
+            <span className="truncate font-medium text-neutral-300">scholar@gkshah.com.np</span>
           </div>
         </div>
       </aside>
 
       {/* Dynamic Central Content (main container strictly controlled by activeView) */}
-      <main className="flex-1 overflow-y-auto relative flex flex-col transition-all duration-300 ease-in-out">
+      <main className="flex-1 overflow-y-auto relative flex flex-col transition-all duration-300 ease-in-out bg-[#171717] text-neutral-200">
         
         {/* Module 3.1: Global Utility Header */}
-        <header className="sticky top-0 z-30 flex items-center justify-between px-8 py-3.5 bg-slate-50/90 backdrop-blur-md border-b border-gray-200/60">
+        <header className="sticky top-0 z-30 flex items-center justify-between px-8 py-3.5 bg-[#171717]/85 backdrop-blur-md border-b border-white/10">
           <div className="flex items-center gap-3">
             {!isLeftSidebarOpen && (
               <button
                 type="button"
                 onClick={() => setIsLeftSidebarOpen(true)}
-                className="p-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 shadow-xs cursor-pointer mr-1"
+                className="p-1.5 rounded-lg border border-white/10 bg-white/5 text-neutral-300 hover:bg-white/10 shadow-xs cursor-pointer mr-1"
                 title="Expand sidebar"
                 aria-label="Expand sidebar"
               >
@@ -398,7 +398,7 @@ export default function ScholarAgenticDashboard() {
             >
               <ScholarCoreLogo size="sm" withText={true} />
             </Link>
-            <span className="text-xs bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded-full font-medium">
+            <span className="text-xs bg-white/10 text-neutral-300 px-2 py-0.5 rounded-full font-medium">
               scholar.gkshah.com.np
             </span>
           </div>

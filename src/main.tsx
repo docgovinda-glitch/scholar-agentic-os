@@ -33,6 +33,12 @@ import { warmServer } from './services/serverWarmup';
  * chunk) — only its trigger moved from an if/else to a <Route path="/admin/*">.
  */
 
+// Strictly force unified dark mode across all environments
+if (typeof document !== 'undefined') {
+  document.documentElement.classList.add('dark');
+  document.documentElement.setAttribute('data-theme', 'dark');
+}
+
 // Start waking the server before rendering, not after the first user action.
 void warmServer();
 

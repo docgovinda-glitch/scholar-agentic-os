@@ -497,35 +497,43 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(within(dialog).getByText("Create an account")).toBeInTheDocument();
   });
 
-  it("applies soft dark mode background, softened borders, and fine-tuned muted accent colors to workspace template cards", async () => {
+  it("applies elevated bg-white/5 background, subtle border-white/10 borders, and high contrast text to workspace template cards", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     const assignmentHeading = await screen.findByRole("heading", { name: "Coursework & Essays" });
     const assignmentCard = assignmentHeading.closest("button")!;
-    expect(assignmentCard.className).toContain("dark:bg-[#171717]");
-    expect(assignmentCard.className).toContain("dark:border-neutral-800");
+    expect(assignmentCard.className).toContain("bg-white/5");
+    expect(assignmentCard.className).toContain("border-white/10");
+    expect(assignmentHeading.className).toContain("text-neutral-100");
+    expect(assignmentCard.innerHTML).toContain("text-neutral-400");
     expect(assignmentCard.innerHTML).toContain("dark:text-blue-400");
     expect(assignmentCard.innerHTML).toContain("dark:bg-blue-500/10");
 
     const journalHeading = screen.getByRole("heading", { name: "Journal Article" });
     const journalCard = journalHeading.closest("button")!;
-    expect(journalCard.className).toContain("dark:bg-[#171717]");
-    expect(journalCard.className).toContain("dark:border-neutral-800");
+    expect(journalCard.className).toContain("bg-white/5");
+    expect(journalCard.className).toContain("border-white/10");
+    expect(journalHeading.className).toContain("text-neutral-100");
+    expect(journalCard.innerHTML).toContain("text-neutral-400");
     expect(journalCard.innerHTML).toContain("dark:text-amber-400/90");
     expect(journalCard.innerHTML).toContain("dark:bg-amber-500/10");
 
     const proposalHeading = screen.getByRole("heading", { name: "Research Proposal" });
     const proposalCard = proposalHeading.closest("button")!;
-    expect(proposalCard.className).toContain("dark:bg-[#171717]");
-    expect(proposalCard.className).toContain("dark:border-neutral-800");
+    expect(proposalCard.className).toContain("bg-white/5");
+    expect(proposalCard.className).toContain("border-white/10");
+    expect(proposalHeading.className).toContain("text-neutral-100");
+    expect(proposalCard.innerHTML).toContain("text-neutral-400");
     expect(proposalCard.innerHTML).toContain("dark:text-indigo-400/90");
     expect(proposalCard.innerHTML).toContain("dark:bg-indigo-500/10");
 
     const presentationHeading = screen.getByRole("heading", { name: "Slides & Keynotes" });
     const presentationCard = presentationHeading.closest("button")!;
-    expect(presentationCard.className).toContain("dark:bg-[#171717]");
-    expect(presentationCard.className).toContain("dark:border-neutral-800");
+    expect(presentationCard.className).toContain("bg-white/5");
+    expect(presentationCard.className).toContain("border-white/10");
+    expect(presentationHeading.className).toContain("text-neutral-100");
+    expect(presentationCard.innerHTML).toContain("text-neutral-400");
     expect(presentationCard.innerHTML).toContain("dark:text-teal-300/90");
     expect(presentationCard.innerHTML).toContain("dark:bg-teal-500/10");
   });

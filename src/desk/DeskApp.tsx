@@ -429,42 +429,44 @@ function AiAccessRoute() {
  */
 export default function DeskApp() {
   return (
-    <LoadingProvider>
-      <Suspense fallback={<GlobalLoader />}>
-        <Routes>
-          <Route path="/" element={<RootOrProjectsRoute />} />
-          <Route path="/signin" element={<RootOrProjectsRoute />} />
-          <Route path="/signup" element={<RootOrProjectsRoute />} />
-          <Route path="/signup/check-email" element={<PublicOnly><RegisteredRoute /></PublicOnly>} />
-          <Route path="/signup/resend" element={<PublicOnly><ResendVerificationRoute /></PublicOnly>} />
-          <Route path="/reset-password" element={<PublicOnly><ForgotRoute /></PublicOnly>} />
-          <Route
-            path="/reset-password/confirm"
-            element={
-              <RequireRecovery>
-                <RecoverRoute />
-              </RequireRecovery>
-            }
-          />
-          <Route path="/verify-email" element={<VerifyEmailRoute />} />
-          <Route path="/*" element={<RequireAuth />}>
-            <Route path="onboarding" element={<OnboardingRoute />} />
-            <Route element={<RequireOnboarding />}>
-              <Route element={<OnboardingGate />}>
-                <Route path="projects" element={<ProjectsIndexRoute />} />
-                <Route path="projects/:projectId" element={<ProjectRoute />} />
-                <Route path="projects/:projectId/:view" element={<ProjectRoute />} />
-                <Route path="settings" element={<SettingsRoute />} />
-                <Route path="vault" element={<VaultRoute />} />
-                <Route path="ai-access" element={<AiAccessRoute />} />
-                <Route path="ai-access/:section" element={<AiAccessRoute />} />
-                <Route path="agents" element={<Navigate to="/projects" replace />} />
-                <Route path="*" element={<Navigate to="/projects" replace />} />
+    <div className="min-h-screen w-full bg-[#171717] text-neutral-200">
+      <LoadingProvider>
+        <Suspense fallback={<GlobalLoader />}>
+          <Routes>
+            <Route path="/" element={<RootOrProjectsRoute />} />
+            <Route path="/signin" element={<RootOrProjectsRoute />} />
+            <Route path="/signup" element={<RootOrProjectsRoute />} />
+            <Route path="/signup/check-email" element={<PublicOnly><RegisteredRoute /></PublicOnly>} />
+            <Route path="/signup/resend" element={<PublicOnly><ResendVerificationRoute /></PublicOnly>} />
+            <Route path="/reset-password" element={<PublicOnly><ForgotRoute /></PublicOnly>} />
+            <Route
+              path="/reset-password/confirm"
+              element={
+                <RequireRecovery>
+                  <RecoverRoute />
+                </RequireRecovery>
+              }
+            />
+            <Route path="/verify-email" element={<VerifyEmailRoute />} />
+            <Route path="/*" element={<RequireAuth />}>
+              <Route path="onboarding" element={<OnboardingRoute />} />
+              <Route element={<RequireOnboarding />}>
+                <Route element={<OnboardingGate />}>
+                  <Route path="projects" element={<ProjectsIndexRoute />} />
+                  <Route path="projects/:projectId" element={<ProjectRoute />} />
+                  <Route path="projects/:projectId/:view" element={<ProjectRoute />} />
+                  <Route path="settings" element={<SettingsRoute />} />
+                  <Route path="vault" element={<VaultRoute />} />
+                  <Route path="ai-access" element={<AiAccessRoute />} />
+                  <Route path="ai-access/:section" element={<AiAccessRoute />} />
+                  <Route path="agents" element={<Navigate to="/projects" replace />} />
+                  <Route path="*" element={<Navigate to="/projects" replace />} />
+                </Route>
               </Route>
             </Route>
-          </Route>
-        </Routes>
-      </Suspense>
-    </LoadingProvider>
+          </Routes>
+        </Suspense>
+      </LoadingProvider>
+    </div>
   );
 }
