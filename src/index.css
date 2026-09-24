@@ -120,9 +120,9 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  /* DAY MODE (Sand & Snow) */
-  --bg-sidebar: #F7F5F0;      /* Warm sand */
-  --bg-canvas: #F7F5F0;       /* Warm sand */
+  /* DAY MODE */
+  --bg-sidebar: #F4F4F5;
+  --bg-canvas: #FAFAFA;
   --bg-card: #FFFFFF;         /* Pure white for elevated elements */
   --bg-button-primary: #000000; 
   --text-primary: #111111;
@@ -137,12 +137,12 @@
   --theme-fg: var(--text-primary);
   --theme-border: var(--border-subtle);
 
-  /* Surfaces — Sand Off-White baseline (warm, low-strain academic paper ground) */
-  --surface-canvas:  #F7F5F0; /* page ground — Sand Off-White */
+  /* Surfaces — Day Mode Baseline */
+  --surface-canvas:  #FAFAFA; /* page ground — Day Mode */
   --surface-raised:  #FFFFFF; /* cards, panels, popovers */
-  --surface-inset:   #EFECE6; /* wells, nested panels, input backgrounds */
-  --surface-sunken:  #E5E1D6; /* deepest recess, track backgrounds */
-  --surface-hover:   #EFECE6; /* hover on an otherwise transparent row */
+  --surface-inset:   #F4F4F5; /* wells, nested panels, input backgrounds */
+  --surface-sunken:  #E4E4E7; /* deepest recess, track backgrounds */
+  --surface-hover:   #F4F4F5; /* hover on an otherwise transparent row */
 
   /* Borders */
   --border-subtle:   #E4E4E7; /* dividers inside a panel */

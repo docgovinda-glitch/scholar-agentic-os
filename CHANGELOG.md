@@ -7,14 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-24
 
-### Fixed & Refactored (Theme Switching & Day/Night Mode Restoration)
-- **Day/Night Mode Toggle Button Restoration & Dynamic Theme Support (`src/desk/ProjectListScreen.tsx`, `index.html`, `server.ts`, `src/index.css`, `src/main.tsx`)**:
-  - Restored full interactive theme switching on the sidebar sun/moon button with immediate zero-latency transition between dark mode (`#171717`) and light mode (`#F7F5F0`).
-  - Implemented an Apple-grade, lightweight cross-fade (`180ms cubic-bezier(0.16, 1, 0.3, 1)`) scoped exclusively to `background-color`, `border-color`, and `color` via transient `html.theme-transition` class, completely eliminating full-screen flicker, layout lag, and geometric resizing shifts.
-  - Reconnected toggle logic to update `data-theme` attribute, toggle `.dark` CSS class on `document.documentElement`, and persist selection across `scholar-theme` and `theme` in `localStorage`.
-  - Replaced static `#171717` styles on `html, body, #root` in `src/index.css` and `index.html` with dynamic CSS design tokens (`var(--surface-canvas)` and `var(--text-primary)`).
-  - Maintained CSP SHA-256 integrity in `server.ts` with verified pre-paint theme hydration script in `index.html`.
-  - Applied dual-mode classes (`bg-white dark:bg-[#171717]`, `border-neutral-200 dark:border-white/10`, `text-neutral-900 dark:text-neutral-100`) across canvas, navigation sidebar, template cards, prompt bar, AI Assistant drawer, format selection grid, and delete confirmation modal without altering any visual dimensions or database connections.
+### Fixed & Refactored (Day/Night Cross-Fade Transition, Palette Baseline & Dashboard Alignment)
+- **Day/Night Mode Toggle & Seamless Cross-Fade (`src/desk/ProjectListScreen.tsx`, `src/index.css`)**:
+  - Restored interactive theme switching on the sidebar footer button with instant zero-latency transition and Apple-grade cross-fade (`180ms cubic-bezier(0.16, 1, 0.3, 1)`) scoped strictly to `background-color`, `border-color`, and `color`.
+  - Added smooth icon micro-rotation animation (`relative w-4 h-4 transition-transform duration-200 rotate-0 dark:-rotate-90`) on theme toggle.
+  - Enforced official palette baseline: Night Mode (Canvas `bg-[#171717]`, Sidebar `bg-[#1C1C1E]`, Borders `border-white/10`, Text `text-white`), Day Mode (Canvas `bg-[#FAFAFA]`, Sidebar `bg-[#F4F4F5]`, Borders `border-neutral-200`, Text `text-neutral-900`).
+- **Dashboard Declutter & Flush Card Alignment (`src/desk/ProjectListScreen.tsx`, `src/desk/__tests__/ProjectListScreen.test.tsx`)**:
+  - Wrapped 4-card template grid and AI prompt bar within a shared `max-w-4xl` container for clean, flush outer margin alignment.
+  - Maintained interactive click targets over the entire card surface area with pinned inline word count and slide target specifications.
+  - Enforced compact Recents typography (`text-[13px] font-medium text-neutral-500 hover:text-neutral-900 dark:hover:text-white`) with optimistic deletion and Gemini-style popover options.
 
 ### Added & Refactored (Targeted UX Decluttering & Deferred Database Initialization)
 - **Targeted Dashboard Template Cards UX Decluttering (`src/desk/ProjectListScreen.tsx`)**:

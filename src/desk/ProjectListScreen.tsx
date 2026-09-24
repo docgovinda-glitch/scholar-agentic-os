@@ -1055,7 +1055,7 @@ Keep your response concise, helpful, and academically grounded.`;
   }
 
   return (
-    <div className="h-screen w-full flex overflow-hidden bg-white dark:bg-[#171717] text-neutral-900 dark:text-neutral-200 font-sans selection:bg-neutral-100 selection:text-[#171717]">
+    <div className="h-screen w-full flex overflow-hidden bg-[#FAFAFA] dark:bg-[#171717] text-neutral-900 dark:text-white font-sans selection:bg-neutral-100 selection:text-[#171717]">
       {/* Mobile Backdrop Overlay */}
       {mobileMenuOpen && (
         <div
@@ -1067,7 +1067,7 @@ Keep your response concise, helpful, and academically grounded.`;
 
       {/* Left Sidebar (Navigation Pane) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-[#F7F5F0] dark:bg-[#1C1C1E] text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-[#F4F4F5] dark:bg-[#1C1C1E] text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
           mobileMenuOpen
             ? "translate-x-0 w-[260px] shadow-2xl"
             : "-translate-x-full md:translate-x-0 " + (isSidebarOpen ? "w-[260px]" : "w-0 border-r-0 overflow-hidden")
@@ -1261,7 +1261,7 @@ Keep your response concise, helpful, and academically grounded.`;
                             scrollToProjects();
                           }
                         }}
-                        className="group flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/5 hover:text-neutral-200 dark:hover:bg-white/5 dark:hover:text-neutral-200 transition-colors duration-200 cursor-pointer text-[13px] font-medium text-neutral-600 dark:text-neutral-400 antialiased"
+                        className="group flex items-center justify-between px-3 py-2 rounded-lg hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors duration-200 cursor-pointer text-[13px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white antialiased"
                         title={item.title}
                       >
                         <span className="truncate pr-2 flex items-center gap-2 min-w-0">
@@ -1345,7 +1345,7 @@ Keep your response concise, helpful, and academically grounded.`;
         </div>
 
         {/* Bottom Section */}
-        <div className="flex-shrink-0 p-3 border-t border-neutral-200 dark:border-white/10 flex flex-col gap-2 w-[260px] bg-[#F7F5F0] dark:bg-[#1C1C1E]">
+        <div className="flex-shrink-0 p-3 border-t border-neutral-200 dark:border-white/10 flex flex-col gap-2 w-[260px] bg-[#F4F4F5] dark:bg-[#1C1C1E]">
           {/* Action Row: Settings Navigation Item + Minimal Icon-Only Theme Toggle */}
           <div className="flex items-center justify-between gap-1.5">
             {onOpenAccountSettings && (
@@ -1374,11 +1374,13 @@ Keep your response concise, helpful, and academically grounded.`;
               aria-label="Toggle theme"
               title={`Switch to ${theme === "dark" ? "Day" : "Night"} mode`}
             >
-              {theme === "dark" ? (
-                <Sun className="w-4 h-4 text-amber-400" />
-              ) : (
-                <Moon className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
-              )}
+              <div className="relative w-4 h-4 transition-transform duration-200 rotate-0 dark:-rotate-90">
+                {theme === "dark" ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
+                )}
+              </div>
             </button>
           </div>
 
@@ -1396,9 +1398,9 @@ Keep your response concise, helpful, and academically grounded.`;
       </aside>
 
       {/* Main Content Area (Center Pane) */}
-      <main className="flex-1 h-full overflow-y-auto bg-white dark:bg-[#171717] text-neutral-900 dark:text-neutral-200 scholar-scrollbar relative flex flex-col transition-all duration-300 ease-in-out">
+      <main className="flex-1 h-full overflow-y-auto bg-[#FAFAFA] dark:bg-[#171717] text-neutral-900 dark:text-white scholar-scrollbar relative flex flex-col transition-all duration-300 ease-in-out">
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
-        <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-white/85 dark:bg-[#171717]/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10">
+        <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-[#FAFAFA]/85 dark:bg-[#171717]/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10">
           <div className="flex items-center gap-3">
             {/* Mobile Drawer Trigger Button */}
             <button
@@ -1497,7 +1499,7 @@ Keep your response concise, helpful, and academically grounded.`;
           </div>
         ) : (
           /* Centered Reading Column */
-          <div className="max-w-5xl mx-auto px-6 pt-8 pb-28 w-full flex-1">
+          <div className="max-w-4xl mx-auto px-6 pt-8 pb-28 w-full flex-1">
           {/* Onboarding welcome banner */}
           {welcomeVisible && (
             <div
@@ -1545,7 +1547,7 @@ Keep your response concise, helpful, and academically grounded.`;
               onCancel={() => setChoosing(false)}
             />
           ) : (
-            <div className="w-full max-w-5xl mx-auto flex flex-col">
+            <div className="w-full max-w-4xl mx-auto flex flex-col">
               {/* 4 Academic Workspace Cards Grid */}
               <div className="w-full">
                 <div className={`grid w-full gap-4 transition-all duration-300 ${

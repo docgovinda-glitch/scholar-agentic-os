@@ -73,8 +73,8 @@ html, body, #root {
 
 ## 3. Sidebar Theme Toggle Button Implementation
 
-### 3.1 Button & Interaction States
-In the sidebar footer (`src/desk/ProjectListScreen.tsx`), the button wrapping the sun icon provides immediate zero-latency feedback:
+### 3.1 Button & Interaction States with Micro-Rotation
+In the sidebar footer (`src/desk/ProjectListScreen.tsx`), the button wrapping the sun icon provides immediate zero-latency feedback with a smooth micro-rotation animation on icon state changes:
 
 ```tsx
 {/* Minimal Icon-Only Theme Toggle */}
@@ -85,11 +85,13 @@ In the sidebar footer (`src/desk/ProjectListScreen.tsx`), the button wrapping th
   aria-label="Toggle theme"
   title={`Switch to ${theme === "dark" ? "Day" : "Night"} mode`}
 >
-  {theme === "dark" ? (
-    <Sun className="w-4 h-4 text-amber-400" />
-  ) : (
-    <Moon className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
-  )}
+  <div className="relative w-4 h-4 transition-transform duration-200 rotate-0 dark:-rotate-90">
+    {theme === "dark" ? (
+      <Sun className="w-4 h-4 text-amber-400" />
+    ) : (
+      <Moon className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
+    )}
+  </div>
 </button>
 ```
 
@@ -147,16 +149,23 @@ const toggleTheme = useCallback(() => {
 
 ---
 
-## 4. Component Surface Harmonization
+## 4. Component Surface Harmonization & Palette Baseline
 
 All primary surfaces dynamically adapt to Day/Night transitions without layout shift or styling regression:
-- **Main Canvas**: `bg-white dark:bg-[#171717] text-neutral-900 dark:text-neutral-200`
-- **Navigation Sidebar**: `bg-[#F7F5F0] dark:bg-[#1C1C1E] border-r border-neutral-200 dark:border-white/10`
-- **Template Cards**: `bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10`
-- **Prompt Input Bar**: `bg-neutral-100/90 dark:bg-white/5 border border-neutral-200 dark:border-white/10`
-- **AI Assistant Drawer**: `bg-white dark:bg-[#1C1C1E] border-l border-neutral-200 dark:border-white/10`
-- **Delete Confirmation Modal**: `bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10`
-- **Format Selection Grid**: `bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10`
+- **Night Mode Baseline**:
+  - Canvas: `bg-[#171717]`
+  - Sidebar: `bg-[#1C1C1E]`
+  - Borders: `border-white/10`
+  - Text: `text-white`
+- **Day Mode Baseline**:
+  - Canvas: `bg-[#FAFAFA]`
+  - Sidebar: `bg-[#F4F4F5]`
+  - Borders: `border-neutral-200`
+  - Text: `text-neutral-900`
+- **Container Alignment**:
+  - Reading column and shared 4-card template grid + prompt bar container: `max-w-4xl mx-auto flex flex-col` ensuring identical left and right outer margin alignment.
+- **Recents Navigation**:
+  - Compact typography `text-[13px] font-medium text-neutral-500 hover:text-neutral-900 dark:hover:text-white` with Gemini-style `MoreVertical` (3-dots) popover menu and optimistic deletion.
 
 ---
 
@@ -164,6 +173,6 @@ All primary surfaces dynamically adapt to Day/Night transitions without layout s
 
 1. **Type Safety**: `npx tsc --noEmit` verified with 0 errors.
 2. **CSP Verification**: `node scripts/verify-csp-hash.mjs` matches `index.html` inline script hash.
-3. **Automated Unit & Integration Tests**: 100% pass rate across 238 test suites (2,595 tests passing).
-4. **Production Build**: `npm run build` succeeds cleanly.
-5. **Database State**: Remote Supabase database (`gfjhsijrwodjvkisouzw`) fully synchronized across all 25 migrations.
+3. **Automated Unit & Integration Tests**: 100% pass rate across 239 test suites (2,601 tests passing).
+4. **Production Build**: `npm run build` succeeds cleanly in 5.37s.
+5. **Database State**: Remote Supabase database (`gfjhsijrwodjvkisouzw`) fully synchronized across all migrations.

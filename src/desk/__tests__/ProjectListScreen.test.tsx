@@ -417,15 +417,15 @@ describe("sidebar projects & platform navigation", () => {
     expect(header.className).toContain("mt-8");
     expect(header.className).toContain("mb-2");
 
-    // 2. Project items Airbnb-style scaling and muted text
+    // 2. Project items compact typography and muted text
     const titleEl = await within(aside!).findByText("Comparative Analysis of In Vivo Cleavage");
     const itemContainer = titleEl.closest(".group")!;
     expect(itemContainer.className).toContain("text-[13px]");
-    expect(itemContainer.className).toContain("text-neutral-400");
+    expect(itemContainer.className).toContain("text-neutral-500");
 
     // 3. Subtle hover state
-    expect(itemContainer.className).toContain("hover:bg-white/5");
-    expect(itemContainer.className).toContain("hover:text-neutral-200");
+    expect(itemContainer.className).toContain("hover:text-neutral-900");
+    expect(itemContainer.className).toContain("dark:hover:text-white");
     expect(itemContainer.className).toContain("transition-colors");
     expect(itemContainer.className).toContain("duration-200");
 
@@ -538,7 +538,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(presentationCard.innerHTML).toContain("dark:bg-teal-500/10");
   });
 
-  it("enforces shared max-w-5xl container, mt-10 gap, flat border-white/10 styling, w-full input, and dark canvas", async () => {
+  it("enforces shared max-w-4xl container, mt-10 gap, flat border-white/10 styling, w-full input, and dark canvas", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
@@ -554,7 +554,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     const sharedParent = promptContainer.parentElement!;
 
     expect(sharedParent.className).toContain("w-full");
-    expect(sharedParent.className).toContain("max-w-5xl");
+    expect(sharedParent.className).toContain("max-w-4xl");
     expect(sharedParent.className).toContain("mx-auto");
     expect(sharedParent.className).toContain("flex-col");
 
@@ -742,6 +742,36 @@ describe("minimal website assistant", () => {
     // 4. Click once more to reopen
     fireEvent.click(askScholarBtn);
     expect(await screen.findByRole("heading", { name: "Ask Scholar" })).toBeInTheDocument();
+  });
+});
+
+describe("day/night mode toggle & seamless transition", () => {
+  it("renders theme toggle button with micro-rotation and toggles theme state with transient transition class", async () => {
+    vi.useFakeTimers();
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const themeToggleBtn = screen.getByRole("button", { name: /toggle theme/i });
+    expect(themeToggleBtn).toBeInTheDocument();
+
+    // Check micro-rotation wrapper
+    const rotationWrapper = themeToggleBtn.querySelector(".transition-transform");
+    expect(rotationWrapper).toBeInTheDocument();
+    expect(rotationWrapper?.className).toContain("duration-200");
+
+    // Click to toggle
+    fireEvent.click(themeToggleBtn);
+
+    // Verify theme-transition class attached to documentElement
+    expect(document.documentElement.classList.contains("theme-transition")).toBe(true);
+
+    // Advance timers by 200ms
+    vi.advanceTimersByTime(200);
+
+    // Verify theme-transition class removed after 200ms
+    expect(document.documentElement.classList.contains("theme-transition")).toBe(false);
+
+    vi.useRealTimers();
   });
 });
 
