@@ -970,6 +970,27 @@ describe("distinct academic format USPs & specs", () => {
     expect(card.querySelector(".lucide-edit")).toBeNull();
   });
 
+  it("does not render italicized info badge or blueprint tooltips on template cards", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const headings = [
+      "Coursework & Essays",
+      "Journal Article",
+      "Research Proposal",
+      "Slides & Keynotes",
+    ];
+
+    for (const title of headings) {
+      const heading = screen.getByRole("heading", { name: title });
+      const card = heading.closest("button")!;
+      expect(card.querySelector("span.font-serif")).toBeNull();
+      expect(card.querySelector("[title*='blueprint']")).toBeNull();
+      expect(card.querySelector("[title*='methodology']")).toBeNull();
+      expect(card.querySelector("[aria-label*='blueprint']")).toBeNull();
+    }
+  });
+
   it("supports auto-expanding prompt bar with file upload, drag-and-drop, paste, chips, backspace removal, and keyboard submit", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);

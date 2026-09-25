@@ -5,7 +5,17 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-24
+## [Unreleased] - 2026-09-25
+
+### Removed & Refactored (Template Cards: Removal of Italicized Info Badges & Tooltips)
+- **Decluttered Card Top Row (`src/desk/ProjectListScreen.tsx`)**:
+  - Removed floating italicized info badges ("*i*"), hover tooltips (*"View methodology & stages blueprint"*), and secondary indicators from the top-right corner of all 4 template cards.
+  - Streamlined template card headers to display solely the category icon in its high-contrast badge container, eliminating visual noise and secondary click-target collisions.
+  - Cleaned up unused `previewFormatId` state and unreachable blueprint preview overlays.
+- **Test Suite Updates (`src/desk/__tests__/ProjectListScreen.test.tsx`)**:
+  - Added unit test asserting the complete absence of `span.font-serif`, blueprint tooltips, and methodology indicators across all 4 template cards.
+
+## [2026-09-24]
 
 ### Added & Refactored (Bottom-Anchored Dashboard Layout: ChatGPT & Google Gemini Architecture)
 - **Bottom-Anchored Viewport Structure (`src/desk/ProjectListScreen.tsx`)**:

@@ -716,7 +716,6 @@ export default function ProjectListScreen({
   }, [userEmail, projects, searchQuery]);
 
   const [activeProviderLabel, setActiveProviderLabel] = useState<string>("Ready");
-  const [previewFormatId, setPreviewFormatId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userEmail) {
@@ -1729,7 +1728,7 @@ Keep your response concise, helpful, and academically grounded.`;
                               : ""
                           }`}
                         >
-                          {/* Top Row: Icon & Info indicator */}
+                          {/* Top Row: Clean Category Icon Container */}
                           <div className="flex items-center justify-between w-full">
                             <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
                               {isBootingThis ? (
@@ -1737,27 +1736,6 @@ Keep your response concise, helpful, and academically grounded.`;
                               ) : (
                                 <FormatIcon id={tile.id} className="w-4 h-4" />
                               )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span
-                                role="button"
-                                tabIndex={0}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    e.stopPropagation();
-                                    setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
-                                  }
-                                }}
-                                className="w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-serif italic font-bold"
-                                title="View methodology & stages blueprint"
-                                aria-label={`View stages blueprint for ${tile.label}`}
-                              >
-                                i
-                              </span>
                             </div>
                           </div>
 
@@ -1782,60 +1760,6 @@ Keep your response concise, helpful, and academically grounded.`;
                               ))}
                             </span>
                           </div>
-
-                          {/* Interactive Stages & Methodology Blueprint Overlay */}
-                          {previewFormatId === tile.id && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute inset-0 bg-white dark:bg-[#1C1C1E] rounded-2xl p-4 z-20 flex flex-col justify-between border border-neutral-200 dark:border-white/10 shadow-xl animate-in fade-in zoom-in-95 duration-150 text-left"
-                            >
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className={`text-[11px] font-bold uppercase tracking-wider ${tileTheme.accentText}`}>
-                                    {tile.label} • Blueprint
-                                  </span>
-                                  <span
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={() => setPreviewFormatId(null)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter" || e.key === " ") setPreviewFormatId(null);
-                                    }}
-                                    className="w-5 h-5 rounded-full flex items-center justify-center text-gray-400 hover:text-white cursor-pointer"
-                                    aria-label="Close preview"
-                                  >
-                                    ✕
-                                  </span>
-                                </div>
-                                <p className="text-[11px] text-neutral-400 mb-2 leading-tight">
-                                  {STAGE_BREAKDOWNS[tile.id]?.highlights}
-                                </p>
-                                <div className="space-y-1">
-                                  {STAGE_BREAKDOWNS[tile.id]?.phases.map((ph, phIdx) => (
-                                    <div key={phIdx} className="text-[11px] font-medium text-neutral-200 flex items-center gap-1.5">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                                      <span className="truncate">{ph}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="pt-2 border-t border-white/10 flex items-center justify-between">
-                                <span className="text-[10px] text-slate-400">{tile.budget}</span>
-                                <span
-                                  onClick={() => {
-                                    if (!userEmail) {
-                                      openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
-                                      return;
-                                    }
-                                    handleCreate(tile.id);
-                                  }}
-                                  className="text-[11px] font-bold text-blue-400 hover:underline cursor-pointer"
-                                >
-                                  Boot Workspace →
-                                </span>
-                              </div>
-                            </div>
-                          )}
                         </button>
                       );
                     })}
