@@ -352,6 +352,16 @@ describe("signIn", () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe("Incorrect password. Please try again.");
   });
+
+  it("reports unconfirmed email with clear verification prompt", async () => {
+    mockRpc.mockResolvedValue({ data: "jane@example.com", error: null });
+    mockAuth.signInWithPassword.mockResolvedValue({ data: { user: null }, error: { message: "Email not confirmed" } });
+
+    const result = await signIn({ username: "jdoe", password: "secret-password" });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Your email address has not been verified yet");
+  });
 });
 
 

@@ -263,6 +263,12 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
   });
 
   if (signInError) {
+    if (signInError.message?.toLowerCase().includes("email not confirmed")) {
+      return {
+        success: false,
+        error: "Your email address has not been verified yet. Please check your inbox or resend the verification link.",
+      };
+    }
     return { success: false, error: "Incorrect password. Please try again." };
   }
 
