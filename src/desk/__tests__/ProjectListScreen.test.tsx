@@ -6,7 +6,7 @@
 // now select-then-confirm rather than one click per option, since a bare
 // <select> has no equivalent to "click this card to create it".
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, within, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -355,7 +355,7 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     expect(aside).toHaveClass("flex-shrink-0");
     // custom agentic scrollbar and scroll container on main
     expect(main).toHaveClass("scholar-scrollbar");
-    expect(main).toHaveClass("overflow-y-auto");
+    expect(main).toHaveClass("overflow-hidden");
 
     // Click toggle button in the top-left of the main header to collapse
     const toggleBtn = screen.getByRole("button", { name: "Toggle sidebar" });
@@ -544,7 +544,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(presentationCard.innerHTML).toContain("dark:bg-teal-500/10");
   });
 
-  it("enforces shared max-w-4xl container, mt-10 gap, flat border-white/10 styling, w-full input, and dark canvas", async () => {
+  it("enforces shared max-w-4xl container, bottom-anchored prompt container, flat border-white/10 styling, w-full input, and dark canvas", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
@@ -553,23 +553,26 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(mainCanvas.className).toContain("bg-[#171717]");
     expect(mainCanvas.className).not.toContain("bg-[var(--bg-canvas)]");
 
-    // 2. Shared Container Alignment
+    // 2. Shared Container Alignment & Bottom Docking
     const promptInput = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i);
     const promptForm = promptInput.closest("form")!;
-    const promptContainer = promptForm.parentElement!;
-    const sharedParent = promptContainer.parentElement!;
+    const sharedParent = promptForm.parentElement!;
 
     expect(sharedParent.className).toContain("w-full");
     expect(sharedParent.className).toContain("max-w-4xl");
     expect(sharedParent.className).toContain("mx-auto");
     expect(sharedParent.className).toContain("flex-col");
+    expect(sharedParent.className).toContain("items-center");
 
-    // 3. Spacing mt-10
-    expect(promptContainer.className).toContain("mt-10");
+    // 3. Welcome workspace heading and removed disclaimer footer
+    expect(screen.getByRole("heading", { name: "Where will your research begin?" })).toBeInTheDocument();
+    expect(screen.getByText("Select an academic deliverable or paste your assignment guidelines below.")).toBeInTheDocument();
+    expect(screen.queryByText("Scholar Core Socratic Engine · Verify citations against official institutional rubrics.")).not.toBeInTheDocument();
 
     // 4. Shadow & Border Fix on prompt bar
-    expect(promptForm.className).toContain("border-white/10");
-    expect(promptForm.className).toContain("bg-white/5");
+    expect(promptForm.className).toContain("border-neutral-200");
+    expect(promptForm.className).toContain("dark:border-white/10");
+    expect(promptForm.className).toContain("dark:bg-[#1C1C1E]");
     expect(promptForm.className).toContain("shadow-sm");
     expect(promptForm.className).not.toContain("shadow-lg");
     expect(promptForm.className).not.toContain("shadow-xl");
@@ -780,4 +783,298 @@ describe("day/night mode toggle & seamless transition", () => {
     vi.useRealTimers();
   });
 });
+
+describe("ghost project deletion & strict unique project naming", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("prevents zombie project resurrection after deletion even if listProjects returns stale data", async () => {
+    listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
+    deleteProject.mockResolvedValue({ success: true, id: "proj-101" });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    // Wait for project to appear in recents
+    await screen.findByText(SAMPLE_PROJECT.answers.title);
+
+    // Click more options -> Delete -> Confirm Delete
+    const moreBtn = await screen.findByRole("button", { name: "More options" });
+    fireEvent.click(moreBtn);
+
+    const deleteBtn = screen.getByRole("button", { name: /^Delete$/i });
+    fireEvent.click(deleteBtn);
+
+    const confirmDeleteBtn = screen.getByRole("button", { name: "Delete" });
+    fireEvent.click(confirmDeleteBtn);
+
+    await waitFor(() => expect(deleteProject).toHaveBeenCalled());
+    const deletedId = deleteProject.mock.calls[0][0];
+    expect(sessionStorage.getItem("scholar_deleted_project_ids")).toContain(deletedId);
+
+    // Even if listProjects returns the deleted project (stale cache / race condition)
+    listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
+    cleanup();
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    // The project must NOT reappear in recents
+    expect(screen.queryByText("Autonomous AI Agents in Medicine")).not.toBeInTheDocument();
+  });
+
+  it("enforces strict case-insensitive unique naming on project rename", async () => {
+    const projectA = { ...SAMPLE_PROJECT, projectId: "p-1", answers: { title: "Neural Dynamics" } };
+    const projectB = { ...SAMPLE_PROJECT, projectId: "p-2", answers: { title: "Quantum Simulation" } };
+    listProjects.mockResolvedValue({ items: [projectA, projectB] });
+
+    const alertMock = vi.spyOn(window, "alert").mockImplementation(() => {});
+    const promptMock = vi.spyOn(window, "prompt").mockReturnValue("  quantum simulation  ");
+
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    await screen.findByText("Neural Dynamics");
+
+    const moreButtons = await screen.findAllByRole("button", { name: "More options" });
+    fireEvent.click(moreButtons[0]); // More options for Project A
+
+    const renameBtn = screen.getByRole("button", { name: /^Rename$/i });
+    fireEvent.click(renameBtn);
+
+    // Alert should have triggered warning of duplicate
+    expect(alertMock).toHaveBeenCalledWith(expect.stringContaining("already exists"));
+    // saveIntakeAnswers should NOT have been called with duplicate title
+    expect(saveIntakeAnswers).not.toHaveBeenCalledWith("p-1", { title: "quantum simulation" });
+
+    alertMock.mockRestore();
+    promptMock.mockRestore();
+  });
+
+  it("reuses existing zero-content Untitled Project draft instead of creating a duplicate", async () => {
+    const emptyDraft = {
+      projectId: "proj-empty-draft",
+      outputTypeId: "OT-01",
+      answers: { title: "Untitled Project" },
+      hasDocument: false,
+      intakeCompleteness: 0,
+      authors: [],
+      gates: [],
+    };
+    listProjects.mockResolvedValue({ items: [emptyDraft] });
+    const onOpen = vi.fn();
+
+    renderScreen(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
+
+    // Wait for existing project to load in Recents
+    await screen.findByText("Untitled Project");
+
+    // Click Coursework & Essays tile directly on dashboard
+    const essayHeading = screen.getByRole("heading", { name: "Coursework & Essays" });
+    const essayCard = essayHeading.closest("button");
+    expect(essayCard).toBeInTheDocument();
+
+    fireEvent.click(essayCard!);
+
+    // Should NOT call createProject; should reuse and focus the existing draft
+    expect(createProject).not.toHaveBeenCalled();
+    expect(onOpen).toHaveBeenCalledWith("proj-empty-draft");
+  });
+
+  it("auto-increments Untitled Project title when existing untitled project has content", async () => {
+    const activeDraft = {
+      projectId: "proj-active",
+      outputTypeId: "OT-01",
+      answers: { title: "Untitled Project" },
+      hasDocument: true,
+      intakeCompleteness: 0.8,
+      authors: [],
+      gates: [],
+    };
+    listProjects.mockResolvedValue({ items: [activeDraft] });
+    createProject.mockResolvedValue({ projectId: "proj-new-unique" });
+    const onOpen = vi.fn();
+
+    renderScreen(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
+
+    // Wait for existing project to load in Recents
+    await screen.findByText("Untitled Project");
+
+    // Click Coursework & Essays tile directly on dashboard
+    const essayHeading = screen.getByRole("heading", { name: "Coursework & Essays" });
+    const essayCard = essayHeading.closest("button");
+    expect(essayCard).toBeInTheDocument();
+
+    fireEvent.click(essayCard!);
+
+    // Should call createProject because existing draft has content
+    await waitFor(() => expect(createProject).toHaveBeenCalledWith("OT-01"));
+    // Should auto-assign incremented title "Untitled Project 1"
+    await waitFor(() =>
+      expect(saveIntakeAnswers).toHaveBeenCalledWith("proj-new-unique", { title: "Untitled Project 1" })
+    );
+    await waitFor(() => expect(onOpen).toHaveBeenCalledWith("proj-new-unique"));
+  });
+});
+
+describe("distinct academic format USPs & specs", () => {
+  it("renders step-by-step workflow guidance and academic deliverables for all 4 academic formats on the dashboard", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    // 1. Coursework & Essays
+    expect(screen.getByRole("heading", { name: "Coursework & Essays" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/Guides you through thesis formulation, marking rubric alignment, critical argument synthesis, and citation formatting\./i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("Structured Outline")).toBeInTheDocument();
+    expect(screen.getByText("Rubric Matched")).toBeInTheDocument();
+    expect(screen.getByText("800 – 4,000 words")).toBeInTheDocument();
+
+    // 2. Journal Article
+    expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/Structures formal IMRaD manuscripts with deep literature synthesis, methodology validation, and peer-review readiness\./i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("IMRaD Architecture")).toBeInTheDocument();
+    expect(screen.getByText("Peer Review")).toBeInTheDocument();
+    expect(screen.getByText("4,000 – 10,000 words")).toBeInTheDocument();
+
+    // 3. Research Proposal
+    expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/Guides research question definition, literature gap identification, theoretical frameworks, and methodology design\./i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("Gap Analysis")).toBeInTheDocument();
+    expect(screen.getByText("Ethics & Methodology")).toBeInTheDocument();
+    expect(screen.getByText("3,000 – 15,000 words")).toBeInTheDocument();
+
+    // 4. Slides & Keynotes
+    expect(screen.getByRole("heading", { name: "Slides & Keynotes" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/Converts academic papers into visual presentation slides with scripted speaker notes and executive takeaways\./i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("Slide Deck Outline")).toBeInTheDocument();
+    expect(screen.getByText("Scripted Speaker Notes")).toBeInTheDocument();
+    expect(screen.getByText("10 – 35 slides")).toBeInTheDocument();
+  });
+
+  it("renders centered middle-dot separator with subtle opacity styling", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const essayHeading = screen.getByRole("heading", { name: "Coursework & Essays" });
+    const card = essayHeading.closest("button")!;
+    const dot = card.querySelector(".opacity-60");
+    expect(dot).toBeInTheDocument();
+    expect(dot?.textContent).toBe("·");
+  });
+
+  it("does not render pen, pencil, or edit icons on dashboard cards", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const essayHeading = screen.getByRole("heading", { name: "Coursework & Essays" });
+    const card = essayHeading.closest("button")!;
+    expect(card.querySelector(".lucide-pencil")).toBeNull();
+    expect(card.querySelector(".lucide-edit")).toBeNull();
+  });
+
+  it("does not render italicized info badge or blueprint tooltips on template cards", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const headings = [
+      "Coursework & Essays",
+      "Journal Article",
+      "Research Proposal",
+      "Slides & Keynotes",
+    ];
+
+    for (const title of headings) {
+      const heading = screen.getByRole("heading", { name: title });
+      const card = heading.closest("button")!;
+      expect(card.querySelector("span.font-serif")).toBeNull();
+      expect(card.querySelector("[title*='blueprint']")).toBeNull();
+      expect(card.querySelector("[title*='methodology']")).toBeNull();
+      expect(card.querySelector("[aria-label*='blueprint']")).toBeNull();
+    }
+  });
+
+  it("supports auto-expanding prompt bar with file upload, drag-and-drop, paste, chips, backspace removal, and keyboard submit", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const promptTextarea = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i) as HTMLTextAreaElement;
+    expect(promptTextarea).toBeInTheDocument();
+    const promptForm = promptTextarea.closest("form")!;
+
+    // No duplicate "Ask & Actions" box
+    expect(screen.queryByText("Ask & Actions")).not.toBeInTheDocument();
+
+    // Paperclip button & file input
+    const uploadBtn = screen.getByRole("button", { name: /Attach files or images/i });
+    expect(uploadBtn).toBeInTheDocument();
+    const fileInput = screen.getByLabelText("File upload") as HTMLInputElement;
+    expect(fileInput).toBeInTheDocument();
+    expect(fileInput.accept).toBe(".pdf,.doc,.docx,.txt,image/*");
+
+    // Tooltip relative positioning
+    const paperclipTooltip = uploadBtn.parentElement?.querySelector("span");
+    expect(paperclipTooltip?.className).toContain("bottom-full");
+    expect(paperclipTooltip?.className).toContain("mb-2");
+
+    // Simulate file attachment
+    const testFile = new File(["syllabus content"], "syllabus_brief.pdf", { type: "application/pdf" });
+    fireEvent.change(fileInput, { target: { files: [testFile] } });
+
+    // Expect attachment chip to appear
+    const chip = await screen.findByText("syllabus_brief.pdf");
+    expect(chip).toBeInTheDocument();
+
+    // Drag and drop interaction
+    fireEvent.dragOver(promptForm);
+    expect(promptForm.className).toContain("border-blue-500");
+    fireEvent.dragLeave(promptForm);
+    expect(promptForm.className).not.toContain("border-blue-500");
+
+    const droppedFile = new File(["chart data"], "data_chart.png", { type: "image/png" });
+    fireEvent.drop(promptForm, {
+      dataTransfer: { files: [droppedFile] },
+    });
+    expect(await screen.findByText("data_chart.png")).toBeInTheDocument();
+
+    // Clipboard paste interaction
+    const pastedFile = new File(["rubric doc"], "marking_rubric.docx", {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    fireEvent.paste(promptTextarea, {
+      clipboardData: {
+        items: [
+          {
+            kind: "file",
+            getAsFile: () => pastedFile,
+          },
+        ],
+      },
+    });
+    expect(await screen.findByText("marking_rubric.docx")).toBeInTheDocument();
+
+    // Backspace removes last attachment when input is empty
+    expect(promptTextarea.value).toBe("");
+    fireEvent.keyDown(promptTextarea, { key: "Backspace" });
+    expect(screen.queryByText("marking_rubric.docx")).not.toBeInTheDocument();
+
+    // Remove chip via X button
+    const removeBtn = screen.getByRole("button", { name: /Remove data_chart.png/i });
+    expect(removeBtn).toBeInTheDocument();
+    fireEvent.click(removeBtn);
+    expect(screen.queryByText("data_chart.png")).not.toBeInTheDocument();
+
+    // Type into textarea and submit with Enter
+    fireEvent.change(promptTextarea, { target: { value: "Investigate CRISPR off-target effects" } });
+    fireEvent.keyDown(promptTextarea, { key: "Enter", shiftKey: false });
+    // Textarea clears on send
+    expect(promptTextarea.value).toBe("");
+  });
+});
+
+
+
 

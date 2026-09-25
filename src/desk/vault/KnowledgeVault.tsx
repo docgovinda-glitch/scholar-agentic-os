@@ -100,7 +100,17 @@ export default function KnowledgeVault({
         listProjects().catch(() => ({ items: [] as ProjectView[] })),
         listOutputTypes().catch(() => ({ items: [] as OutputTypeSummary[] })),
       ]);
-      setProjects(projRes?.items || []);
+      let items = projRes?.items || [];
+      try {
+        const stored = sessionStorage.getItem("scholar_deleted_project_ids");
+        if (stored) {
+          const deleted = new Set(JSON.parse(stored));
+          items = items.filter((p) => !deleted.has(p.projectId));
+        }
+      } catch {
+        // ignore
+      }
+      setProjects(items);
       setTypes(typeRes?.items || []);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to load projects";
@@ -109,6 +119,7 @@ export default function KnowledgeVault({
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     loadData();
@@ -174,8 +185,34 @@ export default function KnowledgeVault({
     const targetProject = projectToDelete;
     const previousProjects = projects;
 
-    // Immediately close modal and update local state
+    const markDeleted = (id: string) => {
+      try {
+        const stored = sessionStorage.getItem("scholar_deleted_project_ids");
+        const list = stored ? JSON.parse(stored) : [];
+        if (!list.includes(id)) {
+          list.push(id);
+          sessionStorage.setItem("scholar_deleted_project_ids", JSON.stringify(list));
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    const unmarkDeleted = (id: string) => {
+      try {
+        const stored = sessionStorage.getItem("scholar_deleted_project_ids");
+        if (stored) {
+          const list = JSON.parse(stored).filter((item: string) => item !== id);
+          sessionStorage.setItem("scholar_deleted_project_ids", JSON.stringify(list));
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    // Immediately close modal, mark deleted, and update local state
     setProjectToDelete(null);
+    markDeleted(targetProject.projectId);
     setProjects((prev) => (prev ? prev.filter((p) => p.projectId !== targetProject.projectId) : []));
 
     try {
@@ -185,11 +222,13 @@ export default function KnowledgeVault({
     } catch (err: unknown) {
       console.error("Failed to delete project:", err);
       // Rollback on failure
+      unmarkDeleted(targetProject.projectId);
       setProjects(previousProjects);
       const msg = err instanceof Error ? err.message : "Failed to delete project";
       alert(`Could not delete project: ${msg}`);
     }
   };
+
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--bg-canvas)] text-[var(--text-primary)] font-sans antialiased">

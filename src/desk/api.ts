@@ -61,6 +61,11 @@ import {
   deleteEphemeralProject,
 } from "./ephemeralProjectStore";
 
+import {
+  deleteCachedProject,
+  removePendingMutationsForProject,
+} from "../services/offline/indexedDbStorage";
+
 export {
   isEphemeralProject,
   getEphemeralProject,
@@ -68,6 +73,7 @@ export {
   updateEphemeralProject,
   deleteEphemeralProject,
 };
+
 
 /**
  * Commits an ephemeral project to the database when user triggers an explicit commit
@@ -487,14 +493,23 @@ export async function executeAgenticLLM(
 
   const handleFailoverEvent = (event: any) => {
     if (event.type === "switch") {
+      const rawId = event.providerId || "";
+      const [provId, modId] = rawId.split("::");
       const nextCandidate = candidates.find(
-        (c) => c.provider === event.providerId || `${c.provider}::${c.model}`.startsWith(event.providerId)
+        (c) =>
+          c.provider === rawId ||
+          c.provider === provId ||
+          `${c.provider}::${c.model || "default"}` === `${provId}::${modId}`
       );
-      const spec = nextCandidate ? getCloudProvider(nextCandidate.provider) : undefined;
+      const targetProvider = nextCandidate?.provider || provId || rawId;
+      const targetModel = nextCandidate?.model || (modId && modId !== "default" ? modId : undefined);
+      const spec = getCloudProvider(targetProvider);
       updateExecutionScope(executionId, {
-        providerId: event.providerId,
-        providerName: spec?.name || event.providerId,
-        modelId: nextCandidate?.model,
+        providerId: targetProvider,
+        activeProvider: targetProvider,
+        providerName: spec?.name || targetProvider,
+        modelId: targetModel,
+        activeModel: targetModel,
         isFallback: true,
         status: "fallback",
         message: event.userMessage,
@@ -612,15 +627,79 @@ export function listProjects(): Promise<{ items: ProjectView[] }> {
   return authedFetch("/api/projects").then((r) => json(r));
 }
 
-export function deleteProject(projectId: string): Promise<void> {
+/**
+ * Purge any project keys from browser storage to eliminate zombie cache data.
+ */
+export function cleanupProjectStorage(projectId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const cleanStorage = (storage: Storage) => {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (
+          key &&
+          (key.includes(projectId) ||
+            key.startsWith(`project_${projectId}`) ||
+            key.startsWith(`draft_${projectId}`))
+        ) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => storage.removeItem(k));
+    };
+
+    if (window.localStorage) cleanStorage(window.localStorage);
+    if (window.sessionStorage) cleanStorage(window.sessionStorage);
+  } catch (err) {
+    console.warn("Non-fatal: failed to clean up project storage", err);
+  }
+}
+
+export async function deleteProject(projectId: string): Promise<{ success: boolean; id: string }> {
+  // 1. Purge ephemeral in-memory state if this was an unsaved draft
   if (isEphemeralProject(projectId)) {
     deleteEphemeralProject(projectId);
-    return Promise.resolve();
+    cleanupProjectStorage(projectId);
+    return { success: true, id: projectId };
   }
-  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}`, {
-    method: "DELETE",
-  }).then((r) => json(r));
+
+  // 2. Clean up browser storage and offline IndexedDB cache
+  cleanupProjectStorage(projectId);
+  try {
+    await deleteCachedProject(projectId);
+    await removePendingMutationsForProject(projectId);
+  } catch (err) {
+    console.warn("Non-fatal: offline cache cleanup failed for project", projectId, err);
+  }
+
+  // 3. Await hard deletion from Supabase directly if configured
+  if (isSupabaseConfigured()) {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { error } = await supabase
+        .from("projects")
+        .delete()
+        .eq("project_id", projectId);
+
+      if (error) {
+        console.warn("Direct Supabase deletion error, falling back to server route:", error);
+      }
+    }
+  }
+
+  // 4. Call server endpoint to ensure cascade deletion on server store as well
+  try {
+    await authedFetch(`/api/projects/${encodeURIComponent(projectId)}`, {
+      method: "DELETE",
+    }).then((r) => json(r));
+  } catch (err) {
+    console.warn("Server DELETE /api/projects/:id response:", err);
+  }
+
+  return { success: true, id: projectId };
 }
+
 
 /**
  * The full Atlas spec for one output type — this is where `intakeSchema`

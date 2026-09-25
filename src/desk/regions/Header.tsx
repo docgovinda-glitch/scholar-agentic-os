@@ -24,6 +24,7 @@ export default function Header({
   onOpenVault,
   onOpenAiAccess,
   onToggleRail,
+  onRenameProject,
   userEmail,
 }: {
   project: ProjectView;
@@ -33,10 +34,20 @@ export default function Header({
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
   onToggleRail?: () => void;
+  onRenameProject?: (newTitle: string) => Promise<void> | void;
   userEmail?: string | null;
 }) {
   const current = project.gates?.find((g) => g.status !== "signed_off") ?? project.gates?.[project.gates.length - 1];
   const [searchOpen, setSearchOpen] = useState(false);
+
+  const handleRename = () => {
+    if (!onRenameProject) return;
+    const currentTitle = project.answers?.title || "";
+    const newTitle = window.prompt("Rename research project:", currentTitle || outputTypeLabel);
+    if (newTitle && newTitle.trim()) {
+      onRenameProject(newTitle.trim());
+    }
+  };
 
   return (
     <>
@@ -71,9 +82,18 @@ export default function Header({
       <span className="text-[color:var(--text-muted)]" aria-hidden="true">
         /
       </span>
-      <span className="max-w-xs truncate text-[color:var(--text-secondary)]" title={project.projectId}>
-        {outputTypeLabel}
-      </span>
+      <div className="flex items-center gap-1.5 max-w-xs sm:max-w-md">
+        <span
+          className={`truncate font-medium text-[color:var(--text-secondary)] ${
+            onRenameProject ? "cursor-pointer hover:text-[color:var(--text-primary)] hover:underline" : ""
+          }`}
+          title={onRenameProject ? `Click to rename: ${project.answers?.title || outputTypeLabel}` : project.projectId}
+          onClick={onRenameProject ? handleRename : undefined}
+        >
+          {project.answers?.title || outputTypeLabel}
+        </span>
+      </div>
+
       {current && (
         <span className="ml-2 rounded-full border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)] px-2 py-0.5 text-xs text-[color:var(--accent)]">
           {current.gate} {current.name}

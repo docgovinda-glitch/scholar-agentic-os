@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   createProject,
@@ -12,6 +12,11 @@ import {
   parseFileForAgent,
   type AiOperationalStatus,
 } from "./api";
+import {
+  isDuplicateProjectTitle,
+  getNextUntitledProjectTitle,
+  findReusableEmptyProject,
+} from "./projectNaming";
 import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
 import { syncActiveSessionToRegistry } from "../services/auth/multiAccountService";
@@ -51,6 +56,10 @@ import {
 import { getCloudProvider } from "../config/providerCatalog";
 import { loadUserAiSettings } from "../services/userAiSettings";
 
+export interface Attachment {
+  file: File;
+  previewUrl?: string;
+}
 
 /** Curated 4 essential academic formats */
 export const FORMAT_TILES = [
@@ -58,33 +67,45 @@ export const FORMAT_TILES = [
     id: "OT-01",
     label: "Coursework & Essays",
     title: "Coursework & Essays",
-    features: "Zero Hallucination · Verified Citations · Zero Errors",
-    footer: "800 – 4,000 words",
-    budget: "800 – 4,000 words",
+    guidance: "Guides you through thesis formulation, marking rubric alignment, critical argument synthesis, and citation formatting.",
+    specs: "Structured Outline · Rubric Matched · 800 – 4,000 words",
+    footer: "Structured Outline · Rubric Matched · 800 – 4,000 words",
+    usp: "Marking Rubric Alignment · Argument Synthesis",
+    features: "Structured Outline · Rubric Matched · 800 – 4,000 words",
+    budget: "Structured Outline · Rubric Matched · 800 – 4,000 words",
   },
   {
     id: "OT-10",
     label: "Journal Article",
     title: "Journal Article",
-    features: "Zero Hallucination · Verified Citations · Zero Errors",
-    footer: "4,000 – 10,000 words",
-    budget: "4,000 – 10,000 words",
+    guidance: "Structures formal IMRaD manuscripts with deep literature synthesis, methodology validation, and peer-review readiness.",
+    specs: "IMRaD Architecture · Peer Review · 4,000 – 10,000 words",
+    footer: "IMRaD Architecture · Peer Review · 4,000 – 10,000 words",
+    usp: "Peer-Review Standard · IMRaD Methodology",
+    features: "IMRaD Architecture · Peer Review · 4,000 – 10,000 words",
+    budget: "IMRaD Architecture · Peer Review · 4,000 – 10,000 words",
   },
   {
     id: "OT-19",
     label: "Research Proposal",
     title: "Research Proposal",
-    features: "Zero Hallucination · Verified Citations · Zero Errors",
-    footer: "3,000 – 15,000 words",
-    budget: "3,000 – 15,000 words",
+    guidance: "Guides research question definition, literature gap identification, theoretical frameworks, and methodology design.",
+    specs: "Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words",
+    footer: "Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words",
+    usp: "Literature Gap Analysis · Ethical Frameworks",
+    features: "Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words",
+    budget: "Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words",
   },
   {
     id: "OT-22",
     label: "Slides & Keynotes",
     title: "Slides & Keynotes",
-    features: "Zero Hallucination · Verified Citations · Zero Errors",
-    footer: "10 – 35 slides",
-    budget: "10 – 35 slides",
+    guidance: "Converts academic papers into visual presentation slides with scripted speaker notes and executive takeaways.",
+    specs: "Slide Deck Outline · Scripted Speaker Notes · 10 – 35 slides",
+    footer: "Slide Deck Outline · Scripted Speaker Notes · 10 – 35 slides",
+    usp: "Speaker Notes Scripting · Visual Layouts",
+    features: "Slide Deck Outline · Scripted Speaker Notes · 10 – 35 slides",
+    budget: "Slide Deck Outline · Scripted Speaker Notes · 10 – 35 slides",
   },
 ];
 
@@ -561,6 +582,42 @@ export default function ProjectListScreen({
   }, [location.pathname, navigate]);
 
   const [projects, setProjects] = useState<ProjectView[] | null>(null);
+  const deletedProjectIdsRef = useRef<Set<string>>(new Set());
+
+  // Initialize from sessionStorage to prevent zombie project resurrection across fast reloads/nav
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem("scholar_deleted_project_ids");
+      if (stored) {
+        const arr = JSON.parse(stored);
+        if (Array.isArray(arr)) {
+          arr.forEach((id) => deletedProjectIdsRef.current.add(id));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const markProjectAsDeleted = useCallback((id: string) => {
+    deletedProjectIdsRef.current.add(id);
+    try {
+      const arr = Array.from(deletedProjectIdsRef.current);
+      sessionStorage.setItem("scholar_deleted_project_ids", JSON.stringify(arr));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const unmarkProjectAsDeleted = useCallback((id: string) => {
+    deletedProjectIdsRef.current.delete(id);
+    try {
+      const arr = Array.from(deletedProjectIdsRef.current);
+      sessionStorage.setItem("scholar_deleted_project_ids", JSON.stringify(arr));
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const handleCreate = useCallback(async (outputTypeId: string) => {
     if (!userEmail) {
@@ -569,20 +626,23 @@ export default function ProjectListScreen({
       return;
     }
     if (creating) return;
+
+    // Check if an existing zero-content draft of this format exists to reuse and prevent project bloat
+    const reusable = findReusableEmptyProject(projects || [], outputTypeId);
+    if (reusable && reusable.projectId) {
+      onOpen(reusable.projectId);
+      return;
+    }
+
     setCreating(true);
     setCreatingFormatId(outputTypeId);
     setError(null);
     try {
       const project = await createProject(outputTypeId);
       // Auto-assign unique default project title (Untitled Project, Untitled Project 1, ...)
-      const existingTitles = new Set((projects || []).map((p) => (p.answers?.title || "").trim().toLowerCase()));
-      let defaultTitle = "Untitled Project";
-      let counter = 1;
-      while (existingTitles.has(defaultTitle.toLowerCase())) {
-        defaultTitle = `Untitled Project ${counter}`;
-        counter++;
-      }
-      await saveIntakeAnswers(project.projectId, { title: defaultTitle }).catch(() => {});
+      const defaultTitle = getNextUntitledProjectTitle(projects || []);
+      await Promise.resolve(saveIntakeAnswers(project.projectId, { title: defaultTitle })).catch(() => {});
+
       if (project.answers) {
         project.answers.title = defaultTitle;
       } else {
@@ -595,6 +655,7 @@ export default function ProjectListScreen({
       setCreatingFormatId(null);
     }
   }, [userEmail, creating, openAuth, onOpen, projects]);
+
   const [types, setTypes] = useState<OutputTypeSummary[] | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [welcomeVisible, setWelcomeVisible] = useState(() => showWelcome ?? false);
@@ -702,7 +763,6 @@ export default function ProjectListScreen({
   }, [userEmail, projects, searchQuery]);
 
   const [activeProviderLabel, setActiveProviderLabel] = useState<string>("Ready");
-  const [previewFormatId, setPreviewFormatId] = useState<string | null>(null);
   const [isPromptSuggestionsOpen, setIsPromptSuggestionsOpen] = useState(false);
 
   useEffect(() => {
@@ -727,11 +787,15 @@ export default function ProjectListScreen({
       return;
     }
     listProjects()
-      .then((r) => setProjects(r.items))
+      .then((r) => {
+        const deleted = deletedProjectIdsRef.current;
+        setProjects(r.items.filter((p) => !deleted.has(p.projectId)));
+      })
       .catch(() => {
         setProjects([]);
       });
   }, [userEmail]);
+
 
   useEffect(() => {
     load();
@@ -782,6 +846,9 @@ export default function ProjectListScreen({
   const [isGuideThinking, setIsGuideThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const guideInputRef = useRef<HTMLInputElement | null>(null);
+  const guideTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const guideFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const [aiStatus, setAiStatus] = useState<AiOperationalStatus | null>(null);
   const [attachments, setAttachments] = useState<Array<{
@@ -824,7 +891,7 @@ export default function ProjectListScreen({
     };
   }, []);
 
-  async function handleFileSelect(files: FileList | null) {
+  async function handleFileSelect(files: FileList | File[] | null) {
     if (!files || files.length === 0) return;
     setIsUploadingAttachment(true);
     try {
@@ -833,7 +900,7 @@ export default function ProjectListScreen({
         const file = files[i];
         try {
           const parsed = await parseFileForAgent(file);
-          const previewUrl = parsed.isImage ? URL.createObjectURL(file) : undefined;
+          const previewUrl = parsed.isImage && typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : undefined;
           newItems.push({
             id: `att-${Date.now()}-${i}`,
             name: file.name,
@@ -867,6 +934,10 @@ export default function ProjectListScreen({
   function removeAttachment(id: string) {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   }
+
+  const addFiles = useCallback((files: File[]) => {
+    handleFileSelect(files);
+  }, [handleFileSelect]);
 
   const promptMatchingProjects = useMemo(() => {
     if (!projects || !guideInput.trim()) return [];
@@ -947,6 +1018,8 @@ export default function ProjectListScreen({
     setGuideMessages((prev) => [...prev, userMsg]);
     setGuideInput("");
     setAttachments([]);
+    if (guideTextareaRef.current) guideTextareaRef.current.style.height = "auto";
+    setIsGuideThinking(true);
     setIsGuideThinking(true);
 
     try {
@@ -1049,6 +1122,40 @@ export default function ProjectListScreen({
     }
   }
 
+  const handleSubmitPrompt = useCallback(() => {
+    if (!guideInput.trim() && attachments.length === 0) return;
+    setIsAiSidebarOpen(true);
+    handleSendGuideMessage();
+    if (guideTextareaRef.current) guideTextareaRef.current.style.height = "auto";
+  }, [guideInput, attachments]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmitPrompt();
+    } else if (e.key === "Backspace" && guideInput === "" && attachments.length > 0) {
+      removeAttachment(attachments[attachments.length - 1].id);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const newFiles: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].kind === "file") {
+        const file = items[i].getAsFile();
+        if (file) newFiles.push(file);
+      }
+    }
+
+    if (newFiles.length > 0) {
+      e.preventDefault();
+      addFiles(newFiles);
+    }
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const newFormat = params.get("newFormat");
@@ -1105,13 +1212,8 @@ export default function ProjectListScreen({
       const newTitle = window.prompt("Rename research project:", item.title);
       if (newTitle && newTitle.trim() && newTitle.trim() !== item.title && item.projectId) {
         const trimmed = newTitle.trim();
-        // Check for duplicate title against other existing projects
-        const isDuplicate = (projects || []).some(
-          (p) =>
-            p.projectId !== item.projectId &&
-            (p.answers?.title || "").trim().toLowerCase() === trimmed.toLowerCase()
-        );
-        if (isDuplicate) {
+        // Check for duplicate title against other existing projects (case-insensitive)
+        if (isDuplicateProjectTitle(trimmed, item.projectId, projects || [])) {
           alert(`A project with the name "${trimmed}" already exists. Please choose a unique name.`);
           return;
         }
@@ -1167,25 +1269,30 @@ export default function ProjectListScreen({
     // 1. Instantly close the modal dialog without delay
     setProjectToDelete(null);
 
-    // 2. Instantly filter the project out of the local state
+    // 2. Mark project as deleted immediately to prevent race conditions & ghost resurrection
+    markProjectAsDeleted(targetId);
+
+    // 3. Instantly filter the project out of the local state
     setProjects((curr) => (curr ? curr.filter((p) => p.projectId !== targetId) : []));
 
-    // 3. Perform backend deletion asynchronously
+    // 4. Perform backend deletion
     try {
       if (!targetId.startsWith("demo-")) {
         await deleteProject(targetId);
       }
-      // Re-sync project list with server in background
-      listProjects()
-        .then((r) => setProjects(r.items))
-        .catch(() => {});
+      // Re-sync project list with server in background, filtering out any deleted IDs
+      const res = await listProjects();
+      const deleted = deletedProjectIdsRef.current;
+      setProjects(res.items.filter((p) => !deleted.has(p.projectId)));
     } catch (e) {
       console.error("Failed to delete project:", e);
       // Rollback on failure
+      unmarkProjectAsDeleted(targetId);
       setProjects(previousProjects);
       setError((e as Error).message || "Failed to delete project. Please try again.");
     }
   }
+
 
   // Close delete modal on Escape key
   useEffect(() => {
@@ -1561,9 +1668,9 @@ export default function ProjectListScreen({
       </aside>
 
       {/* Main Content Area (Center Pane) */}
-      <main className="flex-1 h-full overflow-y-auto bg-[#FAFAFA] dark:bg-[#171717] text-neutral-900 dark:text-white scholar-scrollbar relative flex flex-col transition-all duration-300 ease-in-out">
+      <main className="flex-1 flex flex-col h-screen w-full bg-white dark:bg-[#171717] overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out">
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
-        <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-[#FAFAFA]/85 dark:bg-[#171717]/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10">
+        <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-white/85 dark:bg-[#171717]/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
           <div className="flex items-center gap-3">
             {/* Mobile Drawer Trigger Button */}
             <button
@@ -1660,91 +1767,105 @@ export default function ProjectListScreen({
               onSectionChange={onAiAccessSectionChange}
             />
           </div>
+        ) : choosing ? (
+          <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-y-auto scholar-scrollbar">
+            <div className="w-full max-w-4xl my-auto py-6">
+              <ChooseOutputType
+                types={types}
+                creating={creating}
+                onPick={handleCreate}
+                onCancel={() => setChoosing(false)}
+              />
+            </div>
+          </div>
         ) : (
-          /* Centered Reading Column */
-          <div className="max-w-4xl mx-auto px-6 pt-8 pb-4 w-full flex-1">
-          {/* Onboarding welcome banner */}
-          {welcomeVisible && (
-            <div
-              role="status"
-              className="mb-8 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] p-5 flex items-start justify-between gap-4 shadow-sm"
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-gray-100 text-neutral-900 dark:text-gray-900 flex items-center justify-center flex-shrink-0 shadow-xs">
-                  <ScholarCoreLogo size="sm" className="text-neutral-900 dark:text-gray-900" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-neutral-900 dark:text-gray-100 font-sans">Welcome to your Scholar Workspace</p>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 font-normal leading-relaxed font-sans">
-                    Select an academic workspace to begin, or upload reference PDFs to your Vault.
+          <>
+            {/* Scrollable / Flexible Center Area */}
+            <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-y-auto scholar-scrollbar">
+              <div className="w-full max-w-4xl flex flex-col items-center gap-6 my-auto pb-4">
+                {/* Onboarding welcome banner */}
+                {welcomeVisible && (
+                  <div
+                    role="status"
+                    className="w-full rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] p-5 flex items-start justify-between gap-4 shadow-sm"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-gray-100 text-neutral-900 dark:text-gray-900 flex items-center justify-center flex-shrink-0 shadow-xs">
+                        <ScholarCoreLogo size="sm" className="text-neutral-900 dark:text-gray-900" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-neutral-900 dark:text-gray-100 font-sans">Welcome to your Scholar Workspace</p>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 font-normal leading-relaxed font-sans">
+                          Select an academic workspace to begin, or upload reference PDFs to your Vault.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      aria-label="Dismiss"
+                      onClick={() => setWelcomeVisible(false)}
+                      className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-700 dark:hover:text-gray-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+
+                {/* Error Alert */}
+                {error && (
+                  <div className="w-full rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-3.5 text-red-400 text-xs font-medium flex items-center gap-3">
+                    <svg className="w-4 h-4 flex-shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span className="font-semibold font-sans">{error}</span>
+                  </div>
+                )}
+
+                {/* Subtle Welcome / Workspace Heading */}
+                <div className="text-center mb-2">
+                  <h1 className="text-2xl font-semibold text-neutral-900 dark:text-white tracking-tight">
+                    Where will your research begin?
+                  </h1>
+                  <p className="text-[13px] text-neutral-500 mt-1">
+                    Select an academic deliverable or paste your assignment guidelines below.
                   </p>
                 </div>
-              </div>
-              <button
-                aria-label="Dismiss"
-                onClick={() => setWelcomeVisible(false)}
-                className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-700 dark:hover:text-gray-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          )}
 
-          {/* Error Alert */}
-          {error && (
-            <div className="mb-8 rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-3.5 text-red-400 text-xs font-medium flex items-center gap-3">
-              <svg className="w-4 h-4 flex-shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <span className="font-semibold font-sans">{error}</span>
-            </div>
-          )}
-
-          {choosing ? (
-            <ChooseOutputType
-              types={types}
-              creating={creating}
-              onPick={handleCreate}
-              onCancel={() => setChoosing(false)}
-            />
-          ) : (
-            <div className="w-full max-w-4xl mx-auto flex flex-col">
-              {/* 4 Academic Workspace Cards Grid */}
-              <div className="w-full">
-                <div className={`grid w-full gap-4 transition-all duration-300 ${
-                  isAiSidebarOpen
-                    ? "grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4"
-                    : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
-                }`}>
-                  {FORMAT_TILES.map((tile) => {
-                    const isBootingThis = creatingFormatId === tile.id;
-                    const isOtherBooting = creating && !isBootingThis;
-                    const tileTheme = getFormatTileTheme(tile.id);
-                    return (
-                      <button
-                        key={tile.id}
-                        type="button"
-                        onClick={() => {
-                          if (creating) return;
-                          if (!userEmail) {
-                            openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
-                            return;
-                          }
-                          handleCreate(tile.id);
-                        }}
-                        disabled={isOtherBooting}
-                        className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer flex flex-col justify-between h-full text-left relative ${
-                          isOtherBooting
-                            ? "opacity-50 cursor-not-allowed"
-                            : isBootingThis
-                            ? "ring-2 ring-neutral-400 dark:ring-white/20 cursor-wait"
-                            : ""
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center justify-between w-full mb-3">
+                {/* 4-Card Template Grid (Resting gracefully above the bottom input) */}
+                <div className="w-full">
+                  <div className={`grid w-full gap-4 transition-all duration-300 ${
+                    isAiSidebarOpen
+                      ? "grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4"
+                      : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+                  }`}>
+                    {FORMAT_TILES.map((tile) => {
+                      const isBootingThis = creatingFormatId === tile.id;
+                      const isOtherBooting = creating && !isBootingThis;
+                      const tileTheme = getFormatTileTheme(tile.id);
+                      return (
+                        <button
+                          key={tile.id}
+                          type="button"
+                          onClick={() => {
+                            if (creating) return;
+                            if (!userEmail) {
+                              openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
+                              return;
+                            }
+                            handleCreate(tile.id);
+                          }}
+                          disabled={isOtherBooting}
+                          className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-xs hover:shadow cursor-pointer flex flex-col justify-between min-h-[16rem] h-64 text-left relative ${
+                            isOtherBooting
+                              ? "opacity-50 cursor-not-allowed"
+                              : isBootingThis
+                              ? "ring-2 ring-neutral-400 dark:ring-white/20 cursor-wait"
+                              : ""
+                          }`}
+                        >
+                          {/* Top Row: Clean Category Icon Container */}
+                          <div className="flex items-center justify-between w-full">
                             <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
                               {isBootingThis ? (
                                 <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -1752,97 +1873,40 @@ export default function ProjectListScreen({
                                 <FormatIcon id={tile.id} className="w-4 h-4" />
                               )}
                             </div>
-                            <div className="flex items-center gap-1">
-                              <span
-                                role="button"
-                                tabIndex={0}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    e.stopPropagation();
-                                    setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
-                                  }
-                                }}
-                                className="w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-serif italic font-bold"
-                                title="View methodology & stages blueprint"
-                                aria-label={`View stages blueprint for ${tile.label}`}
-                              >
-                                i
-                              </span>
-                            </div>
                           </div>
-                          <h3 className="text-base font-bold tracking-tight text-neutral-900 dark:text-neutral-100 leading-snug">
-                            {tile.label}
-                          </h3>
-                        </div>
-                        <div className="mt-4 pt-3 border-t border-neutral-200 dark:border-white/10 flex items-center justify-between gap-2 text-xs text-neutral-500 dark:text-neutral-400 font-sans">
-                          <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">{tile.footer}</span>
-                        </div>
 
-                        {/* Interactive Stages & Methodology Blueprint Overlay */}
-                        {previewFormatId === tile.id && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute inset-0 bg-white dark:bg-[#1C1C1E] rounded-2xl p-4 z-20 flex flex-col justify-between border border-neutral-200 dark:border-white/10 shadow-xl animate-in fade-in zoom-in-95 duration-150 text-left"
-                          >
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <span className={`text-[11px] font-bold uppercase tracking-wider ${tileTheme.accentText}`}>
-                                  {tile.label} • Blueprint
-                                </span>
-                                <span
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={() => setPreviewFormatId(null)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") setPreviewFormatId(null);
-                                  }}
-                                  className="w-5 h-5 rounded-full flex items-center justify-center text-gray-400 hover:text-white cursor-pointer"
-                                  aria-label="Close preview"
-                                >
-                                  ✕
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-neutral-400 mb-2 leading-tight">
-                                {STAGE_BREAKDOWNS[tile.id]?.highlights}
-                              </p>
-                              <div className="space-y-1">
-                                {STAGE_BREAKDOWNS[tile.id]?.phases.map((ph, phIdx) => (
-                                  <div key={phIdx} className="text-[11px] font-medium text-neutral-200 flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                                    <span className="truncate">{ph}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="pt-2 border-t border-white/10 flex items-center justify-between">
-                              <span className="text-[10px] text-slate-400">{tile.budget}</span>
-                              <span
-                                onClick={() => {
-                                  if (!userEmail) {
-                                    openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
-                                    return;
-                                  }
-                                  handleCreate(tile.id);
-                                }}
-                                className="text-[11px] font-bold text-blue-400 hover:underline cursor-pointer"
-                              >
-                                Boot Workspace →
-                              </span>
-                            </div>
+                          {/* Middle Content: Title & Actionable Workflow Guidance */}
+                          <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-start">
+                            <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
+                              {tile.label}
+                            </h3>
+                            <p className="text-[12px] leading-relaxed font-normal text-neutral-500 dark:text-neutral-400 mt-2 line-clamp-3">
+                              {tile.guidance}
+                            </p>
                           </div>
-                        )}
-                      </button>
-                    );
-                  })}
+
+                          {/* Bottom Row: Divider & Actionable Deliverables Spec */}
+                          <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between gap-2 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans">
+                            <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">
+                              {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
+                                <React.Fragment key={idx}>
+                                  {idx > 0 && <span className="mx-1 text-neutral-400 dark:text-neutral-500 opacity-60">·</span>}
+                                  <span>{part}</span>
+                                </React.Fragment>
+                              ))}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* Main AI Prompt Bar — Parallel to the line above settings */}
-              <div className="mt-10 sticky bottom-0 z-20 w-full relative pointer-events-none h-[114px] flex flex-col justify-start bg-gradient-to-t from-[#FAFAFA] dark:from-[#171717] via-[#FAFAFA]/95 dark:via-[#171717]/95 to-transparent">
+            {/* Main AI Prompt Bar — Parallel to the line above settings */}
+            <div className="sticky bottom-0 z-20 w-full relative pointer-events-none h-[114px] flex flex-col justify-start bg-gradient-to-t from-[#FAFAFA] dark:from-[#171717] via-[#FAFAFA]/95 dark:via-[#171717]/95 to-transparent px-4">
+              <div className="w-full max-w-4xl mx-auto relative pointer-events-auto flex flex-col items-center">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -1850,14 +1914,30 @@ export default function ProjectListScreen({
                       setIsPromptSuggestionsOpen(false);
                       setIsAiSidebarOpen(true);
                       handleSendGuideMessage();
-                      setTimeout(() => guideInputRef.current?.focus(), 300);
+                      setTimeout(() => guideTextareaRef.current?.focus(), 300);
                     }
                   }}
-                  className="pointer-events-auto flex flex-col justify-between w-full h-[96px] rounded-2xl bg-neutral-100/90 dark:bg-white/5 border border-neutral-200 dark:border-white/10 shadow-sm px-4 pt-2.5 pb-2 transition-all duration-200 focus-within:border-neutral-400 dark:focus-within:border-white/20 focus-within:shadow-sm"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    if (e.dataTransfer.files?.length) {
+                      addFiles(Array.from(e.dataTransfer.files));
+                    }
+                  }}
+                  className={`pointer-events-auto flex flex-col justify-between w-full h-[96px] rounded-2xl bg-neutral-100/90 dark:bg-[#1C1C1E] border transition-all duration-200 shadow-sm px-4 pt-2.5 pb-2 ${
+                    isDragging
+                      ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/5"
+                      : "border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/20"
+                  }`}
                 >
                   {/* Pending Attachments Chips */}
                   {attachments.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1.5 pb-1.5 border-b border-neutral-200/50 dark:border-white/5 mb-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5 pb-1.5 border-b border-neutral-200/50 dark:border-white/5 mb-1.5 overflow-x-auto max-h-16">
                       {attachments.map((att) => (
                         <div
                           key={att.id}
@@ -1876,8 +1956,8 @@ export default function ProjectListScreen({
                           <button
                             type="button"
                             onClick={() => removeAttachment(att.id)}
-                            className="text-neutral-400 hover:text-red-500 p-0.5 cursor-pointer"
-                            title="Remove attachment"
+                            aria-label={`Remove ${att.name}`}
+                            className="p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -1893,9 +1973,9 @@ export default function ProjectListScreen({
 
                   {/* Top: Transparent flexible input */}
                   <div className="w-full flex items-center">
-                    <input
-                      ref={guideInputRef}
-                      type="text"
+                    <textarea
+                      ref={guideTextareaRef}
+                      rows={1}
                       value={guideInput}
                       onChange={(e) => {
                         setGuideInput(e.target.value);
@@ -1907,46 +1987,68 @@ export default function ProjectListScreen({
                       onKeyDown={(e) => {
                         if (e.key === "Escape") {
                           setIsPromptSuggestionsOpen(false);
-                        }
-                        if (e.key === "Enter" && !e.shiftKey) {
+                        } else if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
                           if (guideInput.trim() || attachments.length > 0) {
                             setIsPromptSuggestionsOpen(false);
                             setIsAiSidebarOpen(true);
                             handleSendGuideMessage();
-                            setTimeout(() => guideInputRef.current?.focus(), 300);
+                            setTimeout(() => guideTextareaRef.current?.focus(), 300);
                           }
+                        } else if (e.key === "Backspace" && guideInput === "" && attachments.length > 0) {
+                          removeAttachment(attachments[attachments.length - 1].id);
+                        }
+                      }}
+                      onPaste={(e) => {
+                        const items = e.clipboardData?.items;
+                        if (!items) return;
+                        const newFiles: File[] = [];
+                        for (let i = 0; i < items.length; i++) {
+                          if (items[i].kind === "file") {
+                            const file = items[i].getAsFile();
+                            if (file) newFiles.push(file);
+                          }
+                        }
+                        if (newFiles.length > 0) {
+                          e.preventDefault();
+                          addFiles(newFiles);
                         }
                       }}
                       placeholder="Paste text, drop files/images, or draft research instructions..."
                       style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                      className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none prompt-bare-input"
+                      className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input"
                     />
                   </div>
 
                   {/* Bottom Action Row: Attachments & Mode Selector on left, Submit button on right */}
-                  <div className="flex items-center justify-between gap-2 mt-1.5 pt-1 border-t border-neutral-200/40 dark:border-white/5">
+                  <div className="flex items-center justify-between gap-2 mt-1.5 pt-1 border-t border-neutral-200/40 dark:border-white/5 w-full">
                     <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => mainFileInputRef.current?.click()}
-                        title="Attach PDF, Word, Excel, CSV, or Image"
-                        aria-label="Attach file"
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                      >
-                        <Paperclip className="w-4 h-4" />
-                      </button>
-                      <input
-                        ref={mainFileInputRef}
-                        type="file"
-                        multiple
-                        accept=".pdf,.doc,.docx,.txt,.md,.markdown,.csv,.xlsx,.xls,.png,.jpg,.jpeg,.webp,.gif"
-                        className="hidden"
-                        onChange={(e) => {
-                          handleFileSelect(e.target.files);
-                          e.target.value = "";
-                        }}
-                      />
+                      <div className="relative group">
+                        <button
+                          type="button"
+                          onClick={() => mainFileInputRef.current?.click()}
+                          title="Attach files or images"
+                          aria-label="Attach files or images"
+                          className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                        >
+                          <Paperclip className="w-4 h-4" />
+                        </button>
+                        <span className="hidden group-hover:block absolute bottom-full mb-2 left-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
+                          Upload files or images (.pdf, .docx, images)
+                        </span>
+                        <input
+                          ref={mainFileInputRef}
+                          type="file"
+                          multiple
+                          accept=".pdf,.doc,.docx,.txt,image/*"
+                          aria-label="File upload"
+                          className="hidden"
+                          onChange={(e) => {
+                            handleFileSelect(e.target.files);
+                            e.target.value = "";
+                          }}
+                        />
+                      </div>
 
                       {/* Intelligent Mode Selection Pills */}
                       <div className="flex items-center gap-1 bg-neutral-200/50 dark:bg-white/5 p-0.5 rounded-lg text-[10px] font-medium">
@@ -1992,88 +2094,92 @@ export default function ProjectListScreen({
                       </div>
                     </div>
 
-                    <button
-                      type="submit"
-                      title="Send"
-                      aria-label="Send message"
-                      disabled={(!guideInput.trim() && attachments.length === 0) || isGuideThinking}
-                      className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
-                        (guideInput.trim() || attachments.length > 0) && !isGuideThinking
-                          ? "bg-neutral-900 dark:bg-white text-white dark:text-gray-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-sm"
-                          : "bg-neutral-200 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-                      }`}
-                    >
-                      {isGuideThinking ? (
-                        <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
-                      )}
-                    </button>
+                    <div className="relative group">
+                      <button
+                        type="submit"
+                        title="Send message"
+                        aria-label="Send message"
+                        disabled={(!guideInput.trim() && attachments.length === 0) || isGuideThinking}
+                        className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
+                          (guideInput.trim() || attachments.length > 0) && !isGuideThinking
+                            ? "bg-neutral-900 dark:bg-white text-white dark:text-gray-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-sm"
+                            : "bg-neutral-200 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
+                        }`}
+                      >
+                        {isGuideThinking ? (
+                          <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                        )}
+                      </button>
+                      <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
+                        Send message (Enter)
+                      </span>
+                    </div>
                   </div>
                 </form>
 
-                  {/* Instant Suggestions & Matching Projects Popover */}
-                  {guideInput.trim().length >= 2 && isPromptSuggestionsOpen && (
-                    <div className="pointer-events-auto absolute left-0 right-0 bottom-full mb-3 bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 rounded-2xl shadow-2xl z-30 p-2 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 max-h-80 overflow-y-auto">
-                      {/* Matching Projects */}
-                      {promptMatchingProjects.length > 0 && (
-                        <div className="mb-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 px-3 py-1 block">
-                            Matching Projects ({promptMatchingProjects.length})
-                          </span>
-                          {promptMatchingProjects.map((p) => (
-                            <button
-                              key={p.projectId}
-                              type="button"
-                              onClick={() => {
-                                setIsPromptSuggestionsOpen(false);
-                                onOpen(p.projectId);
-                              }}
-                              className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-left hover:bg-white/5 transition-colors cursor-pointer group"
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <span className="w-6 h-6 rounded-lg bg-neutral-800 flex items-center justify-center shrink-0">
-                                  <FormatIcon id={p.outputTypeId} className="w-3.5 h-3.5" />
-                                </span>
-                                <span className="text-xs font-medium text-neutral-200 truncate group-hover:text-blue-400">
-                                  {p.answers?.title || "Untitled Project"}
-                                </span>
-                              </div>
-                              <span className="text-[11px] text-neutral-400 group-hover:text-neutral-200 shrink-0 font-medium">
-                                Open →
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Platform Action Suggestions */}
-                      <div>
+                {/* Instant Suggestions & Matching Projects Popover */}
+                {guideInput.trim().length >= 2 && isPromptSuggestionsOpen && (
+                  <div className="pointer-events-auto absolute left-0 right-0 bottom-full mb-3 bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 rounded-2xl shadow-2xl z-30 p-2 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 max-h-80 overflow-y-auto">
+                    {/* Matching Projects */}
+                    {promptMatchingProjects.length > 0 && (
+                      <div className="mb-2">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 px-3 py-1 block">
-                          Ask & Actions
+                          Matching Projects ({promptMatchingProjects.length})
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsPromptSuggestionsOpen(false);
-                            setIsAiSidebarOpen(true);
-                            handleSendGuideMessage();
-                          }}
-                          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left hover:bg-white/5 transition-colors cursor-pointer"
-                        >
-                          <span className="text-xs text-neutral-300 truncate">
-                            Ask Scholar: <strong className="text-white font-medium">"{guideInput}"</strong>
-                          </span>
-                          <span className="text-[11px] text-blue-400 font-medium shrink-0 ml-2">Submit ↗</span>
-                        </button>
+                        {promptMatchingProjects.map((p) => (
+                          <button
+                            key={p.projectId}
+                            type="button"
+                            onClick={() => {
+                              setIsPromptSuggestionsOpen(false);
+                              onOpen(p.projectId);
+                            }}
+                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-left hover:bg-white/5 transition-colors cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="w-6 h-6 rounded-lg bg-neutral-800 flex items-center justify-center shrink-0">
+                                <FormatIcon id={p.outputTypeId} className="w-3.5 h-3.5" />
+                              </span>
+                              <span className="text-xs font-medium text-neutral-200 truncate group-hover:text-blue-400">
+                                {p.answers?.title || "Untitled Project"}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-neutral-400 group-hover:text-neutral-200 shrink-0 font-medium">
+                              Open →
+                            </span>
+                          </button>
+                        ))}
                       </div>
+                    )}
+
+                    {/* Platform Action Suggestions */}
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 px-3 py-1 block">
+                        Ask & Actions
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPromptSuggestionsOpen(false);
+                          setIsAiSidebarOpen(true);
+                          handleSendGuideMessage();
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left hover:bg-white/5 transition-colors cursor-pointer"
+                      >
+                        <span className="text-xs text-neutral-300 truncate">
+                          Ask Scholar: <strong className="text-white font-medium">"{guideInput}"</strong>
+                        </span>
+                        <span className="text-[11px] text-blue-400 font-medium shrink-0 ml-2">Submit ↗</span>
+                      </button>
                     </div>
-                  )}
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </div>
-      )}
+          </>
+        )}
       </main>
 
       {/* Secondary View (Right Panel): Module 3.2 AI Assistant Sidebar (w-96) */}
@@ -2687,13 +2793,14 @@ function ChooseOutputType({
             {FORMAT_TILES.map((tile) => {
               const isSelected = selected === tile.id;
               const tileTheme = getFormatTileTheme(tile.id);
+              const uspParts = tile.usp ? tile.usp.split(" · ") : [];
 
               return (
                 <div
                   key={tile.id}
                   onClick={() => setSelected(tile.id)}
                   onDoubleClick={() => onPick(tile.id)}
-                  className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer flex flex-col justify-between h-full text-left relative ${
+                  className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-xs hover:shadow cursor-pointer flex flex-col justify-between h-56 text-left relative ${
                     isSelected
                       ? "ring-2 ring-neutral-400 dark:ring-white/30 border-neutral-400 dark:border-white/30"
                       : ""
@@ -2710,12 +2817,22 @@ function ChooseOutputType({
                         </svg>
                       </div>
                     </div>
-                    <h3 className="text-base font-bold tracking-tight text-neutral-900 dark:text-neutral-100 leading-snug">
+                    <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-neutral-100 leading-snug">
                       {tile.label}
                     </h3>
+                    <p className="text-[12px] leading-relaxed font-normal text-neutral-500 dark:text-neutral-400 mt-1.5 line-clamp-2">
+                      {tile.guidance || tile.usp}
+                    </p>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-neutral-200 dark:border-white/10 flex items-center justify-between gap-2 text-xs text-neutral-500 dark:text-neutral-400 font-sans">
-                    <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">{tile.footer}</span>
+                  <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between gap-2 text-[12px] text-neutral-500 dark:text-neutral-400 font-sans">
+                    <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">
+                      {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
+                        <Fragment key={idx}>
+                          {idx > 0 && <span className="mx-1 text-neutral-400 dark:text-neutral-500 opacity-60">·</span>}
+                          <span>{part}</span>
+                        </Fragment>
+                      ))}
+                    </span>
                     <span className="font-semibold text-neutral-700 dark:text-neutral-300">Select</span>
                   </div>
                 </div>

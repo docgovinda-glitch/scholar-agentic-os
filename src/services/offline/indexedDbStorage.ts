@@ -189,6 +189,47 @@ export async function removePendingMutation(id: string): Promise<void> {
   }
 }
 
+export async function deleteCachedProject(projectId: string): Promise<void> {
+  memoryStorage.projects.delete(projectId);
+  if (!hasIndexedDb()) return;
+
+  try {
+    const db = await openScholarDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction("projects", "readwrite");
+      const store = tx.objectStore("projects");
+      const req = store.delete(projectId);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch {
+    // Non-fatal if IDB transaction fails
+  }
+}
+
+export async function removePendingMutationsForProject(projectId: string): Promise<void> {
+  for (const [id, mut] of memoryStorage.syncQueue.entries()) {
+    if (mut.projectId === projectId) {
+      memoryStorage.syncQueue.delete(id);
+    }
+  }
+  if (!hasIndexedDb()) return;
+
+  try {
+    const db = await openScholarDb();
+    const mutations = await getPendingMutations();
+    const toDelete = mutations.filter((m) => m.projectId === projectId);
+    if (toDelete.length === 0) return;
+    const tx = db.transaction("sync_queue", "readwrite");
+    const store = tx.objectStore("sync_queue");
+    for (const m of toDelete) {
+      store.delete(m.id);
+    }
+  } catch {
+    // Non-fatal
+  }
+}
+
 export async function clearOfflineCache(): Promise<void> {
   memoryStorage.projects.clear();
   memoryStorage.vaultSources.clear();
@@ -206,3 +247,4 @@ export async function clearOfflineCache(): Promise<void> {
     }
   }
 }
+

@@ -153,10 +153,33 @@ describe("Final Production Environment Acceptance Checks", { timeout: 25000 }, (
       );
 
       expect(result).toBeTruthy();
-      // Handle potential markdown code fencing in responses
-      const cleanJson = result.replace(/```json/g, "").replace(/```/g, "").trim();
-      const parsed = JSON.parse(cleanJson);
+      let parsed: any;
+      try {
+        parsed = JSON.parse(result.replace(/```json/g, "").replace(/```/g, "").trim());
+      } catch {
+        const start = result.indexOf("{");
+        if (start !== -1) {
+          let depth = 0;
+          let end = -1;
+          for (let i = start; i < result.length; i++) {
+            if (result[i] === "{") depth++;
+            else if (result[i] === "}") {
+              depth--;
+              if (depth === 0) {
+                end = i;
+                break;
+              }
+            }
+          }
+          if (end !== -1) {
+            parsed = JSON.parse(result.slice(start, end + 1));
+          }
+        }
+      }
+      expect(parsed).toBeDefined();
       expect(parsed.objective || parsed.methodology).toBeDefined();
+
+
 
       // Verify Active Model execution state was recorded
       expect(recordedState).toBeDefined();

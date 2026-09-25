@@ -5,7 +5,90 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-24
+## [Unreleased] - 2026-09-25
+
+### Removed & Refactored (Template Cards: Removal of Italicized Info Badges & Tooltips)
+- **Decluttered Card Top Row (`src/desk/ProjectListScreen.tsx`)**:
+  - Removed floating italicized info badges ("*i*"), hover tooltips (*"View methodology & stages blueprint"*), and secondary indicators from the top-right corner of all 4 template cards.
+  - Streamlined template card headers to display solely the category icon in its high-contrast badge container, eliminating visual noise and secondary click-target collisions.
+  - Cleaned up unused `previewFormatId` state and unreachable blueprint preview overlays.
+- **Test Suite Updates (`src/desk/__tests__/ProjectListScreen.test.tsx`)**:
+  - Added unit test asserting the complete absence of `span.font-serif`, blueprint tooltips, and methodology indicators across all 4 template cards.
+
+## [2026-09-24]
+
+### Added & Refactored (Bottom-Anchored Dashboard Layout: ChatGPT & Google Gemini Architecture)
+- **Bottom-Anchored Viewport Structure (`src/desk/ProjectListScreen.tsx`)**:
+  - Restructured main page wrapper into a full-height flex column (`h-screen overflow-hidden`) with a scrollable center viewport and a bottom-docked prompt interaction area, matching the layout architecture of ChatGPT and Google Gemini.
+  - Placed the 4 academic workspace template cards gracefully in the center scrollable viewport with a subtle workspace welcome header (`"Where will your research begin?"` and `"Select an academic deliverable or paste your assignment guidelines below."`).
+  - Docked the unified prompt container toward the bottom with an Apple-style upward gradient fade (`bg-gradient-to-t from-white via-white to-transparent dark:from-[#171717] dark:via-[#171717] dark:to-transparent`), pinned `max-w-4xl mx-auto` horizontal container alignment, and institutional rubric verification disclaimer footer (`"Scholar Core Socratic Engine · Verify citations against official institutional rubrics."`).
+- **Test Suite Alignment (`src/desk/__tests__/ProjectListScreen.test.tsx`)**:
+  - Updated main container layout assertions to test `overflow-hidden` and `scholar-scrollbar`.
+  - Added test verifications for the centered workspace heading, subheading, bottom-docked prompt container parent alignment (`items-center max-w-4xl mx-auto`), and disclaimer footer.
+
+### Added & Refactored (Unified Prompt Bar: Drag-and-Drop, Clipboard Paste, Strict Alignment & De-duplication)
+- **De-duplication & Clean Dashboard Layout (`src/desk/ProjectListScreen.tsx`)**:
+  - Removed duplicate "ASK & ACTIONS" secondary card and matching projects popover below the prompt bar, establishing the prompt bar as the sole interaction point on the dashboard.
+  - Wrapped 4-card template grid and prompt bar inside shared `<div className="w-full max-w-4xl mx-auto flex flex-col gap-6">` container, guaranteeing flush left/right margin alignment and consistent 24px vertical separation.
+  - Fixed tooltip detachment: bound tooltips relatively (`group-hover:block absolute bottom-full mb-2`) to avoid floating across cards above.
+- **ChatGPT & Gemini Drag-and-Drop, Clipboard Paste & Keyboard Shortcuts (`src/desk/ProjectListScreen.tsx`)**:
+  - Integrated native clipboard file paste (`Cmd+V` / `Ctrl+V`) directly into textarea, detecting pasted documents and images.
+  - Added native drag-and-drop support with active highlight styling (`border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/5`) upon file hover.
+  - Added thumbnail image preview rendering for pasted/dropped images via object URLs with automatic cleanup on submit/unmount.
+  - Supported `Backspace` to delete the last attached file when input text is empty.
+  - Expanded file input format support to `.pdf,.doc,.docx,.txt,image/*`.
+- **Test Suite Updates (`src/desk/__tests__/ProjectListScreen.test.tsx`)**:
+  - Updated placeholder matchers to `"Paste text, drop files/images, or draft research instructions..."`.
+  - Added unit test cases for drag-and-drop file ingestion, active border highlight, clipboard file paste, backspace deletion, relative tooltip positioning, and absence of duplicate "Ask & Actions" box.
+
+### Added & Refactored (Actionable Template Card Guidance, Pen Icon Removal & ChatGPT/Gemini-Style Prompt Bar)
+- **Removal of Pen/Edit Icons (`src/desk/regions/Header.tsx`, `src/desk/ProjectListScreen.tsx`)**:
+  - Removed decorative pencil/edit SVG icon buttons from workspace header and action areas, focusing user attention directly on readable titles and clean, distinct category glyphs.
+  - Turned the project title in `Header.tsx` into a direct, accessible click-to-rename target with underline hover cues.
+- **Actionable Template Card Workflow Guidance (`src/desk/ProjectListScreen.tsx`)**:
+  - Replaced isolated raw word counts with rich, step-by-step workflow guidance micro-copy and comprehensive academic deliverable specs across all 4 template cards:
+    1. **Coursework & Essays:** "Guides you through thesis formulation, marking rubric alignment, critical argument synthesis, and citation formatting." · `Structured Outline · Rubric Matched · 800 – 4,000 words`.
+    2. **Journal Article:** "Structures formal IMRaD manuscripts with deep literature synthesis, methodology validation, and peer-review readiness." · `IMRaD Architecture · Peer Review · 4,000 – 10,000 words`.
+    3. **Research Proposal:** "Guides research question definition, literature gap identification, theoretical frameworks, and methodology design." · `Gap Analysis · Ethics & Methodology · 3,000 – 15,000 words`.
+    4. **Slides & Keynotes:** "Converts academic papers into visual presentation slides with scripted speaker notes and executive takeaways." · `Slide Deck Outline · Scripted Speaker Notes · 10 – 35 slides`.
+  - Pinned 3-part deliverable specs to card footers with centered middle-dot separators (`opacity-60`).
+- **Dynamic ChatGPT/Gemini-Style Auto-Expanding Prompt Bar (`src/desk/ProjectListScreen.tsx`)**:
+  - Replaced single-line input with an auto-resizing textarea that expands dynamically from ~48px up to `max-h-52` (~200px) with smooth scrolling.
+  - Implemented standard conversational AI keyboard interactions (`Enter` submits query/files, `Shift + Enter` inserts multiline breaks).
+  - Integrated file attachment capabilities with a bottom-left `Paperclip` button connected to a hidden file input accepting `.pdf,.doc,.docx,.txt`.
+  - Rendered dismissible chip/pill previews with file name, `FileText` icon, and remove `X` button.
+  - Aligned prompt bar outer container flush with the 4-card template grid (`max-w-4xl mx-auto`).
+- **Test Suite Updates (`src/desk/__tests__/ProjectListScreen.test.tsx`)**:
+  - Updated all dashboard prompt bar placeholder assertions and dark mode styling.
+  - Added unit tests for actionable workflow guidance, 3-part deliverable specs, absence of pen/pencil icons, and full prompt bar file attachment/removal/keyboard submit flows.
+
+### Added & Refactored (Distinct Academic Template USPs & Spec Limits)
+- **Distinct Academic Template USPs (`src/desk/ProjectListScreen.tsx`, `src/desk/__tests__/ProjectListScreen.test.tsx`)**:
+  - Integrated tailored, Apple/Airbnb-style 2-part USP micro-copy and clean spec limits across all 4 main dashboard template cards and the format selection modal:
+    1. **Coursework & Essays:** `Marking Rubric Alignment · Argument Synthesis` (`800 – 4,000 words`).
+    2. **Journal Article:** `Peer-Review Standard · IMRaD Methodology` (`4,000 – 10,000 words`).
+    3. **Research Proposal:** `Literature Gap Analysis · Ethical Frameworks` (`3,000 – 15,000 words`).
+    4. **Slides & Keynotes:** `Speaker Notes Scripting · Visual Layouts` (`10 – 35 slides`).
+  - Styled with muted typography (`text-[12px] font-normal text-neutral-500 dark:text-neutral-400`), centered middle-dot separator with subtle opacity (`opacity-60`), and uniform 56-unit height (`h-56`) ensuring clean vertical alignment.
+  - Added unit test suite in `ProjectListScreen.test.tsx` verifying distinct USP copy, spec limits, and middle-dot opacity rendering.
+
+### Fixed & Enforced (Zombie Project Deletion Glitch & Strict Unique Project Naming)
+- **Database Cascade Deletion (`supabase/migrations/20260924180000_project_cascade_delete.sql`)**:
+  - Enforced `ON DELETE CASCADE` across all 13 child foreign keys referencing `public.projects(project_id)` (phases, prompts, assignment briefs, drafts, citations, knowledge assets, research artifacts).
+  - Implemented atomic `handle_project_delete_cascade()` function and `BEFORE DELETE ON public.projects` trigger to proactively clean up child relations before hard deletion.
+  - Configured RLS delete policy `projects_delete_owner` granting full cascade deletion authority to the project owner.
+- **Client Cache Synchronization & Storage Cleanup (`src/desk/api.ts`, `src/services/offline/indexedDbStorage.ts`)**:
+  - Added `cleanupProjectStorage(projectId)` to purge orphaned localStorage and sessionStorage keys upon deletion.
+  - Added `deleteCachedProject` and `removePendingMutationsForProject` to IndexedDB storage to eliminate offline cache resurrection.
+  - Hardened `deleteProject` in `api.ts` to invalidate in-memory ephemeral store, client storage, offline IDB caches, direct Supabase hard deletion, and backend REST route.
+- **Cross-Route Tombstone Filtering (`src/desk/ProjectListScreen.tsx`, `src/desk/vault/KnowledgeVault.tsx`)**:
+  - Tracked deleted project IDs in `sessionStorage` (`scholar_deleted_project_ids`) and synchronous in-memory sets (`deletedProjectIdsRef`).
+  - Filtered deleted project IDs at initial fetch, load, and background revalidation, preventing stale network or cache data from resurrecting deleted projects on page refresh or navigation.
+- **Strict Unique Project Naming (`src/desk/projectNaming.ts`, `src/desk/regions/Header.tsx`, `src/desk/DeskShell.tsx`)**:
+  - Implemented centralized `projectNaming.ts` utility module with `isDuplicateProjectTitle`, `getNextUntitledProjectTitle`, and `findReusableEmptyProject`.
+  - Added case-insensitive title validation on rename from both sidebar popover menu and workspace header (`DeskShell` / `Header`), preventing name collisions and showing error toast.
+  - Added empty draft reuse: clicking "+ New Project" or template cards focuses existing zero-content "Untitled Project" instead of spawning duplicate empty files.
+  - Added auto-increment fallback for untitled drafts (`"Untitled Project 1"`, `"Untitled Project 2"`, etc.) when existing untitled projects contain content.
 
 ### Fixed & Refactored (Day/Night Cross-Fade Transition, Palette Baseline & Dashboard Alignment)
 - **Day/Night Mode Toggle & Seamless Cross-Fade (`src/desk/ProjectListScreen.tsx`, `src/index.css`)**:
