@@ -426,6 +426,10 @@ body {
 }
 
 /* Apply smooth cross-fade only to color properties, never layout geometry */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after,
 html.theme-transition,
 html.theme-transition *,
 html.theme-transition *::before,

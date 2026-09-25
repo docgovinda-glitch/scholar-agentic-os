@@ -1838,7 +1838,7 @@ export default function ProjectListScreen({
   }
 
   return (
-    <div className="h-screen w-full flex overflow-hidden bg-[#FAFAFA] dark:bg-[#171717] text-neutral-900 dark:text-white font-sans selection:bg-neutral-100 selection:text-[#171717]">
+    <div className="h-screen w-full flex overflow-hidden bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-white font-sans selection:bg-neutral-100 selection:text-[#171717]">
       {/* Mobile Backdrop Overlay */}
       {mobileMenuOpen && (
         <div
@@ -1850,7 +1850,7 @@ export default function ProjectListScreen({
 
       {/* Left Sidebar (Navigation Pane) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-[#F4F4F5] dark:bg-[#1C1C1E] text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
           mobileMenuOpen
             ? "translate-x-0 w-[260px] shadow-2xl"
             : "-translate-x-full md:translate-x-0 " + (isSidebarOpen ? "w-[260px]" : "w-0 border-r-0 overflow-hidden")
@@ -2140,7 +2140,7 @@ export default function ProjectListScreen({
         </div>
 
         {/* Bottom Section */}
-        <div className="flex-shrink-0 p-3 border-t border-neutral-200 dark:border-white/10 flex flex-col justify-between gap-2 w-[260px] bg-[#F4F4F5] dark:bg-[#1C1C1E] h-[114px]">
+        <div className="flex-shrink-0 p-3 border-t border-neutral-200 dark:border-white/10 flex flex-col justify-between gap-2 w-[260px] bg-white dark:bg-[#1C1C1E] h-[114px]">
           {/* Action Row: Settings Navigation Item + Minimal Icon-Only Theme Toggle */}
           <div className="flex items-center justify-between gap-1.5">
             {onOpenAccountSettings && (
@@ -2193,9 +2193,9 @@ export default function ProjectListScreen({
       </aside>
 
       {/* Main Content Area (Center Pane) */}
-      <main className="flex-1 flex flex-col h-screen w-full bg-white dark:bg-[#171717] overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out">
+      <main className="flex-1 flex flex-col h-screen w-full bg-[#F8F9FA] dark:bg-[#171717] overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out">
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
-        <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-white/85 dark:bg-[#171717]/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
+        <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-[#F8F9FA]/85 dark:bg-[#171717]/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
           <div className="flex items-center gap-3">
             {/* Mobile Drawer Trigger Button */}
             <button
@@ -2396,7 +2396,7 @@ export default function ProjectListScreen({
                             handleCreate(tile.id);
                           }}
                           disabled={isOtherBooting}
-                          className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-xs hover:shadow cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
+                          className={`group bg-white dark:bg-[#1C1C1E] border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
                             isOtherBooting
                               ? "opacity-50 cursor-not-allowed"
                               : isBootingThis
@@ -2417,16 +2417,16 @@ export default function ProjectListScreen({
 
                           {/* Middle Content: Title & Actionable Workflow Guidance */}
                           <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-start">
-                            <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
+                            <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-white group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
                               {tile.label}
                             </h3>
-                            <p className="text-[12px] leading-relaxed font-normal text-neutral-500 dark:text-neutral-400 mt-2 line-clamp-3">
+                            <p className="text-[12px] leading-relaxed font-normal text-neutral-600 dark:text-neutral-400 mt-2 line-clamp-3">
                               {tile.guidance}
                             </p>
                           </div>
 
                           {/* Bottom Row: Divider & Actionable Deliverables Spec */}
-                          <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
+                          <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-500 font-sans leading-tight">
                             {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
                               <React.Fragment key={idx}>
                                 {idx > 0 && <span className="text-neutral-400 dark:text-neutral-500 opacity-60 font-bold">·</span>}
@@ -2443,7 +2443,7 @@ export default function ProjectListScreen({
             </div>
 
             {/* Main AI Prompt Bar — Parallel to the line above settings */}
-            <div className="sticky bottom-0 z-20 w-full relative pointer-events-none min-h-[114px] flex flex-col justify-start bg-gradient-to-t from-[#FAFAFA] dark:from-[#171717] via-[#FAFAFA]/95 dark:via-[#171717]/95 to-transparent px-4 pb-2">
+            <div className="sticky bottom-0 z-20 w-full relative pointer-events-none min-h-[114px] flex flex-col justify-start bg-gradient-to-t from-[#F8F9FA] dark:from-[#171717] via-[#F8F9FA]/95 dark:via-[#171717]/95 to-transparent px-4 pb-2">
               <div className="w-full max-w-4xl mx-auto relative pointer-events-auto flex flex-col items-center">
                 {/* Contextual Clarification when Ask Scholar is Open */}
                 {isAiSidebarOpen && (
@@ -2526,10 +2526,10 @@ export default function ProjectListScreen({
                       addMainFiles(Array.from(e.dataTransfer.files));
                     }
                   }}
-                  className={`pointer-events-auto flex flex-col justify-between w-full min-h-[92px] rounded-2xl bg-white/95 dark:bg-[#1C1C1E]/95 backdrop-blur-md border transition-all duration-200 shadow-sm hover:shadow-md px-4 pt-2.5 pb-2 ${
+                  className={`pointer-events-auto flex flex-col justify-between w-full rounded-2xl bg-white dark:bg-[#1C1C1E] border border-neutral-200/90 dark:border-white/10 shadow-sm focus-within:border-neutral-400 dark:focus-within:border-white/20 p-3 transition-all duration-200 ${
                     isDragging
                       ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10 dark:bg-blue-950/20"
-                      : "border-neutral-200/90 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 focus-within:ring-2 focus-within:ring-blue-500/15"
+                      : ""
                   }`}
                 >
                   {/* Pending Attachments Chips */}
@@ -2624,11 +2624,7 @@ export default function ProjectListScreen({
                         title="Send message (Enter)"
                         aria-label="Send message"
                         disabled={(!mainPromptInput.trim() && mainAttachments.length === 0) || isGuideThinking}
-                        className={`flex-shrink-0 h-7 px-2.5 rounded-full flex items-center justify-center gap-1 transition-all duration-200 cursor-pointer ${
-                          (mainPromptInput.trim() || mainAttachments.length > 0) && !isGuideThinking
-                            ? "bg-neutral-900 dark:bg-white text-white dark:text-gray-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-sm active:scale-95"
-                            : "bg-neutral-200 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-                        }`}
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-sm disabled:bg-neutral-200 dark:disabled:bg-white/10 disabled:text-neutral-400 dark:disabled:text-neutral-600 disabled:cursor-not-allowed"
                       >
                         {isGuideThinking ? (
                           <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />

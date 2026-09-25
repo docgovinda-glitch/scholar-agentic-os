@@ -177,3 +177,30 @@ The prompt bar at the bottom of the workspace commands user actions via a sleek,
    - When `mode === 'deep_research'`, displays: `[ 🧭 Deep Research × ]`.
    - Clicking the `×` button smoothly resets the mode back to `auto`.
 
+---
+
+## 7. Light Mode Surface Elevation, Contrast & Theme Cross-Fade
+
+1. **3-Tier Surface Elevation (Apple / Airbnb System)**:
+   - **Canvas Background**: Uses `bg-[#F8F9FA]` in Light Mode and `dark:bg-[#171717]` in Dark Mode, eliminating washed-out flat white canvases.
+   - **Sidebar Navigation**: Uses `bg-white dark:bg-[#1C1C1E]` with crisp `border-r border-neutral-200 dark:border-white/10`.
+   - **Workspace Template Cards**: Elevated onto `bg-white dark:bg-[#1C1C1E]` with `border border-neutral-200/90 dark:border-white/10` and subtle depth shadow (`shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md`).
+   - **Card Typography**:
+     - Titles: `text-neutral-900 dark:text-white font-semibold`.
+     - Actionable workflow guidance: `text-neutral-600 dark:text-neutral-400`.
+     - Footer deliverable specs: `text-neutral-500 dark:text-neutral-500`.
+
+2. **High-Contrast Prompt Bar Controls**:
+   - **Input Container**: `rounded-2xl bg-white dark:bg-[#1C1C1E] border border-neutral-200/90 dark:border-white/10 shadow-sm focus-within:border-neutral-400 dark:focus-within:border-white/20 p-3`.
+   - **`+` Action Trigger**: High-contrast `text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 rounded-full p-1.5`.
+   - **Send Arrow Button**:
+     - Light Mode: `bg-neutral-900 text-white hover:bg-neutral-800`.
+     - Dark Mode: `dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100`.
+     - Disabled State: `disabled:bg-neutral-200 dark:disabled:bg-white/10 disabled:text-neutral-400 dark:disabled:text-neutral-600 disabled:cursor-not-allowed`.
+
+3. **Apple-Grade Smooth Theme Cross-Fade**:
+   - Scoped transitions in `src/index.css` targeting only `background-color`, `border-color`, and `color` with an ultra-smooth `180ms cubic-bezier(0.16, 1, 0.3, 1)` curve.
+   - Layout geometry properties are untouched, preventing layout jumps or white flashes.
+   - Transient `theme-transition` class applied to `document.documentElement` during the 200ms toggle window.
+
+

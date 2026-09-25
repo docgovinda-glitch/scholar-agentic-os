@@ -112,7 +112,7 @@ export function PromptBarActionMenu({
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="p-1.5 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer flex items-center justify-center"
+          className="p-1.5 rounded-full text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
           aria-label="Add files and more"
           title="Add files and more"
         >

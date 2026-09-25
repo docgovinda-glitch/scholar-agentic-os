@@ -121,7 +121,7 @@ function AssignmentWorkspaceInner({
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#FAFAFA] dark:bg-[#171717] p-6 text-center text-neutral-800 dark:text-neutral-200">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#F8F9FA] dark:bg-[#171717] p-6 text-center text-neutral-800 dark:text-neutral-200">
         <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-2">
           <span className="text-2xl">⚠️</span>
         </div>
@@ -142,8 +142,8 @@ function AssignmentWorkspaceInner({
   // Immediate page load renders lightweight structural shell conforming to current theme
   if (isLoading || !project) {
     return (
-      <div className="h-screen flex flex-col bg-[#FAFAFA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 overflow-hidden">
-        <header className="border-b border-neutral-200/80 dark:border-white/10 bg-[#FAFAFA] dark:bg-[#171717] z-20 shrink-0">
+      <div className="h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 overflow-hidden">
+        <header className="border-b border-neutral-200/80 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#171717] z-20 shrink-0">
           <div className="flex items-center justify-between px-4 h-12 gap-4">
             <div className="flex items-center gap-2.5 min-w-0">
               <button
@@ -169,11 +169,11 @@ function AssignmentWorkspaceInner({
           </div>
         </header>
 
-        <div className="flex-1 flex overflow-hidden relative bg-[#FAFAFA] dark:bg-[#171717]">
+        <div className="flex-1 flex overflow-hidden relative bg-[#F8F9FA] dark:bg-[#171717]">
           <div className="hidden md:block w-64 lg:w-72 shrink-0 h-full overflow-y-auto bg-[#F4F4F5] dark:bg-[#1C1C1E] border-r border-neutral-200/80 dark:border-white/10">
             <PhaseNavSkeleton />
           </div>
-          <main className="flex-1 h-full overflow-y-auto bg-[#FAFAFA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100">
+          <main className="flex-1 h-full overflow-y-auto bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100">
             <MainStageSkeleton />
           </main>
           <div className="w-80 lg:w-96 shrink-0 h-full overflow-y-auto hidden sm:block bg-[#F4F4F5] dark:bg-[#1C1C1E] border-l border-neutral-200/80 dark:border-white/10">
@@ -208,9 +208,9 @@ function AssignmentWorkspaceInner({
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#FAFAFA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 overflow-hidden">
+    <div className="h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 overflow-hidden">
       {/* Minimalist Workspace Header */}
-      <header className="border-b border-neutral-200/80 dark:border-white/10 bg-[#FAFAFA] dark:bg-[#171717] z-20 shrink-0">
+      <header className="border-b border-neutral-200/80 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#171717] z-20 shrink-0">
         <div className="flex items-center justify-between px-4 h-12 gap-4">
           <div className="flex items-center gap-2.5 min-w-0">
             {/* Mobile Nav Toggle */}
@@ -283,7 +283,7 @@ function AssignmentWorkspaceInner({
       </header>
 
       {/* 3-Column Workspace Body conforming to light & dark theme continuity */}
-      <div className="flex-1 flex overflow-hidden relative bg-[#FAFAFA] dark:bg-[#171717]">
+      <div className="flex-1 flex overflow-hidden relative bg-[#F8F9FA] dark:bg-[#171717]">
         {/* Left Column: 8-Phase Journey Rail (Desktop) */}
         <div className="hidden md:block w-64 lg:w-72 shrink-0 h-full overflow-y-auto bg-[#F4F4F5] dark:bg-[#1C1C1E] border-r border-neutral-200/80 dark:border-white/10">
           <AssignmentStageNavigation />
@@ -300,7 +300,7 @@ function AssignmentWorkspaceInner({
         )}
 
         {/* Center Column: Active Stage Workspace */}
-        <main className="flex-1 h-full overflow-y-auto bg-[#FAFAFA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100">
+        <main className="flex-1 h-full overflow-y-auto bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100">
           <React.Suspense fallback={<MainStageSkeleton />}>
             {renderActiveStage()}
           </React.Suspense>
