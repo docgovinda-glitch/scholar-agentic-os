@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic } from "../utils/llm.ts";
 import { executeWebSearch, formatSearchResultsForPrompt } from "../src/research/webSearchEngine.ts";
 import { executeDeepResearch } from "../src/research/deepResearchEngine.ts";
+import { validateAndRefineCitations } from "../src/research/citationValidator.ts";
 import type { CitationStyleRegistry } from "../../src/citation_compliance/formattingEngine.ts";
 
 /**
@@ -23,7 +24,14 @@ function determineExecutionMode(
   // If user uploaded files or images, do NOT accidentally hijack into generic web search
   // unless user explicitly requested external web search or online literature review
   if (hasFiles || hasImages) {
-    if (lower.includes("search the web") || lower.includes("search online") || lower.includes("lookup online")) {
+    if (
+      lower.includes("search the web") ||
+      lower.includes("search online") ||
+      lower.includes("lookup online") ||
+      lower.includes("external sources") ||
+      lower.includes("verify online") ||
+      lower.includes("fact check")
+    ) {
       return "search";
     }
     if (lower.includes("deep research") || lower.includes("systematic literature review")) {
@@ -32,7 +40,7 @@ function determineExecutionMode(
     return "chat";
   }
 
-  // Deep research triggers
+  // Deep research triggers: complex, comparative, multi-step scholarly inquiries
   const deepResearchTriggers = [
     "deep research",
     "comprehensive research",
@@ -42,24 +50,46 @@ function determineExecutionMode(
     "detailed analysis of all sources",
     "cross-check claims",
     "multi-source research",
+    "comparative study",
+    "meta-analysis",
+    "conflicting evidence",
   ];
   if (deepResearchTriggers.some((t) => lower.includes(t))) {
     return "deep-research";
   }
 
-  // Web search triggers
+  // Web search triggers: current events, temporal queries, facts, people, orgs, policies, statistics
+  const currentYear = new Date().getFullYear();
   const searchTriggers = [
     "search the web",
     "latest developments",
     "current events",
     "recent news",
-    "what happened in 202",
-    "current status of",
+    "current status",
     "who is currently",
     "today",
+    "yesterday",
+    "this week",
+    "this month",
+    "this year",
+    "now",
     "recent studies on",
     "lookup online",
     "web search",
+    "prime minister",
+    "president",
+    "stock price",
+    "market cap",
+    "inflation rate",
+    "gdp",
+    "election",
+    "guidelines",
+    "regulations",
+    "what happened to",
+    "who won",
+    "current price",
+    String(currentYear),
+    String(currentYear - 1),
   ];
   if (searchTriggers.some((t) => lower.includes(t))) {
     return "search";
@@ -315,11 +345,19 @@ export function registerAIRoutes(
       } else if (normalizedImages.length > 0) {
         assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nCarefully examine the attached image(s) above. Directly describe, analyze, and answer the user's inquiry based on the visual contents, details, structures, and any text visible within the image(s).`;
       } else if (files.length > 0 && mode === "search") {
-        assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nNote: You have access to both the user's uploaded document(s) and live web search findings. Clearly distinguish facts derived from the uploaded file from facts obtained via web sources, and cite web sources where appropriate.`;
+        assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nNote: You have access to both the user's uploaded document(s) and live verified web search findings. Clearly distinguish facts derived from the uploaded file from facts obtained via web sources. Ground external facts in the retrieved sources and cite with inline [1], [2] or [Source Title](URL).`;
       } else if (files.length > 0) {
         assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nAnalyze the uploaded document above and directly answer the user's inquiry based on the document text.`;
       } else if (mode === "search") {
-        assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nSynthesize an authoritative, evidence-backed answer using the live web search findings provided above. Cite your sources with markdown links [Source Title](URL).`;
+        assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nSynthesize an authoritative, research-grade answer using the live verified web search findings provided above.
+
+Formatting & Citation Rules:
+1. Answer / Summary: Directly and concisely answer the user's core inquiry first.
+2. Key Findings & Empirical Evidence: Ground every assertion in the retrieved sources using inline numeric citations [1], [2] or markdown links [Source Title](URL) placed directly beside the supported claims.
+3. Cross-Verification & Contradictions: If credible sources disagree or present different figures/methodologies, explicitly explain the divergence rather than presenting disputed information as established fact.
+4. Source Quality: Prioritize government (.gov), academic (.edu / peer-reviewed), and primary disclosures. Clearly state if any information is an estimate, opinion, or unverified.
+5. Absolute Citation Accuracy: Only cite the retrieved sources above. Never invent citations, statistics, or URLs.
+6. Conclude with a clean "## References & Evidence Base" section listing the consulted sources with their numbers [1], [2] and titles.`;
       } else {
         assembledUserPrompt += effectivePrompt;
       }
@@ -333,13 +371,20 @@ export function registerAIRoutes(
         candidates,
       });
 
+      // 6. Post-Generation Quality-Control & Citation Validation
+      const validated = validateAndRefineCitations(result.text, citations, {
+        files,
+        images: normalizedImages,
+        requireSourcesSection: mode === "search",
+      });
+
       res.json({
         ok: true,
-        text: result.text,
+        text: validated.text,
         provider: result.provider,
         model: result.model,
         mode,
-        citations,
+        citations: validated.citations,
       });
     } catch (err) {
       console.error("Agent execution error:", err);

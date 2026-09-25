@@ -10,6 +10,7 @@
  */
 
 import { executeWebSearch, type SearchResultItem } from "./webSearchEngine.ts";
+import { validateAndRefineCitations } from "./citationValidator.ts";
 import { completeWithFailover } from "../../../src/platform/gateway/gateway.ts";
 import { defaultPolicy } from "../../../src/platform/warden/policy.ts";
 import { recordConsent } from "../../../src/platform/warden/warden.ts";
@@ -269,7 +270,7 @@ Structure requirements:
 # Deep Research Report: ${topic}
 
 ## Executive Summary
-Brief high-level distillation of core findings${hasAttachments ? " and primary conclusions regarding the attached materials" : ""}.
+Direct, punchy distillation of core findings and conclusions${hasAttachments ? " regarding the attached materials and research questions" : ""}.
 
 ## Research Objectives & Scope
 Outline the questions investigated based on the plan${hasAttachments ? ", including specific analysis of the provided attachments" : ""}.
@@ -282,19 +283,23 @@ Detailed, rigorous examination of the user's uploaded document text, data, and/o
 }
 
 ## Thematic Analysis & Key Findings
-Present the evidence organized by the sub-questions. Synthesize facts and cite references inline using markdown links [Source Title](URL).
+Present the evidence organized by the sub-questions. Synthesize facts and cite references inline directly beside claims using [1], [2] or markdown links [Source Title](URL).
 
 ## Cross-Verification & Critical Evaluation
 - Consensus Findings: Areas of agreement across independent sources.
-- Conflicting Claims / Ambiguities: Discrepancies, unresolved questions, or differing interpretations.
+- Conflicting Claims / Ambiguities: Discrepancies, conflicting figures, or differing methodological interpretations across sources.
+- Primary Source Status: Clearly state when official government/academic primary documents confirm or refute claims.
+
+## Limitations & Uncertainty
+State any gaps in evidence, unverified assertions, or caveats.
 
 ## Strategic Recommendations / Scholarly Conclusions
 Actionable scholarly takeaways and future directions.
 
 ## References & Evidence Base
-Numbered list of all cited sources with complete titles and clickable links.
+Numbered list of all cited sources with complete titles, publishers, authority badges, and clickable links.
 
-Ground your claims in the retrieved evidence and primary attachments. Be factual, clear, and uncompromising in scholarly depth.`;
+Ground your claims in the retrieved evidence and primary attachments. Never invent citations or facts. Be factual, clear, and uncompromising in scholarly depth.`;
 
   const synthesisUserPrompt = `Topic: ${topic}
 
@@ -303,11 +308,12 @@ ${evidenceDigest}
 
 Generate the comprehensive Deep Research Report.`;
 
-  const synthesizedReport = await callLlmHelper(synthesisSystemPrompt, synthesisUserPrompt, candidates, "text", images);
+  const rawSynthesizedReport = await callLlmHelper(synthesisSystemPrompt, synthesisUserPrompt, candidates, "text", images);
+  const validated = validateAndRefineCitations(rawSynthesizedReport, allCitations, { files, images });
 
   // Extract consensus and divergent highlights heuristically or from LLM text
   const consensusClaims: string[] = [
-    `Strong factual alignment observed across ${allCitations.length} retrieved references on core foundations.`,
+    `Strong factual alignment observed across ${validated.citations.length} retrieved references on core foundations.`,
   ];
   const divergentClaims: string[] = [
     `Divergence in implementation timelines and jurisdictional specifics noted across independent sources.`,
@@ -319,8 +325,8 @@ Generate the comprehensive Deep Research Report.`;
     evidence,
     consensusClaims,
     divergentClaims,
-    synthesizedReport,
-    allCitations,
+    synthesizedReport: validated.text,
+    allCitations: validated.citations,
     completedAt: new Date().toISOString(),
   };
 }

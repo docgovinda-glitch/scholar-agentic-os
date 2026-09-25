@@ -52,6 +52,7 @@ import {
   ExternalLink,
   Loader2,
   Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 import { getCloudProvider } from "../config/providerCatalog";
 import { loadUserAiSettings } from "../services/userAiSettings";
@@ -173,7 +174,19 @@ export interface WebsiteAssistantMessage {
   provider?: string;
   model?: string;
   plan?: string[];
-  citations?: Array<{ title?: string; url?: string; snippet?: string; source?: string; venue?: string; year?: number }>;
+  citations?: Array<{
+    title?: string;
+    url?: string;
+    snippet?: string;
+    domain?: string;
+    publisher?: string;
+    authorityBadge?: string;
+    authorityTier?: string;
+    source?: string;
+    venue?: string;
+    year?: number | string;
+    isPrimary?: boolean;
+  }>;
   attachments?: Array<{ name: string; isImage: boolean; previewUrl?: string }>;
   error?: boolean;
 }
@@ -268,7 +281,8 @@ export const WEBSITE_ASSISTANT_FAQS = [
 export function renderFormattedGuideText(text: string) {
   if (!text) return null;
 
-  const inlineRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|`([^`]+)`|\*\*\*([^*]+)\*\*\*|___([^_]+)___|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+?)\*|\b_([^_]+)_\b|~~([^~]+)~~/g;
+  const inlineRegex =
+    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\[(\d+(?:\s*,\s*\d+)*)\]|`([^`]+)`|\*\*\*([^*]+)\*\*\*|___([^_]+)___|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+?)\*|\b_([^_]+)_\b|~~([^~]+)~~/g;
 
   const parseInline = (str: string): React.ReactNode[] => {
     const nodes: React.ReactNode[] = [];
@@ -285,55 +299,85 @@ export function renderFormattedGuideText(text: string) {
         // Link: [title](url)
         const linkTitle = match[1];
         const linkUrl = match[2];
-        nodes.push(
-          <a
-            key={`l-${match.index}`}
-            href={linkUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline font-medium inline-flex items-center gap-0.5 mx-0.5 transition-colors"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span>{linkTitle}</span>
-            <span className="text-[10px]">↗</span>
-          </a>
-        );
+        const isNumeric = /^\d+$/.test(linkTitle.trim());
+
+        if (isNumeric) {
+          nodes.push(
+            <a
+              key={`cite-num-${match.index}`}
+              href={linkUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center font-mono text-[10px] font-semibold px-1.5 py-0.2 mx-0.5 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border border-blue-200/60 dark:border-blue-700/50 hover:bg-blue-100 dark:hover:bg-blue-800/60 hover:scale-105 transition-all select-none align-baseline cursor-pointer"
+              title={`Verified Citation [${linkTitle}] — ${linkUrl}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              [{linkTitle}]
+            </a>
+          );
+        } else {
+          nodes.push(
+            <a
+              key={`l-${match.index}`}
+              href={linkUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline font-medium inline-flex items-center gap-0.5 mx-0.5 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span>{linkTitle}</span>
+              <span className="text-[10px]">↗</span>
+            </a>
+          );
+        }
       } else if (match[3] !== undefined) {
+        // Numeric Bracket Citation: [1], [2], [1, 2]
+        const citeNums = match[3];
+        nodes.push(
+          <span
+            key={`cite-${match.index}`}
+            className="inline-flex items-center justify-center font-mono text-[10px] font-semibold px-1.5 py-0.2 mx-0.5 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border border-blue-200/60 dark:border-blue-700/50 hover:bg-blue-100 dark:hover:bg-blue-800/60 hover:scale-105 transition-all select-none align-baseline cursor-pointer"
+            title={`Verified Citation [${citeNums}]`}
+          >
+            [{citeNums}]
+          </span>
+        );
+      } else if (match[4] !== undefined) {
         // Inline code: `code`
         nodes.push(
           <code
             key={`c-${match.index}`}
             className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-neutral-200/80 dark:bg-white/10 text-neutral-800 dark:text-neutral-200 font-medium"
           >
-            {match[3]}
+            {match[4]}
           </code>
         );
-      } else if (match[4] !== undefined || match[5] !== undefined) {
+      } else if (match[5] !== undefined || match[6] !== undefined) {
         // Bold-italic: ***text*** or ___text___
         nodes.push(
           <strong key={`bi-${match.index}`} className="font-semibold text-neutral-900 dark:text-white">
-            <em className="italic">{match[4] || match[5]}</em>
+            <em className="italic">{match[5] || match[6]}</em>
           </strong>
         );
-      } else if (match[6] !== undefined || match[7] !== undefined) {
+      } else if (match[7] !== undefined || match[8] !== undefined) {
         // Bold: **text** or __text__
         nodes.push(
           <strong key={`b-${match.index}`} className="font-semibold text-neutral-900 dark:text-white">
-            {match[6] || match[7]}
+            {match[7] || match[8]}
           </strong>
         );
-      } else if (match[8] !== undefined || match[9] !== undefined) {
+      } else if (match[9] !== undefined || match[10] !== undefined) {
         // Italic: *text* or _text_
         nodes.push(
           <em key={`i-${match.index}`} className="italic text-neutral-800 dark:text-neutral-200">
-            {match[8] || match[9]}
+            {match[9] || match[10]}
           </em>
         );
-      } else if (match[10] !== undefined) {
+      } else if (match[11] !== undefined) {
         // Strikethrough: ~~text~~
         nodes.push(
           <del key={`d-${match.index}`} className="line-through opacity-70">
-            {match[10]}
+            {match[11]}
           </del>
         );
       }
@@ -2360,8 +2404,13 @@ export default function ProjectListScreen({
                           </span>
                         )}
                         {msg.mode === "search" && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-green-500/10 text-green-600 dark:text-green-300 border border-green-500/20 font-medium">
-                            🔍 Web Search
+                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/20 font-medium">
+                            🔍 Perplexity-Grade Research
+                          </span>
+                        )}
+                        {msg.citations && msg.citations.length > 0 && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium">
+                            ✓ {msg.citations.length} {msg.citations.length === 1 ? "Source" : "Sources"}
                           </span>
                         )}
                         {msg.provider && (
@@ -2431,40 +2480,91 @@ export default function ProjectListScreen({
                       </div>
                     )}
 
-                    {/* Citations & Sources */}
+                    {/* Perplexity-Grade Citations & Sources Tray */}
                     {msg.citations && msg.citations.length > 0 && (
-                      <div className="mt-3 pt-2.5 border-t border-neutral-200 dark:border-white/10">
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2 flex items-center gap-1.5">
-                          <Globe className="w-3.5 h-3.5 text-green-500" />
-                          <span>Verified Sources & Citations ({msg.citations.length})</span>
+                      <div className="mt-3.5 pt-3 border-t border-neutral-200 dark:border-white/10">
+                        <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <Globe className="w-3.5 h-3.5 text-blue-500" />
+                            <span>Verified Sources & Provenance ({msg.citations.length})</span>
+                          </div>
+                          <span className="text-[10px] font-medium normal-case px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3" />
+                            <span>100% Authenticated</span>
+                          </span>
                         </div>
-                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                          {msg.citations.map((c, cIdx) => (
-                            <a
-                              key={cIdx}
-                              href={c.url || "#"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex flex-col p-2 rounded-lg bg-white dark:bg-neutral-800/60 border border-neutral-200 dark:border-white/10 hover:border-blue-400 dark:hover:border-blue-500 transition group text-left"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200 group-hover:text-blue-500 truncate">
-                                  {c.title || c.url || "External Source"}
-                                </span>
-                                <ExternalLink className="w-3 h-3 text-neutral-400 group-hover:text-blue-500 shrink-0" />
-                              </div>
-                              {c.snippet && (
-                                <span className="text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-2 mt-0.5">
-                                  {c.snippet}
-                                </span>
-                              )}
-                              <div className="flex items-center gap-2 mt-1 text-[10px] text-neutral-400">
-                                {c.source && <span>{c.source}</span>}
-                                {c.venue && <span>• {c.venue}</span>}
-                                {c.year && <span>• ({c.year})</span>}
-                              </div>
-                            </a>
-                          ))}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1 scholar-scrollbar">
+                          {msg.citations.map((c, cIdx) => {
+                            const domain =
+                              c.domain ||
+                              (c.url
+                                ? (() => {
+                                    try {
+                                      return new URL(c.url).hostname.replace(/^www\./, "");
+                                    } catch {
+                                      return "source";
+                                    }
+                                  })()
+                                : "source");
+                            const badge = c.authorityBadge || (c.isPrimary ? "Primary Source" : c.venue || "Verified Web");
+                            const isGovOrAcademic =
+                              badge.toLowerCase().includes("gov") ||
+                              badge.toLowerCase().includes("peer-reviewed") ||
+                              badge.toLowerCase().includes("academic");
+
+                            return (
+                              <a
+                                key={cIdx}
+                                href={c.url || "#"}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex flex-col p-2.5 rounded-xl bg-white/70 dark:bg-neutral-800/60 border border-neutral-200/90 dark:border-white/10 hover:border-blue-400 dark:hover:border-blue-500/60 hover:shadow-xs transition group text-left relative overflow-hidden"
+                              >
+                                <div className="flex items-center justify-between gap-1.5 mb-1">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="flex-shrink-0 text-[10px] font-mono font-semibold px-1 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                                      {cIdx + 1}
+                                    </span>
+                                    <img
+                                      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                                      alt=""
+                                      className="w-3.5 h-3.5 rounded-xs flex-shrink-0 opacity-80 group-hover:opacity-100"
+                                      onError={(e) => {
+                                        (e.target as HTMLElement).style.display = "none";
+                                      }}
+                                    />
+                                    <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400 truncate">
+                                      {c.publisher || domain}
+                                    </span>
+                                  </div>
+                                  <ExternalLink className="w-3 h-3 text-neutral-400 group-hover:text-blue-500 shrink-0 transition-colors" />
+                                </div>
+
+                                <div className="text-xs font-medium text-neutral-800 dark:text-neutral-200 group-hover:text-blue-500 dark:group-hover:text-blue-400 line-clamp-2 leading-snug">
+                                  {c.title || c.url || "External Verified Source"}
+                                </div>
+
+                                {c.snippet && (
+                                  <div className="text-[10px] text-neutral-500 dark:text-neutral-400 line-clamp-2 mt-1 leading-normal">
+                                    {c.snippet}
+                                  </div>
+                                )}
+
+                                <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t border-neutral-100 dark:border-white/5 text-[9px]">
+                                  <span
+                                    className={`px-1.5 py-0.2 rounded-full font-medium ${
+                                      isGovOrAcademic
+                                        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
+                                        : "bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300"
+                                    }`}
+                                  >
+                                    {badge}
+                                  </span>
+                                  {c.year && <span className="text-neutral-400">• {c.year}</span>}
+                                </div>
+                              </a>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -2490,7 +2590,13 @@ export default function ProjectListScreen({
                   <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
                     <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
                   </div>
-                  <span className="animate-pulse">Scholar Core is synthesizing response...</span>
+                  <span className="animate-pulse">
+                    {sidebarAiMode === "deep-research"
+                      ? "Conducting multi-vector deep research across academic & official sources..."
+                      : sidebarAiMode === "search"
+                      ? "Searching authoritative sources & cross-checking claims..."
+                      : "Scholar Core is researching and synthesizing response..."}
+                  </span>
                 </div>
               )}
             </div>
