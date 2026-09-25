@@ -152,3 +152,28 @@ The **Academic Assignment Workspace** (`/workspace/[id]`) strictly inherits the 
 5. **Collapsible Socratic Tutor Drawer**:
    - Header drawer toggle button that collapses the right panel for focused drafting.
    - Lightweight tabs (`Socratic`, `Rubric`, `Counter-Args`, `Polish`) with ChatGPT-style conversation bubbles matching the active light/dark theme.
+
+---
+
+## 6. ChatGPT-Style Floating Action Popover Menu (`+`) & Active Mode Chips
+
+The prompt bar at the bottom of the workspace commands user actions via a sleek, minimalist ChatGPT-inspired popover interface (`PromptBarActionMenu.tsx`):
+
+1. **Trigger Button (`+`)**:
+   - Circular `+` button placed at the bottom-left of the prompt container with a subtle tooltip: `"Add files and more"`.
+   - Clicking toggles the floating menu open/closed.
+2. **Floating Popover (`z-50`)**:
+   - Positioned directly above the `+` button (`absolute bottom-full mb-2 left-0`).
+   - Container styling: `w-56 p-1.5 rounded-2xl bg-white dark:bg-[#212121] border border-neutral-200 dark:border-white/10 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100`.
+   - Menu Items:
+     - **Add files & photos** (Paperclip icon) → Triggers hidden native file upload picker (`.pdf,.doc,.docx,.txt,image/*`).
+     - **Web search** (Globe icon) → Selects `search` mode and closes popover.
+     - **Deep research** (Compass icon) → Selects `deep_research` mode and closes popover.
+3. **Outside Click & Escape Dismissal**:
+   - Registered DOM click-outside listener via `useRef` and `Escape` key event listener cleanly dismiss the popover.
+4. **Active Mode Indicator Chip**:
+   - When in `auto` mode, zero pills or chips are rendered, keeping the input container minimal and distraction-free.
+   - When `mode === 'search'`, displays a single compact chip next to `+`: `[ 🌐 Search × ]`.
+   - When `mode === 'deep_research'`, displays: `[ 🧭 Deep Research × ]`.
+   - Clicking the `×` button smoothly resets the mode back to `auto`.
+

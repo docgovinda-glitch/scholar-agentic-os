@@ -1008,17 +1008,35 @@ describe("distinct academic format USPs & specs", () => {
     // No duplicate "Ask & Actions" box
     expect(screen.queryByText("Ask & Actions")).not.toBeInTheDocument();
 
-    // Paperclip button & file input
-    const uploadBtn = screen.getByRole("button", { name: /Attach files or images/i });
+    // '+' trigger button & file input
+    const uploadBtn = screen.getByRole("button", { name: /Add files and more/i });
     expect(uploadBtn).toBeInTheDocument();
     const fileInput = screen.getByLabelText("File upload") as HTMLInputElement;
     expect(fileInput).toBeInTheDocument();
     expect(fileInput.accept).toBe(".pdf,.doc,.docx,.txt,image/*");
 
     // Tooltip relative positioning
-    const paperclipTooltip = uploadBtn.parentElement?.querySelector("span");
-    expect(paperclipTooltip?.className).toContain("bottom-full");
-    expect(paperclipTooltip?.className).toContain("mb-2");
+    const plusTooltip = uploadBtn.parentElement?.querySelector("span");
+    expect(plusTooltip?.className).toContain("bottom-full");
+    expect(plusTooltip?.className).toContain("mb-2");
+
+    // Popover menu interaction & mode toggles
+    fireEvent.click(uploadBtn);
+    expect(screen.getByRole("menu", { name: /Prompt options menu/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Add files & photos/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Web search/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Deep research/i })).toBeInTheDocument();
+
+    // Select Web Search mode
+    fireEvent.click(screen.getByRole("menuitem", { name: /Web search/i }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByText("Search")).toBeInTheDocument();
+
+    // Reset mode via × button on chip
+    const resetChipBtn = screen.getByRole("button", { name: /Reset mode/i });
+    expect(resetChipBtn).toBeInTheDocument();
+    fireEvent.click(resetChipBtn);
+    expect(screen.queryByRole("button", { name: /Reset mode/i })).not.toBeInTheDocument();
 
     // Simulate file attachment
     const testFile = new File(["syllabus content"], "syllabus_brief.pdf", { type: "application/pdf" });

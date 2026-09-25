@@ -56,6 +56,7 @@ import {
 } from "lucide-react";
 import { getCloudProvider } from "../config/providerCatalog";
 import { loadUserAiSettings } from "../services/userAiSettings";
+import { PromptBarActionMenu, type PromptMode } from "./PromptBarActionMenu";
 
 export interface Attachment {
   file: File;
@@ -1071,10 +1072,9 @@ export default function ProjectListScreen({
   const [mainPromptInput, setMainPromptInput] = useState("");
   const [mainAttachments, setMainAttachments] = useState<AgentAttachmentItem[]>([]);
   const [isMainUploadingAttachment, setIsMainUploadingAttachment] = useState<boolean>(false);
-  const [mainAiMode, setMainAiMode] = useState<"normal" | "search" | "deep-research">("normal");
+  const [mainAiMode, setMainAiMode] = useState<PromptMode>("auto");
   const [isDragging, setIsDragging] = useState(false);
   const guideTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const mainFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Sidebar Chat / Website Assistant State
   const [guideInput, setGuideInput] = useState("");
@@ -1227,13 +1227,18 @@ export default function ProjectListScreen({
     if (!mainPromptInput.trim() && mainAttachments.length === 0) return;
     const text = mainPromptInput;
     const atts = [...mainAttachments];
-    const mode = mainAiMode;
-    setSidebarAiMode(mode);
+    const targetMode: "normal" | "search" | "deep-research" =
+      mainAiMode === "search"
+        ? "search"
+        : mainAiMode === "deep_research"
+        ? "deep-research"
+        : "normal";
+    setSidebarAiMode(targetMode);
     setIsAiSidebarOpen(true);
     setMainPromptInput("");
     setMainAttachments([]);
     if (guideTextareaRef.current) guideTextareaRef.current.style.height = "auto";
-    handleSendGuideMessage(text, atts, mode);
+    handleSendGuideMessage(text, atts, targetMode);
     setTimeout(() => guideInputRef.current?.focus(), 250);
   };
 
@@ -2229,77 +2234,11 @@ export default function ProjectListScreen({
 
                   {/* Bottom Action Row: Attachments & Mode Selector on left, Submit button on right */}
                   <div className="flex items-center justify-between gap-2 mt-1.5 pt-1 border-t border-neutral-200/40 dark:border-white/5 w-full">
-                    <div className="flex items-center gap-1.5">
-                      <div className="relative group">
-                        <button
-                          type="button"
-                          onClick={() => mainFileInputRef.current?.click()}
-                          title="Attach files or images"
-                          aria-label="Attach files or images"
-                          className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                        >
-                          <Paperclip className="w-4 h-4" />
-                        </button>
-                        <span className="hidden group-hover:block absolute bottom-full mb-2 left-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
-                          Upload files or images (.pdf, .docx, images)
-                        </span>
-                        <input
-                          ref={mainFileInputRef}
-                          type="file"
-                          multiple
-                          accept=".pdf,.doc,.docx,.txt,image/*"
-                          aria-label="File upload"
-                          className="hidden"
-                          onChange={(e) => {
-                            handleMainFileSelect(e.target.files);
-                            e.target.value = "";
-                          }}
-                        />
-                      </div>
-
-                      {/* Intelligent Mode Selection Pills */}
-                      <div className="flex items-center gap-1 bg-neutral-200/50 dark:bg-white/5 p-0.5 rounded-lg text-[10px] font-medium">
-                        <button
-                          type="button"
-                          onClick={() => setMainAiMode("normal")}
-                          className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
-                            mainAiMode === "normal"
-                              ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                              : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                          }`}
-                          title="Automatic capability detection"
-                        >
-                          <Sparkles className="w-2.5 h-2.5 text-blue-500" />
-                          <span>Auto</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setMainAiMode("search")}
-                          className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
-                            mainAiMode === "search"
-                              ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                              : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                          }`}
-                          title="Real-time web search and citation verification"
-                        >
-                          <Globe className="w-2.5 h-2.5 text-green-500" />
-                          <span>Search</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setMainAiMode("deep-research")}
-                          className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
-                            mainAiMode === "deep-research"
-                              ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                              : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                          }`}
-                          title="Multi-stage scholarly investigation, source cross-checking, and report synthesis"
-                        >
-                          <Compass className="w-2.5 h-2.5 text-purple-500" />
-                          <span>Deep Research</span>
-                        </button>
-                      </div>
-                    </div>
+                    <PromptBarActionMenu
+                      currentMode={mainAiMode}
+                      onSelectMode={setMainAiMode}
+                      onAttachFiles={handleMainFileSelect}
+                    />
 
                     <div className="relative group">
                       <button
