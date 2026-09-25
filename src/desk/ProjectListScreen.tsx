@@ -27,9 +27,11 @@ import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
 import VaultScreen from "./vault/VaultScreen";
 import KnowledgeVault from "./vault/KnowledgeVault";
 import AiAccessPage, { type SectionId } from "./aiAccess/AiAccessPage";
+import { CommandPalette } from "./components/CommandPalette";
 import {
   Plus,
   ArrowUp,
+  ArrowRight,
   X,
   RotateCcw,
   Lightbulb,
@@ -1068,6 +1070,11 @@ export default function ProjectListScreen({
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Command Palette & Resizable Assistant Split-Pane States
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [aiSidebarWidth, setAiSidebarWidth] = useState<number>(450);
+  const [isResizingAiSidebar, setIsResizingAiSidebar] = useState<boolean>(false);
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const auth = params.get("auth");
@@ -1146,6 +1153,38 @@ export default function ProjectListScreen({
   useEffect(() => {
     if (showWelcome) onWelcomeSeen?.();
   }, []);
+
+  // Global keyboard shortcut (⌘K / Ctrl+K) to toggle Command Palette
+  useEffect(() => {
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
+  // Split-panel mouse drag resizing for AI assistant drawer
+  useEffect(() => {
+    if (!isResizingAiSidebar) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = window.innerWidth - e.clientX;
+      if (newWidth >= 360 && newWidth <= 750) {
+        setAiSidebarWidth(newWidth);
+      }
+    };
+    const handleMouseUp = () => {
+      setIsResizingAiSidebar(false);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizingAiSidebar]);
 
   const recentProjectsList = useMemo(() => {
     if (!userEmail || !projects || projects.length === 0) {
@@ -1537,7 +1576,19 @@ export default function ProjectListScreen({
             model: agentResponse.model,
             plan: agentResponse.plan,
             citations: agentResponse.citations,
-            followUps: ["How do I create a research project?", "What is Knowledge Vault?", "How do I set up AI?"],
+            followUps:
+              agentResponse.followUps ||
+              (targetMode === "deep-research" || targetMode === "search" || (agentResponse.citations && agentResponse.citations.length > 0)
+                ? [
+                    "What are the leading methodological counter-arguments?",
+                    "Compare contradictory findings in recent literature",
+                    "How can I translate this into an academic paper outline?",
+                  ]
+                : [
+                    "How do I create a research project?",
+                    "What is Knowledge Vault?",
+                    "How do I set up AI?",
+                  ]),
           };
           setGuideMessages((prev) => [...prev, assistantMsg]);
         } else {
@@ -1561,6 +1612,62 @@ export default function ProjectListScreen({
       setIsGuideThinking(false);
     }
   }
+
+  // Boot project workspace directly from assistant research findings
+  const handleBootProjectFromResearch = useCallback(
+    async (researchMessage: WebsiteAssistantMessage) => {
+      if (!userEmail) {
+        openAuth("signup", "Sign in or create an account to initialize a research workspace from these findings.", "OT-10");
+        return;
+      }
+      if (creating) return;
+
+      setCreating(true);
+      setCreatingFormatId("OT-10");
+      setError(null);
+
+      try {
+        const currentIdx = guideMessages.findIndex((m) => m.id === researchMessage.id);
+        const priorUserMsg =
+          currentIdx > 0
+            ? guideMessages.slice(0, currentIdx).filter((m) => m.sender === "user").slice(-1)[0]
+            : undefined;
+
+        const topic =
+          priorUserMsg?.text ||
+          researchMessage.text.split("\n")[0].replace(/^#+\s*/, "").slice(0, 80) ||
+          "Synthesized Research Project";
+        const cleanTitle = topic.length > 60 ? `${topic.slice(0, 57)}...` : topic;
+
+        const project = await createProject("OT-10");
+
+        const citationNotes =
+          researchMessage.citations && researchMessage.citations.length > 0
+            ? researchMessage.citations
+                .map(
+                  (c, i) =>
+                    `[${i + 1}] ${c.title || c.url || "Source"} (${c.publisher || c.domain || ""})\n${c.snippet || ""}\nURL: ${c.url || "N/A"}`
+                )
+                .join("\n\n")
+            : "";
+
+        const intake = {
+          title: cleanTitle,
+          researchQuestion: topic,
+          backgroundNotes: `Synthesized Research Notes (Scholar Core Research Copilot):\n\n${researchMessage.text}`,
+          preliminaryEvidence: citationNotes,
+        };
+
+        await Promise.resolve(saveIntakeAnswers(project.projectId, intake)).catch(() => {});
+        onOpen(project.projectId);
+      } catch (err: any) {
+        setError(err?.message || "Failed to initialize project from research findings.");
+        setCreating(false);
+        setCreatingFormatId(null);
+      }
+    },
+    [userEmail, creating, openAuth, guideMessages, onOpen]
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -1832,8 +1939,16 @@ export default function ProjectListScreen({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full h-full bg-neutral-900/5 dark:bg-white/5 border border-neutral-200 dark:border-white/10 rounded-full pl-10 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 transition-all cursor-text text-neutral-900 dark:text-neutral-200 placeholder-neutral-500 dark:placeholder-neutral-400"
+                className="w-full h-full bg-neutral-900/5 dark:bg-white/5 border border-neutral-200 dark:border-white/10 rounded-full pl-10 pr-11 text-xs focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 transition-all cursor-text text-neutral-900 dark:text-neutral-200 placeholder-neutral-500 dark:placeholder-neutral-400"
               />
+              <button
+                type="button"
+                onClick={() => setIsCommandPaletteOpen(true)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-neutral-200/60 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/20 text-[10px] font-mono font-medium text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer"
+                title="Open Command Palette (⌘K)"
+              >
+                ⌘K
+              </button>
             </div>
           </div>
         </div>
@@ -2117,6 +2232,19 @@ export default function ProjectListScreen({
 
           {/* Top Bar Right: AI Assistant Toggle & Active Provider Status */}
           <div className="flex items-center gap-2.5">
+            {/* Quick Command Palette Button */}
+            <button
+              type="button"
+              onClick={() => setIsCommandPaletteOpen(true)}
+              className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium transition-colors border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 hover:bg-neutral-900/10 dark:hover:bg-white/10 text-neutral-600 dark:text-neutral-300 cursor-pointer shadow-2xs"
+              title="Open Command Palette (⌘K)"
+            >
+              <Search className="w-3.5 h-3.5 text-neutral-400" />
+              <span>Search / Commands</span>
+              <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-200/60 dark:bg-white/10 text-neutral-500 dark:text-neutral-400">
+                ⌘K
+              </kbd>
+            </button>
             {/* Active AI Status Pill */}
             {userEmail ? (
               <button
@@ -2523,17 +2651,38 @@ export default function ProjectListScreen({
         )}
       </main>
 
-      {/* Secondary View (Right Panel): Module 3.2 AI Assistant Sidebar (Elevated UI/UX) */}
+      {/* Secondary View (Right Panel): Module 3.2 AI Assistant Sidebar (Elevated UI/UX & Resizable Split-Pane) */}
       <aside
-        className={`h-full bg-white dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 flex flex-col transition-all duration-300 ease-in-out shrink-0 z-30 ${
+        style={
           isAiSidebarOpen
-            ? "w-full sm:w-[420px] md:w-[450px] max-w-[calc(100vw-1rem)] translate-x-0"
+            ? { width: `min(${aiSidebarWidth}px, 100vw)` }
+            : undefined
+        }
+        className={`h-full bg-white dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 flex flex-col shrink-0 z-30 relative ${
+          isResizingAiSidebar ? "transition-none select-none" : "transition-all duration-300 ease-in-out"
+        } ${
+          isAiSidebarOpen
+            ? "w-full max-w-[calc(100vw-1rem)] translate-x-0"
             : "w-0 translate-x-full overflow-hidden border-none"
         }`}
         aria-hidden={!isAiSidebarOpen}
       >
+        {/* Resizable Split-Pane Drag Divider on Left Edge */}
         {isAiSidebarOpen && (
-          <div className="h-full flex flex-col w-full sm:w-[420px] md:w-[450px]">
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsResizingAiSidebar(true);
+            }}
+            className="hidden sm:flex absolute left-0 top-0 bottom-0 w-2.5 -ml-1 cursor-col-resize hover:bg-sky-500/30 active:bg-sky-500/50 transition-colors z-40 items-center justify-center select-none group"
+            title="Drag to resize panel (360px - 750px)"
+          >
+            <div className="w-0.5 h-8 bg-neutral-300 dark:bg-white/20 rounded-full group-hover:bg-sky-500 transition-colors" />
+          </div>
+        )}
+
+        {isAiSidebarOpen && (
+          <div className="h-full flex flex-col w-full">
             {/* Sidebar Header with glassmorphism & elevated badge */}
             <header className="px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/95 dark:bg-[#18181B]/95 backdrop-blur-md sticky top-0 z-20">
               <div className="flex items-center gap-3">
@@ -2829,6 +2978,17 @@ export default function ProjectListScreen({
                             <span>Vault</span>
                           </button>
 
+                          {/* Boot Project from Research Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleBootProjectFromResearch(msg)}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 transition-colors cursor-pointer font-medium"
+                            title="Initialize a new academic project workspace populated with this research"
+                          >
+                            <FolderPlus className="w-3 h-3 text-emerald-500" />
+                            <span>Boot Project</span>
+                          </button>
+
                           {msg.mode !== "deep-research" && (
                             <button
                               type="button"
@@ -2866,6 +3026,35 @@ export default function ProjectListScreen({
                         >
                           <span>{msg.action.label}</span>
                         </button>
+                      </div>
+                    )}
+
+                    {/* Dynamic Follow-Up Questions ("Related Inquiries") */}
+                    {msg.sender === "assistant" && msg.followUps && msg.followUps.length > 0 && (
+                      <div className="mt-3 pt-2.5 border-t border-neutral-200/60 dark:border-white/10 space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                          <Lightbulb className="w-3 h-3 text-amber-500" />
+                          <span>Related Inquiries</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {msg.followUps.map((fu, fuIdx) => (
+                            <button
+                              key={fuIdx}
+                              type="button"
+                              onClick={() =>
+                                handleSendGuideMessage(
+                                  fu,
+                                  undefined,
+                                  msg.mode === "deep-research" ? "deep-research" : msg.mode === "search" ? "search" : "normal"
+                                )
+                              }
+                              className="text-[11px] text-left px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/[0.06] hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:border-sky-300 dark:hover:border-sky-500/30 border border-neutral-200/60 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors cursor-pointer inline-flex items-center gap-1 group"
+                            >
+                              <span>{fu}</span>
+                              <ArrowRight className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity text-sky-500 shrink-0" />
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -3173,6 +3362,49 @@ export default function ProjectListScreen({
           </div>
         </div>
       )}
+
+      {/* Global Universal Command Palette (⌘K / Ctrl+K) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        projects={projects || []}
+        onOpenProject={(id) => {
+          setIsCommandPaletteOpen(false);
+          onOpen(id);
+        }}
+        onCreateProject={(formatId) => {
+          setIsCommandPaletteOpen(false);
+          handleCreate(formatId);
+        }}
+        onOpenVault={() => {
+          setIsCommandPaletteOpen(false);
+          if (!userEmail) {
+            openAuth("signin", "Sign in to access your Knowledge Vault references.");
+            return;
+          }
+          setActiveView("vault");
+          onOpenVault?.();
+        }}
+        onOpenAiAccess={() => {
+          setIsCommandPaletteOpen(false);
+          if (onOpenAiAccess) onOpenAiAccess();
+          else setActiveView("ai-access");
+        }}
+        onOpenAskScholar={(initialQuery, mode) => {
+          setIsCommandPaletteOpen(false);
+          setIsAiSidebarOpen(true);
+          if (mode === "deep-research") {
+            setSidebarAiMode("deep_research");
+          } else if (mode === "search") {
+            setSidebarAiMode("search");
+          }
+          if (initialQuery) {
+            handleSendGuideMessage(initialQuery, undefined, mode);
+          }
+        }}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+      />
 
       {/* In-Page Authentication Modal */}
       <EmbeddedAuthModal
