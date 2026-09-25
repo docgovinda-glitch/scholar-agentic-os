@@ -53,6 +53,13 @@ import {
   Loader2,
   Sparkles,
   ShieldCheck,
+  Copy,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Zap,
+  Scale,
+  Info,
 } from "lucide-react";
 import { getCloudProvider } from "../config/providerCatalog";
 import { loadUserAiSettings } from "../services/userAiSettings";
@@ -279,7 +286,138 @@ export const WEBSITE_ASSISTANT_FAQS = [
   },
 ];
 
-export function renderFormattedGuideText(text: string) {
+export function CodeBlockWithCopy({ lang, code }: { lang: string; code: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="my-2 rounded-xl bg-neutral-900 dark:bg-black/80 border border-neutral-800 dark:border-white/10 overflow-hidden shadow-2xs">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5 text-[10px] font-mono text-neutral-400">
+        <span className="uppercase tracking-wider font-semibold">{lang || "code"}</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer"
+          title="Copy code to clipboard"
+        >
+          {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+          <span>{copied ? "Copied" : "Copy"}</span>
+        </button>
+      </div>
+      <pre className="p-3 text-xs font-mono text-neutral-200 overflow-x-auto scholar-scrollbar leading-relaxed">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+export type WebsiteCitationItem = NonNullable<WebsiteAssistantMessage["citations"]>[number];
+
+export function InlineCitationBadge({
+  num,
+  url,
+  citation,
+}: {
+  num: string | number;
+  url?: string;
+  citation?: WebsiteCitationItem;
+}) {
+  const targetUrl = url || citation?.url;
+  const domain =
+    citation?.domain ||
+    (targetUrl
+      ? (() => {
+          try {
+            return new URL(targetUrl).hostname.replace(/^www\./, "");
+          } catch {
+            return "source";
+          }
+        })()
+      : undefined);
+
+  return (
+    <span className="relative group/cite inline-block align-baseline mx-0.5 select-none">
+      <a
+        href={targetUrl || "#"}
+        target={targetUrl ? "_blank" : undefined}
+        rel="noopener noreferrer"
+        onClick={(e) => {
+          if (!targetUrl) e.preventDefault();
+          e.stopPropagation();
+        }}
+        className="inline-flex items-center justify-center font-mono text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border border-blue-200/70 dark:border-blue-700/60 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-500 hover:scale-105 active:scale-95 transition-all shadow-2xs cursor-pointer"
+        title={targetUrl ? `Verified Citation [${num}] — ${targetUrl}` : `Verified Citation [${num}]`}
+      >
+        [{num}]
+      </a>
+
+      {/* Perplexity-Grade Citation Hover Card Popover */}
+      {citation && (
+        <span className="pointer-events-none opacity-0 group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-all duration-200 ease-out absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 rounded-xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200 dark:border-white/15 shadow-xl text-left z-50 transform group-hover/cite:translate-y-0 translate-y-1 block">
+          <span className="flex items-center justify-between gap-1.5 mb-1.5">
+            <span className="flex items-center gap-1.5 min-w-0">
+              {domain && (
+                <img
+                  src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                  alt=""
+                  className="w-3.5 h-3.5 rounded-xs shrink-0"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = "none";
+                  }}
+                />
+              )}
+              <span className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+                {citation.publisher || domain || "Verified Source"}
+              </span>
+            </span>
+            {citation.year && (
+              <span className="text-[10px] text-neutral-400 font-mono shrink-0">
+                {citation.year}
+              </span>
+            )}
+          </span>
+
+          <span className="block text-xs font-medium text-neutral-900 dark:text-neutral-100 line-clamp-2 leading-snug mb-1">
+            {citation.title || "External Scholarly Resource"}
+          </span>
+
+          {citation.snippet && (
+            <span className="block text-[10px] text-neutral-500 dark:text-neutral-400 line-clamp-2 leading-relaxed mb-2 italic">
+              "{citation.snippet}"
+            </span>
+          )}
+
+          <span className="flex items-center justify-between pt-1.5 border-t border-neutral-100 dark:border-white/10 text-[9px]">
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 font-medium border border-emerald-200 dark:border-emerald-800/40">
+              {citation.authorityBadge || "Verified"}
+            </span>
+            {targetUrl && (
+              <a
+                href={targetUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline flex items-center gap-0.5 font-medium"
+              >
+                <span>Visit Source</span>
+                <span className="text-[10px]">↗</span>
+              </a>
+            )}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+export function renderFormattedGuideText(
+  text: string,
+  citations?: WebsiteAssistantMessage["citations"]
+) {
   if (!text) return null;
 
   const inlineRegex =
@@ -303,18 +441,17 @@ export function renderFormattedGuideText(text: string) {
         const isNumeric = /^\d+$/.test(linkTitle.trim());
 
         if (isNumeric) {
+          const num = parseInt(linkTitle.trim(), 10);
+          const matchedCite =
+            citations && num > 0 && num <= citations.length ? citations[num - 1] : undefined;
+
           nodes.push(
-            <a
+            <InlineCitationBadge
               key={`cite-num-${match.index}`}
-              href={linkUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center font-mono text-[10px] font-semibold px-1.5 py-0.2 mx-0.5 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border border-blue-200/60 dark:border-blue-700/50 hover:bg-blue-100 dark:hover:bg-blue-800/60 hover:scale-105 transition-all select-none align-baseline cursor-pointer"
-              title={`Verified Citation [${linkTitle}] — ${linkUrl}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              [{linkTitle}]
-            </a>
+              num={linkTitle}
+              url={linkUrl}
+              citation={matchedCite}
+            />
           );
         } else {
           nodes.push(
@@ -334,14 +471,25 @@ export function renderFormattedGuideText(text: string) {
       } else if (match[3] !== undefined) {
         // Numeric Bracket Citation: [1], [2], [1, 2]
         const citeNums = match[3];
+        const mIdx = match.index;
+        const nums = citeNums.split(",").map((n) => n.trim());
+
         nodes.push(
-          <span
-            key={`cite-${match.index}`}
-            className="inline-flex items-center justify-center font-mono text-[10px] font-semibold px-1.5 py-0.2 mx-0.5 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border border-blue-200/60 dark:border-blue-700/50 hover:bg-blue-100 dark:hover:bg-blue-800/60 hover:scale-105 transition-all select-none align-baseline cursor-pointer"
-            title={`Verified Citation [${citeNums}]`}
-          >
-            [{citeNums}]
-          </span>
+          <React.Fragment key={`cite-group-${mIdx}`}>
+            {nums.map((numStr, nIdx) => {
+              const num = parseInt(numStr, 10);
+              const matchedCite =
+                citations && num > 0 && num <= citations.length ? citations[num - 1] : undefined;
+              return (
+                <InlineCitationBadge
+                  key={`cite-${mIdx}-${nIdx}`}
+                  num={numStr}
+                  url={matchedCite?.url}
+                  citation={matchedCite}
+                />
+              );
+            })}
+          </React.Fragment>
         );
       } else if (match[4] !== undefined) {
         // Inline code: `code`
@@ -490,6 +638,44 @@ export function renderFormattedGuideText(text: string) {
         }
 
         if (block.type === "heading") {
+          const lower = block.content.toLowerCase();
+          const isConflict =
+            lower.includes("conflict") ||
+            lower.includes("discrepanc") ||
+            lower.includes("cross-verification");
+          const isLimitation =
+            lower.includes("limitation") ||
+            lower.includes("uncertaint") ||
+            lower.includes("caveat");
+
+          if (isConflict) {
+            return (
+              <div
+                key={idx}
+                className="mt-3 mb-1.5 p-2.5 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200"
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider mb-1">
+                  <Scale className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>{parseInline(block.content)}</span>
+                </div>
+              </div>
+            );
+          }
+
+          if (isLimitation) {
+            return (
+              <div
+                key={idx}
+                className="mt-3 mb-1.5 p-2.5 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/15 border border-indigo-500/30 text-indigo-900 dark:text-indigo-200"
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider mb-1">
+                  <Info className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span>{parseInline(block.content)}</span>
+                </div>
+              </div>
+            );
+          }
+
           if (block.level === 1) {
             return (
               <h3 key={idx} className="font-bold text-sm sm:text-base text-neutral-900 dark:text-neutral-100 pt-2.5 pb-0.5 border-b border-neutral-200/60 dark:border-white/10 tracking-tight">
@@ -545,18 +731,7 @@ export function renderFormattedGuideText(text: string) {
         }
 
         if (block.type === "code_block") {
-          return (
-            <div key={idx} className="my-2 rounded-xl bg-neutral-900 dark:bg-black/60 border border-neutral-800 dark:border-white/10 overflow-hidden shadow-2xs">
-              {block.lang && (
-                <div className="px-3 py-1 bg-white/5 border-b border-white/5 text-[10px] font-mono text-neutral-400 uppercase tracking-wider">
-                  {block.lang}
-                </div>
-              )}
-              <pre className="p-3 text-xs font-mono text-neutral-200 overflow-x-auto scholar-scrollbar leading-relaxed">
-                <code>{block.code}</code>
-              </pre>
-            </div>
-          );
+          return <CodeBlockWithCopy key={idx} lang={block.lang} code={block.code} />;
         }
 
         const isHeaderLike = block.content.endsWith(":") || block.content.startsWith("👉");
@@ -1083,8 +1258,9 @@ export default function ProjectListScreen({
   const [sidebarAiMode, setSidebarAiMode] = useState<"normal" | "search" | "deep-research">("normal");
   const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([]);
   const [isGuideThinking, setIsGuideThinking] = useState(false);
+  const [expandedPlanIds, setExpandedPlanIds] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const guideInputRef = useRef<HTMLInputElement | null>(null);
+  const guideInputRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [aiStatus, setAiStatus] = useState<AiOperationalStatus | null>(null);
@@ -1202,6 +1378,8 @@ export default function ProjectListScreen({
       // Ignore clipboard write issues
     }
   }
+
+  const handleCopyResponse = handleCopyMessage;
 
   function scrollToProjects() {
     const el = document.getElementById("projects-section");
@@ -2126,8 +2304,50 @@ export default function ProjectListScreen({
             </div>
 
             {/* Main AI Prompt Bar — Parallel to the line above settings */}
-            <div className="sticky bottom-0 z-20 w-full relative pointer-events-none h-[114px] flex flex-col justify-start bg-gradient-to-t from-[#FAFAFA] dark:from-[#171717] via-[#FAFAFA]/95 dark:via-[#171717]/95 to-transparent px-4">
+            <div className="sticky bottom-0 z-20 w-full relative pointer-events-none min-h-[114px] flex flex-col justify-start bg-gradient-to-t from-[#FAFAFA] dark:from-[#171717] via-[#FAFAFA]/95 dark:via-[#171717]/95 to-transparent px-4 pb-2">
               <div className="w-full max-w-4xl mx-auto relative pointer-events-auto flex flex-col items-center">
+                {/* Contextual Research Prompt Starters (when input is empty) */}
+                {!mainPromptInput.trim() && mainAttachments.length === 0 && (
+                  <div className="flex items-center gap-1.5 mb-2 overflow-x-auto max-w-full scholar-scrollbar py-0.5 pointer-events-auto select-none">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMainPromptInput("Synthesize the latest 2026 developments in quantum computing and superconducting qubits.");
+                        setMainAiMode("deep_research");
+                        guideTextareaRef.current?.focus();
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 dark:bg-white/5 border border-neutral-200/90 dark:border-white/10 text-[11px] text-neutral-600 dark:text-neutral-400 hover:text-purple-600 dark:hover:text-purple-300 hover:border-purple-300 dark:hover:border-purple-500/30 hover:bg-purple-50/60 dark:hover:bg-purple-950/20 transition-all cursor-pointer shadow-2xs whitespace-nowrap active:scale-95"
+                    >
+                      <Sparkles className="w-3 h-3 text-purple-500" />
+                      <span>🔬 Deep Research Frontier Topics</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMainPromptInput("Compare prime editing and base editing off-target fidelity in human cells.");
+                        setMainAiMode("search");
+                        guideTextareaRef.current?.focus();
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 dark:bg-white/5 border border-neutral-200/90 dark:border-white/10 text-[11px] text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-300 hover:border-blue-300 dark:hover:border-blue-500/30 hover:bg-blue-50/60 dark:hover:bg-blue-950/20 transition-all cursor-pointer shadow-2xs whitespace-nowrap active:scale-95"
+                    >
+                      <Globe className="w-3 h-3 text-blue-500" />
+                      <span>🔍 Live Multi-Source Search</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMainPromptInput("Verify and cross-reference our internal research hypotheses against academic literature.");
+                        setMainAiMode("deep_research");
+                        guideTextareaRef.current?.focus();
+                      }}
+                      className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 dark:bg-white/5 border border-neutral-200/90 dark:border-white/10 text-[11px] text-neutral-600 dark:text-neutral-400 hover:text-emerald-600 dark:hover:text-emerald-300 hover:border-emerald-300 dark:hover:border-emerald-500/30 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/20 transition-all cursor-pointer shadow-2xs whitespace-nowrap active:scale-95"
+                    >
+                      <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                      <span>🛡️ Cross-Verify Evidence</span>
+                    </button>
+                  </div>
+                )}
+
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -2150,10 +2370,10 @@ export default function ProjectListScreen({
                       addMainFiles(Array.from(e.dataTransfer.files));
                     }
                   }}
-                  className={`pointer-events-auto flex flex-col justify-between w-full h-[96px] rounded-2xl bg-neutral-100/90 dark:bg-[#1C1C1E] border transition-all duration-200 shadow-sm px-4 pt-2.5 pb-2 ${
+                  className={`pointer-events-auto flex flex-col justify-between w-full min-h-[92px] rounded-2xl bg-white/95 dark:bg-[#1C1C1E]/95 backdrop-blur-md border transition-all duration-200 shadow-sm hover:shadow-md px-4 pt-2.5 pb-2 ${
                     isDragging
-                      ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/5"
-                      : "border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/20"
+                      ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10 dark:bg-blue-950/20"
+                      : "border-neutral-200/90 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 focus-within:ring-2 focus-within:ring-blue-500/15"
                   }`}
                 >
                   {/* Pending Attachments Chips */}
@@ -2162,7 +2382,7 @@ export default function ProjectListScreen({
                       {mainAttachments.map((att) => (
                         <div
                           key={att.id}
-                          className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs"
+                          className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs"
                         >
                           {att.isImage ? (
                             att.previewUrl ? (
@@ -2200,6 +2420,8 @@ export default function ProjectListScreen({
                       value={mainPromptInput}
                       onChange={(e) => {
                         setMainPromptInput(e.target.value);
+                        e.target.style.height = "auto";
+                        e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
@@ -2228,7 +2450,7 @@ export default function ProjectListScreen({
                       }}
                       placeholder="Paste text, drop files/images, or draft research instructions..."
                       style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                      className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input max-h-24 overflow-y-auto scholar-scrollbar"
+                      className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input max-h-28 overflow-y-auto scholar-scrollbar"
                     />
                   </div>
 
@@ -2243,19 +2465,22 @@ export default function ProjectListScreen({
                     <div className="relative group">
                       <button
                         type="submit"
-                        title="Send message"
+                        title="Send message (Enter)"
                         aria-label="Send message"
                         disabled={(!mainPromptInput.trim() && mainAttachments.length === 0) || isGuideThinking}
-                        className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
+                        className={`flex-shrink-0 h-7 px-2.5 rounded-full flex items-center justify-center gap-1 transition-all duration-200 cursor-pointer ${
                           (mainPromptInput.trim() || mainAttachments.length > 0) && !isGuideThinking
-                            ? "bg-neutral-900 dark:bg-white text-white dark:text-gray-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-sm"
+                            ? "bg-neutral-900 dark:bg-white text-white dark:text-gray-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-sm active:scale-95"
                             : "bg-neutral-200 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
                         }`}
                       >
                         {isGuideThinking ? (
                           <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                         ) : (
-                          <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <>
+                            <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span className="text-[10px] font-mono opacity-60">↵</span>
+                          </>
                         )}
                       </button>
                       <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
@@ -2366,7 +2591,7 @@ export default function ProjectListScreen({
                   </div>
 
                   <div
-                    className={`rounded-2xl px-4 py-3 max-w-[88%] leading-relaxed ${
+                    className={`rounded-2xl px-4 py-3 max-w-[90%] leading-relaxed ${
                       msg.sender === "user"
                         ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs rounded-tr-xs"
                         : msg.error
@@ -2397,25 +2622,42 @@ export default function ProjectListScreen({
                       </div>
                     )}
 
-                    {msg.sender === "assistant" ? renderFormattedGuideText(msg.text) : (
+                    {msg.sender === "assistant" ? renderFormattedGuideText(msg.text, msg.citations) : (
                       <div className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.text}</div>
                     )}
 
-                    {/* Deep Research Plan */}
+                    {/* Deep Research Plan — Interactive Collapsible Trajectory Accordion */}
                     {msg.plan && msg.plan.length > 0 && (
-                      <div className="mt-3 p-2.5 rounded-xl bg-neutral-900/5 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-xs">
-                        <div className="font-semibold text-neutral-800 dark:text-neutral-200 mb-1.5 flex items-center gap-1.5">
-                          <Compass className="w-3.5 h-3.5 text-purple-500" />
-                          <span>Research Trajectory & Sub-inquiries</span>
-                        </div>
-                        <ul className="space-y-1 text-neutral-600 dark:text-neutral-400 text-[11px]">
-                          {msg.plan.map((step, sIdx) => (
-                            <li key={sIdx} className="flex items-start gap-1.5">
-                              <span className="text-purple-500 font-bold">•</span>
-                              <span>{step}</span>
-                            </li>
-                          ))}
-                        </ul>
+                      <div className="mt-3 rounded-xl bg-neutral-900/5 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-xs overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedPlanIds((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }))}
+                          className="w-full flex items-center justify-between p-2.5 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
+                        >
+                          <div className="font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                            <Compass className="w-3.5 h-3.5 text-purple-500" />
+                            <span>Research Trajectory & Inquiry Decompositions ({msg.plan.length} Steps)</span>
+                          </div>
+                          <span className="text-neutral-400">
+                            {expandedPlanIds[msg.id] !== false ? (
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
+                          </span>
+                        </button>
+                        {expandedPlanIds[msg.id] !== false && (
+                          <div className="px-2.5 pb-2.5 pt-0.5 border-t border-neutral-200/50 dark:border-white/5">
+                            <ul className="space-y-1.5 text-neutral-600 dark:text-neutral-400 text-[11px] pt-1.5">
+                              {msg.plan.map((step, sIdx) => (
+                                <li key={sIdx} className="flex items-start gap-1.5">
+                                  <span className="text-purple-500 font-bold shrink-0">✓</span>
+                                  <span>{step}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -2508,6 +2750,72 @@ export default function ProjectListScreen({
                       </div>
                     )}
 
+                    {/* Response Utility Action Bar */}
+                    {msg.sender === "assistant" && !msg.error && (
+                      <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-neutral-200/60 dark:border-white/10 text-[11px] text-neutral-500 dark:text-neutral-400">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyResponse(msg.id, msg.text)}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                            title="Copy full response to markdown"
+                          >
+                            {copiedMessageId === msg.id ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-500" />
+                                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!userEmail) {
+                                openAuth("signin", "Sign in to save research findings to your Knowledge Vault.");
+                                return;
+                              }
+                              onOpenVault?.();
+                            }}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                            title="Open Knowledge Vault to manage citations & evidence"
+                          >
+                            <Database className="w-3 h-3 text-amber-500" />
+                            <span>Vault</span>
+                          </button>
+
+                          {msg.mode !== "deep-research" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSidebarAiMode("deep-research");
+                                const lastUserMsg = guideMessages.filter((m) => m.sender === "user").slice(-1)[0];
+                                if (lastUserMsg) {
+                                  handleSendGuideMessage(lastUserMsg.text, undefined, "deep-research");
+                                }
+                              }}
+                              className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-purple-50 dark:hover:bg-purple-950/30 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
+                              title="Conduct comprehensive deep research on this topic"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              <span>Deep Research</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {msg.model && (
+                          <span className="text-[10px] text-neutral-400 font-mono truncate max-w-[130px]">
+                            {msg.model}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {/* Quick Action Deep-Links */}
                     {msg.action && (
                       <div className="mt-3 pt-2.5 border-t border-neutral-200 dark:border-white/10">
@@ -2525,17 +2833,26 @@ export default function ProjectListScreen({
               ))}
 
               {isGuideThinking && (
-                <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400 p-2">
-                  <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
+                <div className="flex items-center gap-2.5 text-xs text-neutral-600 dark:text-neutral-300 p-3 rounded-2xl bg-neutral-100/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 animate-in fade-in">
+                  <div className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 animate-spin">
                     <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
                   </div>
-                  <span className="animate-pulse">
-                    {sidebarAiMode === "deep-research"
-                      ? "Conducting multi-vector deep research across academic & official sources..."
-                      : sidebarAiMode === "search"
-                      ? "Searching authoritative sources & cross-checking claims..."
-                      : "Scholar Core is researching and synthesizing response..."}
-                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-semibold text-[11px] text-neutral-800 dark:text-neutral-200">
+                      {sidebarAiMode === "deep-research"
+                        ? "Scholarly Deep Research in Progress"
+                        : sidebarAiMode === "search"
+                        ? "Live Multi-Vector Search & Verification"
+                        : "Scholar Core Reasoning"}
+                    </span>
+                    <span className="text-[11px] text-neutral-500 dark:text-neutral-400 animate-pulse">
+                      {sidebarAiMode === "deep-research"
+                        ? "Decomposing inquiries, querying academic repositories, and validating citation authenticity..."
+                        : sidebarAiMode === "search"
+                        ? "Searching authoritative sources and cross-checking evidence..."
+                        : "Researching and synthesizing response..."}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
@@ -2631,19 +2948,28 @@ export default function ProjectListScreen({
                 className="flex flex-col gap-1.5 rounded-2xl bg-neutral-100 dark:bg-white/5 p-2 shadow-sm border border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/20 transition-all"
               >
                 <div className="flex items-center gap-2 px-2">
-                  <input
-                    ref={guideInputRef}
-                    type="text"
+                  <textarea
+                    ref={guideInputRef as any}
+                    rows={1}
                     value={guideInput}
-                    onChange={(e) => setGuideInput(e.target.value)}
+                    onChange={(e) => {
+                      setGuideInput(e.target.value);
+                      e.target.style.height = "auto";
+                      e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                    }}
                     onKeyDown={(e) => {
-                      if (e.key === "Backspace" && guideInput === "" && sidebarAttachments.length > 0) {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (guideInput.trim() || sidebarAttachments.length > 0) {
+                          handleSendGuideMessage();
+                        }
+                      } else if (e.key === "Backspace" && guideInput === "" && sidebarAttachments.length > 0) {
                         removeSidebarAttachment(sidebarAttachments[sidebarAttachments.length - 1].id);
                       }
                     }}
                     placeholder="Ask anything, search projects, or type a command..."
                     style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                    className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none prompt-bare-input"
+                    className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none resize-none prompt-bare-input max-h-28 overflow-y-auto scholar-scrollbar"
                   />
                 </div>
 
@@ -2675,38 +3001,41 @@ export default function ProjectListScreen({
                       <button
                         type="button"
                         onClick={() => setSidebarAiMode("normal")}
-                        className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
+                        className={`px-1.5 py-0.5 rounded transition cursor-pointer flex items-center gap-0.5 ${
                           sidebarAiMode === "normal"
                             ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                             : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                         }`}
                         title="Automatic capability detection"
                       >
-                        Auto
+                        <Zap className="w-2.5 h-2.5 text-amber-500" />
+                        <span>Auto</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setSidebarAiMode("search")}
-                        className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
+                        className={`px-1.5 py-0.5 rounded transition cursor-pointer flex items-center gap-0.5 ${
                           sidebarAiMode === "search"
                             ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                             : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                         }`}
                         title="Web Search"
                       >
-                        Search
+                        <Globe className="w-2.5 h-2.5 text-blue-500" />
+                        <span>Search</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setSidebarAiMode("deep-research")}
-                        className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
+                        className={`px-1.5 py-0.5 rounded transition cursor-pointer flex items-center gap-0.5 ${
                           sidebarAiMode === "deep-research"
                             ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                             : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                         }`}
                         title="Deep Research"
                       >
-                        Deep Research
+                        <Sparkles className="w-2.5 h-2.5 text-purple-500" />
+                        <span>Deep Research</span>
                       </button>
                     </div>
                   </div>
@@ -2716,10 +3045,10 @@ export default function ProjectListScreen({
                     disabled={(!guideInput.trim() && sidebarAttachments.length === 0) || isGuideThinking}
                     className={`rounded-full p-1.5 flex items-center justify-center transition cursor-pointer ${
                       (guideInput.trim() || sidebarAttachments.length > 0) && !isGuideThinking
-                        ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-xs"
+                        ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-xs active:scale-95"
                         : "bg-neutral-200 dark:bg-white/5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
                     }`}
-                    title="Send question"
+                    title="Send question (Enter)"
                     aria-label="Send question"
                   >
                     <ArrowUp className="w-3.5 h-3.5" />
