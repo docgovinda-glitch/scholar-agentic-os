@@ -43,7 +43,7 @@ vi.mock("../../services/supabaseClient", () => ({
   isSupabaseConfigured: () => true,
 }));
 
-const { default: ProjectListScreen } = await import("../ProjectListScreen");
+const { default: ProjectListScreen, renderFormattedGuideText } = await import("../ProjectListScreen");
 
 function renderScreen(ui: React.ReactElement) {
   return render(<MemoryRouter>{ui}</MemoryRouter>);
@@ -1075,6 +1075,68 @@ describe("distinct academic format USPs & specs", () => {
   });
 });
 
+describe("prompt isolation & rich markdown rendering", () => {
+  it("isolates main dashboard prompt input and sidebar chat input so typing does not appear in two places", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
+    // Open the sidebar
+    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    fireEvent.click(toggleBtn);
 
+    const mainTextarea = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i) as HTMLTextAreaElement;
+    const sidebarInput = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i) as HTMLInputElement;
 
+    // Both are initially empty
+    expect(mainTextarea.value).toBe("");
+    expect(sidebarInput.value).toBe("");
+
+    // Typing in main dashboard textarea does not mirror into sidebar
+    fireEvent.change(mainTextarea, { target: { value: "Topic in Main Box" } });
+    expect(mainTextarea.value).toBe("Topic in Main Box");
+    expect(sidebarInput.value).toBe("");
+
+    // Typing in sidebar input does not mirror into main textarea
+    fireEvent.change(sidebarInput, { target: { value: "Question in Sidebar" } });
+    expect(mainTextarea.value).toBe("Topic in Main Box");
+    expect(sidebarInput.value).toBe("Question in Sidebar");
+  });
+
+  it("renders rich formatted markdown without raw hashtags or raw asterisks", () => {
+    const rawMarkdown = [
+      "The concept of a **Hindu Nation** (or *Hindu Rashtra*) is an academic subject.",
+      "",
+      "### 1. Ideological Foundations: Hindutva",
+      "",
+      "• **V.D. Savarkar**: In his seminal 1923 work, *Hindutva: Who is a Hindu?*, Savarkar defined concepts.",
+      "",
+      "> Direct quotation from historical source",
+      "",
+      "```json",
+      "{\"status\": \"ok\"}",
+      "```",
+    ].join("\n");
+
+    const { container } = render(<div>{renderFormattedGuideText(rawMarkdown)}</div>);
+
+    // Headings rendered without ### hashtags
+    expect(screen.queryByText(/### 1\. Ideological Foundations/)).not.toBeInTheDocument();
+    expect(screen.getByText("1. Ideological Foundations: Hindutva")).toBeInTheDocument();
+    const headingElem = screen.getByText("1. Ideological Foundations: Hindutva").closest("h5");
+    expect(headingElem).toBeInTheDocument();
+
+    // Bold & italic rendered without raw asterisks
+    expect(screen.queryByText(/\*Hindu Rashtra\*/)).not.toBeInTheDocument();
+    expect(screen.getByText("Hindu Nation")).toBeInTheDocument();
+    expect(screen.getByText("Hindu Rashtra")).toBeInTheDocument();
+    expect(screen.getByText("Hindutva: Who is a Hindu?")).toBeInTheDocument();
+
+    // Blockquote
+    expect(container.querySelector("blockquote")).toBeInTheDocument();
+    expect(screen.getByText("Direct quotation from historical source")).toBeInTheDocument();
+
+    // Code block
+    expect(container.querySelector("pre code")).toBeInTheDocument();
+    expect(screen.getByText(/\{\"status\": \"ok\"\}/)).toBeInTheDocument();
+  });
+});

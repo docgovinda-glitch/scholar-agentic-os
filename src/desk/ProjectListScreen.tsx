@@ -61,6 +61,16 @@ export interface Attachment {
   previewUrl?: string;
 }
 
+export interface AgentAttachmentItem {
+  id: string;
+  name: string;
+  isImage: boolean;
+  size: number;
+  fileData?: { name: string; text: string; type: string };
+  imageData?: { data: string; mimeType: string; name: string };
+  previewUrl?: string;
+}
+
 /** Curated 4 essential academic formats */
 export const FORMAT_TILES = [
   {
@@ -258,86 +268,260 @@ export const WEBSITE_ASSISTANT_FAQS = [
 export function renderFormattedGuideText(text: string) {
   if (!text) return null;
 
-  const lines = text.split("\n");
+  const inlineRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|`([^`]+)`|\*\*\*([^*]+)\*\*\*|___([^_]+)___|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+?)\*|\b_([^_]+)_\b|~~([^~]+)~~/g;
 
-  const parseBoldAndLinks = (str: string) => {
-    // Parse markdown links [Title](url) and bold **bold**
-    const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
-    const segments: React.ReactNode[] = [];
-    let lastIndex = 0;
+  const parseInline = (str: string): React.ReactNode[] => {
+    const nodes: React.ReactNode[] = [];
+    let lastIdx = 0;
     let match: RegExpExecArray | null;
+    inlineRegex.lastIndex = 0;
 
-    while ((match = linkRegex.exec(str)) !== null) {
-      if (match.index > lastIndex) {
-        segments.push(parseBoldOnly(str.slice(lastIndex, match.index)));
+    while ((match = inlineRegex.exec(str)) !== null) {
+      if (match.index > lastIdx) {
+        nodes.push(str.slice(lastIdx, match.index));
       }
-      const linkTitle = match[1];
-      const linkUrl = match[2];
-      segments.push(
-        <a
-          key={`link-${match.index}`}
-          href={linkUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline font-medium inline-flex items-center gap-0.5 mx-0.5"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span>{linkTitle}</span>
-          <span className="text-[10px]">↗</span>
-        </a>
-      );
-      lastIndex = linkRegex.lastIndex;
-    }
-    if (lastIndex < str.length) {
-      segments.push(parseBoldOnly(str.slice(lastIndex)));
-    }
-    return segments;
-  };
 
-  const parseBoldOnly = (s: string) => {
-    const parts = s.split(/(\*\*[^*]+\*\*)/g);
-    return parts.map((part, pIdx) => {
-      if (part.startsWith("**") && part.endsWith("**")) {
-        return (
-          <strong key={pIdx} className="font-semibold text-slate-900 dark:text-white">
-            {part.slice(2, -2)}
+      if (match[1] !== undefined) {
+        // Link: [title](url)
+        const linkTitle = match[1];
+        const linkUrl = match[2];
+        nodes.push(
+          <a
+            key={`l-${match.index}`}
+            href={linkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline font-medium inline-flex items-center gap-0.5 mx-0.5 transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span>{linkTitle}</span>
+            <span className="text-[10px]">↗</span>
+          </a>
+        );
+      } else if (match[3] !== undefined) {
+        // Inline code: `code`
+        nodes.push(
+          <code
+            key={`c-${match.index}`}
+            className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-neutral-200/80 dark:bg-white/10 text-neutral-800 dark:text-neutral-200 font-medium"
+          >
+            {match[3]}
+          </code>
+        );
+      } else if (match[4] !== undefined || match[5] !== undefined) {
+        // Bold-italic: ***text*** or ___text___
+        nodes.push(
+          <strong key={`bi-${match.index}`} className="font-semibold text-neutral-900 dark:text-white">
+            <em className="italic">{match[4] || match[5]}</em>
           </strong>
         );
+      } else if (match[6] !== undefined || match[7] !== undefined) {
+        // Bold: **text** or __text__
+        nodes.push(
+          <strong key={`b-${match.index}`} className="font-semibold text-neutral-900 dark:text-white">
+            {match[6] || match[7]}
+          </strong>
+        );
+      } else if (match[8] !== undefined || match[9] !== undefined) {
+        // Italic: *text* or _text_
+        nodes.push(
+          <em key={`i-${match.index}`} className="italic text-neutral-800 dark:text-neutral-200">
+            {match[8] || match[9]}
+          </em>
+        );
+      } else if (match[10] !== undefined) {
+        // Strikethrough: ~~text~~
+        nodes.push(
+          <del key={`d-${match.index}`} className="line-through opacity-70">
+            {match[10]}
+          </del>
+        );
       }
-      return part;
-    });
+
+      lastIdx = inlineRegex.lastIndex;
+    }
+
+    if (lastIdx < str.length) {
+      nodes.push(str.slice(lastIdx));
+    }
+
+    return nodes;
   };
 
-  return (
-    <div className="space-y-2 whitespace-pre-wrap text-[13px] leading-relaxed text-inherit">
-      {lines.map((line, idx) => {
-        const trimmed = line.trim();
+  // Block parser
+  const lines = text.split("\n");
+  type Block =
+    | { type: "empty" }
+    | { type: "hr" }
+    | { type: "heading"; level: number; content: string }
+    | { type: "bullet"; content: string }
+    | { type: "ordered"; num: string; content: string }
+    | { type: "blockquote"; content: string }
+    | { type: "code_block"; lang: string; code: string }
+    | { type: "paragraph"; content: string };
 
-        if (!trimmed) {
-          return <div key={idx} className="h-1" />;
+  const blocks: Block[] = [];
+  let inCodeBlock = false;
+  let codeBlockLang = "";
+  let codeBlockLines: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const trimmed = rawLine.trim();
+
+    if (trimmed.startsWith("```")) {
+      if (inCodeBlock) {
+        blocks.push({ type: "code_block", lang: codeBlockLang, code: codeBlockLines.join("\n") });
+        inCodeBlock = false;
+        codeBlockLang = "";
+        codeBlockLines = [];
+      } else {
+        inCodeBlock = true;
+        codeBlockLang = trimmed.slice(3).trim();
+        codeBlockLines = [];
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBlockLines.push(rawLine);
+      continue;
+    }
+
+    if (!trimmed) {
+      blocks.push({ type: "empty" });
+      continue;
+    }
+
+    if (/^(---|___|\*\*\*)$/.test(trimmed)) {
+      blocks.push({ type: "hr" });
+      continue;
+    }
+
+    const headingMatch = trimmed.match(/^(#{2,6})\s*(.*)$|^(#)\s+(.*)$/);
+    if (headingMatch) {
+      const hashes = headingMatch[1] || headingMatch[3];
+      const headingContent = headingMatch[2] !== undefined ? headingMatch[2] : headingMatch[4];
+      blocks.push({
+        type: "heading",
+        level: hashes.length,
+        content: headingContent,
+      });
+      continue;
+    }
+
+    if (trimmed.startsWith(">")) {
+      blocks.push({ type: "blockquote", content: trimmed.replace(/^>\s*/, "") });
+      continue;
+    }
+
+    if (trimmed.startsWith("• ") || trimmed.startsWith("- ") || (trimmed.startsWith("* ") && !trimmed.startsWith("***"))) {
+      blocks.push({ type: "bullet", content: trimmed.replace(/^(?:•|-|\*)\s+/, "") });
+      continue;
+    }
+
+    const orderedMatch = trimmed.match(/^(\d+)[\.\)]\s+(.*)$/);
+    if (orderedMatch) {
+      blocks.push({ type: "ordered", num: orderedMatch[1], content: orderedMatch[2] });
+      continue;
+    }
+
+    blocks.push({ type: "paragraph", content: trimmed });
+  }
+
+  if (inCodeBlock && codeBlockLines.length > 0) {
+    blocks.push({ type: "code_block", lang: codeBlockLang, code: codeBlockLines.join("\n") });
+  }
+
+  return (
+    <div className="space-y-1.5 text-[13px] leading-relaxed text-inherit">
+      {blocks.map((block, idx) => {
+        if (block.type === "empty") {
+          return <div key={idx} className="h-1.5" />;
         }
 
-        const isBullet = trimmed.startsWith("•") || trimmed.startsWith("- ") || trimmed.startsWith("* ");
-        const bulletText = isBullet ? trimmed.replace(/^[•\-*]\s*/, "") : trimmed;
-        const parsedContent = parseBoldAndLinks(bulletText);
+        if (block.type === "hr") {
+          return <hr key={idx} className="border-neutral-200 dark:border-white/10 my-2.5" />;
+        }
 
-        if (isBullet) {
+        if (block.type === "heading") {
+          if (block.level === 1) {
+            return (
+              <h3 key={idx} className="font-bold text-sm sm:text-base text-neutral-900 dark:text-neutral-100 pt-2.5 pb-0.5 border-b border-neutral-200/60 dark:border-white/10 tracking-tight">
+                {parseInline(block.content)}
+              </h3>
+            );
+          }
+          if (block.level === 2) {
+            return (
+              <h4 key={idx} className="font-bold text-sm text-neutral-900 dark:text-neutral-100 pt-2 pb-0.5 tracking-tight">
+                {parseInline(block.content)}
+              </h4>
+            );
+          }
+          if (block.level === 3) {
+            return (
+              <h5 key={idx} className="font-semibold text-[13px] sm:text-sm text-neutral-900 dark:text-neutral-100 pt-1.5 pb-0.5 tracking-tight">
+                {parseInline(block.content)}
+              </h5>
+            );
+          }
           return (
-            <div key={idx} className="flex items-start gap-2 pl-1">
-              <span className="text-slate-400 dark:text-neutral-500 font-bold shrink-0 leading-relaxed">•</span>
-              <span className="flex-1 min-w-0">{parsedContent}</span>
+            <h6 key={idx} className="font-semibold text-xs text-neutral-800 dark:text-neutral-300 uppercase tracking-wider pt-1 pb-0.5">
+              {parseInline(block.content)}
+            </h6>
+          );
+        }
+
+        if (block.type === "bullet") {
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-1 my-0.5">
+              <span className="text-neutral-400 dark:text-neutral-500 font-bold shrink-0 leading-relaxed">•</span>
+              <div className="flex-1 min-w-0 leading-relaxed">{parseInline(block.content)}</div>
             </div>
           );
         }
 
-        const isHeader = trimmed.endsWith(":") || trimmed.startsWith("👉") || /^[0-9]+\./.test(trimmed) || trimmed.startsWith("###") || trimmed.startsWith("##");
+        if (block.type === "ordered") {
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-1 my-0.5">
+              <span className="text-neutral-500 dark:text-neutral-400 font-medium shrink-0 text-xs leading-relaxed min-w-[16px]">{block.num}.</span>
+              <div className="flex-1 min-w-0 leading-relaxed">{parseInline(block.content)}</div>
+            </div>
+          );
+        }
+
+        if (block.type === "blockquote") {
+          return (
+            <blockquote key={idx} className="border-l-2 border-neutral-300 dark:border-neutral-600 pl-3 py-1 my-1.5 italic text-neutral-700 dark:text-neutral-300 text-xs sm:text-[13px]">
+              {parseInline(block.content)}
+            </blockquote>
+          );
+        }
+
+        if (block.type === "code_block") {
+          return (
+            <div key={idx} className="my-2 rounded-xl bg-neutral-900 dark:bg-black/60 border border-neutral-800 dark:border-white/10 overflow-hidden shadow-2xs">
+              {block.lang && (
+                <div className="px-3 py-1 bg-white/5 border-b border-white/5 text-[10px] font-mono text-neutral-400 uppercase tracking-wider">
+                  {block.lang}
+                </div>
+              )}
+              <pre className="p-3 text-xs font-mono text-neutral-200 overflow-x-auto scholar-scrollbar leading-relaxed">
+                <code>{block.code}</code>
+              </pre>
+            </div>
+          );
+        }
+
+        const isHeaderLike = block.content.endsWith(":") || block.content.startsWith("👉");
 
         return (
           <p
             key={idx}
-            className={isHeader ? "font-medium text-slate-900 dark:text-neutral-100 pt-0.5" : "text-inherit"}
+            className={isHeaderLike ? "font-medium text-neutral-900 dark:text-neutral-100 pt-0.5 leading-relaxed" : "leading-relaxed text-inherit"}
           >
-            {parsedContent}
+            {parseInline(block.content)}
           </p>
         );
       })}
@@ -840,30 +1024,27 @@ export default function ProjectListScreen({
     return map;
   }, [types]);
 
-  // Website Assistant State (Help & Guidance Layer)
+  // Main Dashboard Prompt Bar State
+  const [mainPromptInput, setMainPromptInput] = useState("");
+  const [mainAttachments, setMainAttachments] = useState<AgentAttachmentItem[]>([]);
+  const [isMainUploadingAttachment, setIsMainUploadingAttachment] = useState<boolean>(false);
+  const [mainAiMode, setMainAiMode] = useState<"normal" | "search" | "deep-research">("normal");
+  const [isDragging, setIsDragging] = useState(false);
+  const guideTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const mainFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Sidebar Chat / Website Assistant State
   const [guideInput, setGuideInput] = useState("");
+  const [sidebarAttachments, setSidebarAttachments] = useState<AgentAttachmentItem[]>([]);
+  const [isSidebarUploadingAttachment, setIsSidebarUploadingAttachment] = useState<boolean>(false);
+  const [sidebarAiMode, setSidebarAiMode] = useState<"normal" | "search" | "deep-research">("normal");
   const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([]);
   const [isGuideThinking, setIsGuideThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const guideInputRef = useRef<HTMLInputElement | null>(null);
-  const guideTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const guideFileInputRef = useRef<HTMLInputElement | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [aiStatus, setAiStatus] = useState<AiOperationalStatus | null>(null);
-  const [attachments, setAttachments] = useState<Array<{
-    id: string;
-    name: string;
-    isImage: boolean;
-    size: number;
-    fileData?: { name: string; text: string; type: string };
-    imageData?: { data: string; mimeType: string; name: string };
-    previewUrl?: string;
-  }>>([]);
-  const [isUploadingAttachment, setIsUploadingAttachment] = useState<boolean>(false);
-  const [activeAiMode, setActiveAiMode] = useState<"normal" | "search" | "deep-research">("normal");
-  const mainFileInputRef = useRef<HTMLInputElement | null>(null);
-  const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Sync AI operational status
   useEffect(() => {
@@ -891,18 +1072,22 @@ export default function ProjectListScreen({
     };
   }, []);
 
-  async function handleFileSelect(files: FileList | File[] | null) {
+  async function parseFilesToAttachments(
+    files: FileList | File[] | null,
+    setUploading: (val: boolean) => void,
+    setItems: React.Dispatch<React.SetStateAction<AgentAttachmentItem[]>>
+  ) {
     if (!files || files.length === 0) return;
-    setIsUploadingAttachment(true);
+    setUploading(true);
     try {
-      const newItems = [...attachments];
+      const newItems: AgentAttachmentItem[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         try {
           const parsed = await parseFileForAgent(file);
           const previewUrl = parsed.isImage && typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : undefined;
           newItems.push({
-            id: `att-${Date.now()}-${i}`,
+            id: `att-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
             name: file.name,
             size: file.size,
             isImage: parsed.isImage,
@@ -913,7 +1098,7 @@ export default function ProjectListScreen({
         } catch (parseErr) {
           console.error("Failed to parse file for agent:", file.name, parseErr);
           newItems.push({
-            id: `att-${Date.now()}-${i}`,
+            id: `att-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
             name: file.name,
             size: file.size,
             isImage: false,
@@ -925,23 +1110,35 @@ export default function ProjectListScreen({
           });
         }
       }
-      setAttachments(newItems);
+      setItems((prev) => [...prev, ...newItems]);
     } finally {
-      setIsUploadingAttachment(false);
+      setUploading(false);
     }
   }
 
-  function removeAttachment(id: string) {
-    setAttachments((prev) => prev.filter((a) => a.id !== id));
-  }
+  const handleMainFileSelect = (files: FileList | File[] | null) => {
+    return parseFilesToAttachments(files, setIsMainUploadingAttachment, setMainAttachments);
+  };
 
-  const addFiles = useCallback((files: File[]) => {
-    handleFileSelect(files);
-  }, [handleFileSelect]);
+  const removeMainAttachment = (id: string) => {
+    setMainAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const addMainFiles = (files: File[]) => {
+    handleMainFileSelect(files);
+  };
+
+  const handleSidebarFileSelect = (files: FileList | File[] | null) => {
+    return parseFilesToAttachments(files, setIsSidebarUploadingAttachment, setSidebarAttachments);
+  };
+
+  const removeSidebarAttachment = (id: string) => {
+    setSidebarAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
 
   const promptMatchingProjects = useMemo(() => {
-    if (!projects || !guideInput.trim()) return [];
-    const q = guideInput.toLowerCase().trim();
+    if (!projects || !mainPromptInput.trim()) return [];
+    const q = mainPromptInput.toLowerCase().trim();
     return projects
       .filter((p) => {
         const title = (p.answers?.title || "").toLowerCase();
@@ -949,7 +1146,7 @@ export default function ProjectListScreen({
         return title.includes(q) || outputType.includes(q);
       })
       .slice(0, 3);
-  }, [projects, guideInput]);
+  }, [projects, mainPromptInput]);
 
   const scrollToAssistant = useCallback(() => {
     setMobileMenuOpen(false);
@@ -993,9 +1190,29 @@ export default function ProjectListScreen({
     }
   }
 
-  async function handleSendGuideMessage(textToSend?: string) {
+  const handleSendMainPrompt = () => {
+    if (!mainPromptInput.trim() && mainAttachments.length === 0) return;
+    const text = mainPromptInput;
+    const atts = [...mainAttachments];
+    const mode = mainAiMode;
+    setIsPromptSuggestionsOpen(false);
+    setIsAiSidebarOpen(true);
+    setMainPromptInput("");
+    setMainAttachments([]);
+    if (guideTextareaRef.current) guideTextareaRef.current.style.height = "auto";
+    handleSendGuideMessage(text, atts, mode);
+    setTimeout(() => guideInputRef.current?.focus(), 250);
+  };
+
+  async function handleSendGuideMessage(
+    textToSend?: string,
+    attachmentsToSend?: AgentAttachmentItem[],
+    modeToSend?: "normal" | "search" | "deep-research"
+  ) {
+    const isSidebarDirect = textToSend === undefined;
     const rawQuery = (textToSend !== undefined ? textToSend : guideInput).trim();
-    const currentAttachments = [...attachments];
+    const currentAttachments = attachmentsToSend !== undefined ? [...attachmentsToSend] : [...sidebarAttachments];
+    const targetMode = modeToSend !== undefined ? modeToSend : sidebarAiMode;
 
     if (!rawQuery && currentAttachments.length === 0) return;
 
@@ -1016,10 +1233,10 @@ export default function ProjectListScreen({
     };
 
     setGuideMessages((prev) => [...prev, userMsg]);
-    setGuideInput("");
-    setAttachments([]);
-    if (guideTextareaRef.current) guideTextareaRef.current.style.height = "auto";
-    setIsGuideThinking(true);
+    if (isSidebarDirect) {
+      setGuideInput("");
+      setSidebarAttachments([]);
+    }
     setIsGuideThinking(true);
 
     try {
@@ -1060,7 +1277,7 @@ export default function ProjectListScreen({
         let agentResponse: any;
         const systemPrompt = `You are Scholar Core Socratic Assistant, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers with clear citations.`;
 
-        if (currentAttachments.length === 0 && activeAiMode === "normal" && !query.toLowerCase().includes("deep research") && !query.toLowerCase().includes("search the web")) {
+        if (currentAttachments.length === 0 && targetMode === "normal" && !query.toLowerCase().includes("deep research") && !query.toLowerCase().includes("search the web")) {
           // Standard text generation — calls executeAgenticLLM first (compatible with unit tests and client router)
           try {
             const txt = await executeAgenticLLM(systemPrompt, query, "simple");
@@ -1070,7 +1287,7 @@ export default function ProjectListScreen({
             agentResponse = await executeAgenticQuery({
               prompt: query,
               systemPrompt,
-              mode: activeAiMode,
+              mode: targetMode,
               history,
             });
           }
@@ -1079,7 +1296,7 @@ export default function ProjectListScreen({
           agentResponse = await executeAgenticQuery({
             prompt: query,
             systemPrompt,
-            mode: activeAiMode,
+            mode: targetMode,
             files: currentAttachments.filter((a) => a.fileData).map((a) => a.fileData!),
             images: currentAttachments.filter((a) => a.imageData).map((a) => a.imageData!),
             history,
@@ -1121,40 +1338,6 @@ export default function ProjectListScreen({
       setIsGuideThinking(false);
     }
   }
-
-  const handleSubmitPrompt = useCallback(() => {
-    if (!guideInput.trim() && attachments.length === 0) return;
-    setIsAiSidebarOpen(true);
-    handleSendGuideMessage();
-    if (guideTextareaRef.current) guideTextareaRef.current.style.height = "auto";
-  }, [guideInput, attachments]);
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmitPrompt();
-    } else if (e.key === "Backspace" && guideInput === "" && attachments.length > 0) {
-      removeAttachment(attachments[attachments.length - 1].id);
-    }
-  };
-
-  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-
-    const newFiles: File[] = [];
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].kind === "file") {
-        const file = items[i].getAsFile();
-        if (file) newFiles.push(file);
-      }
-    }
-
-    if (newFiles.length > 0) {
-      e.preventDefault();
-      addFiles(newFiles);
-    }
-  };
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -1910,11 +2093,8 @@ export default function ProjectListScreen({
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (guideInput.trim() || attachments.length > 0) {
-                      setIsPromptSuggestionsOpen(false);
-                      setIsAiSidebarOpen(true);
-                      handleSendGuideMessage();
-                      setTimeout(() => guideTextareaRef.current?.focus(), 300);
+                    if (mainPromptInput.trim() || mainAttachments.length > 0) {
+                      handleSendMainPrompt();
                     }
                   }}
                   onDragOver={(e) => {
@@ -1926,7 +2106,7 @@ export default function ProjectListScreen({
                     e.preventDefault();
                     setIsDragging(false);
                     if (e.dataTransfer.files?.length) {
-                      addFiles(Array.from(e.dataTransfer.files));
+                      addMainFiles(Array.from(e.dataTransfer.files));
                     }
                   }}
                   className={`pointer-events-auto flex flex-col justify-between w-full h-[96px] rounded-2xl bg-neutral-100/90 dark:bg-[#1C1C1E] border transition-all duration-200 shadow-sm px-4 pt-2.5 pb-2 ${
@@ -1936,9 +2116,9 @@ export default function ProjectListScreen({
                   }`}
                 >
                   {/* Pending Attachments Chips */}
-                  {attachments.length > 0 && (
+                  {mainAttachments.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1.5 pb-1.5 border-b border-neutral-200/50 dark:border-white/5 mb-1.5 overflow-x-auto max-h-16">
-                      {attachments.map((att) => (
+                      {mainAttachments.map((att) => (
                         <div
                           key={att.id}
                           className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs"
@@ -1955,7 +2135,7 @@ export default function ProjectListScreen({
                           <span className="truncate max-w-[150px] font-medium text-[11px]">{att.name}</span>
                           <button
                             type="button"
-                            onClick={() => removeAttachment(att.id)}
+                            onClick={() => removeMainAttachment(att.id)}
                             aria-label={`Remove ${att.name}`}
                             className="p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
                           >
@@ -1963,7 +2143,7 @@ export default function ProjectListScreen({
                           </button>
                         </div>
                       ))}
-                      {isUploadingAttachment && (
+                      {isMainUploadingAttachment && (
                         <span className="text-[11px] text-neutral-400 flex items-center gap-1 animate-pulse">
                           <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing attachment...
                         </span>
@@ -1976,27 +2156,24 @@ export default function ProjectListScreen({
                     <textarea
                       ref={guideTextareaRef}
                       rows={1}
-                      value={guideInput}
+                      value={mainPromptInput}
                       onChange={(e) => {
-                        setGuideInput(e.target.value);
+                        setMainPromptInput(e.target.value);
                         setIsPromptSuggestionsOpen(true);
                       }}
                       onFocus={() => {
-                        if (guideInput.trim().length >= 2) setIsPromptSuggestionsOpen(true);
+                        if (mainPromptInput.trim().length >= 2) setIsPromptSuggestionsOpen(true);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Escape") {
                           setIsPromptSuggestionsOpen(false);
                         } else if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
-                          if (guideInput.trim() || attachments.length > 0) {
-                            setIsPromptSuggestionsOpen(false);
-                            setIsAiSidebarOpen(true);
-                            handleSendGuideMessage();
-                            setTimeout(() => guideTextareaRef.current?.focus(), 300);
+                          if (mainPromptInput.trim() || mainAttachments.length > 0) {
+                            handleSendMainPrompt();
                           }
-                        } else if (e.key === "Backspace" && guideInput === "" && attachments.length > 0) {
-                          removeAttachment(attachments[attachments.length - 1].id);
+                        } else if (e.key === "Backspace" && mainPromptInput === "" && mainAttachments.length > 0) {
+                          removeMainAttachment(mainAttachments[mainAttachments.length - 1].id);
                         }
                       }}
                       onPaste={(e) => {
@@ -2011,7 +2188,7 @@ export default function ProjectListScreen({
                         }
                         if (newFiles.length > 0) {
                           e.preventDefault();
-                          addFiles(newFiles);
+                          addMainFiles(newFiles);
                         }
                       }}
                       placeholder="Paste text, drop files/images, or draft research instructions..."
@@ -2044,7 +2221,7 @@ export default function ProjectListScreen({
                           aria-label="File upload"
                           className="hidden"
                           onChange={(e) => {
-                            handleFileSelect(e.target.files);
+                            handleMainFileSelect(e.target.files);
                             e.target.value = "";
                           }}
                         />
@@ -2054,9 +2231,9 @@ export default function ProjectListScreen({
                       <div className="flex items-center gap-1 bg-neutral-200/50 dark:bg-white/5 p-0.5 rounded-lg text-[10px] font-medium">
                         <button
                           type="button"
-                          onClick={() => setActiveAiMode("normal")}
+                          onClick={() => setMainAiMode("normal")}
                           className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
-                            activeAiMode === "normal"
+                            mainAiMode === "normal"
                               ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                               : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                           }`}
@@ -2067,9 +2244,9 @@ export default function ProjectListScreen({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setActiveAiMode("search")}
+                          onClick={() => setMainAiMode("search")}
                           className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
-                            activeAiMode === "search"
+                            mainAiMode === "search"
                               ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                               : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                           }`}
@@ -2080,9 +2257,9 @@ export default function ProjectListScreen({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setActiveAiMode("deep-research")}
+                          onClick={() => setMainAiMode("deep-research")}
                           className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
-                            activeAiMode === "deep-research"
+                            mainAiMode === "deep-research"
                               ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                               : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                           }`}
@@ -2099,9 +2276,9 @@ export default function ProjectListScreen({
                         type="submit"
                         title="Send message"
                         aria-label="Send message"
-                        disabled={(!guideInput.trim() && attachments.length === 0) || isGuideThinking}
+                        disabled={(!mainPromptInput.trim() && mainAttachments.length === 0) || isGuideThinking}
                         className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
-                          (guideInput.trim() || attachments.length > 0) && !isGuideThinking
+                          (mainPromptInput.trim() || mainAttachments.length > 0) && !isGuideThinking
                             ? "bg-neutral-900 dark:bg-white text-white dark:text-gray-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-sm"
                             : "bg-neutral-200 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
                         }`}
@@ -2120,7 +2297,7 @@ export default function ProjectListScreen({
                 </form>
 
                 {/* Instant Suggestions & Matching Projects Popover */}
-                {guideInput.trim().length >= 2 && isPromptSuggestionsOpen && (
+                {mainPromptInput.trim().length >= 2 && isPromptSuggestionsOpen && (
                   <div className="pointer-events-auto absolute left-0 right-0 bottom-full mb-3 bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 rounded-2xl shadow-2xl z-30 p-2 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 max-h-80 overflow-y-auto">
                     {/* Matching Projects */}
                     {promptMatchingProjects.length > 0 && (
@@ -2163,13 +2340,12 @@ export default function ProjectListScreen({
                         type="button"
                         onClick={() => {
                           setIsPromptSuggestionsOpen(false);
-                          setIsAiSidebarOpen(true);
-                          handleSendGuideMessage();
+                          handleSendMainPrompt();
                         }}
                         className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left hover:bg-white/5 transition-colors cursor-pointer"
                       >
                         <span className="text-xs text-neutral-300 truncate">
-                          Ask Scholar: <strong className="text-white font-medium">"{guideInput}"</strong>
+                          Ask Scholar: <strong className="text-white font-medium">"{mainPromptInput}"</strong>
                         </span>
                         <span className="text-[11px] text-blue-400 font-medium shrink-0 ml-2">Submit ↗</span>
                       </button>
@@ -2438,9 +2614,9 @@ export default function ProjectListScreen({
               </div>
 
               {/* Pending Attachments Chips in Sidebar */}
-              {attachments.length > 0 && (
+              {sidebarAttachments.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5 mb-2 px-1">
-                  {attachments.map((att) => (
+                  {sidebarAttachments.map((att) => (
                     <div
                       key={att.id}
                       className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200"
@@ -2457,14 +2633,14 @@ export default function ProjectListScreen({
                       <span className="truncate max-w-[120px] font-medium text-[11px]">{att.name}</span>
                       <button
                         type="button"
-                        onClick={() => removeAttachment(att.id)}
+                        onClick={() => removeSidebarAttachment(att.id)}
                         className="text-neutral-400 hover:text-red-500 p-0.5 cursor-pointer"
                       >
                         <X className="w-3 h-3" />
                       </button>
                     </div>
                   ))}
-                  {isUploadingAttachment && (
+                  {isSidebarUploadingAttachment && (
                     <span className="text-[11px] text-neutral-400 flex items-center gap-1 animate-pulse">
                       <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing...
                     </span>
@@ -2486,6 +2662,11 @@ export default function ProjectListScreen({
                     type="text"
                     value={guideInput}
                     onChange={(e) => setGuideInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Backspace" && guideInput === "" && sidebarAttachments.length > 0) {
+                        removeSidebarAttachment(sidebarAttachments[sidebarAttachments.length - 1].id);
+                      }
+                    }}
                     placeholder="Ask anything, search projects, or type a command..."
                     style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
                     className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none prompt-bare-input"
@@ -2510,7 +2691,7 @@ export default function ProjectListScreen({
                       accept=".pdf,.doc,.docx,.txt,.md,.markdown,.csv,.xlsx,.xls,.png,.jpg,.jpeg,.webp,.gif"
                       className="hidden"
                       onChange={(e) => {
-                        handleFileSelect(e.target.files);
+                        handleSidebarFileSelect(e.target.files);
                         e.target.value = "";
                       }}
                     />
@@ -2519,9 +2700,9 @@ export default function ProjectListScreen({
                     <div className="flex items-center gap-0.5 bg-neutral-200/50 dark:bg-white/5 p-0.5 rounded-lg text-[9px] font-medium">
                       <button
                         type="button"
-                        onClick={() => setActiveAiMode("normal")}
+                        onClick={() => setSidebarAiMode("normal")}
                         className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
-                          activeAiMode === "normal"
+                          sidebarAiMode === "normal"
                             ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                             : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                         }`}
@@ -2531,9 +2712,9 @@ export default function ProjectListScreen({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setActiveAiMode("search")}
+                        onClick={() => setSidebarAiMode("search")}
                         className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
-                          activeAiMode === "search"
+                          sidebarAiMode === "search"
                             ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                             : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                         }`}
@@ -2543,9 +2724,9 @@ export default function ProjectListScreen({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setActiveAiMode("deep-research")}
+                        onClick={() => setSidebarAiMode("deep-research")}
                         className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
-                          activeAiMode === "deep-research"
+                          sidebarAiMode === "deep-research"
                             ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                             : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                         }`}
@@ -2558,9 +2739,9 @@ export default function ProjectListScreen({
 
                   <button
                     type="submit"
-                    disabled={(!guideInput.trim() && attachments.length === 0) || isGuideThinking}
+                    disabled={(!guideInput.trim() && sidebarAttachments.length === 0) || isGuideThinking}
                     className={`rounded-full p-1.5 flex items-center justify-center transition cursor-pointer ${
-                      (guideInput.trim() || attachments.length > 0) && !isGuideThinking
+                      (guideInput.trim() || sidebarAttachments.length > 0) && !isGuideThinking
                         ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-xs"
                         : "bg-neutral-200 dark:bg-white/5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
                     }`}
