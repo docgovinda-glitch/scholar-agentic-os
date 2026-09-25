@@ -83,7 +83,7 @@ export function registerAIRoutes(
             : c.provider === "anthropic"
             ? "Anthropic Claude"
             : c.provider,
-        model: c.model || (c.provider === "gemini" ? "gemini-2.5-flash" : "default"),
+        model: c.model || (c.provider === "gemini" ? "gemini-3.1-flash-lite" : "default"),
         tier: "server",
         capabilities:
           c.provider === "gemini"
@@ -200,7 +200,7 @@ export function registerAIRoutes(
           plan: research.plan,
           citations: research.allCitations,
           provider: "gemini",
-          model: "gemini-2.5-flash",
+          model: "gemini-3.1-flash-lite",
         });
       }
 

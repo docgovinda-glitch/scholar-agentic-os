@@ -26,17 +26,21 @@ export function buildAuthorizedPolicy(candidates: CandidateProvider[]): EgressPo
 export function getCandidates(): CandidateProvider[] {
   const candidates: CandidateProvider[] = [];
   
-  if (process.env.OPENROUTER_API_KEY) {
-    candidates.push({ provider: "openrouter", apiKey: process.env.OPENROUTER_API_KEY });
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  if (openRouterKey && !openRouterKey.includes("your_openrouter_api_key") && openRouterKey.trim().length > 10) {
+    candidates.push({ provider: "openrouter", apiKey: openRouterKey });
   }
-  if (process.env.ANTHROPIC_API_KEY) {
-    candidates.push({ provider: "anthropic", apiKey: process.env.ANTHROPIC_API_KEY });
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (anthropicKey && !anthropicKey.includes("your_anthropic_api_key") && anthropicKey.trim().length > 10) {
+    candidates.push({ provider: "anthropic", apiKey: anthropicKey });
   }
-  if (process.env.GEMINI_API_KEY) {
-    candidates.push({ provider: "gemini", apiKey: process.env.GEMINI_API_KEY, model: "gemini-2.5-flash" });
-    candidates.push({ provider: "gemini", apiKey: process.env.GEMINI_API_KEY, model: "gemini-3-flash-preview" });
-    candidates.push({ provider: "gemini", apiKey: process.env.GEMINI_API_KEY, model: "gemini-3.5-flash" });
-    candidates.push({ provider: "gemini", apiKey: process.env.GEMINI_API_KEY, model: "gemini-flash-latest" });
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey && !geminiKey.includes("your_gemini_api_key") && geminiKey.trim().length > 10) {
+    // Verified working models with high/active quota in Google Generative AI API:
+    candidates.push({ provider: "gemini", apiKey: geminiKey, model: "gemini-3.1-flash-lite" });
+    candidates.push({ provider: "gemini", apiKey: geminiKey, model: "gemini-3.5-flash-lite" });
+    candidates.push({ provider: "gemini", apiKey: geminiKey, model: "gemini-3-flash-preview" });
+    candidates.push({ provider: "gemini", apiKey: geminiKey, model: "gemini-2.5-flash" });
   }
   
   return candidates;

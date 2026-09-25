@@ -68,6 +68,37 @@ async function fetchLocalWithTimeout(url: string, init: RequestInit): Promise<Re
   }
 }
 
+/**
+ * Cloud providers receive an outbound generation timeout to prevent requests
+ * from hanging indefinitely and triggering Cloudflare 524 gateway timeouts.
+ */
+const CLOUD_GENERATION_TIMEOUT_MS = 25_000;
+
+async function fetchCloudWithTimeout(url: string, init: RequestInit, timeoutMs = CLOUD_GENERATION_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  const parentSignal = init.signal as AbortSignal | undefined;
+  if (parentSignal) {
+    if (parentSignal.aborted) {
+      controller.abort(parentSignal.reason);
+    } else {
+      parentSignal.addEventListener("abort", () => controller.abort(parentSignal.reason), { once: true });
+    }
+  }
+
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError" && !parentSignal?.aborted) {
+      throw new Error(`AI Provider request timed out after ${timeoutMs / 1000}s.`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function requireLocalModel(runnerId: string, model: string | undefined): string {
   if (!model) {
     throw new Error(`No model specified for local runner "${runnerId}" — discover an installed model before completing.`);
@@ -230,7 +261,7 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
     let model = req.model || this.spec.defaultModel;
     const url = chatUrl(this.spec);
     const headers = { "Content-Type": "application/json", ...buildAuthHeaders(this.spec, req.apiKey) };
-    let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false, model), signal: req.signal });
+    let response = await fetchCloudWithTimeout(url, { method: "POST", headers, body: this.buildBody(req, false, model), signal: req.signal });
     
     let lastDetail = "";
     // Controlled in-provider fallback on model unavailability (404 or 400/422 decommissioned)
@@ -242,7 +273,7 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
         const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
         for (const fbModel of fallbacks) {
           const fallbackBody = this.buildBody(req, false, fbModel);
-          const retryRes = await fetch(url, { method: "POST", headers, body: fallbackBody, signal: req.signal });
+          const retryRes = await fetchCloudWithTimeout(url, { method: "POST", headers, body: fallbackBody, signal: req.signal });
           if (retryRes.ok) {
             response = retryRes;
             model = fbModel;
@@ -271,7 +302,7 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
     let model = req.model || this.spec.defaultModel;
     const url = chatUrl(this.spec);
     const headers = { "Content-Type": "application/json", Accept: "text/event-stream", ...buildAuthHeaders(this.spec, req.apiKey) };
-    let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true, model), signal: req.signal });
+    let response = await fetchCloudWithTimeout(url, { method: "POST", headers, body: this.buildBody(req, true, model), signal: req.signal }, 40_000);
 
     let lastDetail = "";
     // Controlled in-provider fallback on model unavailability (404 or 400/422 decommissioned)
@@ -283,7 +314,7 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
         const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
         for (const fbModel of fallbacks) {
           const fallbackBody = this.buildBody(req, true, fbModel);
-          const retryRes = await fetch(url, { method: "POST", headers, body: fallbackBody, signal: req.signal });
+          const retryRes = await fetchCloudWithTimeout(url, { method: "POST", headers, body: fallbackBody, signal: req.signal }, 40_000);
           if (retryRes.ok) {
             response = retryRes;
             model = fbModel;
@@ -360,7 +391,7 @@ class AnthropicAdapter implements ProviderAdapter {
     let model = req.model || this.spec.defaultModel;
     const url = chatUrl(this.spec);
     const headers = { "Content-Type": "application/json", ...buildAuthHeaders(this.spec, req.apiKey) };
-    let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false, model), signal: req.signal });
+    let response = await fetchCloudWithTimeout(url, { method: "POST", headers, body: this.buildBody(req, false, model), signal: req.signal });
 
     let lastDetail = "";
     if (!response.ok) {
@@ -370,7 +401,7 @@ class AnthropicAdapter implements ProviderAdapter {
         quarantineModel(this.id, model, check.detail || "model_unavailable");
         const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
         for (const fbModel of fallbacks) {
-          const retryRes = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false, fbModel), signal: req.signal });
+          const retryRes = await fetchCloudWithTimeout(url, { method: "POST", headers, body: this.buildBody(req, false, fbModel), signal: req.signal });
           if (retryRes.ok) {
             response = retryRes;
             model = fbModel;
@@ -400,7 +431,7 @@ class AnthropicAdapter implements ProviderAdapter {
     let model = req.model || this.spec.defaultModel;
     const url = chatUrl(this.spec);
     const headers = { "Content-Type": "application/json", Accept: "text/event-stream", ...buildAuthHeaders(this.spec, req.apiKey) };
-    let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true, model), signal: req.signal });
+    let response = await fetchCloudWithTimeout(url, { method: "POST", headers, body: this.buildBody(req, true, model), signal: req.signal }, 40_000);
 
     let lastDetail = "";
     if (!response.ok) {
@@ -410,7 +441,7 @@ class AnthropicAdapter implements ProviderAdapter {
         quarantineModel(this.id, model, check.detail || "model_unavailable");
         const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
         for (const fbModel of fallbacks) {
-          const retryRes = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true, fbModel), signal: req.signal });
+          const retryRes = await fetchCloudWithTimeout(url, { method: "POST", headers, body: this.buildBody(req, true, fbModel), signal: req.signal }, 40_000);
           if (retryRes.ok) {
             response = retryRes;
             model = fbModel;
@@ -510,7 +541,7 @@ class GeminiAdapter implements ProviderAdapter {
     let model = (req.model || this.spec.defaultModel).replace(/^models\//, "");
     const baseUrl = resolveBaseUrl(this.spec);
     const url = `${baseUrl}/models/${model}:generateContent?key=${encodeURIComponent(req.apiKey)}`;
-    let response = await fetch(url, {
+    let response = await fetchCloudWithTimeout(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(this.buildBody(req)),
@@ -528,7 +559,7 @@ class GeminiAdapter implements ProviderAdapter {
         for (const fbModel of fallbacks) {
           const cleanFb = fbModel.replace(/^models\//, "");
           const fbUrl = `${baseUrl}/models/${cleanFb}:generateContent?key=${encodeURIComponent(req.apiKey)}`;
-          const retryRes = await fetch(fbUrl, {
+          const retryRes = await fetchCloudWithTimeout(fbUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(this.buildBody(req)),
@@ -561,12 +592,12 @@ class GeminiAdapter implements ProviderAdapter {
     let model = (req.model || this.spec.defaultModel).replace(/^models\//, "");
     const baseUrl = resolveBaseUrl(this.spec);
     const url = `${baseUrl}/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(req.apiKey)}`;
-    let response = await fetch(url, {
+    let response = await fetchCloudWithTimeout(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(this.buildBody(req)),
       signal: req.signal,
-    });
+    }, 40_000);
 
     let lastDetail = "";
     // Dynamic Controlled fallback on model unavailability (404 or 400/422 decommissioned)
@@ -579,12 +610,12 @@ class GeminiAdapter implements ProviderAdapter {
         for (const fbModel of fallbacks) {
           const cleanFb = fbModel.replace(/^models\//, "");
           const fbUrl = `${baseUrl}/models/${cleanFb}:streamGenerateContent?alt=sse&key=${encodeURIComponent(req.apiKey)}`;
-          const retryRes = await fetch(fbUrl, {
+          const retryRes = await fetchCloudWithTimeout(fbUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(this.buildBody(req)),
             signal: req.signal,
-          });
+          }, 40_000);
           if (retryRes.ok) {
             response = retryRes;
             model = cleanFb;

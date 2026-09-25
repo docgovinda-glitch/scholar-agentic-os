@@ -1362,6 +1362,9 @@ export async function executeAgenticQuery(
   const res = await authedJsonFetch("/api/ai/agent", "POST", payload);
   if (!res.ok) {
     const errorBody = await res.json().catch(() => ({}));
+    if (res.status === 524 || res.status === 504) {
+      throw new Error("AI Gateway Timeout (524): The upstream AI provider took too long to respond. The system will automatically use the high-speed fallback model.");
+    }
     const errorMsg = errorBody.error || `AI Request failed with status ${res.status}`;
     throw new Error(errorMsg);
   }
