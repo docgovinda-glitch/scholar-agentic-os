@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
 import { Link } from "react-router-dom";
+import { getAiOperationalStatus, type AiOperationalStatus } from "./api";
 interface Message {
   id: string;
   sender: "assistant" | "user";
@@ -79,10 +80,31 @@ export default function ScholarAgenticDashboard() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [inlinePrompt, setInlinePrompt] = useState<string>("Make the main argument more clear...");
   const [isMounted, setIsMounted] = useState<boolean>(false);
+  const [aiStatus, setAiStatus] = useState<AiOperationalStatus | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsMounted(true);
+    let active = true;
+    async function loadStatus() {
+      try {
+        const s = await getAiOperationalStatus();
+        if (active) setAiStatus(s);
+      } catch {
+        if (active) {
+          setAiStatus({
+            connected: false,
+            statusText: "AI Disconnected",
+            capabilities: { text: false, vision: false, document: false, webSearch: false, deepResearch: false },
+            providers: [],
+          });
+        }
+      }
+    }
+    loadStatus();
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Auto-scroll chat canvas on new messages
@@ -204,21 +226,21 @@ export default function ScholarAgenticDashboard() {
             <button
               type="button"
               onClick={() => setActiveView("projects")}
-              className="w-full py-2.5 px-6 rounded-full text-xs font-semibold bg-white text-neutral-900 hover:bg-neutral-200 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group mb-3"
+              className="w-full h-10 px-4 rounded-full text-xs font-semibold bg-white text-neutral-900 hover:bg-neutral-200 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group mb-2.5"
             >
               <span className="text-base font-bold leading-none">+</span>
               <span>New Project</span>
             </button>
 
-            <div className="relative group cursor-text mb-4">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400 group-hover:text-neutral-200 transition-colors pointer-events-none" />
+            <div className="relative group cursor-text mb-4 w-full h-10">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 group-hover:text-neutral-200 transition-colors pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 transition-all cursor-text text-neutral-200 placeholder-neutral-400"
+                className="w-full h-full bg-white/5 border border-white/10 rounded-full pl-10 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-white/20 transition-all cursor-text text-neutral-200 placeholder-neutral-400"
               />
             </div>
           </div>
@@ -902,7 +924,17 @@ export default function ScholarAgenticDashboard() {
                 <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
                   <ScholarCoreLogo size="sm" withText={false} />
                   <span>Ask Scholar</span>
-                  <span className="text-green-500 font-bold">• AI Ready</span>
+                  {aiStatus ? (
+                    aiStatus.connected ? (
+                      <span className="text-green-500 font-bold" title={`Operational: ${aiStatus.provider || "Gemini"}`}>
+                        • {aiStatus.statusText}
+                      </span>
+                    ) : (
+                      <span className="text-amber-500 font-bold">• AI Disconnected</span>
+                    )
+                  ) : (
+                    <span className="text-gray-400">• Checking AI...</span>
+                  )}
                 </div>
                 <button
                   type="button"

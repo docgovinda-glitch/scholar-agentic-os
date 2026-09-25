@@ -41,7 +41,7 @@ import type {
   SupportStrength,
   VoiceProfile,
 } from "./types";
-import { readProviderKey } from "../services/userAiSettings";
+import { readProviderKey, providersWithStoredKey } from "../services/userAiSettings";
 
 /** Raised when the server rejects the session. Callers re-authenticate rather than retry. */
 export class UnauthenticatedError extends Error {
@@ -449,10 +449,28 @@ export async function executeAgenticLLM(
   }
 
   if (candidates.length === 0) {
+    // Graceful fallback: Delegate to server-side AI execution route
+    try {
+      const serverRes = await authedJsonFetch("/api/ai/agent", "POST", {
+        prompt: userPrompt,
+        systemPrompt,
+        taskType,
+      });
+      if (serverRes.ok) {
+        const data = await serverRes.json();
+        if (data && data.ok && data.text) {
+          onChunk?.(data.text);
+          return data.text;
+        }
+      }
+    } catch (serverErr) {
+      console.warn("Server AI fallback execution failed:", serverErr);
+    }
+
     throw new Error(
       clientDecision?.reasoning ||
-      "No AI providers are currently available on this device satisfying task requirements. " +
-      "Connect a provider in AI Access settings or run a local AI runtime."
+      "No AI providers are currently available on this device or server satisfying task requirements. " +
+      "Connect a provider in AI Access settings or configure server credentials."
     );
   }
 
@@ -1154,3 +1172,190 @@ export function sendCopilotMessage(
     json<{ ok: boolean; response: string }>(r)
   );
 }
+
+export interface AiOperationalStatus {
+  connected: boolean;
+  statusText: string;
+  provider?: string;
+  model?: string;
+  isFallback?: boolean;
+  capabilities: {
+    text: boolean;
+    vision: boolean;
+    document: boolean;
+    webSearch: boolean;
+    deepResearch: boolean;
+  };
+  providers: Array<{
+    id: string;
+    name: string;
+    model: string;
+    tier: string;
+  }>;
+}
+
+export async function getAiOperationalStatus(): Promise<AiOperationalStatus> {
+  let byokProviders: string[] = [];
+  try {
+    byokProviders = providersWithStoredKey();
+  } catch {
+    byokProviders = [];
+  }
+  const hasClientByok = byokProviders.length > 0;
+
+  try {
+    const res = await authedFetch("/api/ai/status");
+    if (res.ok) {
+      const serverStatus = await res.json();
+      const connected = Boolean(serverStatus.connected || hasClientByok);
+      const activeProvider = serverStatus.providers?.[0]?.name || (hasClientByok ? byokProviders[0] : undefined);
+      const activeModel = serverStatus.providers?.[0]?.model;
+
+      return {
+        connected,
+        statusText: connected
+          ? (activeProvider ? `AI Ready (${activeProvider})` : "AI Ready")
+          : "AI Disconnected",
+        provider: activeProvider,
+        model: activeModel,
+        capabilities: {
+          text: connected,
+          vision: Boolean(serverStatus.capabilities?.vision || (hasClientByok && byokProviders.includes("gemini"))),
+          document: true,
+          webSearch: true,
+          deepResearch: connected,
+        },
+        providers: serverStatus.providers || [],
+      };
+    }
+  } catch (e) {
+    // Backend unreachable, fallback to client status
+  }
+
+  return {
+    connected: hasClientByok,
+    statusText: hasClientByok ? `AI Ready (${byokProviders[0]})` : "AI Disconnected",
+    provider: hasClientByok ? byokProviders[0] : undefined,
+    capabilities: {
+      text: hasClientByok,
+      vision: hasClientByok,
+      document: true,
+      webSearch: false,
+      deepResearch: false,
+    },
+    providers: byokProviders.map((p: string) => ({ id: p, name: p, model: "byok", tier: "client" })),
+  };
+}
+
+export interface AgenticQueryRequest {
+  prompt: string;
+  systemPrompt?: string;
+  mode?: "normal" | "search" | "deep-research";
+  files?: Array<{ name: string; text?: string; content?: string; type?: string; size?: number }>;
+  images?: Array<{ data: string; mimeType: string; name?: string }>;
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
+  onChunk?: (chunk: string) => void;
+}
+
+export interface AgenticQueryResponse {
+  ok: boolean;
+  text: string;
+  mode?: string;
+  provider?: string;
+  model?: string;
+  plan?: string[];
+  citations?: Array<{ title?: string; url?: string; snippet?: string; source?: string; venue?: string; year?: number }>;
+  error?: string;
+}
+
+export async function executeAgenticQuery(
+  req: AgenticQueryRequest
+): Promise<AgenticQueryResponse> {
+  const payload = {
+    prompt: req.prompt,
+    systemPrompt: req.systemPrompt,
+    mode: req.mode && req.mode !== "normal" ? req.mode : undefined,
+    files: req.files,
+    images: req.images,
+    history: req.history,
+  };
+
+  const res = await authedJsonFetch("/api/ai/agent", "POST", payload);
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const errorMsg = errorBody.error || `AI Request failed with status ${res.status}`;
+    throw new Error(errorMsg);
+  }
+
+  const data = await res.json();
+  if (data.ok && data.text) {
+    req.onChunk?.(data.text);
+  }
+  return data;
+}
+
+export async function parseFileForAgent(
+  file: File
+): Promise<{ isImage: boolean; fileData?: { name: string; text: string; type: string }; imageData?: { data: string; mimeType: string; name: string } }> {
+  const isImage = file.type.startsWith("image/");
+  if (isImage) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const commaIdx = result.indexOf(",");
+        const base64 = commaIdx >= 0 ? result.slice(commaIdx + 1) : result;
+        resolve({
+          isImage: true,
+          imageData: {
+            data: base64,
+            mimeType: file.type || "image/png",
+            name: file.name,
+          },
+        });
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (file.type.startsWith("text/") || ext === "txt" || ext === "md" || ext === "markdown" || ext === "json" || ext === "csv") {
+    try {
+      const text = await file.text();
+      return {
+        isImage: false,
+        fileData: {
+          name: file.name,
+          text,
+          type: file.type || "text/plain",
+        },
+      };
+    } catch {
+      // fallback to backend parser
+    }
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await authedFetch("/api/vault/parse-file", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.error || `Could not parse file ${file.name}`);
+  }
+
+  const parsed = await res.json();
+  return {
+    isImage: false,
+    fileData: {
+      name: file.name,
+      text: parsed.text || "",
+      type: file.type || "application/octet-stream",
+    },
+  };
+}
+

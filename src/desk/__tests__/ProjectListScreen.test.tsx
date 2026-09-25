@@ -17,6 +17,9 @@ const listProjects = vi.fn();
 const deleteProject = vi.fn();
 const saveIntakeAnswers = vi.fn();
 const executeAgenticLLM = vi.fn();
+const executeAgenticQuery = vi.fn().mockResolvedValue({ ok: true, text: "Mock response" });
+const getAiOperationalStatus = vi.fn().mockResolvedValue({ connected: true, statusText: "AI Ready" });
+const parseFileForAgent = vi.fn().mockResolvedValue({ isImage: false, fileData: { name: "test.pdf", text: "parsed", type: "application/pdf" } });
 vi.mock("../api", () => ({
   createProject: (...a: unknown[]) => createProject(...a),
   listOutputTypes: (...a: unknown[]) => listOutputTypes(...a),
@@ -24,6 +27,9 @@ vi.mock("../api", () => ({
   deleteProject: (...a: unknown[]) => deleteProject(...a),
   saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
   executeAgenticLLM: (...a: unknown[]) => executeAgenticLLM(...a),
+  executeAgenticQuery: (...a: unknown[]) => executeAgenticQuery(...a),
+  getAiOperationalStatus: (...a: unknown[]) => getAiOperationalStatus(...a),
+  parseFileForAgent: (...a: unknown[]) => parseFileForAgent(...a),
 }));
 vi.mock("../../services/supabaseClient", () => ({
   getSupabaseClient: () => ({
@@ -166,7 +172,7 @@ describe("the search bar & delete confirmation modal", () => {
     expect(screen.getByPlaceholderText("Search projects...")).toBeInTheDocument();
 
     // Consolidated transparent AI prompt bar on main dashboard
-    const promptInput = screen.getByPlaceholderText(/Draft a Research Proposal, analyze data, or search projects.../i);
+    const promptInput = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i);
     expect(promptInput).toBeInTheDocument();
     expect(promptInput).toHaveClass("bg-transparent");
   });
@@ -454,7 +460,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
 
     // Consolidated transparent AI prompt bar immediately below cards
-    const promptBar = screen.getByPlaceholderText(/Draft a Research Proposal, analyze data, or search projects.../i);
+    const promptBar = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i);
     expect(promptBar).toBeInTheDocument();
 
     // Projects section, secondary search, and progress cards are purged from main canvas
@@ -548,7 +554,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(mainCanvas.className).not.toContain("bg-[var(--bg-canvas)]");
 
     // 2. Shared Container Alignment
-    const promptInput = screen.getByPlaceholderText(/Draft a Research Proposal, analyze data, or search projects/i);
+    const promptInput = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i);
     const promptForm = promptInput.closest("form")!;
     const promptContainer = promptForm.parentElement!;
     const sharedParent = promptContainer.parentElement!;

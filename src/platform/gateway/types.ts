@@ -40,6 +40,8 @@ export interface CompletionRequest {
   caching?: boolean;
   /** Optional cancellation signal to cleanly abort HTTP network calls */
   signal?: AbortSignal;
+  /** Optional multimodal image attachments (base64 data URLs or image URLs) */
+  images?: { dataUrl: string; mimeType?: string; name?: string }[];
 }
 
 export interface CompletionResult {

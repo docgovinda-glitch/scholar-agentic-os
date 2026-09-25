@@ -195,11 +195,29 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
       }
     }
 
+    let userContent: any = userPrompt;
+    if (req.images && req.images.length > 0) {
+      userContent = [
+        { type: "text", text: userPrompt },
+        ...req.images.map((img) => {
+          const raw = (img as any).dataUrl || (img as any).data || "";
+          return {
+            type: "image_url",
+            image_url: {
+              url: raw.startsWith("data:")
+                ? raw
+                : `data:${img.mimeType || "image/jpeg"};base64,${raw}`,
+            },
+          };
+        }),
+      ];
+    }
+
     return JSON.stringify({
       model,
       messages: [
         ...(systemMessage ? [systemMessage] : []),
-        { role: "user", content: userPrompt },
+        { role: "user", content: userContent },
       ],
       temperature: req.temperature ?? 0.3,
       ...(req.maxTokens ? { max_tokens: req.maxTokens } : {}),
@@ -310,11 +328,29 @@ class AnthropicAdapter implements ProviderAdapter {
   private buildBody(req: CompletionRequest, stream: boolean, modelOverride?: string) {
     const model = modelOverride || req.model || this.spec.defaultModel;
     const userPrompt = req.userPrompt && req.userPrompt.trim() ? req.userPrompt : "Proceed with research task.";
+    let userContent: any = userPrompt;
+    if (req.images && req.images.length > 0) {
+      userContent = [
+        ...req.images.map((img) => {
+          const raw = (img as any).dataUrl || (img as any).data || "";
+          return {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: img.mimeType || "image/jpeg",
+              data: raw.replace(/^data:[^;]+;base64,/, ""),
+            },
+          };
+        }),
+        { type: "text", text: userPrompt },
+      ];
+    }
+
     return JSON.stringify({
       model,
       max_tokens: req.maxTokens ?? 4096,
       ...(req.systemPrompt && req.systemPrompt.trim() ? { system: req.systemPrompt } : {}),
-      messages: [{ role: "user", content: userPrompt }],
+      messages: [{ role: "user", content: userContent }],
       temperature: req.temperature ?? 0.3,
       ...(stream ? { stream: true } : {}),
     });
@@ -417,8 +453,31 @@ class GeminiAdapter implements ProviderAdapter {
 
   private buildBody(req: CompletionRequest) {
     const userPrompt = req.userPrompt && req.userPrompt.trim() ? req.userPrompt : "Proceed with research task.";
+    const parts: any[] = [{ text: userPrompt }];
+
+    if (req.images && req.images.length > 0) {
+      for (const img of req.images) {
+        const raw = (img as any).dataUrl || (img as any).data || "";
+        if (!raw) continue;
+        const mimeType =
+          img.mimeType ||
+          (raw.startsWith("data:")
+            ? raw.split(";")[0].replace("data:", "")
+            : "image/jpeg");
+        const base64Data = raw.includes(";base64,")
+          ? raw.split(";base64,")[1]
+          : raw;
+        parts.push({
+          inlineData: {
+            mimeType,
+            data: base64Data,
+          },
+        });
+      }
+    }
+
     return {
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      contents: [{ role: "user", parts }],
       ...(req.systemPrompt && req.systemPrompt.trim() ? { systemInstruction: { parts: [{ text: req.systemPrompt }] } } : {}),
       generationConfig: {
         temperature: req.temperature ?? 0.3,

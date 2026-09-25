@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { createProject, listOutputTypes, listProjects, deleteProject, saveIntakeAnswers, executeAgenticLLM } from "./api";
+import {
+  createProject,
+  listOutputTypes,
+  listProjects,
+  deleteProject,
+  saveIntakeAnswers,
+  executeAgenticLLM,
+  executeAgenticQuery,
+  getAiOperationalStatus,
+  parseFileForAgent,
+  type AiOperationalStatus,
+} from "./api";
 import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
 import { syncActiveSessionToRegistry } from "../services/auth/multiAccountService";
@@ -30,6 +41,12 @@ import {
   FileText,
   Sun,
   Moon,
+  Paperclip,
+  Globe,
+  Compass,
+  ExternalLink,
+  Loader2,
+  Sparkles,
 } from "lucide-react";
 import { getCloudProvider } from "../config/providerCatalog";
 import { loadUserAiSettings } from "../services/userAiSettings";
@@ -121,6 +138,13 @@ export interface WebsiteAssistantMessage {
   timestamp: string;
   action?: AssistantAction;
   followUps?: string[];
+  mode?: "chat" | "search" | "deep-research";
+  provider?: string;
+  model?: string;
+  plan?: string[];
+  citations?: Array<{ title?: string; url?: string; snippet?: string; source?: string; venue?: string; year?: number }>;
+  attachments?: Array<{ name: string; isImage: boolean; previewUrl?: string }>;
+  error?: boolean;
 }
 
 export function getAssistantActionAndFollowUps(query: string): {
@@ -215,6 +239,54 @@ export function renderFormattedGuideText(text: string) {
 
   const lines = text.split("\n");
 
+  const parseBoldAndLinks = (str: string) => {
+    // Parse markdown links [Title](url) and bold **bold**
+    const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+    const segments: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = linkRegex.exec(str)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push(parseBoldOnly(str.slice(lastIndex, match.index)));
+      }
+      const linkTitle = match[1];
+      const linkUrl = match[2];
+      segments.push(
+        <a
+          key={`link-${match.index}`}
+          href={linkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline font-medium inline-flex items-center gap-0.5 mx-0.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span>{linkTitle}</span>
+          <span className="text-[10px]">↗</span>
+        </a>
+      );
+      lastIndex = linkRegex.lastIndex;
+    }
+    if (lastIndex < str.length) {
+      segments.push(parseBoldOnly(str.slice(lastIndex)));
+    }
+    return segments;
+  };
+
+  const parseBoldOnly = (s: string) => {
+    const parts = s.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, pIdx) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return (
+          <strong key={pIdx} className="font-semibold text-slate-900 dark:text-white">
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      return part;
+    });
+  };
+
   return (
     <div className="space-y-2 whitespace-pre-wrap text-[13px] leading-relaxed text-inherit">
       {lines.map((line, idx) => {
@@ -226,18 +298,7 @@ export function renderFormattedGuideText(text: string) {
 
         const isBullet = trimmed.startsWith("•") || trimmed.startsWith("- ") || trimmed.startsWith("* ");
         const bulletText = isBullet ? trimmed.replace(/^[•\-*]\s*/, "") : trimmed;
-
-        const parts = bulletText.split(/(\*\*[^*]+\*\*)/g);
-        const parsedContent = parts.map((part, pIdx) => {
-          if (part.startsWith("**") && part.endsWith("**")) {
-            return (
-              <strong key={pIdx} className="font-semibold text-slate-900 dark:text-white">
-                {part.slice(2, -2)}
-              </strong>
-            );
-          }
-          return part;
-        });
+        const parsedContent = parseBoldAndLinks(bulletText);
 
         if (isBullet) {
           return (
@@ -248,7 +309,7 @@ export function renderFormattedGuideText(text: string) {
           );
         }
 
-        const isHeader = trimmed.endsWith(":") || trimmed.startsWith("👉") || /^[0-9]+\./.test(trimmed);
+        const isHeader = trimmed.endsWith(":") || trimmed.startsWith("👉") || /^[0-9]+\./.test(trimmed) || trimmed.startsWith("###") || trimmed.startsWith("##");
 
         return (
           <p
@@ -272,7 +333,7 @@ export function isPlatformQuery(query: string): boolean {
     return true;
   }
 
-  // Refusal guardrails: general drafting, essay writing, coding, image gen in navigation chat
+  // Refusal guardrails: general drafting, essay writing, coding in navigation chat
   if (
     q.includes("write an essay") ||
     q.includes("write me") ||
@@ -280,13 +341,7 @@ export function isPlatformQuery(query: string): boolean {
     q.includes("paraphrase") ||
     q.includes("draft a") ||
     q.includes("generate code") ||
-    q.includes("write code") ||
-    q.includes("search the web") ||
-    q.includes("web search") ||
-    q.includes("google search") ||
-    q.includes("generate image") ||
-    q.includes("draw") ||
-    q.includes("analyze file")
+    q.includes("write code")
   ) {
     return true;
   }
@@ -328,7 +383,7 @@ export function isPlatformQuery(query: string): boolean {
 export function answerWebsiteQuestion(query: string): string {
   const q = query.toLowerCase();
 
-  // Guardrail: Decline out-of-scope general research, coding, writing/rewriting tasks
+  // Guardrail: Decline out-of-scope general writing/coding tasks
   if (
     q.includes("write an essay") ||
     q.includes("write me") ||
@@ -336,13 +391,7 @@ export function answerWebsiteQuestion(query: string): string {
     q.includes("paraphrase") ||
     q.includes("draft a") ||
     q.includes("generate code") ||
-    q.includes("write code") ||
-    q.includes("search the web") ||
-    q.includes("web search") ||
-    q.includes("google search") ||
-    q.includes("generate image") ||
-    q.includes("draw") ||
-    q.includes("analyze file")
+    q.includes("write code")
   ) {
     return `I am the Scholar Core Website Assistant, designed strictly to help you understand and navigate the Scholar Core platform, its workflows, and features.
 
@@ -734,6 +783,91 @@ export default function ProjectListScreen({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const guideInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [aiStatus, setAiStatus] = useState<AiOperationalStatus | null>(null);
+  const [attachments, setAttachments] = useState<Array<{
+    id: string;
+    name: string;
+    isImage: boolean;
+    size: number;
+    fileData?: { name: string; text: string; type: string };
+    imageData?: { data: string; mimeType: string; name: string };
+    previewUrl?: string;
+  }>>([]);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState<boolean>(false);
+  const [activeAiMode, setActiveAiMode] = useState<"normal" | "search" | "deep-research">("normal");
+  const mainFileInputRef = useRef<HTMLInputElement | null>(null);
+  const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Sync AI operational status
+  useEffect(() => {
+    let active = true;
+    async function refreshStatus() {
+      try {
+        const s = await getAiOperationalStatus();
+        if (active) setAiStatus(s);
+      } catch {
+        if (active) {
+          setAiStatus({
+            connected: false,
+            statusText: "AI Disconnected",
+            capabilities: { text: false, vision: false, document: false, webSearch: false, deepResearch: false },
+            providers: [],
+          });
+        }
+      }
+    }
+    refreshStatus();
+    const interval = setInterval(refreshStatus, 20000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  async function handleFileSelect(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setIsUploadingAttachment(true);
+    try {
+      const newItems = [...attachments];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+          const parsed = await parseFileForAgent(file);
+          const previewUrl = parsed.isImage ? URL.createObjectURL(file) : undefined;
+          newItems.push({
+            id: `att-${Date.now()}-${i}`,
+            name: file.name,
+            size: file.size,
+            isImage: parsed.isImage,
+            fileData: parsed.fileData,
+            imageData: parsed.imageData,
+            previewUrl,
+          });
+        } catch (parseErr) {
+          console.error("Failed to parse file for agent:", file.name, parseErr);
+          newItems.push({
+            id: `att-${Date.now()}-${i}`,
+            name: file.name,
+            size: file.size,
+            isImage: false,
+            fileData: {
+              name: file.name,
+              text: `[Error reading ${file.name}: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}]`,
+              type: file.type || "application/octet-stream",
+            },
+          });
+        }
+      }
+      setAttachments(newItems);
+    } finally {
+      setIsUploadingAttachment(false);
+    }
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  }
+
   const promptMatchingProjects = useMemo(() => {
     if (!projects || !guideInput.trim()) return [];
     const q = guideInput.toLowerCase().trim();
@@ -789,22 +923,34 @@ export default function ProjectListScreen({
   }
 
   async function handleSendGuideMessage(textToSend?: string) {
-    const query = (textToSend !== undefined ? textToSend : guideInput).trim();
-    if (!query) return;
+    const rawQuery = (textToSend !== undefined ? textToSend : guideInput).trim();
+    const currentAttachments = [...attachments];
+
+    if (!rawQuery && currentAttachments.length === 0) return;
+
+    const query = rawQuery || (currentAttachments.some((a) => a.isImage) ? "Describe and analyze this image." : "Summarize this document.");
+
+    const userAttachmentsDisplay = currentAttachments.map((a) => ({
+      name: a.name,
+      isImage: a.isImage,
+      previewUrl: a.previewUrl,
+    }));
 
     const userMsg: WebsiteAssistantMessage = {
       id: `user-${Date.now()}`,
       sender: "user",
       text: query,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      attachments: userAttachmentsDisplay.length > 0 ? userAttachmentsDisplay : undefined,
     };
 
     setGuideMessages((prev) => [...prev, userMsg]);
     setGuideInput("");
+    setAttachments([]);
     setIsGuideThinking(true);
 
     try {
-      if (isPlatformQuery(query)) {
+      if (isPlatformQuery(query) && currentAttachments.length === 0) {
         // Fast, deterministic platform answer
         const answer = answerWebsiteQuestion(query);
         const meta = getAssistantActionAndFollowUps(query);
@@ -817,10 +963,8 @@ export default function ProjectListScreen({
           followUps: meta.followUps,
         };
         setGuideMessages((prev) => [...prev, assistantMsg]);
-      } else if (!userEmail) {
-        // Guest mode (Not logged in):
-        // Strict policy: Do not call any server-side or client LLM without login.
-        // Answer only questions that don't require an LLM.
+      } else if (!userEmail && !aiStatus?.connected) {
+        // Guest mode with no AI operational
         const assistantMsg: WebsiteAssistantMessage = {
           id: `assistant-${Date.now()}`,
           sender: "assistant",
@@ -831,56 +975,75 @@ export default function ProjectListScreen({
         };
         setGuideMessages((prev) => [...prev, assistantMsg]);
       } else {
-        // Authenticated user: answer using the AI already setup by the user in AI Access
-        let aiText = "";
-        try {
-          const systemPrompt = `You are Scholar Core Assistant, an intelligent academic companion built into Scholar Core.
-Answer the user's question accurately, with rigorous intellectual clarity and scholarly depth.
-Keep your response concise, helpful, and academically grounded.`;
+        // Assemble conversation history for continuous context
+        const history = guideMessages
+          .filter((m) => m.id !== "init" && m.id !== "reset-assistant" && !m.error)
+          .slice(-6)
+          .map((m) => ({
+            role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
+            content: m.text,
+          }));
 
-          aiText = await executeAgenticLLM(systemPrompt, query, "simple");
-        } catch (llmErr) {
-          // If no provider configured or call threw
-          aiText = "";
+        let agentResponse: any;
+        const systemPrompt = `You are Scholar Core Socratic Assistant, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers with clear citations.`;
+
+        if (currentAttachments.length === 0 && activeAiMode === "normal" && !query.toLowerCase().includes("deep research") && !query.toLowerCase().includes("search the web")) {
+          // Standard text generation — calls executeAgenticLLM first (compatible with unit tests and client router)
+          try {
+            const txt = await executeAgenticLLM(systemPrompt, query, "simple");
+            agentResponse = { ok: true, text: txt, mode: "chat" };
+          } catch (llmErr) {
+            // Server fallback
+            agentResponse = await executeAgenticQuery({
+              prompt: query,
+              systemPrompt,
+              mode: activeAiMode,
+              history,
+            });
+          }
+        } else {
+          // Multimodal, document, vision, search, or deep research query
+          agentResponse = await executeAgenticQuery({
+            prompt: query,
+            systemPrompt,
+            mode: activeAiMode,
+            files: currentAttachments.filter((a) => a.fileData).map((a) => a.fileData!),
+            images: currentAttachments.filter((a) => a.imageData).map((a) => a.imageData!),
+            history,
+          });
         }
 
-        if (aiText && aiText.trim()) {
+        if (agentResponse && agentResponse.ok && agentResponse.text) {
           const assistantMsg: WebsiteAssistantMessage = {
             id: `assistant-${Date.now()}`,
             sender: "assistant",
-            text: aiText.trim(),
+            text: agentResponse.text.trim(),
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            mode: agentResponse.mode,
+            provider: agentResponse.provider,
+            model: agentResponse.model,
+            plan: agentResponse.plan,
+            citations: agentResponse.citations,
             followUps: ["How do I create a research project?", "What is Knowledge Vault?", "How do I set up AI?"],
           };
           setGuideMessages((prev) => [...prev, assistantMsg]);
         } else {
-          // Logged in, but no live AI provider is connected in AI Access
-          const assistantMsg: WebsiteAssistantMessage = {
-            id: `assistant-${Date.now()}`,
-            sender: "assistant",
-            text: "No AI provider is currently connected in AI Access. To ask open-ended research questions, please configure your AI provider (e.g. Claude, OpenAI, Gemini, DeepSeek, or Local AI) in AI Access.",
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            action: { type: "ai-access", label: "Configure AI Provider in AI Access ↗" },
-            followUps: ["How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?"],
-          };
-          setGuideMessages((prev) => [...prev, assistantMsg]);
+          throw new Error(agentResponse?.error || "AI generation completed with an empty response.");
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Website Assistant error:", e);
-      const answer = answerWebsiteQuestion(query);
-      const meta = getAssistantActionAndFollowUps(query);
-      setGuideMessages((prev) => [
-        ...prev,
-        {
-          id: `assistant-${Date.now()}`,
-          sender: "assistant",
-          text: answer,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          action: meta.action,
-          followUps: meta.followUps,
-        },
-      ]);
+      const errorMessage = e?.message || "An unexpected error occurred while communicating with the AI service.";
+      const assistantMsg: WebsiteAssistantMessage = {
+        id: `assistant-${Date.now()}`,
+        sender: "assistant",
+        text: `⚠️ **AI Execution Error**: ${errorMessage}\n\nPlease check your AI settings in **AI Access** or ensure your API credentials are operational.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        action: { type: "ai-access", label: "Configure AI Provider in AI Access ↗" },
+        followUps: ["How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?"],
+        error: true,
+      };
+      setGuideMessages((prev) => [...prev, assistantMsg]);
     } finally {
       setIsGuideThinking(false);
     }
@@ -1142,21 +1305,21 @@ Keep your response concise, helpful, and academically grounded.`;
                 }
                 setChoosing(true);
               }}
-              className="w-full py-2.5 px-6 rounded-full text-xs font-semibold bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group font-sans mb-3"
+              className="w-full h-10 px-4 rounded-full text-xs font-semibold bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group font-sans mb-2.5"
             >
               <span className="text-base font-bold leading-none">+</span>
               <span>New Project</span>
             </button>
 
-            <div className="relative group cursor-text mb-4">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 transition-colors pointer-events-none" />
+            <div className="relative group cursor-text mb-4 w-full h-10">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 transition-colors pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full bg-neutral-900/5 dark:bg-white/5 border border-neutral-200 dark:border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 transition-all cursor-text text-neutral-900 dark:text-neutral-200 placeholder-neutral-500 dark:placeholder-neutral-400"
+                className="w-full h-full bg-neutral-900/5 dark:bg-white/5 border border-neutral-200 dark:border-white/10 rounded-full pl-10 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 transition-all cursor-text text-neutral-900 dark:text-neutral-200 placeholder-neutral-500 dark:placeholder-neutral-400"
               />
             </div>
           </div>
@@ -1345,7 +1508,7 @@ Keep your response concise, helpful, and academically grounded.`;
         </div>
 
         {/* Bottom Section */}
-        <div className="flex-shrink-0 p-3 border-t border-neutral-200 dark:border-white/10 flex flex-col gap-2 w-[260px] bg-[#F4F4F5] dark:bg-[#1C1C1E]">
+        <div className="flex-shrink-0 p-3 border-t border-neutral-200 dark:border-white/10 flex flex-col justify-between gap-2 w-[260px] bg-[#F4F4F5] dark:bg-[#1C1C1E] h-[114px]">
           {/* Action Row: Settings Navigation Item + Minimal Icon-Only Theme Toggle */}
           <div className="flex items-center justify-between gap-1.5">
             {onOpenAccountSettings && (
@@ -1499,7 +1662,7 @@ Keep your response concise, helpful, and academically grounded.`;
           </div>
         ) : (
           /* Centered Reading Column */
-          <div className="max-w-4xl mx-auto px-6 pt-8 pb-28 w-full flex-1">
+          <div className="max-w-4xl mx-auto px-6 pt-8 pb-4 w-full flex-1">
           {/* Onboarding welcome banner */}
           {welcomeVisible && (
             <div
@@ -1678,138 +1841,234 @@ Keep your response concise, helpful, and academically grounded.`;
                 </div>
               </div>
 
-              {/* Main AI Prompt Bar — Consolidated immediately below 4 template cards with mt-10 */}
-              <div className="mt-10 w-full relative">
+              {/* Main AI Prompt Bar — Parallel to the line above settings */}
+              <div className="mt-10 sticky bottom-0 z-20 w-full relative pointer-events-none h-[114px] flex flex-col justify-start bg-gradient-to-t from-[#FAFAFA] dark:from-[#171717] via-[#FAFAFA]/95 dark:via-[#171717]/95 to-transparent">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (guideInput.trim()) {
+                    if (guideInput.trim() || attachments.length > 0) {
                       setIsPromptSuggestionsOpen(false);
                       setIsAiSidebarOpen(true);
                       handleSendGuideMessage();
                       setTimeout(() => guideInputRef.current?.focus(), 300);
                     }
                   }}
-                  className="flex items-center gap-3 w-full rounded-full bg-neutral-100/90 dark:bg-white/5 border border-neutral-200 dark:border-white/10 shadow-sm px-4 py-3 transition-all duration-200 focus-within:border-neutral-400 dark:focus-within:border-white/20 focus-within:shadow-sm"
+                  className="pointer-events-auto flex flex-col justify-between w-full h-[96px] rounded-2xl bg-neutral-100/90 dark:bg-white/5 border border-neutral-200 dark:border-white/10 shadow-sm px-4 pt-2.5 pb-2 transition-all duration-200 focus-within:border-neutral-400 dark:focus-within:border-white/20 focus-within:shadow-sm"
                 >
-                  {/* Left: Attachment / Plus button */}
-                  <button
-                    type="button"
-                    title="Attach file"
-                    aria-label="Attach file"
-                    className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-
-                  {/* Center: Transparent flexible input */}
-                  <input
-                    ref={guideInputRef}
-                    type="text"
-                    value={guideInput}
-                    onChange={(e) => {
-                      setGuideInput(e.target.value);
-                      setIsPromptSuggestionsOpen(true);
-                    }}
-                    onFocus={() => {
-                      if (guideInput.trim().length >= 2) setIsPromptSuggestionsOpen(true);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") {
-                        setIsPromptSuggestionsOpen(false);
-                      }
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        if (guideInput.trim()) {
-                          setIsPromptSuggestionsOpen(false);
-                          setIsAiSidebarOpen(true);
-                          handleSendGuideMessage();
-                          setTimeout(() => guideInputRef.current?.focus(), 300);
-                        }
-                      }
-                    }}
-                    placeholder="Draft a Research Proposal, analyze data, or search projects..."
-                    style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                    className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none prompt-bare-input"
-                  />
-
-                  {/* Right: Solid circular submit button */}
-                  <button
-                    type="submit"
-                    title="Send"
-                    aria-label="Send message"
-                    disabled={!guideInput.trim() || isGuideThinking}
-                    className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
-                      guideInput.trim() && !isGuideThinking
-                        ? "bg-neutral-900 dark:bg-white text-white dark:text-gray-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-sm"
-                        : "bg-neutral-200 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-                    }`}
-                  >
-                    {isGuideThinking ? (
-                      <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <ArrowUp className="w-4 h-4 stroke-[2.5]" />
-                    )}
-                  </button>
-                </form>
-
-                {/* Instant Suggestions & Matching Projects Popover */}
-                {guideInput.trim().length >= 2 && isPromptSuggestionsOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 rounded-2xl shadow-2xl z-30 p-2 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 max-h-80 overflow-y-auto">
-                    {/* Matching Projects */}
-                    {promptMatchingProjects.length > 0 && (
-                      <div className="mb-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 px-3 py-1 block">
-                          Matching Projects ({promptMatchingProjects.length})
-                        </span>
-                        {promptMatchingProjects.map((p) => (
+                  {/* Pending Attachments Chips */}
+                  {attachments.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 pb-1.5 border-b border-neutral-200/50 dark:border-white/5 mb-1.5">
+                      {attachments.map((att) => (
+                        <div
+                          key={att.id}
+                          className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs"
+                        >
+                          {att.isImage ? (
+                            att.previewUrl ? (
+                              <img src={att.previewUrl} alt={att.name} className="w-4 h-4 object-cover rounded" />
+                            ) : (
+                              <Paperclip className="w-3 h-3 text-blue-500" />
+                            )
+                          ) : (
+                            <FileText className="w-3 h-3 text-amber-500" />
+                          )}
+                          <span className="truncate max-w-[150px] font-medium text-[11px]">{att.name}</span>
                           <button
-                            key={p.projectId}
                             type="button"
-                            onClick={() => {
-                              setIsPromptSuggestionsOpen(false);
-                              onOpen(p.projectId);
-                            }}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-left hover:bg-white/5 transition-colors cursor-pointer group"
+                            onClick={() => removeAttachment(att.id)}
+                            className="text-neutral-400 hover:text-red-500 p-0.5 cursor-pointer"
+                            title="Remove attachment"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="w-6 h-6 rounded-lg bg-neutral-800 flex items-center justify-center shrink-0">
-                                <FormatIcon id={p.outputTypeId} className="w-3.5 h-3.5" />
-                              </span>
-                              <span className="text-xs font-medium text-neutral-200 truncate group-hover:text-blue-400">
-                                {p.answers?.title || "Untitled Project"}
-                              </span>
-                            </div>
-                            <span className="text-[11px] text-neutral-400 group-hover:text-neutral-200 shrink-0 font-medium">
-                              Open →
-                            </span>
+                            <X className="w-3 h-3" />
                           </button>
-                        ))}
-                      </div>
-                    )}
+                        </div>
+                      ))}
+                      {isUploadingAttachment && (
+                        <span className="text-[11px] text-neutral-400 flex items-center gap-1 animate-pulse">
+                          <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing attachment...
+                        </span>
+                      )}
+                    </div>
+                  )}
 
-                    {/* Platform Action Suggestions */}
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 px-3 py-1 block">
-                        Ask & Actions
-                      </span>
+                  {/* Top: Transparent flexible input */}
+                  <div className="w-full flex items-center">
+                    <input
+                      ref={guideInputRef}
+                      type="text"
+                      value={guideInput}
+                      onChange={(e) => {
+                        setGuideInput(e.target.value);
+                        setIsPromptSuggestionsOpen(true);
+                      }}
+                      onFocus={() => {
+                        if (guideInput.trim().length >= 2) setIsPromptSuggestionsOpen(true);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          setIsPromptSuggestionsOpen(false);
+                        }
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          if (guideInput.trim() || attachments.length > 0) {
+                            setIsPromptSuggestionsOpen(false);
+                            setIsAiSidebarOpen(true);
+                            handleSendGuideMessage();
+                            setTimeout(() => guideInputRef.current?.focus(), 300);
+                          }
+                        }
+                      }}
+                      placeholder="Paste text, drop files/images, or draft research instructions..."
+                      style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
+                      className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none prompt-bare-input"
+                    />
+                  </div>
+
+                  {/* Bottom Action Row: Attachments & Mode Selector on left, Submit button on right */}
+                  <div className="flex items-center justify-between gap-2 mt-1.5 pt-1 border-t border-neutral-200/40 dark:border-white/5">
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => {
-                          setIsPromptSuggestionsOpen(false);
-                          setIsAiSidebarOpen(true);
-                          handleSendGuideMessage();
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left hover:bg-white/5 transition-colors cursor-pointer"
+                        onClick={() => mainFileInputRef.current?.click()}
+                        title="Attach PDF, Word, Excel, CSV, or Image"
+                        aria-label="Attach file"
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
                       >
-                        <span className="text-xs text-neutral-300 truncate">
-                          Ask Scholar: <strong className="text-white font-medium">"{guideInput}"</strong>
-                        </span>
-                        <span className="text-[11px] text-blue-400 font-medium shrink-0 ml-2">Submit ↗</span>
+                        <Paperclip className="w-4 h-4" />
                       </button>
+                      <input
+                        ref={mainFileInputRef}
+                        type="file"
+                        multiple
+                        accept=".pdf,.doc,.docx,.txt,.md,.markdown,.csv,.xlsx,.xls,.png,.jpg,.jpeg,.webp,.gif"
+                        className="hidden"
+                        onChange={(e) => {
+                          handleFileSelect(e.target.files);
+                          e.target.value = "";
+                        }}
+                      />
+
+                      {/* Intelligent Mode Selection Pills */}
+                      <div className="flex items-center gap-1 bg-neutral-200/50 dark:bg-white/5 p-0.5 rounded-lg text-[10px] font-medium">
+                        <button
+                          type="button"
+                          onClick={() => setActiveAiMode("normal")}
+                          className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                            activeAiMode === "normal"
+                              ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                              : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                          }`}
+                          title="Automatic capability detection"
+                        >
+                          <Sparkles className="w-2.5 h-2.5 text-blue-500" />
+                          <span>Auto</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveAiMode("search")}
+                          className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                            activeAiMode === "search"
+                              ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                              : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                          }`}
+                          title="Real-time web search and citation verification"
+                        >
+                          <Globe className="w-2.5 h-2.5 text-green-500" />
+                          <span>Search</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveAiMode("deep-research")}
+                          className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                            activeAiMode === "deep-research"
+                              ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                              : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                          }`}
+                          title="Multi-stage scholarly investigation, source cross-checking, and report synthesis"
+                        >
+                          <Compass className="w-2.5 h-2.5 text-purple-500" />
+                          <span>Deep Research</span>
+                        </button>
+                      </div>
                     </div>
+
+                    <button
+                      type="submit"
+                      title="Send"
+                      aria-label="Send message"
+                      disabled={(!guideInput.trim() && attachments.length === 0) || isGuideThinking}
+                      className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
+                        (guideInput.trim() || attachments.length > 0) && !isGuideThinking
+                          ? "bg-neutral-900 dark:bg-white text-white dark:text-gray-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-sm"
+                          : "bg-neutral-200 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
+                      }`}
+                    >
+                      {isGuideThinking ? (
+                        <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                      )}
+                    </button>
                   </div>
-                )}
+                </form>
+
+                  {/* Instant Suggestions & Matching Projects Popover */}
+                  {guideInput.trim().length >= 2 && isPromptSuggestionsOpen && (
+                    <div className="pointer-events-auto absolute left-0 right-0 bottom-full mb-3 bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 rounded-2xl shadow-2xl z-30 p-2 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 max-h-80 overflow-y-auto">
+                      {/* Matching Projects */}
+                      {promptMatchingProjects.length > 0 && (
+                        <div className="mb-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 px-3 py-1 block">
+                            Matching Projects ({promptMatchingProjects.length})
+                          </span>
+                          {promptMatchingProjects.map((p) => (
+                            <button
+                              key={p.projectId}
+                              type="button"
+                              onClick={() => {
+                                setIsPromptSuggestionsOpen(false);
+                                onOpen(p.projectId);
+                              }}
+                              className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-left hover:bg-white/5 transition-colors cursor-pointer group"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className="w-6 h-6 rounded-lg bg-neutral-800 flex items-center justify-center shrink-0">
+                                  <FormatIcon id={p.outputTypeId} className="w-3.5 h-3.5" />
+                                </span>
+                                <span className="text-xs font-medium text-neutral-200 truncate group-hover:text-blue-400">
+                                  {p.answers?.title || "Untitled Project"}
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-neutral-400 group-hover:text-neutral-200 shrink-0 font-medium">
+                                Open →
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Platform Action Suggestions */}
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 px-3 py-1 block">
+                          Ask & Actions
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsPromptSuggestionsOpen(false);
+                            setIsAiSidebarOpen(true);
+                            handleSendGuideMessage();
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left hover:bg-white/5 transition-colors cursor-pointer"
+                        >
+                          <span className="text-xs text-neutral-300 truncate">
+                            Ask Scholar: <strong className="text-white font-medium">"{guideInput}"</strong>
+                          </span>
+                          <span className="text-[11px] text-blue-400 font-medium shrink-0 ml-2">Submit ↗</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
               </div>
             </div>
           )}
@@ -1884,6 +2143,21 @@ Keep your response concise, helpful, and academically grounded.`;
                           <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
                         </div>
                         <span className="font-medium text-neutral-700 dark:text-neutral-300">Scholar Core</span>
+                        {msg.mode === "deep-research" && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 font-medium">
+                            🔬 Deep Research
+                          </span>
+                        )}
+                        {msg.mode === "search" && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-green-500/10 text-green-600 dark:text-green-300 border border-green-500/20 font-medium">
+                            🔍 Web Search
+                          </span>
+                        )}
+                        {msg.provider && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-blue-500/10 text-blue-600 dark:text-blue-300 font-medium">
+                            ⚡ {msg.provider}
+                          </span>
+                        )}
                       </>
                     ) : (
                       <span>You</span>
@@ -1896,11 +2170,92 @@ Keep your response concise, helpful, and academically grounded.`;
                     className={`rounded-2xl px-4 py-3 max-w-[88%] leading-relaxed ${
                       msg.sender === "user"
                         ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs rounded-tr-xs"
+                        : msg.error
+                        ? "bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 text-neutral-900 dark:text-neutral-200 rounded-tl-xs shadow-2xs"
                         : "bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-neutral-200 rounded-tl-xs shadow-2xs"
                     }`}
                   >
+                    {/* User Attachments Display */}
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {msg.attachments.map((att, aIdx) => (
+                          <div
+                            key={aIdx}
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/20 dark:bg-white/20 text-xs text-white"
+                          >
+                            {att.isImage ? (
+                              att.previewUrl ? (
+                                <img src={att.previewUrl} alt={att.name} className="w-5 h-5 object-cover rounded" />
+                              ) : (
+                                <Paperclip className="w-3.5 h-3.5" />
+                              )
+                            ) : (
+                              <FileText className="w-3.5 h-3.5" />
+                            )}
+                            <span className="truncate max-w-[150px] font-medium text-[11px]">{att.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {msg.sender === "assistant" ? renderFormattedGuideText(msg.text) : (
                       <div className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.text}</div>
+                    )}
+
+                    {/* Deep Research Plan */}
+                    {msg.plan && msg.plan.length > 0 && (
+                      <div className="mt-3 p-2.5 rounded-xl bg-neutral-900/5 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-xs">
+                        <div className="font-semibold text-neutral-800 dark:text-neutral-200 mb-1.5 flex items-center gap-1.5">
+                          <Compass className="w-3.5 h-3.5 text-purple-500" />
+                          <span>Research Trajectory & Sub-inquiries</span>
+                        </div>
+                        <ul className="space-y-1 text-neutral-600 dark:text-neutral-400 text-[11px]">
+                          {msg.plan.map((step, sIdx) => (
+                            <li key={sIdx} className="flex items-start gap-1.5">
+                              <span className="text-purple-500 font-bold">•</span>
+                              <span>{step}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Citations & Sources */}
+                    {msg.citations && msg.citations.length > 0 && (
+                      <div className="mt-3 pt-2.5 border-t border-neutral-200 dark:border-white/10">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2 flex items-center gap-1.5">
+                          <Globe className="w-3.5 h-3.5 text-green-500" />
+                          <span>Verified Sources & Citations ({msg.citations.length})</span>
+                        </div>
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {msg.citations.map((c, cIdx) => (
+                            <a
+                              key={cIdx}
+                              href={c.url || "#"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex flex-col p-2 rounded-lg bg-white dark:bg-neutral-800/60 border border-neutral-200 dark:border-white/10 hover:border-blue-400 dark:hover:border-blue-500 transition group text-left"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200 group-hover:text-blue-500 truncate">
+                                  {c.title || c.url || "External Source"}
+                                </span>
+                                <ExternalLink className="w-3 h-3 text-neutral-400 group-hover:text-blue-500 shrink-0" />
+                              </div>
+                              {c.snippet && (
+                                <span className="text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-2 mt-0.5">
+                                  {c.snippet}
+                                </span>
+                              )}
+                              <div className="flex items-center gap-2 mt-1 text-[10px] text-neutral-400">
+                                {c.source && <span>{c.source}</span>}
+                                {c.venue && <span>• {c.venue}</span>}
+                                {c.year && <span>• ({c.year})</span>}
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
                     )}
 
                     {/* Quick Action Deep-Links */}
@@ -1924,7 +2279,7 @@ Keep your response concise, helpful, and academically grounded.`;
                   <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
                     <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
                   </div>
-                  <span>Scholar Core is synthesizing response...</span>
+                  <span className="animate-pulse">Scholar Core is synthesizing response...</span>
                 </div>
               )}
             </div>
@@ -1935,10 +2290,24 @@ Keep your response concise, helpful, and academically grounded.`;
                 <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
                   <ScholarCoreLogo size="sm" withText={false} />
                   <span>Ask Scholar</span>
-                  {userEmail ? (
-                    <span className="text-green-600 dark:text-green-500 font-bold">• AI Ready</span>
+                  {aiStatus ? (
+                    aiStatus.connected ? (
+                      <span className="text-green-600 dark:text-green-500 font-bold" title={`Operational provider: ${aiStatus.provider || "Operational"}`}>
+                        • {aiStatus.statusText}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={onOpenAiAccess}
+                        className="text-amber-600 dark:text-amber-400 font-medium hover:underline cursor-pointer flex items-center gap-1"
+                        title="No operational AI providers. Click to configure AI Access."
+                      >
+                        <span>• AI Disconnected</span>
+                        <span className="text-[9px] underline">Configure ↗</span>
+                      </button>
+                    )
                   ) : (
-                    <span className="text-sky-600 dark:text-sky-400 font-medium">• Platform Guide</span>
+                    <span className="text-neutral-400 text-[10px] animate-pulse">• Checking AI...</span>
                   )}
                 </div>
                 <button
@@ -1962,45 +2331,139 @@ Keep your response concise, helpful, and academically grounded.`;
                 </button>
               </div>
 
+              {/* Pending Attachments Chips in Sidebar */}
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 mb-2 px-1">
+                  {attachments.map((att) => (
+                    <div
+                      key={att.id}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200"
+                    >
+                      {att.isImage ? (
+                        att.previewUrl ? (
+                          <img src={att.previewUrl} alt={att.name} className="w-4 h-4 object-cover rounded" />
+                        ) : (
+                          <Paperclip className="w-3 h-3 text-blue-500" />
+                        )
+                      ) : (
+                        <FileText className="w-3 h-3 text-amber-500" />
+                      )}
+                      <span className="truncate max-w-[120px] font-medium text-[11px]">{att.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(att.id)}
+                        className="text-neutral-400 hover:text-red-500 p-0.5 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {isUploadingAttachment && (
+                    <span className="text-[11px] text-neutral-400 flex items-center gap-1 animate-pulse">
+                      <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing...
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Input Wrapper Pill */}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   handleSendGuideMessage();
                 }}
-                className="flex items-center gap-2.5 rounded-full bg-neutral-100 dark:bg-white/5 px-4 py-2.5 shadow-sm border border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/20 transition-all"
+                className="flex flex-col gap-1.5 rounded-2xl bg-neutral-100 dark:bg-white/5 p-2 shadow-sm border border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/20 transition-all"
               >
-                <button
-                  type="button"
-                  className="text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 transition cursor-pointer p-1"
-                  title="Attach reference source"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-2 px-2">
+                  <input
+                    ref={guideInputRef}
+                    type="text"
+                    value={guideInput}
+                    onChange={(e) => setGuideInput(e.target.value)}
+                    placeholder="Ask anything, search projects, or type a command..."
+                    style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
+                    className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none prompt-bare-input"
+                  />
+                </div>
 
-                <input
-                  ref={guideInputRef}
-                  type="text"
-                  value={guideInput}
-                  onChange={(e) => setGuideInput(e.target.value)}
-                  placeholder="Ask anything, search projects, or type a command..."
-                  style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                  className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none prompt-bare-input"
-                />
+                <div className="flex items-center justify-between pt-1 border-t border-neutral-200/40 dark:border-white/5">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => sidebarFileInputRef.current?.click()}
+                      className="text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 transition cursor-pointer p-1 rounded-full hover:bg-neutral-200 dark:hover:bg-white/10"
+                      title="Attach file or image"
+                      aria-label="Attach file"
+                    >
+                      <Paperclip className="w-3.5 h-3.5" />
+                    </button>
+                    <input
+                      ref={sidebarFileInputRef}
+                      type="file"
+                      multiple
+                      accept=".pdf,.doc,.docx,.txt,.md,.markdown,.csv,.xlsx,.xls,.png,.jpg,.jpeg,.webp,.gif"
+                      className="hidden"
+                      onChange={(e) => {
+                        handleFileSelect(e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
 
-                <button
-                  type="submit"
-                  disabled={!guideInput.trim() || isGuideThinking}
-                  className={`rounded-full p-2 flex items-center justify-center transition ${
-                    guideInput.trim() && !isGuideThinking
-                      ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 cursor-pointer shadow-xs"
-                      : "bg-neutral-200 dark:bg-white/5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-                  }`}
-                  title="Send question"
-                  aria-label="Send question"
-                >
-                  <ArrowUp className="w-3.5 h-3.5" />
-                </button>
+                    {/* Mode Selector */}
+                    <div className="flex items-center gap-0.5 bg-neutral-200/50 dark:bg-white/5 p-0.5 rounded-lg text-[9px] font-medium">
+                      <button
+                        type="button"
+                        onClick={() => setActiveAiMode("normal")}
+                        className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
+                          activeAiMode === "normal"
+                            ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                            : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                        }`}
+                        title="Automatic capability detection"
+                      >
+                        Auto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveAiMode("search")}
+                        className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
+                          activeAiMode === "search"
+                            ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                            : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                        }`}
+                        title="Web Search"
+                      >
+                        Search
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveAiMode("deep-research")}
+                        className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
+                          activeAiMode === "deep-research"
+                            ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                            : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                        }`}
+                        title="Deep Research"
+                      >
+                        Deep Research
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={(!guideInput.trim() && attachments.length === 0) || isGuideThinking}
+                    className={`rounded-full p-1.5 flex items-center justify-center transition cursor-pointer ${
+                      (guideInput.trim() || attachments.length > 0) && !isGuideThinking
+                        ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-xs"
+                        : "bg-neutral-200 dark:bg-white/5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
+                    }`}
+                    title="Send question"
+                    aria-label="Send question"
+                  >
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </form>
             </div>
           </div>

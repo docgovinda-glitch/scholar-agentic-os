@@ -148,26 +148,40 @@ export function baseProviderId(id: string): string {
 const cooldowns = new Map<string, number>();
 
 export function isInCooldown(candidateId: string): boolean {
+  const until = cooldowns.get(candidateId);
+  if (until !== undefined) {
+    if (Date.now() >= until) {
+      cooldowns.delete(candidateId);
+    } else {
+      return true;
+    }
+  }
   const base = baseProviderId(candidateId);
   const health = getProviderHealth(base);
   if (health.cooldownUntil && Date.now() < health.cooldownUntil) {
-    return true;
+    if (health.status === "auth_failed" || health.status === "offline") {
+      return true;
+    }
   }
-  const until = cooldowns.get(base) ?? cooldowns.get(candidateId);
-  if (until === undefined) return false;
-  if (Date.now() >= until) {
-    cooldowns.delete(base);
-    cooldowns.delete(candidateId);
-    return false;
+  const baseUntil = cooldowns.get(base);
+  if (baseUntil !== undefined) {
+    if (Date.now() >= baseUntil) {
+      cooldowns.delete(base);
+    } else {
+      return true;
+    }
   }
-  return true;
+  return false;
 }
 
 export function cooldownRemainingMs(candidateId: string): number {
   const base = baseProviderId(candidateId);
   const health = getProviderHealth(base);
-  const healthRemaining = health.cooldownUntil ? Math.max(0, health.cooldownUntil - Date.now()) : 0;
-  const until = cooldowns.get(base) ?? cooldowns.get(candidateId);
+  const healthRemaining =
+    health.cooldownUntil && (health.status === "auth_failed" || health.status === "offline")
+      ? Math.max(0, health.cooldownUntil - Date.now())
+      : 0;
+  const until = cooldowns.get(candidateId) ?? cooldowns.get(base);
   const localRemaining = until ? Math.max(0, until - Date.now()) : 0;
   return Math.max(healthRemaining, localRemaining);
 }
@@ -176,10 +190,11 @@ export function setCooldown(candidateId: string, ms: number): void {
   const base = baseProviderId(candidateId);
   if (ms > 0) {
     const expires = Date.now() + ms;
-    cooldowns.set(base, expires);
     cooldowns.set(candidateId, expires);
-    // Sync with shared provider-health state machine across concurrent agents
-    recordProviderFailure(base, "rate_limited", ms);
+    if (candidateId === base) {
+      cooldowns.set(base, expires);
+      recordProviderFailure(base, "rate_limited", ms);
+    }
   } else {
     clearCooldown(candidateId);
   }
@@ -467,7 +482,9 @@ export async function executeWithFailover<T>(
     error: worst?.error
       ? {
           ...worst.error,
-          message: "AI generation is temporarily unavailable. Your research data is safe. Retry when a provider becomes available.",
+          message:
+            worst.error.message ||
+            "AI generation is temporarily unavailable. Your research data is safe. Retry when a provider becomes available.",
         }
       : {
           kind: "unknown",
