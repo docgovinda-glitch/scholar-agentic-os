@@ -117,7 +117,6 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
     isEstimatingRubric,
     estimateRubricGrade,
     applyTutorSuggestionToDraft,
-    academicLevel,
     currentWordCount,
   } = useAssignmentWorkspace();
 
@@ -149,10 +148,11 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
 
   return (
     <aside
-      className={`flex flex-col h-full bg-[#171717] border-l border-white/5 text-neutral-200 ${className}`}
+      className={`flex flex-col h-full bg-[#F4F4F5] dark:bg-[#1C1C1E] border-l border-neutral-200/80 dark:border-white/10 text-neutral-800 dark:text-neutral-200 ${className}`}
+      aria-label="Socratic AI Tutor"
     >
       {/* Mode Selector Tabs (Top-most entry point) */}
-      <div className="p-2 border-b border-white/5 bg-[#171717]">
+      <div className="p-2 border-b border-neutral-200/80 dark:border-white/10 bg-[#F4F4F5] dark:bg-[#1C1C1E]">
         <div className="grid grid-cols-4 gap-1">
           {MODE_DEFINITIONS.map((mode) => {
             const isSelected = tutorMode === mode.id;
@@ -161,37 +161,37 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
                 key={mode.id}
                 type="button"
                 onClick={() => setTutorMode(mode.id)}
-                className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-lg text-center transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-center transition-all cursor-pointer ${
                   isSelected
-                    ? "bg-white/10 border border-white/10 text-neutral-100 font-bold shadow-xs"
-                    : "text-neutral-400 hover:bg-white/5 border border-transparent"
+                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-xs border border-neutral-200/60 dark:border-white/10"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/50 dark:hover:bg-white/5 border border-transparent font-medium"
                 }`}
                 title={mode.description}
               >
-                <span className="text-xs leading-none mb-0.5">{mode.icon}</span>
-                <span className="text-[10px] truncate max-w-full font-semibold">{mode.shortLabel}</span>
+                <span className="text-xs leading-none mb-1">{mode.icon}</span>
+                <span className="text-[10px] truncate max-w-full">{mode.shortLabel}</span>
               </button>
             );
           })}
         </div>
-        <p className="text-[10px] text-neutral-400 mt-1.5 px-1 truncate">
-          <span className="font-semibold text-neutral-300">{activeModeDef.label}:</span>{" "}
+        <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-2 px-1 truncate">
+          <span className="font-semibold text-neutral-900 dark:text-neutral-200">{activeModeDef.label}:</span>{" "}
           {activeModeDef.description}
         </p>
       </div>
 
       {/* Quick Rubric Audit Action Banner in Rubric Mode */}
       {tutorMode === "rubric" && (
-        <div className="p-2.5 bg-neutral-900 border-b border-white/5 flex items-center justify-between gap-2">
-          <div className="text-[11px] text-neutral-400">
-            <span className="font-bold text-neutral-200 block">Live Marking Audit</span>
+        <div className="p-3 bg-white dark:bg-[#2C2C2E] border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between gap-2 shadow-2xs">
+          <div className="text-[11px] text-neutral-600 dark:text-neutral-400">
+            <span className="font-semibold text-neutral-900 dark:text-neutral-100 block">Live Marking Audit</span>
             <span>Assess draft against 1st / 2:1 marking criteria</span>
           </div>
           <button
             type="button"
             disabled={isEstimatingRubric || currentWordCount < 50}
             onClick={handleRunRubricAudit}
-            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50 shadow-xs flex items-center gap-1.5 shrink-0"
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold transition-all cursor-pointer disabled:opacity-50 shadow-xs flex items-center gap-1.5 shrink-0"
           >
             {isEstimatingRubric ? (
               <>
@@ -209,7 +209,7 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
       )}
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
         {tutorMessages.map((msg) => {
           const isUser = msg.sender === "user";
           return (
@@ -220,8 +220,8 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
               <div
                 className={`max-w-[92%] rounded-2xl p-3.5 text-xs leading-relaxed ${
                   isUser
-                    ? "bg-neutral-800 text-neutral-100 border border-white/10 rounded-br-xs"
-                    : "bg-neutral-900 border border-white/5 text-neutral-200 rounded-bl-xs shadow-xs"
+                    ? "bg-neutral-200/80 dark:bg-white/10 text-neutral-900 dark:text-white rounded-br-xs font-normal"
+                    : "bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 text-neutral-800 dark:text-neutral-200 rounded-bl-xs shadow-xs"
                 }`}
               >
                 {/* Text Body */}
@@ -229,33 +229,33 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
 
                 {/* Socratic Questions Cards */}
                 {msg.socraticQuestions && msg.socraticQuestions.length > 0 && (
-                  <div className="mt-3 space-y-2 pt-2.5 border-t border-white/5">
-                    <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider flex items-center gap-1">
+                  <div className="mt-3 space-y-2 pt-2.5 border-t border-neutral-200/60 dark:border-white/10">
+                    <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 tracking-wider flex items-center gap-1">
                       <span>🏛️</span> Socratic Probes to Deepen Your Thinking:
                     </span>
                     {msg.socraticQuestions.map((sq: SocraticQuestion) => (
                       <div
                         key={sq.id}
-                        className="p-2.5 rounded-xl bg-[#171717] border border-white/10 space-y-1.5"
+                        className="p-3 rounded-xl bg-neutral-50 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 space-y-1.5"
                       >
                         <div className="flex items-center justify-between gap-1 flex-wrap">
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
                             {sq.challengeType.replace(/_/g, " ").toUpperCase()}
                           </span>
-                          <span className="text-[10px] font-medium text-neutral-400">
+                          <span className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
                             Concept: {sq.targetConcept}
                           </span>
                         </div>
-                        <p className="text-xs font-semibold text-neutral-100">
+                        <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
                           "{sq.question}"
                         </p>
-                        <p className="text-[11px] text-neutral-400 italic">
+                        <p className="text-[11px] text-neutral-600 dark:text-neutral-400 italic">
                           💡 {sq.rationale}
                         </p>
                         <button
                           type="button"
                           onClick={() => sendTutorMessage(`Regarding the Socratic question "${sq.question}": here is my thought...`, "socratic")}
-                          className="text-[10px] font-bold text-blue-400 hover:underline mt-1 inline-block cursor-pointer"
+                          className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline mt-1 inline-block cursor-pointer"
                         >
                           Explore This Probe →
                         </button>
@@ -266,38 +266,38 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
 
                 {/* Rubric Grade Estimation Card */}
                 {msg.rubricEstimation && (
-                  <div className="mt-3 space-y-2.5 pt-2.5 border-t border-white/5">
-                    <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#171717] border border-white/10">
+                  <div className="mt-3 space-y-2.5 pt-2.5 border-t border-neutral-200/60 dark:border-white/10">
+                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-neutral-50 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10">
                       <div>
-                        <span className="text-[10px] uppercase font-bold text-neutral-400 block">
+                        <span className="text-[10px] uppercase font-bold text-neutral-500 dark:text-neutral-400 block tracking-wider">
                           Estimated Grade Band
                         </span>
-                        <h4 className="text-sm font-extrabold text-neutral-100">
+                        <h4 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
                           {msg.rubricEstimation.bandLabel}
                         </h4>
                       </div>
-                      <div className={`px-2.5 py-1 rounded-full text-xs font-black border ${BAND_COLORS[msg.rubricEstimation.overallBand]?.badge || "bg-neutral-500/10 text-neutral-400 border-neutral-500/20"}`}>
+                      <div className={`px-2.5 py-1 rounded-full text-xs font-black border ${BAND_COLORS[msg.rubricEstimation.overallBand]?.badge || "bg-neutral-500/10 text-neutral-600 dark:text-neutral-400 border-neutral-500/20"}`}>
                         {msg.rubricEstimation.overallScore}%
                       </div>
                     </div>
 
                     {/* Criteria Breakdown */}
                     <div className="space-y-1.5">
-                      <span className="text-[10px] uppercase font-bold text-neutral-400 block">
+                      <span className="text-[10px] uppercase font-bold text-neutral-500 dark:text-neutral-400 block tracking-wider">
                         Marking Dimensions:
                       </span>
                       {msg.rubricEstimation.criteria.map((c) => (
                         <div
                           key={c.id}
-                          className="p-2 rounded-lg bg-[#171717] border border-white/10 text-[11px] space-y-1"
+                          className="p-2.5 rounded-lg bg-neutral-50 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 text-[11px] space-y-1"
                         >
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-neutral-200">{c.criterion}</span>
-                            <span className="font-semibold text-neutral-400">{c.score} / {c.maxScore}</span>
+                            <span className="font-semibold text-neutral-800 dark:text-neutral-200">{c.criterion}</span>
+                            <span className="font-semibold text-neutral-500 dark:text-neutral-400">{c.score} / {c.maxScore}</span>
                           </div>
-                          <p className="text-[10px] text-neutral-300">{c.critique}</p>
+                          <p className="text-[10px] text-neutral-600 dark:text-neutral-300">{c.critique}</p>
                           {c.howToReachNextBand && (
-                            <p className="text-[10px] text-blue-400 font-medium">
+                            <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
                               🎯 To Step Up: {c.howToReachNextBand}
                             </p>
                           )}
@@ -307,11 +307,11 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
 
                     {/* Roadmap to Higher Band */}
                     {msg.rubricEstimation.targetBandRoadmap && (
-                      <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-[11px] space-y-1">
-                        <span className="font-bold text-blue-400 block">
+                      <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-[11px] space-y-1">
+                        <span className="font-semibold text-blue-600 dark:text-blue-400 block">
                           🚀 Roadmap to {msg.rubricEstimation.targetBandRoadmap.targetBand}:
                         </span>
-                        <ul className="list-disc list-inside text-neutral-300 text-[10px] space-y-0.5">
+                        <ul className="list-disc list-inside text-neutral-700 dark:text-neutral-300 text-[10px] space-y-0.5">
                           {msg.rubricEstimation.targetBandRoadmap.actionableSteps.map((step, sIdx) => (
                             <li key={sIdx}>{step}</li>
                           ))}
@@ -323,28 +323,28 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
 
                 {/* Counterarguments Card */}
                 {msg.counterArguments && msg.counterArguments.length > 0 && (
-                  <div className="mt-3 space-y-2 pt-2.5 border-t border-white/5">
-                    <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider flex items-center gap-1">
+                  <div className="mt-3 space-y-2 pt-2.5 border-t border-neutral-200/60 dark:border-white/10">
+                    <span className="text-[10px] uppercase font-bold text-amber-600 dark:text-amber-400 tracking-wider flex items-center gap-1">
                       <span>⚔️</span> Theoretical Objections & Counterarguments:
                     </span>
                     {msg.counterArguments.map((ca: CounterArgument) => (
                       <div
                         key={ca.id}
-                        className="p-2.5 rounded-xl bg-[#171717] border border-white/10 space-y-1.5 text-[11px]"
+                        className="p-3 rounded-xl bg-neutral-50 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 space-y-1.5 text-[11px]"
                       >
-                        <span className="font-bold text-neutral-100 block">
+                        <span className="font-semibold text-neutral-900 dark:text-neutral-100 block">
                           Counterpoint: {ca.opposingViewpoint}
                         </span>
-                        <p className="text-[10px] text-neutral-300">
+                        <p className="text-[10px] text-neutral-600 dark:text-neutral-300">
                           <span className="font-semibold">Theoretical Grounding:</span> {ca.theoreticalGrounding}
                         </p>
                         {ca.keyScholarsOrSchools && ca.keyScholarsOrSchools.length > 0 && (
-                          <p className="text-[10px] text-neutral-400">
+                          <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
                             <span className="font-semibold">Key Proponents:</span> {ca.keyScholarsOrSchools.join(", ")}
                           </p>
                         )}
-                        <div className="pt-1 border-t border-white/5 text-[10px] text-amber-300">
-                          <span className="font-bold">🛡️ Rebuttal Blueprint:</span> {ca.suggestedRebuttalStrategy}
+                        <div className="pt-1 border-t border-neutral-200/60 dark:border-white/10 text-[10px] text-amber-700 dark:text-amber-300">
+                          <span className="font-semibold">🛡️ Rebuttal Blueprint:</span> {ca.suggestedRebuttalStrategy}
                         </div>
                       </div>
                     ))}
@@ -353,11 +353,11 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
 
                 {/* Actionable Polish Suggestion */}
                 {msg.actionableSuggestion && msg.actionableSuggestion.suggestedText && (
-                  <div className="mt-2.5 pt-2 border-t border-white/5 text-[11px]">
-                    <span className="font-bold text-blue-400 block mb-1">
+                  <div className="mt-2.5 pt-2 border-t border-neutral-200/60 dark:border-white/10 text-[11px]">
+                    <span className="font-semibold text-blue-600 dark:text-blue-400 block mb-1">
                       💡 Suggested Academic Polish:
                     </span>
-                    <p className="italic text-neutral-300 p-2 rounded-lg bg-[#171717] border border-white/10">
+                    <p className="italic text-neutral-700 dark:text-neutral-300 p-2.5 rounded-lg bg-neutral-50 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10">
                       {msg.actionableSuggestion.suggestedText}
                     </p>
                     <button
@@ -367,14 +367,14 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
                         targetSectionId: msg.actionableSuggestion?.targetSectionId,
                         type: msg.actionableSuggestion?.type,
                       })}
-                      className="mt-1.5 text-[10px] font-bold text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      className="mt-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
                     >
                       <span>📥</span> Apply to Section Draft
                     </button>
                   </div>
                 )}
               </div>
-              <span className="text-[10px] text-neutral-500 mt-1 px-1">
+              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-1 px-1">
                 {msg.timestamp}
               </span>
             </div>
@@ -382,7 +382,7 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
         })}
 
         {(isTutorReplying || isEstimatingRubric) && (
-          <div className="flex items-center gap-2 text-xs text-neutral-400 p-2">
+          <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400 p-2">
             <div className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" />
             <div className="w-2 h-2 rounded-full bg-blue-500 animate-bounce [animation-delay:0.2s]" />
             <div className="w-2 h-2 rounded-full bg-blue-500 animate-bounce [animation-delay:0.4s]" />
@@ -397,8 +397,8 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
       </div>
 
       {/* Contextual Prompt Chips */}
-      <div className="p-2.5 border-t border-white/5 bg-neutral-900/60">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+      <div className="p-3 border-t border-neutral-200/80 dark:border-white/10 bg-white/50 dark:bg-[#1C1C1E]/50">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 block mb-1.5">
           {activeModeDef.shortLabel} Queries:
         </span>
         <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto pr-1">
@@ -408,7 +408,7 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
               type="button"
               disabled={isTutorReplying || isEstimatingRubric}
               onClick={() => handleChipClick(prompt)}
-              className="text-[11px] px-2.5 py-1 rounded-full border border-white/10 bg-neutral-800 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-700/80 transition-colors cursor-pointer text-left truncate max-w-full"
+              className="text-[11px] px-2.5 py-1 rounded-full border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:border-neutral-300 dark:hover:border-white/20 hover:bg-neutral-50 dark:hover:bg-white/10 transition-colors cursor-pointer text-left truncate max-w-full font-medium"
             >
               {prompt}
             </button>
@@ -417,7 +417,7 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
       </div>
 
       {/* Input Box */}
-      <form onSubmit={handleSubmit} className="p-3 border-t border-white/5 bg-[#171717]">
+      <form onSubmit={handleSubmit} className="p-3 border-t border-neutral-200/80 dark:border-white/10 bg-[#F4F4F5] dark:bg-[#1C1C1E]">
         <div className="flex items-center gap-2">
           <input
             type="text"
@@ -425,12 +425,12 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
             onChange={(e) => setInputText(e.target.value)}
             placeholder={`Ask your ${activeModeDef.shortLabel} Tutor...`}
             disabled={isTutorReplying || isEstimatingRubric}
-            className="flex-1 bg-neutral-900 border border-white/10 rounded-lg px-3 py-2 text-xs text-neutral-100 placeholder-neutral-500 focus:outline-hidden focus:border-neutral-600 transition-colors"
+            className="flex-1 bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 transition-all"
           />
           <button
             type="submit"
             disabled={!inputText.trim() || isTutorReplying || isEstimatingRubric}
-            className="px-3.5 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-500 transition-all cursor-pointer disabled:opacity-50 shadow-xs"
+            className="px-4 py-2 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 rounded-xl text-xs font-semibold hover:opacity-90 transition-all cursor-pointer disabled:opacity-40 shadow-xs shrink-0"
           >
             Ask
           </button>

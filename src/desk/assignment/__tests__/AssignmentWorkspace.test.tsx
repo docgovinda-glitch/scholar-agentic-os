@@ -138,8 +138,17 @@ describe("Scholar Core Assignment Workspace", () => {
     fireEvent.click(backBtn);
     expect(handleClose).toHaveBeenCalledTimes(1);
 
-    // Plain text title (from answers or fallback)
-    expect(within(header).getByText("Academic Assignment")).toBeInTheDocument();
+    // Inline-editable title with auto-save
+    const titleInput = await within(header).findByLabelText("Assignment Title");
+    expect(titleInput).toBeInTheDocument();
+    fireEvent.change(titleInput, { target: { value: "Renamed Assignment" } });
+    fireEvent.blur(titleInput);
+    await waitFor(() => {
+      expect(saveIntakeAnswers).toHaveBeenCalledWith(
+        "proj-123",
+        expect.objectContaining({ assignment_title: "Renamed Assignment" })
+      );
+    });
 
     // Verify removed clutter on left: no Scholar Core logo or Undergraduate pill in header
     expect(within(header).queryByText("SCHOLAR CORE")).not.toBeInTheDocument();
@@ -155,9 +164,8 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(tutorToggle).toBeInTheDocument();
     expect(within(header).queryByText("AI Tutor")).not.toBeInTheDocument();
 
-    // 4. Refined Word Count: muted typography
-    expect(within(header).getByText(/Target: 2000w/i)).toBeInTheDocument();
-    expect(within(header).getByText(/0w written/i)).toBeInTheDocument();
+    // 4. Compact status badge: 0 / 2,000 words
+    expect(within(header).getByText(/0 \/ 2,000 words/i)).toBeInTheDocument();
   });
 });
 

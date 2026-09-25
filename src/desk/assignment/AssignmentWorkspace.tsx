@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { AssignmentStage } from "./types";
 import { AssignmentProvider, useAssignmentWorkspace } from "./AssignmentContext";
 import AssignmentStageNavigation from "./components/AssignmentStageNavigation";
@@ -14,21 +14,18 @@ const AssignmentStructureStage = React.lazy(() => import("./stages/AssignmentStr
 const AssignmentDraftStage = React.lazy(() => import("./stages/AssignmentDraftStage"));
 const AssignmentFinalStage = React.lazy(() => import("./stages/AssignmentFinalStage"));
 
-// Subtle dark-mode skeleton placeholders
+// Lightweight minimalist skeleton placeholders conforming to light/dark themes
 export function PhaseNavSkeleton() {
   return (
-    <div className="w-full h-full p-4 space-y-4 bg-[#171717] border-r border-white/5 animate-pulse text-neutral-400">
-      <div className="space-y-1.5 pb-3 border-b border-white/5">
-        <div className="h-4 w-28 bg-white/10 rounded" />
-        <div className="h-3 w-40 bg-white/5 rounded" />
+    <div className="w-full h-full p-4 space-y-4 bg-[#F4F4F5] dark:bg-[#1C1C1E] border-r border-neutral-200/80 dark:border-white/10 animate-pulse text-neutral-400">
+      <div className="space-y-1.5 pb-3 border-b border-neutral-200/80 dark:border-white/10">
+        <div className="h-4 w-28 bg-neutral-200 dark:bg-white/10 rounded" />
+        <div className="h-3 w-40 bg-neutral-200 dark:bg-white/5 rounded" />
       </div>
       <div className="space-y-2 pt-1">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-10 w-full bg-white/5 rounded-lg border border-white/5" />
+          <div key={i} className="h-10 w-full bg-neutral-200/60 dark:bg-white/5 rounded-xl border border-neutral-200/60 dark:border-white/5" />
         ))}
-      </div>
-      <div className="mt-8 pt-4 border-t border-white/5">
-        <div className="h-16 w-full bg-neutral-900/60 rounded-lg border border-white/5" />
       </div>
     </div>
   );
@@ -36,35 +33,18 @@ export function PhaseNavSkeleton() {
 
 export function MainStageSkeleton() {
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-8 animate-pulse text-neutral-400">
-      <div className="border-b border-white/5 pb-4 space-y-2">
-        <div className="h-6 w-60 bg-white/10 rounded" />
-        <div className="h-3.5 w-96 max-w-full bg-white/5 rounded" />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-neutral-900/80 p-5 rounded-xl border border-white/5">
-        <div className="md:col-span-2 space-y-2">
-          <div className="h-4 w-48 bg-white/10 rounded" />
-          <div className="h-28 w-full bg-neutral-800/60 rounded-lg border border-white/10" />
+    <div className="max-w-4xl mx-auto p-6 sm:p-8 space-y-8 animate-pulse text-neutral-400">
+      <div className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-sm space-y-6">
+        <div className="border-b border-neutral-100 dark:border-white/5 pb-4 space-y-2">
+          <div className="h-6 w-60 bg-neutral-200 dark:bg-white/10 rounded-lg" />
+          <div className="h-3.5 w-96 max-w-full bg-neutral-200/70 dark:bg-white/5 rounded" />
         </div>
-        <div className="space-y-2">
-          <div className="h-4 w-28 bg-white/10 rounded" />
-          <div className="grid grid-cols-2 gap-2">
-            <div className="h-9 bg-neutral-800/60 rounded-lg border border-white/5" />
-            <div className="h-9 bg-neutral-800/60 rounded-lg border border-white/5" />
+        <div className="space-y-4">
+          <div className="h-28 w-full bg-neutral-100 dark:bg-white/5 rounded-xl border border-neutral-200/60 dark:border-white/10" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="h-10 bg-neutral-100 dark:bg-white/5 rounded-xl border border-neutral-200/60 dark:border-white/10" />
+            <div className="h-10 bg-neutral-100 dark:bg-white/5 rounded-xl border border-neutral-200/60 dark:border-white/10" />
           </div>
-        </div>
-        <div className="space-y-2">
-          <div className="h-4 w-28 bg-white/10 rounded" />
-          <div className="h-9 bg-neutral-800/60 rounded-lg border border-white/5" />
-        </div>
-        <div className="space-y-2">
-          <div className="h-4 w-36 bg-white/10 rounded" />
-          <div className="h-9 bg-neutral-800/60 rounded-lg border border-white/5" />
-        </div>
-        <div className="space-y-2">
-          <div className="h-4 w-40 bg-white/10 rounded" />
-          <div className="h-9 bg-neutral-800/60 rounded-lg border border-white/5" />
         </div>
       </div>
     </div>
@@ -73,15 +53,15 @@ export function MainStageSkeleton() {
 
 export function AiTutorSkeleton() {
   return (
-    <div className="w-full h-full p-4 space-y-4 bg-[#171717] border-l border-white/5 animate-pulse text-neutral-400">
-      <div className="flex items-center justify-between pb-3 border-b border-white/5">
-        <div className="h-4 w-24 bg-white/10 rounded" />
-        <div className="h-4 w-12 bg-white/5 rounded" />
+    <div className="w-full h-full p-4 space-y-4 bg-[#F4F4F5] dark:bg-[#1C1C1E] border-l border-neutral-200/80 dark:border-white/10 animate-pulse text-neutral-400">
+      <div className="flex items-center justify-between pb-3 border-b border-neutral-200/80 dark:border-white/10">
+        <div className="h-4 w-24 bg-neutral-200 dark:bg-white/10 rounded" />
+        <div className="h-4 w-12 bg-neutral-200 dark:bg-white/5 rounded" />
       </div>
-      <div className="h-24 w-full bg-neutral-900/80 rounded-xl border border-white/5" />
+      <div className="h-24 w-full bg-white dark:bg-[#2C2C2E] rounded-xl border border-neutral-200/60 dark:border-white/10" />
       <div className="space-y-2 pt-2">
-        <div className="h-16 w-full bg-neutral-900/60 rounded-lg border border-white/5" />
-        <div className="h-16 w-full bg-neutral-900/60 rounded-lg border border-white/5" />
+        <div className="h-16 w-full bg-white dark:bg-[#2C2C2E] rounded-xl border border-neutral-200/60 dark:border-white/10" />
+        <div className="h-16 w-full bg-white dark:bg-[#2C2C2E] rounded-xl border border-neutral-200/60 dark:border-white/10" />
       </div>
     </div>
   );
@@ -102,23 +82,55 @@ function AssignmentWorkspaceInner({
     currentWordCount,
     isLoading,
     error,
+    saveAnswers,
   } = useAssignmentWorkspace();
 
   const [tutorPanelOpen, setTutorPanelOpen] = useState(true);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
+  // Inline-editable title with auto-save on blur / Enter
+  const initialTitle =
+    project?.answers?.["assignment_title"] ||
+    project?.answers?.["title"] ||
+    "Academic Assignment";
+  const [editableTitle, setEditableTitle] = useState(initialTitle);
+
+  useEffect(() => {
+    if (project) {
+      setEditableTitle(
+        project.answers?.["assignment_title"] ||
+        project.answers?.["title"] ||
+        "Academic Assignment"
+      );
+    }
+  }, [project]);
+
+  const handleTitleBlur = () => {
+    const trimmed = editableTitle.trim() || "Academic Assignment";
+    setEditableTitle(trimmed);
+    if (project && (trimmed !== (project.answers?.["assignment_title"] || project.answers?.["title"]))) {
+      saveAnswers({ assignment_title: trimmed, title: trimmed });
+    }
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    }
+  };
+
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#171717] p-6 text-center text-neutral-200">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#FAFAFA] dark:bg-[#171717] p-6 text-center text-neutral-800 dark:text-neutral-200">
         <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-2">
           <span className="text-2xl">⚠️</span>
         </div>
-        <p className="max-w-md text-sm text-red-400 font-medium">{error}</p>
+        <p className="max-w-md text-sm text-red-600 dark:text-red-400 font-medium">{error}</p>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-white/10 px-5 py-2.5 text-sm font-medium text-neutral-200 hover:bg-white/5 transition-colors cursor-pointer"
+            className="rounded-full border border-neutral-300 dark:border-white/10 px-5 py-2.5 text-sm font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
           >
             Back to projects
           </button>
@@ -127,13 +139,13 @@ function AssignmentWorkspaceInner({
     );
   }
 
-  // Immediate page load renders lightweight structural shell with dark skeletons
+  // Immediate page load renders lightweight structural shell conforming to current theme
   if (isLoading || !project) {
     return (
-      <div className="dark h-screen flex flex-col bg-[#171717] text-neutral-200 overflow-hidden" data-theme="dark">
-        <header className="border-b border-white/5 bg-[#171717] z-20 shrink-0">
+      <div className="h-screen flex flex-col bg-[#FAFAFA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 overflow-hidden">
+        <header className="border-b border-neutral-200/80 dark:border-white/10 bg-[#FAFAFA] dark:bg-[#171717] z-20 shrink-0">
           <div className="flex items-center justify-between px-4 h-12 gap-4">
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
               <button
                 type="button"
                 onClick={() => {
@@ -141,32 +153,30 @@ function AssignmentWorkspaceInner({
                   else if (typeof window !== "undefined") window.location.href = "/";
                 }}
                 title="Back"
-                className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition-colors cursor-pointer py-1 shrink-0"
+                aria-label="Back"
+                className="p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0"
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                 </svg>
-                <span>Back</span>
               </button>
-              <div className="h-4 w-36 bg-white/5 rounded animate-pulse" />
+              <div className="h-4 w-36 bg-neutral-200 dark:bg-white/10 rounded animate-pulse" />
             </div>
-            <div className="flex items-center gap-4 shrink-0">
-              <div className="hidden sm:flex items-center gap-2">
-                <div className="h-3.5 w-24 bg-white/5 rounded animate-pulse" />
-              </div>
-              <div className="w-7 h-7 rounded-lg bg-white/5" />
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="h-6 w-28 bg-neutral-200 dark:bg-white/10 rounded-full animate-pulse" />
+              <div className="w-7 h-7 rounded-lg bg-neutral-200 dark:bg-white/10" />
             </div>
           </div>
         </header>
 
-        <div className="flex-1 flex overflow-hidden relative bg-[#171717]">
-          <div className="hidden md:block w-64 lg:w-72 shrink-0 h-full overflow-y-auto bg-[#171717] border-r border-white/5">
+        <div className="flex-1 flex overflow-hidden relative bg-[#FAFAFA] dark:bg-[#171717]">
+          <div className="hidden md:block w-64 lg:w-72 shrink-0 h-full overflow-y-auto bg-[#F4F4F5] dark:bg-[#1C1C1E] border-r border-neutral-200/80 dark:border-white/10">
             <PhaseNavSkeleton />
           </div>
-          <main className="flex-1 h-full overflow-y-auto bg-[#171717] text-neutral-200">
+          <main className="flex-1 h-full overflow-y-auto bg-[#FAFAFA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100">
             <MainStageSkeleton />
           </main>
-          <div className="w-80 lg:w-96 shrink-0 h-full overflow-y-auto hidden sm:block bg-[#171717] border-l border-white/5">
+          <div className="w-80 lg:w-96 shrink-0 h-full overflow-y-auto hidden sm:block bg-[#F4F4F5] dark:bg-[#1C1C1E] border-l border-neutral-200/80 dark:border-white/10">
             <AiTutorSkeleton />
           </div>
         </div>
@@ -198,22 +208,24 @@ function AssignmentWorkspaceInner({
   };
 
   return (
-    <div className="dark h-screen flex flex-col bg-[#171717] text-neutral-200 overflow-hidden" data-theme="dark">
-      {/* Workspace Header */}
-      <header className="border-b border-white/5 bg-[#171717] z-20 shrink-0">
+    <div className="h-screen flex flex-col bg-[#FAFAFA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 overflow-hidden">
+      {/* Minimalist Workspace Header */}
+      <header className="border-b border-neutral-200/80 dark:border-white/10 bg-[#FAFAFA] dark:bg-[#171717] z-20 shrink-0">
         <div className="flex items-center justify-between px-4 h-12 gap-4">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
             {/* Mobile Nav Toggle */}
             <button
               type="button"
               onClick={() => setMobileNavOpen(true)}
-              className="md:hidden p-1 rounded text-neutral-400 hover:text-white cursor-pointer"
+              className="md:hidden p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 cursor-pointer transition-colors"
               aria-label="Open navigation"
             >
-              ☰
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
             </button>
 
-            {/* Clean Back Button */}
+            {/* Apple/Notion-Style Clean Back Button */}
             <button
               type="button"
               onClick={() => {
@@ -221,39 +233,45 @@ function AssignmentWorkspaceInner({
                 else if (typeof window !== "undefined") window.location.href = "/";
               }}
               title="Back"
-              className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition-colors cursor-pointer py-1 shrink-0"
+              aria-label="Back"
+              className="p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
               </svg>
-              <span>Back</span>
             </button>
 
-            {/* Plain Text Title */}
-            <span className="text-xs sm:text-sm font-medium text-neutral-200 truncate">
-              {project.answers["assignment_title"] || project.answers["title"] || "Academic Assignment"}
-            </span>
+            {/* Inline-Editable Project Title with Auto-Save onBlur */}
+            <input
+              type="text"
+              value={editableTitle}
+              onChange={(e) => setEditableTitle(e.target.value)}
+              onBlur={handleTitleBlur}
+              onKeyDown={handleTitleKeyDown}
+              aria-label="Assignment Title"
+              title="Click to edit assignment title"
+              className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 bg-transparent hover:bg-neutral-200/50 dark:hover:bg-white/5 focus:bg-white dark:focus:bg-[#1C1C1E] border border-transparent hover:border-neutral-200/80 dark:hover:border-white/10 focus:border-neutral-300 dark:focus:border-white/20 rounded-lg px-2 py-1 focus:outline-none transition-all truncate max-w-xs sm:max-w-md md:max-w-lg cursor-text"
+            />
           </div>
 
-          {/* Right Section: Word Count & Minimalist AI Tutor Icon */}
-          <div className="flex items-center gap-4 shrink-0">
-            {/* Muted borderless word count tracker */}
-            <div className="hidden sm:flex items-center gap-2 text-sm text-neutral-400 tabular-nums">
-              <span>Target: {targetWordCount}w</span>
-              <span className="text-neutral-600 dark:text-neutral-500">•</span>
-              <span className="text-neutral-300">{currentWordCount}w written</span>
+          {/* Right Section: Compact Status Badge & Socratic Tutor Drawer Toggle */}
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Apple-grade compact status badge: 0 / 2,000 words */}
+            <div className="px-3 py-1 rounded-full text-[12px] font-medium text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 tabular-nums flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span>{currentWordCount.toLocaleString()} / {targetWordCount.toLocaleString()} words</span>
             </div>
 
-            {/* Minimalist AI Tutor Icon Button */}
+            {/* Socratic Tutor Drawer Toggle Button */}
             <button
               type="button"
               onClick={() => setTutorPanelOpen(!tutorPanelOpen)}
               className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center ${
                 tutorPanelOpen
-                  ? "text-neutral-200 bg-white/10"
-                  : "text-neutral-400 hover:text-neutral-200 hover:bg-white/5"
+                  ? "text-neutral-900 dark:text-white bg-neutral-200/70 dark:bg-white/10 shadow-2xs"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/50 dark:hover:bg-white/5"
               }`}
-              title="Toggle AI Tutor"
+              title="Toggle Socratic Tutor drawer"
               aria-label="Toggle AI Tutor"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
@@ -264,17 +282,17 @@ function AssignmentWorkspaceInner({
         </div>
       </header>
 
-      {/* 3-Column Workspace Body */}
-      <div className="flex-1 flex overflow-hidden relative bg-[#171717]">
+      {/* 3-Column Workspace Body conforming to light & dark theme continuity */}
+      <div className="flex-1 flex overflow-hidden relative bg-[#FAFAFA] dark:bg-[#171717]">
         {/* Left Column: 8-Phase Journey Rail (Desktop) */}
-        <div className="hidden md:block w-64 lg:w-72 shrink-0 h-full overflow-y-auto bg-[#171717] border-r border-white/5">
+        <div className="hidden md:block w-64 lg:w-72 shrink-0 h-full overflow-y-auto bg-[#F4F4F5] dark:bg-[#1C1C1E] border-r border-neutral-200/80 dark:border-white/10">
           <AssignmentStageNavigation />
         </div>
 
         {/* Mobile Slide-out Stage Nav */}
         {mobileNavOpen && (
-          <div className="fixed inset-0 z-50 flex md:hidden bg-black/60 backdrop-blur-xs">
-            <div className="w-4/5 max-w-xs h-full bg-[#171717] border-r border-white/5">
+          <div className="fixed inset-0 z-50 flex md:hidden bg-black/50 backdrop-blur-xs">
+            <div className="w-4/5 max-w-xs h-full bg-[#F4F4F5] dark:bg-[#1C1C1E] border-r border-neutral-200/80 dark:border-white/10">
               <AssignmentStageNavigation onSelectStage={() => setMobileNavOpen(false)} />
             </div>
             <div className="flex-1" onClick={() => setMobileNavOpen(false)} />
@@ -282,15 +300,15 @@ function AssignmentWorkspaceInner({
         )}
 
         {/* Center Column: Active Stage Workspace */}
-        <main className="flex-1 h-full overflow-y-auto bg-[#171717] text-neutral-200">
+        <main className="flex-1 h-full overflow-y-auto bg-[#FAFAFA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100">
           <React.Suspense fallback={<MainStageSkeleton />}>
             {renderActiveStage()}
           </React.Suspense>
         </main>
 
-        {/* Right Column: Contextual AI Tutor & Word Count Panel */}
+        {/* Right Column: Collapsible Socratic Tutor Drawer */}
         {tutorPanelOpen && (
-          <div className="w-80 lg:w-96 shrink-0 h-full overflow-y-auto hidden sm:block bg-[#171717] border-l border-white/5">
+          <div className="w-80 lg:w-96 shrink-0 h-full overflow-y-auto hidden sm:block bg-[#F4F4F5] dark:bg-[#1C1C1E] border-l border-neutral-200/80 dark:border-white/10">
             <React.Suspense fallback={<AiTutorSkeleton />}>
               <SocraticTutor />
             </React.Suspense>

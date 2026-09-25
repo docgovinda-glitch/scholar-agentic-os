@@ -124,3 +124,31 @@ Automated tests in `src/desk/__tests__/ProjectListScreen.test.tsx` verify:
 - Sidebar "Platform Guide" button scrolls smoothly to `#website-assistant`.
 - Website Assistant answers platform queries and refuses out-of-scope writing requests.
 - All 75 test suites (599 tests) across `src/desk/` pass with zero regressions.
+
+---
+
+## 5. Academic Assignment Workspace Minimalist Design & Theme Continuity
+
+The **Academic Assignment Workspace** (`/workspace/[id]`) strictly inherits the light/dark minimalist design language established across Scholar Core:
+
+1. **Theme Continuity**:
+   - **Main Canvas**: `bg-[#FAFAFA] dark:bg-[#171717]` with text dynamically adapting via `text-neutral-900 dark:text-neutral-100`.
+   - **Sidebar & Panels**: `bg-[#F4F4F5] dark:bg-[#1C1C1E]` with subtle dividers `border-neutral-200/80 dark:border-white/10`.
+   - **Content Cards**: `bg-white dark:bg-[#1C1C1E]` with `rounded-2xl border border-neutral-200/80 dark:border-white/10 shadow-sm`.
+2. **Apple/Notion-Style Header**:
+   - Minimalist back button with `ArrowLeft` icon and subtle hover fill.
+   - Inline-editable assignment title with automatic background persistence on blur / Enter key.
+   - Compact status badge: `0 / 2,000 words` wrapped in a pill badge with an emerald status indicator.
+3. **Apple-Grade Left Stepper Rail**:
+   - Clean progressive vertical stepper (`01 Understand`, `02 Plan`, `03 Research`, etc.) without chunky padlock emojis, raw icons, or cluttered descriptions.
+   - Active phase highlighted with an illuminated pill, crisp title, and active indicator dot.
+   - Removed legacy "Academic Integrity Shield" container.
+4. **Phase 1 Setup Card & Form Controls**:
+   - Enclosed inside a unified `rounded-2xl` card identical to the dashboard template cards.
+   - Apple-style segmented slider for Academic Level (`Undergraduate` | `Postgraduate / Masters`).
+   - Styled custom dropdowns with chevrons for Assignment Type and Citation Style.
+   - Smooth inline validation error states replacing harsh raw yellow emojis.
+   - High-contrast primary CTA button (`Analyze Assignment Brief`) illuminating on valid form states.
+5. **Collapsible Socratic Tutor Drawer**:
+   - Header drawer toggle button that collapses the right panel for focused drafting.
+   - Lightweight tabs (`Socratic`, `Rubric`, `Counter-Args`, `Polish`) with ChatGPT-style conversation bubbles matching the active light/dark theme.
