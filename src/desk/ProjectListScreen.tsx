@@ -1902,11 +1902,15 @@ export default function ProjectListScreen({
               aria-label="Ask Scholar"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
                 isAiSidebarOpen
-                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold border border-amber-500/20"
+                  ? "bg-sky-500/10 text-sky-600 dark:text-sky-300 font-semibold border border-sky-500/20 shadow-2xs"
                   : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
               }`}
             >
-              <MessageSquare className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 flex-shrink-0" />
+              <MessageSquare className={`h-4 w-4 flex-shrink-0 transition-colors ${
+                isAiSidebarOpen
+                  ? "text-sky-600 dark:text-sky-300"
+                  : "text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200"
+              }`} />
               <span>Ask Scholar</span>
             </button>
           </div>
@@ -2121,7 +2125,9 @@ export default function ProjectListScreen({
                   if (onOpenAiAccess) onOpenAiAccess();
                   else setActiveView("ai-access");
                 }}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer shadow-2xs"
+                className={`${
+                  isAiSidebarOpen ? "hidden 2xl:inline-flex" : "hidden sm:inline-flex"
+                } items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer shadow-2xs`}
                 title="AI Access Settings • Click to configure"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -2262,7 +2268,7 @@ export default function ProjectListScreen({
                             handleCreate(tile.id);
                           }}
                           disabled={isOtherBooting}
-                          className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-xs hover:shadow cursor-pointer flex flex-col justify-between min-h-[16rem] h-64 text-left relative ${
+                          className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-xs hover:shadow cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
                             isOtherBooting
                               ? "opacity-50 cursor-not-allowed"
                               : isBootingThis
@@ -2292,15 +2298,13 @@ export default function ProjectListScreen({
                           </div>
 
                           {/* Bottom Row: Divider & Actionable Deliverables Spec */}
-                          <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between gap-2 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans">
-                            <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">
-                              {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
-                                <React.Fragment key={idx}>
-                                  {idx > 0 && <span className="mx-1 text-neutral-400 dark:text-neutral-500 opacity-60">·</span>}
-                                  <span>{part}</span>
-                                </React.Fragment>
-                              ))}
-                            </span>
+                          <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
+                            {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
+                              <React.Fragment key={idx}>
+                                {idx > 0 && <span className="text-neutral-400 dark:text-neutral-500 opacity-60 font-bold">·</span>}
+                                <span className="font-medium whitespace-nowrap">{part}</span>
+                              </React.Fragment>
+                            ))}
                           </div>
                         </button>
                       );
@@ -2313,9 +2317,26 @@ export default function ProjectListScreen({
             {/* Main AI Prompt Bar — Parallel to the line above settings */}
             <div className="sticky bottom-0 z-20 w-full relative pointer-events-none min-h-[114px] flex flex-col justify-start bg-gradient-to-t from-[#FAFAFA] dark:from-[#171717] via-[#FAFAFA]/95 dark:via-[#171717]/95 to-transparent px-4 pb-2">
               <div className="w-full max-w-4xl mx-auto relative pointer-events-auto flex flex-col items-center">
+                {/* Contextual Clarification when Ask Scholar is Open */}
+                {isAiSidebarOpen && (
+                  <div className="w-full flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400 mb-1.5 px-2 select-none">
+                    <span className="font-medium text-neutral-600 dark:text-neutral-300">Draft Assignment Guidelines</span>
+                    <button
+                      type="button"
+                      onClick={() => guideInputRef.current?.focus()}
+                      className="text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                    >
+                      <span>Ask Scholar Copilot Active</span>
+                      <span className="text-[10px]">➔</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Contextual Research Prompt Starters (when input is empty) */}
                 {!mainPromptInput.trim() && mainAttachments.length === 0 && (
-                  <div className="flex items-center gap-1.5 mb-2 overflow-x-auto max-w-full scholar-scrollbar py-0.5 pointer-events-auto select-none">
+                  <div className={`items-center gap-1.5 mb-2 overflow-x-auto max-w-full scholar-scrollbar py-0.5 pointer-events-auto select-none ${
+                    isAiSidebarOpen ? "hidden lg:flex" : "flex"
+                  }`}>
                     <button
                       type="button"
                       onClick={() => {
@@ -2850,6 +2871,58 @@ export default function ProjectListScreen({
                   </div>
                 </div>
               ))}
+
+              {/* Contextual Research Launchpad (when thread is fresh) */}
+              {guideMessages.length <= 1 && !isGuideThinking && (
+                <div className="pt-1 animate-in fade-in duration-300">
+                  <div className="p-3.5 rounded-2xl bg-neutral-50/90 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 space-y-2.5">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                      <Sparkles className="w-3.5 h-3.5 text-sky-500" />
+                      <span>Suggested Research Inquiries</span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSidebarAiMode("deep_research");
+                          handleSendGuideMessage("Synthesize peer-reviewed literature on neural-symbolic reasoning and agentic workflows.", undefined, "deep-research");
+                        }}
+                        className="w-full text-left p-2 rounded-xl bg-white dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-500/30 text-xs text-neutral-700 dark:text-neutral-300 hover:text-purple-600 dark:hover:text-purple-300 transition-all flex items-center justify-between group cursor-pointer shadow-2xs"
+                      >
+                        <span className="truncate">🔬 Deep Research: Neural-symbolic reasoning</span>
+                        <span className="text-[10px] text-neutral-400 group-hover:text-purple-500 opacity-0 group-hover:opacity-100 transition-opacity">Launch ↗</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSidebarAiMode("search");
+                          handleSendGuideMessage("Compare conflicting clinical trial findings for prime editing vs CRISPR-Cas9.", undefined, "search");
+                        }}
+                        className="w-full text-left p-2 rounded-xl bg-white dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 hover:border-blue-300 dark:hover:border-blue-500/30 text-xs text-neutral-700 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-blue-300 transition-all flex items-center justify-between group cursor-pointer shadow-2xs"
+                      >
+                        <span className="truncate">🔍 Multi-Source Search: Prime editing trials</span>
+                        <span className="text-[10px] text-neutral-400 group-hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">Launch ↗</span>
+                      </button>
+
+                      {userEmail && recentProjectsList.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const pTitle = recentProjectsList[0].title;
+                            handleSendGuideMessage(`Analyze literature gaps and methodology for project: "${pTitle}"`);
+                          }}
+                          className="w-full text-left p-2 rounded-xl bg-white dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 hover:border-sky-300 dark:hover:border-sky-500/30 text-xs text-neutral-700 dark:text-neutral-300 hover:text-sky-600 dark:hover:text-sky-300 transition-all flex items-center justify-between group cursor-pointer shadow-2xs"
+                        >
+                          <span className="truncate">📄 Cross-reference recent: {recentProjectsList[0].title}</span>
+                          <span className="text-[10px] text-neutral-400 group-hover:text-sky-500 opacity-0 group-hover:opacity-100 transition-opacity">Analyze ↗</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {isGuideThinking && (
                 <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-sky-500/5 via-purple-500/5 to-transparent dark:from-sky-500/10 dark:via-purple-500/10 dark:to-transparent border border-sky-200/60 dark:border-white/10 shadow-xs animate-in fade-in">
