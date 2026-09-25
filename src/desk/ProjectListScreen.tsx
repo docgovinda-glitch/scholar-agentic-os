@@ -67,7 +67,7 @@ export interface AgentAttachmentItem {
   isImage: boolean;
   size: number;
   fileData?: { name: string; text: string; type: string };
-  imageData?: { data: string; mimeType: string; name: string };
+  imageData?: { data: string; dataUrl?: string; mimeType: string; name: string };
   previewUrl?: string;
 }
 
@@ -1084,7 +1084,9 @@ export default function ProjectListScreen({
         const file = files[i];
         try {
           const parsed = await parseFileForAgent(file);
-          const previewUrl = parsed.isImage && typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : undefined;
+          const previewUrl = parsed.isImage
+            ? (typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : parsed.imageData?.dataUrl)
+            : undefined;
           newItems.push({
             id: `att-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
             name: file.name,

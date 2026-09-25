@@ -12,6 +12,24 @@ const upload = multer({
   },
 });
 
+async function extractTextFromPdf(buffer: Buffer): Promise<{ text: string }> {
+  try {
+    if (typeof (pdfParseModule as any).PDFParse === "function") {
+      const parser = new (pdfParseModule as any).PDFParse({ data: buffer });
+      const res = await parser.getText();
+      return { text: res.text || "" };
+    }
+    const fn = (pdfParseModule as any).default || pdfParseModule;
+    if (typeof fn === "function") {
+      const res = await fn(buffer);
+      return { text: res.text || "" };
+    }
+  } catch (err) {
+    console.warn("PDF parser error:", err);
+  }
+  return { text: "" };
+}
+
 parseRouter.post("/", upload.single("file"), async (req, res) => {
   const file = req.file;
   if (!file) {
@@ -22,7 +40,7 @@ parseRouter.post("/", upload.single("file"), async (req, res) => {
 
   try {
     if (file.mimetype === "application/pdf" || file.originalname.endsWith(".pdf")) {
-      const data = await pdfParse(file.buffer);
+      const data = await extractTextFromPdf(file.buffer);
       text = data.text;
     } else if (
       file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||

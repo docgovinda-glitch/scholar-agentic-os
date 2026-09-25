@@ -1331,7 +1331,7 @@ export interface AgenticQueryRequest {
   systemPrompt?: string;
   mode?: "normal" | "search" | "deep-research";
   files?: Array<{ name: string; text?: string; content?: string; type?: string; size?: number }>;
-  images?: Array<{ data: string; mimeType: string; name?: string }>;
+  images?: Array<{ data?: string; dataUrl?: string; mimeType?: string; name?: string }>;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
   onChunk?: (chunk: string) => void;
 }
@@ -1378,20 +1378,41 @@ export async function executeAgenticQuery(
 
 export async function parseFileForAgent(
   file: File
-): Promise<{ isImage: boolean; fileData?: { name: string; text: string; type: string }; imageData?: { data: string; mimeType: string; name: string } }> {
-  const isImage = file.type.startsWith("image/");
+): Promise<{
+  isImage: boolean;
+  fileData?: { name: string; text: string; type: string };
+  imageData?: { data: string; dataUrl: string; mimeType: string; name: string };
+}> {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  const imageExtensions = new Set(["png", "jpg", "jpeg", "webp", "gif", "svg", "bmp", "avif", "ico", "tiff", "tif"]);
+  const isImage = file.type.startsWith("image/") || imageExtensions.has(ext);
+
   if (isImage) {
+    let mimeType = file.type;
+    if (!mimeType || mimeType === "application/octet-stream") {
+      if (ext === "jpg" || ext === "jpeg") mimeType = "image/jpeg";
+      else if (ext === "png") mimeType = "image/png";
+      else if (ext === "webp") mimeType = "image/webp";
+      else if (ext === "gif") mimeType = "image/gif";
+      else if (ext === "svg") mimeType = "image/svg+xml";
+      else if (ext === "bmp") mimeType = "image/bmp";
+      else if (ext === "avif") mimeType = "image/avif";
+      else mimeType = "image/png";
+    }
+
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result as string;
         const commaIdx = result.indexOf(",");
         const base64 = commaIdx >= 0 ? result.slice(commaIdx + 1) : result;
+        const dataUrl = result.startsWith("data:") ? result : `data:${mimeType};base64,${base64}`;
         resolve({
           isImage: true,
           imageData: {
             data: base64,
-            mimeType: file.type || "image/png",
+            dataUrl,
+            mimeType,
             name: file.name,
           },
         });
@@ -1401,7 +1422,6 @@ export async function parseFileForAgent(
     });
   }
 
-  const ext = file.name.split(".").pop()?.toLowerCase();
   if (file.type.startsWith("text/") || ext === "txt" || ext === "md" || ext === "markdown" || ext === "json" || ext === "csv") {
     try {
       const text = await file.text();

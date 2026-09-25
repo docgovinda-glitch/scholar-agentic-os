@@ -52,7 +52,8 @@ async function callLlmHelper(
   systemPrompt: string,
   userPrompt: string,
   candidates: CandidateProvider[],
-  responseFormat?: "json" | "text"
+  responseFormat?: "json" | "text",
+  images?: Array<{ dataUrl?: string; data?: string; mimeType?: string; name?: string }>
 ): Promise<string> {
   let policy = defaultPolicy();
   for (const c of candidates) {
@@ -61,15 +62,40 @@ async function callLlmHelper(
     }
   }
 
+  let orderedCandidates = [...candidates];
+  if (images && images.length > 0) {
+    orderedCandidates.sort((a, b) => {
+      if (a.provider === "gemini" && b.provider !== "gemini") return -1;
+      if (b.provider === "gemini" && a.provider !== "gemini") return 1;
+      return 0;
+    });
+  }
+
+  const normalizedImages =
+    images && images.length > 0
+      ? images.map((img) => ({
+          dataUrl:
+            img.dataUrl ||
+            (img.data
+              ? img.data.startsWith("data:")
+                ? img.data
+                : `data:${img.mimeType || "image/jpeg"};base64,${img.data}`
+              : ""),
+          mimeType: img.mimeType || "image/jpeg",
+          name: img.name || "image",
+        }))
+      : undefined;
+
   const result = await completeWithFailover(
     {
-      taskClass: "verification",
+      taskClass: normalizedImages ? "chat" : "verification",
       systemPrompt,
       userPrompt,
       segments: [],
+      images: normalizedImages,
       responseFormat: responseFormat === "json" ? "json" : undefined,
     },
-    { candidates },
+    { candidates: orderedCandidates },
     policy
   );
 
@@ -81,11 +107,13 @@ async function callLlmHelper(
 }
 
 /**
- * Stage 1: Formulate a multi-vector research plan from user topic.
+ * Stage 1: Formulate a multi-vector research plan from user topic and attachments.
  */
 export async function formulateResearchPlan(
   topic: string,
-  candidates: CandidateProvider[]
+  candidates: CandidateProvider[],
+  files?: Array<{ name: string; text?: string; type?: string }>,
+  images?: Array<{ dataUrl?: string; data?: string; mimeType?: string; name?: string }>
 ): Promise<ResearchPlan> {
   const systemPrompt = `You are the Scholar Core Deep Research Planning Agent.
 Analyze the user's research topic and deconstruct it into a rigorous research plan.
@@ -101,9 +129,21 @@ Return a STRICT JSON object with this exact shape:
     }
   ]
 }
-Provide exactly 3 focused subQuestions that explore foundational context, recent empirical evidence, and policy/practical implications.`;
+Provide exactly 3 focused subQuestions that explore foundational context, empirical evidence, and practical implications.`;
 
-  const userPrompt = `Research Topic: ${topic}\n\nGenerate the structured research plan.`;
+  let attachmentDetails = "";
+  if (files && files.length > 0) {
+    attachmentDetails += "\nAttached User Documents:\n" + files.map((f) => `- ${f.name} (${f.text ? f.text.slice(0, 300) + "..." : "Document"})`).join("\n");
+  }
+  if (images && images.length > 0) {
+    attachmentDetails += "\nAttached User Visual Media:\n" + images.map((img, i) => `- Image ${i + 1}: ${img.name || "visual attachment"}`).join("\n");
+  }
+
+  const userPrompt = `Research Topic: ${topic}${
+    attachmentDetails
+      ? `\n\nAttachments Context:${attachmentDetails}\n\nNote: If attachments are provided, formulate the plan to directly analyze and contextualize the attached documents/images alongside relevant external scholarly literature.`
+      : ""
+  }\n\nGenerate the structured research plan.`;
 
   try {
     const raw = await callLlmHelper(systemPrompt, userPrompt, candidates, "json");
@@ -145,15 +185,17 @@ Provide exactly 3 focused subQuestions that explore foundational context, recent
 }
 
 /**
- * Execute the complete Deep Research pipeline end-to-end.
+ * Execute the complete Deep Research pipeline end-to-end, supporting documents and images.
  */
 export async function executeDeepResearch(
   topic: string,
   candidates: CandidateProvider[],
-  onProgress?: (status: string) => void
+  onProgress?: (status: string) => void,
+  files?: Array<{ name: string; text?: string; type?: string }>,
+  images?: Array<{ dataUrl?: string; data?: string; mimeType?: string; name?: string }>
 ): Promise<DeepResearchResult> {
   onProgress?.("Formulating structured research plan & decomposing sub-questions...");
-  const plan = await formulateResearchPlan(topic, candidates);
+  const plan = await formulateResearchPlan(topic, candidates, files, images);
 
   onProgress?.(`Conducting multi-source investigations across ${plan.subQuestions.length} research vectors...`);
 
@@ -185,6 +227,26 @@ export async function executeDeepResearch(
   onProgress?.("Cross-checking evidence, analyzing consensus vs conflicts, and synthesizing report...");
 
   let evidenceDigest = "";
+
+  // 1. Primary Source Documents
+  if (files && files.length > 0) {
+    evidenceDigest += `\n### Primary Source Documents (Uploaded by User)\n`;
+    for (const f of files) {
+      const text = (f.text || "").trim();
+      const snippet = text.length > 15000 ? text.slice(0, 15000) + "\n... [Remaining content in uploaded document] ..." : text;
+      evidenceDigest += `\n#### Document: ${f.name}\n${snippet || "(Empty document)"}\n`;
+    }
+  }
+
+  // 2. Primary Visual Attachments
+  if (images && images.length > 0) {
+    evidenceDigest += `\n### Primary Visual Attachments (Uploaded by User)\n`;
+    images.forEach((img, i) => {
+      evidenceDigest += `- [Visual Evidence ${i + 1}] ${img.name || `Image_${i + 1}`} (Multimodal visual data attached and inspected directly by the model)\n`;
+    });
+  }
+
+  // 3. Multi-Vector Web Search Evidence
   evidence.forEach((ev, idx) => {
     evidenceDigest += `\n### Dimension ${idx + 1}: ${ev.subQuestion}\nSearch Query: ${ev.searchQuery}\n`;
     if (ev.sources.length === 0) {
@@ -196,18 +258,28 @@ export async function executeDeepResearch(
     }
   });
 
+  const hasAttachments = (files && files.length > 0) || (images && images.length > 0);
   const synthesisSystemPrompt = `You are Scholar Core Deep Research Agent, an authoritative academic synthesizer.
-You have formulated a research plan and gathered empirical evidence across multiple search vectors.
+You have formulated a research plan and gathered empirical evidence across multiple search vectors${
+    hasAttachments ? ", as well as primary source documents/visual media provided directly by the user" : ""
+  }.
 Now, write an exhaustive, highly structured, academically rigorous Deep Research Report.
 
 Structure requirements:
 # Deep Research Report: ${topic}
 
 ## Executive Summary
-Brief high-level distillation of core findings.
+Brief high-level distillation of core findings${hasAttachments ? " and primary conclusions regarding the attached materials" : ""}.
 
 ## Research Objectives & Scope
-Outline the questions investigated based on the plan.
+Outline the questions investigated based on the plan${hasAttachments ? ", including specific analysis of the provided attachments" : ""}.
+
+${
+  hasAttachments
+    ? `## Analysis of Primary Attachments (Documents & Visual Evidence)
+Detailed, rigorous examination of the user's uploaded document text, data, and/or visual content in the images, identifying key information, methodologies, or visual elements.`
+    : ""
+}
 
 ## Thematic Analysis & Key Findings
 Present the evidence organized by the sub-questions. Synthesize facts and cite references inline using markdown links [Source Title](URL).
@@ -222,7 +294,7 @@ Actionable scholarly takeaways and future directions.
 ## References & Evidence Base
 Numbered list of all cited sources with complete titles and clickable links.
 
-Ground your claims in the retrieved evidence. Be factual, clear, and uncompromising in scholarly depth.`;
+Ground your claims in the retrieved evidence and primary attachments. Be factual, clear, and uncompromising in scholarly depth.`;
 
   const synthesisUserPrompt = `Topic: ${topic}
 
@@ -231,7 +303,7 @@ ${evidenceDigest}
 
 Generate the comprehensive Deep Research Report.`;
 
-  const synthesizedReport = await callLlmHelper(synthesisSystemPrompt, synthesisUserPrompt, candidates, "text");
+  const synthesizedReport = await callLlmHelper(synthesisSystemPrompt, synthesisUserPrompt, candidates, "text", images);
 
   // Extract consensus and divergent highlights heuristically or from LLM text
   const consensusClaims: string[] = [

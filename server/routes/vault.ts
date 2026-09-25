@@ -72,6 +72,24 @@ function extractCleanStringsFromBuffer(buffer: Buffer): string {
   return matches ? matches.join("\n").replace(/\n{3,}/g, "\n\n").trim() : content;
 }
 
+async function extractTextFromPdf(buffer: Buffer): Promise<{ text: string; numpages: number }> {
+  try {
+    if (typeof (pdfParseModule as any).PDFParse === "function") {
+      const parser = new (pdfParseModule as any).PDFParse({ data: buffer });
+      const res = await parser.getText();
+      return { text: res.text || "", numpages: res.total || 1 };
+    }
+    const fn = (pdfParseModule as any).default || pdfParseModule;
+    if (typeof fn === "function") {
+      const res = await fn(buffer);
+      return { text: res.text || "", numpages: res.numpages || 1 };
+    }
+  } catch (err) {
+    console.warn("PDF parser error:", err);
+  }
+  return { text: "", numpages: 1 };
+}
+
 /**
  * POST /api/vault/parse-file
  * Multi-format universal document parser for Vault (PDF, DOCX, XLSX, CSV, TXT, MD)
@@ -96,9 +114,12 @@ router.post("/parse-file", upload.single("file"), async (req: Request, res: Resp
   try {
     if (file.mimetype === "application/pdf" || ext === "pdf") {
       try {
-        const pdfData = await pdfParse(file.buffer);
+        const pdfData = await extractTextFromPdf(file.buffer);
         extractedText = pdfData.text || "";
         metadata.pageCount = pdfData.numpages;
+        if (!extractedText.trim()) {
+          extractedText = extractCleanStringsFromBuffer(file.buffer);
+        }
       } catch (pdfErr) {
         console.warn("pdf-parse fallback triggered:", pdfErr);
         extractedText = extractCleanStringsFromBuffer(file.buffer);
