@@ -1102,6 +1102,19 @@ describe("prompt isolation & rich markdown rendering", () => {
     expect(sidebarInput.value).toBe("Question in Sidebar");
   });
 
+  it("does not display a secondary 'Ask & Actions' or suggestions popup when typing in the prompt box", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const mainTextarea = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i) as HTMLTextAreaElement;
+    fireEvent.change(mainTextarea, { target: { value: "Hello" } });
+
+    // Should not render the intrusive popover, duplicate submit, or matching projects card
+    expect(screen.queryByText(/Ask & Actions/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Submit ↗/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Matching Projects/i)).not.toBeInTheDocument();
+  });
+
   it("renders rich formatted markdown without raw hashtags or raw asterisks", () => {
     const rawMarkdown = [
       "The concept of a **Hindu Nation** (or *Hindu Rashtra*) is an academic subject.",

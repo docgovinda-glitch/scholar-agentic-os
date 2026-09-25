@@ -947,7 +947,6 @@ export default function ProjectListScreen({
   }, [userEmail, projects, searchQuery]);
 
   const [activeProviderLabel, setActiveProviderLabel] = useState<string>("Ready");
-  const [isPromptSuggestionsOpen, setIsPromptSuggestionsOpen] = useState(false);
 
   useEffect(() => {
     if (!userEmail) {
@@ -1136,18 +1135,6 @@ export default function ProjectListScreen({
     setSidebarAttachments((prev) => prev.filter((a) => a.id !== id));
   };
 
-  const promptMatchingProjects = useMemo(() => {
-    if (!projects || !mainPromptInput.trim()) return [];
-    const q = mainPromptInput.toLowerCase().trim();
-    return projects
-      .filter((p) => {
-        const title = (p.answers?.title || "").toLowerCase();
-        const outputType = (p.outputTypeId || "").toLowerCase();
-        return title.includes(q) || outputType.includes(q);
-      })
-      .slice(0, 3);
-  }, [projects, mainPromptInput]);
-
   const scrollToAssistant = useCallback(() => {
     setMobileMenuOpen(false);
     setIsAiSidebarOpen(true);
@@ -1195,7 +1182,7 @@ export default function ProjectListScreen({
     const text = mainPromptInput;
     const atts = [...mainAttachments];
     const mode = mainAiMode;
-    setIsPromptSuggestionsOpen(false);
+    setSidebarAiMode(mode);
     setIsAiSidebarOpen(true);
     setMainPromptInput("");
     setMainAttachments([]);
@@ -2101,7 +2088,10 @@ export default function ProjectListScreen({
                     e.preventDefault();
                     setIsDragging(true);
                   }}
-                  onDragLeave={() => setIsDragging(false)}
+                  onDragLeave={(e) => {
+                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                    setIsDragging(false);
+                  }}
                   onDrop={(e) => {
                     e.preventDefault();
                     setIsDragging(false);
@@ -2159,15 +2149,9 @@ export default function ProjectListScreen({
                       value={mainPromptInput}
                       onChange={(e) => {
                         setMainPromptInput(e.target.value);
-                        setIsPromptSuggestionsOpen(true);
-                      }}
-                      onFocus={() => {
-                        if (mainPromptInput.trim().length >= 2) setIsPromptSuggestionsOpen(true);
                       }}
                       onKeyDown={(e) => {
-                        if (e.key === "Escape") {
-                          setIsPromptSuggestionsOpen(false);
-                        } else if (e.key === "Enter" && !e.shiftKey) {
+                        if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
                           if (mainPromptInput.trim() || mainAttachments.length > 0) {
                             handleSendMainPrompt();
@@ -2193,7 +2177,7 @@ export default function ProjectListScreen({
                       }}
                       placeholder="Paste text, drop files/images, or draft research instructions..."
                       style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                      className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input"
+                      className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input max-h-24 overflow-y-auto scholar-scrollbar"
                     />
                   </div>
 
@@ -2295,63 +2279,6 @@ export default function ProjectListScreen({
                     </div>
                   </div>
                 </form>
-
-                {/* Instant Suggestions & Matching Projects Popover */}
-                {mainPromptInput.trim().length >= 2 && isPromptSuggestionsOpen && (
-                  <div className="pointer-events-auto absolute left-0 right-0 bottom-full mb-3 bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 rounded-2xl shadow-2xl z-30 p-2 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 max-h-80 overflow-y-auto">
-                    {/* Matching Projects */}
-                    {promptMatchingProjects.length > 0 && (
-                      <div className="mb-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 px-3 py-1 block">
-                          Matching Projects ({promptMatchingProjects.length})
-                        </span>
-                        {promptMatchingProjects.map((p) => (
-                          <button
-                            key={p.projectId}
-                            type="button"
-                            onClick={() => {
-                              setIsPromptSuggestionsOpen(false);
-                              onOpen(p.projectId);
-                            }}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-left hover:bg-white/5 transition-colors cursor-pointer group"
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="w-6 h-6 rounded-lg bg-neutral-800 flex items-center justify-center shrink-0">
-                                <FormatIcon id={p.outputTypeId} className="w-3.5 h-3.5" />
-                              </span>
-                              <span className="text-xs font-medium text-neutral-200 truncate group-hover:text-blue-400">
-                                {p.answers?.title || "Untitled Project"}
-                              </span>
-                            </div>
-                            <span className="text-[11px] text-neutral-400 group-hover:text-neutral-200 shrink-0 font-medium">
-                              Open →
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Platform Action Suggestions */}
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 px-3 py-1 block">
-                        Ask & Actions
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsPromptSuggestionsOpen(false);
-                          handleSendMainPrompt();
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left hover:bg-white/5 transition-colors cursor-pointer"
-                      >
-                        <span className="text-xs text-neutral-300 truncate">
-                          Ask Scholar: <strong className="text-white font-medium">"{mainPromptInput}"</strong>
-                        </span>
-                        <span className="text-[11px] text-blue-400 font-medium shrink-0 ml-2">Submit ↗</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </>
