@@ -1255,7 +1255,7 @@ export default function ProjectListScreen({
   const [guideInput, setGuideInput] = useState("");
   const [sidebarAttachments, setSidebarAttachments] = useState<AgentAttachmentItem[]>([]);
   const [isSidebarUploadingAttachment, setIsSidebarUploadingAttachment] = useState<boolean>(false);
-  const [sidebarAiMode, setSidebarAiMode] = useState<"normal" | "search" | "deep-research">("normal");
+  const [sidebarAiMode, setSidebarAiMode] = useState<PromptMode>("auto");
   const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([]);
   const [isGuideThinking, setIsGuideThinking] = useState(false);
   const [expandedPlanIds, setExpandedPlanIds] = useState<Record<string, boolean>>({});
@@ -1411,7 +1411,7 @@ export default function ProjectListScreen({
         : mainAiMode === "deep_research"
         ? "deep-research"
         : "normal";
-    setSidebarAiMode(targetMode);
+    setSidebarAiMode(mainAiMode);
     setIsAiSidebarOpen(true);
     setMainPromptInput("");
     setMainAttachments([]);
@@ -1428,7 +1428,14 @@ export default function ProjectListScreen({
     const isSidebarDirect = textToSend === undefined;
     const rawQuery = (textToSend !== undefined ? textToSend : guideInput).trim();
     const currentAttachments = attachmentsToSend !== undefined ? [...attachmentsToSend] : [...sidebarAttachments];
-    const targetMode = modeToSend !== undefined ? modeToSend : sidebarAiMode;
+    const targetMode: "normal" | "search" | "deep-research" =
+      modeToSend !== undefined
+        ? modeToSend
+        : sidebarAiMode === "search"
+        ? "search"
+        : sidebarAiMode === "deep_research"
+        ? "deep-research"
+        : "normal";
 
     if (!rawQuery && currentAttachments.length === 0) return;
 
@@ -2495,26 +2502,33 @@ export default function ProjectListScreen({
         )}
       </main>
 
-      {/* Secondary View (Right Panel): Module 3.2 AI Assistant Sidebar (w-96) */}
+      {/* Secondary View (Right Panel): Module 3.2 AI Assistant Sidebar (Elevated UI/UX) */}
       <aside
-        className={`h-full bg-white dark:bg-[#1C1C1E] text-neutral-800 dark:text-neutral-300 shadow-2xl border-l border-neutral-200 dark:border-white/10 flex flex-col transition-all duration-300 ease-in-out shrink-0 z-30 ${
-          isAiSidebarOpen ? "w-full sm:w-96 max-w-[calc(100vw-2rem)] translate-x-0" : "w-0 translate-x-full overflow-hidden border-none"
+        className={`h-full bg-white dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 flex flex-col transition-all duration-300 ease-in-out shrink-0 z-30 ${
+          isAiSidebarOpen
+            ? "w-full sm:w-[420px] md:w-[450px] max-w-[calc(100vw-1rem)] translate-x-0"
+            : "w-0 translate-x-full overflow-hidden border-none"
         }`}
         aria-hidden={!isAiSidebarOpen}
       >
         {isAiSidebarOpen && (
-          <div className="h-full flex flex-col w-full sm:w-96">
-            {/* Sidebar Header */}
-            <header className="p-5 border-b border-neutral-200 dark:border-white/10 flex items-center justify-between shrink-0 bg-neutral-50 dark:bg-[#1C1C1E]">
-              <div className="flex items-center gap-2.5">
-                <ScholarCoreLogo size="sm" withText={false} />
+          <div className="h-full flex flex-col w-full sm:w-[420px] md:w-[450px]">
+            {/* Sidebar Header with glassmorphism & elevated badge */}
+            <header className="px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/95 dark:bg-[#18181B]/95 backdrop-blur-md sticky top-0 z-20">
+              <div className="flex items-center gap-3">
+                <div className="relative flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500/10 via-indigo-500/10 to-purple-500/10 dark:from-sky-500/20 dark:via-indigo-500/20 dark:to-purple-500/20 border border-sky-500/20 dark:border-white/10 flex items-center justify-center shadow-2xs">
+                    <ScholarCoreLogo size="sm" withText={false} className="scale-85" />
+                  </div>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-[#18181B]" title="AI Online" />
+                </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">
+                    <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">
                       Ask Scholar
                     </h2>
-                    <span className="text-[10px] bg-sky-950/50 text-sky-300 px-1.5 py-0.5 rounded-full font-medium border border-sky-900/50">
-                      Guide
+                    <span className="text-[10px] bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 px-2 py-0.5 rounded-full font-medium border border-sky-200 dark:border-sky-800/40">
+                      Research Copilot
                     </span>
                   </div>
                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
@@ -2523,33 +2537,38 @@ export default function ProjectListScreen({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsAiSidebarOpen(false)}
-                className="p-1.5 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 rounded-full hover:bg-neutral-900/5 dark:hover:bg-white/10 transition cursor-pointer"
-                title="Close Assistant"
-                aria-label="Close Assistant"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setIsAiSidebarOpen(false)}
+                  className="p-1.5 text-neutral-400 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/10 transition cursor-pointer"
+                  title="Close Assistant"
+                  aria-label="Close Assistant"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </header>
 
-            {/* Horizontally Scrolling Pill Row (Module 3.3) */}
-            <div className="overflow-x-auto scrollbar-hide flex gap-2 px-5 py-3 border-b border-neutral-200 dark:border-white/10 shrink-0 bg-neutral-100/50 dark:bg-[#171717]/50">
-              {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleSendGuideMessage(faq.question)}
-                  className="rounded-full bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300 px-3 py-1.5 text-xs whitespace-nowrap cursor-pointer hover:bg-neutral-200 dark:hover:bg-white/10 hover:border-neutral-300 dark:hover:border-white/20 transition-colors shadow-2xs shrink-0"
-                >
-                  {faq.shortLabel}
-                </button>
-              ))}
+            {/* Horizontally Scrolling Suggested Questions (Module 3.3) */}
+            <div className="relative border-b border-neutral-200/80 dark:border-white/10 shrink-0 bg-neutral-50/70 dark:bg-[#151518]/70">
+              <div className="overflow-x-auto scrollbar-hide flex items-center gap-2 px-4 py-2.5">
+                {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSendGuideMessage(faq.question)}
+                    className="group inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white px-3 py-1.5 text-[11px] font-medium whitespace-nowrap cursor-pointer hover:bg-neutral-50 dark:hover:bg-white/10 hover:border-neutral-300 dark:hover:border-white/20 transition-all shadow-2xs shrink-0 active:scale-95"
+                  >
+                    <Sparkles className="w-3 h-3 text-neutral-400 group-hover:text-amber-500 transition-colors" />
+                    <span>{faq.shortLabel}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Chat Canvas (flex-1 overflow-y-auto) */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-sm scholar-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm scholar-scrollbar">
               {guideMessages.map((msg) => (
                 <div
                   key={msg.id}
@@ -2561,7 +2580,7 @@ export default function ProjectListScreen({
                         <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
                           <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
                         </div>
-                        <span className="font-medium text-neutral-700 dark:text-neutral-300">Scholar Core</span>
+                        <span className="font-semibold text-neutral-700 dark:text-neutral-300">Scholar Core</span>
                         {msg.mode === "deep-research" && (
                           <span className="px-1.5 py-0.5 rounded text-[9px] bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 font-medium">
                             🔬 Deep Research
@@ -2591,12 +2610,12 @@ export default function ProjectListScreen({
                   </div>
 
                   <div
-                    className={`rounded-2xl px-4 py-3 max-w-[90%] leading-relaxed ${
+                    className={`rounded-2xl px-4 py-3 max-w-[88%] leading-relaxed ${
                       msg.sender === "user"
-                        ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs rounded-tr-xs"
+                        ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-sm rounded-tr-xs"
                         : msg.error
                         ? "bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 text-neutral-900 dark:text-neutral-200 rounded-tl-xs shadow-2xs"
-                        : "bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-neutral-200 rounded-tl-xs shadow-2xs"
+                        : "bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 rounded-tl-xs shadow-2xs"
                     }`}
                   >
                     {/* User Attachments Display */}
@@ -2628,15 +2647,15 @@ export default function ProjectListScreen({
 
                     {/* Deep Research Plan — Interactive Collapsible Trajectory Accordion */}
                     {msg.plan && msg.plan.length > 0 && (
-                      <div className="mt-3 rounded-xl bg-neutral-900/5 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-xs overflow-hidden">
+                      <div className="mt-3 rounded-xl bg-purple-500/5 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/30 text-xs overflow-hidden">
                         <button
                           type="button"
                           onClick={() => setExpandedPlanIds((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }))}
-                          className="w-full flex items-center justify-between p-2.5 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
+                          className="w-full flex items-center justify-between p-2.5 hover:bg-purple-500/10 dark:hover:bg-purple-900/20 transition-colors cursor-pointer text-left"
                         >
                           <div className="font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
                             <Compass className="w-3.5 h-3.5 text-purple-500" />
-                            <span>Research Trajectory & Inquiry Decompositions ({msg.plan.length} Steps)</span>
+                            <span>Research Trajectory ({msg.plan.length} Steps)</span>
                           </div>
                           <span className="text-neutral-400">
                             {expandedPlanIds[msg.id] !== false ? (
@@ -2647,7 +2666,7 @@ export default function ProjectListScreen({
                           </span>
                         </button>
                         {expandedPlanIds[msg.id] !== false && (
-                          <div className="px-2.5 pb-2.5 pt-0.5 border-t border-neutral-200/50 dark:border-white/5">
+                          <div className="px-2.5 pb-2.5 pt-0.5 border-t border-purple-200/40 dark:border-purple-800/20">
                             <ul className="space-y-1.5 text-neutral-600 dark:text-neutral-400 text-[11px] pt-1.5">
                               {msg.plan.map((step, sIdx) => (
                                 <li key={sIdx} className="flex items-start gap-1.5">
@@ -2661,20 +2680,20 @@ export default function ProjectListScreen({
                       </div>
                     )}
 
-                    {/* Perplexity-Grade Citations & Sources Tray */}
+                    {/* Verified Sources Tray in Sidebar */}
                     {msg.citations && msg.citations.length > 0 && (
-                      <div className="mt-3.5 pt-3 border-t border-neutral-200 dark:border-white/10">
+                      <div className="mt-3.5 pt-3 border-t border-neutral-200/80 dark:border-white/10">
                         <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2.5">
                           <div className="flex items-center gap-1.5">
                             <Globe className="w-3.5 h-3.5 text-blue-500" />
-                            <span>Verified Sources & Provenance ({msg.citations.length})</span>
+                            <span>Verified Sources ({msg.citations.length})</span>
                           </div>
                           <span className="text-[10px] font-medium normal-case px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                             <ShieldCheck className="w-3 h-3" />
-                            <span>100% Authenticated</span>
+                            <span>Authenticated</span>
                           </span>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1 scholar-scrollbar">
+                        <div className="space-y-2 max-h-64 overflow-y-auto pr-1 scholar-scrollbar">
                           {msg.citations.map((c, cIdx) => {
                             const domain =
                               c.domain ||
@@ -2699,7 +2718,7 @@ export default function ProjectListScreen({
                                 href={c.url || "#"}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex flex-col p-2.5 rounded-xl bg-white/70 dark:bg-neutral-800/60 border border-neutral-200/90 dark:border-white/10 hover:border-blue-400 dark:hover:border-blue-500/60 hover:shadow-xs transition group text-left relative overflow-hidden"
+                                className="flex flex-col p-2.5 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 hover:border-blue-400 dark:hover:border-blue-500/60 hover:shadow-xs transition group text-left relative overflow-hidden"
                               >
                                 <div className="flex items-center justify-between gap-1.5 mb-1">
                                   <div className="flex items-center gap-1.5 min-w-0">
@@ -2793,7 +2812,7 @@ export default function ProjectListScreen({
                             <button
                               type="button"
                               onClick={() => {
-                                setSidebarAiMode("deep-research");
+                                setSidebarAiMode("deep_research");
                                 const lastUserMsg = guideMessages.filter((m) => m.sender === "user").slice(-1)[0];
                                 if (lastUserMsg) {
                                   handleSendGuideMessage(lastUserMsg.text, undefined, "deep-research");
@@ -2809,7 +2828,7 @@ export default function ProjectListScreen({
                         </div>
 
                         {msg.model && (
-                          <span className="text-[10px] text-neutral-400 font-mono truncate max-w-[130px]">
+                          <span className="text-[10px] text-neutral-400 font-mono truncate max-w-[120px]">
                             {msg.model}
                           </span>
                         )}
@@ -2833,40 +2852,53 @@ export default function ProjectListScreen({
               ))}
 
               {isGuideThinking && (
-                <div className="flex items-center gap-2.5 text-xs text-neutral-600 dark:text-neutral-300 p-3 rounded-2xl bg-neutral-100/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 animate-in fade-in">
-                  <div className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 animate-spin">
-                    <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
+                <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-sky-500/5 via-purple-500/5 to-transparent dark:from-sky-500/10 dark:via-purple-500/10 dark:to-transparent border border-sky-200/60 dark:border-white/10 shadow-xs animate-in fade-in">
+                  <div className="relative flex items-center justify-center shrink-0 mt-0.5">
+                    <div className="w-6 h-6 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 flex items-center justify-center shadow-xs">
+                      <ScholarCoreLogo size="sm" withText={false} className="scale-75 animate-spin" />
+                    </div>
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-sky-500 animate-ping" />
                   </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-semibold text-[11px] text-neutral-800 dark:text-neutral-200">
-                      {sidebarAiMode === "deep-research"
-                        ? "Scholarly Deep Research in Progress"
-                        : sidebarAiMode === "search"
-                        ? "Live Multi-Vector Search & Verification"
-                        : "Scholar Core Reasoning"}
-                    </span>
-                    <span className="text-[11px] text-neutral-500 dark:text-neutral-400 animate-pulse">
-                      {sidebarAiMode === "deep-research"
-                        ? "Decomposing inquiries, querying academic repositories, and validating citation authenticity..."
+                  <div className="flex flex-col gap-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-xs text-neutral-900 dark:text-neutral-100">
+                        {sidebarAiMode === "deep_research"
+                          ? "Scholarly Deep Research in Progress"
+                          : sidebarAiMode === "search"
+                          ? "Live Multi-Vector Search & Verification"
+                          : "Scholar Core Reasoning"}
+                      </span>
+                      <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.2 rounded-full border border-purple-200 dark:border-purple-800/40 animate-pulse">
+                        Active
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                      {sidebarAiMode === "deep_research"
+                        ? "Formulating multi-angle inquiries, querying academic repositories, and validating citation authenticity..."
                         : sidebarAiMode === "search"
                         ? "Searching authoritative sources and cross-checking evidence..."
-                        : "Researching and synthesizing response..."}
-                    </span>
+                        : "Analyzing research context and synthesizing findings..."}
+                    </p>
+                    <div className="w-full h-1 bg-neutral-200/60 dark:bg-white/10 rounded-full overflow-hidden mt-1">
+                      <div className="h-full bg-gradient-to-r from-sky-500 via-purple-500 to-indigo-500 w-1/2 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]" />
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
             {/* Pinned Floating Input Component (Module 3.4) */}
-            <div className="p-4 bg-white/95 dark:bg-[#1C1C1E]/95 backdrop-blur-md border-t border-neutral-200 dark:border-white/10 shrink-0">
-              <div className="flex items-center justify-between px-2 mb-2">
+            <div className="p-3.5 bg-white/95 dark:bg-[#18181B]/95 backdrop-blur-md border-t border-neutral-200/80 dark:border-white/10 shrink-0">
+              {/* Status & Reset Bar */}
+              <div className="flex items-center justify-between px-1 mb-2">
                 <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
-                  <ScholarCoreLogo size="sm" withText={false} />
-                  <span>Ask Scholar</span>
+                  <ScholarCoreLogo size="sm" withText={false} className="scale-75" />
+                  <span className="font-medium text-neutral-700 dark:text-neutral-300">Ask Scholar</span>
                   {aiStatus ? (
                     aiStatus.connected ? (
-                      <span className="text-green-600 dark:text-green-500 font-bold" title={`Operational provider: ${aiStatus.provider || "Operational"}`}>
-                        • {aiStatus.statusText}
+                      <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold" title={`Operational provider: ${aiStatus.provider || "Operational"}`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>{aiStatus.statusText}</span>
                       </span>
                     ) : (
                       <button
@@ -2875,7 +2907,8 @@ export default function ProjectListScreen({
                         className="text-amber-600 dark:text-amber-400 font-medium hover:underline cursor-pointer flex items-center gap-1"
                         title="No operational AI providers. Click to configure AI Access."
                       >
-                        <span>• AI Disconnected</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        <span>AI Disconnected</span>
                         <span className="text-[9px] underline">Configure ↗</span>
                       </button>
                     )
@@ -2896,7 +2929,7 @@ export default function ProjectListScreen({
                       },
                     ])
                   }
-                  className="text-[11px] text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 flex items-center gap-1 cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
                   title="Reset conversation"
                 >
                   <RotateCcw className="w-3 h-3" />
@@ -2910,30 +2943,32 @@ export default function ProjectListScreen({
                   {sidebarAttachments.map((att) => (
                     <div
                       key={att.id}
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200"
+                      className="flex items-center gap-1.5 px-2 py-0.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs animate-in fade-in"
                     >
                       {att.isImage ? (
                         att.previewUrl ? (
                           <img src={att.previewUrl} alt={att.name} className="w-4 h-4 object-cover rounded" />
                         ) : (
-                          <Paperclip className="w-3 h-3 text-blue-500" />
+                          <Paperclip className="w-3.5 h-3.5 text-blue-500" />
                         )
                       ) : (
-                        <FileText className="w-3 h-3 text-amber-500" />
+                        <FileText className="w-3.5 h-3.5 text-amber-500" />
                       )}
-                      <span className="truncate max-w-[120px] font-medium text-[11px]">{att.name}</span>
+                      <span className="truncate max-w-[140px] font-medium text-[11px]">{att.name}</span>
                       <button
                         type="button"
                         onClick={() => removeSidebarAttachment(att.id)}
-                        className="text-neutral-400 hover:text-red-500 p-0.5 cursor-pointer"
+                        className="text-neutral-400 hover:text-red-500 p-0.5 rounded-full hover:bg-neutral-200 dark:hover:bg-white/10 cursor-pointer transition-colors"
+                        title="Remove attachment"
+                        aria-label="Remove attachment"
                       >
                         <X className="w-3 h-3" />
                       </button>
                     </div>
                   ))}
                   {isSidebarUploadingAttachment && (
-                    <span className="text-[11px] text-neutral-400 flex items-center gap-1 animate-pulse">
-                      <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing...
+                    <span className="text-[11px] text-neutral-400 flex items-center gap-1.5 animate-pulse">
+                      <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing attachment...
                     </span>
                   )}
                 </div>
@@ -2945,9 +2980,9 @@ export default function ProjectListScreen({
                   e.preventDefault();
                   handleSendGuideMessage();
                 }}
-                className="flex flex-col gap-1.5 rounded-2xl bg-neutral-100 dark:bg-white/5 p-2 shadow-sm border border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/20 transition-all"
+                className="relative flex flex-col rounded-2xl bg-neutral-100/90 dark:bg-white/[0.06] p-2.5 shadow-xs border border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 focus-within:bg-white dark:focus-within:bg-[#1E1E20] focus-within:shadow-md transition-all"
               >
-                <div className="flex items-center gap-2 px-2">
+                <div className="w-full px-1">
                   <textarea
                     ref={guideInputRef as any}
                     rows={1}
@@ -2955,7 +2990,7 @@ export default function ProjectListScreen({
                     onChange={(e) => {
                       setGuideInput(e.target.value);
                       e.target.style.height = "auto";
-                      e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                      e.target.style.height = `${Math.min(e.target.scrollHeight, 130)}px`;
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
@@ -2969,90 +3004,42 @@ export default function ProjectListScreen({
                     }}
                     placeholder="Ask anything, search projects, or type a command..."
                     style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                    className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none resize-none prompt-bare-input max-h-28 overflow-y-auto scholar-scrollbar"
+                    className="w-full bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-[13px] text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none resize-none prompt-bare-input max-h-32 min-h-[36px] overflow-y-auto scholar-scrollbar leading-relaxed"
                   />
                 </div>
 
-                <div className="flex items-center justify-between pt-1 border-t border-neutral-200/40 dark:border-white/5">
-                  <div className="flex items-center gap-1">
+                <div className="flex items-center justify-between pt-1.5 mt-1 border-t border-neutral-200/50 dark:border-white/5">
+                  <PromptBarActionMenu
+                    currentMode={sidebarAiMode}
+                    onSelectMode={setSidebarAiMode}
+                    onAttachFiles={handleSidebarFileSelect}
+                  />
+
+                  <div className="relative group">
                     <button
-                      type="button"
-                      onClick={() => sidebarFileInputRef.current?.click()}
-                      className="text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 transition cursor-pointer p-1 rounded-full hover:bg-neutral-200 dark:hover:bg-white/10"
-                      title="Attach file or image"
-                      aria-label="Attach file"
+                      type="submit"
+                      disabled={(!guideInput.trim() && sidebarAttachments.length === 0) || isGuideThinking}
+                      className={`h-7 px-2.5 rounded-full flex items-center justify-center gap-1 transition-all duration-200 cursor-pointer ${
+                        (guideInput.trim() || sidebarAttachments.length > 0) && !isGuideThinking
+                          ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-xs active:scale-95"
+                          : "bg-neutral-200 dark:bg-white/10 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
+                      }`}
+                      title="Send question (Enter)"
+                      aria-label="Send question"
                     >
-                      <Paperclip className="w-3.5 h-3.5" />
+                      {isGuideThinking ? (
+                        <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span className="text-[10px] font-mono opacity-60">↵</span>
+                        </>
+                      )}
                     </button>
-                    <input
-                      ref={sidebarFileInputRef}
-                      type="file"
-                      multiple
-                      accept=".pdf,.doc,.docx,.txt,.md,.markdown,.csv,.xlsx,.xls,.png,.jpg,.jpeg,.webp,.gif"
-                      className="hidden"
-                      onChange={(e) => {
-                        handleSidebarFileSelect(e.target.files);
-                        e.target.value = "";
-                      }}
-                    />
-
-                    {/* Mode Selector */}
-                    <div className="flex items-center gap-0.5 bg-neutral-200/50 dark:bg-white/5 p-0.5 rounded-lg text-[9px] font-medium">
-                      <button
-                        type="button"
-                        onClick={() => setSidebarAiMode("normal")}
-                        className={`px-1.5 py-0.5 rounded transition cursor-pointer flex items-center gap-0.5 ${
-                          sidebarAiMode === "normal"
-                            ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                            : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                        }`}
-                        title="Automatic capability detection"
-                      >
-                        <Zap className="w-2.5 h-2.5 text-amber-500" />
-                        <span>Auto</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSidebarAiMode("search")}
-                        className={`px-1.5 py-0.5 rounded transition cursor-pointer flex items-center gap-0.5 ${
-                          sidebarAiMode === "search"
-                            ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                            : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                        }`}
-                        title="Web Search"
-                      >
-                        <Globe className="w-2.5 h-2.5 text-blue-500" />
-                        <span>Search</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSidebarAiMode("deep-research")}
-                        className={`px-1.5 py-0.5 rounded transition cursor-pointer flex items-center gap-0.5 ${
-                          sidebarAiMode === "deep-research"
-                            ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                            : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                        }`}
-                        title="Deep Research"
-                      >
-                        <Sparkles className="w-2.5 h-2.5 text-purple-500" />
-                        <span>Deep Research</span>
-                      </button>
-                    </div>
+                    <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
+                      Send question (Enter)
+                    </span>
                   </div>
-
-                  <button
-                    type="submit"
-                    disabled={(!guideInput.trim() && sidebarAttachments.length === 0) || isGuideThinking}
-                    className={`rounded-full p-1.5 flex items-center justify-center transition cursor-pointer ${
-                      (guideInput.trim() || sidebarAttachments.length > 0) && !isGuideThinking
-                        ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-xs active:scale-95"
-                        : "bg-neutral-200 dark:bg-white/5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-                    }`}
-                    title="Send question (Enter)"
-                    aria-label="Send question"
-                  >
-                    <ArrowUp className="w-3.5 h-3.5" />
-                  </button>
                 </div>
               </form>
             </div>
