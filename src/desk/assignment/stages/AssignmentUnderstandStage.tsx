@@ -8,6 +8,7 @@ import {
   ASSIGNMENT_TYPE_LABELS,
   cleanAnswerString,
 } from "../types";
+import { Upload, ChevronDown, ChevronUp, Sparkles, ArrowRight, Check, AlertCircle, FileText } from "lucide-react";
 
 const CITATION_STYLES = [
   { id: "apa7", name: "APA 7th Edition (Author, Year)" },
@@ -234,8 +235,16 @@ export default function AssignmentUnderstandStage() {
           act: "Synthesize counterarguments and reach a justified, evidence-backed conclusion.",
         },
         evaluate: {
-          def: "Assess the value, effectiveness, or validity of something based on academic criteria.",
-          act: "Judge strengths vs limitations and reach a justified conclusion.",
+          def: "Form a judgment on the value, efficacy, or validity of theories and evidence.",
+          act: "Provide balanced criteria-based judgments supported by scholarly consensus.",
+        },
+        "critically assess": {
+          def: "Examine boundaries, merits, and limitations with rigorous theoretical depth.",
+          act: "Contrast alternative interpretations and highlight methodological limitations.",
+        },
+        assess: {
+          def: "Determine the significance, scale, or value of concepts or findings.",
+          act: "Weigh practical and theoretical implications with clear benchmarks.",
         },
         analyse: {
           def: "Break down complex issues into component parts to examine relationships and causes.",
@@ -245,21 +254,17 @@ export default function AssignmentUnderstandStage() {
           def: "Break down complex issues into component parts to examine relationships and causes.",
           act: "Explain 'how' and 'why', not merely descriptive facts.",
         },
+        discuss: {
+          def: "Explore multiple viewpoints, debates, and nuances surrounding the core question.",
+          act: "Structure a cohesive narrative balancing primary schools of thought.",
+        },
+        examine: {
+          def: "Investigate closely, scrutinizing assumptions and empirical proof.",
+          act: "Surface hidden assumptions and cross-reference with primary research.",
+        },
         compare: {
-          def: "Identify both similarities and differences between theories, concepts, or models.",
-          act: "Synthesize comparative points systematically across themes.",
-        },
-        assess: {
-          def: "Estimate the nature, quality, or significance of an argument or approach.",
-          act: "Measure against established benchmarks or counter-theories.",
-        },
-        argue: {
-          def: "Present a well-supported point of view and defend it logically against potential counterarguments.",
-          act: "Build a structured line of reasoning leading to a clear conclusion.",
-        },
-        explain: {
-          def: "Clarify how or why a phenomenon occurs, demonstrating conceptual mastery.",
-          act: "Provide clear reasoning, mechanisms, and illustrative examples.",
+          def: "Identify meaningful similarities, divergences, and underlying tensions.",
+          act: "Use structured comparative matrices rather than isolated descriptions.",
         },
       };
 
@@ -281,7 +286,6 @@ export default function AssignmentUnderstandStage() {
         detectedVerbs.push({
           verb: "Analyse",
           meaning: "Break down complex issues into component parts to examine relationships and causes.",
-          act: "Explain 'how' and 'why', not merely descriptive facts.",
           academicExpectation: "Explain 'how' and 'why', not merely descriptive facts.",
         });
       }
@@ -403,269 +407,261 @@ export default function AssignmentUnderstandStage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 sm:p-8 space-y-8 text-neutral-900 dark:text-neutral-100">
-      {/* Primary Intake Form Card matching Dashboard Template Card Aesthetics */}
-      <div className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-sm space-y-6">
-        {/* Header: Clean Typography with subtle academic badge */}
-        <div className="border-b border-neutral-100 dark:border-white/5 pb-5">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-              First-Class Alignment (70%+ Benchmark)
-            </span>
-            <span className="text-[10px] font-mono text-neutral-400">
-              Phase 1 of 8
-            </span>
+    <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 space-y-8 text-neutral-900 dark:text-neutral-100 font-sans">
+      {/* Page Title & Subtitle Header */}
+      <div>
+        <div className="flex items-center gap-2 mb-2.5">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
+            Phase 1 • Understand
+          </span>
+          <span className="text-xs text-neutral-400 dark:text-neutral-500 font-medium">
+            Phase 1 of 8
+          </span>
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-neutral-900 dark:text-white">
+          Phase 1: Understand the Assignment
+        </h1>
+        <p className="text-sm sm:text-base text-neutral-500 dark:text-neutral-400 mt-2 leading-relaxed">
+          Paste your brief or upload a document to extract questions, word limits, and grading criteria.
+        </p>
+      </div>
+
+      {/* Main Intake Canvas Card (Apple / Airbnb Flat Canvas) */}
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/70 dark:border-white/10 p-6 sm:p-8 shadow-xs space-y-7">
+        {/* Question Input Section */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+              <span>Assignment Question / Instructions</span>
+              <span className="text-rose-500 text-xs">*</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingBrief}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200/70 dark:hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {uploadingBrief ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin" />
+                  <span>Parsing Brief…</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload Brief (.pdf, .docx)</span>
+                </>
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.doc,.txt"
+              onChange={handleFileUpload}
+              disabled={uploadingBrief}
+              className="hidden"
+            />
           </div>
-          <h2 className="text-xl font-semibold text-neutral-900 dark:text-white tracking-tight">
-            Phase 1: Understand the Assignment
-          </h2>
-          <p className="text-[13px] text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
-            Define the assignment parameters to tailor your outline, research scope, and rubric alignment.
+
+          <textarea
+            value={localQuestion}
+            onChange={(e) => setLocalQuestion(e.target.value)}
+            onBlur={handleQuestionBlur}
+            rows={5}
+            placeholder="Paste your assignment prompt, essay title, or question here..."
+            className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-4 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-white/15 focus:border-neutral-400 dark:focus:border-white/20 transition-all leading-relaxed resize-y"
+          />
+
+          {uploadingBrief && (
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-2 animate-pulse">
+              <span className="w-3 h-3 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin" />
+              <span>Extracting brief text and grading details from uploaded document…</span>
+            </p>
+          )}
+        </div>
+
+        {/* Academic Level Pill Switch */}
+        <div className="space-y-2.5">
+          <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
+            Academic Level
+          </label>
+          <div className="inline-flex p-1 rounded-xl bg-neutral-100 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 w-full sm:max-w-md">
+            <button
+              type="button"
+              onClick={() => handleLevelChange("undergraduate")}
+              className={`flex-1 py-2 px-4 rounded-lg text-xs font-medium transition-all cursor-pointer text-center ${
+                localLevel === "undergraduate"
+                  ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+              }`}
+            >
+              Undergraduate
+            </button>
+            <button
+              type="button"
+              onClick={() => handleLevelChange("postgraduate")}
+              className={`flex-1 py-2 px-4 rounded-lg text-xs font-medium transition-all cursor-pointer text-center ${
+                localLevel === "postgraduate"
+                  ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+              }`}
+            >
+              Postgraduate / Masters
+            </button>
+          </div>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            {localLevel === "postgraduate"
+              ? "Calibrated for Master's study: deep theoretical synthesis, methodological reflexivity, and nuanced counterarguments."
+              : "Calibrated for Undergraduate study: conceptual clarity, structured logical flow, accurate evidence, and clear thesis progression."}
           </p>
         </div>
 
-        {/* Form Controls Grid */}
-        <div className="space-y-5">
-          {/* Assignment Instructions / Prompt Box (Full Width) */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-                <span>Assignment Question / Instructions</span>
-                <span className="text-rose-500">*</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingBrief}
-                className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer flex items-center gap-1.5 transition-colors px-2.5 py-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/5 disabled:opacity-50"
-              >
-                {uploadingBrief ? (
-                  <>
-                    <span className="w-3 h-3 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin" />
-                    <span>Parsing Brief…</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.37l-8.647 8.648a1.5 1.5 0 01-2.121-2.121l7.693-7.693" />
-                    </svg>
-                    <span>Upload Brief (.pdf, .docx)</span>
-                  </>
-                )}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx,.doc,.txt"
-                onChange={handleFileUpload}
-                disabled={uploadingBrief}
-                className="hidden"
-              />
-            </div>
-            <textarea
-              value={localQuestion}
-              onChange={(e) => setLocalQuestion(e.target.value)}
-              onBlur={handleQuestionBlur}
-              rows={4}
-              placeholder="Paste your assignment prompt, essay question, or case study instructions here..."
-              className="w-full bg-neutral-50 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 rounded-xl p-3.5 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 transition-all leading-relaxed resize-y"
-            />
-            {uploadingBrief && (
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 animate-pulse flex items-center gap-1.5">
-                <span className="w-3 h-3 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin" />
-                <span>Extracting brief text from uploaded document…</span>
-              </p>
-            )}
-          </div>
-
-          {/* Academic Level Apple-Style Segmented Control */}
+        {/* Controls Grid: Assignment Type, Target Word Count, Citation Style */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* Assignment Type */}
           <div className="space-y-2">
             <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-              <span>Academic Level</span>
-              <span className="text-rose-500">*</span>
+              <span>Assignment Type</span>
+              <span className="text-rose-500 text-xs">*</span>
             </label>
-            <div className="bg-neutral-100 dark:bg-white/5 p-1 rounded-xl border border-neutral-200/60 dark:border-white/10 grid grid-cols-2 gap-1">
-              <button
-                type="button"
-                onClick={() => handleLevelChange("undergraduate")}
-                className={`py-2 px-3 rounded-lg text-xs transition-all cursor-pointer ${
-                  localLevel === "undergraduate"
-                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white font-medium"
-                }`}
+            <div className="relative">
+              <select
+                value={localType}
+                onChange={(e) => handleTypeChange(e.target.value as AssignmentType)}
+                className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-white/15 focus:border-neutral-400 dark:focus:border-white/20 transition-all appearance-none cursor-pointer pr-10 font-medium"
               >
-                Undergraduate
-              </button>
-              <button
-                type="button"
-                onClick={() => handleLevelChange("postgraduate")}
-                className={`py-2 px-3 rounded-lg text-xs transition-all cursor-pointer ${
-                  localLevel === "postgraduate"
-                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white font-medium"
-                }`}
-              >
-                Postgraduate / Masters
-              </button>
-            </div>
-            <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-              {localLevel === "postgraduate"
-                ? "Postgraduate mode deepens critical synthesis, theoretical engagement, and nuanced counterargument evaluation."
-                : "Undergraduate mode prioritizes conceptual clarity, rigorous evidence, clear argument, and accurate structure."}
-            </p>
-          </div>
-
-          {/* 3-Field Grid: Assignment Type, Target Word Count, Citation Style */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Assignment Type Dropdown */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-                <span>Assignment Type</span>
-                <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <select
-                  value={localType}
-                  onChange={(e) => handleTypeChange(e.target.value as AssignmentType)}
-                  className="w-full bg-neutral-50 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 transition-all appearance-none cursor-pointer pr-10"
-                >
-                  {Object.entries(ASSIGNMENT_TYPE_LABELS).map(([key, label]) => (
-                    <option key={key} value={key} className="bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-neutral-100">
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-neutral-400">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Target Word Count */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-                <span>Target Word Count</span>
-                <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min={200}
-                  max={20000}
-                  step={100}
-                  value={localWordCount || ""}
-                  onChange={(e) => setLocalWordCount(Math.max(0, Number(e.target.value)))}
-                  onBlur={handleWordCountBlur}
-                  placeholder="e.g. 2000"
-                  className="w-full bg-neutral-50 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 transition-all font-semibold pr-16"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] text-neutral-400 font-medium">words</span>
-              </div>
-              {localWordCount > 0 && (
-                <div className="flex items-center gap-1.5 text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">
-                  <span>Intro ~{Math.round(localWordCount * 0.1)}w</span>
-                  <span>·</span>
-                  <span>Body ~{Math.round(localWordCount * 0.75)}w</span>
-                  <span>·</span>
-                  <span>Concl ~{Math.round(localWordCount * 0.15)}w</span>
-                </div>
-              )}
-            </div>
-
-            {/* Citation Style Dropdown */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-                <span>Citation Style</span>
-                <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <select
-                  value={localCitation}
-                  onChange={(e) => handleCitationChange(e.target.value)}
-                  className="w-full bg-neutral-50 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 transition-all appearance-none cursor-pointer pr-10"
-                >
-                  {CITATION_STYLES.map((st) => (
-                    <option key={st.id} value={st.id} className="bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-neutral-100">
-                      {st.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-neutral-400">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
+                {Object.entries(ASSIGNMENT_TYPE_LABELS).map(([key, label]) => (
+                  <option key={key} value={key} className="bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-neutral-100">
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-neutral-400">
+                <ChevronDown className="w-4 h-4" />
               </div>
             </div>
           </div>
 
-          {/* Optional Details Collapsible Accordion */}
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => setShowAdditional(!showAdditional)}
-              className="text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${showAdditional ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-              <span>{showAdditional ? "Hide Additional Course Details" : "Add Course, Rubric & Deadline Details (Optional)"}</span>
-            </button>
-
-            {showAdditional && (
-              <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/70 dark:bg-white/5 animate-in fade-in duration-150">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Course / Subject</label>
-                  <input
-                    type="text"
-                    value={course}
-                    onChange={(e) => setCourse(e.target.value)}
-                    onBlur={handleCourseDetailsBlur}
-                    placeholder="e.g. POLI3002 International Security"
-                    className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">University / Institution</label>
-                  <input
-                    type="text"
-                    value={institution}
-                    onChange={(e) => setInstitution(e.target.value)}
-                    onBlur={handleCourseDetailsBlur}
-                    placeholder="e.g. University of Edinburgh"
-                    className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Submission Deadline</label>
-                  <input
-                    type="date"
-                    value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
-                    onBlur={handleCourseDetailsBlur}
-                    className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
-                  />
-                </div>
-                <div className="md:col-span-3 space-y-1.5">
-                  <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Marking Rubric / Learning Outcomes</label>
-                  <textarea
-                    value={rubricText}
-                    onChange={(e) => setRubricText(e.target.value)}
-                    onBlur={handleCourseDetailsBlur}
-                    rows={2}
-                    placeholder="Paste grading criteria or learning outcomes to evaluate against..."
-                    className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg p-3 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 leading-relaxed"
-                  />
-                </div>
+          {/* Target Word Count */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+              <span>Target Word Count</span>
+              <span className="text-rose-500 text-xs">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                min={200}
+                max={20000}
+                step={100}
+                value={localWordCount || ""}
+                onChange={(e) => setLocalWordCount(Math.max(0, Number(e.target.value)))}
+                onBlur={handleWordCountBlur}
+                placeholder="e.g. 2000"
+                className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-white/15 focus:border-neutral-400 dark:focus:border-white/20 transition-all font-semibold pr-16"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-neutral-400 font-medium pointer-events-none">
+                words
+              </span>
+            </div>
+            {localWordCount > 0 && (
+              <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 font-mono">
+                <span>Intro ~{Math.round(localWordCount * 0.1)}w</span>
+                <span>·</span>
+                <span>Body ~{Math.round(localWordCount * 0.75)}w</span>
+                <span>·</span>
+                <span>Concl ~{Math.round(localWordCount * 0.15)}w</span>
               </div>
             )}
+          </div>
+
+          {/* Citation Style */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+              <span>Citation Style</span>
+              <span className="text-rose-500 text-xs">*</span>
+            </label>
+            <div className="relative">
+              <select
+                value={localCitation}
+                onChange={(e) => handleCitationChange(e.target.value)}
+                className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-white/15 focus:border-neutral-400 dark:focus:border-white/20 transition-all appearance-none cursor-pointer pr-10 font-medium"
+              >
+                {CITATION_STYLES.map((st) => (
+                  <option key={st.id} value={st.id} className="bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-neutral-100">
+                    {st.name}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-neutral-400">
+                <ChevronDown className="w-4 h-4" />
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Validation Feedback & Action CTA */}
-        <div className="pt-4 border-t border-neutral-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Minimal Accordion: Add course details & grading rubric */}
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={() => setShowAdditional(!showAdditional)}
+            className="text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer py-1"
+          >
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showAdditional ? "rotate-180" : ""}`} />
+            <span>{showAdditional ? "Hide course details & grading rubric" : "+ Add course details & grading rubric (optional)"}</span>
+          </button>
+
+          {showAdditional && (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 p-5 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] animate-in fade-in duration-150">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Course / Module Code</label>
+                <input
+                  type="text"
+                  value={course}
+                  onChange={(e) => setCourse(e.target.value)}
+                  onBlur={handleCourseDetailsBlur}
+                  placeholder="e.g. POLI3002 International Security"
+                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3.5 py-2 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">University / Institution</label>
+                <input
+                  type="text"
+                  value={institution}
+                  onChange={(e) => setInstitution(e.target.value)}
+                  onBlur={handleCourseDetailsBlur}
+                  placeholder="e.g. University of Edinburgh"
+                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3.5 py-2 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Deadline</label>
+                <input
+                  type="date"
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                  onBlur={handleCourseDetailsBlur}
+                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3.5 py-2 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
+                />
+              </div>
+              <div className="md:col-span-3 space-y-1.5 pt-1">
+                <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Marking Rubric / Assessment Criteria</label>
+                <textarea
+                  value={rubricText}
+                  onChange={(e) => setRubricText(e.target.value)}
+                  onBlur={handleCourseDetailsBlur}
+                  rows={3}
+                  placeholder="Paste marking criteria or grade band descriptions to index..."
+                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg p-3 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 leading-relaxed"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Primary Action Button (Centered / Full-Width Black Pill) */}
+        <div className="pt-4 border-t border-neutral-100 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
           {!canAnalyze ? (
             <p className="text-xs text-rose-500 dark:text-rose-400 font-medium">
               Please provide the assignment question, word count, and citation style to continue.
@@ -676,62 +672,63 @@ export default function AssignmentUnderstandStage() {
             type="button"
             disabled={!canAnalyze || isAnalyzing}
             onClick={handleAnalyze}
-            className="bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-all rounded-xl px-6 py-2.5 font-medium text-[13px] disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer shrink-0"
+            className="w-full sm:w-auto px-8 py-3 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-medium text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
           >
             {isAnalyzing ? (
               <>
-                <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 <span>Analyzing Assignment Brief…</span>
               </>
             ) : (
-              <span>{analysis ? "Re-Analyze Assignment Brief" : "Analyze Assignment Brief"}</span>
+              <span>{analysis ? "Re-Analyze Assignment Brief →" : "Analyze Assignment Brief →"}</span>
             )}
           </button>
         </div>
 
         {analysisError && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400">
-            {analysisError}
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{analysisError}</span>
           </div>
         )}
       </div>
 
-      {/* Assignment Analysis Agent Results */}
+      {/* Analysis Breakdown Results (Apple / Airbnb Flat Presentation) */}
       {analysis && (
-        <div className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-sm space-y-6">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/70 dark:border-white/10 p-6 sm:p-8 shadow-xs space-y-7 animate-in fade-in duration-200">
           <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-4">
             <div>
-              <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-white tracking-tight">
                 Assignment Analysis Breakdown
-              </h3>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+              </h2>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                 Target expectations, command verbs, and academic scope boundaries unpacked by the Socratic Agent.
               </p>
             </div>
-            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
               ✓ Analysis Ready{analysis.briefLedger && analysis.briefLedger.length > 0 ? ` · ${analysis.briefLedger.length} Rules Indexed` : ""}
             </span>
           </div>
 
-          {/* Command Verbs Unpacking */}
+          {/* Command Verbs & Examiner Demands */}
           {analysis.commandVerbs && analysis.commandVerbs.length > 0 && (
             <div className="space-y-3">
-              <h4 className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+              <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                 Command Verbs & Examiner Demands
-              </h4>
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {analysis.commandVerbs.map((cv, idx) => (
                   <div
                     key={idx}
-                    className="p-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/70 dark:bg-white/5 space-y-1.5"
+                    className="p-4 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] space-y-1.5"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-neutral-200 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold text-xs">
+                      <span className="px-2.5 py-0.5 rounded-full bg-neutral-200/80 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold text-xs">
                         {cv.verb}
                       </span>
-                      <span className="text-[11px] text-neutral-500 dark:text-neutral-400 italic">{cv.meaning}</span>
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400 italic">{cv.meaning}</span>
                     </div>
-                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed pt-1">
                       <span className="font-semibold text-neutral-900 dark:text-neutral-100">Requirement:</span> {cv.academicExpectation}
                     </p>
                   </div>
@@ -740,24 +737,24 @@ export default function AssignmentUnderstandStage() {
             </div>
           )}
 
-          {/* Key Conceptual Scope & Boundaries */}
+          {/* Scope Boundaries: Included vs Excluded */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-2">
-              <h5 className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+            <div className="p-5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-2.5">
+              <h4 className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
                 ✓ What Must Be Researched & Included
-              </h5>
-              <ul className="text-xs text-neutral-700 dark:text-neutral-300 space-y-1 list-disc list-inside">
+              </h4>
+              <ul className="text-xs text-neutral-700 dark:text-neutral-300 space-y-1.5 list-disc list-inside leading-relaxed">
                 {analysis.scopeBoundaries?.included?.map((inc, i) => (
                   <li key={i}>{inc}</li>
                 ))}
               </ul>
             </div>
 
-            <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-2">
-              <h5 className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+            <div className="p-5 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-2.5">
+              <h4 className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
                 ✕ Out of Scope (Do Not Waste Word Budget On)
-              </h5>
-              <ul className="text-xs text-neutral-700 dark:text-neutral-300 space-y-1 list-disc list-inside">
+              </h4>
+              <ul className="text-xs text-neutral-700 dark:text-neutral-300 space-y-1.5 list-disc list-inside leading-relaxed">
                 {analysis.scopeBoundaries?.excluded?.map((exc, i) => (
                   <li key={i}>{exc}</li>
                 ))}
@@ -765,10 +762,10 @@ export default function AssignmentUnderstandStage() {
             </div>
           </div>
 
-          {/* Guidance Overview */}
-          <div className="p-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/70 dark:bg-white/5 space-y-3">
+          {/* Summary & Core Specifications */}
+          <div className="p-5 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] space-y-3">
             <div>
-              <span className="text-[10px] uppercase font-semibold text-neutral-500 dark:text-neutral-400 block tracking-wider">
+              <span className="text-xs uppercase font-semibold text-neutral-500 dark:text-neutral-400 block tracking-wider">
                 Summary & Expected Response
               </span>
               <p className="text-xs text-neutral-800 dark:text-neutral-200 mt-1 leading-relaxed">
@@ -776,36 +773,36 @@ export default function AssignmentUnderstandStage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-neutral-200/60 dark:border-white/5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-neutral-200/60 dark:border-white/5">
               <div>
-                <span className="text-[10px] uppercase font-semibold text-neutral-500 dark:text-neutral-400 block tracking-wider">Evidence Requirements</span>
-                <p className="text-xs text-neutral-700 dark:text-neutral-300 mt-0.5">{analysis.evidenceRequirements}</p>
+                <span className="text-[11px] uppercase font-semibold text-neutral-400 block tracking-wider">Evidence Requirements</span>
+                <p className="text-xs text-neutral-700 dark:text-neutral-300 mt-1">{analysis.evidenceRequirements}</p>
               </div>
               <div>
-                <span className="text-[10px] uppercase font-semibold text-neutral-500 dark:text-neutral-400 block tracking-wider">Word Budget Guidance</span>
-                <p className="text-xs text-neutral-700 dark:text-neutral-300 mt-0.5">{analysis.wordCountImplications}</p>
+                <span className="text-[11px] uppercase font-semibold text-neutral-400 block tracking-wider">Word Budget Guidance</span>
+                <p className="text-xs text-neutral-700 dark:text-neutral-300 mt-1">{analysis.wordCountImplications}</p>
               </div>
               <div>
-                <span className="text-[10px] uppercase font-semibold text-neutral-500 dark:text-neutral-400 block tracking-wider">Referencing Style</span>
-                <p className="text-xs text-neutral-700 dark:text-neutral-300 mt-0.5">{analysis.citationGuidance}</p>
+                <span className="text-[11px] uppercase font-semibold text-neutral-400 block tracking-wider">Referencing Style</span>
+                <p className="text-xs text-neutral-700 dark:text-neutral-300 mt-1">{analysis.citationGuidance}</p>
               </div>
             </div>
           </div>
 
-          {/* Rubric Criteria, Grading Benchmarks & Detected Penalties */}
+          {/* Rubric Insights & Penalty Clauses */}
           {analysis.markingCriteriaInsights && analysis.markingCriteriaInsights.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+            <div className="space-y-2.5">
+              <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                 Marking Rubric Insights & Assessment Standards
-              </h4>
+              </h3>
               <div className="space-y-2">
                 {analysis.markingCriteriaInsights.map((insight, idx) => (
                   <div
                     key={idx}
-                    className={`p-3 rounded-xl border text-xs leading-relaxed ${
+                    className={`p-3.5 rounded-xl border text-xs leading-relaxed ${
                       insight.includes("🚨") || insight.toLowerCase().includes("penalty")
                         ? "border-rose-500/30 bg-rose-500/5 text-rose-700 dark:text-rose-300 font-medium"
-                        : "border-neutral-200/80 dark:border-white/10 bg-neutral-50/70 dark:bg-white/5 text-neutral-700 dark:text-neutral-300"
+                        : "border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] text-neutral-700 dark:text-neutral-300"
                     }`}
                   >
                     {insight}
@@ -816,11 +813,11 @@ export default function AssignmentUnderstandStage() {
           )}
 
           {/* Student Approval & Confirmation Banner */}
-          <div className="p-5 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50 dark:bg-white/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="pt-4 border-t border-neutral-100 dark:border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h4 className="text-xs font-semibold text-neutral-900 dark:text-white">
+              <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
                 Is my understanding of the assignment correct?
-              </h4>
+              </h3>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
                 Approve to lock this understanding and generate your tailored research plan.
               </p>
@@ -828,7 +825,7 @@ export default function AssignmentUnderstandStage() {
             <button
               type="button"
               onClick={handleApproveAnalysis}
-              className="bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 rounded-xl px-5 py-2.5 text-xs font-semibold transition-all cursor-pointer shadow-xs shrink-0"
+              className="w-full sm:w-auto px-7 py-3 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] text-xs font-semibold transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center gap-2"
             >
               ✓ Approve & Continue to Research Plan →
             </button>
