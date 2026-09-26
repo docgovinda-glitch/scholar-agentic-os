@@ -9,6 +9,8 @@ const getDocument = vi.fn();
 const getRubric = vi.fn();
 const getOutputTypeSpec = vi.fn();
 const saveIntakeAnswers = vi.fn();
+const authedFetch = vi.fn();
+const authedJsonFetch = vi.fn();
 
 vi.mock("../../api", () => ({
   getProject: (...a: unknown[]) => getProject(...a),
@@ -16,6 +18,10 @@ vi.mock("../../api", () => ({
   getRubric: (...a: unknown[]) => getRubric(...a),
   getOutputTypeSpec: (...a: unknown[]) => getOutputTypeSpec(...a),
   saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
+  authedFetch: (...a: unknown[]) => authedFetch(...a),
+  authedJsonFetch: (...a: unknown[]) => authedJsonFetch(...a),
+  isEphemeralProject: (id: string) => typeof id === "string" && (id.startsWith("draft-") || id.startsWith("ephemeral-")),
+  commitProjectToDatabase: vi.fn().mockImplementation(async (id: string) => ({ projectId: id, answers: {} })),
 }));
 
 vi.mock("../../../services/userVault", () => ({
@@ -166,6 +172,113 @@ describe("Scholar Core Assignment Workspace", () => {
 
     // 4. Compact status badge: 0 / 2,000 words
     expect(within(header).getByText(/0 \/ 2,000 words/i)).toBeInTheDocument();
+  });
+
+  it("completes full brief upload and sequential analysis flow with exact line citations without visual regressions", async () => {
+    authedFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        text: "[L001] Assessment Question: Critically evaluate algorithmic governance.\n[L002] Target word count is 2500 words.\n[L012-L015] Penalty Warning: Late submissions incur an automatic 5% per day penalty deduction.\n[L016] Excluded Topics: Do not write about general history before 2000.",
+        lineCount: 4,
+        detectedWordCount: 2500,
+        detectedLevel: "undergraduate",
+        detectedCitation: "apa7",
+      }),
+    });
+
+    authedJsonFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        commandVerbs: [
+          {
+            verb: "Critically evaluate",
+            meaning: "Weigh competing theoretical arguments and empirical evidence to judge their validity.",
+            academicExpectation: "You must not merely describe; synthesize counterarguments and substantiate a justified academic conclusion. ([L001])",
+          },
+        ],
+        summary: "The examiner requires a rigorous essay addressing algorithmic governance...",
+        keyConcepts: ["Algorithmic Governance", "Accountability", "Empirical Evidence"],
+        scopeBoundaries: {
+          included: ["[L001] Systematic evaluation of algorithmic governance systems"],
+          excluded: ["[L016] Do not write about general history before 2000"],
+        },
+        expectedResponseType: "Essay",
+        evidenceRequirements: "Authoritative scholarly sources",
+        markingCriteriaInsights: [
+          "🚨 Detected Assessment Penalty: [L012-L015] Late submissions incur an automatic 5% per day penalty deduction.",
+        ],
+        wordCountImplications: "Target: 2,500 words (Intro: ~250w, Body: ~2000w, Conclusion: ~250w). Standard ±10% penalty threshold applies.",
+        citationGuidance: "Format all in-text citations and reference list strictly according to APA7 conventions.",
+        academicLevelNotes: "Calibrated for Undergraduate study.",
+        approvedByUser: false,
+        briefLedger: [
+          {
+            lineRange: "[L012-L015]",
+            category: "penalty",
+            description: "Late submission penalty",
+            verbatimText: "Late submissions incur an automatic 5% per day penalty deduction.",
+          },
+        ],
+      }),
+    });
+
+    render(
+      <AssignmentWorkspace
+        projectId="proj-123"
+        initialStage="understand"
+        onStageChange={vi.fn()}
+      />
+    );
+
+    // 1. Wait for lazy-loaded Phase 1 and locate file input
+    expect(await screen.findByText(/Phase 1: Understand the Assignment/i)).toBeInTheDocument();
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(fileInput).toBeInTheDocument();
+
+    const dummyFile = new File(["dummy brief content"], "assignment_brief.docx", {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+
+    Object.defineProperty(fileInput, "files", {
+      value: [dummyFile],
+      configurable: true,
+    });
+    fireEvent.change(fileInput, { target: { files: [dummyFile] } });
+
+    // 2. Verify text populates textarea and metadata detected
+    await waitFor(() => {
+      const textarea = screen.getByPlaceholderText(/Paste your assignment prompt/i) as HTMLTextAreaElement;
+      expect(textarea.value).toContain("[L012-L015] Penalty Warning");
+    });
+
+    // 3. Click "Analyze Assignment Brief"
+    const analyzeBtn = screen.getByRole("button", { name: /Analyze Assignment Brief/i });
+    expect(analyzeBtn).toBeInTheDocument();
+    fireEvent.click(analyzeBtn);
+
+    // 4. Verify existing analysis breakdown renders with exact line citations
+    expect(await screen.findByText(/Assignment Analysis Breakdown/i)).toBeInTheDocument();
+    expect(screen.getByText(/✓ Analysis Ready · 1 Rules Indexed/i)).toBeInTheDocument();
+    expect(screen.getByText(/\[L012-L015\] Late submissions incur an automatic 5% per day penalty deduction/i)).toBeInTheDocument();
+    expect(screen.getByText(/\[L016\] Do not write about general history before 2000/i)).toBeInTheDocument();
+
+    // 5. Confirm no visual regressions or unwanted stage tabs exist
+    expect(screen.queryByText(/AssignmentDeconstructStage/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/AssignmentThesisBudgetStage/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/AssignmentPeelMatrixStage/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/AssignmentCitationGroundingStage/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/AssignmentAuditExportStage/i)).not.toBeInTheDocument();
+
+    // Confirm only the 8 canonical phases exist
+    expect(screen.getByRole("button", { name: /Phase 1: Understand/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 2: Plan/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 3: Research/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 4: Evidence/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 5: Think/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 6: Structure/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 7: Draft/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 8: Finalize/i })).toBeInTheDocument();
   });
 });
 

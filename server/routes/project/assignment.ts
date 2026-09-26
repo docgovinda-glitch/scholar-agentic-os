@@ -4,6 +4,7 @@ import * as pdfParseModule from "pdf-parse";
 import mammoth from "mammoth";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
 import { callOpenRouterJSON, callOpenRouterText } from "../../utils/llm.ts";
+import { rejectClientCredentials } from "../../src/middleware/rejectClientCredentials.ts";
 import {
   auditDocumentLineByLine,
   runBriefScannerGraph,
@@ -328,16 +329,16 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     // 6. Persist the ledger in the project JSONB answers under assignment_analysis and brief_ledger
     project.answers = {
       ...project.answers,
-      assignment_question: question,
-      academic_level: academicLevel,
-      assignment_type: assignmentType,
-      word_count: targetWords,
-      word_limit: targetWords,
-      citation_style: citationStyle,
-      assignment_brief_text: briefText,
-      marking_rubric: rubricText,
-      assignment_analysis: finalAnalysis,
-      brief_ledger: ledger,
+      assignment_question: String(question),
+      academic_level: String(academicLevel),
+      assignment_type: String(assignmentType),
+      word_count: String(targetWords),
+      word_limit: String(targetWords),
+      citation_style: String(citationStyle),
+      assignment_brief_text: String(briefText),
+      marking_rubric: String(rubricText),
+      assignment_analysis: JSON.stringify(finalAnalysis),
+      brief_ledger: JSON.stringify(ledger),
     };
     await getProjectStore().save(project);
 
