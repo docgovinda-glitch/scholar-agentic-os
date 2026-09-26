@@ -430,6 +430,7 @@ router.post("/draft-section", async (req: express.Request<{ id: string }>, res) 
     thesis = "",
     approvedEvidence = [],
     keyPoints = [],
+    assignmentType = project.answers["assignment_type"] || "essay",
   } = req.body || {};
 
   try {
@@ -440,14 +441,30 @@ router.post("/draft-section", async (req: express.Request<{ id: string }>, res) 
           .join("\n")
       : "No external evidence provided. Write conceptually and indicate where citations are needed.";
 
+    const genreGuidance =
+      assignmentType === "reflection"
+        ? "Format: Reflective academic analysis. First-person reflective voice is appropriate where recounting personal or professional experience, tightly integrated with third-person analytical frameworks and literature (e.g. Gibbs' Reflective Cycle)."
+        : assignmentType === "case_study"
+        ? "Format: Strategic case study analysis. Use clear analytical headings, direct evaluation of organizational problems, and evidence-grounded strategic recommendations."
+        : assignmentType === "report" || assignmentType === "business_assignment"
+        ? "Format: Formal report prose. Use structured numbered subheadings, concise analytical paragraphs, and evidence-based recommendations."
+        : assignmentType === "lab_report"
+        ? "Format: Scientific laboratory report. Use objective, empirical scientific terminology with precision."
+        : assignmentType === "policy_analysis"
+        ? "Format: Policy analysis briefing paper. Frame policy options with criteria-based evaluation (feasibility, cost, equity) and concrete recommendations."
+        : "Format: Academic essay. Maintain rigorous paragraph structure (Topic sentence → Evidence & Explanation → Critical Analysis → Transition).";
+
     const prompt = `You are the Scholar Core Grounded Academic Drafting Agent.
 Write the draft for section: "${sectionTitle}".
+
+Assignment Type: ${assignmentType}
+${genreGuidance}
 
 Section Guidance: ${sectionGuidance}
 Target Word Count: Approximately ${targetWordCount} words
 Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Write with advanced theoretical synthesis, nuanced evaluation, and sophisticated academic prose." : "Write with clear, coherent argumentation, conceptual accuracy, and formal academic tone."})
 Citation Style: ${citationStyle}
-Central Thesis: "${thesis}"
+Central Thesis / Stance: "${thesis}"
 Key Points to cover: ${keyPoints.join(", ")}
 
 ${evidenceContext}
@@ -455,7 +472,7 @@ ${evidenceContext}
 CRITICAL RULES:
 1. ONLY cite from the approved evidence provided above. Do NOT fabricate citations, authors, or statistics.
 2. Integrate in-text citations smoothly according to ${citationStyle}.
-3. Maintain rigorous paragraph structure (Topic sentence → Evidence & Explanation → Critical Analysis → Transition).
+3. Maintain rigorous paragraph structure and academic tone.
 4. Provide ONLY the section draft text.`;
 
     const draft = await callOpenRouterText(

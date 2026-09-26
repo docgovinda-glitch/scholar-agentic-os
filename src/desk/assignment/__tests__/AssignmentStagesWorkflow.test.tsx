@@ -9,6 +9,8 @@ const getDocument = vi.fn();
 const getRubric = vi.fn();
 const getOutputTypeSpec = vi.fn();
 const saveIntakeAnswers = vi.fn();
+const authedJsonFetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+const authedFetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
 
 vi.mock("../../api", () => ({
   getProject: (...a: unknown[]) => getProject(...a),
@@ -16,6 +18,8 @@ vi.mock("../../api", () => ({
   getRubric: (...a: unknown[]) => getRubric(...a),
   getOutputTypeSpec: (...a: unknown[]) => getOutputTypeSpec(...a),
   saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
+  authedJsonFetch: (...a: unknown[]) => authedJsonFetch(...a),
+  authedFetch: (...a: unknown[]) => authedFetch(...a),
 }));
 
 vi.mock("../../../services/userVault", () => ({

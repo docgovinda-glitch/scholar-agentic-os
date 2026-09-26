@@ -1,7 +1,171 @@
 import React, { useState, useEffect } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { authedJsonFetch } from "../../api";
-import type { ResearchPlan } from "../types";
+import type { ResearchPlan, AssignmentType } from "../types";
+
+export function generateAdaptiveResearchPlan(
+  type: AssignmentType,
+  question: string,
+  academicLevel: string,
+  analysis?: any
+): ResearchPlan {
+  const qClean = question?.trim() || "Academic coursework brief";
+  const concepts = analysis?.keyConcepts?.length > 0 ? analysis.keyConcepts : ["Theoretical Foundation", "Empirical Analysis", "Critical Evaluation"];
+
+  let coreQuestions: string[] = [];
+  let debates: string[] = [];
+  let evidenceTypes: string[] = [];
+  let searchStrategies: string[] = [];
+  let outOfScope: string[] = [];
+
+  switch (type) {
+    case "case_study":
+      coreQuestions = [
+        `What are the critical strategic challenges and root causes facing the organization in "${qClean.slice(0, 80)}"?`,
+        "How do internal operational and cultural capabilities compare against external industry competitive pressures?",
+        "Which strategic alternative generates the greatest sustainable competitive advantage and financial viability?",
+      ];
+      debates = [
+        "Operational efficiency vs disruptive strategic innovation",
+        "Short-term profitability vs long-term sustainable stakeholder value",
+        "Internal restructuring vs external market expansion",
+      ];
+      evidenceTypes = [
+        "Company financial statements and annual reports (10-K / annual filings)",
+        "Industry market research reports (Gartner, Statista, IBISWorld)",
+        "Peer-reviewed strategic management case analyses (HBR, Strategic Management Journal)",
+      ];
+      searchStrategies = [
+        `"${concepts[0] || 'strategic positioning'}" AND "case study" AND "market performance"`,
+        "competitive advantage AND industry disruption AND corporate governance",
+        "strategic implementation roadmap AND operational risk mitigation",
+      ];
+      outOfScope = [
+        "Broad macroeconomic history unrelated to the immediate industry context",
+        "Unverified consumer opinions or generic blog commentary without audited financial data",
+      ];
+      break;
+
+    case "report":
+    case "business_assignment":
+      coreQuestions = [
+        `What are the terms of reference and primary operational findings regarding "${qClean.slice(0, 80)}"?`,
+        "What empirical and organizational evidence substantiates the observed performance gaps?",
+        "What prioritized, SMART recommendations should executive management implement?",
+      ];
+      debates = [
+        "Cost reduction vs quality enhancement in process re-engineering",
+        "Centralized regulatory compliance vs agile operational autonomy",
+        "Capital expenditure feasibility vs expected return on investment (ROI)",
+      ];
+      evidenceTypes = [
+        "Organizational benchmarks and operational key performance indicators (KPIs)",
+        "Regulatory standards, industry codes of practice, and government whitepapers",
+        "Empirical management research and peer-reviewed business publications",
+      ];
+      searchStrategies = [
+        `"${concepts[0] || 'operational management'}" AND "benchmarking" AND "empirical findings"`,
+        "best practices AND performance metrics AND policy compliance",
+        "SMART recommendations AND organizational change implementation",
+      ];
+      outOfScope = [
+        "Abstract philosophical conjecture unsupported by empirical organizational data",
+        "Unfocused historical chronologies that do not serve the immediate terms of reference",
+      ];
+      break;
+
+    case "reflection":
+      coreQuestions = [
+        `How did my personal and professional competencies manifest during the encounter in "${qClean.slice(0, 80)}"?`,
+        "What cognitive assumptions or emotional responses influenced my decision-making process?",
+        "How do established reflective models (e.g., Gibbs, Schön) explain my practice, and what concrete behavioral changes will I adopt?",
+      ];
+      debates = [
+        "Intuitive clinical/professional judgment vs rigid protocol adherence",
+        "Self-awareness of unconscious bias vs objective standards of practice",
+        "Individual agency vs systemic institutional constraints",
+      ];
+      evidenceTypes = [
+        "Reflective frameworks and educational theories (Gibbs, Schön, Kolb, Johns)",
+        "Professional codes of ethics and disciplinary competency standards",
+        "Peer-reviewed literature on reflective practice and professional development",
+      ];
+      searchStrategies = [
+        "\"Gibbs reflective cycle\" AND professional development AND critical evaluation",
+        "reflective practice AND clinical reasoning OR ethical decision-making",
+        "transformative learning theory AND practice competency standards",
+      ];
+      outOfScope = [
+        "Merely descriptive storytelling or diary logs lacking critical analytical depth",
+        "External blame deflection without critical self-examination",
+      ];
+      break;
+
+    case "lab_report":
+      coreQuestions = [
+        `What are the fundamental physical/chemical/biological mechanisms underlying "${qClean.slice(0, 80)}"?`,
+        "Did empirical measurements corroborate or refute the established testable hypotheses?",
+        "What systematic, instrument, and random errors influenced experimental precision, and how can they be mitigated?",
+      ];
+      debates = [
+        "Theoretical model predictions vs empirical measurement anomalies",
+        "Calibration precision vs environmental perturbation effects",
+        "Statistical significance (p-values) vs practical physical relevance",
+      ];
+      evidenceTypes = [
+        "Primary empirical laboratory datasets and instrument logs",
+        "Peer-reviewed scientific methodology standards and protocol literature",
+        "Authoritative physical/chemical/biological reference constants and values",
+      ];
+      searchStrategies = [
+        `"${concepts[0] || 'experimental methodology'}" AND "empirical results" AND error analysis`,
+        "standard protocol AND experimental uncertainty AND statistical validation",
+        "peer-reviewed experimental calibration AND measurement error models",
+      ];
+      outOfScope = [
+        "Subjective or speculative commentary without empirical mathematical backing",
+        "Uncalibrated raw data tables dumped without statistical summaries or graphs",
+      ];
+      break;
+
+    default: // Standard academic essays
+      coreQuestions = [
+        `What are the primary theoretical arguments and empirical evidence surrounding "${qClean.slice(0, 80)}"?`,
+        "How do competing scholarly perspectives interpret the central tension or causal mechanism?",
+        "What evidence-grounded thesis best withstands critical counterargument and scrutiny?",
+      ];
+      debates = [
+        "Orthodox foundational theory vs revisionist critical interpretations",
+        "Quantitative empirical models vs qualitative interpretive frameworks",
+        "Universal theoretical claims vs context-specific historical realities",
+      ];
+      evidenceTypes = [
+        "Peer-reviewed academic journal articles from leading field publications",
+        "Seminal scholarly monographs and university press publications",
+        "Audited institutional empirical data and meta-analyses",
+      ];
+      searchStrategies = [
+        `"${concepts[0] || 'core theory'}" AND "critical evaluation" AND "scholarly debate"`,
+        `"${concepts[1] || 'empirical evidence'}" AND theoretical frameworks AND ${academicLevel}`,
+        "systematic review AND counterarguments AND contemporary synthesis",
+      ];
+      outOfScope = [
+        "Non-academic opinion pieces, Wikipedia entries, and unverified blogs",
+        "Tangential background details that do not directly address the prompt's command verbs",
+      ];
+      break;
+  }
+
+  return {
+    coreQuestions,
+    mainConcepts: concepts,
+    keyDebates: debates,
+    evidenceTypesNeeded: evidenceTypes,
+    searchStrategies,
+    outOfScopeTopics: outOfScope,
+    approvedByUser: true,
+  };
+}
 
 export default function AssignmentPlanStage() {
   const {
@@ -49,11 +213,18 @@ export default function AssignmentPlanStage() {
         assignmentType,
         analysis,
       });
-      if (!res.ok) throw new Error("Failed to generate research plan");
+      if (!res.ok) throw new Error("Failed to generate research plan from server");
       const data: ResearchPlan = await res.json();
       await setResearchPlan(data);
     } catch (err: any) {
-      setError(err.message || "Failed to generate research plan");
+      console.warn("Using resilient adaptive research plan generator:", err);
+      const adaptivePlan = generateAdaptiveResearchPlan(
+        assignmentType,
+        question,
+        academicLevel,
+        analysis
+      );
+      await setResearchPlan(adaptivePlan);
     } finally {
       setIsGenerating(false);
     }

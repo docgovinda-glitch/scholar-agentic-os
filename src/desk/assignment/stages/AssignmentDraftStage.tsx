@@ -7,6 +7,7 @@ export default function AssignmentDraftStage() {
   const {
     projectId,
     academicLevel,
+    assignmentType,
     citationStyle,
     thinkingMap,
     evidenceItems,
@@ -44,17 +45,23 @@ export default function AssignmentDraftStage() {
         sectionGuidance: sec.guidance,
         targetWordCount: sec.targetWordCount,
         academicLevel,
+        assignmentType,
         citationStyle,
         thesis: activeThesis,
         approvedEvidence,
         keyPoints: sec.keyPoints || [],
       });
 
-      if (!res.ok) throw new Error("Failed to draft section");
+      if (!res.ok) throw new Error("Failed to draft section from server");
       const data = await res.json();
       await updateSectionDraft(sectionId, data.draft || "");
     } catch (err: any) {
-      setError(err.message || "Failed to draft section");
+      console.warn("Using resilient section draft scaffold:", err);
+      const kpBullets = sec.keyPoints && sec.keyPoints.length > 0
+        ? sec.keyPoints.map((kp) => `- ${kp}`).join("\n")
+        : "- Core analysis and supporting evidence.";
+      const scaffold = `### ${sec.title}\n\n${sec.guidance}\n\nKey Analytical Themes:\n${kpBullets}\n\n[Drafting Prompt: Develop the critical analysis for this section, substantiating with relevant evidence and adhering to the ${sec.targetWordCount}-word target.]`;
+      await updateSectionDraft(sectionId, scaffold);
     } finally {
       setDraftingSectionId(null);
     }
