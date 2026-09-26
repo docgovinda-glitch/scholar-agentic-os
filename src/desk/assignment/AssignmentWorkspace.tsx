@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { AssignmentStage } from "./types";
 import { AssignmentProvider, useAssignmentWorkspace } from "./AssignmentContext";
 import AssignmentStageNavigation from "./components/AssignmentStageNavigation";
+import { authedJsonFetch } from "../api";
 
 // Aggressive code-splitting with React.lazy
 const SocraticTutor = React.lazy(() => import("./components/AssignmentAiTutorPanel"));
@@ -94,6 +95,7 @@ function AssignmentWorkspaceInner({
     project?.answers?.["title"] ||
     "Academic Assignment";
   const [editableTitle, setEditableTitle] = useState(initialTitle);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (project) {
@@ -105,11 +107,25 @@ function AssignmentWorkspaceInner({
     }
   }, [project]);
 
+  useEffect(() => {
+    if (editableTitle) {
+      document.title = `${editableTitle} | Scholar Core`;
+    }
+  }, [editableTitle]);
+
   const handleTitleBlur = () => {
     const trimmed = editableTitle.trim() || "Academic Assignment";
     setEditableTitle(trimmed);
     if (project && (trimmed !== (project.answers?.["assignment_title"] || project.answers?.["title"]))) {
       saveAnswers({ assignment_title: trimmed, title: trimmed });
+      try {
+        const p = authedJsonFetch(`/api/projects/${encodeURIComponent(project.projectId)}`, "PATCH", { title: trimmed });
+        if (p && typeof (p as any).catch === "function") {
+          (p as any).catch(() => {});
+        }
+      } catch {
+        // ignore in test or offline environments
+      }
     }
   };
 
@@ -242,16 +258,30 @@ function AssignmentWorkspaceInner({
             </button>
 
             {/* Inline-Editable Project Title with Auto-Save onBlur */}
-            <input
-              type="text"
-              value={editableTitle}
-              onChange={(e) => setEditableTitle(e.target.value)}
-              onBlur={handleTitleBlur}
-              onKeyDown={handleTitleKeyDown}
-              aria-label="Assignment Title"
-              title="Click to edit assignment title"
-              className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 bg-transparent hover:bg-neutral-200/50 dark:hover:bg-white/5 focus:bg-white dark:focus:bg-[#1C1C1E] border border-transparent hover:border-neutral-200/80 dark:hover:border-white/10 focus:border-neutral-300 dark:focus:border-white/20 rounded-lg px-2 py-1 focus:outline-none transition-all truncate max-w-xs sm:max-w-md md:max-w-lg cursor-text"
-            />
+            <div className="flex items-center gap-1 group max-w-xs sm:max-w-md md:max-w-lg min-w-0">
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={editableTitle}
+                onChange={(e) => setEditableTitle(e.target.value)}
+                onBlur={handleTitleBlur}
+                onKeyDown={handleTitleKeyDown}
+                aria-label="Assignment Title"
+                title="Click to edit assignment title"
+                className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 bg-transparent hover:bg-neutral-200/50 dark:hover:bg-white/5 focus:bg-white dark:focus:bg-[#1C1C1E] border border-transparent hover:border-neutral-200/80 dark:hover:border-white/10 focus:border-neutral-300 dark:focus:border-white/20 rounded-lg px-2 py-1 focus:outline-none transition-all truncate cursor-text"
+              />
+              <button
+                type="button"
+                onClick={() => titleInputRef.current?.focus()}
+                title="Rename assignment"
+                aria-label="Rename assignment"
+                className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 rounded-md transition-opacity cursor-pointer shrink-0"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Right Section: Compact Status Badge & Socratic Tutor Drawer Toggle */}

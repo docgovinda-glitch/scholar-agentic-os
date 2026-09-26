@@ -212,7 +212,13 @@ export default function AssignmentUnderstandStage() {
       });
 
       if (response && response.ok) {
-        const data: AssignmentAnalysis = await response.json();
+        const data = await response.json();
+        if (data.updatedTitle) {
+          await saveAnswers({
+            title: data.updatedTitle,
+            assignment_title: data.updatedTitle,
+          });
+        }
         await setAnalysis(data);
         return;
       }
@@ -379,6 +385,10 @@ export default function AssignmentUnderstandStage() {
           setLocalCitation(data.detectedCitation);
           updates.citation_style = data.detectedCitation;
           updates.citationStyle = data.detectedCitation;
+        }
+        if (data.updatedTitle) {
+          updates.title = data.updatedTitle;
+          updates.assignment_title = data.updatedTitle;
         }
         await saveAnswers(updates);
       }

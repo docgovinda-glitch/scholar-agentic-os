@@ -4,6 +4,7 @@ import {
   getNextUntitledProjectTitle,
   findReusableEmptyProject,
   getProjectTitle,
+  isBlankProject,
 } from "../projectNaming";
 
 describe("projectNaming utilities", () => {
@@ -133,6 +134,63 @@ describe("projectNaming utilities", () => {
         },
       ];
       expect(findReusableEmptyProject(existing, "OT-10")).toBeNull();
+    });
+
+    it("identifies untitled variants such as 'Academic Assignment' as reusable if empty", () => {
+      const existing = [
+        {
+          projectId: "p1",
+          outputTypeId: "OT-01",
+          answers: { title: "Academic Assignment" },
+          hasDocument: false,
+          intakeCompleteness: 0,
+        },
+      ];
+      expect(findReusableEmptyProject(existing, "OT-01")?.projectId).toBe("p1");
+    });
+  });
+
+  describe("isBlankProject", () => {
+    it("returns true for null, undefined, or empty project", () => {
+      expect(isBlankProject(null)).toBe(true);
+      expect(isBlankProject(undefined)).toBe(true);
+      expect(isBlankProject({})).toBe(true);
+    });
+
+    it("returns true for pristine project with only default word count or provisional fields", () => {
+      expect(
+        isBlankProject({
+          answers: {
+            title: "Untitled Project",
+            instructions: "provisional",
+            word_count: "2000",
+          },
+          hasDocument: false,
+          intakeCompleteness: 0,
+        })
+      ).toBe(true);
+    });
+
+    it("returns false if project has a document", () => {
+      expect(isBlankProject({ hasDocument: true })).toBe(false);
+    });
+
+    it("returns false if project has actual brief or instructions", () => {
+      expect(
+        isBlankProject({
+          answers: {
+            instructions: "Analyze macroeconomic policy shocks",
+          },
+        })
+      ).toBe(false);
+    });
+
+    it("returns false if intake completeness is greater than 0.1", () => {
+      expect(
+        isBlankProject({
+          intakeCompleteness: 0.4,
+        })
+      ).toBe(false);
     });
   });
 });

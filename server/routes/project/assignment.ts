@@ -3,7 +3,8 @@ import multer from "multer";
 import * as pdfParseModule from "pdf-parse";
 import mammoth from "mammoth";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText } from "../../utils/llm.ts";
+import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy } from "../../utils/llm.ts";
+import { completeWithFailover } from "../../../src/platform/gateway/gateway.ts";
 import { rejectClientCredentials } from "../../src/middleware/rejectClientCredentials.ts";
 import {
   auditDocumentLineByLine,
@@ -33,6 +34,188 @@ function extractProjectInstructions(project: any, reqBody?: any): string {
     reqBody?.question ||
     extractStandardizedInstructions(project?.answers);
   return cleanAnswerString(candidate);
+}
+
+function capitalizeTitleWords(str: string): string {
+  const minor = new Set(["a", "an", "the", "and", "but", "or", "for", "nor", "on", "at", "to", "from", "by", "in", "of", "with"]);
+  const words = str.split(" ").filter(Boolean);
+  return words
+    .map((w, idx) => {
+      const lower = w.toLowerCase();
+      if (idx > 0 && minor.has(lower)) return lower;
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    })
+    .join(" ");
+}
+
+function cleanTitleCandidate(raw: string): string {
+  let s = raw
+    .replace(/^#+\s*/, "") // markdown headers
+    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "") // outer quotes
+    .replace(
+      /^(?:critically\s+evaluate\s+(?:the\s+)?|critically\s+assess\s+(?:the\s+)?|critically\s+examine\s+(?:the\s+)?|critically\s+discuss\s+(?:the\s+)?|evaluate\s+(?:the\s+)?|assess\s+(?:the\s+)?|examine\s+(?:the\s+)?|discuss\s+(?:the\s+)?|to\s+what\s+extent\s+(?:does|do|is|are)\s+|an\s+analysis\s+of\s+|an\s+investigation\s+into\s+|how\s+(?:does|do|can)\s+|explore\s+(?:the\s+)?)/i,
+      ""
+    )
+    .replace(/[.?!;:]+$/, "")
+    .trim();
+
+  const firstClause = s.split(/[.;]/)[0].trim();
+  if (firstClause.length >= 6) s = firstClause;
+
+  const words = s.split(/\s+/).filter(Boolean);
+  if (words.length <= 2) {
+    if (words.length === 0) return "";
+    return capitalizeTitleWords(words.join(" "));
+  }
+
+  const selectedWords = words.slice(0, Math.min(words.length, 7));
+  let result = selectedWords.join(" ");
+  result = result.replace(/\s+(?:and|or|in|of|for|with|to|at|by|from|the|a|an|on)$/i, "");
+
+  return capitalizeTitleWords(result);
+}
+
+/**
+ * Fast, deterministic heuristic to extract a concise academic title (3 to 7 words)
+ * from the first several lines of a brief or assignment question.
+ */
+export function deriveHeuristicTitle(rawText: string): string {
+  if (!rawText || typeof rawText !== "string") return "Academic Assignment";
+
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((l) => l.trim().replace(/^\[L\d+\]\s*/, "")) // remove [L001] prefixes
+    .filter((l) => l.length > 0);
+
+  if (lines.length === 0) return "Academic Assignment";
+
+  // Check first 5 lines for course code + subject or title indicators
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const line = lines[i];
+
+    // Skip bare generic document header labels e.g. "Assignment Brief", "Essay Prompt"
+    if (/^(?:assignment\s*(?:brief|question|specification)?|coursework\s*(?:brief|specification)?|syllabus\s*brief|essay\s*prompt)$/i.test(line)) {
+      continue;
+    }
+
+    // Pattern 1: Course code prefix e.g. "POLI3002: Security Analysis in the 21st Century" or "CS 7015 - Machine Learning"
+    const courseCodeMatch = line.match(/^([A-Z]{2,5}\s*\d{3,5})[:\s\-–]+(.+)$/i);
+    if (courseCodeMatch) {
+      const code = courseCodeMatch[1].replace(/\s+/g, "").toUpperCase();
+      const subject = cleanTitleCandidate(courseCodeMatch[2]);
+      if (subject.length > 0) {
+        return `${code} ${subject}`.slice(0, 60).trim();
+      }
+    }
+
+    // Pattern 2: Explicit prefix e.g. "Title: ...", "Topic: ...", "Assignment Question: ..."
+    const explicitPrefixMatch = line.match(
+      /^(?:assignment\s*(?:brief|question|title)?|essay\s*(?:topic|title)?|coursework\s*(?:title)?|module\s*(?:title)?|topic|question|task)\s*[:\-–—]\s*(.+)$/i
+    );
+    if (explicitPrefixMatch) {
+      const cleaned = cleanTitleCandidate(explicitPrefixMatch[1]);
+      if (cleaned.length >= 4) return cleaned;
+    }
+  }
+
+  // Pattern 3: Clean first prominent sentence or question
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const line = lines[i];
+    if (/^(?:assignment\s*(?:brief|question|specification)?|coursework\s*(?:brief|specification)?|syllabus\s*brief|essay\s*prompt)$/i.test(line)) {
+      continue;
+    }
+    const cleaned = cleanTitleCandidate(line);
+    if (cleaned.length >= 6) {
+      return cleaned;
+    }
+  }
+
+  return "Academic Assignment";
+}
+
+/**
+ * Intelligent Semantic Auto-Naming:
+ * Generates a concise academic research title (3 to 7 words).
+ * Tries LLM if configured; otherwise gracefully falls back to deterministic heuristic.
+ */
+export async function deriveSemanticAcademicTitle(
+  briefText: string,
+  _req?: express.Request
+): Promise<string> {
+  const heuristic = deriveHeuristicTitle(briefText);
+  if (!briefText || briefText.trim().length < 15) {
+    return heuristic;
+  }
+
+  try {
+    const candidates = getCandidates();
+    if (candidates.length > 0) {
+      const prompt = `Generate a concise, academic title (3 to 7 words, e.g. "Quantum Computing Cryptographic Architectures", "Algorithmic Bias in Healthcare") based on this assignment brief. Output ONLY the plain text title, with NO punctuation, NO quotes, NO explanation:\n\n${briefText.slice(0, 1500)}`;
+      const response = await completeWithFailover(
+        {
+          taskClass: "summarisation",
+          systemPrompt: "You are an expert academic research registrar. Craft a concise, formal academic title (3-7 words).",
+          userPrompt: prompt,
+          segments: [{ label: "Brief", text: briefText.slice(0, 1500) }],
+        },
+        { candidates },
+        buildAuthorizedPolicy(candidates)
+      );
+
+      if (response.ok && response.value?.text) {
+        const candidate = response.value.text
+          .trim()
+          .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
+          .replace(/^(?:title|topic)[:\s\-–]+/i, "")
+          .replace(/[.?!;:]+$/, "")
+          .trim();
+        const wordCount = candidate.split(/\s+/).length;
+        if (wordCount >= 2 && wordCount <= 10 && candidate.length >= 5 && candidate.length <= 75) {
+          return capitalizeTitleWords(candidate);
+        }
+      }
+    }
+  } catch {
+    // Fall back to heuristic
+  }
+
+  return heuristic;
+}
+
+/**
+ * Automatically updates project title in answers & record if currently untitled.
+ */
+export async function autoUpdateProjectTitleIfUntitled(
+  project: any,
+  derivedTitle: string
+): Promise<string> {
+  if (!project) return derivedTitle;
+  if (!project.answers) project.answers = {};
+
+  const currentTitle = (
+    project.answers["title"] ||
+    project.answers["assignment_title"] ||
+    project.title ||
+    ""
+  ).trim();
+
+  const isDefaultOrUntitled =
+    !currentTitle ||
+    currentTitle.toLowerCase().includes("untitled") ||
+    currentTitle.toLowerCase() === "academic assignment" ||
+    currentTitle.toLowerCase() === "synthesized research project";
+
+  if (isDefaultOrUntitled && derivedTitle && derivedTitle !== "Academic Assignment") {
+    project.answers["title"] = derivedTitle;
+    project.answers["assignment_title"] = derivedTitle;
+    if (typeof project.title === "string") {
+      project.title = derivedTitle;
+    }
+    await getProjectStore().save(project);
+    return derivedTitle;
+  }
+
+  return currentTitle || derivedTitle;
 }
 
 const upload = multer({
@@ -157,6 +340,9 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
     }
     await getProjectStore().save(project);
 
+    const derivedTitle = await deriveSemanticAcademicTitle(text, req);
+    const updatedTitle = await autoUpdateProjectTitleIfUntitled(project, derivedTitle);
+
     return res.json({
       success: true,
       text,
@@ -164,6 +350,7 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
       detectedWordCount,
       detectedLevel,
       detectedCitation,
+      updatedTitle,
     });
   } catch (err: any) {
     console.error("Error parsing brief in assignment router:", err);
@@ -396,6 +583,9 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     };
 
     // 6. Persist the ledger in the project JSONB answers under assignment_analysis and brief_ledger
+    const derivedTitle = await deriveSemanticAcademicTitle(question || briefText, req);
+    const updatedTitle = await autoUpdateProjectTitleIfUntitled(project, derivedTitle);
+
     project.answers = {
       ...project.answers,
       instructions: String(question),
@@ -416,12 +606,14 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       marking_rubric: String(rubricText),
       assignment_analysis: JSON.stringify(finalAnalysis),
       brief_ledger: JSON.stringify(ledger),
+      ...(updatedTitle ? { title: updatedTitle, assignment_title: updatedTitle } : {}),
     };
     await getProjectStore().save(project);
 
     res.json({
       ...finalAnalysis,
       briefLedger: ledger,
+      updatedTitle: updatedTitle || project.answers?.["title"] || (project as any).title,
     });
   } catch (err: any) {
     console.error("Assignment deconstruction error:", err);

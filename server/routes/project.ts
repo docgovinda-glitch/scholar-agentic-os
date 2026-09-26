@@ -1323,6 +1323,43 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   }));
 
   /**
+   * Update top-level project metadata such as title and answers.
+   * Body: { title?: string, answers?: Record<string, string> }
+   */
+  app.patch("/api/projects/:id", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { title, answers } = req.body ?? {};
+    let nextAnswers = { ...record.answers };
+    let hasChanges = false;
+
+    if (typeof title === "string") {
+      const cleanTitle = title.trim();
+      if (cleanTitle) {
+        nextAnswers.title = cleanTitle;
+        nextAnswers.assignment_title = cleanTitle;
+        hasChanges = true;
+      }
+    }
+
+    if (answers && typeof answers === "object" && !Array.isArray(answers)) {
+      for (const [k, v] of Object.entries(answers)) {
+        if (typeof v === "string") {
+          nextAnswers[k] = v;
+          hasChanges = true;
+        }
+      }
+    }
+
+    if (hasChanges) {
+      const updated = await store.save({ ...record, answers: nextAnswers });
+      return res.json(projectView(updated));
+    }
+
+    res.json(projectView(record));
+  }));
+
+  /**
    * Submit or update intake answers, recomputing G0's exit criteria
    * (docs 14 §5.2's per-field allowsProvisional contract, via
    * computeG0ExitCriteria). 409s if G0 is already signed off — invalidate

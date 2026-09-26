@@ -16,6 +16,7 @@ import {
   isDuplicateProjectTitle,
   getNextUntitledProjectTitle,
   findReusableEmptyProject,
+  isBlankProject,
 } from "./projectNaming";
 import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
@@ -1025,13 +1026,15 @@ export default function ProjectListScreen({
     }
   }, []);
 
+  const isCreatingRef = useRef(false);
+
   const handleCreate = useCallback(async (outputTypeId: string) => {
     if (!userEmail) {
       const tile = FORMAT_TILES.find((t) => t.id === outputTypeId);
       openAuth("signup", `Sign in or create an account to initialize your ${tile?.label || "research"} workspace.`, outputTypeId);
       return;
     }
-    if (creating) return;
+    if (creating || isCreatingRef.current) return;
 
     // Check if an existing zero-content draft of this format exists to reuse and prevent project bloat
     const reusable = findReusableEmptyProject(projects || [], outputTypeId);
@@ -1040,6 +1043,21 @@ export default function ProjectListScreen({
       return;
     }
 
+    // Also check session storage for any untouched empty project stub generated in this session
+    try {
+      const sessionEmptyId = sessionStorage.getItem("scholar_session_empty_project_id");
+      if (sessionEmptyId) {
+        const found = projects?.find((p) => p.projectId === sessionEmptyId && (!outputTypeId || p.outputTypeId === outputTypeId));
+        if (found && isBlankProject(found)) {
+          onOpen(found.projectId);
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    isCreatingRef.current = true;
     setCreating(true);
     setCreatingFormatId(outputTypeId);
     setError(null);
@@ -1054,11 +1072,20 @@ export default function ProjectListScreen({
       } else {
         project.answers = { title: defaultTitle };
       }
+
+      try {
+        sessionStorage.setItem("scholar_session_empty_project_id", project.projectId);
+      } catch {
+        // ignore
+      }
+
       onOpen(project.projectId);
     } catch (e) {
       setError((e as Error).message);
       setCreating(false);
       setCreatingFormatId(null);
+    } finally {
+      isCreatingRef.current = false;
     }
   }, [userEmail, creating, openAuth, onOpen, projects]);
 
@@ -1205,19 +1232,48 @@ export default function ProjectListScreen({
     if (!userEmail || !projects || projects.length === 0) {
       return [];
     }
-    let filtered = projects;
+    // Filter out completely blank untouched projects (0 word count, no text, no brief)
+    // Exception: If all projects are blank, keep at most the newest one
+    const active = projects.filter((p) => !isBlankProject(p));
+    const candidateList = active.length > 0 ? active : (projects.length > 0 ? [projects[0]] : []);
+
+    let filtered = candidateList;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      filtered = projects.filter((p) => {
+      filtered = candidateList.filter((p) => {
         const t = (p.answers?.title || "").toLowerCase();
         return t.includes(q);
       });
     }
-    return filtered.map((p) => ({
-      id: p.projectId,
-      projectId: p.projectId,
-      title: p.answers?.title?.trim() || "Untitled Project",
-    }));
+
+    const seenTitles = new Map<string, number>();
+
+    return filtered.map((p) => {
+      let rawTitle = p.answers?.title?.trim() || (p.answers as any)?.assignment_title?.trim() || "";
+      let title = rawTitle;
+
+      if (!title) {
+        const typeTile = FORMAT_TILES.find((t) => t.id === p.outputTypeId);
+        const typeLabel = typeTile ? typeTile.label : "Project";
+        const dateStr = (p as any).updatedAt
+          ? new Date((p as any).updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+          : new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        title = `Untitled ${typeLabel} (${dateStr})`;
+      }
+
+      // Disambiguate duplicate identical names in recents list
+      const count = seenTitles.get(title) || 0;
+      seenTitles.set(title, count + 1);
+      if (count > 0) {
+        title = `${title} (${count + 1})`;
+      }
+
+      return {
+        id: p.projectId,
+        projectId: p.projectId,
+        title,
+      };
+    });
   }, [userEmail, projects, searchQuery]);
 
   const [activeProviderLabel, setActiveProviderLabel] = useState<string>("Ready");
@@ -1684,14 +1740,17 @@ export default function ProjectListScreen({
     [userEmail, creating, openAuth, guideMessages, onOpen]
   );
 
+  const handledNewFormatRef = useRef<string | null>(null);
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const newFormat = params.get("newFormat");
-    if (newFormat && userEmail && !creating) {
+    if (newFormat && userEmail && !creating && handledNewFormatRef.current !== newFormat) {
+      handledNewFormatRef.current = newFormat;
       handleCreate(newFormat);
       navigate("/projects", { replace: true });
     }
-  }, [location.search, userEmail, creating, navigate]);
+  }, [location.search, userEmail, creating, navigate, handleCreate]);
 
   const [projectToDelete, setProjectToDelete] = useState<ProjectView | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -2079,20 +2138,35 @@ export default function ProjectListScreen({
                           {isPinned && <Pin className="w-3 h-3 text-amber-500/80 group-hover:text-amber-500 rotate-45 flex-shrink-0 transition-colors duration-200" />}
                           <span className="truncate">{item.title}</span>
                         </span>
-                        <button
-                          type="button"
-                          aria-label="More options"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setActiveRecentMenuId((prev) => (prev === item.id ? null : item.id));
-                          }}
-                          className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-neutral-900/10 dark:hover:bg-white/10 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 flex-shrink-0 ${
-                            isMenuOpen ? "!opacity-100" : ""
-                          }`}
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          <button
+                            type="button"
+                            aria-label="Trash project"
+                            title="Delete project"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleRecentAction("delete", item);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-red-500/10 text-neutral-400 hover:text-red-500 flex-shrink-0 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="More options"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setActiveRecentMenuId((prev) => (prev === item.id ? null : item.id));
+                            }}
+                            className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-neutral-900/10 dark:hover:bg-white/10 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 flex-shrink-0 ${
+                              isMenuOpen ? "!opacity-100" : ""
+                            }`}
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Popover Options Menu */}

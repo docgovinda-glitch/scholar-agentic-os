@@ -261,8 +261,17 @@ export function AssignmentProvider({
         standardized.citation_style = cs;
       }
 
+      if (updates.title !== undefined || updates.assignment_title !== undefined || updates.updatedTitle !== undefined) {
+        const titleVal = String(updates.title ?? updates.assignment_title ?? updates.updatedTitle ?? "").trim();
+        if (titleVal) {
+          standardized.title = titleVal;
+          standardized.assignment_title = titleVal;
+        }
+      }
+
       const merged = { ...project.answers, ...standardized };
       setProject((prev) => (prev ? { ...prev, answers: merged } : null));
+
       try {
         await saveIntakeAnswers(activeProjectId, merged);
       } catch (err) {

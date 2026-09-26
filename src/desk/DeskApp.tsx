@@ -199,6 +199,12 @@ function ProjectRoute() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (projectId === "new") {
+      const search = new URLSearchParams(location.search);
+      const format = search.get("format") || "OT-01";
+      navigate(`/projects?newFormat=${format}`, { replace: true });
+      return;
+    }
     let active = true;
     if (projectId) {
       getProject(projectId)
@@ -218,7 +224,7 @@ function ProjectRoute() {
     return () => {
       active = false;
     };
-  }, [projectId]);
+  }, [projectId, location.search, navigate]);
 
   const onDeskShellViewChange = useCallback(
     (next: DeskShellView, options?: { replace?: boolean }) => {
