@@ -2247,19 +2247,6 @@ export default function ProjectListScreen({
 
           {/* Top Bar Right: AI Assistant Toggle & Active Provider Status */}
           <div className="flex items-center gap-2.5">
-            {/* Quick Command Palette Button */}
-            <button
-              type="button"
-              onClick={() => setIsCommandPaletteOpen(true)}
-              className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium transition-colors border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 hover:bg-neutral-900/10 dark:hover:bg-white/10 text-neutral-600 dark:text-neutral-300 cursor-pointer shadow-2xs"
-              title="Open Command Palette (⌘K)"
-            >
-              <Search className="w-3.5 h-3.5 text-neutral-400" />
-              <span>Search / Commands</span>
-              <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-200/60 dark:bg-white/10 text-neutral-500 dark:text-neutral-400">
-                ⌘K
-              </kbd>
-            </button>
             {/* Active AI Status Pill */}
             {userEmail ? (
               <button
@@ -2458,7 +2445,7 @@ export default function ProjectListScreen({
             </div>
 
             {/* Main AI Prompt Bar — Parallel to the line above settings */}
-            <div className="sticky bottom-0 z-20 w-full relative pointer-events-none min-h-[114px] flex flex-col justify-start bg-gradient-to-t from-[#F8F9FA] dark:from-[#171717] via-[#F8F9FA]/95 dark:via-[#171717]/95 to-transparent px-4 pb-2">
+            <div className="sticky bottom-0 z-20 w-full relative pointer-events-none flex flex-col justify-start bg-gradient-to-t from-[#F8F9FA] dark:from-[#171717] via-[#F8F9FA]/95 dark:via-[#171717]/95 to-transparent px-4 pb-3">
               <div className="w-full max-w-4xl mx-auto relative pointer-events-auto flex flex-col items-center">
                 {/* Contextual Clarification when Ask Scholar is Open */}
                 {isAiSidebarOpen && (
@@ -2471,50 +2458,6 @@ export default function ProjectListScreen({
                     >
                       <span>Ask Scholar Copilot Active</span>
                       <span className="text-[10px]">➔</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Contextual Research Prompt Starters (when input is empty) */}
-                {!mainPromptInput.trim() && mainAttachments.length === 0 && (
-                  <div className={`items-center gap-1.5 mb-2 overflow-x-auto max-w-full scholar-scrollbar py-0.5 pointer-events-auto select-none ${
-                    isAiSidebarOpen ? "hidden lg:flex" : "flex"
-                  }`}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMainPromptInput("Synthesize the latest 2026 developments in quantum computing and superconducting qubits.");
-                        setMainAiMode("deep_research");
-                        guideTextareaRef.current?.focus();
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 dark:bg-white/5 border border-neutral-200/90 dark:border-white/10 text-[11px] text-neutral-600 dark:text-neutral-400 hover:text-purple-600 dark:hover:text-purple-300 hover:border-purple-300 dark:hover:border-purple-500/30 hover:bg-purple-50/60 dark:hover:bg-purple-950/20 transition-all cursor-pointer shadow-2xs whitespace-nowrap active:scale-95"
-                    >
-                      <Sparkles className="w-3 h-3 text-purple-500" />
-                      <span>🔬 Deep Research Frontier Topics</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMainPromptInput("Compare prime editing and base editing off-target fidelity in human cells.");
-                        setMainAiMode("search");
-                        guideTextareaRef.current?.focus();
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 dark:bg-white/5 border border-neutral-200/90 dark:border-white/10 text-[11px] text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-300 hover:border-blue-300 dark:hover:border-blue-500/30 hover:bg-blue-50/60 dark:hover:bg-blue-950/20 transition-all cursor-pointer shadow-2xs whitespace-nowrap active:scale-95"
-                    >
-                      <Globe className="w-3 h-3 text-blue-500" />
-                      <span>🔍 Live Multi-Source Search</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMainPromptInput("Verify and cross-reference our internal research hypotheses against academic literature.");
-                        setMainAiMode("deep_research");
-                        guideTextareaRef.current?.focus();
-                      }}
-                      className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 dark:bg-white/5 border border-neutral-200/90 dark:border-white/10 text-[11px] text-neutral-600 dark:text-neutral-400 hover:text-emerald-600 dark:hover:text-emerald-300 hover:border-emerald-300 dark:hover:border-emerald-500/30 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/20 transition-all cursor-pointer shadow-2xs whitespace-nowrap active:scale-95"
-                    >
-                      <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                      <span>🛡️ Cross-Verify Evidence</span>
                     </button>
                   </div>
                 )}

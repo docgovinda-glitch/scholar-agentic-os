@@ -199,8 +199,26 @@ The prompt bar at the bottom of the workspace commands user actions via a sleek,
      - Disabled State: `disabled:bg-neutral-200 dark:disabled:bg-white/10 disabled:text-neutral-400 dark:disabled:text-neutral-600 disabled:cursor-not-allowed`.
 
 3. **Apple-Grade Smooth Theme Cross-Fade**:
-   - Scoped transitions in `src/index.css` targeting only `background-color`, `border-color`, and `color` with an ultra-smooth `180ms cubic-bezier(0.16, 1, 0.3, 1)` curve.
-   - Layout geometry properties are untouched, preventing layout jumps or white flashes.
-   - Transient `theme-transition` class applied to `document.documentElement` during the 200ms toggle window.
+   - Integrated the modern **View Transitions API** (`document.startViewTransition`) for full-viewport GPU hardware-accelerated cross-fades over 250ms with `cubic-bezier(0.16, 1, 0.3, 1)`.
+   - Scoped synchronized fallback transitions in `src/index.css` across `background-color`, `border-color`, `color`, `fill`, `stroke`, and `box-shadow` (200ms `cubic-bezier(0.16, 1, 0.3, 1)`), eliminating SVG icon and drop-shadow snap-lag.
+   - Guarded against motion sensitivities via `@media (prefers-reduced-motion: reduce)`.
+
+---
+
+## 8. Dashboard Visual De-Cluttering & Single Primary Interaction Anchor
+
+1. **Purged Suggestion Pills Row**:
+   - Completely removed the redundant horizontal suggestion pills container (*"✨ 🔬 Deep Research Frontier Topics"*, *"🌐 🔍 Live Multi-Source Search"*, *"🛡️ 🛡️ Cross-Verify Evidence"*) and its parent wrapper.
+   - Eliminated reserved min-height constraints (`min-h-[114px]`), ensuring no empty margins or dead space exist between the 4 template cards and the prompt bar.
+
+2. **Purged Duplicate Header Command Pill**:
+   - Removed the top header command pill button (*"Search / Commands ⌘K"*).
+   - Preserved global keyboard shortcut `⌘K` / `Ctrl+K` and sidebar search button triggers for the Command Palette.
+   - The top header remains ultra-lightweight and distraction-free, focusing exclusively on navigation breadcrumbs/sidebar toggle and user profile controls.
+
+3. **Center-Staged Clean Canvas**:
+   - The dashboard workspace strictly spotlights:
+     1. The **4 curated deliverable template cards** (*Assignment*, *Journal Article*, *Research Proposal*, *Presentation*).
+     2. The **bottom-docked auto-expanding prompt bar** as the single primary interaction point.
 
 
