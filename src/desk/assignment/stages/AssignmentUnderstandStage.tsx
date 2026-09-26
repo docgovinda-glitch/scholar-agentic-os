@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { authedJsonFetch, authedFetch } from "../../api";
 import {
@@ -19,6 +19,7 @@ const CITATION_STYLES = [
 
 export default function AssignmentUnderstandStage() {
   const {
+    projectId,
     project,
     question,
     academicLevel,
@@ -32,6 +33,8 @@ export default function AssignmentUnderstandStage() {
     advanceStage,
     ensurePersisted,
   } = useAssignmentWorkspace();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const courseName = project?.answers?.["course_name"] || "";
   const institutionName = project?.answers?.["institution"] || "";
@@ -230,21 +233,33 @@ export default function AssignmentUnderstandStage() {
 
     try {
       const targetProjectId = await ensurePersisted();
-      const res = await authedFetch(`/api/projects/${targetProjectId}/parse-file`, {
+      const res = await authedFetch(`/api/projects/${targetProjectId}/assignment/parse-brief`, {
         method: "POST",
         body: formData,
       });
       if (!res.ok) throw new Error("Failed to parse brief file");
       const data = await res.json();
       const extractedText = data.text || "";
-      setLocalBrief((prev) => (prev ? `${prev}\n\n${extractedText}` : extractedText));
-      if (!localQuestion && extractedText.length > 20) {
-        setLocalQuestion(extractedText.slice(0, 300));
+      if (extractedText) {
+        setLocalQuestion(extractedText);
+        setLocalBrief(extractedText);
+        if (data.detectedWordCount && data.detectedWordCount >= 200) {
+          setLocalWordCount(data.detectedWordCount);
+        }
+        if (data.detectedLevel) {
+          setLocalLevel(data.detectedLevel);
+        }
+        if (data.detectedCitation) {
+          setLocalCitation(data.detectedCitation);
+        }
       }
     } catch (err: any) {
       setAnalysisError(err.message || "Failed to parse brief file");
     } finally {
       setUploadingBrief(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -279,19 +294,34 @@ export default function AssignmentUnderstandStage() {
                 <span>Assignment Question / Instructions</span>
                 <span className="text-rose-500">*</span>
               </label>
-              <label className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer flex items-center gap-1.5 transition-colors px-2.5 py-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/5">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.37l-8.647 8.648a1.5 1.5 0 01-2.121-2.121l7.693-7.693" />
-                </svg>
-                <span>Upload Brief (.pdf, .docx)</span>
-                <input
-                  type="file"
-                  accept=".pdf,.docx,.doc,.txt"
-                  onChange={handleFileUpload}
-                  disabled={uploadingBrief}
-                  className="hidden"
-                />
-              </label>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingBrief}
+                className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer flex items-center gap-1.5 transition-colors px-2.5 py-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/5 disabled:opacity-50"
+              >
+                {uploadingBrief ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin" />
+                    <span>Parsing Brief…</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.37l-8.647 8.648a1.5 1.5 0 01-2.121-2.121l7.693-7.693" />
+                    </svg>
+                    <span>Upload Brief (.pdf, .docx)</span>
+                  </>
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.doc,.txt"
+                onChange={handleFileUpload}
+                disabled={uploadingBrief}
+                className="hidden"
+              />
             </div>
             <textarea
               value={localQuestion}
@@ -616,6 +646,29 @@ export default function AssignmentUnderstandStage() {
               </div>
             </div>
           </div>
+
+          {/* Rubric Criteria, Grading Benchmarks & Detected Penalties */}
+          {analysis.markingCriteriaInsights && analysis.markingCriteriaInsights.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+                Marking Rubric Insights & Assessment Standards
+              </h4>
+              <div className="space-y-2">
+                {analysis.markingCriteriaInsights.map((insight, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-xl border text-xs leading-relaxed ${
+                      insight.includes("🚨") || insight.toLowerCase().includes("penalty")
+                        ? "border-rose-500/30 bg-rose-500/5 text-rose-700 dark:text-rose-300 font-medium"
+                        : "border-neutral-200/80 dark:border-white/10 bg-neutral-50/70 dark:bg-white/5 text-neutral-700 dark:text-neutral-300"
+                    }`}
+                  >
+                    {insight}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Student Approval & Confirmation Banner */}
           <div className="p-5 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50 dark:bg-white/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

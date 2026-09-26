@@ -1,10 +1,39 @@
 import express from "express";
+import multer from "multer";
+import * as pdfParseModule from "pdf-parse";
+import mammoth from "mammoth";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
 import { callOpenRouterJSON, callOpenRouterText } from "../../utils/llm.ts";
 import { rejectClientCredentials } from "../../src/middleware/rejectClientCredentials.ts";
+import { runBriefScannerGraph } from "../../services/briefScannerGraph.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(rejectClientCredentials);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 15 * 1024 * 1024, // 15MB limit
+  },
+});
+
+async function extractTextFromPdf(buffer: Buffer): Promise<{ text: string }> {
+  try {
+    if (typeof (pdfParseModule as any).PDFParse === "function") {
+      const parser = new (pdfParseModule as any).PDFParse({ data: buffer });
+      const res = await parser.getText();
+      return { text: res.text || "" };
+    }
+    const fn = (pdfParseModule as any).default || pdfParseModule;
+    if (typeof fn === "function") {
+      const res = await fn(buffer);
+      return { text: res.text || "" };
+    }
+  } catch (err) {
+    console.warn("PDF parser error in assignment router:", err);
+  }
+  return { text: "" };
+}
 
 async function getProjectSafe(req: express.Request<any>, res: express.Response) {
   const projectId = req.params.id;
@@ -20,7 +49,78 @@ async function getProjectSafe(req: express.Request<any>, res: express.Response) 
   return project;
 }
 
-// 1. POST /api/projects/:id/assignment/analyze
+// 0. POST /api/projects/:id/assignment/parse-brief (File Upload for Briefs)
+router.post("/parse-brief", upload.single("file"), async (req: express.Request<{ id: string }>, res: express.Response) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+
+  const file = req.file;
+  if (!file) {
+    return res.status(400).json({ error: "No file provided" });
+  }
+
+  let text = "";
+  try {
+    if (file.mimetype === "application/pdf" || file.originalname.toLowerCase().endsWith(".pdf")) {
+      const data = await extractTextFromPdf(file.buffer);
+      text = data.text;
+    } else if (
+      file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      file.originalname.toLowerCase().endsWith(".docx") ||
+      file.originalname.toLowerCase().endsWith(".doc")
+    ) {
+      const result = await mammoth.extractRawText({ buffer: file.buffer });
+      text = result.value || "";
+    } else {
+      text = file.buffer.toString("utf-8");
+    }
+
+    // Clean whitespace and normalize line breaks
+    text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+
+    // Detect metadata
+    let detectedWordCount: number | undefined;
+    const wordMatch =
+      text.match(/(?:word\s*count|target|limit|length)\s*(?:is|of|:)?\s*([1-9]\d{2,4})/i) ||
+      text.match(/\b([1-9]\d{2,4})\s*words\b/i);
+    if (wordMatch) {
+      const parsed = parseInt(wordMatch[1], 10);
+      if (parsed >= 200 && parsed <= 50000) {
+        detectedWordCount = parsed;
+      }
+    }
+
+    let detectedLevel: "undergraduate" | "postgraduate" | undefined;
+    if (/\b(postgraduate|masters|master's|msc|ma|mba|llm|phd|level\s*7)\b/i.test(text)) {
+      detectedLevel = "postgraduate";
+    } else if (/\b(undergraduate|bachelor|bachelor's|bsc|ba|level\s*[456])\b/i.test(text)) {
+      detectedLevel = "undergraduate";
+    }
+
+    let detectedCitation: string | undefined;
+    if (/\b(apa\s*7|\bapa\b)/i.test(text)) detectedCitation = "apa7";
+    else if (/\bharvard\b/i.test(text)) detectedCitation = "harvard";
+    else if (/\bieee\b/i.test(text)) detectedCitation = "ieee";
+    else if (/\bmla\b/i.test(text)) detectedCitation = "mla9";
+    else if (/\bchicago\b/i.test(text)) detectedCitation = "chicago";
+    else if (/\boscola\b/i.test(text)) detectedCitation = "oscola";
+
+    const lines = text.split("\n").filter((l) => l.trim().length > 0);
+
+    return res.json({
+      success: true,
+      text,
+      lineCount: lines.length,
+      detectedWordCount,
+      detectedLevel,
+      detectedCitation,
+    });
+  } catch (err: any) {
+    console.error("Error parsing brief in assignment router:", err);
+    return res.status(500).json({ error: err.message || "Failed to extract text from brief" });
+  }
+});
+
 // 1. POST /api/projects/:id/assignment/analyze & /deconstruct
 const handleDeconstruct = async (req: express.Request<{ id: string }>, res: express.Response) => {
   const project = await getProjectSafe(req, res);
@@ -37,108 +137,20 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
   } = req.body || {};
 
   try {
-    const prompt = `You are the Scholar Core Assignment Deconstruction & Rubric Analysis Agent.
-Analyze the following university assignment brief and marking rubric with high academic precision.
+    // Execute deterministic Sequential LangGraph Line-by-Line Scanner
+    const briefContent = `${question}\n\n${briefText}\n\n${rubricText}`.trim();
+    const graphAnalysis = await runBriefScannerGraph({
+      briefText: briefContent,
+      question,
+      assignmentType,
+      academicLevel,
+      targetWordCount: Number(targetWordCount) || 2000,
+      citationStyle,
+      rubricText,
+    });
 
-Assignment Question / Prompt: "${question}"
-Assignment Type: ${assignmentType}
-Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Expect deep critical evaluation, theoretical synthesis, and independent argument" : "Focus on conceptual clarity, rigorous evidence, clear argument, and accurate referencing"})
-Target Word Count: ${targetWordCount} words
-Citation Style: ${citationStyle}
-Assignment Brief / Rubric Details: "${briefText} ${rubricText}"
-
-Analyze this assignment rigorously and extract:
-1. Command verbs present (e.g. Critically discuss, Evaluate, Analyse, Compare, Assess, Argue, Describe, Explain) and what the examiner specifically demands.
-2. Grade band descriptors: Define explicit benchmarks for:
-   - First Class (70%+ / Grade A): Outstanding critical evaluation, counterargument synthesis, original insight.
-   - Upper Second Class (60-69% / Grade B): Sound structure, solid evidence, consistent analytical argument.
-   - Lower Second Class (50-59% / Grade C): Descriptive narrative, basic structure, limited critical depth.
-   - Third Class / Pass (40-49%): Minimal argumentation, heavy textbook reliance, superficial analysis.
-3. Explicit sub-questions (directly stated in the prompt) and Implicit sub-questions (unspoken theoretical or empirical questions required for a First Class mark).
-4. Concrete constraints (word count limits, penalties, required citation style, excluded themes).
-5. A comprehensive executive summary of what the examiner is asking.
-6. Key conceptual domains and terminology.
-7. Clear scope boundaries (what is strictly in scope vs out of scope).
-8. Evidence and source requirements.
-9. Word-count allocation implications.
-10. Citation and referencing guidance.
-11. Academic level specific depth notes.
-
-Return ONLY valid JSON matching this exact structure:
-{
-  "commandVerbs": [
-    {
-      "verb": "Critically evaluate",
-      "meaning": "Weigh competing theoretical arguments and evidence to judge their validity.",
-      "academicExpectation": "You must not merely describe; you must identify weaknesses and justify a conclusion."
-    }
-  ],
-  "gradeBandDescriptors": [
-    {
-      "band": "1st_class",
-      "label": "First Class (70%+ / Grade A)",
-      "minScore": 70,
-      "criteria": ["Comprehensive critique of assumptions", "Nuanced counterarguments", "Theoretical synthesis"],
-      "whatExaminersLookFor": "Deep dialectical engagement and independent, justified academic reasoning."
-    },
-    {
-      "band": "2_1_upper_second",
-      "label": "Upper Second Class (60–69% / Grade B)",
-      "minScore": 60,
-      "criteria": ["Clear critical argument", "Well-evidenced claims", "Consistent structure"],
-      "whatExaminersLookFor": "Consistent analysis without lapsing into passive description."
-    },
-    {
-      "band": "2_2_lower_second",
-      "label": "Lower Second Class (50–59% / Grade C)",
-      "minScore": 50,
-      "criteria": ["Largely descriptive", "Basic scholarly citations", "Uneven argumentation"],
-      "whatExaminersLookFor": "Basic factual understanding, though lacking counterargument analysis."
-    },
-    {
-      "band": "3rd_class",
-      "label": "Third Class / Pass (40–49%)",
-      "minScore": 40,
-      "criteria": ["Superficial coverage", "Minimal academic evidence", "Weak structure"],
-      "whatExaminersLookFor": "Threshold pass with significant gaps in reasoning."
-    }
-  ],
-  "subQuestions": {
-    "explicit": ["...", "..."],
-    "implicit": ["...", "..."]
-  },
-  "constraints": [
-    "Word count target: ${targetWordCount} words (standard ±10% penalty threshold)",
-    "Citation standard: ${citationStyle.toUpperCase()} referencing mandatory",
-    "Must integrate dialectical counterarguments"
-  ],
-  "summary": "...",
-  "keyConcepts": ["...", "..."],
-  "scopeBoundaries": {
-    "included": ["...", "..."],
-    "excluded": ["...", "..."]
-  },
-  "expectedResponseType": "...",
-  "evidenceRequirements": "...",
-  "markingCriteriaInsights": ["...", "..."],
-  "wordCountImplications": "...",
-  "citationGuidance": "...",
-  "academicLevelNotes": "...",
-  "approvedByUser": false
-}`;
-
-    const analysis = await callOpenRouterJSON(
-      req,
-      res,
-      "You are the Scholar Core Assignment Deconstruction & Rubric Analysis Agent.",
-      prompt,
-      "openrouter/auto",
-      "analysis"
-    );
-    if (!analysis) return;
-    res.json(analysis);
+    res.json(graphAnalysis);
   } catch (err: any) {
-    if (err?.message === "RequireFrontendLLMException") return;
     console.error("Assignment deconstruction error:", err);
     if (!res.headersSent) {
       res.status(500).json({ error: err.message || "Failed to deconstruct assignment brief" });

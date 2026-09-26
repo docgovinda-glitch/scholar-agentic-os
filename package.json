@@ -21,6 +21,9 @@
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
+    "@langchain/core": "^1.2.12",
+    "@langchain/langgraph": "^1.4.18",
+    "@langchain/openai": "^1.5.13",
     "@supabase/supabase-js": "^2.110.7",
     "@tiptap/core": "^3.30.1",
     "@tiptap/extension-placeholder": "^3.30.1",
