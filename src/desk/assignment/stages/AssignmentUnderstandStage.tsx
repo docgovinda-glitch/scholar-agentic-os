@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { authedJsonFetch, authedFetch } from "../../api";
 import {
@@ -6,6 +6,7 @@ import {
   type AssignmentType,
   type AssignmentAnalysis,
   ASSIGNMENT_TYPE_LABELS,
+  cleanAnswerString,
 } from "../types";
 
 const CITATION_STYLES = [
@@ -32,21 +33,26 @@ export default function AssignmentUnderstandStage() {
     setAnalysis,
     advanceStage,
     ensurePersisted,
+    isLoading,
   } = useAssignmentWorkspace();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const courseName = project?.answers?.["course_name"] || "";
+  const courseName = project?.answers?.["course_name"] || project?.answers?.["courseCode"] || "";
   const institutionName = project?.answers?.["institution"] || "";
   const deadlineDate = project?.answers?.["deadline"] || "";
-  const markingRubricText = project?.answers?.["marking_rubric"] || "";
+  const markingRubricText = project?.answers?.["marking_rubric"] || project?.answers?.["rubric"] || "";
 
-  const [localQuestion, setLocalQuestion] = useState(question);
-  const [localLevel, setLocalLevel] = useState<AcademicLevel>(academicLevel);
-  const [localType, setLocalType] = useState<AssignmentType>(assignmentType);
-  const [localWordCount, setLocalWordCount] = useState<number>(targetWordCount);
-  const [localCitation, setLocalCitation] = useState<string>(citationStyle);
-  const [localBrief, setLocalBrief] = useState(assignmentBriefText);
+  const [localQuestion, setLocalQuestion] = useState(
+    cleanAnswerString(question)
+  );
+  const [localLevel, setLocalLevel] = useState<AcademicLevel>(academicLevel || "undergraduate");
+  const [localType, setLocalType] = useState<AssignmentType>(assignmentType || "essay");
+  const [localWordCount, setLocalWordCount] = useState<number>(targetWordCount || 2000);
+  const [localCitation, setLocalCitation] = useState<string>(citationStyle || "apa7");
+  const [localBrief, setLocalBrief] = useState(
+    cleanAnswerString(assignmentBriefText) || cleanAnswerString(question)
+  );
   const [course, setCourse] = useState(courseName);
   const [institution, setInstitution] = useState(institutionName);
   const [deadline, setDeadline] = useState(deadlineDate);
@@ -57,6 +63,100 @@ export default function AssignmentUnderstandStage() {
   const [uploadingBrief, setUploadingBrief] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [userFeedback, setUserFeedback] = useState("");
+
+  // Hydrate local state whenever project.answers changes / finishes loading
+  useEffect(() => {
+    if (isLoading) return;
+    const currentInstructions = cleanAnswerString(question);
+    setLocalQuestion((prev) => {
+      // If user hasn't typed anything or prev is empty or "provisional", hydrate immediately
+      if (!prev || prev.trim().toLowerCase() === "provisional") {
+        return currentInstructions;
+      }
+      return prev;
+    });
+    if (academicLevel) setLocalLevel(academicLevel);
+    if (assignmentType) setLocalType(assignmentType);
+    if (targetWordCount > 0) setLocalWordCount(targetWordCount);
+    if (citationStyle) setLocalCitation(citationStyle);
+    const cleanedBrief = cleanAnswerString(assignmentBriefText);
+    if (cleanedBrief) {
+      setLocalBrief(cleanedBrief);
+    } else if (currentInstructions) {
+      setLocalBrief(currentInstructions);
+    }
+    if (courseName) setCourse(courseName);
+    if (institutionName) setInstitution(institutionName);
+    if (deadlineDate) setDeadline(deadlineDate);
+    if (markingRubricText) setRubricText(markingRubricText);
+  }, [
+    isLoading,
+    question,
+    academicLevel,
+    assignmentType,
+    targetWordCount,
+    citationStyle,
+    assignmentBriefText,
+    courseName,
+    institutionName,
+    deadlineDate,
+    markingRubricText,
+  ]);
+
+  // Autosave / onBlur debouncing to commit any changes directly to PostgreSQL / JSONB storage
+  const handleQuestionBlur = () => {
+    const trimmed = cleanAnswerString(localQuestion);
+    if (trimmed) {
+      saveAnswers({
+        instructions: trimmed,
+        assignment_question: trimmed,
+        assignment_brief_text: trimmed,
+        research_topic: trimmed,
+        assignment_brief: trimmed,
+      });
+    }
+  };
+
+  const handleWordCountBlur = () => {
+    if (localWordCount > 0) {
+      saveAnswers({
+        targetWordCount: localWordCount,
+        target_word_count: localWordCount,
+        word_count: localWordCount,
+        word_limit: localWordCount,
+      });
+    }
+  };
+
+  const handleLevelChange = (lvl: AcademicLevel) => {
+    setLocalLevel(lvl);
+    saveAnswers({ academicLevel: lvl, academic_level: lvl });
+  };
+
+  const handleTypeChange = (t: AssignmentType) => {
+    setLocalType(t);
+    saveAnswers({ assignmentType: t, assignment_type: t });
+  };
+
+  const handleCitationChange = (cs: string) => {
+    setLocalCitation(cs);
+    saveAnswers({ citationStyle: cs, citation_style: cs });
+  };
+
+  const handleCourseDetailsBlur = () => {
+    saveAnswers({
+      course_name: course,
+      institution,
+      deadline,
+      marking_rubric: rubricText,
+      courseDetails: {
+        courseCode: course,
+        institution,
+        deadline,
+        rubric: rubricText,
+      },
+    });
+  };
 
   const canAnalyze =
     localQuestion.trim().length >= 10 &&
@@ -72,18 +172,31 @@ export default function AssignmentUnderstandStage() {
 
     // Save intake details first
     await saveAnswers({
+      instructions: localQuestion,
       research_topic: localQuestion,
       assignment_question: localQuestion,
+      assignment_brief: localQuestion,
       academic_level: localLevel,
+      academicLevel: localLevel,
       assignment_type: localType,
+      assignmentType: localType,
       word_count: localWordCount,
       word_limit: localWordCount,
+      targetWordCount: localWordCount,
+      target_word_count: localWordCount,
       citation_style: localCitation,
-      assignment_brief_text: localBrief,
+      citationStyle: localCitation,
+      assignment_brief_text: localBrief || localQuestion,
       course_name: course,
       institution,
       deadline,
       marking_rubric: rubricText,
+      courseDetails: {
+        courseCode: course,
+        institution,
+        deadline,
+        rubric: rubricText,
+      },
     });
 
     try {
@@ -243,15 +356,31 @@ export default function AssignmentUnderstandStage() {
       if (extractedText) {
         setLocalQuestion(extractedText);
         setLocalBrief(extractedText);
+        const updates: Record<string, any> = {
+          instructions: extractedText,
+          assignment_question: extractedText,
+          assignment_brief_text: extractedText,
+          research_topic: extractedText,
+          assignment_brief: extractedText,
+        };
         if (data.detectedWordCount && data.detectedWordCount >= 200) {
           setLocalWordCount(data.detectedWordCount);
+          updates.word_count = data.detectedWordCount;
+          updates.word_limit = data.detectedWordCount;
+          updates.targetWordCount = data.detectedWordCount;
+          updates.target_word_count = data.detectedWordCount;
         }
         if (data.detectedLevel) {
           setLocalLevel(data.detectedLevel);
+          updates.academic_level = data.detectedLevel;
+          updates.academicLevel = data.detectedLevel;
         }
         if (data.detectedCitation) {
           setLocalCitation(data.detectedCitation);
+          updates.citation_style = data.detectedCitation;
+          updates.citationStyle = data.detectedCitation;
         }
+        await saveAnswers(updates);
       }
     } catch (err: any) {
       setAnalysisError(err.message || "Failed to parse brief file");
@@ -326,6 +455,7 @@ export default function AssignmentUnderstandStage() {
             <textarea
               value={localQuestion}
               onChange={(e) => setLocalQuestion(e.target.value)}
+              onBlur={handleQuestionBlur}
               rows={4}
               placeholder="Paste your assignment prompt, essay question, or case study instructions here..."
               className="w-full bg-neutral-50 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 rounded-xl p-3.5 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 transition-all leading-relaxed resize-y"
@@ -347,7 +477,7 @@ export default function AssignmentUnderstandStage() {
             <div className="bg-neutral-100 dark:bg-white/5 p-1 rounded-xl border border-neutral-200/60 dark:border-white/10 grid grid-cols-2 gap-1">
               <button
                 type="button"
-                onClick={() => setLocalLevel("undergraduate")}
+                onClick={() => handleLevelChange("undergraduate")}
                 className={`py-2 px-3 rounded-lg text-xs transition-all cursor-pointer ${
                   localLevel === "undergraduate"
                     ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
@@ -358,7 +488,7 @@ export default function AssignmentUnderstandStage() {
               </button>
               <button
                 type="button"
-                onClick={() => setLocalLevel("postgraduate")}
+                onClick={() => handleLevelChange("postgraduate")}
                 className={`py-2 px-3 rounded-lg text-xs transition-all cursor-pointer ${
                   localLevel === "postgraduate"
                     ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
@@ -386,7 +516,7 @@ export default function AssignmentUnderstandStage() {
               <div className="relative">
                 <select
                   value={localType}
-                  onChange={(e) => setLocalType(e.target.value as AssignmentType)}
+                  onChange={(e) => handleTypeChange(e.target.value as AssignmentType)}
                   className="w-full bg-neutral-50 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 transition-all appearance-none cursor-pointer pr-10"
                 >
                   {Object.entries(ASSIGNMENT_TYPE_LABELS).map(([key, label]) => (
@@ -417,6 +547,7 @@ export default function AssignmentUnderstandStage() {
                   step={100}
                   value={localWordCount || ""}
                   onChange={(e) => setLocalWordCount(Math.max(0, Number(e.target.value)))}
+                  onBlur={handleWordCountBlur}
                   placeholder="e.g. 2000"
                   className="w-full bg-neutral-50 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 transition-all font-semibold pr-16"
                 />
@@ -442,7 +573,7 @@ export default function AssignmentUnderstandStage() {
               <div className="relative">
                 <select
                   value={localCitation}
-                  onChange={(e) => setLocalCitation(e.target.value)}
+                  onChange={(e) => handleCitationChange(e.target.value)}
                   className="w-full bg-neutral-50 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 transition-all appearance-none cursor-pointer pr-10"
                 >
                   {CITATION_STYLES.map((st) => (
@@ -481,6 +612,7 @@ export default function AssignmentUnderstandStage() {
                     type="text"
                     value={course}
                     onChange={(e) => setCourse(e.target.value)}
+                    onBlur={handleCourseDetailsBlur}
                     placeholder="e.g. POLI3002 International Security"
                     className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
                   />
@@ -491,6 +623,7 @@ export default function AssignmentUnderstandStage() {
                     type="text"
                     value={institution}
                     onChange={(e) => setInstitution(e.target.value)}
+                    onBlur={handleCourseDetailsBlur}
                     placeholder="e.g. University of Edinburgh"
                     className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
                   />
@@ -501,6 +634,7 @@ export default function AssignmentUnderstandStage() {
                     type="date"
                     value={deadline}
                     onChange={(e) => setDeadline(e.target.value)}
+                    onBlur={handleCourseDetailsBlur}
                     className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
                   />
                 </div>
@@ -509,6 +643,7 @@ export default function AssignmentUnderstandStage() {
                   <textarea
                     value={rubricText}
                     onChange={(e) => setRubricText(e.target.value)}
+                    onBlur={handleCourseDetailsBlur}
                     rows={2}
                     placeholder="Paste grading criteria or learning outcomes to evaluate against..."
                     className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg p-3 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 leading-relaxed"

@@ -19,9 +19,21 @@ import type {
   ResearchPlan,
   TutorWorkspacePatch,
 } from "../../../src/desk/assignment/types.ts";
+import {
+  cleanAnswerString,
+  extractStandardizedInstructions,
+} from "../../../src/desk/assignment/types.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(rejectClientCredentials);
+
+function extractProjectInstructions(project: any, reqBody?: any): string {
+  const candidate =
+    reqBody?.instructions ||
+    reqBody?.question ||
+    extractStandardizedInstructions(project?.answers);
+  return cleanAnswerString(candidate);
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -120,6 +132,31 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
 
     const lines = text.split("\n").filter((l) => l.trim().length > 0);
 
+    // Guaranteed persistence: commit extracted brief directly into project answers
+    if (!project.answers) {
+      project.answers = {};
+    }
+    project.answers["instructions"] = text;
+    project.answers["assignment_question"] = text;
+    project.answers["assignment_brief_text"] = text;
+    project.answers["research_topic"] = text;
+    project.answers["assignment_brief"] = text;
+    if (detectedWordCount) {
+      project.answers["targetWordCount"] = String(detectedWordCount);
+      project.answers["target_word_count"] = String(detectedWordCount);
+      project.answers["word_count"] = String(detectedWordCount);
+      project.answers["word_limit"] = String(detectedWordCount);
+    }
+    if (detectedLevel) {
+      project.answers["academicLevel"] = detectedLevel;
+      project.answers["academic_level"] = detectedLevel;
+    }
+    if (detectedCitation) {
+      project.answers["citationStyle"] = detectedCitation;
+      project.answers["citation_style"] = detectedCitation;
+    }
+    await getProjectStore().save(project);
+
     return res.json({
       success: true,
       text,
@@ -139,15 +176,40 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
   const project = await getProjectSafe(req, res);
   if (!project) return;
 
-  const {
-    question = project.answers["assignment_question"] || project.answers["assignment_brief"] || "",
-    assignmentType = project.answers["assignment_type"] || "essay",
-    academicLevel = project.answers["academic_level"] || "undergraduate",
-    targetWordCount = project.answers["word_count"] || 2000,
-    citationStyle = project.answers["citation_style"] || "apa7",
-    briefText = project.answers["assignment_brief_text"] || "",
-    rubricText = project.answers["marking_rubric"] || "",
-  } = req.body || {};
+  const question =
+    cleanAnswerString(req.body?.instructions) ||
+    cleanAnswerString(req.body?.question) ||
+    extractStandardizedInstructions(project.answers);
+  const assignmentType =
+    req.body?.assignmentType ||
+    project.answers["assignmentType"] ||
+    project.answers["assignment_type"] ||
+    "essay";
+  const academicLevel =
+    req.body?.academicLevel ||
+    project.answers["academicLevel"] ||
+    project.answers["academic_level"] ||
+    "undergraduate";
+  const targetWordCount = Number(
+    req.body?.targetWordCount ||
+    project.answers["targetWordCount"] ||
+    project.answers["word_count"] ||
+    project.answers["word_limit"] ||
+    2000
+  );
+  const citationStyle =
+    cleanAnswerString(req.body?.citationStyle) ||
+    cleanAnswerString(project.answers["citationStyle"]) ||
+    cleanAnswerString(project.answers["citation_style"]) ||
+    "apa7";
+  const briefText =
+    cleanAnswerString(req.body?.briefText) ||
+    cleanAnswerString(project.answers["assignment_brief_text"]) ||
+    question;
+  const rubricText =
+    cleanAnswerString(req.body?.rubricText) ||
+    cleanAnswerString(project.answers["marking_rubric"]) ||
+    "";
 
   try {
     const combinedContent = [question, briefText, rubricText].filter(Boolean).join("\n\n").trim();
@@ -336,13 +398,21 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     // 6. Persist the ledger in the project JSONB answers under assignment_analysis and brief_ledger
     project.answers = {
       ...project.answers,
+      instructions: String(question),
       assignment_question: String(question),
+      assignment_brief_text: String(briefText),
+      research_topic: String(question),
+      assignment_brief: String(question),
+      academicLevel: String(academicLevel),
       academic_level: String(academicLevel),
+      assignmentType: String(assignmentType),
       assignment_type: String(assignmentType),
+      targetWordCount: String(targetWords),
+      target_word_count: String(targetWords),
       word_count: String(targetWords),
       word_limit: String(targetWords),
+      citationStyle: String(citationStyle),
       citation_style: String(citationStyle),
-      assignment_brief_text: String(briefText),
       marking_rubric: String(rubricText),
       assignment_analysis: JSON.stringify(finalAnalysis),
       brief_ledger: JSON.stringify(ledger),
@@ -462,12 +532,18 @@ router.post("/plan", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
 
-  const {
-    question = project.answers["assignment_question"] || "",
-    academicLevel = project.answers["academic_level"] || "undergraduate",
-    assignmentType = project.answers["assignment_type"] || "essay",
-    analysis = project.answers["assignment_analysis"],
-  } = req.body || {};
+  const question = extractProjectInstructions(project, req.body);
+  const academicLevel =
+    req.body?.academicLevel ||
+    project.answers["academicLevel"] ||
+    project.answers["academic_level"] ||
+    "undergraduate";
+  const assignmentType =
+    req.body?.assignmentType ||
+    project.answers["assignmentType"] ||
+    project.answers["assignment_type"] ||
+    "essay";
+  const analysis = req.body?.analysis || project.answers["assignment_analysis"];
 
   try {
     const prompt = `You are the Scholar Core Assignment Research Planning Agent.

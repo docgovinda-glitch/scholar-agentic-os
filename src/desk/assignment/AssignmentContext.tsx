@@ -28,7 +28,11 @@ import type {
   TutorMode,
   RubricGradeEstimation,
 } from "./types";
-import { ASSIGNMENT_STAGES } from "./types";
+import {
+  ASSIGNMENT_STAGES,
+  cleanAnswerString,
+  extractStandardizedInstructions,
+} from "./types";
 
 interface AssignmentContextValue {
   projectId: string;
@@ -100,6 +104,7 @@ interface AssignmentContextValue {
 
   // Save Answers Helper
   saveAnswers: (updates: Record<string, any>) => Promise<void>;
+  updateProjectAnswers: (updates: Record<string, any>) => Promise<void>;
   ensurePersisted: () => Promise<string>;
 }
 
@@ -222,7 +227,41 @@ export function AssignmentProvider({
   const saveAnswers = useCallback(
     async (updates: Record<string, any>) => {
       if (!project) return;
-      const merged = { ...project.answers, ...updates };
+      const standardized: Record<string, any> = { ...updates };
+      if (updates.instructions !== undefined || updates.assignment_question !== undefined) {
+        const text = cleanAnswerString(updates.instructions ?? updates.assignment_question ?? "");
+        standardized.instructions = text;
+        standardized.assignment_question = text;
+        standardized.assignment_brief_text = text;
+        standardized.research_topic = text;
+        if (standardized.assignment_brief === "provisional" || text) {
+          standardized.assignment_brief = text;
+        }
+      }
+      if (updates.academicLevel !== undefined || updates.academic_level !== undefined) {
+        const lvl = updates.academicLevel ?? updates.academic_level;
+        standardized.academicLevel = lvl;
+        standardized.academic_level = lvl;
+      }
+      if (updates.assignmentType !== undefined || updates.assignment_type !== undefined) {
+        const t = updates.assignmentType ?? updates.assignment_type;
+        standardized.assignmentType = t;
+        standardized.assignment_type = t;
+      }
+      if (updates.targetWordCount !== undefined || updates.word_count !== undefined || updates.word_limit !== undefined) {
+        const wc = updates.targetWordCount ?? updates.word_count ?? updates.word_limit;
+        standardized.targetWordCount = Number(wc);
+        standardized.target_word_count = Number(wc);
+        standardized.word_count = Number(wc);
+        standardized.word_limit = Number(wc);
+      }
+      if (updates.citationStyle !== undefined || updates.citation_style !== undefined) {
+        const cs = updates.citationStyle ?? updates.citation_style;
+        standardized.citationStyle = cs;
+        standardized.citation_style = cs;
+      }
+
+      const merged = { ...project.answers, ...standardized };
       setProject((prev) => (prev ? { ...prev, answers: merged } : null));
       try {
         await saveIntakeAnswers(activeProjectId, merged);
@@ -259,12 +298,31 @@ export function AssignmentProvider({
 
   // Extract core properties from project answers
   const answers = project?.answers || {};
-  const academicLevel: AcademicLevel = (answers["academic_level"] as AcademicLevel) || "undergraduate";
-  const assignmentType: AssignmentType = (answers["assignment_type"] as AssignmentType) || "essay";
-  const targetWordCount = Number(answers["word_count"] || answers["word_limit"] || 2000);
-  const citationStyle = answers["citation_style"] || "apa7";
-  const question = answers["assignment_question"] || answers["assignment_brief"] || "";
-  const assignmentBriefText = answers["assignment_brief_text"] || "";
+  const academicLevel: AcademicLevel =
+    (answers["academicLevel"] as AcademicLevel) ||
+    (answers["academic_level"] as AcademicLevel) ||
+    "undergraduate";
+  const assignmentType: AssignmentType =
+    (answers["assignmentType"] as AssignmentType) ||
+    (answers["assignment_type"] as AssignmentType) ||
+    "essay";
+  const targetWordCount = Number(
+    answers["targetWordCount"] ||
+    answers["target_word_count"] ||
+    answers["word_count"] ||
+    answers["word_limit"] ||
+    2000
+  );
+  const citationStyle =
+    cleanAnswerString(answers["citationStyle"]) ||
+    cleanAnswerString(answers["citation_style"]) ||
+    "apa7";
+  const question = extractStandardizedInstructions(answers);
+  const assignmentBriefText =
+    cleanAnswerString(answers["assignment_brief_text"]) ||
+    cleanAnswerString(answers["briefText"]) ||
+    cleanAnswerString(answers["brief"]) ||
+    question;
 
   // Structured entities
   const analysis: AssignmentAnalysis | null = answers["assignment_analysis"]
@@ -691,6 +749,7 @@ export function AssignmentProvider({
         estimateRubricGrade,
         applyTutorSuggestionToDraft,
         saveAnswers,
+        updateProjectAnswers: saveAnswers,
       }}
     >
       {children}

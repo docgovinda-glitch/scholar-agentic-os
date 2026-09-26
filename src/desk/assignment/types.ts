@@ -405,3 +405,63 @@ export const COMMON_COMMAND_VERBS: Record<string, { definition: string; keyActio
     keyAction: "Detail specific traits accurately (usually foundational for analysis).",
   },
 };
+
+export interface CourseDetails {
+  courseCode?: string;
+  institution?: string;
+  deadline?: string;
+  rubric?: string;
+}
+
+export interface AssignmentProjectAnswers {
+  instructions: string;
+  academicLevel: AcademicLevel;
+  assignmentType: AssignmentType;
+  targetWordCount: number;
+  citationStyle: string;
+  courseDetails?: CourseDetails;
+  assignment_analysis?: AssignmentAnalysis;
+  brief_ledger?: DocumentRequirement[];
+  assignment_plan?: ResearchPlan;
+  // Legacy / interoperability aliases
+  assignment_question?: string;
+  assignment_brief_text?: string;
+  research_topic?: string;
+  word_count?: number;
+  word_limit?: number;
+  target_word_count?: number;
+  citation_style?: string;
+  academic_level?: AcademicLevel;
+  assignment_type?: AssignmentType;
+  course_name?: string;
+  institution?: string;
+  deadline?: string;
+  marking_rubric?: string;
+  [key: string]: any;
+}
+
+export function cleanAnswerString(val: any): string {
+  if (typeof val !== "string") return "";
+  const trimmed = val.trim();
+  if (trimmed.toLowerCase() === "provisional") return "";
+  return trimmed;
+}
+
+export function extractStandardizedInstructions(answers: Record<string, any> = {}): string {
+  const candidates = [
+    answers.instructions,
+    answers.assignment_question,
+    answers.assignment_brief_text,
+    answers.briefText,
+    answers.brief,
+    answers.prompt,
+    answers.research_topic,
+    answers.assignment_brief,
+  ];
+  for (const c of candidates) {
+    const cleaned = cleanAnswerString(c);
+    if (cleaned.length > 0) return cleaned;
+  }
+  return "";
+}
+
