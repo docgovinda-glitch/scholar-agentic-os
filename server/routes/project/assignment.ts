@@ -21,7 +21,8 @@ async function getProjectSafe(req: express.Request<any>, res: express.Response) 
 }
 
 // 1. POST /api/projects/:id/assignment/analyze
-router.post("/analyze", async (req: express.Request<{ id: string }>, res) => {
+// 1. POST /api/projects/:id/assignment/analyze & /deconstruct
+const handleDeconstruct = async (req: express.Request<{ id: string }>, res: express.Response) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
 
@@ -36,26 +37,32 @@ router.post("/analyze", async (req: express.Request<{ id: string }>, res) => {
   } = req.body || {};
 
   try {
-    const prompt = `You are the Scholar Core Assignment Analysis Agent.
-Analyze the following university assignment brief with high academic precision.
+    const prompt = `You are the Scholar Core Assignment Deconstruction & Rubric Analysis Agent.
+Analyze the following university assignment brief and marking rubric with high academic precision.
 
 Assignment Question / Prompt: "${question}"
 Assignment Type: ${assignmentType}
-Academic Level: ${academicLevel} (Note: ${academicLevel === "postgraduate" ? "Expect deep critical evaluation, theoretical synthesis, and independent argument" : "Focus on conceptual clarity, rigorous evidence, clear argument, and accurate referencing"})
+Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Expect deep critical evaluation, theoretical synthesis, and independent argument" : "Focus on conceptual clarity, rigorous evidence, clear argument, and accurate referencing"})
 Target Word Count: ${targetWordCount} words
 Citation Style: ${citationStyle}
 Assignment Brief / Rubric Details: "${briefText} ${rubricText}"
 
 Analyze this assignment rigorously and extract:
-1. Command verbs present (e.g. Critically discuss, Evaluate, Analyse, Compare, Assess, Argue, Describe, Explain) and explain what the examiner specifically demands.
-2. A comprehensive summary of what the lecturer is asking.
-3. Key conceptual domains and terminology.
-4. Clear scope boundaries (what is in scope vs out of scope).
-5. Evidence and source requirements.
-6. Key marking criteria insights.
-7. Word-count allocation implications.
-8. Citation and referencing guidance.
-9. Academic level specific depth notes.
+1. Command verbs present (e.g. Critically discuss, Evaluate, Analyse, Compare, Assess, Argue, Describe, Explain) and what the examiner specifically demands.
+2. Grade band descriptors: Define explicit benchmarks for:
+   - First Class (70%+ / Grade A): Outstanding critical evaluation, counterargument synthesis, original insight.
+   - Upper Second Class (60-69% / Grade B): Sound structure, solid evidence, consistent analytical argument.
+   - Lower Second Class (50-59% / Grade C): Descriptive narrative, basic structure, limited critical depth.
+   - Third Class / Pass (40-49%): Minimal argumentation, heavy textbook reliance, superficial analysis.
+3. Explicit sub-questions (directly stated in the prompt) and Implicit sub-questions (unspoken theoretical or empirical questions required for a First Class mark).
+4. Concrete constraints (word count limits, penalties, required citation style, excluded themes).
+5. A comprehensive executive summary of what the examiner is asking.
+6. Key conceptual domains and terminology.
+7. Clear scope boundaries (what is strictly in scope vs out of scope).
+8. Evidence and source requirements.
+9. Word-count allocation implications.
+10. Citation and referencing guidance.
+11. Academic level specific depth notes.
 
 Return ONLY valid JSON matching this exact structure:
 {
@@ -65,6 +72,45 @@ Return ONLY valid JSON matching this exact structure:
       "meaning": "Weigh competing theoretical arguments and evidence to judge their validity.",
       "academicExpectation": "You must not merely describe; you must identify weaknesses and justify a conclusion."
     }
+  ],
+  "gradeBandDescriptors": [
+    {
+      "band": "1st_class",
+      "label": "First Class (70%+ / Grade A)",
+      "minScore": 70,
+      "criteria": ["Comprehensive critique of assumptions", "Nuanced counterarguments", "Theoretical synthesis"],
+      "whatExaminersLookFor": "Deep dialectical engagement and independent, justified academic reasoning."
+    },
+    {
+      "band": "2_1_upper_second",
+      "label": "Upper Second Class (60–69% / Grade B)",
+      "minScore": 60,
+      "criteria": ["Clear critical argument", "Well-evidenced claims", "Consistent structure"],
+      "whatExaminersLookFor": "Consistent analysis without lapsing into passive description."
+    },
+    {
+      "band": "2_2_lower_second",
+      "label": "Lower Second Class (50–59% / Grade C)",
+      "minScore": 50,
+      "criteria": ["Largely descriptive", "Basic scholarly citations", "Uneven argumentation"],
+      "whatExaminersLookFor": "Basic factual understanding, though lacking counterargument analysis."
+    },
+    {
+      "band": "3rd_class",
+      "label": "Third Class / Pass (40–49%)",
+      "minScore": 40,
+      "criteria": ["Superficial coverage", "Minimal academic evidence", "Weak structure"],
+      "whatExaminersLookFor": "Threshold pass with significant gaps in reasoning."
+    }
+  ],
+  "subQuestions": {
+    "explicit": ["...", "..."],
+    "implicit": ["...", "..."]
+  },
+  "constraints": [
+    "Word count target: ${targetWordCount} words (standard ±10% penalty threshold)",
+    "Citation standard: ${citationStyle.toUpperCase()} referencing mandatory",
+    "Must integrate dialectical counterarguments"
   ],
   "summary": "...",
   "keyConcepts": ["...", "..."],
@@ -84,7 +130,7 @@ Return ONLY valid JSON matching this exact structure:
     const analysis = await callOpenRouterJSON(
       req,
       res,
-      "You are the Scholar Core Assignment Analysis Agent.",
+      "You are the Scholar Core Assignment Deconstruction & Rubric Analysis Agent.",
       prompt,
       "openrouter/auto",
       "analysis"
@@ -93,12 +139,15 @@ Return ONLY valid JSON matching this exact structure:
     res.json(analysis);
   } catch (err: any) {
     if (err?.message === "RequireFrontendLLMException") return;
-    console.error("Assignment analysis error:", err);
+    console.error("Assignment deconstruction error:", err);
     if (!res.headersSent) {
-      res.status(500).json({ error: err.message || "Failed to analyze assignment" });
+      res.status(500).json({ error: err.message || "Failed to deconstruct assignment brief" });
     }
   }
-});
+};
+
+router.post("/analyze", handleDeconstruct);
+router.post("/deconstruct", handleDeconstruct);
 
 // 2. POST /api/projects/:id/assignment/plan
 router.post("/plan", async (req: express.Request<{ id: string }>, res) => {
@@ -789,6 +838,396 @@ Return ONLY valid JSON matching:
     console.error("Rubric estimation error:", err);
     if (!res.headersSent) {
       res.status(500).json({ error: err.message || "Failed to estimate rubric grade" });
+    }
+  }
+});
+
+// 10. POST /api/projects/:id/assignment/thesis-budget
+router.post("/thesis-budget", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+
+  const {
+    question = project.answers["assignment_question"] || "",
+    assignmentType = project.answers["assignment_type"] || "essay",
+    academicLevel = project.answers["academic_level"] || "undergraduate",
+    targetWordCount = Number(project.answers["word_count"]) || 2000,
+    deconstruction = project.answers["assignment_deconstruction"],
+  } = req.body || {};
+
+  try {
+    const totalWords = Number(targetWordCount) || 2000;
+    const introWords = Math.round(totalWords * 0.10);
+    const conclusionWords = Math.round(totalWords * 0.15);
+    const bodyTotal = totalWords - introWords - conclusionWords;
+    const theme1Words = Math.round(bodyTotal / 3);
+    const theme2Words = Math.round(bodyTotal / 3);
+    const theme3Words = bodyTotal - theme1Words - theme2Words;
+
+    const prompt = `You are the Scholar Core Thesis Formulation & Word Budgeting Agent.
+For this academic assignment:
+Question: "${question}"
+Type: ${assignmentType}
+Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Demonstrate high theoretical sophistication, critical synthesis, and defensible stance" : "Ensure clarity, logical structure, and strong evidence"})
+Target Word Count: ${totalWords} words
+Deconstruction Context: ${JSON.stringify(deconstruction || {})}
+
+TASKS:
+1. Formulate 3 distinct argumentative, defensible thesis statements:
+   - Stance A (Dialectical Synthesis): Bridges and synthesizes opposing theories/evidence.
+   - Stance B (Critical Challenge): Directly challenges common assumptions or mainstream discourse.
+   - Stance C (Nuanced Contextual / Empirical): Emphasizes situational constraints, empirical boundary conditions, or structural determinants.
+   For each, provide a clear academic rationale and explain how it defends against major counterarguments.
+
+2. Propose 3 focused, dialectical body themes that systematically prove this thesis.
+
+3. Allocate word budget mathematically:
+   - Introduction: ${introWords} words (~10%)
+   - Body Theme 1: ${theme1Words} words (~25%)
+   - Body Theme 2: ${theme2Words} words (~25%)
+   - Body Theme 3: ${theme3Words} words (~25%)
+   - Conclusion: ${conclusionWords} words (~15%)
+   Sum: ${totalWords} words (Tolerance: ±10%).
+
+Return ONLY valid JSON matching:
+{
+  "selectedThesis": "...",
+  "thesisRationale": "...",
+  "counterargumentHandling": "...",
+  "alternativeTheses": [
+    {
+      "id": "thesis-synthesis",
+      "statement": "...",
+      "stance": "Dialectical Synthesis",
+      "rationale": "..."
+    },
+    {
+      "id": "thesis-challenge",
+      "statement": "...",
+      "stance": "Critical Challenge",
+      "rationale": "..."
+    },
+    {
+      "id": "thesis-empirical",
+      "statement": "...",
+      "stance": "Nuanced Empirical",
+      "rationale": "..."
+    }
+  ],
+  "totalTargetWords": ${totalWords},
+  "tolerancePercent": 10,
+  "sections": [
+    {
+      "id": "sec-intro",
+      "title": "Introduction & Thesis Statement",
+      "type": "introduction",
+      "targetWordCount": ${introWords},
+      "currentWordCount": 0,
+      "targetPercent": 10,
+      "guidance": "Hook the reader, provide contextual background, articulate central thesis, and define scope.",
+      "keyPoints": ["Historical/theoretical context", "Explicit thesis statement", "Scope and roadmap"]
+    },
+    {
+      "id": "sec-theme-1",
+      "title": "Theme 1: ...",
+      "type": "body_theme",
+      "targetWordCount": ${theme1Words},
+      "currentWordCount": 0,
+      "targetPercent": 25,
+      "guidance": "Examine foundational theoretical premises and initial empirical evidence.",
+      "keyPoints": ["...", "..."]
+    },
+    {
+      "id": "sec-theme-2",
+      "title": "Theme 2: ...",
+      "type": "body_theme",
+      "targetWordCount": ${theme2Words},
+      "currentWordCount": 0,
+      "targetPercent": 25,
+      "guidance": "Evaluate core empirical mechanisms, contradictions, and dialectical tensions.",
+      "keyPoints": ["...", "..."]
+    },
+    {
+      "id": "sec-theme-3",
+      "title": "Theme 3: ...",
+      "type": "body_theme",
+      "targetWordCount": ${theme3Words},
+      "currentWordCount": 0,
+      "targetPercent": 25,
+      "guidance": "Analyze systemic counterarguments, policy/practical implications, and syntheses.",
+      "keyPoints": ["...", "..."]
+    },
+    {
+      "id": "sec-conclusion",
+      "title": "Conclusion & Synthesis",
+      "type": "conclusion",
+      "targetWordCount": ${conclusionWords},
+      "currentWordCount": 0,
+      "targetPercent": 15,
+      "guidance": "Synthesize body findings, reaffirm thesis without mere repetition, state broader scholarly implications.",
+      "keyPoints": ["Synthesis of findings", "Reaffirmation of thesis", "Broader scholarly implications"]
+    }
+  ],
+  "approvedByUser": false
+}`;
+
+    const data = await callOpenRouterJSON(
+      req,
+      res,
+      "You are the Scholar Core Thesis Formulation & Word Budgeting Agent.",
+      prompt,
+      "openrouter/auto",
+      "reasoning"
+    );
+    if (!data) return;
+    res.json(data);
+  } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
+    console.error("Thesis budget error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to generate thesis and word budget" });
+    }
+  }
+});
+
+// 11. POST /api/projects/:id/assignment/peel-matrix
+router.post("/peel-matrix", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+
+  const {
+    themeTitle = "Critical Analysis of Theoretical Foundations",
+    thesis = project.answers["assignment_thesis"] || "",
+    targetWords = 500,
+    academicLevel = project.answers["academic_level"] || "undergraduate",
+    citationStyle = project.answers["citation_style"] || "apa7",
+    keyPoints = [],
+  } = req.body || {};
+
+  try {
+    const prompt = `You are the Scholar Core PEEL Argument Matrix Agent.
+Construct an academically rigorous, dialectical body theme using the Point-Evidence-Explanation-Link structure:
+
+Theme Title: "${themeTitle}"
+Central Thesis Defended: "${thesis}"
+Target Word Count: ${targetWords} words
+Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Write with advanced theoretical synthesis, nuanced critique, and seamless scholarly integration." : "Ensure clear logical claims, substantiated evidence, critical evaluation, and clear prose."})
+Citation Style: ${citationStyle}
+Key Points to Cover: ${JSON.stringify(keyPoints)}
+
+STRUCTURE TO GENERATE:
+1. P (Point): A precise, declarative topic sentence that directly advances and defends the central thesis.
+2. E (Evidence): Academic grounding, empirical research, or theoretical models (cite realistic peer-reviewed literature in ${citationStyle}).
+3. E (Explanation & Dialectical Critique):
+   - Critical mechanism: Explain why and how this evidence proves the point.
+   - Counterargument: What would a critical scholar, competing school, or opposing framework object?
+   - Rebuttal: How does the argument answer or assimilate that counterargument without weakening the thesis?
+4. L (Link): A synthesising sentence that connects the analysis back to the overall thesis and creates a transition.
+5. Draft Content: The complete, publication-ready academic paragraph (~${targetWords} words) combining these elements with flawless academic prose.
+
+Return ONLY valid JSON matching:
+{
+  "themeTitle": "${themeTitle}",
+  "targetWords": ${targetWords},
+  "currentWords": 0,
+  "point": "Clear topic sentence claim...",
+  "evidence": "Empirical study / theoretical grounding in ${citationStyle}...",
+  "explanation": "Critical mechanism analysis...",
+  "counterargument": "Opposing viewpoint or limitation...",
+  "rebuttal": "Substantiated defense answering the objection...",
+  "link": "Synthesising sentence connecting to thesis...",
+  "draftContent": "Full polished academic prose for this section...",
+  "status": "complete",
+  "linkedSourceIds": []
+}`;
+
+    const data = await callOpenRouterJSON(
+      req,
+      res,
+      "You are the Scholar Core PEEL Argument Matrix Agent.",
+      prompt,
+      "openrouter/auto",
+      "drafting"
+    );
+    if (!data) return;
+    if (data && data.draftContent) {
+      data.currentWords = data.draftContent.trim().split(/\s+/).filter(Boolean).length;
+    }
+    res.json(data);
+  } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
+    console.error("PEEL matrix generation error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to generate PEEL matrix" });
+    }
+  }
+});
+
+// 12. POST /api/projects/:id/assignment/citations-ground
+router.post("/citations-ground", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+
+  const {
+    question = project.answers["assignment_question"] || "",
+    citationStyle = project.answers["citation_style"] || "apa7",
+    academicLevel = project.answers["academic_level"] || "undergraduate",
+    themes = [],
+  } = req.body || {};
+
+  try {
+    const prompt = `You are the Scholar Core Academic Citation & Grounding Agent.
+Identify and format 8-12 realistic, high-impact peer-reviewed scholarly sources to ground this assignment:
+
+Question: "${question}"
+Academic Level: ${academicLevel}
+Citation Style: ${citationStyle}
+Themes: ${JSON.stringify(themes)}
+
+For each source, provide:
+- High relevance to the themes
+- Verified academic journal or scholarly university press publication
+- Full bibliographic citation formatted strictly in ${citationStyle}
+- In-text citation format (e.g., "(Smith & Doe, 2024)" for APA/Harvard or "[1]" for IEEE)
+- Quote or key empirical finding snippet
+
+Return ONLY valid JSON matching:
+{
+  "citations": [
+    {
+      "id": "cit-1",
+      "sourceTitle": "...",
+      "authors": ["..."],
+      "year": "2024",
+      "journalOrPublisher": "...",
+      "doi": "10.1016/...",
+      "citationText": "...",
+      "inTextCitation": "...",
+      "citationStyle": "${citationStyle}",
+      "verifiedPeerReviewed": true,
+      "linkedThemeIds": [],
+      "quoteOrFindingSnippet": "..."
+    }
+  ]
+}`;
+
+    const data = await callOpenRouterJSON(
+      req,
+      res,
+      "You are the Scholar Core Academic Citation & Grounding Agent.",
+      prompt,
+      "openrouter/auto",
+      "discovery"
+    );
+    if (!data) return;
+    res.json(data);
+  } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
+    console.error("Citation grounding error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to ground citations" });
+    }
+  }
+});
+
+// 13. POST /api/projects/:id/assignment/audit-export
+router.post("/audit-export", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+
+  const {
+    question = project.answers["assignment_question"] || "",
+    academicLevel = project.answers["academic_level"] || "undergraduate",
+    assignmentType = project.answers["assignment_type"] || "essay",
+    targetWordCount = Number(project.answers["word_count"]) || 2000,
+    citationStyle = project.answers["citation_style"] || "apa7",
+    fullDraft = "",
+    deconstruction = project.answers["assignment_deconstruction"],
+  } = req.body || {};
+
+  try {
+    const actualWordCount = fullDraft.trim().split(/\s+/).filter(Boolean).length;
+    const minWords = Math.round(targetWordCount * 0.90);
+    const maxWords = Math.round(targetWordCount * 1.10);
+    const isWordCountCompliant = actualWordCount >= minWords && actualWordCount <= maxWords;
+
+    const prompt = `You are the Scholar Core Senior Examiner & Rubric Audit Agent.
+Conduct a rigorous submission check on this assignment against university grading standards:
+
+Question: "${question}"
+Type: ${assignmentType}
+Level: ${academicLevel}
+Target Word Count: ${targetWordCount} words (Actual: ${actualWordCount} words, Allowed: ${minWords} - ${maxWords})
+Citation Standard: ${citationStyle}
+Deconstruction Context: ${JSON.stringify(deconstruction || {})}
+
+Full Assignment Draft:
+"""
+${fullDraft.slice(0, 10000)}
+"""
+
+Evaluate strictly across 10 academic dimensions:
+1. question_addressed (Did the student answer all parts of the question?)
+2. argument_logic (Is the central thesis rigorously defended?)
+3. peel_matrix_depth (Are body themes structured with clear Point-Evidence-Explanation-Link?)
+4. counterargument_critique (Were counterarguments proactively addressed?)
+5. evidence_sufficiency (Are claims grounded in peer-reviewed scholarship?)
+6. academic_level (Appropriate for ${academicLevel}?)
+7. word_count (Within ±10% tolerance?)
+8. citation_accuracy (Consistent ${citationStyle} referencing?)
+9. structure_coherence (Smooth transitions and clear introduction/conclusion?)
+10. originality (Independent analysis vs passive summarisation?)
+
+Assign an overall percentage mark (0-100) and grade band:
+- First Class (1st): 70%+
+- Upper Second (2:1): 60-69%
+- Lower Second (2:2): 50-59%
+- Third / Pass: 40-49%
+
+Return ONLY valid JSON matching:
+{
+  "overallScore": 76,
+  "overallBand": "1st_class",
+  "bandLabel": "First Class (1st) — 76%",
+  "summary": "...",
+  "rubricAlignmentScore": 85,
+  "wordCountAdherence": {
+    "actual": ${actualWordCount},
+    "target": ${targetWordCount},
+    "minAllowed": ${minWords},
+    "maxAllowed": ${maxWords},
+    "status": "${isWordCountCompliant ? "compliant" : actualWordCount < minWords ? "under_budget" : "over_budget"}",
+    "deviationPercent": ${Math.round(Math.abs(actualWordCount - targetWordCount) / targetWordCount * 100)}
+  },
+  "criteriaResults": [
+    {
+      "category": "question_addressed",
+      "label": "Question Addressed",
+      "status": "pass",
+      "summary": "...",
+      "feedback": "..."
+    }
+  ],
+  "strengths": ["...", "..."],
+  "priorityFixes": ["..."],
+  "readyForSubmission": true
+}`;
+
+    const data = await callOpenRouterJSON(
+      req,
+      res,
+      "You are the Scholar Core Senior Examiner & Rubric Audit Agent.",
+      prompt,
+      "openrouter/auto",
+      "verification"
+    );
+    if (!data) return;
+    res.json(data);
+  } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
+    console.error("Audit export error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to generate submission audit" });
     }
   }
 });

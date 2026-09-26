@@ -22,7 +22,7 @@ export default function AssignmentStageNavigation({
           Workflow
         </span>
         <span className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500">
-          8 Phases
+          {ASSIGNMENT_STAGES.length} Stages
         </span>
       </div>
 

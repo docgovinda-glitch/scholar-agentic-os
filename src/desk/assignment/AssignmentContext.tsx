@@ -14,10 +14,16 @@ import {
 import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
 import type {
   AssignmentStage,
+  GuidedAssignmentStage,
   StageStatus,
   AcademicLevel,
   AssignmentType,
   AssignmentAnalysis,
+  AssignmentDeconstruction,
+  ThesisAndWordBudget,
+  PeelMatrixData,
+  GroundedCitationItem,
+  SubmissionAuditReport,
   ResearchPlan,
   DiscoveredSource,
   EvidenceItem,
@@ -28,7 +34,7 @@ import type {
   TutorMode,
   RubricGradeEstimation,
 } from "./types";
-import { ASSIGNMENT_STAGES } from "./types";
+import { ASSIGNMENT_STAGES, normalizeAssignmentStage } from "./types";
 
 interface AssignmentContextValue {
   projectId: string;
@@ -51,7 +57,19 @@ interface AssignmentContextValue {
   question: string;
   assignmentBriefText: string;
 
-  // Analysis & Plan
+  // 5 Guided Stages Domain Models
+  deconstruction: AssignmentDeconstruction | null;
+  setDeconstruction: (d: AssignmentDeconstruction) => Promise<void>;
+  thesisBudget: ThesisAndWordBudget | null;
+  setThesisBudget: (tb: ThesisAndWordBudget) => Promise<void>;
+  peelMatrix: PeelMatrixData | null;
+  setPeelMatrix: (pm: PeelMatrixData) => Promise<void>;
+  groundedCitations: GroundedCitationItem[];
+  setGroundedCitations: (c: GroundedCitationItem[]) => Promise<void>;
+  auditReport: SubmissionAuditReport | null;
+  setAuditReport: (r: SubmissionAuditReport) => Promise<void>;
+
+  // Legacy Stage Models for Backwards Compatibility
   analysis: AssignmentAnalysis | null;
   setAnalysis: (analysis: AssignmentAnalysis) => Promise<void>;
   researchPlan: ResearchPlan | null;
@@ -157,7 +175,7 @@ export function AssignmentProvider({
   }, [activeProjectId]);
 
   // Active stage
-  const currentStage: AssignmentStage = initialStage ?? "understand";
+  const currentStage: AssignmentStage = initialStage ?? "deconstruct";
 
   // AI Tutor & Rubric Estimator state
   const [tutorMode, setTutorMode] = useState<TutorMode>("socratic");
@@ -184,7 +202,7 @@ export function AssignmentProvider({
         const targetStage: AssignmentStage =
           persistedStage && ASSIGNMENT_STAGES.some((s) => s.id === persistedStage)
             ? (persistedStage as AssignmentStage)
-            : "understand";
+            : "deconstruct";
         onStageChangeCallback(targetStage, { replace: true });
       }
 
@@ -318,6 +336,103 @@ export function AssignmentProvider({
         : answers["assignment_submission_report"])
     : null;
 
+  // 5 Guided Stages Domain Entities
+  const deconstruction: AssignmentDeconstruction | null = useMemo(() => {
+    const raw = answers["assignment_deconstruction"] || answers["assignment_analysis"];
+    if (!raw) return null;
+    try {
+      return typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch {
+      return null;
+    }
+  }, [answers["assignment_deconstruction"], answers["assignment_analysis"]]);
+
+  const thesisBudget: ThesisAndWordBudget | null = useMemo(() => {
+    const raw = answers["assignment_thesis_budget"];
+    if (!raw) return null;
+    try {
+      return typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch {
+      return null;
+    }
+  }, [answers["assignment_thesis_budget"]]);
+
+  const peelMatrix: PeelMatrixData | null = useMemo(() => {
+    const raw = answers["assignment_peel_matrix"];
+    if (!raw) return null;
+    try {
+      return typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch {
+      return null;
+    }
+  }, [answers["assignment_peel_matrix"]]);
+
+  const groundedCitations: GroundedCitationItem[] = useMemo(() => {
+    const raw = answers["assignment_citations"];
+    if (!raw) return [];
+    try {
+      return typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch {
+      return [];
+    }
+  }, [answers["assignment_citations"]]);
+
+  const auditReport: SubmissionAuditReport | null = useMemo(() => {
+    const raw = answers["assignment_audit_report"] || answers["assignment_submission_report"];
+    if (!raw) return null;
+    try {
+      return typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch {
+      return null;
+    }
+  }, [answers["assignment_audit_report"], answers["assignment_submission_report"]]);
+
+  // Setters for 5 Guided Stages
+  const setDeconstruction = useCallback(
+    async (newDeconstruction: AssignmentDeconstruction) => {
+      await saveAnswers({
+        assignment_deconstruction: newDeconstruction,
+        assignment_analysis: newDeconstruction,
+      });
+    },
+    [saveAnswers]
+  );
+
+  const setThesisBudget = useCallback(
+    async (newBudget: ThesisAndWordBudget) => {
+      await saveAnswers({
+        assignment_thesis_budget: newBudget,
+        assignment_thesis: newBudget.selectedThesis,
+        word_count: newBudget.totalTargetWords,
+      });
+    },
+    [saveAnswers]
+  );
+
+  const setPeelMatrix = useCallback(
+    async (newMatrix: PeelMatrixData) => {
+      await saveAnswers({ assignment_peel_matrix: newMatrix });
+    },
+    [saveAnswers]
+  );
+
+  const setGroundedCitations = useCallback(
+    async (newCitations: GroundedCitationItem[]) => {
+      await saveAnswers({ assignment_citations: newCitations });
+    },
+    [saveAnswers]
+  );
+
+  const setAuditReport = useCallback(
+    async (newReport: SubmissionAuditReport) => {
+      await saveAnswers({
+        assignment_audit_report: newReport,
+        assignment_submission_report: newReport,
+      });
+    },
+    [saveAnswers]
+  );
+
   // Setters
   const setAnalysis = useCallback(
     async (newAnalysis: AssignmentAnalysis) => {
@@ -406,10 +521,24 @@ export function AssignmentProvider({
     [saveAnswers]
   );
 
-  // Word count calculations
+  // Word count calculations across PEEL themes and outline
   const currentWordCount = useMemo(() => {
-    return outline.reduce((sum, sec) => sum + (sec.currentWordCount || 0), 0);
-  }, [outline]);
+    let peelCount = 0;
+    if (peelMatrix?.themes && Array.isArray(peelMatrix.themes)) {
+      peelCount = peelMatrix.themes.reduce((sum, t) => {
+        const text = t.draftContent || `${t.point || ""} ${t.evidence || ""} ${t.explanation || ""} ${t.counterargument || ""} ${t.rebuttal || ""} ${t.link || ""}`;
+        return sum + (text.trim() ? text.trim().split(/\s+/).filter(Boolean).length : 0);
+      }, 0);
+      if (peelMatrix.introductionDraft) {
+        peelCount += peelMatrix.introductionDraft.trim().split(/\s+/).filter(Boolean).length;
+      }
+      if (peelMatrix.conclusionDraft) {
+        peelCount += peelMatrix.conclusionDraft.trim().split(/\s+/).filter(Boolean).length;
+      }
+    }
+    const outlineCount = outline.reduce((sum, sec) => sum + (sec.currentWordCount || 0), 0);
+    return Math.max(peelCount, outlineCount);
+  }, [peelMatrix, outline]);
 
   const remainingWordCount = Math.max(0, targetWordCount - currentWordCount);
   const wordCountPercentage = targetWordCount > 0 ? Math.min(100, Math.round((currentWordCount / targetWordCount) * 100)) : 0;
@@ -535,20 +664,39 @@ export function AssignmentProvider({
     [outline, updateSectionDraft]
   );
 
-  // Compute status for all 8 stages
+  // Compute status for all stages (5 guided stages + legacy aliases)
   const stageStatuses: Record<AssignmentStage, StageStatus> = useMemo(() => {
-    const hasUnderstand = Boolean(question && targetWordCount > 0 && citationStyle);
-    const hasAnalysis = Boolean(analysis && analysis.approvedByUser);
+    const hasDeconstruct = Boolean(
+      deconstruction || (question && targetWordCount > 0 && citationStyle && analysis?.approvedByUser)
+    );
+    const hasThesisBudget = Boolean(
+      thesisBudget?.selectedThesis || (thinkingMap && (thinkingMap.selectedThesisId || thinkingMap.customThesis))
+    );
+    const hasPeelMatrix = Boolean(
+      (peelMatrix?.themes && peelMatrix.themes.length > 0) || outline.length >= 3 || currentWordCount >= Math.min(200, targetWordCount * 0.3)
+    );
+    const hasCitations = groundedCitations.length >= 2 || sources.filter((s) => s.status === "kept").length >= 2;
+    const hasAuditExport = Boolean(auditReport || submissionReport);
+
+    const hasUnderstand = hasDeconstruct;
     const hasPlan = Boolean(researchPlan && researchPlan.approvedByUser);
-    const hasSources = sources.filter((s) => s.status === "kept").length >= 2;
+    const hasSources = hasCitations;
     const hasEvidence = evidenceItems.filter((e) => e.status === "approved").length >= 2;
-    const hasThinking = Boolean(thinkingMap && (thinkingMap.selectedThesisId || thinkingMap.customThesis));
+    const hasThinking = hasThesisBudget;
     const hasStructure = outline.length >= 3;
-    const hasDraft = currentWordCount >= Math.min(200, targetWordCount * 0.3);
-    const hasReport = Boolean(submissionReport);
+    const hasDraft = hasPeelMatrix;
+    const hasReport = hasAuditExport;
 
     return {
-      understand: hasUnderstand && hasAnalysis ? "completed" : currentStage === "understand" ? "active" : "needs_review",
+      // 5 Guided Stages
+      deconstruct: hasDeconstruct ? "completed" : (currentStage === "deconstruct" || currentStage === "understand") ? "active" : "needs_review",
+      thesis_budget: hasThesisBudget ? "completed" : (currentStage === "thesis_budget" || currentStage === "plan" || currentStage === "structure") ? "active" : hasDeconstruct ? "available" : "locked",
+      peel_matrix: hasPeelMatrix ? "completed" : (currentStage === "peel_matrix" || currentStage === "think" || currentStage === "draft") ? "active" : hasThesisBudget ? "available" : "locked",
+      citations: hasCitations ? "completed" : (currentStage === "citations" || currentStage === "research" || currentStage === "evidence") ? "active" : hasPeelMatrix ? "available" : "locked",
+      audit_export: hasAuditExport ? "completed" : (currentStage === "audit_export" || currentStage === "final") ? "active" : hasCitations ? "available" : "locked",
+
+      // Legacy Aliases
+      understand: hasUnderstand ? "completed" : currentStage === "understand" ? "active" : "needs_review",
       plan: hasPlan ? "completed" : currentStage === "plan" ? "active" : hasUnderstand ? "available" : "locked",
       research: hasSources ? "completed" : currentStage === "research" ? "active" : hasPlan ? "available" : "locked",
       evidence: hasEvidence ? "completed" : currentStage === "evidence" ? "active" : hasSources ? "available" : "locked",
@@ -558,6 +706,11 @@ export function AssignmentProvider({
       final: hasReport ? "completed" : currentStage === "final" ? "active" : hasDraft ? "available" : "locked",
     };
   }, [
+    deconstruction,
+    thesisBudget,
+    peelMatrix,
+    groundedCitations,
+    auditReport,
     question,
     targetWordCount,
     citationStyle,
@@ -593,6 +746,18 @@ export function AssignmentProvider({
         citationStyle,
         question,
         assignmentBriefText,
+        // 5 Guided Stages
+        deconstruction,
+        setDeconstruction,
+        thesisBudget,
+        setThesisBudget,
+        peelMatrix,
+        setPeelMatrix,
+        groundedCitations,
+        setGroundedCitations,
+        auditReport,
+        setAuditReport,
+        // Legacy
         analysis,
         setAnalysis,
         researchPlan,

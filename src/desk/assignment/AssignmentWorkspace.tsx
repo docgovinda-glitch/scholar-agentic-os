@@ -5,6 +5,12 @@ import AssignmentStageNavigation from "./components/AssignmentStageNavigation";
 
 // Aggressive code-splitting with React.lazy
 const SocraticTutor = React.lazy(() => import("./components/AssignmentAiTutorPanel"));
+const AssignmentDeconstructStage = React.lazy(() => import("./stages/AssignmentDeconstructStage"));
+const AssignmentThesisBudgetStage = React.lazy(() => import("./stages/AssignmentThesisBudgetStage"));
+const AssignmentPeelMatrixStage = React.lazy(() => import("./stages/AssignmentPeelMatrixStage"));
+const AssignmentCitationGroundingStage = React.lazy(() => import("./stages/AssignmentCitationGroundingStage"));
+const AssignmentAuditExportStage = React.lazy(() => import("./stages/AssignmentAuditExportStage"));
+// Legacy stages
 const AssignmentUnderstandStage = React.lazy(() => import("./stages/AssignmentUnderstandStage"));
 const AssignmentPlanStage = React.lazy(() => import("./stages/AssignmentPlanStage"));
 const AssignmentResearchStage = React.lazy(() => import("./stages/AssignmentResearchStage"));
@@ -186,24 +192,34 @@ function AssignmentWorkspaceInner({
 
   const renderActiveStage = () => {
     switch (currentStage) {
+      // 5 Guided Stages
+      case "deconstruct":
+        return <AssignmentDeconstructStage />;
+      case "thesis_budget":
+        return <AssignmentThesisBudgetStage />;
+      case "peel_matrix":
+        return <AssignmentPeelMatrixStage />;
+      case "citations":
+        return <AssignmentCitationGroundingStage />;
+      case "audit_export":
+        return <AssignmentAuditExportStage />;
+
+      // Backward-compatible legacy aliases
       case "understand":
-        return <AssignmentUnderstandStage />;
+        return <AssignmentDeconstructStage />;
       case "plan":
-        return <AssignmentPlanStage />;
-      case "research":
-        return <AssignmentResearchStage />;
-      case "evidence":
-        return <AssignmentEvidenceStage />;
-      case "think":
-        return <AssignmentThinkStage />;
       case "structure":
-        return <AssignmentStructureStage />;
+        return <AssignmentThesisBudgetStage />;
+      case "think":
       case "draft":
-        return <AssignmentDraftStage />;
+        return <AssignmentPeelMatrixStage />;
+      case "research":
+      case "evidence":
+        return <AssignmentCitationGroundingStage />;
       case "final":
-        return <AssignmentFinalStage />;
+        return <AssignmentAuditExportStage />;
       default:
-        return <AssignmentUnderstandStage />;
+        return <AssignmentDeconstructStage />;
     }
   };
 

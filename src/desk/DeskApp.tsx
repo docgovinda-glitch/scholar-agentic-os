@@ -65,7 +65,10 @@ function isResearchStage(value: string | undefined): value is ResearchStage {
   return !!value && STAGE_MAP.has(value as ResearchStage);
 }
 
-const ASSIGNMENT_STAGE_SET = new Set<string>(ASSIGNMENT_STAGES.map((s) => s.id));
+const ASSIGNMENT_STAGE_SET = new Set<string>([
+  ...ASSIGNMENT_STAGES.map((s) => s.id),
+  "understand", "plan", "research", "evidence", "think", "structure", "draft", "final"
+]);
 function isAssignmentStage(value: string | undefined): value is AssignmentStage {
   return !!value && ASSIGNMENT_STAGE_SET.has(value);
 }

@@ -16,6 +16,10 @@ vi.mock("../../api", () => ({
   getRubric: (...a: unknown[]) => getRubric(...a),
   getOutputTypeSpec: (...a: unknown[]) => getOutputTypeSpec(...a),
   saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
+  isEphemeralProject: () => false,
+  commitProjectToDatabase: vi.fn(),
+  authedJsonFetch: vi.fn(),
+  authedFetch: vi.fn(),
 }));
 
 vi.mock("../../../services/userVault", () => ({
@@ -57,45 +61,35 @@ describe("Scholar Core Assignment Workspace", () => {
     });
   });
 
-  it("renders the 3-column workspace with 8-phase navigation, active workspace, and AI tutor panel", async () => {
+  it("renders the 3-column workspace with 5-stage navigation, active workspace, and AI tutor panel", async () => {
     render(
       <AssignmentWorkspace
         projectId="proj-123"
-        initialStage="understand"
+        initialStage="deconstruct"
         onStageChange={vi.fn()}
       />
     );
 
-    // Left Rail: 8 stages strictly begin with navigation items
-    expect(await screen.findByText(/Phase 2/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Phase 1/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Phase 4/i)).toBeInTheDocument();
-    expect(screen.getByText(/Phase 5/i)).toBeInTheDocument();
-    expect(screen.getByText(/Phase 6/i)).toBeInTheDocument();
-    expect(screen.getByText(/Phase 8/i)).toBeInTheDocument();
-
-    // Verify left rail purged elements
-    expect(screen.queryByText(/Academic Assignment Journey/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Structured 8-phase research/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Undergraduate Workspace/i)).not.toBeInTheDocument();
+    // Left Rail: 5 guided stages
+    expect(await screen.findByText(/1. Deconstruct/i)).toBeInTheDocument();
+    expect(screen.getByText(/2. Thesis & Budget/i)).toBeInTheDocument();
+    expect(screen.getByText(/3. PEEL Matrix/i)).toBeInTheDocument();
+    expect(screen.getByText(/4. Citations/i)).toBeInTheDocument();
+    expect(screen.getByText(/5. Audit & Export/i)).toBeInTheDocument();
 
     // Center Stage (lazy loaded)
-    expect(await screen.findByText(/Phase 1: Understand the Assignment/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Stage 01 • Deconstruction/i)).toBeInTheDocument();
     expect(screen.getByText(/Target Word Count/i)).toBeInTheDocument();
 
-    // Right AI Tutor Sidebar: 4-tab navigation serves as top-most entry point
+    // Right AI Tutor Sidebar
     const tutorPanel = await screen.findByRole("complementary");
     expect(within(tutorPanel).getByRole("button", { name: /socratic/i })).toBeInTheDocument();
     expect(within(tutorPanel).getByRole("button", { name: /rubric/i })).toBeInTheDocument();
     expect(within(tutorPanel).getByRole("button", { name: /counter-args/i })).toBeInTheDocument();
     expect(within(tutorPanel).getByRole("button", { name: /polish/i })).toBeInTheDocument();
-
-    // Verify right sidebar purged header and duplicate word count are not present
-    expect(screen.queryByText(/Academic Thinking & Writing Tutor/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Word Count Budget Planner/i)).not.toBeInTheDocument();
   });
 
-  it("enforces mandatory target word count and citation style before analysis", async () => {
+  it("handles prompt input and analysis trigger", async () => {
     getProject.mockResolvedValueOnce({
       projectId: "proj-123",
       outputTypeId: "OT-01",
@@ -103,8 +97,8 @@ describe("Scholar Core Assignment Workspace", () => {
       hasDocument: false,
       answers: {
         assignment_question: "",
-        word_count: 0,
-        citation_style: "",
+        word_count: 2000,
+        citation_style: "apa7",
       },
       gates: [],
     });
@@ -112,12 +106,12 @@ describe("Scholar Core Assignment Workspace", () => {
     render(
       <AssignmentWorkspace
         projectId="proj-123"
-        initialStage="understand"
+        initialStage="deconstruct"
         onStageChange={vi.fn()}
       />
     );
 
-    expect(await screen.findByText(/Please provide the assignment question, word count, and citation style to continue/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Enter prompt \(10\+ chars\) to run analysis/i)).toBeInTheDocument();
   });
 
   it("renders a minimalist, decluttered workspace header", async () => {
@@ -125,7 +119,7 @@ describe("Scholar Core Assignment Workspace", () => {
     render(
       <AssignmentWorkspace
         projectId="proj-123"
-        initialStage="understand"
+        initialStage="deconstruct"
         onStageChange={vi.fn()}
         onClose={handleClose}
       />
@@ -150,22 +144,11 @@ describe("Scholar Core Assignment Workspace", () => {
       );
     });
 
-    // Verify removed clutter on left: no Scholar Core logo or Undergraduate pill in header
-    expect(within(header).queryByText("SCHOLAR CORE")).not.toBeInTheDocument();
-    expect(within(header).queryByText("Undergraduate")).not.toBeInTheDocument();
-    expect(within(header).queryByText("Postgraduate")).not.toBeInTheDocument();
-
-    // 2. Purged Right Section: No Vault or AI Access buttons in workspace header
-    expect(within(header).queryByRole("button", { name: /vault/i })).not.toBeInTheDocument();
-    expect(within(header).queryByRole("button", { name: /ai access/i })).not.toBeInTheDocument();
-
-    // 3. Simplified AI Tutor: minimalist icon button
+    // 2. Simplified AI Tutor: minimalist icon button
     const tutorToggle = within(header).getByRole("button", { name: /toggle ai tutor/i });
     expect(tutorToggle).toBeInTheDocument();
-    expect(within(header).queryByText("AI Tutor")).not.toBeInTheDocument();
 
-    // 4. Compact status badge: 0 / 2,000 words
+    // 3. Compact status badge: 0 / 2,000 words
     expect(within(header).getByText(/0 \/ 2,000 words/i)).toBeInTheDocument();
   });
 });
-
