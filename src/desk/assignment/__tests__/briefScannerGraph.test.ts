@@ -99,7 +99,7 @@ Upper Second (60-69%): Consistent critical argument with sound empirical substan
     expect(excludedFound).toBe(true);
 
     // 4. Verify Word Budget and Summary
-    expect(analysis.wordCountImplications).toContain("2500");
+    expect(analysis.wordCountImplications).toMatch(/2,?500/);
     expect(analysis.citationGuidance).toContain("APA7");
   });
 
@@ -117,5 +117,49 @@ Upper Second (60-69%): Consistent critical argument with sound empirical substan
     expect(analysis.commandVerbs.length).toBeGreaterThan(0);
     expect(analysis.scopeBoundaries.included.length).toBeGreaterThan(0);
     expect(analysis.expectedResponseType).toBeDefined();
+  });
+
+  it("verifies category-to-shape mapping for prompt, constraint, rubric_band, penalty, and formatting", async () => {
+    const brief = `
+[Prompt Section]
+Assessment Question: Critically analyze and compare renewable energy transition policies in the UK and Germany.
+
+[Scope and Constraints]
+Requirement: You must include empirical case data from 2018 to 2024.
+Scope Warning: Do not discuss nuclear power developments or historical coal subsidies.
+
+[Grading Rubric]
+First Class (70%+): Outstanding theoretical depth, systematic comparative methodology, and original synthesis.
+Late Penalty: 5% per day deduction for unauthorized overdue submissions.
+
+[Formatting]
+Word limit: 3000 words.
+Citation: Follow Harvard referencing style rigorously.
+    `;
+
+    const analysis = await runBriefScannerGraph({
+      briefText: brief,
+      question: "Critically analyze and compare renewable energy transition policies in the UK and Germany.",
+      assignmentType: "comparative_essay",
+      academicLevel: "postgraduate",
+      targetWordCount: 3000,
+      citationStyle: "harvard",
+    });
+
+    // 1. Command verbs mapped from prompt category
+    const verbs = analysis.commandVerbs.map((c) => c.verb.toLowerCase());
+    expect(verbs.some((v) => v.includes("analyze") || v.includes("compare"))).toBe(true);
+
+    // 2. Constraints mapped to included vs excluded
+    expect(analysis.scopeBoundaries.included.some((inc) => inc.toLowerCase().includes("empirical case data") || inc.toLowerCase().includes("must"))).toBe(true);
+    expect(analysis.scopeBoundaries.excluded.some((exc) => exc.toLowerCase().includes("nuclear power") || exc.toLowerCase().includes("do not discuss"))).toBe(true);
+
+    // 3. Rubric & Penalty mapped to markingCriteriaInsights
+    expect(analysis.markingCriteriaInsights.some((m) => m.toLowerCase().includes("first class") || m.includes("70%"))).toBe(true);
+    expect(analysis.markingCriteriaInsights.some((m) => m.toLowerCase().includes("penalty") || m.includes("5% per day"))).toBe(true);
+
+    // 4. Formatting mapped to word count implications and citation guidance
+    expect(analysis.wordCountImplications).toContain("3,000");
+    expect(analysis.citationGuidance).toContain("HARVARD");
   });
 });

@@ -59,6 +59,13 @@ export interface CommandVerbDetail {
   academicExpectation: string;
 }
 
+export interface DocumentRequirement {
+  lineRange: string;
+  category: "prompt" | "constraint" | "rubric_band" | "formatting" | "penalty";
+  description: string;
+  verbatimText: string;
+}
+
 export interface AssignmentAnalysis {
   commandVerbs: CommandVerbDetail[];
   summary: string;
@@ -75,6 +82,7 @@ export interface AssignmentAnalysis {
   academicLevelNotes: string;
   approvedByUser: boolean;
   userFeedback?: string;
+  briefLedger?: DocumentRequirement[];
 }
 
 export interface ResearchPlan {

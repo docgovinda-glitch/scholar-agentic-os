@@ -4,8 +4,13 @@ import * as pdfParseModule from "pdf-parse";
 import mammoth from "mammoth";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
 import { callOpenRouterJSON, callOpenRouterText } from "../../utils/llm.ts";
-import { rejectClientCredentials } from "../../src/middleware/rejectClientCredentials.ts";
-import { runBriefScannerGraph } from "../../services/briefScannerGraph.ts";
+import {
+  auditDocumentLineByLine,
+  runBriefScannerGraph,
+  COMMAND_VERB_MAP,
+  type DocumentRequirement,
+} from "../../services/briefScannerGraph.ts";
+import type { AssignmentAnalysis, CommandVerbDetail } from "../../../src/desk/assignment/types.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(rejectClientCredentials);
@@ -137,19 +142,209 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
   } = req.body || {};
 
   try {
-    // Execute deterministic Sequential LangGraph Line-by-Line Scanner
-    const briefContent = `${question}\n\n${briefText}\n\n${rubricText}`.trim();
-    const graphAnalysis = await runBriefScannerGraph({
-      briefText: briefContent,
-      question,
-      assignmentType,
-      academicLevel,
-      targetWordCount: Number(targetWordCount) || 2000,
-      citationStyle,
-      rubricText,
-    });
+    const combinedContent = [question, briefText, rubricText].filter(Boolean).join("\n\n").trim();
+    const ledger: DocumentRequirement[] = await auditDocumentLineByLine(combinedContent);
 
-    res.json(graphAnalysis);
+    // 1. Command Verbs & Examiner Demands (mapped from category === 'prompt')
+    const promptItems = ledger.filter((item) => item.category === "prompt");
+    const commandVerbs: CommandVerbDetail[] = [];
+    const verbSeen = new Set<string>();
+
+    for (const item of promptItems) {
+      const lower = item.verbatimText.toLowerCase();
+      let matched = false;
+      for (const [verbKey, verbVal] of Object.entries(COMMAND_VERB_MAP)) {
+        if (new RegExp(`\\b${verbKey}\\b`, "i").test(lower) && !verbSeen.has(verbKey)) {
+          verbSeen.add(verbKey);
+          matched = true;
+          commandVerbs.push({
+            verb: verbKey.charAt(0).toUpperCase() + verbKey.slice(1),
+            meaning: verbVal.meaning,
+            academicExpectation: `${verbVal.expectation} (${item.lineRange})`,
+          });
+        }
+      }
+      if (!matched && !verbSeen.has(item.lineRange)) {
+        verbSeen.add(item.lineRange);
+        commandVerbs.push({
+          verb: "Task Directive",
+          meaning: "Directly answer the specified task requirement from the brief.",
+          academicExpectation: `${item.verbatimText} (${item.lineRange})`,
+        });
+      }
+    }
+
+    if (commandVerbs.length === 0) {
+      commandVerbs.push(
+        {
+          verb: "Critically evaluate",
+          meaning: "Weigh competing theoretical arguments and empirical evidence to judge their validity.",
+          academicExpectation: "You must not merely describe; synthesize counterarguments and substantiate a justified academic conclusion.",
+        },
+        {
+          verb: "Analyse",
+          meaning: "Break down complex issues into component parts to examine relationships and causes.",
+          academicExpectation: "Explain 'how' and 'why' with methodological rigor, avoiding superficial summary.",
+        }
+      );
+    }
+
+    // 2. Key Conceptual Scope & Boundaries (mapped from category === 'constraint': mustInclude vs excluded)
+    const constraintItems = ledger.filter((item) => item.category === "constraint");
+    const included: string[] = [];
+    const excluded: string[] = [];
+
+    for (const item of constraintItems) {
+      if (/(?:do not|must not|avoid|exclude|excluded|out of scope|not acceptable|will not be credited|shall not|never)/i.test(item.verbatimText)) {
+        excluded.push(`${item.lineRange} ${item.verbatimText}`);
+      } else {
+        included.push(`${item.lineRange} ${item.verbatimText}`);
+      }
+    }
+
+    // Also include prompt requirements if specified
+    for (const p of promptItems) {
+      if (/^(?:\d+[\.\)]|[a-e][\.\)]|\?)/.test(p.verbatimText) || p.verbatimText.length > 20) {
+        const itemTag = `${p.lineRange} ${p.verbatimText}`;
+        if (!included.includes(itemTag)) {
+          included.push(itemTag);
+        }
+      }
+    }
+
+    if (included.length === 0) {
+      included.push(
+        `Direct deconstruction and systematic investigation of: "${question.slice(0, 100)}"`,
+        `Application of authoritative theoretical frameworks appropriate to ${academicLevel} study`,
+        `Substantiation of claims using peer-reviewed scholarly literature formatted in ${citationStyle.toUpperCase()}`,
+        "Dialectical evaluation of counterarguments, competing evidence, and disciplinary controversies"
+      );
+    }
+
+    if (excluded.length === 0) {
+      excluded.push(
+        "Purely descriptive narrative storytelling or textbook summaries lacking critical evaluation",
+        "Unsubstantiated personal opinion pieces or non-academic blogs/wikis",
+        "Irrelevant biographical or historical context that does not answer the core question",
+        `Content exceeding the target word count (${targetWordCount} words) by more than standard tolerance`
+      );
+    }
+
+    // 3. Rubric Rules & Grade Bands (mapped from category === 'rubric_band' and category === 'penalty')
+    const rubricItems = ledger.filter((item) => item.category === "rubric_band");
+    const penaltyItems = ledger.filter((item) => item.category === "penalty");
+    const markingCriteriaInsights: string[] = [];
+
+    if (rubricItems.length > 0) {
+      markingCriteriaInsights.push(...rubricItems.map((r) => `${r.lineRange} ${r.verbatimText}`).slice(0, 6));
+    } else {
+      markingCriteriaInsights.push(
+        "First Class (70%+): Demands independent critical stance, rigorous theoretical synthesis, and counterargument refutation.",
+        "Upper Second (60–69%): Requires sound structure, clear analytical argument, and consistent scholarly evidence.",
+        "Lower Second (50–59%): Awarded for descriptive summaries that answer the prompt but lack critical depth.",
+        "Third Class (40–49%): Threshold pass; factual knowledge present but marred by structural disorganization."
+      );
+    }
+
+    if (penaltyItems.length > 0) {
+      markingCriteriaInsights.push(
+        ...penaltyItems.map((p) => `🚨 Detected Assessment Penalty: ${p.lineRange} ${p.verbatimText}`)
+      );
+    }
+
+    // 4. Formatting & Word Budget (mapped from category === 'formatting')
+    const targetWords = Number(targetWordCount) || 2000;
+    const introWords = Math.round(targetWords * 0.1);
+    const conclWords = Math.round(targetWords * 0.1);
+    const bodyWords = targetWords - introWords - conclWords;
+
+    const formattingRules = ledger
+      .filter((item) => item.category === "formatting")
+      .map((item) => `${item.lineRange} ${item.verbatimText}`);
+
+    const wordCountImplications = `Target: ${targetWords.toLocaleString()} words (Intro: ~${introWords}w, Body: ~${bodyWords}w, Conclusion: ~${conclWords}w). Standard ±10% penalty threshold applies.${
+      formattingRules.length > 0 ? ` Detected Rules: ${formattingRules.join(" | ")}` : ""
+    }`;
+
+    const citationGuidance = `Format all in-text citations and reference list strictly according to ${citationStyle.toUpperCase()} conventions.${
+      formattingRules.some((r) => new RegExp(citationStyle, "i").test(r)) ? " Confirmed in assignment brief." : ""
+    }`;
+
+    // 5. Concepts, Expected Response Type, Evidence Requirements, Summary
+    const keyConcepts = [
+      "Theoretical Framework",
+      "Empirical Evidence",
+      "Critical Synthesis",
+      "Methodological Rigor",
+      "Counterargument Evaluation",
+    ];
+
+    const expectedResponseType =
+      assignmentType === "case_study"
+        ? "Strategic case analysis diagnosing root causes, evaluating alternatives, and proposing an implementation roadmap."
+        : assignmentType === "report" || assignmentType === "business_assignment"
+        ? "Structured professional report with numbered subheadings, empirical findings, and actionable SMART recommendations."
+        : assignmentType === "reflection"
+        ? "Critical reflective analysis connecting experiential practice with pedagogical and disciplinary theory (e.g. Gibbs' cycle)."
+        : assignmentType === "lab_report"
+        ? "Scientific laboratory report following IMRaD structure with empirical hypothesis testing and error analysis."
+        : "Dialectical academic essay advancing a central argumentative thesis substantiated by peer-reviewed evidence.";
+
+    const evidenceRequirements =
+      academicLevel === "postgraduate"
+        ? "High-impact peer-reviewed journal articles, foundational theoretical monographs, and authoritative empirical datasets."
+        : "Authoritative academic sources, scholarly peer-reviewed journals, and verified institutional benchmark data.";
+
+    const academicLevelNotes =
+      academicLevel === "postgraduate"
+        ? "Calibrated for Postgraduate / Masters study: demands high theoretical synthesis, methodological reflexivity, nuanced hedging, and original critical insight."
+        : "Calibrated for Undergraduate study: emphasizes conceptual clarity, structured logical flow, accurate evidence deployment, and clear thesis progression.";
+
+    const penaltyNote = penaltyItems.length > 0 ? ` Note: ${penaltyItems.length} specific penalty clause(s) identified.` : "";
+
+    const summary = `The examiner requires a rigorous ${assignmentType.replace(/_/g, " ")} addressing "${question.slice(
+      0,
+      140
+    )}...". The submission must reflect ${academicLevel} standards, deploy ${citationStyle.toUpperCase()} referencing, and deliver disciplined analysis within the ${targetWords}-word budget.${penaltyNote}`;
+
+    const finalAnalysis: AssignmentAnalysis = {
+      commandVerbs,
+      summary,
+      keyConcepts,
+      scopeBoundaries: {
+        included: included.slice(0, 8),
+        excluded: excluded.slice(0, 8),
+      },
+      expectedResponseType,
+      evidenceRequirements,
+      markingCriteriaInsights,
+      wordCountImplications,
+      citationGuidance,
+      academicLevelNotes,
+      approvedByUser: false,
+      briefLedger: ledger,
+    };
+
+    // 6. Persist the ledger in the project JSONB answers under assignment_analysis and brief_ledger
+    project.answers = {
+      ...project.answers,
+      assignment_question: question,
+      academic_level: academicLevel,
+      assignment_type: assignmentType,
+      word_count: targetWords,
+      word_limit: targetWords,
+      citation_style: citationStyle,
+      assignment_brief_text: briefText,
+      marking_rubric: rubricText,
+      assignment_analysis: finalAnalysis,
+      brief_ledger: ledger,
+    };
+    await getProjectStore().save(project);
+
+    res.json({
+      ...finalAnalysis,
+      briefLedger: ledger,
+    });
   } catch (err: any) {
     console.error("Assignment deconstruction error:", err);
     if (!res.headersSent) {

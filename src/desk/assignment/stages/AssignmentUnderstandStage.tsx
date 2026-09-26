@@ -564,7 +564,7 @@ export default function AssignmentUnderstandStage() {
               </p>
             </div>
             <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-              ✓ Analysis Ready
+              ✓ Analysis Ready{analysis.briefLedger && analysis.briefLedger.length > 0 ? ` · ${analysis.briefLedger.length} Rules Indexed` : ""}
             </span>
           </div>
 

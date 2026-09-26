@@ -5,7 +5,7 @@ import type { AssignmentAnalysis, CommandVerbDetail } from "../../src/desk/assig
 /**
  * Standard university command verb definitions and examiner expectations
  */
-const COMMAND_VERB_MAP: Record<string, { meaning: string; expectation: string }> = {
+export const COMMAND_VERB_MAP: Record<string, { meaning: string; expectation: string }> = {
   "critically evaluate": {
     meaning: "Weigh competing theoretical arguments and empirical evidence to judge their validity.",
     expectation: "You must not merely describe; synthesize counterarguments and substantiate a justified academic conclusion.",
@@ -438,12 +438,13 @@ export async function runBriefScannerGraph(params: {
         ? "High-impact peer-reviewed journal articles, foundational theoretical monographs, and authoritative empirical datasets."
         : "Authoritative academic sources, scholarly peer-reviewed journals, and verified institutional benchmark data.",
     markingCriteriaInsights,
-    wordCountImplications: `Target: ${params.targetWordCount} words (Intro: ~${introWords}w, Body: ~${bodyWords}w, Conclusion: ~${conclWords}w). Standard ±10% penalty threshold applies.`,
+    wordCountImplications: `Target: ${params.targetWordCount.toLocaleString()} words (Intro: ~${introWords}w, Body: ~${bodyWords}w, Conclusion: ~${conclWords}w). Standard ±10% penalty threshold applies.`,
     citationGuidance: `Strict adherence to ${params.citationStyle.toUpperCase()} formatting for all in-text citations and reference list entries.`,
     academicLevelNotes:
       params.academicLevel === "postgraduate"
         ? "Calibrated for Postgraduate / Masters study: demands high theoretical synthesis, methodological reflexivity, nuanced hedging, and original critical insight."
         : "Calibrated for Undergraduate study: emphasizes conceptual clarity, structured logical flow, accurate evidence deployment, and clear thesis progression.",
     approvedByUser: false,
+    briefLedger: ledger,
   };
 }
