@@ -1,8 +1,61 @@
 import { describe, it, expect } from "vitest";
-import { runBriefScannerGraph } from "../../../../server/services/briefScannerGraph.ts";
+import {
+  indexDocumentLines,
+  auditDocumentLineByLine,
+  runBriefScannerGraph,
+  DocumentRequirementSchema,
+} from "../../../../server/services/briefScannerGraph.ts";
 
 describe("Deterministic Sequential LangGraph Line-by-Line Brief Scanner", () => {
-  it("scans and extracts command verbs, explicit penalties, and excluded boundaries", async () => {
+  it("indexes document lines with standard line numbering tags", () => {
+    const raw = `
+      First line
+      Second line
+
+      Third line
+    `;
+    const indexed = indexDocumentLines(raw);
+    expect(indexed).toEqual([
+      "[L001] First line",
+      "[L002] Second line",
+      "[L003] Third line",
+    ]);
+  });
+
+  it("audits document line-by-line using LangGraph state graph and emits DocumentRequirement ledger", async () => {
+    const rawText = `
+Assessment Question: Critically evaluate the impact of generative AI on academic integrity.
+Target word count is 2000 words.
+Referencing style: APA 7th edition.
+Penalty: Late submissions will incur a 5% per day penalty.
+Do not use unverified Wikipedia sources.
+First class (70%+): Outstanding theoretical synthesis and critical evaluation.
+    `;
+
+    const ledger = await auditDocumentLineByLine(rawText);
+    expect(ledger.length).toBeGreaterThan(0);
+
+    // Validate that each item conforms to DocumentRequirementSchema
+    for (const item of ledger) {
+      const parsed = DocumentRequirementSchema.safeParse(item);
+      expect(parsed.success).toBe(true);
+      expect(item.lineRange).toMatch(/^\[L\d{3}\]$/);
+    }
+
+    // Check detected categories
+    const categories = ledger.map((item) => item.category);
+    expect(categories).toContain("prompt");
+    expect(categories).toContain("formatting");
+    expect(categories).toContain("penalty");
+    expect(categories).toContain("constraint");
+    expect(categories).toContain("rubric_band");
+
+    // Check penalty verbatim
+    const penaltyItem = ledger.find((item) => item.category === "penalty");
+    expect(penaltyItem?.verbatimText).toContain("5% per day penalty");
+  });
+
+  it("scans and extracts command verbs, explicit penalties, and excluded boundaries via runBriefScannerGraph", async () => {
     const briefText = `
 Module: International Security and Governance
 Assessment Question: Critically evaluate the efficacy of autonomous deterrence systems.

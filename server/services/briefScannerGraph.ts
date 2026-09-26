@@ -1,4 +1,5 @@
 import { StateGraph, Annotation, END, START } from "@langchain/langgraph";
+import { z } from "zod";
 import type { AssignmentAnalysis, CommandVerbDetail } from "../../src/desk/assignment/types.ts";
 
 /**
@@ -72,423 +73,225 @@ const COMMAND_VERB_MAP: Record<string, { meaning: string; expectation: string }>
 };
 
 /**
- * Window object representing a slice of the brief
+ * Line Indexer: Formats raw text into line-numbered strings [L001], [L002]...
  */
-interface WindowSlice {
-  index: number;
-  lines: string[];
-  text: string;
+export function indexDocumentLines(rawText: string): string[] {
+  return rawText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0)
+    .map((line, idx) => `[L${String(idx + 1).padStart(3, "0")}] ${line}`);
 }
 
 /**
- * LangGraph State Annotation for Sequential Line-by-Line Scanner
+ * Zod Schemas for Document Requirement Ledger
  */
-const ScannerAnnotation = Annotation.Root({
-  // Input parameters
-  briefText: Annotation<string>({
-    reducer: (curr, update) => update ?? curr,
-    default: () => "",
-  }),
-  question: Annotation<string>({
-    reducer: (curr, update) => update ?? curr,
-    default: () => "",
-  }),
-  assignmentType: Annotation<string>({
-    reducer: (curr, update) => update ?? curr,
-    default: () => "essay",
-  }),
-  academicLevel: Annotation<string>({
-    reducer: (curr, update) => update ?? curr,
-    default: () => "undergraduate",
-  }),
-  targetWordCount: Annotation<number>({
-    reducer: (curr, update) => update ?? curr,
-    default: () => 2000,
-  }),
-  citationStyle: Annotation<string>({
-    reducer: (curr, update) => update ?? curr,
-    default: () => "apa7",
-  }),
+export const DocumentRequirementCategorySchema = z.enum([
+  "prompt",
+  "constraint",
+  "rubric_band",
+  "formatting",
+  "penalty",
+]);
+export type DocumentRequirementCategory = z.infer<typeof DocumentRequirementCategorySchema>;
 
-  // Windows for sequential sliding-window inspection
-  windows: Annotation<WindowSlice[]>({
-    reducer: (curr, update) => update ?? curr,
-    default: () => [],
-  }),
-  currentWindowIndex: Annotation<number>({
-    reducer: (curr, update) => update ?? curr,
-    default: () => 0,
-  }),
+export const DocumentRequirementSchema = z.object({
+  lineRange: z.string().describe("Exact line references, e.g. [L001-L003] or [L012]"),
+  category: DocumentRequirementCategorySchema,
+  description: z.string().describe("Detailed description of the requirement, constraint, rubric tier, or penalty"),
+  verbatimText: z.string().describe("Exact text extracted from the document lines"),
+});
+export type DocumentRequirement = z.infer<typeof DocumentRequirementSchema>;
 
-  // State Accumulator (Guarantees zero lost instructions / rubric items)
-  accumulatedCommandVerbs: Annotation<CommandVerbDetail[]>({
-    reducer: (curr, update) => {
-      const existing = new Set(curr.map((c) => c.verb.toLowerCase()));
-      const next = [...curr];
-      for (const item of update || []) {
-        if (!existing.has(item.verb.toLowerCase())) {
-          existing.add(item.verb.toLowerCase());
-          next.push(item);
-        }
-      }
-      return next;
-    },
-    default: () => [],
-  }),
-  accumulatedConstraints: Annotation<string[]>({
-    reducer: (curr, update) => Array.from(new Set([...(curr || []), ...(update || [])])),
-    default: () => [],
-  }),
-  accumulatedPenalties: Annotation<string[]>({
-    reducer: (curr, update) => Array.from(new Set([...(curr || []), ...(update || [])])),
-    default: () => [],
-  }),
-  accumulatedRubricCriteria: Annotation<string[]>({
-    reducer: (curr, update) => Array.from(new Set([...(curr || []), ...(update || [])])),
-    default: () => [],
-  }),
-  accumulatedScopeIncluded: Annotation<string[]>({
-    reducer: (curr, update) => Array.from(new Set([...(curr || []), ...(update || [])])),
-    default: () => [],
-  }),
-  accumulatedScopeExcluded: Annotation<string[]>({
-    reducer: (curr, update) => Array.from(new Set([...(curr || []), ...(update || [])])),
-    default: () => [],
-  }),
-  accumulatedKeyConcepts: Annotation<string[]>({
-    reducer: (curr, update) => Array.from(new Set([...(curr || []), ...(update || [])])),
-    default: () => [],
-  }),
-  explicitSubQuestions: Annotation<string[]>({
-    reducer: (curr, update) => Array.from(new Set([...(curr || []), ...(update || [])])),
-    default: () => [],
-  }),
-  implicitSubQuestions: Annotation<string[]>({
-    reducer: (curr, update) => Array.from(new Set([...(curr || []), ...(update || [])])),
-    default: () => [],
-  }),
+export const BatchFindingsSchema = z.object({
+  findings: z.array(DocumentRequirementSchema),
+});
+export type BatchFindings = z.infer<typeof BatchFindingsSchema>;
 
-  // Final Output
-  finalAnalysis: Annotation<AssignmentAnalysis | null>({
-    reducer: (curr, update) => update ?? curr,
-    default: () => null,
+/**
+ * LangGraph Annotation.Root State Definition
+ */
+export const ScannerAnnotation = Annotation.Root({
+  rawLines: Annotation<string[]>({ reducer: (_, next) => next, default: () => [] }),
+  cursor: Annotation<number>({ reducer: (_, next) => next, default: () => 0 }),
+  batchSize: Annotation<number>({ reducer: (_, next) => next, default: () => 30 }),
+  overlap: Annotation<number>({ reducer: (_, next) => next, default: () => 5 }),
+  extractedLedger: Annotation<DocumentRequirement[]>({
+    reducer: (curr, next) => curr.concat(next),
+    default: () => [],
   }),
+  isComplete: Annotation<boolean>({ reducer: (_, next) => next, default: () => false }),
 });
 
+export type ScannerState = typeof ScannerAnnotation.State;
+
 /**
- * Initialize sliding windows from brief lines
+ * Deterministic Line-by-Line Scanner Node:
+ * Evaluates the current batch line-by-line without external paid API calls
  */
-function initWindowsNode(state: typeof ScannerAnnotation.State) {
-  const rawText = `${state.question}\n\n${state.briefText}`;
-  const rawLines = rawText
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
+function scanBatch(state: ScannerState) {
+  const batch = state.rawLines.slice(state.cursor, state.cursor + state.batchSize);
 
-  const lines = rawLines.length > 0 ? rawLines : [state.question];
+  if (batch.length === 0 || state.cursor >= state.rawLines.length) {
+    return {
+      isComplete: true,
+      cursor: state.cursor,
+    };
+  }
 
-  const windowSize = 40;
-  const overlap = 8;
-  const step = Math.max(1, windowSize - overlap);
+  const rawFindings: DocumentRequirement[] = [];
 
-  const windows: WindowSlice[] = [];
-  if (lines.length <= windowSize) {
-    windows.push({
-      index: 0,
-      lines,
-      text: lines.join("\n"),
-    });
-  } else {
-    for (let i = 0; i < lines.length; i += step) {
-      const slice = lines.slice(i, i + windowSize);
-      windows.push({
-        index: windows.length,
-        lines: slice,
-        text: slice.join("\n"),
+  for (const line of batch) {
+    const match = line.match(/^(\[L\d{3}\])\s*(.*)$/);
+    const lineTag = match ? match[1] : `[L${String(state.cursor + 1).padStart(3, "0")}]`;
+    const lineContent = match ? match[2] : line;
+
+    // 1. Penalties
+    if (
+      /(?:penalty|penalised|penalized|deduct|deduction|late submission|late penalty|capped at|zero mark|-5%|-10%|\b5%\b|\b10%\b|per day)/i.test(
+        lineContent
+      )
+    ) {
+      rawFindings.push({
+        lineRange: lineTag,
+        category: "penalty",
+        description: `Assessment penalty rule: ${lineContent}`,
+        verbatimText: lineContent,
       });
-      if (i + windowSize >= lines.length) break;
+      continue;
+    }
+
+    // 2. Formatting & Submission constraints
+    if (
+      /(?:font|margin|spacing|double\s*space|1\.5\s*space|word\s*count|words|word limit|page limit|format|times new roman|arial|calibri|referencing style|citation style|apa|harvard|oscola|ieee|chicago|mla)/i.test(
+        lineContent
+      )
+    ) {
+      rawFindings.push({
+        lineRange: lineTag,
+        category: "formatting",
+        description: `Formatting or citation guideline: ${lineContent}`,
+        verbatimText: lineContent,
+      });
+      continue;
+    }
+
+    // 3. Rubric Bands & Grading Criteria
+    if (
+      /(?:70%|first class|1st class|grade a|distinction|60%|upper second|2:1|grade b|merit|50%|lower second|2:2|grade c|pass|40%|third class|fail|marking criteria|rubric|grading band|learning outcome)/i.test(
+        lineContent
+      )
+    ) {
+      rawFindings.push({
+        lineRange: lineTag,
+        category: "rubric_band",
+        description: `Marking rubric tier: ${lineContent}`,
+        verbatimText: lineContent,
+      });
+      continue;
+    }
+
+    // 4. Excluded or Mandatory Scope Constraints
+    if (
+      /(?:do not|must not|avoid|exclude|excluded|out of scope|not acceptable|mandatory|must include|required to|shall not|never|will not be credited)/i.test(
+        lineContent
+      )
+    ) {
+      rawFindings.push({
+        lineRange: lineTag,
+        category: "constraint",
+        description: `Scope constraint: ${lineContent}`,
+        verbatimText: lineContent,
+      });
+      continue;
+    }
+
+    // 5. Prompt Directives & Command Verbs
+    if (
+      /(?:critically evaluate|critically analyse|critically analyze|critically discuss|evaluate|analyse|analyze|compare|contrast|assess|argue|explain|describe|examine|synthesize|justify|assessment question|assignment question|task directive|\?)/i.test(
+        lineContent
+      )
+    ) {
+      rawFindings.push({
+        lineRange: lineTag,
+        category: "prompt",
+        description: `Task directive or question: ${lineContent}`,
+        verbatimText: lineContent,
+      });
     }
   }
+
+  // Validate findings against strict Zod BatchFindingsSchema
+  const validated = BatchFindingsSchema.safeParse({ findings: rawFindings });
+  const findings = validated.success ? validated.data.findings : rawFindings;
+
+  // Advance cursor = cursor + (batchSize - overlap)
+  const step = Math.max(1, state.batchSize - state.overlap);
+  const nextCursor = state.cursor + step;
+  const isComplete = nextCursor >= state.rawLines.length;
 
   return {
-    windows,
-    currentWindowIndex: 0,
+    cursor: nextCursor,
+    isComplete,
+    extractedLedger: findings,
   };
 }
 
 /**
- * Sequential scanner node inspecting the current sliding window line-by-line
+ * Conditional Routing Edge
  */
-function scanWindowNode(state: typeof ScannerAnnotation.State) {
-  const currentIdx = state.currentWindowIndex;
-  const window = state.windows[currentIdx];
-
-  if (!window) {
-    return { currentWindowIndex: currentIdx + 1 };
+function shouldContinue(state: ScannerState): "scanBatch" | typeof END {
+  if (state.cursor >= state.rawLines.length || state.isComplete) {
+    return END;
   }
-
-  const detectedVerbs: CommandVerbDetail[] = [];
-  const detectedConstraints: string[] = [];
-  const detectedPenalties: string[] = [];
-  const detectedRubric: string[] = [];
-  const detectedIncluded: string[] = [];
-  const detectedExcluded: string[] = [];
-  const detectedConcepts: string[] = [];
-  const detectedExplicitSubQ: string[] = [];
-
-  for (const line of window.lines) {
-    const lower = line.toLowerCase();
-
-    // 1. Scan for Command Verbs
-    for (const [verbKey, verbVal] of Object.entries(COMMAND_VERB_MAP)) {
-      const regex = new RegExp(`\\b${verbKey}\\b`, "i");
-      if (regex.test(line)) {
-        detectedVerbs.push({
-          verb: verbKey.charAt(0).toUpperCase() + verbKey.slice(1),
-          meaning: verbVal.meaning,
-          academicExpectation: verbVal.expectation,
-        });
-      }
-    }
-
-    // 2. Scan for Penalties
-    if (
-      /(?:penalty|deduct|deduction|penalised|penalized|late submission|capped at|zero mark|-5%|-10%|5% per day|late penalty)/i.test(
-        line
-      )
-    ) {
-      detectedPenalties.push(line);
-      detectedConstraints.push(`Penalty Clause: ${line}`);
-    }
-
-    // 3. Scan for Constraints (formatting, word limits, referencing)
-    if (
-      /(?:word\s*count|words|font|margin|spacing|double\s*spaced|1\.5\s*spaced|apa|harvard|ieee|mla|chicago|oscola|mandatory|must\s*include|required\s*section)/i.test(
-        line
-      )
-    ) {
-      detectedConstraints.push(line);
-    }
-
-    // 4. Scan for Excluded Scope Items
-    if (
-      /(?:do not|must not|avoid|exclude|excluded|out of scope|not acceptable|will not be credited|do not write about)/i.test(
-        line
-      )
-    ) {
-      detectedExcluded.push(line);
-    }
-
-    // 5. Scan for Included / Core Requirements
-    if (
-      /(?:you should|you must|required to|evaluate how|analyse the|address the following|learning outcome|aims to)/i.test(
-        line
-      )
-    ) {
-      detectedIncluded.push(line);
-    }
-
-    // 6. Scan for Rubric Criteria & Grade Bands
-    if (
-      /(?:70%|first class|grade a|distinction|60%|upper second|2:1|grade b|merit|50%|lower second|2:2|grade c|pass|40%|third class|fail|marking criteria|rubric)/i.test(
-        line
-      )
-    ) {
-      detectedRubric.push(line);
-    }
-
-    // 7. Explicit Sub-Questions
-    if (
-      /^(?:\d+[\.\)]|[a-e][\.\)]|\?)/.test(line) ||
-      (line.includes("?") && line.length > 15)
-    ) {
-      detectedExplicitSubQ.push(line);
-    }
-
-    // 8. Key Disciplinary Concepts (capitalized terms, significant multi-word nouns)
-    const conceptMatches = line.match(/\b[A-Z][a-zA-Z]{3,}(?:\s+[A-Z][a-zA-Z]{3,})*\b/g);
-    if (conceptMatches) {
-      for (const cm of conceptMatches) {
-        if (!/^(Section|Module|Course|University|Assessment|Student|Assignment|Part|Chapter|Please|Figure|Table|Page)/i.test(cm)) {
-          detectedConcepts.push(cm);
-        }
-      }
-    }
-  }
-
-  return {
-    currentWindowIndex: currentIdx + 1,
-    accumulatedCommandVerbs: detectedVerbs,
-    accumulatedConstraints: detectedConstraints,
-    accumulatedPenalties: detectedPenalties,
-    accumulatedRubricCriteria: detectedRubric,
-    accumulatedScopeIncluded: detectedIncluded,
-    accumulatedScopeExcluded: detectedExcluded,
-    accumulatedKeyConcepts: detectedConcepts.slice(0, 15),
-    explicitSubQuestions: detectedExplicitSubQ,
-  };
+  return "scanBatch";
 }
 
 /**
- * Consolidate all accumulated ledger items into the complete AssignmentAnalysis
+ * Compiled Sequential LangGraph Line-by-Line Scanner
  */
-function consolidateLedgerNode(state: typeof ScannerAnnotation.State) {
-  const {
-    question,
-    assignmentType,
-    academicLevel,
-    targetWordCount,
-    citationStyle,
-    accumulatedCommandVerbs,
-    accumulatedConstraints,
-    accumulatedPenalties,
-    accumulatedRubricCriteria,
-    accumulatedScopeIncluded,
-    accumulatedScopeExcluded,
-    accumulatedKeyConcepts,
-    explicitSubQuestions,
-  } = state;
+export const briefScannerGraph = new StateGraph(ScannerAnnotation)
+  .addNode("scanBatch", scanBatch)
+  .addEdge(START, "scanBatch")
+  .addConditionalEdges("scanBatch", shouldContinue)
+  .compile();
 
-  // Ensure default command verbs if none detected
-  const commandVerbs =
-    accumulatedCommandVerbs.length > 0
-      ? accumulatedCommandVerbs
-      : [
-          {
-            verb: "Critically evaluate",
-            meaning: "Weigh competing theoretical arguments and empirical evidence to judge their validity.",
-            academicExpectation: "You must not merely describe; synthesize counterarguments and substantiate a justified academic conclusion.",
-          },
-          {
-            verb: "Analyse",
-            meaning: "Break down complex issues into component parts to examine relationships and causes.",
-            academicExpectation: "Explain 'how' and 'why', not merely descriptive facts.",
-          },
-        ];
-
-  // Derive explicit scope boundaries
-  const included =
-    accumulatedScopeIncluded.length > 0
-      ? accumulatedScopeIncluded.slice(0, 8)
-      : [
-          `Direct deconstruction and systematic investigation of: "${question.slice(0, 100)}"`,
-          `Application of authoritative theoretical frameworks appropriate to ${academicLevel} study`,
-          `Substantiation of claims using peer-reviewed scholarly literature formatted in ${citationStyle.toUpperCase()}`,
-          "Dialectical evaluation of counterarguments, competing evidence, and disciplinary controversies",
-        ];
-
-  const excluded =
-    accumulatedScopeExcluded.length > 0
-      ? accumulatedScopeExcluded.slice(0, 8)
-      : [
-          "Purely descriptive narrative storytelling or textbook summaries lacking critical evaluation",
-          "Unsubstantiated personal opinion pieces or non-academic blogs/wikis",
-          "Irrelevant biographical or historical context that does not answer the core question",
-          `Content exceeding the target word count (${targetWordCount} words) by more than standard tolerance`,
-        ];
-
-  // Derive key concepts
-  const keyConcepts =
-    accumulatedKeyConcepts.length > 0
-      ? Array.from(new Set(accumulatedKeyConcepts)).slice(0, 10)
-      : [
-          "Theoretical Foundations",
-          "Empirical Substantiation",
-          "Critical Evaluation",
-          "Methodological Framework",
-          "Counterargument Synthesis",
-        ];
-
-  // Section word budgets
-  const introWords = Math.round(targetWordCount * 0.1);
-  const conclWords = Math.round(targetWordCount * 0.1);
-  const bodyWords = targetWordCount - introWords - conclWords;
-
-  // Grade band insights
-  const markingCriteriaInsights: string[] = [];
-  if (accumulatedRubricCriteria.length > 0) {
-    markingCriteriaInsights.push(...accumulatedRubricCriteria.slice(0, 6));
-  } else {
-    markingCriteriaInsights.push(
-      "First Class (70%+): Demands independent critical stance, rigorous theoretical synthesis, and counterargument refutation.",
-      "Upper Second (60–69%): Requires sound structure, clear analytical argument, and consistent scholarly evidence.",
-      "Lower Second (50–59%): Awarded for descriptive summaries that answer the prompt but lack critical depth.",
-      "Third Class (40–49%): Threshold pass; factual knowledge present but marred by structural disorganization."
-    );
+/**
+ * Compile & Export: auditDocumentLineByLine(rawFileText: string)
+ */
+export async function auditDocumentLineByLine(rawFileText: string): Promise<DocumentRequirement[]> {
+  const indexed = indexDocumentLines(rawFileText);
+  if (indexed.length === 0) {
+    return [];
   }
 
-  if (accumulatedPenalties.length > 0) {
-    markingCriteriaInsights.push(
-      ...accumulatedPenalties.map((p) => `🚨 Detected Assessment Penalty: ${p}`)
-    );
+  const result = await briefScannerGraph.invoke({
+    rawLines: indexed,
+    cursor: 0,
+    batchSize: 30,
+    overlap: 5,
+    extractedLedger: [],
+    isComplete: false,
+  });
+
+  // Deduplicate ledger based on lineRange + category + verbatimText
+  const seen = new Set<string>();
+  const deduplicated: DocumentRequirement[] = [];
+
+  for (const item of result.extractedLedger || []) {
+    const key = `${item.lineRange}::${item.category}::${item.verbatimText.trim().toLowerCase()}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduplicated.push(item);
+    }
   }
 
-  // Summary
-  const penaltyNote =
-    accumulatedPenalties.length > 0
-      ? ` Note: ${accumulatedPenalties.length} specific penalty clause(s) were identified in the brief.`
-      : "";
-
-  const summary = `The examiner requires a rigorous ${assignmentType} addressing "${question.slice(
-    0,
-    140
-  )}...". The submission must reflect ${academicLevel} standards, deploy ${citationStyle.toUpperCase()} referencing, and deliver disciplined analysis within the ${targetWordCount}-word budget.${penaltyNote}`;
-
-  const finalAnalysis: AssignmentAnalysis = {
-    commandVerbs,
-    summary,
-    keyConcepts,
-    scopeBoundaries: {
-      included,
-      excluded,
-    },
-    expectedResponseType:
-      assignmentType === "case_study"
-        ? "Strategic case analysis diagnosing root causes, evaluating alternatives, and proposing an implementation roadmap."
-        : assignmentType === "report" || assignmentType === "business_assignment"
-        ? "Structured professional report with numbered subheadings, empirical findings, and actionable SMART recommendations."
-        : assignmentType === "reflection"
-        ? "Critical reflective analysis connecting experiential practice with pedagogical and disciplinary theory (e.g. Gibbs' cycle)."
-        : assignmentType === "lab_report"
-        ? "Scientific laboratory report following IMRaD structure with empirical hypothesis testing and error analysis."
-        : "Dialectical academic essay advancing a central argumentative thesis substantiated by peer-reviewed evidence.",
-    evidenceRequirements:
-      academicLevel === "postgraduate"
-        ? "High-impact peer-reviewed journal articles, foundational theoretical monographs, and authoritative empirical datasets."
-        : "Authoritative academic sources, scholarly peer-reviewed journals, and verified institutional benchmark data.",
-    markingCriteriaInsights,
-    wordCountImplications: `Target: ${targetWordCount} words (Intro: ~${introWords}w, Body: ~${bodyWords}w, Conclusion: ~${conclWords}w). Standard ±10% penalty threshold applies.`,
-    citationGuidance: `Strict adherence to ${citationStyle.toUpperCase()} formatting for all in-text citations and reference list entries.`,
-    academicLevelNotes:
-      academicLevel === "postgraduate"
-        ? "Calibrated for Postgraduate / Masters study: demands high theoretical synthesis, methodological reflexivity, nuanced hedging, and original critical insight."
-        : "Calibrated for Undergraduate study: emphasizes conceptual clarity, structured logical flow, accurate evidence deployment, and clear thesis progression.",
-    approvedByUser: false,
-  };
-
-  return { finalAnalysis };
+  return deduplicated;
 }
 
 /**
- * Build and compile the LangGraph Sequential Line-by-Line Scanner
- */
-const briefScannerWorkflow = new StateGraph(ScannerAnnotation)
-  .addNode("init_windows", initWindowsNode)
-  .addNode("scan_window", scanWindowNode)
-  .addNode("consolidate_ledger", consolidateLedgerNode)
-  .addEdge(START, "init_windows")
-  .addEdge("init_windows", "scan_window")
-  .addConditionalEdges("scan_window", (state) => {
-    return state.currentWindowIndex < state.windows.length
-      ? "scan_window"
-      : "consolidate_ledger";
-  })
-  .addEdge("consolidate_ledger", END);
-
-const compiledBriefScannerGraph = briefScannerWorkflow.compile();
-
-/**
- * Public execution helper: runs the deterministic Sequential LangGraph Line-by-Line Brief Scanner
+ * Assignment Analysis Adapter:
+ * Feeds the audited line-by-line ledger into the complete AssignmentAnalysis schema
  */
 export async function runBriefScannerGraph(params: {
   briefText: string;
@@ -499,18 +302,148 @@ export async function runBriefScannerGraph(params: {
   citationStyle: string;
   rubricText?: string;
 }): Promise<AssignmentAnalysis> {
-  const result = await compiledBriefScannerGraph.invoke({
-    briefText: `${params.briefText}\n\n${params.rubricText || ""}`,
-    question: params.question,
-    assignmentType: params.assignmentType,
-    academicLevel: params.academicLevel,
-    targetWordCount: params.targetWordCount,
-    citationStyle: params.citationStyle,
-  });
+  const fullText = `${params.question}\n\n${params.briefText}\n\n${params.rubricText || ""}`.trim();
+  const ledger = await auditDocumentLineByLine(fullText);
 
-  if (!result.finalAnalysis) {
-    throw new Error("Sequential LangGraph Brief Scanner returned null analysis");
+  // 1. Extract command verbs
+  const commandVerbs: CommandVerbDetail[] = [];
+  const verbSeen = new Set<string>();
+
+  for (const item of ledger) {
+    const lower = item.verbatimText.toLowerCase();
+    for (const [verbKey, verbVal] of Object.entries(COMMAND_VERB_MAP)) {
+      if (new RegExp(`\\b${verbKey}\\b`, "i").test(lower) && !verbSeen.has(verbKey)) {
+        verbSeen.add(verbKey);
+        commandVerbs.push({
+          verb: verbKey.charAt(0).toUpperCase() + verbKey.slice(1),
+          meaning: verbVal.meaning,
+          academicExpectation: verbVal.expectation,
+        });
+      }
+    }
   }
 
-  return result.finalAnalysis;
+  if (commandVerbs.length === 0) {
+    commandVerbs.push(
+      {
+        verb: "Critically evaluate",
+        meaning: "Weigh competing theoretical arguments and empirical evidence to judge their validity.",
+        academicExpectation: "You must not merely describe; synthesize counterarguments and substantiate a justified academic conclusion.",
+      },
+      {
+        verb: "Analyse",
+        meaning: "Break down complex issues into component parts to examine relationships and causes.",
+        academicExpectation: "Explain 'how' and 'why', not merely descriptive facts.",
+      }
+    );
+  }
+
+  // 2. Partition constraints and scope
+  const included: string[] = [];
+  const excluded: string[] = [];
+  const penalties: string[] = [];
+  const rubricTiers: string[] = [];
+
+  for (const item of ledger) {
+    if (item.category === "penalty") {
+      penalties.push(`${item.lineRange} ${item.verbatimText}`);
+    } else if (item.category === "rubric_band") {
+      rubricTiers.push(`${item.lineRange} ${item.verbatimText}`);
+    } else if (item.category === "constraint") {
+      if (/(?:do not|must not|avoid|exclude|excluded|out of scope|will not be credited)/i.test(item.verbatimText)) {
+        excluded.push(`${item.lineRange} ${item.verbatimText}`);
+      } else {
+        included.push(`${item.lineRange} ${item.verbatimText}`);
+      }
+    } else if (item.category === "prompt") {
+      included.push(`${item.lineRange} ${item.verbatimText}`);
+    }
+  }
+
+  if (included.length === 0) {
+    included.push(
+      `Direct deconstruction and systematic investigation of: "${params.question.slice(0, 100)}"`,
+      `Application of authoritative theoretical frameworks appropriate to ${params.academicLevel} study`,
+      `Substantiation of claims using peer-reviewed scholarly literature formatted in ${params.citationStyle.toUpperCase()}`,
+      "Dialectical evaluation of counterarguments, competing evidence, and disciplinary controversies"
+    );
+  }
+
+  if (excluded.length === 0) {
+    excluded.push(
+      "Purely descriptive narrative storytelling or textbook summaries lacking critical evaluation",
+      "Unsubstantiated personal opinion pieces or non-academic blogs/wikis",
+      "Irrelevant biographical or historical context that does not answer the core question",
+      `Content exceeding the target word count (${params.targetWordCount} words) by more than standard tolerance`
+    );
+  }
+
+  // 3. Marking Criteria & Penalties
+  const markingCriteriaInsights: string[] = [];
+  if (rubricTiers.length > 0) {
+    markingCriteriaInsights.push(...rubricTiers.slice(0, 6));
+  } else {
+    markingCriteriaInsights.push(
+      "First Class (70%+): Demands independent critical stance, rigorous theoretical synthesis, and counterargument refutation.",
+      "Upper Second (60–69%): Requires sound structure, clear analytical argument, and consistent scholarly evidence.",
+      "Lower Second (50–59%): Awarded for descriptive summaries that answer the prompt but lack critical depth.",
+      "Third Class (40–49%): Threshold pass; factual knowledge present but marred by structural disorganization."
+    );
+  }
+
+  if (penalties.length > 0) {
+    markingCriteriaInsights.push(
+      ...penalties.map((p) => `🚨 Detected Assessment Penalty: ${p}`)
+    );
+  }
+
+  // Word Budgets
+  const introWords = Math.round(params.targetWordCount * 0.1);
+  const conclWords = Math.round(params.targetWordCount * 0.1);
+  const bodyWords = params.targetWordCount - introWords - conclWords;
+
+  const penaltyNote = penalties.length > 0 ? ` Note: ${penalties.length} specific penalty clause(s) identified.` : "";
+
+  const summary = `The examiner requires a rigorous ${params.assignmentType} addressing "${params.question.slice(
+    0,
+    140
+  )}...". The submission must reflect ${params.academicLevel} standards, deploy ${params.citationStyle.toUpperCase()} referencing, and deliver disciplined analysis within the ${params.targetWordCount}-word budget.${penaltyNote}`;
+
+  return {
+    commandVerbs,
+    summary,
+    keyConcepts: [
+      "Theoretical Framework",
+      "Empirical Evidence",
+      "Critical Synthesis",
+      "Methodological Rigor",
+      "Counterargument Evaluation",
+    ],
+    scopeBoundaries: {
+      included: included.slice(0, 8),
+      excluded: excluded.slice(0, 8),
+    },
+    expectedResponseType:
+      params.assignmentType === "case_study"
+        ? "Strategic case analysis diagnosing root causes, evaluating alternatives, and proposing an implementation roadmap."
+        : params.assignmentType === "report" || params.assignmentType === "business_assignment"
+        ? "Structured professional report with numbered subheadings, empirical findings, and actionable SMART recommendations."
+        : params.assignmentType === "reflection"
+        ? "Critical reflective analysis connecting experiential practice with pedagogical and disciplinary theory (e.g. Gibbs' cycle)."
+        : params.assignmentType === "lab_report"
+        ? "Scientific laboratory report following IMRaD structure with empirical hypothesis testing and error analysis."
+        : "Dialectical academic essay advancing a central argumentative thesis substantiated by peer-reviewed evidence.",
+    evidenceRequirements:
+      params.academicLevel === "postgraduate"
+        ? "High-impact peer-reviewed journal articles, foundational theoretical monographs, and authoritative empirical datasets."
+        : "Authoritative academic sources, scholarly peer-reviewed journals, and verified institutional benchmark data.",
+    markingCriteriaInsights,
+    wordCountImplications: `Target: ${params.targetWordCount} words (Intro: ~${introWords}w, Body: ~${bodyWords}w, Conclusion: ~${conclWords}w). Standard ±10% penalty threshold applies.`,
+    citationGuidance: `Strict adherence to ${params.citationStyle.toUpperCase()} formatting for all in-text citations and reference list entries.`,
+    academicLevelNotes:
+      params.academicLevel === "postgraduate"
+        ? "Calibrated for Postgraduate / Masters study: demands high theoretical synthesis, methodological reflexivity, nuanced hedging, and original critical insight."
+        : "Calibrated for Undergraduate study: emphasizes conceptual clarity, structured logical flow, accurate evidence deployment, and clear thesis progression.",
+    approvedByUser: false,
+  };
 }
