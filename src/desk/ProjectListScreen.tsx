@@ -1249,12 +1249,12 @@ export default function ProjectListScreen({
     const seenTitles = new Map<string, number>();
 
     return filtered.map((p) => {
-      let rawTitle = p.answers?.title?.trim() || (p.answers as any)?.assignment_title?.trim() || "";
+      let rawTitle = p.title?.trim() || p.answers?.title?.trim() || (p.answers as any)?.assignment_title?.trim() || "";
       let title = rawTitle;
 
       if (!title) {
         const typeTile = FORMAT_TILES.find((t) => t.id === p.outputTypeId);
-        const typeLabel = typeTile ? typeTile.label : "Project";
+        const typeLabel = typeTile?.id === "OT-01" ? "Essay" : (typeTile ? typeTile.label : "Project");
         const dateStr = (p as any).updatedAt
           ? new Date((p as any).updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
           : new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });

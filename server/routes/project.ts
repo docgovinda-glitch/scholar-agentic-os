@@ -959,6 +959,7 @@ export function projectView(record: ProjectRecord | undefined) {
   return {
     projectId: record.projectId,
     outputTypeId: record.outputTypeId,
+    title: record.answers?.["title"] || record.answers?.["assignment_title"] || "",
     answers: record.answers,
     authors: record.authors || [],
     /** Fraction (0-1) of every intake field (required, recommended, and optional) that has an answer — informational, not gating (only required fields block G0). */

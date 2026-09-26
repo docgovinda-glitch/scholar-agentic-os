@@ -5,6 +5,7 @@ import {
   findReusableEmptyProject,
   getProjectTitle,
   isBlankProject,
+  deriveHeuristicTitle,
 } from "../projectNaming";
 
 describe("projectNaming utilities", () => {
@@ -191,6 +192,40 @@ describe("projectNaming utilities", () => {
           intakeCompleteness: 0.4,
         })
       ).toBe(false);
+    });
+  });
+
+  describe("deriveHeuristicTitle", () => {
+    it("extracts course code and topic from course headers", () => {
+      const brief = "POLI3002: Security Analysis in the 21st Century\nWord count: 2500 words\nAPA 7th";
+      const title = deriveHeuristicTitle(brief);
+      expect(title).toMatch(/POLI3002\s+Security\s+Analysis/i);
+    });
+
+    it("extracts from course codes formatted with dashes e.g. CS-7015", () => {
+      const brief = "CS 7015 - Quantum Computing Architectures\nAssignment 2: Literature Review";
+      const title = deriveHeuristicTitle(brief);
+      expect(title).toMatch(/CS7015\s+Quantum\s+Computing/i);
+    });
+
+    it("extracts and strips command verbs from prompt questions", () => {
+      const brief = "Critically evaluate the impact of algorithmic bias in healthcare diagnostic models.";
+      const title = deriveHeuristicTitle(brief);
+      expect(title).not.toMatch(/critically evaluate/i);
+      expect(title).toMatch(/Algorithmic Bias/i);
+      expect(title.split(/\s+/).length).toBeGreaterThanOrEqual(3);
+      expect(title.split(/\s+/).length).toBeLessThanOrEqual(8);
+    });
+
+    it("extracts from explicit topic prefix e.g. 'Topic:'", () => {
+      const brief = "Assignment Brief\nTopic: Macroeconomic Fiscal Policy Under Inflationary Shocks\nDue Date: Oct 15";
+      const title = deriveHeuristicTitle(brief);
+      expect(title).toMatch(/Macroeconomic Fiscal Policy/i);
+    });
+
+    it("falls back gracefully for empty or short text", () => {
+      expect(deriveHeuristicTitle("")).toBe("Academic Assignment");
+      expect(deriveHeuristicTitle("   \n\n  ")).toBe("Academic Assignment");
     });
   });
 });

@@ -270,7 +270,7 @@ export function AssignmentProvider({
       }
 
       const merged = { ...project.answers, ...standardized };
-      setProject((prev) => (prev ? { ...prev, answers: merged } : null));
+      setProject((prev) => (prev ? { ...prev, answers: merged, title: standardized.title || prev.title } : null));
 
       try {
         await saveIntakeAnswers(activeProjectId, merged);

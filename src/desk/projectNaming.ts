@@ -136,3 +136,101 @@ export function findReusableEmptyProject(
     }) ?? null
   );
 }
+
+function capitalizeTitleWords(str: string): string {
+  const minor = new Set(["a", "an", "the", "and", "but", "or", "for", "nor", "on", "at", "to", "from", "by", "in", "of", "with"]);
+  const words = str.split(" ").filter(Boolean);
+  return words
+    .map((w, idx) => {
+      const lower = w.toLowerCase();
+      if (idx > 0 && minor.has(lower)) return lower;
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    })
+    .join(" ");
+}
+
+function cleanTitleCandidate(raw: string): string {
+  let s = raw
+    .replace(/^#+\s*/, "") // markdown headers
+    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "") // outer quotes
+    .replace(
+      /^(?:critically\s+evaluate\s+(?:the\s+)?|critically\s+assess\s+(?:the\s+)?|critically\s+examine\s+(?:the\s+)?|critically\s+discuss\s+(?:the\s+)?|evaluate\s+(?:the\s+)?|assess\s+(?:the\s+)?|examine\s+(?:the\s+)?|discuss\s+(?:the\s+)?|to\s+what\s+extent\s+(?:does|do|is|are)\s+|an\s+analysis\s+of\s+|an\s+investigation\s+into\s+|how\s+(?:does|do|can)\s+|explore\s+(?:the\s+)?)/i,
+      ""
+    )
+    .replace(/[.?!;:]+$/, "")
+    .trim();
+
+  const firstClause = s.split(/[.;]/)[0].trim();
+  if (firstClause.length >= 6) s = firstClause;
+
+  const words = s.split(/\s+/).filter(Boolean);
+  if (words.length <= 2) {
+    if (words.length === 0) return "";
+    return capitalizeTitleWords(words.join(" "));
+  }
+
+  const selectedWords = words.slice(0, Math.min(words.length, 7));
+  let result = selectedWords.join(" ");
+  result = result.replace(/\s+(?:and|or|in|of|for|with|to|at|by|from|the|a|an|on)$/i, "");
+
+  return capitalizeTitleWords(result);
+}
+
+/**
+ * Fast, deterministic heuristic to extract a concise academic title (3 to 7 words)
+ * from the first several lines of a brief or assignment question.
+ */
+export function deriveHeuristicTitle(rawText: string): string {
+  if (!rawText || typeof rawText !== "string") return "Academic Assignment";
+
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((l) => l.trim().replace(/^\[L\d+\]\s*/, "")) // remove [L001] prefixes
+    .filter((l) => l.length > 0);
+
+  if (lines.length === 0) return "Academic Assignment";
+
+  // Check first 5 lines for course code + subject or title indicators
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const line = lines[i];
+
+    // Skip bare generic document header labels e.g. "Assignment Brief", "Essay Prompt"
+    if (/^(?:assignment\s*(?:brief|question|specification)?|coursework\s*(?:brief|specification)?|syllabus\s*brief|essay\s*prompt)$/i.test(line)) {
+      continue;
+    }
+
+    // Pattern 1: Course code prefix e.g. "POLI3002: Security Analysis in the 21st Century" or "CS 7015 - Machine Learning"
+    const courseCodeMatch = line.match(/^([A-Z]{2,5}\s*\d{3,5})[:\s\-–]+(.+)$/i);
+    if (courseCodeMatch) {
+      const code = courseCodeMatch[1].replace(/\s+/g, "").toUpperCase();
+      const subject = cleanTitleCandidate(courseCodeMatch[2]);
+      if (subject.length > 0) {
+        return `${code} ${subject}`.slice(0, 60).trim();
+      }
+    }
+
+    // Pattern 2: Explicit prefix e.g. "Title: ...", "Topic: ...", "Assignment Question: ..."
+    const explicitPrefixMatch = line.match(
+      /^(?:assignment\s*(?:brief|question|title)?|essay\s*(?:topic|title)?|coursework\s*(?:title)?|module\s*(?:title)?|topic|question|task)\s*[:\-–—]\s*(.+)$/i
+    );
+    if (explicitPrefixMatch) {
+      const cleaned = cleanTitleCandidate(explicitPrefixMatch[1]);
+      if (cleaned.length >= 4) return cleaned;
+    }
+  }
+
+  // Pattern 3: Clean first prominent sentence or question
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const line = lines[i];
+    if (/^(?:assignment\s*(?:brief|question|specification)?|coursework\s*(?:brief|specification)?|syllabus\s*brief|essay\s*prompt)$/i.test(line)) {
+      continue;
+    }
+    const cleaned = cleanTitleCandidate(line);
+    if (cleaned.length >= 6) {
+      return cleaned;
+    }
+  }
+
+  return "Academic Assignment";
+}
+

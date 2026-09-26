@@ -30,6 +30,7 @@ export interface Author {
 export interface ProjectView {
   projectId: string;
   outputTypeId: string;
+  title?: string;
   answers: Record<string, string>;
   authors: Author[];
   intakeCompleteness: number;

@@ -8,6 +8,7 @@ import {
   ASSIGNMENT_TYPE_LABELS,
   cleanAnswerString,
 } from "../types";
+import { deriveHeuristicTitle } from "../../projectNaming";
 import { Upload, ChevronDown, ChevronUp, Sparkles, ArrowRight, Check, AlertCircle, FileText } from "lucide-react";
 
 const CITATION_STYLES = [
@@ -108,13 +109,34 @@ export default function AssignmentUnderstandStage() {
   const handleQuestionBlur = () => {
     const trimmed = cleanAnswerString(localQuestion);
     if (trimmed) {
-      saveAnswers({
+      const currentTitle =
+        project?.answers?.["title"] ||
+        project?.answers?.["assignment_title"] ||
+        project?.title ||
+        "";
+      const isDefaultOrUntitled =
+        !currentTitle ||
+        currentTitle.toLowerCase().includes("untitled") ||
+        currentTitle.toLowerCase() === "academic assignment" ||
+        currentTitle.toLowerCase() === "synthesized research project";
+
+      const updates: Record<string, any> = {
         instructions: trimmed,
         assignment_question: trimmed,
         assignment_brief_text: trimmed,
         research_topic: trimmed,
         assignment_brief: trimmed,
-      });
+      };
+
+      if (isDefaultOrUntitled && trimmed.length >= 10) {
+        const derived = deriveHeuristicTitle(trimmed);
+        if (derived && derived !== "Academic Assignment") {
+          updates.title = derived;
+          updates.assignment_title = derived;
+        }
+      }
+
+      saveAnswers(updates);
     }
   };
 
@@ -328,6 +350,27 @@ export default function AssignmentUnderstandStage() {
         approvedByUser: false,
       };
 
+      const currentTitle =
+        project?.answers?.["title"] ||
+        project?.answers?.["assignment_title"] ||
+        project?.title ||
+        "";
+      const isDefaultOrUntitled =
+        !currentTitle ||
+        currentTitle.toLowerCase().includes("untitled") ||
+        currentTitle.toLowerCase() === "academic assignment" ||
+        currentTitle.toLowerCase() === "synthesized research project";
+
+      if (isDefaultOrUntitled && localQuestion.trim().length >= 10) {
+        const derived = deriveHeuristicTitle(localQuestion);
+        if (derived && derived !== "Academic Assignment") {
+          await saveAnswers({
+            title: derived,
+            assignment_title: derived,
+          });
+        }
+      }
+
       await setAnalysis(fallbackAnalysis);
     } finally {
       setIsAnalyzing(false);
@@ -393,6 +436,25 @@ export default function AssignmentUnderstandStage() {
         if (data.updatedTitle) {
           updates.title = data.updatedTitle;
           updates.assignment_title = data.updatedTitle;
+        } else {
+          const currentTitle =
+            project?.answers?.["title"] ||
+            project?.answers?.["assignment_title"] ||
+            project?.title ||
+            "";
+          const isDefaultOrUntitled =
+            !currentTitle ||
+            currentTitle.toLowerCase().includes("untitled") ||
+            currentTitle.toLowerCase() === "academic assignment" ||
+            currentTitle.toLowerCase() === "synthesized research project";
+
+          if (isDefaultOrUntitled && extractedText.length >= 10) {
+            const derived = deriveHeuristicTitle(extractedText);
+            if (derived && derived !== "Academic Assignment") {
+              updates.title = derived;
+              updates.assignment_title = derived;
+            }
+          }
         }
         await saveAnswers(updates);
       }
