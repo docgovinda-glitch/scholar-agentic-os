@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
 
@@ -16,10 +16,6 @@ vi.mock("../../api", () => ({
   getRubric: (...a: unknown[]) => getRubric(...a),
   getOutputTypeSpec: (...a: unknown[]) => getOutputTypeSpec(...a),
   saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
-  isEphemeralProject: () => false,
-  commitProjectToDatabase: vi.fn(),
-  authedJsonFetch: vi.fn(),
-  authedFetch: vi.fn(),
 }));
 
 vi.mock("../../../services/userVault", () => ({
@@ -45,7 +41,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("Assignment Workspace Guided Stages & Workflow", () => {
+describe("Assignment Workspace Stages & Workflow", () => {
   beforeEach(() => {
     getProject.mockResolvedValue({
       projectId: "proj-456",
@@ -58,85 +54,38 @@ describe("Assignment Workspace Guided Stages & Workflow", () => {
         citation_style: "harvard",
         academic_level: "postgraduate",
         assignment_type: "policy_analysis",
-        assignment_deconstruction: {
-          commandVerbs: [{ verb: "Critically analyse", meaning: "Deconstruct assumptions", academicExpectation: "Balanced evaluation" }],
-          gradeBandDescriptors: [{ band: "1st_class", label: "First Class (70%+)", minScore: 70, criteria: ["Flawless structure"], whatExaminersLookFor: "Original thesis" }],
-          subQuestions: { explicit: ["How effective are frameworks?"], implicit: ["What structural inequities persist?"] },
-          constraints: ["Word count must adhere to 3000"],
-          summary: "In-depth analysis of climate regime compliance.",
-          scopeBoundaries: { included: ["UNFCCC", "Paris Agreement"], excluded: ["Local municipal codes"] },
-          approvedByUser: true,
-        },
-        assignment_thesis_budget: {
-          selectedThesis: "International climate frameworks systematically entrench historical inequities despite market-mechanism adaptations.",
-          thesisRationale: "Challenges neoliberal climate architecture with empirical evidence.",
-          totalTargetWords: 3000,
-          tolerancePercent: 10,
-          sections: [
-            { id: "sec-1", title: "Introduction & Theoretical Framing", type: "introduction", targetWordCount: 300, currentWordCount: 0, targetPercent: 10, guidance: "Establish thesis", keyPoints: ["Context"] },
-            { id: "sec-2", title: "Theme 1: Regime Compliance Disparities", type: "body_theme", targetWordCount: 1200, currentWordCount: 0, targetPercent: 40, guidance: "Analyze compliance data", keyPoints: ["Compliance"] },
-            { id: "sec-3", title: "Theme 2: Equity & Financial Compensation", type: "body_theme", targetWordCount: 1200, currentWordCount: 0, targetPercent: 40, guidance: "Analyze loss and damage", keyPoints: ["Loss and damage"] },
-            { id: "sec-4", title: "Conclusion & Policy Rebuttal", type: "conclusion", targetWordCount: 300, currentWordCount: 0, targetPercent: 10, guidance: "Synthesize insights", keyPoints: ["Synthesis"] },
-          ],
-          approvedByUser: true,
-        },
-        assignment_peel_matrix: {
-          themes: [
-            {
-              id: "theme-1",
-              themeTitle: "Theme 1: Regime Compliance Disparities",
-              targetWords: 1200,
-              currentWords: 1150,
-              point: "Compliance mechanisms exhibit asymmetric enforcement favoring developed carbon emitters.",
-              evidence: "UNFCCC Article 6 implementation reports (2023) show persistent funding gaps.",
-              explanation: "Market-based credit pricing systematically under-compensates vulnerable nations.",
-              counterargument: "Proponents argue market pricing provides optimal global allocative efficiency.",
-              rebuttal: "However, market friction prevents capital transfer to mitigation-critical jurisdictions.",
-              link: "Hence, institutional restructuring remains necessary to achieve equitable climate stabilization.",
-              draftContent: "Compliance mechanisms exhibit asymmetric enforcement favoring developed carbon emitters.",
-              status: "complete",
-              linkedSourceIds: [],
-            },
-          ],
-          introductionDraft: "International climate governance requires profound theoretical synthesis.",
-          conclusionDraft: "Substantive policy recalibration is imperative.",
-        },
-        assignment_citations: [
+        assignment_outline: [
           {
-            id: "cite-1",
-            sourceTitle: "Global Climate Governance Disparities",
-            authors: ["Ostrom, E.", "Keohane, R."],
-            year: "2023",
-            journalOrPublisher: "Global Environmental Politics",
-            inTextCitation: "(Ostrom & Keohane, 2023)",
-            fullReference: "Ostrom, E., & Keohane, R. (2023). Global Climate Governance Disparities. Global Environmental Politics, 23(1), 45-68.",
-            verifiedPeerReviewed: true,
-            claim: "Market pricing systematically under-compensates vulnerable nations.",
+            id: "sec-1",
+            title: "Introduction & Context",
+            targetWordCount: 300,
+            currentWordCount: 310,
+            draftContent: "International climate governance requires profound theoretical synthesis.",
+            guidance: "Set up the international context.",
+            keyPoints: ["Context", "Thesis"],
+            status: "drafted",
+          },
+          {
+            id: "sec-2",
+            title: "Theoretical Framework",
+            targetWordCount: 1200,
+            currentWordCount: 1150,
+            draftContent: "Regime theory and constructivist dynamics elucidate state compliance.",
+            guidance: "Synthesize competing regime theories.",
+            keyPoints: ["Regimes", "Equity"],
+            status: "drafted",
+          },
+          {
+            id: "sec-3",
+            title: "Conclusion & Policy Recommendations",
+            targetWordCount: 500,
+            currentWordCount: 480,
+            draftContent: "Substantive policy recalibration is imperative.",
+            guidance: "Offer actionable policy insights.",
+            keyPoints: ["Policy", "Next steps"],
+            status: "drafted",
           },
         ],
-        assignment_audit_report: {
-          overallScore: 82,
-          overallBand: "1st_class",
-          bandLabel: "First Class (1st) — 82%",
-          estimatedGradeBand: "First Class (1st) — 82%",
-          summary: "Outstanding dialectical synthesis with First-Class academic rigor.",
-          rubricAlignmentScore: 94,
-          wordCountAdherence: {
-            actual: 2950,
-            target: 3000,
-            minAllowed: 2700,
-            maxAllowed: 3300,
-            status: "compliant",
-            deviationPercent: 1.6,
-          },
-          criteriaResults: [
-            { name: "Critical Thinking & Nuance", status: "pass", feedback: "Superb counterargument handling", awardedMarks: 28, maxMarks: 30 },
-            { name: "Evidence & Provenance", status: "pass", feedback: "Peer-reviewed citations verified", awardedMarks: 26, maxMarks: 30 },
-          ],
-          strengths: ["Flawless dialectical PEEL structure", "Strong argumentative thesis"],
-          priorityFixes: ["Fine-tune concluding policy synthesis"],
-          readyForSubmission: true,
-        },
       },
       gates: [],
     });
@@ -148,79 +97,78 @@ describe("Assignment Workspace Guided Stages & Workflow", () => {
     });
   });
 
-  it("renders Stage 1 (Deconstruct) with command verbs and grade band descriptors", async () => {
+  it("renders the Structure stage with proportional word count allocations", async () => {
     render(
       <AssignmentWorkspace
         projectId="proj-456"
-        initialStage="deconstruct"
+        initialStage="structure"
         onStageChange={vi.fn()}
       />
     );
 
-    expect(await screen.findByText(/Stage 01 • Deconstruction/i)).toBeInTheDocument();
-    expect(screen.getByText(/Command Verbs & Examiner Demands/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Critically analyse/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/First Class \(70%\+\)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Phase 6: Structure & Word Count Planner/i)).toBeInTheDocument();
+    expect(screen.getByText(/Mandatory Target/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/3,000 words/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByDisplayValue(/Introduction & Context/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/Theoretical Framework/i)).toBeInTheDocument();
   });
 
-  it("renders Stage 2 (Thesis & Budget) with section mathematical word count budget", async () => {
+  it("renders the Grounded Drafting stage with word count tracking and active section draft", async () => {
     render(
       <AssignmentWorkspace
         projectId="proj-456"
-        initialStage="thesis_budget"
+        initialStage="draft"
         onStageChange={vi.fn()}
       />
     );
 
-    expect(await screen.findByText(/Stage 02 • Thesis & Word Budget/i)).toBeInTheDocument();
-    expect(screen.getByText(/1. Argumentative Thesis Statement/i)).toBeInTheDocument();
-    expect(screen.getByText(/2. Mathematical Section Word Budget/i)).toBeInTheDocument();
-    expect(screen.getByText(/Total Word Count Allocation:/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Phase 7: Grounded Academic Drafting/i)).toBeInTheDocument();
+    expect(screen.getByText(/Academic Draft Content:/i)).toBeInTheDocument();
+    expect(screen.getByText(/International climate governance requires profound theoretical synthesis/i)).toBeInTheDocument();
   });
 
-  it("renders Stage 3 (PEEL Matrix) with dialectical scaffolding and prose draft", async () => {
+  it("renders the Finalize stage with 10-Point Submission Audit and export options", async () => {
+    // Mock review API
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (typeof url === "string" && url.includes("/review")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              overallScore: 92,
+              readyForSubmission: true,
+              criteriaResults: [
+                {
+                  category: "question_addressed",
+                  label: "Question Addressed",
+                  status: "pass",
+                  summary: "Fully answers the policy prompt.",
+                },
+                {
+                  category: "critical_thinking",
+                  label: "Critical Thinking",
+                  status: "pass",
+                  summary: "Postgraduate depth demonstrated.",
+                },
+              ],
+              strengths: ["Strong theoretical synthesis", "Nuanced counterarguments"],
+              priorityFixes: ["Fine-tune concluding recommendation clarity"],
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
     render(
       <AssignmentWorkspace
         projectId="proj-456"
-        initialStage="peel_matrix"
+        initialStage="final"
         onStageChange={vi.fn()}
       />
     );
 
-    expect(await screen.findByText(/Stage 03 • PEEL Argument Matrix/i)).toBeInTheDocument();
-    expect(screen.getByText(/P — Point \(Topic Claim & Thesis Alignment\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/E — Evidence \(Empirical Findings & Scholarly Citations\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/★ Counter-Argument \(Opposing Scholarly View\)/i)).toBeInTheDocument();
-  });
-
-  it("renders Stage 4 (Citations) with verified peer-reviewed sources and in-text citations", async () => {
-    render(
-      <AssignmentWorkspace
-        projectId="proj-456"
-        initialStage="citations"
-        onStageChange={vi.fn()}
-      />
-    );
-
-    expect(await screen.findByText(/Stage 04 • Citation & Grounding/i)).toBeInTheDocument();
-    expect(screen.getByText(/Citation Standard & Compliance/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Global Climate Governance Disparities/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/\(Ostrom & Keohane, 2023\)/i)).toBeInTheDocument();
-  });
-
-  it("renders Stage 5 (Audit & Export) with rubric compliance audit and export downloads", async () => {
-    render(
-      <AssignmentWorkspace
-        projectId="proj-456"
-        initialStage="audit_export"
-        onStageChange={vi.fn()}
-      />
-    );
-
-    expect(await screen.findByText(/Stage 05 • Submission Audit & Export/i)).toBeInTheDocument();
-    expect(screen.getByText(/First Class \(1st\) — 82%/i)).toBeInTheDocument();
-    expect(screen.getByText(/Microsoft Word \(\.docx\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Academic PDF \(\.pdf\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/LaTeX Bundle \(\.tex\)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Phase 8: Review & Final Submission/i)).toBeInTheDocument();
+    expect(screen.getByText(/Academic Readiness Assessment/i)).toBeInTheDocument();
+    expect(screen.getByText(/Download Word \(\.docx\)/i)).toBeInTheDocument();
   });
 });

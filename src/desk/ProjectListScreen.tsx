@@ -132,13 +132,12 @@ export const FORMAT_TILES = [
 
 export const STAGE_BREAKDOWNS: Record<string, { phases: string[]; highlights: string }> = {
   "OT-01": {
-    highlights: "5-Stage dialectical academic workflow with First-Class rubric deconstruction, PEEL matrix, and citation audit.",
+    highlights: "Rigorous coursework workflow with syllabus alignment and citation provenance audit.",
     phases: [
-      "Stage 1: Rubric & Brief Deconstruction",
-      "Stage 2: Thesis & Word Budgeting",
-      "Stage 3: PEEL Argument Matrix",
-      "Stage 4: Citation & Academic Grounding",
-      "Stage 5: Submission Audit & Export",
+      "Phase I: Assignment Scope & Rubric Analysis",
+      "Phase II: Knowledge Vault Evidence Ingestion",
+      "Phase III: Grounded Multi-Section Drafting",
+      "Phase IV: Citation Auditor & Defense Script",
     ],
   },
   "OT-10": {

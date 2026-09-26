@@ -6,15 +6,7 @@
 import type { CanonicalReference } from "../../citation_compliance/model/reference";
 import type { CitationStyleType } from "../../services/vault/citationService";
 
-export type GuidedAssignmentStage =
-  | "deconstruct"
-  | "thesis_budget"
-  | "peel_matrix"
-  | "citations"
-  | "audit_export";
-
 export type AssignmentStage =
-  | GuidedAssignmentStage
   | "understand"
   | "plan"
   | "research"
@@ -23,32 +15,6 @@ export type AssignmentStage =
   | "structure"
   | "draft"
   | "final";
-
-export function normalizeAssignmentStage(stage?: string | null): GuidedAssignmentStage {
-  if (!stage) return "deconstruct";
-  switch (stage) {
-    case "deconstruct":
-    case "understand":
-      return "deconstruct";
-    case "thesis_budget":
-    case "plan":
-    case "structure":
-      return "thesis_budget";
-    case "peel_matrix":
-    case "think":
-    case "draft":
-      return "peel_matrix";
-    case "citations":
-    case "research":
-    case "evidence":
-      return "citations";
-    case "audit_export":
-    case "final":
-      return "audit_export";
-    default:
-      return "deconstruct";
-  }
-}
 
 export type AcademicLevel = "undergraduate" | "postgraduate";
 
@@ -91,136 +57,6 @@ export interface CommandVerbDetail {
   verb: string;
   meaning: string;
   academicExpectation: string;
-}
-
-export interface GradeBandDescriptor {
-  band: "1st_class" | "2_1_upper_second" | "2_2_lower_second" | "3rd_class";
-  label: string; // e.g. "First Class (70%+ / Grade A)"
-  minScore: number;
-  criteria: string[];
-  whatExaminersLookFor: string;
-}
-
-export interface SubQuestions {
-  explicit: string[];
-  implicit: string[];
-}
-
-export interface AssignmentDeconstruction {
-  commandVerbs: CommandVerbDetail[];
-  gradeBandDescriptors: GradeBandDescriptor[];
-  subQuestions: SubQuestions;
-  constraints: string[];
-  summary: string;
-  keyConcepts: string[];
-  scopeBoundaries: {
-    included: string[];
-    excluded: string[];
-  };
-  expectedResponseType: string;
-  evidenceRequirements: string;
-  markingCriteriaInsights: string[];
-  wordCountImplications: string;
-  citationGuidance: string;
-  academicLevelNotes: string;
-  approvedByUser: boolean;
-  userFeedback?: string;
-}
-
-export interface WordBudgetSection {
-  id: string;
-  title: string;
-  type: "introduction" | "body_theme" | "conclusion";
-  targetWordCount: number;
-  currentWordCount: number;
-  targetPercent: number; // e.g. 10%, 25%, etc.
-  guidance: string;
-  keyPoints: string[];
-}
-
-export interface ThesisAndWordBudget {
-  selectedThesis: string;
-  thesisRationale?: string;
-  counterargumentHandling?: string;
-  alternativeTheses?: Array<{
-    id: string;
-    statement: string;
-    stance?: string;
-    rationale: string;
-  }>;
-  thesisOptions?: ThesisOption[];
-  totalTargetWords: number;
-  tolerancePercent?: number; // e.g. 10 for ±10%
-  sections: WordBudgetSection[];
-  approvedByUser?: boolean;
-}
-
-export interface PeelTheme {
-  id: string;
-  themeTitle: string;
-  targetWords: number;
-  currentWords: number;
-  targetWordCount?: number;
-  currentWordCount?: number;
-  point: string; // Point: Topic sentence defending the thesis
-  evidence: string; // Evidence: Scholarly / empirical backing
-  explanation: string; // Explanation: Critical mechanism and analysis
-  counterargument: string; // Counterargument: Competing viewpoint / critical objection
-  rebuttal: string; // Rebuttal: Addressing the counterargument
-  link: string; // Link: Synthesis back to thesis and forward transition
-  draftContent: string; // Assembled polished prose
-  status?: "not_started" | "drafting" | "reviewed" | "complete";
-  linkedSourceIds?: string[];
-}
-
-export interface PeelMatrixData {
-  themes: PeelTheme[];
-  introductionDraft?: string;
-  conclusionDraft?: string;
-  totalWordCount?: number;
-}
-
-export interface GroundedCitationItem {
-  id: string;
-  sourceTitle: string;
-  authors: string[];
-  year: string;
-  journalOrPublisher?: string;
-  doi?: string;
-  doiOrUrl?: string;
-  citationText?: string;
-  inTextCitation: string;
-  citationStyle?: string; // "apa7" | "harvard" | "ieee" | "mla"
-  verifiedPeerReviewed?: boolean;
-  peerReviewed?: boolean;
-  fromVault?: boolean;
-  linkedThemeIds?: string[];
-  themeId?: string;
-  quoteOrFindingSnippet?: string;
-  claim?: string;
-  fullReference?: string;
-  relevanceExplanation?: string;
-}
-
-export interface SubmissionAuditReport {
-  overallScore: number; // e.g. 76
-  overallBand?: "1st_class" | "2_1_upper_second" | "2_2_lower_second" | "3rd_class";
-  bandLabel: string; // e.g. "First Class (1st) — 76%"
-  estimatedGradeBand?: string;
-  summary: string;
-  rubricAlignmentScore: number;
-  wordCountAdherence: {
-    actual: number;
-    target: number;
-    minAllowed: number;
-    maxAllowed: number;
-    status: "compliant" | "over_budget" | "under_budget";
-    deviationPercent: number;
-  };
-  criteriaResults: ReviewCriteriaResult[];
-  strengths: string[];
-  priorityFixes: string[];
-  readyForSubmission: boolean;
 }
 
 export interface AssignmentAnalysis {
@@ -296,10 +132,7 @@ export interface ThesisOption {
   id: string;
   statement: string;
   rationale: string;
-  counterargumentHandling?: string;
-  direction?: string;
-  argumentativeStance?: string;
-  stance?: string;
+  counterargumentHandling: string;
 }
 
 export interface ThinkingMap {
@@ -325,7 +158,7 @@ export interface OutlineSection {
 }
 
 export interface ReviewCriteriaResult {
-  category?:
+  category:
     | "question_addressed"
     | "argument_logic"
     | "evidence_sufficiency"
@@ -336,13 +169,10 @@ export interface ReviewCriteriaResult {
     | "word_count"
     | "citation_accuracy"
     | "originality";
-  label?: string;
-  name?: string;
-  status: "pass" | "warning" | "action_required" | string;
-  summary?: string;
+  label: string;
+  status: "pass" | "warning" | "action_required";
+  summary: string;
   feedback: string;
-  awardedMarks?: number;
-  maxMarks?: number;
 }
 
 export interface SubmissionCheckReport {
@@ -426,49 +256,6 @@ export interface TutorChatMessage {
 }
 
 export const ASSIGNMENT_STAGES: StageDefinition[] = [
-  {
-    id: "deconstruct",
-    number: 1,
-    label: "1. Rubric & Brief Deconstruction",
-    shortLabel: "1. Deconstruct",
-    description: "Prompt parsing, grade band descriptors, sub-questions, and constraints",
-    icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
-  },
-  {
-    id: "thesis_budget",
-    number: 2,
-    label: "2. Thesis & Word Budgeting",
-    shortLabel: "2. Thesis & Budget",
-    description: "Formulate central argumentative thesis & allocate target word count mathematically",
-    icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
-  },
-  {
-    id: "peel_matrix",
-    number: 3,
-    label: "3. PEEL Argument Matrix",
-    shortLabel: "3. PEEL Matrix",
-    description: "Point-Evidence-Explanation-Link structure with dialectical counterarguments",
-    icon: "M4 6h16M4 10h16M4 14h16M4 18h16",
-  },
-  {
-    id: "citations",
-    number: 4,
-    label: "4. Citation & Academic Grounding",
-    shortLabel: "4. Citations",
-    description: "Ground claims in verified peer-reviewed sources in APA 7th, Harvard, IEEE, or MLA",
-    icon: "M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1",
-  },
-  {
-    id: "audit_export",
-    number: 5,
-    label: "5. Submission Audit & Export",
-    shortLabel: "5. Audit & Export",
-    description: "Rubric compliance evaluation against the brief & publication-ready .docx/PDF export",
-    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-];
-
-export const LEGACY_ASSIGNMENT_STAGES: StageDefinition[] = [
   {
     id: "understand",
     number: 1,
