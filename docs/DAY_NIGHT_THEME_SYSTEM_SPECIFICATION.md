@@ -98,7 +98,7 @@ In the sidebar footer (`src/desk/ProjectListScreen.tsx`), the button wrapping th
 ### 3.2 State Synchronization & Apple-Grade Cross-Fade Logic
 To eliminate jarring color flashes, layout lag, and aggressive full-screen flicker, transitions are scoped exclusively to `background-color`, `border-color`, and `color` using a transient `.theme-transition` class on `document.documentElement` during the toggle window (180ms–200ms).
 
-No geometric layout properties (`width`, `height`, `padding`, `margin`, `transform`) are ever transitioned, keeping icon scaling and layout geometry instantaneous and rock-solid:
+No geometric layout properties (`width`, `height`, `padding`, `margin`, `transform`) are ever transitioned, keeping icon scaling and layout geometry instantaneous and rock-solid. Color, border, shadow, and icon vectors are smoothly cross-faded:
 
 ```css
 /* Scoped transition in src/index.css */
@@ -106,10 +106,20 @@ html.theme-transition,
 html.theme-transition *,
 html.theme-transition *::before,
 html.theme-transition *::after {
-  transition: background-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
-              color 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: background-color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              fill 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              stroke 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1) !important;
   transition-delay: 0s !important;
+}
+
+/* Modern View Transitions API for buttery-smooth hardware-accelerated theme cross-fades */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 250ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 ```
 
@@ -117,6 +127,23 @@ html.theme-transition *::after {
 const transitionTimeoutRef = useRef<number | null>(null);
 
 const toggleTheme = useCallback(() => {
+  const nextTheme = theme === "dark" ? "light" : "dark";
+
+  const applyThemeToDOM = (t: "light" | "dark") => {
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", t);
+      if (t === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+    try {
+      localStorage.setItem("scholar-theme", t);
+      localStorage.setItem("theme", t);
+    } catch {}
+  };
+
   if (typeof document !== "undefined") {
     document.documentElement.classList.add("theme-transition");
     if (transitionTimeoutRef.current !== null) {
@@ -128,23 +155,21 @@ const toggleTheme = useCallback(() => {
     }, 200);
   }
 
-  setTheme((prevTheme) => {
-    const nextTheme = prevTheme === "dark" ? "light" : "dark";
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", nextTheme);
-      if (nextTheme === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
-    try {
-      localStorage.setItem("scholar-theme", nextTheme);
-      localStorage.setItem("theme", nextTheme);
-    } catch {}
-    return nextTheme;
-  });
-}, []);
+  if (
+    typeof document !== "undefined" &&
+    "startViewTransition" in document &&
+    typeof (document as any).startViewTransition === "function" &&
+    !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+  ) {
+    (document as any).startViewTransition(() => {
+      applyThemeToDOM(nextTheme);
+      setTheme(nextTheme);
+    });
+  } else {
+    applyThemeToDOM(nextTheme);
+    setTheme(nextTheme);
+  }
+}, [theme]);
 ```
 
 ---

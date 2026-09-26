@@ -1103,6 +1103,23 @@ export default function ProjectListScreen({
   const transitionTimeoutRef = useRef<number | null>(null);
 
   const toggleTheme = useCallback(() => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+
+    const applyThemeToDOM = (t: "light" | "dark") => {
+      if (typeof document !== "undefined") {
+        document.documentElement.setAttribute("data-theme", t);
+        if (t === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      }
+      try {
+        localStorage.setItem("scholar-theme", t);
+        localStorage.setItem("theme", t);
+      } catch {}
+    };
+
     if (typeof document !== "undefined") {
       document.documentElement.classList.add("theme-transition");
       if (transitionTimeoutRef.current !== null) {
@@ -1114,23 +1131,21 @@ export default function ProjectListScreen({
       }, 200);
     }
 
-    setTheme((prevTheme) => {
-      const nextTheme = prevTheme === "dark" ? "light" : "dark";
-      if (typeof document !== "undefined") {
-        document.documentElement.setAttribute("data-theme", nextTheme);
-        if (nextTheme === "dark") {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
-        }
-      }
-      try {
-        localStorage.setItem("scholar-theme", nextTheme);
-        localStorage.setItem("theme", nextTheme);
-      } catch {}
-      return nextTheme;
-    });
-  }, []);
+    if (
+      typeof document !== "undefined" &&
+      "startViewTransition" in document &&
+      typeof (document as any).startViewTransition === "function" &&
+      !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
+      (document as any).startViewTransition(() => {
+        applyThemeToDOM(nextTheme);
+        setTheme(nextTheme);
+      });
+    } else {
+      applyThemeToDOM(nextTheme);
+      setTheme(nextTheme);
+    }
+  }, [theme]);
 
   useEffect(() => {
     return () => {
