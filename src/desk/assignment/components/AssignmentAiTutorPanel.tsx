@@ -373,6 +373,16 @@ export default function AssignmentAiTutorPanel({ className = "" }: { className?:
                     </button>
                   </div>
                 )}
+
+                {/* Live Workspace Synchronization Patch Badge */}
+                {msg.patch && (
+                  <div className="mt-2.5 pt-2 border-t border-neutral-200/60 dark:border-white/10 text-[11px]">
+                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>⚡ Synchronized to Workspace live</span>
+                    </div>
+                  </div>
+                )}
               </div>
               <span className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-1 px-1">
                 {msg.timestamp}

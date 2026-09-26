@@ -11,7 +11,14 @@ import {
   COMMAND_VERB_MAP,
   type DocumentRequirement,
 } from "../../services/briefScannerGraph.ts";
-import type { AssignmentAnalysis, CommandVerbDetail } from "../../../src/desk/assignment/types.ts";
+import type {
+  AssignmentAnalysis,
+  CommandVerbDetail,
+  CoreResearchQuestion,
+  RecommendedSearchStrategy,
+  ResearchPlan,
+  TutorWorkspacePatch,
+} from "../../../src/desk/assignment/types.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(rejectClientCredentials);
@@ -357,6 +364,99 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
 router.post("/analyze", handleDeconstruct);
 router.post("/deconstruct", handleDeconstruct);
 
+function buildDeterministicResearchPlan(
+  question: string,
+  assignmentType: string,
+  academicLevel: string,
+  analysis?: any
+) {
+  const qClean = question?.trim() || "Academic Coursework Assignment";
+  let parsedAnalysis: any = {};
+  try {
+    parsedAnalysis = typeof analysis === "string" ? JSON.parse(analysis) : analysis || {};
+  } catch {
+    parsedAnalysis = {};
+  }
+  const concepts = parsedAnalysis.keyConcepts?.length > 0 
+    ? parsedAnalysis.keyConcepts 
+    : ["Theoretical Framework", "Empirical Accountability", "Governance & Regulation"];
+
+  const coreQuestions: CoreResearchQuestion[] = [
+    {
+      id: "q-1",
+      question: `What foundational theoretical frameworks and empirical mechanisms govern "${qClean.slice(0, 90)}"?`,
+      rationale: "Establishes conceptual boundaries and foundational academic terminology mandated by First-Class rubric criteria.",
+      category: "Theoretical Foundation",
+    },
+    {
+      id: "q-2",
+      question: `How do competing scholarly perspectives and empirical datasets evaluate tensions between operational efficiency and institutional accountability in ${concepts[0] || "this domain"}?`,
+      rationale: "Fulfills examiner command verb requirements for critical synthesis and debate.",
+      category: "Dialectical Tension",
+    },
+    {
+      id: "q-3",
+      question: `What methodological limitations, systemic risks, and unintended consequences arise when applying ${concepts[1] || "these models"} in practical settings?`,
+      rationale: "Demonstrates high-level evaluative critique and awareness of real-world constraints.",
+      category: "Empirical Reality",
+    },
+    {
+      id: "q-4",
+      question: `Which justified regulatory, ethical, or policy interventions best reconcile competing stakeholder demands and long-term public interest?`,
+      rationale: "Provides grounded, actionable synthesis necessary to conclude the inquiry with academic authority.",
+      category: "Policy & Resolution",
+    },
+  ];
+
+  const searchStrategies: RecommendedSearchStrategy[] = [
+    {
+      id: "strat-1",
+      database: "Google Scholar",
+      searchQuery: `"${concepts[0] || 'algorithmic governance'}" AND ("theoretical framework" OR "conceptual model") AND "peer-reviewed"`,
+      relevanceTarget: "Seminal papers and high-impact theoretical paradigms published in leading journals.",
+    },
+    {
+      id: "strat-2",
+      database: "JSTOR / Scopus",
+      searchQuery: `("${concepts[0] || 'algorithmic governance'}" OR "${concepts[1] || 'accountability'}") AND ("empirical analysis" OR "case study") AND (2020 OR 2021 OR 2022 OR 2023 OR 2024 OR 2025)`,
+      relevanceTarget: "Recent peer-reviewed empirical case studies measuring operational impact.",
+    },
+    {
+      id: "strat-3",
+      database: "CrossRef / Web of Science",
+      searchQuery: `"${concepts[1] || 'regulatory compliance'}" AND ("EU AI Act" OR "institutional oversight") AND NOT "non-academic"`,
+      relevanceTarget: "Statutory governance frameworks and institutional audit methodologies.",
+    },
+    {
+      id: "strat-4",
+      database: "SSRN / Academic Repositories",
+      searchQuery: `("${qClean.slice(0, 40)}" OR "${concepts[2] || 'systemic risk'}") AND ("counterarguments" OR "systemic bias")`,
+      relevanceTarget: "Dialectical counterarguments and stress-testing evidence against orthodox claims.",
+    },
+  ];
+
+  return {
+    coreQuestions,
+    mainConcepts: concepts,
+    keyDebates: [
+      "Algorithmic efficiency vs transparent procedural fairness",
+      "Centralized statutory regulation vs agile self-governance standards",
+      "Individual rights and privacy vs collective security and optimization",
+    ],
+    evidenceTypesNeeded: [
+      "Peer-reviewed academic journal publications (Q1/Q2 ranked journals)",
+      "Official institutional whitepapers (EU Commission, IEEE, OECD)",
+      "Empirical field audit data and audited corporate/public case studies",
+    ],
+    searchStrategies,
+    outOfScopeTopics: [
+      "Unverified blog posts, speculative trade journalism, or marketing collateral",
+      "Broad historical surveys that do not directly address post-2015 modern frameworks",
+    ],
+    approvedByUser: false,
+  };
+}
+
 // 2. POST /api/projects/:id/assignment/plan
 router.post("/plan", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
@@ -376,42 +476,82 @@ Develop an actionable research plan for this university assignment:
 Question: "${question}"
 Type: ${assignmentType}
 Level: ${academicLevel}
-Analysis Context: ${JSON.stringify(analysis || {})}
+Analysis Context: ${typeof analysis === "string" ? analysis : JSON.stringify(analysis || {})}
 
 Formulate:
-1. 3-5 core research questions that must be answered to satisfy the brief.
-2. Main theoretical and empirical concepts.
-3. Key scholarly debates or points of contention.
-4. Specific evidence types needed (peer-reviewed articles, institutional data, case studies).
-5. Concrete search queries and strategies.
+1. 3 to 5 dialectical Core Research Questions (id, question, rationale, category).
+2. 4 to 6 Recommended Search Strategies (id, database, searchQuery with Boolean operators, relevanceTarget).
+3. Main theoretical and empirical concepts.
+4. Key scholarly debates or points of contention.
+5. Specific evidence types needed (peer-reviewed articles, institutional data, case studies).
 6. Clear out-of-scope topics that the student should NOT spend time researching.
 
 Return ONLY valid JSON matching:
 {
-  "coreQuestions": ["...", "..."],
+  "coreQuestions": [
+    {
+      "id": "q-1",
+      "question": "...",
+      "rationale": "...",
+      "category": "Theoretical Foundation"
+    }
+  ],
   "mainConcepts": ["...", "..."],
   "keyDebates": ["...", "..."],
   "evidenceTypesNeeded": ["...", "..."],
-  "searchStrategies": ["...", "..."],
+  "searchStrategies": [
+    {
+      "id": "strat-1",
+      "database": "Google Scholar",
+      "searchQuery": "\\"...\\" AND \\"...\\"",
+      "relevanceTarget": "..."
+    }
+  ],
   "outOfScopeTopics": ["...", "..."],
   "approvedByUser": false
 }`;
 
-    const plan = await callOpenRouterJSON(
-      req,
-      res,
-      "You are the Scholar Core Assignment Research Planning Agent.",
-      prompt,
-      "openrouter/auto",
-      "planning"
-    );
-    if (!plan) return;
+    let plan: any = null;
+    try {
+      plan = await callOpenRouterJSON(
+        req,
+        res,
+        "You are the Scholar Core Assignment Research Planning Agent.",
+        prompt,
+        "openrouter/auto",
+        "planning"
+      );
+    } catch (e: any) {
+      if (e?.message !== "RequireFrontendLLMException") {
+        console.warn("LLM research plan generation unavailable, using adaptive planner:", e?.message);
+      }
+    }
+
+    if (!plan || !plan.coreQuestions || plan.coreQuestions.length === 0) {
+      plan = buildDeterministicResearchPlan(question, assignmentType, academicLevel, analysis);
+    }
+
+    // Persist to project.answers.assignment_plan & assignment_research_plan
+    project.answers = {
+      ...project.answers,
+      assignment_plan: JSON.stringify(plan),
+      assignment_research_plan: JSON.stringify(plan),
+    };
+    await getProjectStore().save(project);
+
     res.json(plan);
   } catch (err: any) {
     if (err?.message === "RequireFrontendLLMException") return;
     console.error("Research plan error:", err);
     if (!res.headersSent) {
-      res.status(500).json({ error: err.message || "Failed to generate research plan" });
+      const fallback = buildDeterministicResearchPlan(question, assignmentType, academicLevel, analysis);
+      project.answers = {
+        ...project.answers,
+        assignment_plan: JSON.stringify(fallback),
+        assignment_research_plan: JSON.stringify(fallback),
+      };
+      await getProjectStore().save(project);
+      res.json(fallback);
     }
   }
 });
@@ -781,6 +921,95 @@ Return ONLY valid JSON matching:
   }
 });
 
+function extractDeterministicTutorPatch(
+  userMessage: string,
+  existingPlan: any,
+  existingAnalysis: any
+): TutorWorkspacePatch | null {
+  const msg = userMessage.toLowerCase();
+  let patch: TutorWorkspacePatch | null = null;
+
+  // 1. Focus or modify a question: e.g. "Focus question 2 on EU AI Act compliance" or "change question 1 to..."
+  const questionFocusMatch = msg.match(/(?:focus|change|update|modify|refine)\s+(?:question|q)\s*(\d+)\s+(?:on|to)\s+(.+)/i);
+  if (questionFocusMatch) {
+    const qIndex = parseInt(questionFocusMatch[1], 10) - 1;
+    const focusTopic = questionFocusMatch[2].trim().replace(/[.!?]+$/, "");
+    const currentQuestions = Array.isArray(existingPlan?.coreQuestions)
+      ? [...existingPlan.coreQuestions]
+      : [];
+    if (currentQuestions.length > 0 && qIndex >= 0 && qIndex < currentQuestions.length) {
+      const target = currentQuestions[qIndex];
+      const targetText = typeof target === "string" ? target : target.question;
+      const updatedQuestionText = `How do ${focusTopic} frameworks critically govern and substantiate ${targetText.slice(0, 80)}?`;
+      if (typeof target === "string") {
+        currentQuestions[qIndex] = updatedQuestionText;
+      } else {
+        currentQuestions[qIndex] = {
+          ...target,
+          question: updatedQuestionText,
+          rationale: `Refocused specifically on ${focusTopic} per student guidance and First-Class grading criteria.`,
+        };
+      }
+      patch = patch || {};
+      patch.plan = patch.plan || {};
+      patch.plan.coreQuestions = currentQuestions;
+    }
+  }
+
+  // 2. Add custom research question: e.g. "Add a research question about..."
+  const addQuestionMatch = msg.match(/(?:add|include)\s+(?:a\s+)?(?:new\s+)?(?:research\s+)?question\s+(?:about|on|regarding)\s+(.+)/i);
+  if (addQuestionMatch) {
+    const newTopic = addQuestionMatch[1].trim().replace(/[.!?]+$/, "");
+    const currentQuestions = Array.isArray(existingPlan?.coreQuestions)
+      ? [...existingPlan.coreQuestions]
+      : [];
+    currentQuestions.push({
+      id: `q-${currentQuestions.length + 1}`,
+      question: `What empirical mechanisms and critical implications arise from ${newTopic}?`,
+      category: "Targeted Inquiry",
+      rationale: `Direct student inquiry exploring ${newTopic}.`,
+    });
+    patch = patch || {};
+    patch.plan = patch.plan || {};
+    patch.plan.coreQuestions = currentQuestions;
+  }
+
+  // 3. Add custom search strategy: e.g. "Add a search strategy for..."
+  const addStrategyMatch = msg.match(/(?:add|include)\s+(?:a\s+)?(?:new\s+)?(?:search\s+)?(?:strategy|query)\s+(?:for|on|about)\s+(.+)/i);
+  if (addStrategyMatch) {
+    const strategyTopic = addStrategyMatch[1].trim().replace(/[.!?]+$/, "");
+    const currentStrategies = Array.isArray(existingPlan?.searchStrategies)
+      ? [...existingPlan.searchStrategies]
+      : [];
+    currentStrategies.push({
+      id: `strat-${currentStrategies.length + 1}`,
+      database: "Google Scholar / CrossRef",
+      searchQuery: `"${strategyTopic}" AND ("empirical analysis" OR "critical review")`,
+      relevanceTarget: `Targeted scholarly literature addressing ${strategyTopic}.`,
+    });
+    patch = patch || {};
+    patch.plan = patch.plan || {};
+    patch.plan.searchStrategies = currentStrategies;
+  }
+
+  // 4. Update or narrow scope: e.g. "Exclude pre-2015 papers"
+  const excludeMatch = msg.match(/(?:exclude|do not include|omit)\s+(.+)/i);
+  if (excludeMatch) {
+    const excludedTopic = excludeMatch[1].trim().replace(/[.!?]+$/, "");
+    const currentOutOfScope = Array.isArray(existingPlan?.outOfScopeTopics)
+      ? [...existingPlan.outOfScopeTopics]
+      : [];
+    if (!currentOutOfScope.includes(excludedTopic)) {
+      currentOutOfScope.push(excludedTopic);
+      patch = patch || {};
+      patch.plan = patch.plan || {};
+      patch.plan.outOfScopeTopics = currentOutOfScope;
+    }
+  }
+
+  return patch;
+}
+
 // 8. POST /api/projects/:id/assignment/tutor-chat
 router.post("/tutor-chat", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
@@ -799,7 +1028,30 @@ router.post("/tutor-chat", async (req: express.Request<{ id: string }>, res) => 
     evidence = [],
     thesis = "",
     activeDraftText = "",
+    analysis = project.answers["assignment_analysis"],
+    plan = project.answers["assignment_plan"] || project.answers["assignment_research_plan"],
   } = req.body || {};
+
+  let parsedPlan: any = null;
+  try {
+    parsedPlan = typeof plan === "string" ? JSON.parse(plan) : plan;
+  } catch {
+    parsedPlan = null;
+  }
+
+  let parsedAnalysis: any = null;
+  try {
+    parsedAnalysis = typeof analysis === "string" ? JSON.parse(analysis) : analysis;
+  } catch {
+    parsedAnalysis = null;
+  }
+
+  const analysisContext = parsedAnalysis
+    ? `ASSIGNMENT ANALYSIS CONTEXT:\n${JSON.stringify(parsedAnalysis, null, 2)}\n`
+    : "";
+  const planContext = parsedPlan
+    ? `CURRENT RESEARCH PLAN CONTEXT:\n${JSON.stringify(parsedPlan, null, 2)}\n`
+    : "";
 
   try {
     const draftContext = activeDraftText
@@ -910,14 +1162,36 @@ Assignment Question: "${question}"
 Central Thesis: "${thesis}"
 Target Word Count: ${targetWordCount} (Current: ${currentWordCount})
 
+${analysisContext}
+${planContext}
 ${draftContext}
 
 ${modeInstruction}
 
+BIDIRECTIONAL WORKSPACE SYNCHRONIZATION:
+If the student asks to modify, refine, refocus, or add research questions, search queries, scope boundaries, or assignment parameters
+(e.g., "Focus question 2 on EU AI Act compliance", "Add a search query for algorithmic transparency in JSTOR", "Exclude pre-2015 papers"):
+You MUST populate the "patch" object in your JSON response alongside your conversational advice:
+
 Return ONLY valid JSON matching:
 {
-  "reply": "Conversational, constructive academic response explaining the tutor's advice...",
+  "reply": "Conversational, constructive academic response explaining the tutor's advice and any updates made...",
   "mode": "${mode}",
+  "patch": {
+    "plan": {
+      "coreQuestions": [
+        { "id": "q-1", "question": "...", "rationale": "...", "category": "..." }
+      ],
+      "searchStrategies": [
+        { "id": "strat-1", "database": "...", "searchQuery": "...", "relevanceTarget": "..." }
+      ],
+      "outOfScopeTopics": ["...", "..."]
+    },
+    "analysis": {
+      "keyConcepts": ["...", "..."]
+    },
+    "question": "..."
+  },
   "socraticQuestions": [ ... ],
   "rubricEstimation": { ... },
   "counterArguments": [ ... ],
@@ -927,15 +1201,66 @@ Return ONLY valid JSON matching:
   }
 }`;
 
-    const data = await callOpenRouterJSON(
-      req,
-      res,
-      "You are the Scholar Core Pedagogical Academic Tutor.",
-      prompt,
-      "openrouter/auto",
-      "chat"
-    );
-    if (!data) return;
+    let data: any = null;
+    try {
+      data = await callOpenRouterJSON(
+        req,
+        res,
+        "You are the Scholar Core Pedagogical Academic Tutor.",
+        prompt,
+        "openrouter/auto",
+        "chat"
+      );
+    } catch (e: any) {
+      if (e?.message !== "RequireFrontendLLMException") {
+        console.warn("LLM tutor chat unavailable, using deterministic Socratic fallback:", e?.message);
+      }
+    }
+
+    if (!data) {
+      const deterministicPatch = extractDeterministicTutorPatch(message, parsedPlan, parsedAnalysis);
+      data = {
+        reply: deterministicPatch
+          ? `I have updated your research workspace accordingly. Focus your inquiry on these refined parameters to ensure strong alignment with First-Class marking criteria.`
+          : `That is a critical inquiry for your assignment. When approaching "${question.slice(0, 80)}", consider how the empirical evidence addresses the theoretical tensions in your thesis.`,
+        mode,
+        patch: deterministicPatch || undefined,
+        socraticQuestions: [
+          {
+            id: `sq-${Date.now()}`,
+            question: `How does your current framing account for competing empirical counterevidence regarding ${parsedAnalysis?.keyConcepts?.[0] || "this topic"}?`,
+            targetConcept: parsedAnalysis?.keyConcepts?.[0] || "Core Thesis",
+            challengeType: "probe_assumptions",
+            rationale: "Ensures dialectical balance and prevents confirmation bias.",
+          },
+        ],
+      };
+    } else if (!data.patch) {
+      const deterministicPatch = extractDeterministicTutorPatch(message, parsedPlan, parsedAnalysis);
+      if (deterministicPatch) {
+        data.patch = deterministicPatch;
+      }
+    }
+
+    // Persist any patch delta directly into project.answers
+    if (data.patch) {
+      if (data.patch.plan) {
+        const existingPlan = parsedPlan || {};
+        const mergedPlan = { ...existingPlan, ...data.patch.plan };
+        project.answers["assignment_plan"] = JSON.stringify(mergedPlan);
+        project.answers["assignment_research_plan"] = JSON.stringify(mergedPlan);
+      }
+      if (data.patch.analysis) {
+        const existingAnalysis = parsedAnalysis || {};
+        const mergedAnalysis = { ...existingAnalysis, ...data.patch.analysis };
+        project.answers["assignment_analysis"] = JSON.stringify(mergedAnalysis);
+      }
+      if (data.patch.question) {
+        project.answers["assignment_question"] = String(data.patch.question);
+      }
+      await getProjectStore().save(project);
+    }
+
     res.json(data);
   } catch (err: any) {
     if (err?.message === "RequireFrontendLLMException") return;

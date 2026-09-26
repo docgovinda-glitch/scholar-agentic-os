@@ -54,8 +54,11 @@ interface AssignmentContextValue {
   // Analysis & Plan
   analysis: AssignmentAnalysis | null;
   setAnalysis: (analysis: AssignmentAnalysis) => Promise<void>;
+  updateAnalysis: (delta: Partial<AssignmentAnalysis>) => Promise<void>;
   researchPlan: ResearchPlan | null;
   setResearchPlan: (plan: ResearchPlan) => Promise<void>;
+  updatePlan: (delta: Partial<ResearchPlan>) => Promise<void>;
+  setQuestion: (question: string) => Promise<void>;
 
   // Sources & Evidence
   sources: DiscoveredSource[];
@@ -270,10 +273,11 @@ export function AssignmentProvider({
         : answers["assignment_analysis"])
     : null;
 
-  const researchPlan: ResearchPlan | null = answers["assignment_research_plan"]
-    ? (typeof answers["assignment_research_plan"] === "string"
-        ? JSON.parse(answers["assignment_research_plan"])
-        : answers["assignment_research_plan"])
+  const rawPlan = answers["assignment_plan"] || answers["assignment_research_plan"];
+  const researchPlan: ResearchPlan | null = rawPlan
+    ? (typeof rawPlan === "string"
+        ? JSON.parse(rawPlan)
+        : rawPlan)
     : null;
 
   const sources: DiscoveredSource[] = useMemo(() => {
@@ -321,14 +325,58 @@ export function AssignmentProvider({
   // Setters
   const setAnalysis = useCallback(
     async (newAnalysis: AssignmentAnalysis) => {
-      await saveAnswers({ assignment_analysis: newAnalysis });
+      await saveAnswers({
+        assignment_analysis: typeof newAnalysis === "string" ? newAnalysis : JSON.stringify(newAnalysis),
+      });
     },
     [saveAnswers]
   );
 
+  const updateAnalysis = useCallback(
+    async (delta: Partial<AssignmentAnalysis>) => {
+      if (!analysis) return;
+      const updated: AssignmentAnalysis = {
+        ...analysis,
+        ...delta,
+      };
+      await setAnalysis(updated);
+    },
+    [analysis, setAnalysis]
+  );
+
   const setResearchPlan = useCallback(
     async (newPlan: ResearchPlan) => {
-      await saveAnswers({ assignment_research_plan: newPlan });
+      await saveAnswers({
+        assignment_plan: typeof newPlan === "string" ? newPlan : JSON.stringify(newPlan),
+        assignment_research_plan: typeof newPlan === "string" ? newPlan : JSON.stringify(newPlan),
+      });
+    },
+    [saveAnswers]
+  );
+
+  const updatePlan = useCallback(
+    async (delta: Partial<ResearchPlan>) => {
+      const current = researchPlan || {
+        coreQuestions: [],
+        mainConcepts: [],
+        keyDebates: [],
+        evidenceTypesNeeded: [],
+        searchStrategies: [],
+        outOfScopeTopics: [],
+        approvedByUser: false,
+      };
+      const updated: ResearchPlan = {
+        ...current,
+        ...delta,
+      };
+      await setResearchPlan(updated);
+    },
+    [researchPlan, setResearchPlan]
+  );
+
+  const setQuestion = useCallback(
+    async (newQuestion: string) => {
+      await saveAnswers({ assignment_question: newQuestion });
     },
     [saveAnswers]
   );
@@ -438,6 +486,8 @@ export function AssignmentProvider({
           question,
           targetWordCount,
           currentWordCount,
+          analysis,
+          plan: researchPlan,
           outline,
           evidence: evidenceItems.filter((e) => e.status === "approved"),
           thesis: thinkingMap?.customThesis || thinkingMap?.thesisOptions?.find((t) => t.id === thinkingMap?.selectedThesisId)?.statement,
@@ -446,6 +496,19 @@ export function AssignmentProvider({
 
         if (!response.ok) throw new Error("Failed to reach AI Tutor");
         const data = await response.json();
+
+        // Apply bidirectional patch if returned by the tutor
+        if (data.patch) {
+          if (data.patch.plan) {
+            await updatePlan(data.patch.plan);
+          }
+          if (data.patch.analysis) {
+            await updateAnalysis(data.patch.analysis);
+          }
+          if (data.patch.question) {
+            await setQuestion(data.patch.question);
+          }
+        }
 
         if (data.rubricEstimation) {
           setLastRubricEstimation(data.rubricEstimation);
@@ -461,6 +524,7 @@ export function AssignmentProvider({
           rubricEstimation: data.rubricEstimation,
           counterArguments: data.counterArguments,
           actionableSuggestion: data.suggestion,
+          patch: data.patch,
         };
         setTutorMessages((prev) => [...prev, replyMsg]);
       } catch (err: any) {
@@ -475,7 +539,7 @@ export function AssignmentProvider({
         setIsTutorReplying(false);
       }
     },
-    [projectId, tutorMode, currentStage, academicLevel, assignmentType, question, targetWordCount, currentWordCount, outline, evidenceItems, thinkingMap]
+    [projectId, tutorMode, currentStage, academicLevel, assignmentType, question, targetWordCount, currentWordCount, outline, evidenceItems, thinkingMap, analysis, researchPlan, updatePlan, updateAnalysis, setQuestion]
   );
 
   // Estimate Rubric Grade
@@ -595,8 +659,11 @@ export function AssignmentProvider({
         assignmentBriefText,
         analysis,
         setAnalysis,
+        updateAnalysis,
         researchPlan,
         setResearchPlan,
+        updatePlan,
+        setQuestion,
         sources,
         setSources,
         toggleSourceStatus,

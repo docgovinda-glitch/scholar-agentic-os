@@ -85,14 +85,35 @@ export interface AssignmentAnalysis {
   briefLedger?: DocumentRequirement[];
 }
 
+export interface CoreResearchQuestion {
+  id: string;
+  question: string;
+  rationale?: string;
+  category?: string;
+}
+
+export interface RecommendedSearchStrategy {
+  id: string;
+  database: string;
+  searchQuery: string;
+  relevanceTarget?: string;
+}
+
 export interface ResearchPlan {
-  coreQuestions: string[];
-  mainConcepts: string[];
-  keyDebates: string[];
-  evidenceTypesNeeded: string[];
-  searchStrategies: string[];
-  outOfScopeTopics: string[];
+  coreQuestions: (string | CoreResearchQuestion)[];
+  mainConcepts?: string[];
+  keyDebates?: string[];
+  evidenceTypesNeeded?: string[];
+  searchStrategies: (string | RecommendedSearchStrategy)[];
+  outOfScopeTopics?: string[];
   approvedByUser: boolean;
+  userFeedback?: string;
+}
+
+export interface TutorWorkspacePatch {
+  plan?: Partial<ResearchPlan>;
+  analysis?: Partial<AssignmentAnalysis>;
+  question?: string;
 }
 
 export interface DiscoveredSource {
@@ -261,6 +282,7 @@ export interface TutorChatMessage {
     targetSectionId?: string;
     suggestedText?: string;
   };
+  patch?: TutorWorkspacePatch;
 }
 
 export const ASSIGNMENT_STAGES: StageDefinition[] = [
