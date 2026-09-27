@@ -63,7 +63,7 @@ describe("Scholar Core Assignment Workspace", () => {
     });
   });
 
-  it("renders the 3-column workspace with 8-phase navigation, active workspace, and AI tutor panel", async () => {
+  it("renders the 4-phase horizontal navigation, active workspace, and AI tutor panel", async () => {
     render(
       <AssignmentWorkspace
         projectId="proj-123"
@@ -72,15 +72,13 @@ describe("Scholar Core Assignment Workspace", () => {
       />
     );
 
-    // Left Rail: 8 stages strictly begin with navigation items
-    expect(await screen.findByText(/Phase 2/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Phase 1/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Phase 4/i)).toBeInTheDocument();
-    expect(screen.getByText(/Phase 5/i)).toBeInTheDocument();
-    expect(screen.getByText(/Phase 6/i)).toBeInTheDocument();
-    expect(screen.getByText(/Phase 8/i)).toBeInTheDocument();
+    // Horizontal 4-Phase Navigation Items
+    expect(await screen.findByRole("button", { name: /Phase 1: Understand/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 2: Sources/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 3: Drafting/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 4: Submission/i })).toBeInTheDocument();
 
-    // Verify left rail purged elements
+    // Verify purged legacy elements
     expect(screen.queryByText(/Academic Assignment Journey/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Structured 8-phase research/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Undergraduate Workspace/i)).not.toBeInTheDocument();
@@ -89,12 +87,14 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(await screen.findByText(/Phase 1: Understand the Assignment/i)).toBeInTheDocument();
     expect(screen.getByText(/Target Word Count/i)).toBeInTheDocument();
 
-    // Right AI Tutor Sidebar: 4-tab navigation serves as top-most entry point
+    // Right Sidebar Copilot: unified ContextPanel mounting active persona (Advisor for Phase 1 Understand)
     const tutorPanel = await screen.findByRole("complementary");
-    expect(within(tutorPanel).getByRole("button", { name: /socratic/i })).toBeInTheDocument();
-    expect(within(tutorPanel).getByRole("button", { name: /rubric/i })).toBeInTheDocument();
-    expect(within(tutorPanel).getByRole("button", { name: /counter-args/i })).toBeInTheDocument();
-    expect(within(tutorPanel).getByRole("button", { name: /polish/i })).toBeInTheDocument();
+    expect(within(tutorPanel).getByText("Advisor")).toBeInTheDocument();
+    expect(within(tutorPanel).getByText(/Assignment Brief & Rubric Guidance/i)).toBeInTheDocument();
+    expect(within(tutorPanel).getByRole("button", { name: /Analyze prompt command verbs/i })).toBeInTheDocument();
+    expect(within(tutorPanel).getByRole("button", { name: /Clarify rubric criteria/i })).toBeInTheDocument();
+    expect(within(tutorPanel).getByRole("button", { name: /Suggest research questions/i })).toBeInTheDocument();
+    expect(within(tutorPanel).getByPlaceholderText(/Ask Advisor a question\.\.\./i)).toBeInTheDocument();
 
     // Verify right sidebar purged header and duplicate word count are not present
     expect(screen.queryByText(/Academic Thinking & Writing Tutor/i)).not.toBeInTheDocument();
@@ -270,15 +270,11 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(screen.queryByText(/AssignmentCitationGroundingStage/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/AssignmentAuditExportStage/i)).not.toBeInTheDocument();
 
-    // Confirm only the 8 canonical phases exist
+    // Confirm only the 4 canonical phases exist
     expect(screen.getByRole("button", { name: /Phase 1: Understand/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 2: Plan/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 3: Research/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 4: Evidence/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 5: Think/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 6: Structure/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 7: Draft/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 8: Finalize/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 2: Sources/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 3: Drafting/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 4: Submission/i })).toBeInTheDocument();
   });
 });
 

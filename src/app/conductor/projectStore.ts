@@ -54,7 +54,7 @@ export interface ProjectRecord {
   ownerId: string;
   outputTypeId: string;
   /** Intake answers so far, keyed by IntakeField.key. "provisional" is a valid value (docs 14 §5.2). */
-  answers: Record<string, string>;
+  answers: Record<string, any>;
   authors: Author[];
   gates: ProjectGateState;
   /** The project's document body, once one has been submitted (server/routes/project.ts's PUT .../document). Undefined until then — G6 has nothing to evaluate before this exists. */

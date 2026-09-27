@@ -28,21 +28,24 @@ This guide addresses the **`[GSI_LOGGER]: An unknown error occurred. m=transform
 When clicking "Sign in with Google", a popup opens, the user selects their account, and the popup redirects to `https://accounts.google.com/gsi/transform` where it remains stuck indefinitely as a blank white page without closing or completing the login.
 
 ### Root Cause: Cross-Origin-Opener-Policy (COOP)
-1. By default, security middleware (Express `helmet`) sends:
+1. By default, Express `helmet` sends:
    ```http
    Cross-Origin-Opener-Policy: same-origin
    ```
-2. When COOP is `same-origin`, the browser isolates the popup window into a separate browsing context group and strips `window.opener` to `null`.
-3. At `accounts.google.com/gsi/transform`, Google's client script attempts to pass the ID token back to the application window by calling `window.opener.postMessage(...)` and then calls `window.close()`.
-4. Because `window.opener` is `null`, the script throws an unhandled `TypeError` inside the popup and cannot communicate or close itself, leaving the user staring at a blank screen.
+2. When COOP is enabled (`same-origin`), the browser isolates the popup window into a separate browsing context group and strips `window.opener` to `null`. At `accounts.google.com/gsi/transform`, Google's client script attempts to pass the ID token back to the application window by calling `window.opener.postMessage(...)` and then calls `window.close()`. Because `window.opener` is `null`, the script throws an unhandled error inside the popup and cannot communicate or close itself.
+3. Furthermore, even with `same-origin-allow-popups`, Chrome enforces COOP boundary restrictions that block embedded Google Identity Services iframes (`client:393`) from issuing internal frame `window.postMessage(...)` calls, producing repeated console errors:
+   ```
+   Cross-Origin-Opener-Policy policy would block the window.postMessage call.
+   kv @ client:393
+   ```
 
 ### Resolution
 1. **Server Header Updated (`server.ts`)**:
    Configured Helmet with:
    ```ts
-   crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }
+   crossOriginOpenerPolicy: false
    ```
-   This retains the opener reference for popups opened by the site while isolating the main page from external windows.
+   Setting `crossOriginOpenerPolicy: false` leaves the browser default (`unsafe-none`). This preserves `window.opener` for all OAuth and Google Identity popups and completely prevents Chrome from blocking Google Identity Services internal `window.postMessage` communications.
 2. **Resilient Redirect Fallback (`GoogleIdentityButton.tsx`)**:
    Added a direct fallback link (`Having trouble with popup? Use redirect sign-in →`) below the Google button. If a user's browser, privacy extension, or environment restricts popups or cross-window communication, clicking this option triggers standard Supabase full-page OAuth redirect (`signInWithGoogle()`).
 

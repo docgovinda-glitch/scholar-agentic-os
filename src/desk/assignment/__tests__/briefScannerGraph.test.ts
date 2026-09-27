@@ -162,4 +162,34 @@ Citation: Follow Harvard referencing style rigorously.
     expect(analysis.wordCountImplications).toContain("3,000");
     expect(analysis.citationGuidance).toContain("HARVARD");
   });
+
+  it("calculates custom section word allocations when sections is passed to runBriefScannerGraph", async () => {
+    const brief = `
+Assessment Question: Critically evaluate the implications of artificial intelligence in jurisprudence.
+Word count: 2000 words.
+Citation: APA 7th edition.
+    `;
+
+    const customSections = {
+      isCustomized: true,
+      intro: { targetWords: 300, guidelines: "Focus on AI definitions" },
+      body: { targetWords: 1300, guidelines: "Case analysis" },
+      conclusion: { targetWords: 400, guidelines: "Future reforms" },
+    };
+
+    const analysis = await runBriefScannerGraph({
+      briefText: brief,
+      question: "Critically evaluate the implications of artificial intelligence in jurisprudence.",
+      assignmentType: "essay",
+      academicLevel: "undergraduate",
+      targetWordCount: 2000,
+      citationStyle: "apa7",
+      sections: customSections,
+    });
+
+    expect(analysis.wordCountImplications).toContain("Intro: ~300w");
+    expect(analysis.wordCountImplications).toContain("Body: ~1300w");
+    expect(analysis.wordCountImplications).toContain("Conclusion: ~400w");
+    expect(analysis.wordCountImplications).toContain("Section allocations customized by student");
+  });
 });

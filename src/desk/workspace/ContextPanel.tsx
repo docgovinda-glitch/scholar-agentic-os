@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { ResearchStage } from "./types";
 import { STAGE_MAP } from "./types";
-import { useResearchWorkspace } from "./ResearchContext";
+import { useOptionalResearchWorkspace } from "./ResearchContext";
 import { sendCopilotMessage } from "../api";
 
-interface AgentInfo {
+export interface AgentInfo {
   name: string;
   role: string;
   description: string;
@@ -15,7 +15,7 @@ interface AgentInfo {
 // A base AI icon to default to if no specific icon is needed
 const AI_ICON = "M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z";
 
-const AGENT_CONFIGS: Record<ResearchStage, AgentInfo> = {
+export const AGENT_CONFIGS: Record<ResearchStage, AgentInfo> = {
   definition: {
     name: "Architect",
     role: "Research Definition Assistant",
@@ -193,18 +193,43 @@ const AGENT_CONFIGS: Record<ResearchStage, AgentInfo> = {
   },
 };
 
+export interface ContextPanelProps {
+  currentStage?: ResearchStage | string;
+  isOpen: boolean;
+  onToggle?: () => void;
+  agent?: AgentInfo;
+  projectId?: string;
+  stageName?: string;
+  onSendMessage?: (
+    text: string,
+    history: Array<{ role: "user" | "assistant"; content: string }>
+  ) => Promise<{ ok: boolean; response: string; error?: string }>;
+}
+
 export default function ContextPanel({
   currentStage,
   isOpen,
   onToggle,
-}: {
-  currentStage: ResearchStage;
-  isOpen: boolean;
-  onToggle: () => void;
-}) {
-  const { projectId, currentStage: globalStage } = useResearchWorkspace();
-  const agent = AGENT_CONFIGS[currentStage];
-  const stageDef = STAGE_MAP.get(currentStage);
+  agent: propAgent,
+  projectId: propProjectId,
+  stageName: propStageName,
+  onSendMessage,
+}: ContextPanelProps) {
+  const researchWorkspace = useOptionalResearchWorkspace();
+  const effectiveProjectId = propProjectId || researchWorkspace?.projectId || "";
+  const effectiveStage = currentStage || researchWorkspace?.currentStage || "definition";
+  const agent: AgentInfo =
+    propAgent ||
+    (typeof effectiveStage === "string" && effectiveStage in AGENT_CONFIGS
+      ? AGENT_CONFIGS[effectiveStage as ResearchStage]
+      : {
+          name: "Copilot",
+          role: "Academic Assistant",
+          description: "I'll assist you with your academic work.",
+          iconPath: AI_ICON,
+          quickActions: [],
+        });
+  const stageDef = typeof effectiveStage === "string" ? STAGE_MAP.get(effectiveStage as ResearchStage) : null;
 
   const [history, setHistory] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [inputValue, setInputValue] = useState("");
@@ -212,7 +237,9 @@ export default function ContextPanel({
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (typeof endOfMessagesRef.current?.scrollIntoView === "function") {
+      endOfMessagesRef.current.scrollIntoView({ behavior: "smooth" });
+    }
   }, [history, isTyping]);
 
   const handleSend = async (messageText?: string) => {
@@ -225,11 +252,20 @@ export default function ContextPanel({
     setIsTyping(true);
 
     try {
-      const res = await sendCopilotMessage(projectId, currentStage, text, history);
-      if (res.ok) {
-        setHistory([...newHistory, { role: "assistant", content: res.response }]);
+      if (onSendMessage) {
+        const res = await onSendMessage(text, history);
+        if (res.ok) {
+          setHistory([...newHistory, { role: "assistant", content: res.response }]);
+        } else {
+          throw new Error(res.error || "Received an error response from the AI provider.");
+        }
       } else {
-        throw new Error((res as any).error || "Received an error response from the AI provider.");
+        const res = await sendCopilotMessage(effectiveProjectId, effectiveStage as ResearchStage, text, history);
+        if (res.ok) {
+          setHistory([...newHistory, { role: "assistant", content: res.response }]);
+        } else {
+          throw new Error((res as any).error || "Received an error response from the AI provider.");
+        }
       }
     } catch (err: any) {
       setHistory([...newHistory, { role: "assistant", content: `**Error**: ${err.message || "Failed to connect to Assistant."}` }]);
@@ -245,18 +281,33 @@ export default function ContextPanel({
         }`}
       >
         <div className="p-6 pb-4 border-b border-[color:var(--border-subtle)]">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)]">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={agent.iconPath} />
-              </svg>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)] shrink-0">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={agent.iconPath} />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-bold text-[color:var(--text-primary)]">{agent.name}</h3>
+                <p className="text-[10px] uppercase tracking-wider text-[color:var(--text-muted)] font-bold">
+                  {agent.role}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-bold text-[color:var(--text-primary)]">{agent.name}</h3>
-              <p className="text-[10px] uppercase tracking-wider text-[color:var(--text-muted)] font-bold">
-                {agent.role}
-              </p>
-            </div>
+            {onToggle && (
+              <button
+                type="button"
+                onClick={onToggle}
+                className="p-1 rounded-lg text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-raised)] transition-colors cursor-pointer"
+                title="Close panel"
+                aria-label="Close copilot panel"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
           <p className="text-sm text-[color:var(--text-secondary)] leading-relaxed">
             {agent.description}
@@ -296,7 +347,7 @@ export default function ContextPanel({
                   Stage Context
                 </div>
                 <p className="text-[color:var(--text-secondary)]">
-                  You are currently working in <strong className="text-[color:var(--text-primary)]">{stageDef?.label || agent.role}</strong>. Any documents or data you upload here will be scoped to this stage's processing parameters.
+                  You are currently working in <strong className="text-[color:var(--text-primary)]">{propStageName || stageDef?.label || agent.role}</strong>. Any documents or data you upload here will be scoped to this stage's processing parameters.
                 </p>
               </div>
             </>

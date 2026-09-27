@@ -720,7 +720,7 @@ export function getOutputTypeSpec(outputTypeId: string): Promise<OutputTypeSpec>
  */
 export function saveIntakeAnswers(
   projectId: string,
-  answers: Record<string, string>
+  answers: Record<string, any>
 ): Promise<ProjectView> {
   if (isEphemeralProject(projectId)) {
     const updated = updateEphemeralProject(projectId, answers);

@@ -197,20 +197,16 @@ const rawSupabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseOrigin = rawSupabaseUrl && rawSupabaseUrl.startsWith("http")
   ? new URL(rawSupabaseUrl).origin
   : undefined;
-// crossOriginOpenerPolicy fix (2026-09-22):
-// Helmet's default `Cross-Origin-Opener-Policy: same-origin` severs `window.opener`
-// for any cross-origin popup (including Google Identity Services popups at
-// accounts.google.com). When `window.opener` is null, Google's
-// `https://accounts.google.com/gsi/transform` endpoint cannot postMessage the ID
-// token back to the parent window and hangs indefinitely on a blank white screen.
-// `same-origin-allow-popups` retains the opener reference for popups opened by this
-// application, enabling Google Sign-In popup communication to complete and close cleanly.
+// crossOriginOpenerPolicy:
+// Helmet defaults to `Cross-Origin-Opener-Policy: same-origin`, which severs `window.opener`
+// and blocks cross-origin postMessage communication. Setting this to `same-origin-allow-popups`
+// still caused Chrome to log "Cross-Origin-Opener-Policy policy would block the window.postMessage call"
+// when Google Identity Services (GIS) library (client:393) communicates via postMessage.
+// Disabling COOP entirely (leaving browser default 'unsafe-none') preserves window.opener for all
+// authentication popups and eliminates COOP postMessage blocks cleanly.
 app.use(
   helmet({
-    // same-origin-allow-popups is required for Google Identity Services (GIS) popups.
-    // Helmet's default "same-origin" severs window.opener with accounts.google.com,
-    // causing the GIS popup to hang indefinitely on accounts.google.com/gsi/transform.
-    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    crossOriginOpenerPolicy: false,
     crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: process.env.NODE_ENV === "production" ? {
       directives: {

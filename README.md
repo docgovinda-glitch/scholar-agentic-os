@@ -8,9 +8,19 @@
 
 Rather than generic forms, each academic format in Scholar Core operates through its own purpose-built workspace tailored to the exact cognitive process of researchers. The primary UI highlights four curated formats, with deep long-form milestone architectures preserved in the underlying codebase:
 
-1. **📝 Assignment Workspace (`OT-01`)**:
-   - **8-Phase Academic Workflow**: *Understand → Plan → Research → Evidence Evaluation → Think/Critique → Structure → Grounded Drafting → Submission Review*.
-   - Features dynamic rubric alignment, interactive AI tutoring, and evidence-gated drafting.
+1. **📝 Coursework & Essay Engine (`OT-01`)** — **v4.0 — 4-Phase Architecture**:
+   - **4-Phase Lifecycle** (supersedes the legacy 8-stage flow):
+     1. **Phase 1 · Understand**: Brief intake wizard, 10/75/15 word-budget split, rubric criteria capture (JSON JSONB-persisted in `assignment_projects`).
+     2. **Phase 2 · Sources**: AI-curated literature cards, lecture/slide PDF dropzone, evidence approval, approved-source ledger.
+     3. **Phase 3 · Drafting**: Invisible chunker engine (`decomposeWordBudget`) for sub-section scaffolding, PEEL synthesis, live section index with per-section word trackers.
+     4. **Phase 4 · Submission**: 10-point rubric compliance evaluator, citation reconciliation auditor (100% in-text → bibliography verification), one-click `.docx` and PDF export with title page, running headers, and formatted bibliography.
+   - **Stage-Scoped Copilot Personas** (via `ContextPanel.tsx` → `/api/projects/:id/assignment/copilot-chat`):
+     - Phase 1 → **Advisor** (brief & rubric grounding)
+     - Phase 2 → **Librarian** (source curation & citation strategy)
+     - Phase 3 → **Scribe** (drafting guidance & PEEL structure)
+     - Phase 4 → **Examiner** (rubric scoring & citation audit)
+   - **Database**: `public.assignment_projects` JSONB table (migration `20260927183000_assignment_projects_schema.sql`) stores full 4-phase state (`brief`, `sources`, `drafting`, `submission`) linked to `public.projects` via `project_id`.
+   - **Test Coverage**: 15 test suites including `AssignmentE2EFlow.test.tsx` (Phase 1→4 traversal + DOCX export verification).
 
 2. **📄 Journal Article Workspace (`OT-10`)**:
    - **25-Stage Empirical Pipeline**: *Topic Selection → Literature Matrix → Claim-Evidence Graph → Methodological Framing → Empirical Generation → Double-Blind Adversarial Peer Review*.

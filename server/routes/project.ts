@@ -1376,14 +1376,19 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       return res.status(400).json({ error: "Missing required field: answers (object)" });
     }
     for (const value of Object.values(answers)) {
-      if (typeof value !== "string") {
-        return res.status(400).json({ error: "Every answer value must be a string (use \"provisional\" for deferred fields)." });
+      if (
+        typeof value !== "string" &&
+        typeof value !== "number" &&
+        typeof value !== "boolean" &&
+        (typeof value !== "object" || value === null)
+      ) {
+        return res.status(400).json({ error: "Every answer value must be JSON-serializable (string, number, boolean, or object)." });
       }
     }
 
     const spec = catalog.getOrThrow(record.outputTypeId);
-    const nextAnswers = { ...record.answers, ...(answers as Record<string, string>) };
-    const criteria = computeG0ExitCriteria(spec, nextAnswers);
+    const nextAnswers = { ...record.answers, ...(answers as Record<string, any>) };
+    const criteria = computeG0ExitCriteria(spec, nextAnswers as any);
 
     try {
       let gates = updateExitCriteria(record.gates, "G0", criteria);

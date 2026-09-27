@@ -5,8 +5,142 @@
 
 import type { CanonicalReference } from "../../citation_compliance/model/reference";
 import type { CitationStyleType } from "../../services/vault/citationService";
+import type { CanonicalDocument } from "../../domain/document/model";
+import type { EvidenceLedger } from "../../domain/evidence/types";
 
-export type AssignmentStage =
+export type AssignmentPhaseId = "understand" | "sources" | "drafting" | "submission";
+
+export interface AssignmentPhaseDefinition {
+  id: AssignmentPhaseId;
+  number: number;
+  label: string;
+  shortLabel: string;
+  description: string;
+  iconKey: "FileText" | "Library" | "PenTool" | "CheckCircle2" | string;
+}
+
+export const ASSIGNMENT_PHASES: AssignmentPhaseDefinition[] = [
+  {
+    id: "understand",
+    number: 1,
+    label: "Phase 1: Understand",
+    shortLabel: "Understand",
+    description: "Question, word count, citation style, level, & AI analysis",
+    iconKey: "FileText",
+  },
+  {
+    id: "sources",
+    number: 2,
+    label: "Phase 2: Sources",
+    shortLabel: "Sources",
+    description: "Scholarly discovery, Knowledge Vault integration, & evidence ledger",
+    iconKey: "Library",
+  },
+  {
+    id: "drafting",
+    number: 3,
+    label: "Phase 3: Drafting",
+    shortLabel: "Drafting",
+    description: "Structured section drafting, real-time word budgets, & AI polish",
+    iconKey: "PenTool",
+  },
+  {
+    id: "submission",
+    number: 4,
+    label: "Phase 4: Submission",
+    shortLabel: "Submission",
+    description: "10-point rubric assessment, citation audit, & camera-ready export",
+    iconKey: "CheckCircle2",
+  },
+];
+
+export interface AssignmentAgentInfo {
+  name: string;
+  role: string;
+  description: string;
+  iconPath: string;
+  quickActions: string[];
+}
+
+export const ASSIGNMENT_AGENT_CONFIGS: Record<AssignmentPhaseId, AssignmentAgentInfo> = {
+  understand: {
+    name: "Advisor",
+    role: "Assignment Brief & Rubric Guidance",
+    description: "I'll guide your understanding of the assignment brief, unpack command verbs, and align with rubric expectations.",
+    iconPath: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253",
+    quickActions: [
+      "Analyze prompt command verbs",
+      "Clarify rubric criteria",
+      "Suggest research questions",
+    ],
+  },
+  sources: {
+    name: "Librarian",
+    role: "Scholarly Literature & Sourcing",
+    description: "I'll help you curate high-impact academic sources, analyze lecture slides, and build verified evidence cards.",
+    iconPath: "M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z",
+    quickActions: [
+      "Recommend empirical sources",
+      "Extract lecture slide concepts",
+      "Verify author credentials",
+    ],
+  },
+  drafting: {
+    name: "Scribe",
+    role: "Academic Drafting & Synthesis",
+    description: "I'll assist you with sequential PEEL paragraph drafting, deepening critical evaluation, and analytical transitions.",
+    iconPath: "M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z",
+    quickActions: [
+      "Deepen analytical critique",
+      "Strengthen PEEL structure",
+      "Synthesize counterargument",
+    ],
+  },
+  submission: {
+    name: "Examiner",
+    role: "Quality Audit & Final Review",
+    description: "I'll audit your submission against the grading rubric, reconcile citations, and ensure formatting perfection.",
+    iconPath: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
+    quickActions: [
+      "Explain predicted grade",
+      "Audit unresolved citations",
+      "Check university formatting",
+    ],
+  },
+};
+
+export const LEGACY_STAGE_TO_PHASE_MAP: Record<string, AssignmentPhaseId> = {
+  understand: "understand",
+  plan: "understand",
+  research: "sources",
+  evidence: "sources",
+  think: "drafting",
+  structure: "drafting",
+  draft: "drafting",
+  final: "submission",
+  sources: "sources",
+  drafting: "drafting",
+  submission: "submission",
+};
+
+export function normalizeAssignmentPhase(phaseOrStage?: string | null): AssignmentPhaseId {
+  if (!phaseOrStage) return "understand";
+  const normalized = phaseOrStage.toLowerCase().trim();
+  if (
+    normalized === "understand" ||
+    normalized === "sources" ||
+    normalized === "drafting" ||
+    normalized === "submission"
+  ) {
+    return normalized as AssignmentPhaseId;
+  }
+  if (normalized in LEGACY_STAGE_TO_PHASE_MAP) {
+    return LEGACY_STAGE_TO_PHASE_MAP[normalized];
+  }
+  return "understand";
+}
+
+export type LegacyAssignmentStage =
   | "understand"
   | "plan"
   | "research"
@@ -15,6 +149,10 @@ export type AssignmentStage =
   | "structure"
   | "draft"
   | "final";
+
+export type AssignmentStage =
+  | AssignmentPhaseId
+  | LegacyAssignmentStage;
 
 export type AcademicLevel = "undergraduate" | "postgraduate";
 
@@ -407,10 +545,23 @@ export const COMMON_COMMAND_VERBS: Record<string, { definition: string; keyActio
 };
 
 export interface CourseDetails {
+  courseName?: string;
   courseCode?: string;
   institution?: string;
   deadline?: string;
   rubric?: string;
+}
+
+export interface SectionDetail {
+  targetWords: number;
+  guidelines: string;
+}
+
+export interface SectionBreakdown {
+  isCustomized: boolean;
+  intro: SectionDetail;
+  body: SectionDetail;
+  conclusion: SectionDetail;
 }
 
 export interface AssignmentProjectAnswers {
@@ -419,6 +570,7 @@ export interface AssignmentProjectAnswers {
   assignmentType: AssignmentType;
   targetWordCount: number;
   citationStyle: string;
+  sections?: SectionBreakdown;
   courseDetails?: CourseDetails;
   assignment_analysis?: AssignmentAnalysis;
   brief_ledger?: DocumentRequirement[];
@@ -463,5 +615,180 @@ export function extractStandardizedInstructions(answers: Record<string, any> = {
     if (cleaned.length > 0) return cleaned;
   }
   return "";
+}
+
+export function normalizeProjectAnswers(answers: any) {
+  if (!answers || typeof answers !== "object") return answers;
+  const target = Number(answers.targetWordCount || answers.word_count || answers.target_word_count || answers.word_limit) || 2000;
+  if (!answers.sections) {
+    const intro = Math.round(target * 0.10);
+    const conclusion = Math.round(target * 0.15);
+    const body = Math.max(0, target - intro - conclusion);
+
+    answers.sections = {
+      isCustomized: false,
+      intro: { targetWords: intro, guidelines: '' },
+      body: { targetWords: body, guidelines: '' },
+      conclusion: { targetWords: conclusion, guidelines: '' },
+    };
+  }
+  return answers;
+}
+
+export function getSectionPromptGuidelines(
+  sectionKey: 'intro' | 'body' | 'conclusion',
+  answers: any
+): string {
+  const section = answers?.sections?.[sectionKey];
+  const targetWords = section?.targetWords ?? 500;
+  const guidelines = section?.guidelines?.trim();
+
+  return `
+SECTION ALLOCATION: ~${targetWords} words
+USER INSTRUCTIONS / MANDATORY CONTENT: ${guidelines ? guidelines : 'Standard academic rigor and appropriate depth for this section.'}
+`.trim();
+}
+
+/**
+ * ============================================================================
+ * SPEC SCHEMA (Section 4.2): 4-PHASE ASSIGNMENT PROJECT STATE
+ * Unified models for brief, sources, drafting, and submission phases.
+ * ============================================================================
+ */
+
+export interface AssignmentBriefRubricCriterion {
+  id?: string;
+  criterion?: string;
+  weightPercentage?: number;
+  description?: string;
+  title?: string;
+  weightPercent?: number;
+  expectedStandard?: string;
+}
+
+export interface AssignmentWordBudget {
+  intro: number;
+  body: number;
+  conclusion: number;
+}
+
+export interface AssignmentBriefState {
+  rawPrompt?: string;
+  instructions: string;
+  assignmentTopic?: string;
+  targetWordCount: number;
+  wordBudget?: AssignmentWordBudget;
+  minWordCount?: number;
+  maxWordCount?: number;
+  academicLevel: AcademicLevel;
+  assignmentType: AssignmentType;
+  citationStyle: string;
+  sections?: SectionBreakdown;
+  constraints?: string[];
+  rubricCriteria?: AssignmentBriefRubricCriterion[];
+  analysis?: AssignmentAnalysis | null;
+  briefLedger?: DocumentRequirement[];
+  courseDetails?: CourseDetails;
+}
+
+export interface UploadedSourceDocument {
+  id: string;
+  name: string;
+  fileUrl?: string;
+  fileSize?: number;
+  uploadedAt: string;
+  mimeType?: string;
+  extractedText?: string;
+}
+
+export interface AssignmentSourcesState {
+  curated: DiscoveredSource[];
+  userUploaded: UploadedSourceDocument[];
+  approvedSourceIds: string[];
+  evidenceLedger?: EvidenceLedger | null;
+  evidenceItems?: EvidenceItem[];
+}
+
+export interface AssignmentDraftingSection {
+  id: string;
+  title: string;
+  targetWordCount: number;
+  currentWordCount: number;
+  guidance: string;
+  draftContent: string;
+  status: "not_started" | "drafting" | "reviewed" | "complete" | "pending" | "generating" | "completed";
+  keyPoints?: string[];
+  linkedEvidenceIds?: string[];
+  boundSourceIds?: string[];
+  academicFunction?: string;
+  sectionType?: "intro" | "body" | "conclusion";
+}
+
+export interface AssignmentDraftingState {
+  internalSections: AssignmentDraftingSection[];
+  activeSectionId: string | null;
+  fullDocumentMarkdown: string;
+  overallWordCount: number;
+  canonicalDocument?: CanonicalDocument | null;
+  thinkingMap?: ThinkingMap | null;
+}
+
+export interface RubricScoreCriterion {
+  criterion: string;
+  score: number;
+  maxScore: number;
+  feedback: string;
+  weightPercentage?: number;
+}
+
+export interface RubricScoreReport {
+  predictedGrade: string; // e.g. "First Class (1st)" | "Upper Second (2:1)" | "Lower Second (2:2)"
+  readinessPercentage: number; // 0 - 100
+  criteriaFeedback: Record<string, string>; // criterion name -> specific qualitative feedback
+  missingRequirements: string[]; // any unaddressed prompt instructions
+  overallScore?: number;
+  overallBand?: GradingBand;
+  bandLabel?: string;
+  summary?: string;
+  criteria?: RubricScoreCriterion[];
+  strengths?: string[];
+  priorityFixes?: string[];
+}
+
+export interface CitationAuditIssue {
+  citation: string;
+  issue: string;
+  severity: "error" | "warning" | "suggestion";
+  suggestedFix?: string;
+}
+
+export interface CitationAuditResult {
+  totalInTextCitations: number;
+  totalBibliographyEntries: number;
+  isReconciled: boolean; // true if 100% of in-text citations resolve to valid sources
+  unresolvedCitations: string[]; // list of citations in text missing from reference pool
+  reconciledCitations?: string[];
+  verifiedCount?: number;
+  flaggedIssues?: CitationAuditIssue[];
+}
+
+export type CitationAuditReport = CitationAuditResult;
+
+export interface AssignmentSubmissionState {
+  rubricScoreReport: RubricScoreReport | SubmissionCheckReport | null;
+  citationAudit: CitationAuditReport | null;
+  isReadyForSubmission: boolean;
+  submittedAt?: string;
+  exportFormats?: ("docx" | "pdf" | "markdown")[];
+}
+
+export interface AssignmentProjectState {
+  projectId: string;
+  currentPhase: AssignmentPhaseId;
+  brief: AssignmentBriefState;
+  sources: AssignmentSourcesState;
+  drafting: AssignmentDraftingState;
+  submission: AssignmentSubmissionState;
+  updatedAt?: string;
 }
 

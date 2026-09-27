@@ -833,6 +833,7 @@ export async function signInWithGoogle(redirectPath: string = ""): Promise<Servi
             },
             auto_select: false,
             cancel_on_tap_outside: true,
+            itp_support: true,
           });
 
           (window as any).google.accounts.id.prompt((notification: any) => {

@@ -101,7 +101,7 @@ describe("Assignment Workspace Stages & Workflow", () => {
     });
   });
 
-  it("renders the Structure stage with proportional word count allocations", async () => {
+  it("safely maps legacy Structure stage to Phase 3 Drafting with word count allocations", async () => {
     render(
       <AssignmentWorkspace
         projectId="proj-456"
@@ -110,14 +110,14 @@ describe("Assignment Workspace Stages & Workflow", () => {
       />
     );
 
-    expect(await screen.findByText(/Phase 6: Structure & Word Count Planner/i)).toBeInTheDocument();
-    expect(screen.getByText(/Mandatory Target/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Phase 03 · Drafting & Synthesis/i)).toBeInTheDocument();
+    expect(screen.getByText(/Grounded Section-by-Section Drafting/i)).toBeInTheDocument();
     expect(screen.getAllByText(/3,000 words/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByDisplayValue(/Introduction & Context/i)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(/Theoretical Framework/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Introduction & Context/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Theoretical Framework/i).length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders the Grounded Drafting stage with word count tracking and active section draft", async () => {
+  it("safely maps legacy Grounded Drafting stage to Phase 3 Drafting with word count tracking", async () => {
     render(
       <AssignmentWorkspace
         projectId="proj-456"
@@ -126,43 +126,12 @@ describe("Assignment Workspace Stages & Workflow", () => {
       />
     );
 
-    expect(await screen.findByText(/Phase 7: Grounded Academic Drafting/i)).toBeInTheDocument();
-    expect(screen.getByText(/Academic Draft Content:/i)).toBeInTheDocument();
-    expect(screen.getByText(/International climate governance requires profound theoretical synthesis/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Phase 03 · Drafting & Synthesis/i)).toBeInTheDocument();
+    expect(screen.getByText(/Overall Draft Progress/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/3,000 words/i).length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders the Finalize stage with 10-Point Submission Audit and export options", async () => {
-    // Mock review API
-    global.fetch = vi.fn().mockImplementation((url) => {
-      if (typeof url === "string" && url.includes("/review")) {
-        return Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              overallScore: 92,
-              readyForSubmission: true,
-              criteriaResults: [
-                {
-                  category: "question_addressed",
-                  label: "Question Addressed",
-                  status: "pass",
-                  summary: "Fully answers the policy prompt.",
-                },
-                {
-                  category: "critical_thinking",
-                  label: "Critical Thinking",
-                  status: "pass",
-                  summary: "Postgraduate depth demonstrated.",
-                },
-              ],
-              strengths: ["Strong theoretical synthesis", "Nuanced counterarguments"],
-              priorityFixes: ["Fine-tune concluding recommendation clarity"],
-            }),
-        });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-    });
-
+  it("safely maps legacy Finalize stage to Phase 4 Submission Quality Audit and export options", async () => {
     render(
       <AssignmentWorkspace
         projectId="proj-456"
@@ -171,8 +140,9 @@ describe("Assignment Workspace Stages & Workflow", () => {
       />
     );
 
-    expect(await screen.findByText(/Phase 8: Review & Final Submission/i)).toBeInTheDocument();
-    expect(screen.getByText(/Academic Readiness Assessment/i)).toBeInTheDocument();
-    expect(screen.getByText(/Download Word \(\.docx\)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Phase 04 · Submission & Review/i)).toBeInTheDocument();
+    expect(screen.getByText(/Submission Quality Audit & Camera-Ready Export/i)).toBeInTheDocument();
+    expect(screen.getByText(/Word Document \(\.docx\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/PDF Document/i)).toBeInTheDocument();
   });
 });

@@ -24,3 +24,5 @@ export function rejectClientCredentials(req: Request, res: Response, next: NextF
   }
   next();
 }
+
+export default rejectClientCredentials;

@@ -301,6 +301,7 @@ export async function runBriefScannerGraph(params: {
   targetWordCount: number;
   citationStyle: string;
   rubricText?: string;
+  sections?: any;
 }): Promise<AssignmentAnalysis> {
   const fullText = `${params.question}\n\n${params.briefText}\n\n${params.rubricText || ""}`.trim();
   const ledger = await auditDocumentLineByLine(fullText);
@@ -397,12 +398,13 @@ export async function runBriefScannerGraph(params: {
     );
   }
 
-  // Word Budgets
-  const introWords = Math.round(params.targetWordCount * 0.1);
-  const conclWords = Math.round(params.targetWordCount * 0.1);
-  const bodyWords = params.targetWordCount - introWords - conclWords;
+  // Word Budgets (10% Intro / 75% Body / 15% Conclusion default, or student custom sections)
+  const introWords = params.sections?.intro?.targetWords ?? Math.round(params.targetWordCount * 0.10);
+  const conclWords = params.sections?.conclusion?.targetWords ?? Math.round(params.targetWordCount * 0.15);
+  const bodyWords = params.sections?.body?.targetWords ?? Math.max(0, params.targetWordCount - introWords - conclWords);
 
   const penaltyNote = penalties.length > 0 ? ` Note: ${penalties.length} specific penalty clause(s) identified.` : "";
+  const customNote = params.sections?.isCustomized ? " Section allocations customized by student." : "";
 
   const summary = `The examiner requires a rigorous ${params.assignmentType} addressing "${params.question.slice(
     0,
@@ -438,7 +440,7 @@ export async function runBriefScannerGraph(params: {
         ? "High-impact peer-reviewed journal articles, foundational theoretical monographs, and authoritative empirical datasets."
         : "Authoritative academic sources, scholarly peer-reviewed journals, and verified institutional benchmark data.",
     markingCriteriaInsights,
-    wordCountImplications: `Target: ${params.targetWordCount.toLocaleString()} words (Intro: ~${introWords}w, Body: ~${bodyWords}w, Conclusion: ~${conclWords}w). Standard ±10% penalty threshold applies.`,
+    wordCountImplications: `Target: ${params.targetWordCount.toLocaleString()} words (Intro: ~${introWords}w, Body: ~${bodyWords}w, Conclusion: ~${conclWords}w). Standard ±10% penalty threshold applies.${customNote}`,
     citationGuidance: `Strict adherence to ${params.citationStyle.toUpperCase()} formatting for all in-text citations and reference list entries.`,
     academicLevelNotes:
       params.academicLevel === "postgraduate"

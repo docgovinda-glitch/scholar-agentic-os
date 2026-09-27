@@ -1,229 +1,155 @@
-// @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
-import "@testing-library/jest-dom/vitest";
-import React from "react";
-import { AssignmentProvider } from "../AssignmentContext";
-import AssignmentAiTutorPanel from "../components/AssignmentAiTutorPanel";
+/**
+ * AssignmentContextPanelIntegration.test.tsx
+ * -------------------------------------------
+ * Replaces the obsolete AssignmentAiTutorPanel.test.tsx
+ * (which tested the deleted legacy copilot component).
+ *
+ * Validates the ContextPanel copilot endpoint wiring:
+ *   - sendAssignmentCopilotMessage is called with correct project/phase args
+ *   - Response handling integrates cleanly with the AssignmentCopilotResponse contract
+ *   - Error resilience: network failures do not crash the service
+ */
 
-const getProject = vi.fn();
-const getDocument = vi.fn();
-const getRubric = vi.fn();
-const getOutputTypeSpec = vi.fn();
-const saveIntakeAnswers = vi.fn();
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../../api", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    getProject: (...a: unknown[]) => getProject(...a),
-    getDocument: (...a: unknown[]) => getDocument(...a),
-    getRubric: (...a: unknown[]) => getRubric(...a),
-    getOutputTypeSpec: (...a: unknown[]) => getOutputTypeSpec(...a),
-    saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
-  };
-});
-
-vi.mock("../../../services/userVault", () => ({
-  loadVault: vi.fn().mockResolvedValue([]),
+// Mock authedJsonFetch used internally by the service
+vi.mock("../../api", () => ({
+  authedJsonFetch: vi.fn(),
 }));
 
-vi.mock("../../../services/vault/cloudDriveService", () => ({
-  getConnectedCloudDrives: vi.fn().mockResolvedValue([]),
-}));
+import { authedJsonFetch } from "../../api";
+import { sendAssignmentCopilotMessage } from "../services/assignmentCopilotService";
+import type { AssignmentPhaseId, AssignmentProjectState } from "../types";
 
-describe("Live Socratic AI Tutor & Rubric Grading Estimator Panel", () => {
+const mockAuthedFetch = authedJsonFetch as ReturnType<typeof vi.fn>;
+
+// Minimal project state for testing
+const mockState: Partial<AssignmentProjectState> = {
+  projectId: "test-proj-123",
+  currentPhase: "drafting",
+  brief: {
+    instructions: "Critically evaluate renewable energy transitions.",
+    targetWordCount: 2000,
+    academicLevel: "undergraduate",
+    assignmentType: "essay",
+    citationStyle: "apa7",
+    sections: {
+      isCustomized: false,
+      intro: { targetWords: 200, guidelines: "" },
+      body: { targetWords: 1500, guidelines: "" },
+      conclusion: { targetWords: 300, guidelines: "" },
+    },
+    constraints: [],
+    rubricCriteria: [],
+  },
+};
+
+describe("Assignment Copilot Service (ContextPanel wiring)", () => {
   beforeEach(() => {
-    getProject.mockResolvedValue({
-      projectId: "proj-tutor-test",
-      outputTypeId: "OT-01",
-      title: "Philosophy of Science Essay",
-      hasDocument: false,
-      answers: {
-        assignment_question: "Critically evaluate Popper's falsificationism versus Kuhn's paradigm shifts.",
-        word_count: 2000,
-        citation_style: "apa7",
-        academic_level: "undergraduate",
-        assignment_type: "critical_essay",
-        assignment_outline: [
-          {
-            id: "sec-1",
-            title: "Introduction & Demarcation Problem",
-            targetWordCount: 300,
-            currentWordCount: 250,
-            draftContent: "Karl Popper proposed falsificationism as the criterion of scientific demarcation...",
-            guidance: "Introduce demarcation criteria.",
-            keyPoints: ["Popper vs Positivists"],
-            linkedEvidenceIds: [],
-            status: "drafting",
-          },
-        ],
-      },
-      gates: [],
-    });
-    getDocument.mockResolvedValue(null);
-    getRubric.mockResolvedValue(null);
-    getOutputTypeSpec.mockResolvedValue({ id: "OT-01", label: "Assignment" });
-
-    // Mock global fetch
-    global.fetch = vi.fn();
+    mockAuthedFetch.mockReset();
   });
 
-  afterEach(() => {
-    cleanup();
-    vi.clearAllMocks();
-  });
-
-  it("renders tutor modes (Socratic, Rubric, Counter-Args, Polish) and initial greeting", async () => {
-    render(
-      <AssignmentProvider
-        projectId="proj-tutor-test"
-        initialStage="draft"
-        onStageChangeCallback={vi.fn()}
-      >
-        <AssignmentAiTutorPanel />
-      </AssignmentProvider>
-    );
-
-    expect(await screen.findByText(/Socratic Inquiry/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Socratic/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/Rubric/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Counter-Args/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Polish/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Socratic Academic Tutor & Rubric Estimator/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Academic Thinking & Writing Tutor/i)).not.toBeInTheDocument();
-  });
-
-  it("switches modes and updates prompt chips", async () => {
-    render(
-      <AssignmentProvider
-        projectId="proj-tutor-test"
-        initialStage="draft"
-        onStageChangeCallback={vi.fn()}
-      >
-        <AssignmentAiTutorPanel />
-      </AssignmentProvider>
-    );
-
-    expect(await screen.findByText(/Challenge the core assumption of my thesis/i)).toBeInTheDocument();
-
-    // Click Rubric mode
-    const rubricTab = screen.getByRole("button", { name: /Rubric/i });
-    fireEvent.click(rubricTab);
-
-    expect(await screen.findByText(/Estimate my draft's grade band & mark/i)).toBeInTheDocument();
-    expect(screen.getByText(/Live Marking Audit/i)).toBeInTheDocument();
-
-    // Click Counter-Args mode
-    const counterTab = screen.getByRole("button", { name: /Counter-Args/i });
-    fireEvent.click(counterTab);
-
-    expect(await screen.findByText(/What would rival theoretical schools object to\?/i)).toBeInTheDocument();
-  });
-
-  it("sends Socratic message and renders structured Socratic questions", async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
-      if (url.includes("/tutor-chat")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
-            reply: "To deepen your critique of Popper, consider how Kuhn views scientific anomalies.",
-            mode: "socratic",
-            socraticQuestions: [
-              {
-                id: "sq-1",
-                question: "Does Popper's falsificationism account for the tenacity of scientists defending established theories?",
-                targetConcept: "Falsification vs Normal Science",
-                challengeType: "probe_assumptions",
-                rationale: "Examines whether negative evidence immediately leads to theoretical abandonment in real history.",
-              },
-            ],
-          }),
-        });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({}) });
+  it("calls the correct copilot API endpoint for the active project and phase", async () => {
+    mockAuthedFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        response: "Your argument in Section 3 requires stronger empirical grounding.",
+      }),
     });
 
-    render(
-      <AssignmentProvider
-        projectId="proj-tutor-test"
-        initialStage="draft"
-        onStageChangeCallback={vi.fn()}
-      >
-        <AssignmentAiTutorPanel />
-      </AssignmentProvider>
+    const result = await sendAssignmentCopilotMessage(
+      "test-proj-123",
+      "drafting" as AssignmentPhaseId,
+      "How can I improve Section 3?",
+      [],
+      mockState as AssignmentProjectState
     );
 
-    const input = await screen.findByPlaceholderText(/Ask your Socratic Tutor/i);
-    fireEvent.change(input, { target: { value: "How do I critique Popper?" } });
-    const askBtn = screen.getByRole("button", { name: /^Ask$/i });
-    await waitFor(() => expect(askBtn).not.toBeDisabled());
-    fireEvent.click(askBtn);
-
-    expect(await screen.findByText(/To deepen your critique of Popper/i)).toBeInTheDocument();
-    expect(screen.getByText(/Socratic Probes to Deepen Your Thinking/i)).toBeInTheDocument();
-    expect(screen.getByText(/PROBE ASSUMPTIONS/i)).toBeInTheDocument();
-    expect(screen.getByText(/Does Popper's falsificationism account for the tenacity/i)).toBeInTheDocument();
+    expect(mockAuthedFetch).toHaveBeenCalledOnce();
+    const [url] = mockAuthedFetch.mock.calls[0];
+    expect(url).toContain("/api/projects/test-proj-123/assignment/copilot-chat");
+    expect(result.ok).toBe(true);
+    expect(result.response).toBe("Your argument in Section 3 requires stronger empirical grounding.");
   });
 
-  it("triggers live rubric grade audit and displays detailed criteria scores and roadmap", async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
-      if (url.includes("/estimate-rubric")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
-            overallScore: 74,
-            overallBand: "1st_class",
-            bandLabel: "First Class (1st) — 74%",
-            summary: "Strong critical synthesis with grounded literature engagement.",
-            criteria: [
-              {
-                id: "crit-1",
-                criterion: "Critical Argumentation & Thesis Depth",
-                currentBand: "1st_class",
-                score: 75,
-                maxScore: 100,
-                critique: "Excellent synthesis of competing paradigms.",
-                howToReachNextBand: "Include Lakatos's research programmes to deepen demarcation critique.",
-              },
-            ],
-            keyStrengths: ["Clear thesis", "Grounded citations"],
-            keyRecommendations: ["Synthesize edge cases"],
-            targetBandRoadmap: {
-              targetBand: "High First Class (80%+)",
-              actionableSteps: [
-                "Incorporate Lakatosian methodology",
-                "Tighten analytical paragraph transitions",
-              ],
-            },
-          }),
-        });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({}) });
+  it("sends phase context and message history in the request body", async () => {
+    mockAuthedFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ response: "Acknowledged." }),
     });
 
-    render(
-      <AssignmentProvider
-        projectId="proj-tutor-test"
-        initialStage="draft"
-        onStageChangeCallback={vi.fn()}
-      >
-        <AssignmentAiTutorPanel />
-      </AssignmentProvider>
+    const history = [
+      { role: "user" as const, content: "What is the rubric?" },
+      { role: "assistant" as const, content: "The rubric emphasizes critical thinking." },
+    ];
+
+    await sendAssignmentCopilotMessage(
+      "test-proj-123",
+      "submission" as AssignmentPhaseId,
+      "Is my citation list complete?",
+      history,
+      mockState as AssignmentProjectState
     );
 
-    // Switch to Rubric mode
-    const rubricTab = await screen.findByRole("button", { name: /Rubric/i });
-    fireEvent.click(rubricTab);
+    const [, , body] = mockAuthedFetch.mock.calls[0];
+    expect(body.phase).toBe("submission");
+    expect(body.message).toBe("Is my citation list complete?");
+    expect(body.history).toHaveLength(2);
+  });
 
-    // Wait for Estimate Grade button to be enabled (word count >= 50 loaded)
-    const estimateBtn = await screen.findByRole("button", { name: /Estimate Grade/i });
-    await waitFor(() => expect(estimateBtn).not.toBeDisabled());
-    fireEvent.click(estimateBtn);
+  it("returns ok:false with an error message when the API returns a non-OK status", async () => {
+    mockAuthedFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: "Internal server error" }),
+    });
 
-    expect(await screen.findByText(/Critical Argumentation & Thesis Depth/i)).toBeInTheDocument();
-    expect(screen.getByText(/75 \/ 100/i)).toBeInTheDocument();
-    expect(screen.getByText(/Roadmap to High First Class \(80%\+\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Incorporate Lakatosian methodology/i)).toBeInTheDocument();
+    const result = await sendAssignmentCopilotMessage(
+      "test-proj-123",
+      "sources" as AssignmentPhaseId,
+      "Which sources should I prioritise?",
+      [],
+      mockState as AssignmentProjectState
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBeTruthy();
+  });
+
+  it("returns ok:false with an error message when the API call throws a network error", async () => {
+    mockAuthedFetch.mockRejectedValueOnce(new Error("Network error"));
+
+    const result = await sendAssignmentCopilotMessage(
+      "test-proj-123",
+      "understand" as AssignmentPhaseId,
+      "Help me understand the rubric.",
+      [],
+      mockState as AssignmentProjectState
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("Network error");
+  });
+
+  it("includes persona metadata in a successful response when provided by the server", async () => {
+    mockAuthedFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        response: "Here are the key citation issues.",
+        persona: { name: "Examiner", role: "Submission Review Specialist" },
+      }),
+    });
+
+    const result = await sendAssignmentCopilotMessage(
+      "test-proj-123",
+      "submission" as AssignmentPhaseId,
+      "Check my citations.",
+      [],
+      mockState as AssignmentProjectState
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.persona?.name).toBe("Examiner");
+    expect(result.persona?.role).toContain("Submission");
   });
 });
