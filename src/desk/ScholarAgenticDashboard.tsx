@@ -142,7 +142,7 @@ export default function ScholarAgenticDashboard() {
         reply = "Knowledge Vault is our zero-document retention repository. It indexes your Google Drive and Microsoft OneDrive metadata without storing copyrighted full texts on our servers. Sources are cryptographically linked to your project workbenches.";
         actions = [{ label: "Browse Knowledge Vault", action: "vault" }];
       } else if (q.includes("create") || q.includes("project") || q.includes("workspace")) {
-        reply = "You can boot 4 specialized academic workspaces: 📝 Assignment (8 phases), 📄 Journal Article (25 stages), 💡 Research Proposal (Grant pipeline), or 📊 Academic Presentation (Slide studio). Each is tailored to peer-review standards.";
+        reply = "You can boot 4 specialized academic workspaces: 📝 Assignment (4 phases: Understand, Sources, Drafting, Submission), 📄 Journal Article (25 stages), 💡 Research Proposal (Grant pipeline), or 📊 Academic Presentation (Slide studio). Each is tailored to peer-review standards.";
         actions = [{ label: "View Academic Templates", action: "templates" }];
       } else if (q.includes("evidence") || q.includes("claim") || q.includes("graph")) {
         reply = "The Evidence Extraction phase parses empirical findings from your approved literature sources into an atomic Claim-Evidence Graph. Every sentence in your generated draft must be backed by a verified citation ledger.";

@@ -151,7 +151,7 @@ const FORMAT_FAMILIES = [
     id: "short_form",
     label: "Assignment",
     icon: "OT-01",
-    desc: "Dedicated 8-phase thinking, evidence board & grounded drafting workspace.",
+    desc: "Dedicated 4-phase brief intake, scholarly sourcing, grounded drafting & submission audit workspace.",
     formats: [
       {
         id: "OT-01",
