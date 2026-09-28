@@ -32,6 +32,478 @@ export interface DecomposeWordBudgetOptions {
   academicLevel?: string;
 }
 
+export interface ThematicSectionTemplate {
+  title: string;
+  academicFunction: string;
+  guidance: string;
+  keyPoints: string[];
+}
+
+export interface ThematicDecomposition {
+  intro: ThematicSectionTemplate;
+  body: ThematicSectionTemplate[];
+  conclusion: ThematicSectionTemplate;
+}
+
+/**
+ * Strips university / administrative metadata from assignment prompt
+ * e.g. "DEPARTMENT OF COMPUTER SCIENCE & QUANTUM INFORMATION SYSTEMS Advanced Assessment: Core Branches of Quantum Computing Honours..."
+ * -> "Core Branches of Quantum Computing"
+ */
+export function extractCoreTopic(rawTopic?: string): string {
+  if (!rawTopic) return "Academic Assignment";
+  let t = rawTopic.trim();
+  t = t.replace(/^(?:DEPARTMENT|FACULTY|SCHOOL|MODULE|COURSE)\s+OF\s+[^:\n]+[:\-\s]*/i, "");
+  t = t.replace(/^(?:ADVANCED\s+ASSESSMENT|FINAL\s+EXAM|ASSESSMENT\s+BRIEF|ESSAY\s+PROMPT|COURSEWORK)[:\-\s]*/i, "");
+  t = t.replace(/\b(?:Honours|Postgraduate|Undergraduate|Master's|PhD)\b.*$/i, "");
+  t = t.replace(/\bWord\s*Count:?.*$/i, "");
+  t = t.replace(/\bTarget:?.*$/i, "");
+  t = t.replace(/\bDetected\s*Rules:?.*$/i, "");
+  t = t.replace(/[\r\n\t]+/g, " ").trim();
+  return t || "Academic Assignment";
+}
+
+/**
+ * Generates tailored section templates tuned specifically to the assignment question & approved literature
+ */
+export function getThematicDecompositionForTopic(
+  rawTopic?: string,
+  approvedSources: any[] = [],
+  bodyCount = 3
+): ThematicDecomposition {
+  const fullTopic = (rawTopic || "").trim();
+  const cleanTopic = extractCoreTopic(fullTopic);
+  const lower = (fullTopic + " " + cleanTopic).toLowerCase();
+
+  // 1. Quantum Computing & Information Systems
+  const isQuantum =
+    lower.includes("quantum") ||
+    lower.includes("qubit") ||
+    lower.includes("superconducting") ||
+    lower.includes("trapped-ion") ||
+    lower.includes("transmon") ||
+    lower.includes("surface code") ||
+    lower.includes("post-quantum") ||
+    lower.includes("qec");
+
+  if (isQuantum) {
+    const quantumBody: ThematicSectionTemplate[] = [
+      {
+        title: "Theme 1: Physical Qubit Modalities & Decoherence Constraints (Superconducting vs Trapped-Ion)",
+        academicFunction: "Hardware Realisations & NISQ Constraints",
+        guidance:
+          "Critically contrast superconducting transmon qubits and trapped-ion architectures, examining T1/T2 relaxation, gate fidelities, cryogenic routing bottlenecks, and zero-noise extrapolation (ZNE).",
+        keyPoints: [
+          "Superconducting transmons vs Trapped-Ions",
+          "Relaxation & dephasing (T1/T2)",
+          "Cryogenic interconnect bottlenecks",
+          "NISQ error mitigation (ZNE/PEC)",
+        ],
+      },
+      {
+        title: "Theme 2: Quantum Algorithmic Complexity, BQP Advantages & Circuit Scaling",
+        academicFunction: "Complexity Classes & Algorithmic Mechanics",
+        guidance:
+          "Analyze quantum complexity classes (BQP vs BPP and NP), the Extended Church-Turing thesis, and algorithmic speedups in Shor's factoring and Grover's search algorithms.",
+        keyPoints: [
+          "BQP complexity class",
+          "Extended Church-Turing thesis",
+          "Shor's quantum Fourier transform",
+          "Grover's amplitude amplification",
+        ],
+      },
+      {
+        title: "Theme 3: Fault Tolerance, Surface Code Thresholds & Post-Quantum Cryptographic Migration",
+        academicFunction: "Surface Codes & Fault Tolerance",
+        guidance:
+          "Evaluate 2D planar surface code architectures, minimum-weight perfect matching (MWPM) syndrome decoding, fault-tolerance thresholds, magic state distillation, and post-quantum cryptographic standards (NIST FIPS 203 ML-KEM).",
+        keyPoints: [
+          "2D planar surface codes & MWPM",
+          "Fault-tolerance threshold theorem",
+          "Magic state distillation (15-to-1)",
+          "NIST PQC standards (ML-KEM)",
+        ],
+      },
+    ];
+
+    if (bodyCount >= 4) {
+      quantumBody.push({
+        title: "Theme 4: Quantum Cryptography, Decoy-State QKD & Post-Quantum Migration Standards",
+        academicFunction: "Quantum Cryptography & PQC Standards",
+        guidance:
+          "Analyze BB84 photon-number-splitting vulnerabilities, decoy-state QKD protocols, and lattice-based post-quantum cryptography migration across enterprise infrastructure.",
+        keyPoints: [
+          "BB84 protocol & PNS attacks",
+          "Decoy-state QKD",
+          "NIST PQC standards",
+          "Lattice-based ML-KEM",
+        ],
+      });
+    }
+
+    if (bodyCount >= 5) {
+      quantumBody.push({
+        title: "Theme 5: Industrial Implementation, Quantum Advantage & Commercial Viability",
+        academicFunction: "Industrial Scalability & Commercial Roadmap",
+        guidance:
+          "Evaluate commercial deployment hurdles, dilution refrigeration requirements, quantum cloud infrastructure, and quantum advantage timelines across chemistry and optimization.",
+        keyPoints: [
+          "Quantum cloud architectures",
+          "Cryogenic scaling limits",
+          "Quantum chemistry simulation",
+          "Commercial horizon timelines",
+        ],
+      });
+    }
+
+    return {
+      intro: {
+        title: "Introduction: Foundations of Quantum Information Systems & Physical Architectures",
+        academicFunction: "Introduction & Foundational Architecture Framework",
+        guidance:
+          "Introduce quantum information principles, delineate DiVincenzo criteria for physical realization, and state thesis evaluating scalability vs decoherence.",
+        keyPoints: [
+          "DiVincenzo criteria",
+          "Physical qubit realizations",
+          "Decoherence and fidelity metrics",
+          "Central argumentative thesis",
+        ],
+      },
+      body: quantumBody.slice(0, bodyCount),
+      conclusion: {
+        title: "Conclusion: Strategic Synthesis & Physical Scalability Horizons in Quantum Computing",
+        academicFunction: "Conclusion & Strategic Synthesis",
+        guidance:
+          "Synthesize physical modality trade-offs, summarize algorithmic advantage benchmarks, and articulate the transitional trajectory from NISQ devices to fault-tolerant computation.",
+        keyPoints: [
+          "Modality trade-offs synthesis",
+          "Complexity horizon",
+          "NISQ to fault-tolerant transition",
+          "Strategic roadmap",
+        ],
+      },
+    };
+  }
+
+  // 2. AI Ethics, Algorithmic Governance & Computer Science Systems
+  const isAiOrAlgo =
+    lower.includes("algorithm") ||
+    lower.includes("machine learning") ||
+    lower.includes("artificial intelligence") ||
+    lower.includes("deep learning") ||
+    lower.includes("neural network") ||
+    lower.includes("ai ethics") ||
+    lower.includes("ai governance") ||
+    lower.includes("automated decision") ||
+    lower.includes("socio-technical") ||
+    lower.includes("predictive accountability");
+
+  if (isAiOrAlgo) {
+    const aiBody: ThematicSectionTemplate[] = [
+      {
+        title: "Theme 1: Machine Learning Foundations: Fairness Metrics & Model Architecture Biases",
+        academicFunction: "Algorithmic Foundations & Mathematical Parity",
+        guidance:
+          "Formulate mathematical and philosophical conceptions of fairness, disparate impact, optimization loss functions, and dataset curation biases.",
+        keyPoints: [
+          "Demographic parity vs equalized odds",
+          "Proxy variable entanglement",
+          "Loss function trade-offs",
+          "Epistemic limits",
+        ],
+      },
+      {
+        title: "Theme 2: Empirical Case Evidence: High-Stakes Socio-Technical Deployment",
+        academicFunction: "Empirical Case Analysis & Contextual Harms",
+        guidance:
+          "Evaluate empirical studies in clinical diagnostics, predictive judicial profiling, and credit underwriting, testing model performance against real-world harm.",
+        keyPoints: [
+          "Clinical diagnostic disparities",
+          "Predictive judicial scoring",
+          "Automated welfare eligibility",
+          "Feedback loops",
+        ],
+      },
+      {
+        title: "Theme 3: Regulatory Governance: Auditability, Strict Liability & Innovation Trade-offs",
+        academicFunction: "Critical Regulatory & Governance Evaluation",
+        guidance:
+          "Critically evaluate strict liability vs negligence, third-party algorithmic auditing, model explainability trade-offs, and compliance burdens.",
+        keyPoints: [
+          "Independent algorithmic audits",
+          "Strict liability vs negligence",
+          "Explainability vs accuracy trade-offs",
+          "Regulatory friction",
+        ],
+      },
+      {
+        title: "Theme 4: Institutional Safeguards, Human-in-the-Loop & Procedural Due Process",
+        academicFunction: "Institutional Safeguards & Procedural Rights",
+        guidance:
+          "Analyze procedural due process rights, human oversight efficacy, contestability mechanisms, and institutional governance architectures.",
+        keyPoints: [
+          "Human-in-the-loop limits",
+          "Contestability & appeal mechanisms",
+          "Procedural due process",
+          "Institutional oversight",
+        ],
+      },
+    ];
+
+    return {
+      intro: {
+        title: "Introduction: Algorithmic Governance, Opacity & Epistemic Accountability",
+        academicFunction: "Introduction & Epistemic Problem Statement",
+        guidance:
+          "Contextualize automated decision systems in socio-technical governance, define black-box epistemic opacity, and advance a thesis on institutional accountability.",
+        keyPoints: [
+          "Algorithmic opacity",
+          "Socio-technical decision systems",
+          "Procedural accountability",
+          "Central thesis statement",
+        ],
+      },
+      body: aiBody.slice(0, bodyCount),
+      conclusion: {
+        title: "Conclusion: Policy Synthesis & Future Frameworks for Trustworthy AI Systems",
+        academicFunction: "Conclusion & Strategic Synthesis",
+        guidance:
+          "Synthesize socio-technical evidence, resolve tensions between innovation and civic protection, and propose actionable governance mechanisms.",
+        keyPoints: [
+          "Synthesis of technical & legal evidence",
+          "Human-in-the-loop governance",
+          "Institutional auditing standards",
+          "Future research horizons",
+        ],
+      },
+    };
+  }
+
+  // 3. International Relations / Geopolitics / Security
+  const isIR =
+    lower.includes("china") ||
+    lower.includes("chinese") ||
+    lower.includes("foreign policy") ||
+    lower.includes("geopolitic") ||
+    lower.includes("international relations") ||
+    lower.includes("hegemon") ||
+    lower.includes("power transition") ||
+    lower.includes("security dilemma") ||
+    lower.includes("multilateral") ||
+    lower.includes("sovereignty");
+
+  if (isIR) {
+    const irBody: ThematicSectionTemplate[] = [
+      {
+        title: "Theme 1: Structural Realism, Hegemonic Rivalry & Security Dilemma Dynamics",
+        academicFunction: "Structural Framework & Balance of Power",
+        guidance:
+          "Interrogate offensive vs defensive realist assumptions, balance of power mechanics, and regional security dilemma escalations.",
+        keyPoints: [
+          "Offensive vs defensive realism",
+          "Security dilemma dynamics",
+          "Regional power balancing",
+          "Strategic intent",
+        ],
+      },
+      {
+        title: "Theme 2: Geo-Economic Statecraft, Trade Networks & Institutional Revisionism",
+        academicFunction: "Geo-Economic Leverage & Institutional Evidence",
+        guidance:
+          "Synthesize empirical evidence on infrastructure investments, multilateral banking initiatives, trade weaponization, and bilateral dependencies.",
+        keyPoints: [
+          "Geo-economic leverage",
+          "Institutional statecraft",
+          "Supply chain dependencies",
+          "Empirical indicators",
+        ],
+      },
+      {
+        title: "Theme 3: Multilateral Friction, Alliance Counter-Balancing & Deterrence Dilemmas",
+        academicFunction: "Critical Evaluation & Dialectical Tension",
+        guidance:
+          "Critically evaluate counter-containment coalitions, minilateral partnerships, sovereignty conflicts, and crisis escalation risks.",
+        keyPoints: [
+          "Minilateralism vs multilateralism",
+          "Deterrence credibility",
+          "Sovereignty contestation",
+          "Counter-coalitions",
+        ],
+      },
+      {
+        title: "Theme 4: Global Institutional Governance, Sanctions & Strategic Autonomy",
+        academicFunction: "Global Governance & Strategic Autonomy",
+        guidance:
+          "Analyze international institutional compliance, sovereign sanctions resistance, diplomatic coalitions, and the fragmentation of global governance.",
+        keyPoints: [
+          "Institutional fragmentation",
+          "Sanctions resistance",
+          "Diplomatic alignment",
+          "Normative contestation",
+        ],
+      },
+    ];
+
+    return {
+      intro: {
+        title: "Introduction: Hegemonic Transitions & the Contemporary International Order",
+        academicFunction: "Introduction & Structural Problem Statement",
+        guidance:
+          "Introduce the systemic debate on the evolving global order, delineate theoretical frameworks of power transition, and articulate a clear thesis on institutional resilience.",
+        keyPoints: [
+          "Systemic power distribution",
+          "Power transition theory",
+          "Liberal international order",
+          "Central thesis statement",
+        ],
+      },
+      body: irBody.slice(0, bodyCount),
+      conclusion: {
+        title: "Conclusion: Strategic Synthesis & Long-Term Geopolitical Trajectories",
+        academicFunction: "Conclusion & Geopolitical Synthesis",
+        guidance:
+          "Synthesize empirical findings against systemic theories, restate the thesis, and articulate strategic implications for future multilateral stability.",
+        keyPoints: [
+          "Synthesis of structural arguments",
+          "Empirical reconciliation",
+          "Future order scenarios",
+          "Policy roadmap",
+        ],
+      },
+    };
+  }
+
+  // 4. Universal Question-Tuned Dynamic Construction
+  const words = cleanTopic.split(/\s+/).filter(Boolean);
+  const topicShort = words.length > 5 ? words.slice(0, 5).join(" ") + "..." : cleanTopic;
+
+  const defaultBody: ThematicSectionTemplate[] = [
+    {
+      title: `Theme 1: Foundational Theoretical Framework & Conceptual Paradigms in ${topicShort}`,
+      academicFunction: "Core Concept & Foundational Framework",
+      guidance: `Define primary terminology, articulate underlying theoretical assumptions, and establish the analytical lens for ${cleanTopic}.`,
+      keyPoints: ["Foundational definitions", "Theoretical framework", "Conceptual boundaries"],
+    },
+    {
+      title: `Theme 2: Empirical Evidence, Case Studies & Applied Analysis in ${topicShort}`,
+      academicFunction: "Empirical Evidence & Contemporary Context",
+      guidance: `Synthesize concrete empirical findings, comparative case studies, and observational data evaluating ${cleanTopic}.`,
+      keyPoints: ["Empirical findings", "Case analysis", "Comparative evaluation"],
+    },
+    {
+      title: `Theme 3: Critical Evaluation, Dialectical Trade-offs & Counter-Perspectives in ${topicShort}`,
+      academicFunction: "Critical Evaluation, Trade-offs & Counter-Perspectives",
+      guidance: `Critically evaluate competing schools of thought, examine methodological limitations, and address dissenting perspectives regarding ${cleanTopic}.`,
+      keyPoints: ["Counter-arguments", "Methodological critique", "Dialectical synthesis"],
+    },
+    {
+      title: `Theme 4: Institutional Governance, Policy Implications & Strategic Implementation`,
+      academicFunction: "Policy Implications & Strategic Implementation",
+      guidance: `Analyze institutional consequences, feasibility constraints, and pragmatic implementation barriers in ${cleanTopic}.`,
+      keyPoints: ["Institutional governance", "Feasibility constraints", "Pragmatic implications"],
+    },
+    {
+      title: `Theme 5: Long-Term Trajectories, Unresolved Limits & Systemic Horizons`,
+      academicFunction: "Synthesis, Long-Term Impact & Methodological Limits",
+      guidance: `Synthesize overarching systemic implications, unaddressed research gaps, and future trajectories for ${cleanTopic}.`,
+      keyPoints: ["Systemic synthesis", "Unresolved tensions", "Future horizons"],
+    },
+  ];
+
+  return {
+    intro: {
+      title: `Introduction: Contextual Scope & Problem Statement in ${topicShort}`,
+      academicFunction: "Introduction & Problem Statement",
+      guidance: `Introduce the scholarly debate on '${cleanTopic}', delineate scope boundaries, and advance a clear, argumentative thesis statement.`,
+      keyPoints: ["Contextual background", "Problem statement", "Central thesis statement", "Roadmap of paper"],
+    },
+    body: defaultBody.slice(0, bodyCount),
+    conclusion: {
+      title: `Conclusion: Strategic Synthesis & Future Horizons in ${topicShort}`,
+      academicFunction: "Conclusion & Strategic Synthesis",
+      guidance: `Synthesize core findings without introducing new evidence, restate the substantiated thesis, and articulate broader academic or policy implications for ${cleanTopic}.`,
+      keyPoints: ["Restatement of thesis", "Synthesis of main arguments", "Broader implications", "Closing judgment"],
+    },
+  };
+}
+
+export interface TuneSectionsOptions {
+  existingSections?: (AssignmentDraftingSection | InternalSectionPlan)[];
+  sections?: (AssignmentDraftingSection | InternalSectionPlan)[];
+  assignmentTopic: string;
+  approvedSources?: DiscoveredSource[] | string[];
+  targetWordCount?: number;
+  academicLevel?: string;
+}
+
+/**
+ * Re-tunes existing sections to match the assignment question & literature,
+ * while preserving all existing drafted content and status.
+ */
+export function tuneSectionsToQuestion(options: TuneSectionsOptions): InternalSectionPlan[] {
+  const existingSections = options.existingSections || options.sections || [];
+  const { assignmentTopic, approvedSources = [] } = options;
+  if (!existingSections || existingSections.length === 0) {
+    return decomposeWordBudget({
+      targetWordCount: options.targetWordCount || 2000,
+      assignmentTopic,
+      approvedSourceIds: Array.isArray(approvedSources)
+        ? approvedSources.map((s) => (typeof s === "string" ? s : s.id))
+        : [],
+    });
+  }
+
+  const bodySections = existingSections.filter(
+    (s) => s.sectionType === "body" || (!s.id.includes("intro") && !s.id.includes("conclusion"))
+  );
+  const bodyCount = Math.max(1, bodySections.length || 3);
+  const decomposition = getThematicDecompositionForTopic(assignmentTopic, approvedSources, bodyCount);
+
+  let bodyIdx = 0;
+  return existingSections.map((sec) => {
+    const isIntro = sec.sectionType === "intro" || sec.id.includes("intro");
+    const isConclusion = sec.sectionType === "conclusion" || sec.id.includes("conclusion");
+
+    if (isIntro) {
+      return {
+        ...sec,
+        sectionType: "intro" as const,
+        title: decomposition.intro.title,
+        academicFunction: decomposition.intro.academicFunction,
+        guidance: decomposition.intro.guidance,
+        keyPoints: decomposition.intro.keyPoints,
+        boundSourceIds: sec.boundSourceIds || [],
+      };
+    }
+
+    if (isConclusion) {
+      return {
+        ...sec,
+        sectionType: "conclusion" as const,
+        title: decomposition.conclusion.title,
+        academicFunction: decomposition.conclusion.academicFunction,
+        guidance: decomposition.conclusion.guidance,
+        keyPoints: decomposition.conclusion.keyPoints,
+        boundSourceIds: sec.boundSourceIds || [],
+      };
+    }
+
+    // Body section
+    const theme = decomposition.body[bodyIdx % decomposition.body.length];
+    bodyIdx++;
+
+    return {
+      ...sec,
+      sectionType: "body" as const,
+      title: theme.title,
+      academicFunction: theme.academicFunction,
+      guidance: theme.guidance,
+      keyPoints: theme.keyPoints,
+      boundSourceIds: sec.boundSourceIds || [],
+    };
+  });
+}
+
 /**
  * Step 1: Invisible Body Word Count Decomposition Formula (Section 3.1)
  * Evaluates W_body and dynamically determines the optimal thematic sub-section breakdown.
@@ -46,12 +518,13 @@ export function decomposeWordBudget(options: DecomposeWordBudgetOptions): Intern
 
   const total = Math.max(200, targetWordCount);
 
-  const isQuantumExam =
+  // Discrete Exam Mode: Only when explicitly requested with 0 intro words and explicit question parts
+  const isStrictExamParts =
+    wordBudget?.intro === 0 &&
     /quantum/i.test(assignmentTopic) &&
-    (/part\s*1|question\s*1|qnt-4020|branches of quantum computing/i.test(assignmentTopic) ||
-      assignmentTopic.toLowerCase().includes("assessment"));
+    /part\s*1|question\s*1|qnt-4020/i.test(assignmentTopic);
 
-  if (isQuantumExam) {
+  if (isStrictExamParts) {
     const partWords = Math.round(total / 4);
     return [
       {
@@ -130,70 +603,38 @@ export function decomposeWordBudget(options: DecomposeWordBudgetOptions): Intern
   const baseWordsPerSubTheme = Math.floor(bodyWords / bodySubThemeCount);
   const remainder = bodyWords - baseWordsPerSubTheme * bodySubThemeCount;
 
-  // Thematic academic functions for body sections
-  const academicFunctions = [
-    {
-      title: "Core Concept & Foundational Theoretical Framework",
-      academicFunction: "Core Concept & Foundational Framework",
-      guidance:
-        "Define primary terminology, articulate underlying philosophical/theoretical assumptions, and establish the analytical lens.",
-      keyPoints: ["Foundational definitions", "Theoretical framework", "Conceptual boundaries"],
-    },
-    {
-      title: "Empirical Evidence & Contemporary Contextual Analysis",
-      academicFunction: "Empirical Evidence & Contemporary Context",
-      guidance:
-        "Synthesize empirical findings, comparative case studies, and concrete data to test theoretical assumptions against real-world practice.",
-      keyPoints: ["Empirical findings", "Case analysis", "Comparative evaluation"],
-    },
-    {
-      title: "Critical Evaluation, Trade-offs & Counter-Perspectives",
-      academicFunction: "Critical Evaluation, Trade-offs & Counter-Perspectives",
-      guidance:
-        "Critically evaluate competing schools of thought, examine methodological limitations, address dissenting views, and resolve dialectical tensions.",
-      keyPoints: ["Counter-arguments", "Methodological critique", "Dialectical synthesis"],
-    },
-    {
-      title: "Policy Implications & Strategic Implementation",
-      academicFunction: "Policy Implications & Strategic Implementation",
-      guidance:
-        "Analyze institutional consequences, governance mechanisms, feasibility constraints, and pragmatic implementation barriers.",
-      keyPoints: ["Institutional governance", "Feasibility constraints", "Pragmatic implications"],
-    },
-    {
-      title: "Long-Term Horizons, Methodological Limits & Systemic Synthesis",
-      academicFunction: "Synthesis, Long-Term Impact & Methodological Limits",
-      guidance:
-        "Synthesize overarching systemic implications, unaddressed questions, and future research trajectories.",
-      keyPoints: ["Systemic synthesis", "Unresolved tensions", "Future horizons"],
-    },
-  ];
+  // Retrieve intelligent question-tuned thematic decomposition
+  const thematicDecomp = getThematicDecompositionForTopic(
+    assignmentTopic,
+    approvedSourceIds,
+    bodySubThemeCount
+  );
 
   const sections: InternalSectionPlan[] = [];
 
   // 1. Introduction Section (~10%)
   sections.push({
     id: "sec-intro",
-    title: "Introduction & Contextual Thesis",
+    title: thematicDecomp.intro.title,
     sectionType: "intro",
-    academicFunction: "Introduction & Problem Statement",
+    academicFunction: thematicDecomp.intro.academicFunction,
     targetWordCount: introWords,
     currentWordCount: 0,
-    guidance: `Introduce the scholarly debate on '${assignmentTopic}', delineate scope boundaries, and advance a clear, argumentative thesis statement.`,
+    guidance: thematicDecomp.intro.guidance,
     draftContent: "",
     status: "pending",
     boundSourceIds: approvedSourceIds.slice(0, 1),
-    keyPoints: ["Contextual background", "Problem statement", "Central thesis statement", "Roadmap of paper"],
+    keyPoints: thematicDecomp.intro.keyPoints,
   });
 
   // 2. Thematic Body Sections
   for (let i = 0; i < bodySubThemeCount; i++) {
-    const fn = academicFunctions[i % academicFunctions.length];
+    const fn = thematicDecomp.body[i % thematicDecomp.body.length];
     const allocatedWords = i === bodySubThemeCount - 1 ? baseWordsPerSubTheme + remainder : baseWordsPerSubTheme;
 
     sections.push({
       id: `sec-body-${i + 1}`,
-      title: `Body Theme ${i + 1}: ${fn.title}`,
+      title: fn.title,
       sectionType: "body",
       academicFunction: fn.academicFunction,
       targetWordCount: allocatedWords,
@@ -209,17 +650,16 @@ export function decomposeWordBudget(options: DecomposeWordBudgetOptions): Intern
   // 3. Conclusion Section (~10-15%)
   sections.push({
     id: "sec-conclusion",
-    title: "Conclusion & Strategic Synthesis",
+    title: thematicDecomp.conclusion.title,
     sectionType: "conclusion",
-    academicFunction: "Conclusion & Strategic Synthesis",
+    academicFunction: thematicDecomp.conclusion.academicFunction,
     targetWordCount: conclusionWords,
     currentWordCount: 0,
-    guidance:
-      "Synthesize core findings without introducing new evidence, restate the substantiated thesis, and articulate broader academic or policy implications.",
+    guidance: thematicDecomp.conclusion.guidance,
     draftContent: "",
     status: "pending",
     boundSourceIds: approvedSourceIds.slice(-2),
-    keyPoints: ["Restatement of thesis", "Synthesis of main arguments", "Broader implications", "Closing judgment"],
+    keyPoints: thematicDecomp.conclusion.keyPoints,
   });
 
   // Automatically bind approved sources across the generated body sections

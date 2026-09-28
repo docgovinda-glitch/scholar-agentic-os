@@ -48,7 +48,11 @@ import {
   normalizeAssignmentPhase,
   AssignmentDraftingSection,
 } from "../types";
-import { decomposeWordBudget, type InternalSectionPlan } from "../services/invisibleChunkerService";
+import {
+  decomposeWordBudget,
+  tuneSectionsToQuestion,
+  type InternalSectionPlan,
+} from "../services/invisibleChunkerService";
 import { auditCitations, evaluateRubricCompliance } from "../services/submissionAuditService";
 
 export interface AssignmentContextValue {
@@ -133,6 +137,8 @@ export interface AssignmentContextValue {
   activeSectionId: string | null;
   setActiveSectionId: (id: string | null) => void;
   updateSectionContent: (sectionId: string, content: string) => Promise<void>;
+  updateSectionTitle: (sectionId: string, newTitle: string) => Promise<void>;
+  tuneOutlineWithQuestion: () => Promise<AssignmentDraftingSection[]>;
   setGeneratingSection: (sectionId: string, isGenerating: boolean) => void;
   generatingSectionIds: Record<string, boolean>;
   initializeDraftingPlan: () => AssignmentDraftingSection[];
@@ -981,6 +987,7 @@ export function AssignmentProvider({
   );
 
   const initializeDraftingPlan = useCallback((): AssignmentDraftingSection[] => {
+    const topicToUse = question || project?.title || "Academic Essay";
     const generated = decomposeWordBudget({
       targetWordCount,
       wordBudget: {
@@ -989,7 +996,7 @@ export function AssignmentProvider({
         conclusion: sections?.conclusion?.targetWords ?? Math.round(targetWordCount * 0.15),
       },
       approvedSourceIds,
-      assignmentTopic: question || "Academic Essay",
+      assignmentTopic: topicToUse,
       academicLevel,
     });
 
@@ -1002,7 +1009,7 @@ export function AssignmentProvider({
       setActiveSectionId((prev) => prev || generated[0].id);
     }
     return generated;
-  }, [targetWordCount, sections, approvedSourceIds, question, academicLevel, saveAnswers]);
+  }, [targetWordCount, sections, approvedSourceIds, question, project?.title, academicLevel, saveAnswers]);
 
   const updateSectionContent = useCallback(
     async (sectionId: string, content: string) => {
@@ -1026,6 +1033,39 @@ export function AssignmentProvider({
     },
     [internalSections, outline, saveAnswers]
   );
+
+  const updateSectionTitle = useCallback(
+    async (sectionId: string, newTitle: string) => {
+      const baseSections = internalSections.length > 0 ? internalSections : outline;
+      const updated = baseSections.map((s) =>
+        s.id === sectionId ? { ...s, title: newTitle } : s
+      );
+
+      await saveAnswers({
+        assignment_internal_sections: updated,
+        assignment_outline: updated,
+      });
+    },
+    [internalSections, outline, saveAnswers]
+  );
+
+  const tuneOutlineWithQuestion = useCallback(async (): Promise<AssignmentDraftingSection[]> => {
+    const topicToUse = question || project?.title || "Academic Assignment";
+    const existing = internalSections.length > 0 ? internalSections : outline;
+    const tuned = tuneSectionsToQuestion({
+      existingSections: existing,
+      assignmentTopic: topicToUse,
+      approvedSources: sources.filter((s) => approvedSourceIds.includes(s.id)),
+      targetWordCount,
+      academicLevel,
+    });
+
+    await saveAnswers({
+      assignment_internal_sections: tuned,
+      assignment_outline: tuned,
+    });
+    return tuned;
+  }, [question, project?.title, internalSections, outline, sources, approvedSourceIds, targetWordCount, academicLevel, saveAnswers]);
 
   const updateSectionDraft = useCallback(
     async (sectionId: string, content: string) => {
@@ -1527,6 +1567,8 @@ export function AssignmentProvider({
         activeSectionId,
         setActiveSectionId,
         updateSectionContent,
+        updateSectionTitle,
+        tuneOutlineWithQuestion,
         setGeneratingSection,
         generatingSectionIds,
         initializeDraftingPlan,

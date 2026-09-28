@@ -42,6 +42,8 @@ export function AssignmentDraftingStage({
     activeSectionId,
     setActiveSectionId,
     updateSectionContent,
+    updateSectionTitle,
+    tuneOutlineWithQuestion,
     setGeneratingSection,
     generatingSectionIds,
     initializeDraftingPlan,
@@ -50,6 +52,7 @@ export function AssignmentDraftingStage({
   const [streamingChunk, setStreamingChunk] = useState<string>("");
   const [activeStreamingSectionId, setActiveStreamingSectionId] = useState<string | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [isTuning, setIsTuning] = useState(false);
 
   // Auto-initialize drafting decomposition plan if empty
   useEffect(() => {
@@ -57,6 +60,30 @@ export function AssignmentDraftingStage({
       initializeDraftingPlan();
     }
   }, [internalSections.length, targetWordCount, initializeDraftingPlan]);
+
+  // Auto-tune generic placeholder titles to question if question is present
+  useEffect(() => {
+    if (internalSections.length > 0 && question && question.trim().length > 0) {
+      const hasGenericTitles = internalSections.some(
+        (s) =>
+          s.title.includes("Core Concept & Foundational") ||
+          s.title.includes("Empirical Evidence & Contemporary Contextual") ||
+          s.title.startsWith("Body Theme 1: Core Concept")
+      );
+      if (hasGenericTitles) {
+        tuneOutlineWithQuestion();
+      }
+    }
+  }, [internalSections, question, tuneOutlineWithQuestion]);
+
+  const handleTuneOutline = useCallback(async () => {
+    setIsTuning(true);
+    try {
+      await tuneOutlineWithQuestion();
+    } finally {
+      setIsTuning(false);
+    }
+  }, [tuneOutlineWithQuestion]);
 
   // Active section entity
   const activeSection = useMemo(() => {
@@ -284,6 +311,10 @@ export function AssignmentDraftingStage({
             onSelectSection={(id) => setActiveSectionId(id)}
             onGenerateNext={handleGenerateNext}
             onGenerateAll={handleGenerateAll}
+            onTuneToQuestion={handleTuneOutline}
+            onUpdateSectionTitle={updateSectionTitle}
+            assignmentTopic={question}
+            isTuning={isTuning}
             isGenerating={Boolean(activeStreamingSectionId) || isGeneratingAll}
             generatingSectionId={activeStreamingSectionId}
           />
@@ -296,6 +327,11 @@ export function AssignmentDraftingStage({
             onUpdateContent={(content) => {
               if (activeSection) {
                 updateSectionContent(activeSection.id, content);
+              }
+            }}
+            onUpdateTitle={(newTitle) => {
+              if (activeSection) {
+                updateSectionTitle(activeSection.id, newTitle);
               }
             }}
             onStreamSection={(revType) => handleStreamSection(activeSection || undefined, revType)}

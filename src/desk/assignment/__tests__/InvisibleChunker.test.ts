@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   decomposeWordBudget,
   bindApprovedSourcesToSections,
+  tuneSectionsToQuestion,
   type InternalSectionPlan,
 } from "../services/invisibleChunkerService";
 
@@ -115,5 +116,59 @@ describe("Invisible Chunker & Decomposition Service", () => {
     bodySections.forEach((sec) => {
       expect(sec.boundSourceIds.length).toBeGreaterThan(0);
     });
+  });
+
+  it("tunes section titles, functions, and guidance to the assignment question (e.g. Quantum Computing)", () => {
+    const rawTopic =
+      "DEPARTMENT OF COMPUTER SCIENCE & QUANTUM INFORMATION SYSTEMS Advanced Assessment: Core Branches of Quantum Computing Honours / Postgraduate";
+    const sections = decomposeWordBudget({
+      targetWordCount: 2000,
+      approvedSourceIds: ["src-1", "src-2", "src-3", "src-4", "src-5"],
+      assignmentTopic: rawTopic,
+    });
+
+    expect(sections[0].title).toMatch(/Quantum/i);
+    const body1 = sections.find((s) => s.id === "sec-body-1");
+    expect(body1?.title).toMatch(/Qubit|Decoherence/i);
+  });
+
+  it("tuneSectionsToQuestion preserves existing drafted prose and word count while tuning titles", () => {
+    const existing: InternalSectionPlan[] = [
+      {
+        id: "sec-intro",
+        title: "Introduction & Contextual Thesis",
+        targetWordCount: 200,
+        currentWordCount: 97,
+        draftContent: "Existing drafted 97 words of introductory prose...",
+        status: "ready" as any,
+        sectionType: "intro",
+        academicFunction: "Introduction",
+        guidance: "Generic intro guidance",
+        boundSourceIds: ["src-1"],
+      },
+      {
+        id: "sec-body-1",
+        title: "Body Theme 1: Core Concept & Foundational Theoretical Framework",
+        targetWordCount: 500,
+        currentWordCount: 0,
+        draftContent: "",
+        status: "pending" as any,
+        sectionType: "body",
+        academicFunction: "Core Concept",
+        guidance: "Generic body guidance",
+        boundSourceIds: ["src-2"],
+      },
+    ];
+
+    const tuned = tuneSectionsToQuestion({
+      sections: existing,
+      assignmentTopic: "Advanced Assessment: Core Branches of Quantum Computing",
+    });
+
+    expect(tuned[0].draftContent).toBe("Existing drafted 97 words of introductory prose...");
+    expect(tuned[0].currentWordCount).toBe(97);
+    expect(tuned[0].title).toMatch(/Quantum/i);
+    expect(tuned[1].title).not.toContain("Core Concept & Foundational");
+    expect(tuned[1].title).toMatch(/Qubit|Modality|Quantum/i);
   });
 });

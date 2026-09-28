@@ -343,4 +343,105 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
       expect(onProceedMock).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("Question-Led Outline Tuning & Inline Title Editing", () => {
+    it("renders tuning banner and button when generic outline titles exist", () => {
+      const onTune = vi.fn();
+      const genericSections: AssignmentDraftingSection[] = [
+        {
+          id: "sec-intro",
+          title: "Introduction & Contextual Thesis",
+          targetWordCount: 200,
+          currentWordCount: 0,
+          draftContent: "",
+          status: "pending",
+          sectionType: "intro",
+          guidance: "Intro",
+        },
+        {
+          id: "sec-body-1",
+          title: "Body Theme 1: Core Concept & Foundational Theoretical Framework",
+          targetWordCount: 500,
+          currentWordCount: 0,
+          draftContent: "",
+          status: "pending",
+          sectionType: "body",
+          guidance: "Body 1",
+        },
+      ];
+
+      render(
+        <DraftingSectionIndex
+          sections={genericSections}
+          activeSectionId="sec-intro"
+          onSelectSection={vi.fn()}
+          onTuneToQuestion={onTune}
+        />
+      );
+
+      expect(screen.getByText("Generic Outline Detected")).toBeInTheDocument();
+      const tuneBtn = screen.getByRole("button", { name: /Tune Outline to Question/i });
+      expect(tuneBtn).toBeInTheDocument();
+
+      fireEvent.click(tuneBtn);
+      expect(onTune).toHaveBeenCalledTimes(1);
+    });
+
+    it("allows inline section title editing in DraftingSectionIndex", () => {
+      const onUpdateTitle = vi.fn();
+      render(
+        <DraftingSectionIndex
+          sections={mockSections}
+          activeSectionId="sec-body-1"
+          onSelectSection={vi.fn()}
+          onUpdateSectionTitle={onUpdateTitle}
+        />
+      );
+
+      // Find the edit button for Body Theme 1
+      const editButtons = screen.getAllByTitle("Edit section title");
+      expect(editButtons.length).toBeGreaterThan(0);
+
+      // Click edit button for the first one
+      fireEvent.click(editButtons[0]);
+
+      // An input field should appear with current title
+      const input = screen.getByDisplayValue("Introduction & Contextual Thesis");
+      expect(input).toBeInTheDocument();
+
+      // Change title and press Save
+      fireEvent.change(input, { target: { value: "Physical Qubit Modalities in Quantum Computing" } });
+      const saveBtn = screen.getByTitle("Save title");
+      fireEvent.click(saveBtn);
+
+      expect(onUpdateTitle).toHaveBeenCalledWith("sec-intro", "Physical Qubit Modalities in Quantum Computing");
+    });
+
+    it("allows inline section title editing in DraftingActiveEditor header", () => {
+      const onUpdateTitle = vi.fn();
+      render(
+        <DraftingActiveEditor
+          section={mockSections[1]}
+          onUpdateContent={vi.fn()}
+          onUpdateTitle={onUpdateTitle}
+        />
+      );
+
+      // Click edit button in the header
+      const editBtn = screen.getByTitle("Edit section title");
+      expect(editBtn).toBeInTheDocument();
+      fireEvent.click(editBtn);
+
+      // Input appears in header
+      const input = screen.getByDisplayValue("Body Theme 1: Core Theoretical Paradigms");
+      expect(input).toBeInTheDocument();
+
+      // Type new title and submit form
+      fireEvent.change(input, { target: { value: "Superconducting Transmon Qubits vs Trapped Ions" } });
+      const saveBtn = screen.getByTitle("Save title");
+      fireEvent.click(saveBtn);
+
+      expect(onUpdateTitle).toHaveBeenCalledWith("Superconducting Transmon Qubits vs Trapped Ions");
+    });
+  });
 });

@@ -17,11 +17,14 @@ import {
   HelpCircle,
   Scissors,
   PlusCircle,
+  Edit2,
+  X,
 } from "lucide-react";
 
 export interface DraftingActiveEditorProps {
   section: AssignmentDraftingSection | null;
   onUpdateContent: (content: string) => void;
+  onUpdateTitle?: (newTitle: string) => void;
   onStreamSection?: (revisionType?: "deepen" | "expand" | "condense") => void;
   isStreaming?: boolean;
   streamingChunk?: string;
@@ -103,6 +106,7 @@ function renderAcademicProseWithCitations(prose: string) {
 export function DraftingActiveEditor({
   section,
   onUpdateContent,
+  onUpdateTitle,
   onStreamSection,
   isStreaming = false,
   streamingChunk = "",
@@ -115,12 +119,16 @@ export function DraftingActiveEditor({
 }: DraftingActiveEditorProps) {
   const [isEditingManually, setIsEditingManually] = useState(false);
   const [manualText, setManualText] = useState(section?.draftContent || "");
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState(section?.title || "");
 
-  // Sync manual text when active section changes
+  // Sync manual text and title when active section changes
   useEffect(() => {
     setManualText(section?.draftContent || "");
     setIsEditingManually(false);
-  }, [section?.id, section?.draftContent]);
+    setTitleInput(section?.title || "");
+    setIsEditingTitle(false);
+  }, [section?.id, section?.draftContent, section?.title]);
 
   if (!section) {
     return (
@@ -190,9 +198,63 @@ export function DraftingActiveEditor({
             )}
           </div>
 
-          <h2 className="text-base sm:text-lg font-semibold tracking-tight text-neutral-900 dark:text-white truncate">
-            {section.title}
-          </h2>
+          {isEditingTitle ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (titleInput.trim()) {
+                  onUpdateTitle?.(titleInput.trim());
+                  setIsEditingTitle(false);
+                }
+              }}
+              className="flex items-center gap-1.5 py-0.5"
+            >
+              <input
+                type="text"
+                value={titleInput}
+                onChange={(e) => setTitleInput(e.target.value)}
+                className="text-sm sm:text-base font-semibold px-2 py-0.5 rounded bg-white dark:bg-[#252528] border border-neutral-300 dark:border-white/20 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="p-1.5 rounded bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 cursor-pointer"
+                title="Save title"
+              >
+                <Check className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTitleInput(section.title);
+                  setIsEditingTitle(false);
+                }}
+                className="p-1.5 rounded hover:bg-neutral-200/60 dark:hover:bg-white/10 text-neutral-500 cursor-pointer"
+                title="Cancel"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </form>
+          ) : (
+            <div className="flex items-center gap-2 group/title">
+              <h2 className="text-base sm:text-lg font-semibold tracking-tight text-neutral-900 dark:text-white truncate">
+                {section.title}
+              </h2>
+              {onUpdateTitle && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTitleInput(section.title);
+                    setIsEditingTitle(true);
+                  }}
+                  className="opacity-0 group-hover/title:opacity-100 transition-opacity p-1 rounded hover:bg-neutral-200/60 dark:hover:bg-white/10 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
+                  title="Edit section title"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Live Word Count Metric */}
