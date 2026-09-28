@@ -165,3 +165,152 @@ export function isResearchStage(value: string | undefined): value is ResearchSta
   if (!value) return false;
   return STAGE_MAP.has(value as ResearchStage);
 }
+
+/**
+ * Streamlined 9-Milestone Academic Pipeline
+ *
+ * Consolidates the 25 underlying execution stages into 9 cohesive,
+ * minimal milestones, reducing cognitive load and visual clutter
+ * without sacrificing provenance, validation gates, or data integrity.
+ */
+export interface ResearchMilestone {
+  id: string;
+  number: number;
+  label: string;
+  shortLabel: string;
+  description: string;
+  icon: string;
+  primaryStage: ResearchStage;
+  subStages: ResearchStage[];
+  phaseId: ResearchPhaseId;
+}
+
+export const STREAMLINED_MILESTONES: ResearchMilestone[] = [
+  {
+    id: "scope_definition",
+    number: 1,
+    label: "Scope & Literature Discovery",
+    shortLabel: "Scope & Literature",
+    description: "Define research questions, methodology, and discover literature",
+    icon: ICONS.document,
+    primaryStage: "definition",
+    subStages: ["definition", "literature"],
+    phaseId: "foundation",
+  },
+  {
+    id: "gap_and_title",
+    number: 2,
+    label: "Gap Analysis & Title Lock",
+    shortLabel: "Gaps & Title Lock",
+    description: "Identify knowledge gaps, select anchor gap, and seal working title",
+    icon: ICONS.lock,
+    primaryStage: "gap_identification",
+    subStages: ["gap_identification", "gap_selection", "title_selection", "title_lock"],
+    phaseId: "foundation",
+  },
+  {
+    id: "evidence_desk",
+    number: 3,
+    label: "Evidence Desk & Sources",
+    shortLabel: "Evidence Desk",
+    description: "Ingest vault sources, approve literature, and upload primary data",
+    icon: ICONS.database,
+    primaryStage: "vault_sources",
+    subStages: ["vault_sources", "source_approval_vault", "additional_data"],
+    phaseId: "evidence",
+  },
+  {
+    id: "claim_synthesis",
+    number: 4,
+    label: "Claim Extraction & Synthesis",
+    shortLabel: "Claim Synthesis",
+    description: "Extract empirical claims, search external sources, and build thematic matrix",
+    icon: ICONS.chart,
+    primaryStage: "evidence_extraction",
+    subStages: ["evidence_extraction", "external_research", "source_approval_external", "evidence_analysis", "manual_review"],
+    phaseId: "evidence",
+  },
+  {
+    id: "target_journal",
+    number: 5,
+    label: "Target Journal & Requirements",
+    shortLabel: "Target Journal",
+    description: "Select target venue and inspect submission limits and citation style",
+    icon: ICONS.compass,
+    primaryStage: "journal_discovery",
+    subStages: ["journal_discovery", "journal_requirements"],
+    phaseId: "drafting",
+  },
+  {
+    id: "manuscript_draft",
+    number: 6,
+    label: "Manuscript Studio & AI Drafting",
+    shortLabel: "Drafting Studio",
+    description: "Section-by-section academic prose drafting with word count budgets",
+    icon: ICONS.pen,
+    primaryStage: "draft",
+    subStages: ["draft"],
+    phaseId: "drafting",
+  },
+  {
+    id: "preflight_audit",
+    number: 7,
+    label: "Integrity & Pre-Flight Audit",
+    shortLabel: "Integrity Audit",
+    description: "Audit claim citations, check semantic originality, and review preprint view",
+    icon: ICONS.shield,
+    primaryStage: "citation_audit",
+    subStages: ["citation_audit", "originality_check", "draft_preview"],
+    phaseId: "drafting",
+  },
+  {
+    id: "peer_review_workbench",
+    number: 8,
+    label: "Peer Review & Live Revision",
+    shortLabel: "Peer Review",
+    description: "7-Lens academic peer critique and interactive before/after revision patcher",
+    icon: ICONS.review,
+    primaryStage: "peer_review",
+    subStages: ["peer_review", "revision"],
+    phaseId: "review",
+  },
+  {
+    id: "camera_ready_export",
+    number: 9,
+    label: "Camera-Ready Typesetting & Export",
+    shortLabel: "Typeset & Export",
+    description: "Final editorial polish, compliance check, and multi-profile camera-ready export",
+    icon: ICONS.export,
+    primaryStage: "final_editor",
+    subStages: ["final_editor", "publication_readiness", "export"],
+    phaseId: "publication",
+  },
+];
+
+export function getMilestoneForStage(stage: ResearchStage): ResearchMilestone | undefined {
+  return STREAMLINED_MILESTONES.find(m => m.subStages.includes(stage));
+}
+
+export function computeMilestoneStatus(
+  milestone: ResearchMilestone,
+  stageStatuses: Record<ResearchStage, StageStatus>
+): { status: StageStatus; completedCount: number; totalCount: number } {
+  const statuses = milestone.subStages.map(s => stageStatuses[s] || "locked");
+  const completedCount = statuses.filter(s => s === "completed").length;
+  const totalCount = milestone.subStages.length;
+
+  if (completedCount === totalCount) {
+    return { status: "completed", completedCount, totalCount };
+  }
+  if (statuses.some(s => s === "ai_processing")) {
+    return { status: "ai_processing", completedCount, totalCount };
+  }
+  if (statuses.some(s => s === "active")) {
+    return { status: "active", completedCount, totalCount };
+  }
+  if (statuses.some(s => s === "available" || s === "needs_review" || s === "warning")) {
+    return { status: "available", completedCount, totalCount };
+  }
+  return { status: "locked", completedCount, totalCount };
+}
+

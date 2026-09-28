@@ -138,7 +138,37 @@ All workspace answers are stored within the project's intake answers JSON map in
 
 ---
 
-## 4. Verification & Testing
+## 4. Streamlined 9-Milestone Pipeline & Minimalist UI
+
+To eliminate visual clutter and reduce researcher cognitive fatigue, the workspace features a **dual-presentation architecture**:
+
+### 9 Streamlined Milestones
+
+The 25 granular execution stages are consolidated into 9 cohesive research studios:
+
+| Milestone | Label | Grouped Execution Stages | Description |
+| :--- | :--- | :--- | :--- |
+| **M1** | Scope & Literature Discovery | `definition`, `literature` | Define problem statement, domain, methodology, and discover foundational literature. |
+| **M2** | Gap Analysis & Title Charter | `gap_identification`, `gap_selection`, `title_selection`, `title_lock` | Generate and select anchor research gap, evaluate title archetypes, and seal specification charter. |
+| **M3** | Evidence Desk & Sources | `vault_sources`, `source_approval_vault`, `additional_data` | Pull vault evidence, approve sources, and ingest primary datasets (CSV/protocols). |
+| **M4** | Claim Extraction & Synthesis | `evidence_extraction`, `external_research`, `source_approval_external`, `evidence_analysis`, `manual_review` | Extract claims, search external indices, approve literature, and build thematic argument matrix. |
+| **M5** | Target Journal & Guidelines | `journal_discovery`, `journal_requirements` | Profile venue match criteria and automatically load target word count budgets and citation styles. |
+| **M6** | Manuscript Studio & AI Drafting | `draft` | Full manuscript prose generation across standard academic sections with active word limits. |
+| **M7** | Integrity & Pre-Flight Audit | `citation_audit`, `originality_check`, `draft_preview` | Verify claim-to-citation provenance, check semantic originality, and inspect preprint layout. |
+| **M8** | Peer Review & Live Revision | `peer_review`, `revision` | 7-Lens peer critique and interactive before/after revision diff patcher. |
+| **M9** | Camera-Ready Typesetting & Export | `final_editor`, `publication_readiness`, `export` | Final editorial touch-ups, pre-flight readiness checklist, and multi-format publication export. |
+
+### Minimalist UI Controls & Features
+
+* **Segmented Mode Switcher (`Minimal (9)` vs `Detailed (25)`)**: Researchers can switch between the 9 streamlined milestone studios and the granular 25-stage sequential tree at any time. Preference is persisted across sessions in `localStorage`.
+* **Intelligent Milestone Navigation**: Clicking any milestone automatically routes to the researcher's active/in-progress sub-stage within that milestone.
+* **Zen Focus Mode**: A dedicated distraction-free writing environment. Hides navigation rails, context panels, and status bars, leaving only the writing canvas and a clean single-line header (`Esc` to exit).
+* **Consolidated Engine Status Pill**: Merges active model, fallback status, and context window meters into a compact badge (`🟢 Model • 32k ▾`) with an on-demand floating popover.
+* **Collapsible Left Rail**: The sidebar can be collapsed to an icon-only strip (54px) or expanded via the sidebar toggle.
+
+---
+
+## 5. Verification & Testing
 
 The workspace is guarded by 26 automated test suites:
 ```bash
@@ -151,6 +181,8 @@ npx tsc --noEmit
 # Verify design system contrast & CSS tokens
 npm run lint
 ```
-* **Vitest Coverage**: 183 of 183 unit and integration tests passing (100% pass rate).
+* **Vitest Coverage**: 189 of 189 unit and integration tests passing across 26 test suites (100% pass rate).
 * **TypeScript Integrity**: 0 compilation or type errors.
+* **Accessibility & Contrast**: 82 of 82 color pairings verified passing WCAG AA standards.
 * **Remote Database Status**: Synchronized with Supabase project `scholarAgent` (`gfjhsijrwodjvkisouzw`).
+

@@ -49,6 +49,36 @@ function ResearchWorkspaceInner({
   const [stageNavOpen, setStageNavOpen] = useState(false);
   const [trayOpen, setTrayOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isZenMode, setIsZenMode] = useState(false);
+  const [engineMenuOpen, setEngineMenuOpen] = useState(false);
+  const engineMenuRef = React.useRef<HTMLDivElement>(null);
+
+  // Close engine popover when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (engineMenuRef.current && !engineMenuRef.current.contains(e.target as Node)) {
+        setEngineMenuOpen(false);
+      }
+    };
+    if (engineMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [engineMenuOpen]);
+
+  // Escape key exits Zen Focus Mode
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isZenMode) {
+        setIsZenMode(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isZenMode]);
 
   const defaultProvider = connected.find(p => p.id === settings.provider);
   const defaultModelText = defaultProvider 
@@ -101,75 +131,107 @@ function ResearchWorkspaceInner({
   return (
     <div className="h-screen flex flex-col bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
       {/* Header */}
-      <header className="border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)]/80 backdrop-blur-md z-10 shrink-0">
-        <div className="flex items-center justify-between px-4 py-3 gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            {/* Mobile Stage Nav Toggle */}
-            <button 
-              className="md:hidden p-2 -ml-2 rounded-lg text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors"
-              onClick={() => setStageNavOpen(true)}
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
-              </svg>
-            </button>
-
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                title="Back to projects"
-                className="hidden md:flex shrink-0 rounded-[var(--radius-sm)] p-2 text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
+      {isZenMode ? (
+        <header className="border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)]/95 backdrop-blur-md z-10 shrink-0 px-4 py-2.5 flex items-center justify-between animate-fade-in">
+          <div className="flex items-center gap-3">
+            <span className="w-2 h-2 rounded-full bg-[color:var(--accent)] animate-pulse" />
+            <h1 className="text-xs font-bold text-[color:var(--text-primary)] truncate max-w-md">
+              {project.answers?.["working_title"] || project.answers?.["title"] || outputType?.label || "Journal Article"}
+            </h1>
+            <span className="text-[10px] font-semibold text-[color:var(--text-muted)] bg-[color:var(--surface-sunken)] px-2 py-0.5 rounded-full border border-[color:var(--border-subtle)]">
+              Zen Focus Mode
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsZenMode(false)}
+            className="px-3 py-1 rounded-full text-xs font-medium bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer flex items-center gap-1.5"
+          >
+            <span>Exit Zen Mode</span>
+            <kbd className="text-[9px] bg-[color:var(--surface-inset)] px-1 rounded font-mono">Esc</kbd>
+          </button>
+        </header>
+      ) : (
+        <header className="border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)]/80 backdrop-blur-md z-10 shrink-0">
+          <div className="flex items-center justify-between px-4 py-2.5 gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              {/* Mobile Stage Nav Toggle */}
+              <button 
+                className="md:hidden p-2 -ml-2 rounded-lg text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors"
+                onClick={() => setStageNavOpen(true)}
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
                 </svg>
               </button>
-            )}
-            <div
-              onClick={() => {
-                if (onClose) onClose();
-                else if (typeof window !== "undefined") window.location.href = "/";
-              }}
-              className="hidden md:flex cursor-pointer transition-opacity duration-200 hover:opacity-70"
-              title="Scholar Core Home"
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
+
+              {/* Desktop Sidebar Toggle */}
+              <button
+                type="button"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                title={sidebarCollapsed ? "Expand Sidebar (Ctrl/Cmd+B)" : "Collapse Sidebar (Ctrl/Cmd+B)"}
+                className="hidden md:flex p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h16" />
+                </svg>
+              </button>
+
+              {onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  title="Back to projects"
+                  className="hidden md:flex shrink-0 rounded-[var(--radius-sm)] p-1.5 text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                </button>
+              )}
+              <div
+                onClick={() => {
                   if (onClose) onClose();
                   else if (typeof window !== "undefined") window.location.href = "/";
-                }
-              }}
-            >
-              <ScholarCoreLogo size="sm" withText className="text-[color:var(--text-primary)]" />
+                }}
+                className="hidden md:flex cursor-pointer transition-opacity duration-200 hover:opacity-70"
+                title="Scholar Core Home"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    if (onClose) onClose();
+                    else if (typeof window !== "undefined") window.location.href = "/";
+                  }
+                }}
+              >
+                <ScholarCoreLogo size="sm" withText className="text-[color:var(--text-primary)]" />
+              </div>
+              <div className="hidden md:block w-px h-5 bg-[color:var(--border-subtle)] mx-0.5" />
+              <div className="min-w-0">
+                <h1 className="text-xs font-bold text-[color:var(--text-primary)] truncate">
+                  {project.answers?.["working_title"] || project.answers?.["title"] || outputType?.label || "Journal Article"}
+                </h1>
+                <p className="text-[10px] text-[color:var(--text-muted)] truncate">
+                  {outputType?.label ?? project.outputTypeId}
+                </p>
+              </div>
             </div>
-            <div className="hidden md:block w-px h-5 bg-[color:var(--border-subtle)] mx-1" />
-            <div className="min-w-0">
-              <h1 className="text-sm font-bold text-[color:var(--text-primary)] truncate">
-                {project.answers?.["working_title"] || project.answers?.["title"] || outputType?.label || "Journal Article"}
-              </h1>
-              <p className="text-[10px] text-[color:var(--text-muted)]">
-                {outputType?.label ?? project.outputTypeId}
-              </p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-2">
-            {/* Desktop Controls */}
-            <div className="hidden md:flex items-center gap-2">
-              {outputType?.workflowVariant === "long_form_chaptered" && (
-                <div className="flex items-center gap-4 px-4 py-1.5 bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-lg mr-2">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] uppercase tracking-wider font-bold text-[color:var(--text-muted)]">Target Chapter</span>
+            <div className="flex items-center gap-2">
+              {/* Desktop Controls */}
+              <div className="hidden md:flex items-center gap-2">
+                {outputType?.workflowVariant === "long_form_chaptered" && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-lg">
+                    <span className="text-[9px] uppercase tracking-wider font-bold text-[color:var(--text-muted)]">Chapter</span>
                     <select
-                      className="bg-transparent text-[11px] font-semibold text-[color:var(--text-primary)] border-none p-0 cursor-pointer focus:ring-0 outline-none w-32 truncate appearance-none hover:bg-[color:var(--surface-hover)] rounded px-1 -ml-1 mt-0.5"
+                      className="bg-transparent text-[11px] font-semibold text-[color:var(--text-primary)] border-none p-0 cursor-pointer focus:ring-0 outline-none w-28 truncate appearance-none hover:bg-[color:var(--surface-hover)] rounded"
                       value={chapterId || "all"}
                       onChange={(e) => setChapterId(e.target.value === "all" ? null : e.target.value)}
                       title="Select a specific chapter to target"
                     >
-                      <option value="all">Whole Document</option>
+                      <option value="all">Whole Doc</option>
                       {outputType?.structure.sections.find(s => s.children)?.children?.map(c => (
                         <option key={c.key} value={c.key}>{c.title}</option>
                       )) || outputType?.structure.sections.map(c => (
@@ -177,22 +239,18 @@ function ResearchWorkspaceInner({
                       ))}
                     </select>
                   </div>
-                </div>
-              )}
-              
-              <div className="flex items-center gap-4 px-4 py-1.5 bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-lg mr-2">
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[9px] uppercase tracking-wider font-bold text-[color:var(--text-muted)]">Active Model</span>
-                    {liveExecution?.isFallbackActive && (
-                      <span className="px-1.5 py-0.5 text-[8px] font-bold tracking-wide bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded animate-pulse border border-amber-500/30">
-                        BACKUP ACTIVE
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                )}
+                
+                {/* Minimalist Scholar AI Engine Status Pill & Popover */}
+                <div className="relative" ref={engineMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setEngineMenuOpen(!engineMenuOpen)}
+                    className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)] hover:border-[color:var(--accent-border)] transition-all cursor-pointer text-xs group"
+                    title="Scholar AI Engine & Context Details"
+                  >
                     <span
-                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                      className={`w-2 h-2 rounded-full shrink-0 ${
                         liveExecution?.status === "error"
                           ? "bg-rose-500"
                           : liveExecution?.isFallbackActive
@@ -202,108 +260,147 @@ function ResearchWorkspaceInner({
                           : "bg-emerald-500"
                       }`}
                     />
-                    <select
-                      className="bg-transparent text-[11px] font-semibold text-[color:var(--text-primary)] border-none p-0 cursor-pointer focus:ring-0 outline-none w-32 truncate appearance-none hover:bg-[color:var(--surface-hover)] rounded px-1 -ml-1"
-                      value={manualModelOverride ? `${manualModelOverride.providerId}:${manualModelOverride.modelId || ""}` : "automatic"}
-                      onChange={(e) => {
-                        if (e.target.value === "automatic") {
-                          setManualModelOverride(null);
-                        } else {
-                          const [providerId, modelId] = e.target.value.split(":");
-                          setManualModelOverride({ providerId, modelId: modelId || undefined });
-                        }
-                      }}
-                      title={
-                        liveExecution?.isFallbackActive
-                          ? `Backup Active: ${liveExecution.activeProvider} (${liveExecution.activeModel})`
-                          : "Select a specific AI model or let the Scholar AI Engine decide (Automatic)"
-                      }
-                    >
-                      <option value="automatic">
-                        {liveExecution && liveExecution.status === "running"
-                          ? `${liveExecution.activeProvider} - ${liveExecution.activeModel} (Live)`
-                          : `${defaultModelText} (Default)`}
-                      </option>
-                      {connected.length > 0 && <optgroup label="Connected Providers">
-                        {connected.map((p) => {
-                          const displayName = p.selectedModel ? `${p.name} - ${p.selectedModel}` : p.name;
-                          const value = `${p.id}:${p.selectedModel || ""}`;
-                          return (
-                            <option key={value} value={value}>
-                              {displayName}
-                            </option>
-                          );
-                        })}
-                      </optgroup>}
-                    </select>
-                  </div>
-                </div>
-                <div className="w-px h-6 bg-[color:var(--border-subtle)]"></div>
-                <div className="flex flex-col min-w-[100px]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] uppercase tracking-wider font-bold text-[color:var(--text-muted)]">Context</span>
-                    <span className="text-[9px] font-mono text-[color:var(--text-secondary)]">32k / 1M</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <div className="w-full h-1.5 bg-[color:var(--surface-canvas)] rounded-full overflow-hidden border border-[color:var(--border-subtle)]">
-                      <div className="h-full bg-indigo-500 w-[3%] rounded-full"></div>
+                    <span className="font-semibold text-[11px] text-[color:var(--text-primary)] max-w-[110px] truncate">
+                      {manualModelOverride ? manualModelOverride.modelId || manualModelOverride.providerId : defaultModelText.split(" - ")[0]}
+                    </span>
+                    {liveExecution?.isFallbackActive && (
+                      <span className="px-1 py-0.2 text-[8px] font-bold bg-amber-500/20 text-amber-500 rounded">
+                        BACKUP
+                      </span>
+                    )}
+                    <span className="text-[10px] text-[color:var(--text-muted)] font-mono">32k</span>
+                    <svg className="w-3 h-3 text-[color:var(--text-muted)] group-hover:text-[color:var(--text-primary)] transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Engine Popover Menu */}
+                  {engineMenuOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-72 p-3 bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-xl shadow-xl z-50 animate-fade-in space-y-3">
+                      <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-2">
+                        <span className="text-xs font-bold text-[color:var(--text-primary)]">Scholar Engine</span>
+                        {liveExecution?.isFallbackActive && (
+                          <span className="px-1.5 py-0.5 text-[8px] font-bold tracking-wide bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded border border-amber-500/30">
+                            BACKUP ACTIVE
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
+                          Active Model
+                        </label>
+                        <select
+                          className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[11px] font-semibold text-[color:var(--text-primary)] rounded-lg p-2 outline-none"
+                          value={manualModelOverride ? `${manualModelOverride.providerId}:${manualModelOverride.modelId || ""}` : "automatic"}
+                          onChange={(e) => {
+                            if (e.target.value === "automatic") {
+                              setManualModelOverride(null);
+                            } else {
+                              const [providerId, modelId] = e.target.value.split(":");
+                              setManualModelOverride({ providerId, modelId: modelId || undefined });
+                            }
+                          }}
+                        >
+                          <option value="automatic">
+                            {liveExecution && liveExecution.status === "running"
+                              ? `${liveExecution.activeProvider} - ${liveExecution.activeModel} (Live)`
+                              : `${defaultModelText} (Default)`}
+                          </option>
+                          {connected.length > 0 && (
+                            <optgroup label="Connected Providers">
+                              {connected.map((p) => {
+                                const displayName = p.selectedModel ? `${p.name} - ${p.selectedModel}` : p.name;
+                                const value = `${p.id}:${p.selectedModel || ""}`;
+                                return (
+                                  <option key={value} value={value}>
+                                    {displayName}
+                                  </option>
+                                );
+                              })}
+                            </optgroup>
+                          )}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1 pt-1">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-[color:var(--text-muted)] font-medium">Context Window</span>
+                          <span className="font-mono text-[color:var(--text-secondary)]">32k / 1M (3%)</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-[color:var(--surface-sunken)] rounded-full overflow-hidden border border-[color:var(--border-subtle)]">
+                          <div className="h-full bg-indigo-500 w-[3%] rounded-full" />
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
+
+                {onOpenVault && (
+                  <button type="button" onClick={onOpenVault} title="Knowledge Vault" className="shrink-0 rounded-lg p-1.5 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                  </button>
+                )}
+                {onOpenAiAccess && (
+                  <button type="button" onClick={onOpenAiAccess} title="AI Models" className="shrink-0 rounded-lg p-1.5 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+                  </button>
+                )}
+
+                {/* Zen Focus Mode Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsZenMode(true)}
+                  title="Enter Zen Focus Mode (Distraction-Free)"
+                  className="shrink-0 rounded-lg p-1.5 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1 text-xs"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                  </svg>
+                  <span className="hidden xl:inline text-[11px] font-medium">Zen</span>
+                </button>
+                
+                <div className="w-px h-4 bg-[color:var(--border-subtle)] mx-0.5" />
+                
+                <button 
+                  type="button" 
+                  onClick={() => setContextPanelOpen(!contextPanelOpen)} 
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${contextPanelOpen ? 'bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)]' : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)]'}`}
+                  title="Toggle AI Context Assistant"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                  </svg>
+                  <span className="text-[11px]">Assistant</span>
+                </button>
               </div>
 
-              {onOpenVault && (
-                <button type="button" onClick={onOpenVault} title="Vault" className="shrink-0 rounded-lg p-2 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+              {/* Mobile Controls */}
+              <div className="md:hidden flex items-center gap-2">
+                <button 
+                  type="button" 
+                  onClick={() => setContextPanelOpen(!contextPanelOpen)} 
+                  className={`p-2 rounded-lg transition-colors cursor-pointer ${contextPanelOpen ? 'bg-[color:var(--accent)] text-white' : 'text-[color:var(--text-secondary)] bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)]'}`}
+                  title="Toggle AI Context Panel"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                  </svg>
                 </button>
-              )}
-              {onOpenAiAccess && (
-                <button type="button" onClick={onOpenAiAccess} title="AI Models" className="shrink-0 rounded-lg p-2 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] active:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+                <button 
+                  type="button" 
+                  onClick={() => setMobileMenuOpen(true)}
+                  className="p-2 rounded-lg bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] cursor-pointer"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                  </svg>
                 </button>
-              )}
-              
-              
-              <div className="w-px h-5 bg-[color:var(--border-subtle)] mx-1" />
-              
-              <button 
-                type="button" 
-                onClick={() => setContextPanelOpen(!contextPanelOpen)} 
-                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${contextPanelOpen ? 'bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)]' : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)]'}`}
-                title="Toggle AI Context Panel"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                </svg>
-                Assistant
-              </button>
-            </div>
-
-            {/* Mobile Controls */}
-            <div className="md:hidden flex items-center gap-2">
-              <button 
-                type="button" 
-                onClick={() => setContextPanelOpen(!contextPanelOpen)} 
-                className={`p-2 rounded-lg transition-colors cursor-pointer ${contextPanelOpen ? 'bg-[color:var(--accent)] text-white' : 'text-[color:var(--text-secondary)] bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)]'}`}
-                title="Toggle AI Context Panel"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                </svg>
-              </button>
-              <button 
-                type="button"
-                onClick={() => setMobileMenuOpen(true)}
-                className="p-2 rounded-lg bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] cursor-pointer"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-                </svg>
-              </button>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
@@ -421,22 +518,26 @@ function ResearchWorkspaceInner({
         )}
         
         {/* Left: Stage Navigation */}
-        <div className={`
-          absolute md:relative inset-y-0 left-0 z-40 
-          transform transition-transform duration-300 ease-in-out
-          ${stageNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-          bg-[color:var(--surface-canvas)] border-r border-[color:var(--border-subtle)] flex flex-col shrink-0
-          w-72 md:w-auto h-full md:h-auto
-        `}>
-          <StageNavigation
-            currentStage={currentStage}
-            stageStatuses={stageStatuses}
-            onStageChange={(stage) => {
-              setStage(stage);
-              setStageNavOpen(false); // Auto-close on mobile
-            }}
-          />
-        </div>
+        {!isZenMode && (
+          <div className={`
+            absolute md:relative inset-y-0 left-0 z-40 
+            transform transition-transform duration-300 ease-in-out
+            ${stageNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+            bg-[color:var(--surface-canvas)] border-r border-[color:var(--border-subtle)] flex flex-col shrink-0
+            ${sidebarCollapsed ? 'w-14' : 'w-72 md:w-auto'} h-full md:h-auto
+          `}>
+            <StageNavigation
+              currentStage={currentStage}
+              stageStatuses={stageStatuses}
+              onStageChange={(stage) => {
+                setStage(stage);
+                setStageNavOpen(false); // Auto-close on mobile
+              }}
+              isCollapsed={sidebarCollapsed}
+              onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+            />
+          </div>
+        )}
 
         {/* Center: Current Stage Content */}
         <div className="flex-1 flex flex-col min-w-0 bg-[color:var(--surface-canvas)] h-full overflow-hidden">
@@ -456,7 +557,7 @@ function ResearchWorkspaceInner({
         </div>
 
         {/* Mobile Backdrop for Context Panel */}
-        {contextPanelOpen && (
+        {!isZenMode && contextPanelOpen && (
           <div 
             className="md:hidden fixed inset-0 z-30 bg-black/50 transition-opacity" 
             onClick={() => setContextPanelOpen(false)}
@@ -464,19 +565,21 @@ function ResearchWorkspaceInner({
         )}
 
         {/* Right: Context Panel */}
-        <div className={`
-          absolute md:relative inset-y-0 right-0 z-40
-          transform transition-transform duration-300 ease-in-out
-          ${contextPanelOpen ? 'translate-x-0' : 'translate-x-full md:hidden'}
-          border-l border-[color:var(--border-subtle)] flex flex-col w-80 md:w-80 shrink-0 bg-[color:var(--surface-canvas)]
-          h-full md:h-auto
-        `}>
-          <ContextPanel
-            currentStage={currentStage}
-            isOpen={contextPanelOpen}
-            onToggle={() => setContextPanelOpen(!contextPanelOpen)}
-          />
-        </div>
+        {!isZenMode && (
+          <div className={`
+            absolute md:relative inset-y-0 right-0 z-40
+            transform transition-transform duration-300 ease-in-out
+            ${contextPanelOpen ? 'translate-x-0' : 'translate-x-full md:hidden'}
+            border-l border-[color:var(--border-subtle)] flex flex-col w-80 md:w-80 shrink-0 bg-[color:var(--surface-canvas)]
+            h-full md:h-auto
+          `}>
+            <ContextPanel
+              currentStage={currentStage}
+              isOpen={contextPanelOpen}
+              onToggle={() => setContextPanelOpen(!contextPanelOpen)}
+            />
+          </div>
+        )}
       </div>
 
       {trayOpen && <Tray projectId={projectId} onClose={() => setTrayOpen(false)} />}
@@ -507,23 +610,25 @@ function ResearchWorkspaceInner({
       />
 
       {/* Status bar */}
-      <div className="shrink-0 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 py-1.5 flex items-center justify-between text-[10px] text-[color:var(--text-muted)]">
-        <div className="flex items-center gap-4">
-          <span>Stage: <strong className="text-[color:var(--text-secondary)]">{currentStage}</strong></span>
-          <span>·</span>
-          <span>Gates: {project.gates.filter((g) => g.status === "signed_off").length}/{project.gates.length} passed</span>
+      {!isZenMode && (
+        <div className="shrink-0 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 py-1.5 flex items-center justify-between text-[10px] text-[color:var(--text-muted)]">
+          <div className="flex items-center gap-4">
+            <span>Stage: <strong className="text-[color:var(--text-secondary)]">{currentStage}</strong></span>
+            <span>·</span>
+            <span>Gates: {project.gates.filter((g) => g.status === "signed_off").length}/{project.gates.length} passed</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span>Intake: {Math.round(project.intakeCompleteness * 100)}%</span>
+            {project.hasDocument && <span>Draft: ready</span>}
+            <button 
+              onClick={() => setTrayOpen(!trayOpen)}
+              className="ml-2 hover:text-[color:var(--text-primary)] transition-colors px-2 py-0.5 rounded bg-[color:var(--surface-hover)]"
+            >
+              {trayOpen ? "Close Tray" : "Open Tray"}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <span>Intake: {Math.round(project.intakeCompleteness * 100)}%</span>
-          {project.hasDocument && <span>Draft: ready</span>}
-          <button 
-            onClick={() => setTrayOpen(!trayOpen)}
-            className="ml-2 hover:text-[color:var(--text-primary)] transition-colors px-2 py-0.5 rounded bg-[color:var(--surface-hover)]"
-          >
-            {trayOpen ? "Close Tray" : "Open Tray"}
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
