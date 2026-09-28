@@ -214,30 +214,8 @@ export default function UserAccountMenu({
             </div>
           )}
 
-          {/* Categorized Primary Navigation: Help */}
-          <div className="flex flex-col gap-0.5 mb-1.5">
-
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                if (onOpenHelp) {
-                  onOpenHelp();
-                } else {
-                  window.open("https://github.com/docgovinda-glitch/scholar-agentic-os#readme", "_blank", "noopener,noreferrer");
-                }
-              }}
-              className="w-full text-left px-3 py-2 rounded-xl hover:bg-[var(--theme-fg)]/5 font-semibold tracking-tight text-[var(--theme-fg)]/80 hover:text-[var(--theme-fg)] transition-colors cursor-pointer flex items-center gap-2.5"
-            >
-              <svg className="w-4 h-4 flex-shrink-0 text-[var(--theme-fg)]/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.451 1.827v.75M12 18h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>Help & Support</span>
-            </button>
-          </div>
-
           {/* Categorized Users / Switch Accounts Section */}
-          <div className="border-t border-[var(--theme-fg)]/10 pt-1.5 pb-1">
+          <div className="pt-1 pb-1">
             <div className="flex items-center justify-between px-3 py-1 text-[11px] font-semibold tracking-tight text-[var(--theme-fg)]/60 uppercase">
               <span>Switch Accounts</span>
               {otherAccounts.length > 0 && <span className="text-[10px] text-[var(--theme-fg)]/40 font-normal">{otherAccounts.length} saved</span>}

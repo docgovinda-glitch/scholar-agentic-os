@@ -90,7 +90,7 @@ describe("UserAccountMenu — Task 1: Scholar Profile UI Card", () => {
 });
 
 describe("UserAccountMenu — Task 2: Minimal Dropdown Menu", () => {
-  it("opens dropdown and shows only minimal items (Settings, Help & Support, Sign Out)", async () => {
+  it("opens dropdown and shows only minimal items (Switch Accounts, Sign Out without Help & Support)", async () => {
     const onOpenAccountSettings = vi.fn();
     render(
       <UserAccountMenu
@@ -105,9 +105,9 @@ describe("UserAccountMenu — Task 2: Minimal Dropdown Menu", () => {
     const trigger = screen.getByRole("button", { name: /Ada Lovelace/i });
     fireEvent.click(trigger);
 
-    // Minimal options present (Settings relocated to sidebar; Help & Support and Sign Out remain)
+    // Minimal options present (Settings relocated to sidebar; Help & Support removed; Sign Out remains)
     expect(screen.queryByRole("button", { name: /Settings/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Help & Support/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Help & Support/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Sign Out/i })).toBeInTheDocument();
 
     // Verify "See plans and pricing" / subscription is NOT present

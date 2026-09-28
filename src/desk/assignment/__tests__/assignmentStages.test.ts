@@ -14,18 +14,14 @@ import {
 } from "../types";
 
 describe("Assignment Stages & Domain Taxonomy", () => {
-  it("defines exactly 8 dedicated academic stages in correct progression", () => {
-    expect(ASSIGNMENT_STAGES).toHaveLength(8);
+  it("defines exactly 4 dedicated academic phases in correct progression", () => {
+    expect(ASSIGNMENT_STAGES).toHaveLength(4);
     const stageIds: AssignmentStage[] = ASSIGNMENT_STAGES.map((s) => s.id);
     expect(stageIds).toEqual([
       "understand",
-      "plan",
-      "research",
-      "evidence",
-      "think",
-      "structure",
-      "draft",
-      "final",
+      "sources",
+      "drafting",
+      "submission",
     ]);
   });
 

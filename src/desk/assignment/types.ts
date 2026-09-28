@@ -254,12 +254,48 @@ export interface TutorWorkspacePatch {
   question?: string;
 }
 
+export type SourceAcademicType =
+  | "journal"
+  | "book"
+  | "conference"
+  | "institutional"
+  | "report"
+  | "vault"
+  | "web";
+
+export type SourceCredibilityTier =
+  | "peer-reviewed"
+  | "academic-press"
+  | "conference-proceedings"
+  | "institutional-report"
+  | "working-paper"
+  | "verified-academic";
+
+export type ResearchMethodology =
+  | "Empirical Study"
+  | "Quantitative Meta-Analysis"
+  | "Qualitative Case Study"
+  | "Systematic Review"
+  | "Theoretical Framework"
+  | "Mixed-Methods"
+  | "Doctrinal Analysis"
+  | "Comparative Analysis";
+
+export type CitationImpactLevel =
+  | "Seminal Work"
+  | "Highly Cited"
+  | "Recent Landmark"
+  | "Emerging Scholarship"
+  | "Standard Academic";
+
+export type LiteratureViewMode = "card" | "list" | "table" | "compact";
+
 export interface DiscoveredSource {
   id: string;
   title: string;
   authors: string[];
   year: string;
-  type: "journal" | "book" | "institutional" | "vault" | "web";
+  type: SourceAcademicType | string;
   journal?: string;
   doi?: string;
   url?: string;
@@ -270,6 +306,21 @@ export interface DiscoveredSource {
   canonicalReference?: CanonicalReference;
   status: "unreviewed" | "kept" | "removed";
   fromVault?: boolean;
+
+  // Academic quality, depth, and research metadata
+  abstract?: string;
+  citationCount?: number;
+  methodology?: ResearchMethodology | string;
+  keyConcepts?: string[];
+  domain?: string;
+  isOpenAccess?: boolean;
+  isBookmarked?: boolean;
+  isExcluded?: boolean;
+  sourceCredibility?: SourceCredibilityTier | string;
+  isVerifiedAcademic?: boolean;
+  citationImpact?: CitationImpactLevel | string;
+  publisher?: string;
+  volumeIssue?: string;
 }
 
 export interface EvidenceItem {
