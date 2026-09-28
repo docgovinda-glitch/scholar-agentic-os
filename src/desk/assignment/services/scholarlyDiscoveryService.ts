@@ -331,11 +331,20 @@ export function deconstructAssignmentQuestion(questionOrTopic?: string): Questio
     "what", "which", "where", "when", "with", "from", "that", "this", "have", "been", "does", "into",
     "their", "about", "between", "through", "impact", "effects", "affect", "affected", "role", "critically",
     "evaluate", "evaluating", "evaluation", "assessment", "assess", "examining", "examine", "discuss",
-    "discussing", "analyzing", "analyze", "analysis", "investigate", "investigating", "to", "extent", "major"
+    "discussing", "analyzing", "analyze", "analysis", "investigate", "investigating", "to", "extent", "major",
+    "department", "school", "faculty", "university", "advanced", "examination", "questionnaire", "framework",
+    "module", "code", "word", "count", "marks", "total", "citation", "format", "candidate", "instructions",
+    "section", "part", "question", "honours", "postgraduate", "undergraduate", "essay", "report", "brief"
   ]);
   const words = cleanedQuestion.split(/\s+/).filter((w) => w.length > 3 && !stopWords.has(w.toLowerCase()));
   const conceptSet = new Set<string>();
 
+  if (lower.includes("quantum")) conceptSet.add("Quantum Computing");
+  if (lower.includes("qubit") || lower.includes("transmon") || lower.includes("trapped-ion")) conceptSet.add("Physical Qubit Architectures");
+  if (lower.includes("nisq") || lower.includes("decoherence")) conceptSet.add("NISQ Processors & Decoherence");
+  if (lower.includes("surface code") || lower.includes("error correction") || lower.includes("qec")) conceptSet.add("Surface Code Fault Tolerance");
+  if (lower.includes("shor") || lower.includes("grover") || lower.includes("algorithm")) conceptSet.add("Quantum Algorithms");
+  if (lower.includes("qkd") || lower.includes("bb84") || lower.includes("pqc") || lower.includes("cryptography")) conceptSet.add("Post-Quantum Cryptography & QKD");
   if (lower.includes("nuclear deterrence")) conceptSet.add("Nuclear Deterrence");
   if (lower.includes("crisis stability")) conceptSet.add("Crisis Stability");
   if (lower.includes("peace and security")) conceptSet.add("International Peace and Security");
@@ -3078,6 +3087,20 @@ export function calculateScholarlyRelevance(
     return 30;
   }
 
+  const isQuestionAboutQuantum =
+    intent.academicDomain === "Quantum Information & Computational Physics" ||
+    intent.subTopic === "quantum_computing" ||
+    /quantum|qubit|transmon|superconducting|trapped-ion|shor|grover|surface code|qkd|pqc/i.test(qLower);
+
+  const isSourceAboutIRorPolicy =
+    source.id.startsWith("src-ir-") ||
+    (source.domain && (source.domain.includes("International") || source.domain.includes("Geopolitics") || source.domain.includes("Policy") || source.domain.includes("Law"))) ||
+    (source.journal && (source.journal.includes("Security") || source.journal.includes("Policy Review") || source.journal.includes("World Politics")));
+
+  if (isQuestionAboutQuantum && isSourceAboutIRorPolicy) {
+    return 15;
+  }
+
   let conceptMatches = 0;
   for (const concept of deconstruction.keyConcepts) {
     const cLower = concept.toLowerCase();
@@ -3142,8 +3165,18 @@ export function calculateScholarlyRelevance(
 
   // 5. Strict Relevancy Gate:
   // If the source has NO concept match, NO title match, and NO case match, penalize heavily so unrelated catalog items NEVER leak
+  const isExactDomainMatch = Boolean(
+    source.domain &&
+    intent.academicDomain &&
+    source.domain.toLowerCase().trim() === intent.academicDomain.toLowerCase().trim()
+  );
+
   if (conceptMatches === 0 && caseMatches === 0 && titleMatches === 0) {
-    score = Math.min(40, score);
+    if (isExactDomainMatch) {
+      score = Math.max(78, score);
+    } else {
+      score = Math.min(40, score);
+    }
   } else if (conceptMatches >= 2 || (conceptMatches >= 1 && caseMatches >= 1) || titleMatches >= 1) {
     // Solid substantive alignment
     score = Math.max(76, score);

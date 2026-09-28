@@ -21,6 +21,19 @@ export const ScholarlyResearchPipeline: React.FC<ScholarlyResearchPipelineProps>
   let detectedSubTopic = "Scholarly Literature";
 
   if (
+    qLower.includes("quantum") ||
+    qLower.includes("qubit") ||
+    qLower.includes("superconducting") ||
+    qLower.includes("trapped-ion") ||
+    qLower.includes("transmon") ||
+    qLower.includes("shor") ||
+    qLower.includes("grover") ||
+    qLower.includes("surface code") ||
+    qLower.includes("qkd") ||
+    qLower.includes("pqc")
+  ) {
+    detectedSubTopic = "Quantum Computing & Information Physics";
+  } else if (
     qLower.includes("united nations") ||
     qLower.includes("peace and security") ||
     qLower.includes("un ") ||

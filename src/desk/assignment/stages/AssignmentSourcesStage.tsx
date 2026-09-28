@@ -182,11 +182,11 @@ export default function AssignmentSourcesStage({
     if (sources.length === 0) {
       const generated = generateCuratedLiteratureSources(question, citationStyle);
       setSources(generated);
-    } else if (isMismatched && approvedSourceIds.length === 0) {
+    } else if (isMismatched) {
       const generated = generateCuratedLiteratureSources(question, citationStyle);
       setSources(generated);
     }
-  }, [sources.length, isMismatched, approvedSourceIds.length, question, citationStyle, setSources, hasTopic, hasUploadedDocs]);
+  }, [sources.length, isMismatched, question, citationStyle, setSources, hasTopic, hasUploadedDocs]);
 
   // Sync bookmarks & exclusions when sources change
   useEffect(() => {
