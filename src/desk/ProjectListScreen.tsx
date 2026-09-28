@@ -2014,26 +2014,6 @@ export default function ProjectListScreen({
               <span className="text-base font-bold leading-none">+</span>
               <span>New Project</span>
             </button>
-
-            <div className="relative group cursor-text mb-4 w-full h-10">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 transition-colors pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search projects..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full h-full bg-neutral-900/5 dark:bg-white/5 border border-neutral-200 dark:border-white/10 rounded-full pl-10 pr-11 text-xs focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 transition-all cursor-text text-neutral-900 dark:text-neutral-200 placeholder-neutral-500 dark:placeholder-neutral-400"
-              />
-              <button
-                type="button"
-                onClick={() => setIsCommandPaletteOpen(true)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-neutral-200/60 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/20 text-[10px] font-mono font-medium text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer"
-                title="Open Command Palette (⌘K)"
-              >
-                ⌘K
-              </button>
-            </div>
           </div>
         </div>
 
@@ -2114,14 +2094,35 @@ export default function ProjectListScreen({
             </button>
           </div>
 
-          {/* Recents Section: Render only when logged in and active projects exist */}
-          {userEmail && recentProjectsList.length > 0 && (
-            <>
-              <h3 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase mt-8 mb-2 px-3">
-                Recents
+          {/* Projects Section: Render only when logged in and active projects exist */}
+          {userEmail && projects && projects.length > 0 && (
+            <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+              <h3 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase mt-8 mb-2 px-3 flex-shrink-0">
+                Projects
               </h3>
 
-              {/* Recents List (Scrollable Area) */}
+              {/* Search Projects Box directly below PROJECTS heading */}
+              <div className="relative group cursor-text mb-2.5 w-full h-10 flex-shrink-0">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 transition-colors pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search projects..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full h-full bg-neutral-900/5 dark:bg-white/5 border border-neutral-200 dark:border-white/10 rounded-full pl-10 pr-11 text-xs focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 transition-all cursor-text text-neutral-900 dark:text-neutral-200 placeholder-neutral-500 dark:placeholder-neutral-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsCommandPaletteOpen(true)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-neutral-200/60 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/20 text-[10px] font-mono font-medium text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer"
+                  title="Open Command Palette (⌘K)"
+                >
+                  ⌘K
+                </button>
+              </div>
+
+              {/* Projects List (Scrollable Area) */}
               <div className="flex-1 overflow-y-auto space-y-1 pr-2 custom-scrollbar pb-3 min-h-0">
                 {isMounted && recentProjectsList.map((item, index) => {
                   const isMenuOpen = activeRecentMenuId === item.id;
@@ -2234,7 +2235,7 @@ export default function ProjectListScreen({
                   );
                 })}
               </div>
-            </>
+            </div>
           )}
         </div>
 

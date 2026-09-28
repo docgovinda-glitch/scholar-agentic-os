@@ -231,18 +231,6 @@ export default function ScholarAgenticDashboard() {
               <span className="text-base font-bold leading-none">+</span>
               <span>New Project</span>
             </button>
-
-            <div className="relative group cursor-text mb-4 w-full h-10">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 group-hover:text-neutral-200 transition-colors pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search projects..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full h-full bg-white/5 border border-white/10 rounded-full pl-10 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-white/20 transition-all cursor-text text-neutral-200 placeholder-neutral-400"
-              />
-            </div>
           </div>
 
           {/* Core Workspace Links (The Library) */}
@@ -291,10 +279,25 @@ export default function ScholarAgenticDashboard() {
             </button>
           </div>
 
-          {/* Recents Header */}
-          <h3 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase mt-8 mb-2 px-3">
-            Recents
-          </h3>
+          {/* Projects Section */}
+          <div className="mt-6 px-3">
+            <h3 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase mb-2">
+              Projects
+            </h3>
+
+            {/* Search Projects Box directly below PROJECTS heading */}
+            <div className="relative group cursor-text mb-2.5 w-full h-10">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 group-hover:text-neutral-200 transition-colors pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search projects..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full h-full bg-white/5 border border-white/10 rounded-full pl-10 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-white/20 transition-all cursor-text text-neutral-200 placeholder-neutral-400"
+              />
+            </div>
+          </div>
 
           {/* Recents List */}
           <div className="space-y-1 px-3">

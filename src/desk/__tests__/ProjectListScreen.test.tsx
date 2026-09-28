@@ -169,7 +169,7 @@ describe("the search bar & delete confirmation modal", () => {
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     // Sidebar search input
-    expect(screen.getByPlaceholderText("Search projects...")).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("Search projects...")).toBeInTheDocument();
 
     // Consolidated transparent AI prompt bar on main dashboard
     const promptInput = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i);
@@ -269,7 +269,7 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     const sidebarNewBtn = within(aside!).getByRole("button", { name: /\+.*New Project/i });
     expect(sidebarNewBtn).toBeInTheDocument();
     expect(sidebarNewBtn).toHaveClass("w-full");
-    const sidebarSearch = within(aside!).getByPlaceholderText("Search projects...");
+    const sidebarSearch = await within(aside!).findByPlaceholderText("Search projects...");
     expect(sidebarSearch).toBeInTheDocument();
 
     // Middle Section: wireframe nav links
@@ -288,8 +288,8 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     const askScholarBtn = within(aside!).getByRole("button", { name: /Ask Scholar/i });
     expect(askScholarBtn).toBeInTheDocument();
 
-    // Recents section contains real user projects
-    expect(await within(aside!).findByRole("heading", { name: "Recents" })).toBeInTheDocument();
+    // Projects section contains real user projects
+    expect(await within(aside!).findByRole("heading", { name: "Projects" })).toBeInTheDocument();
     expect(await within(aside!).findByText("Comparative Analysis of In Vivo Cleavage")).toBeInTheDocument();
 
     // Bottom Section: Settings accessible as standalone item in sidebar above user profile block
@@ -307,8 +307,8 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
     const aside = container.querySelector("aside");
     expect(aside).toBeInTheDocument();
-    // In guest mode with no projects, recents section must not be displayed
-    expect(within(aside!).queryByRole("heading", { name: "Recents" })).not.toBeInTheDocument();
+    // In guest mode with no projects, projects section must not be displayed
+    expect(within(aside!).queryByRole("heading", { name: "Projects" })).not.toBeInTheDocument();
     expect(aside).toHaveClass("w-[260px]");
 
     // Click collapse icon inside sidebar
@@ -382,8 +382,8 @@ describe("sidebar projects & platform navigation", () => {
     expect(within(aside!).queryByRole("button", { name: "Projects" })).not.toBeInTheDocument();
     expect(within(aside!).queryByText("Platform Guide")).not.toBeInTheDocument();
 
-    // Recents section header and project in Recents list
-    expect(await within(aside!).findByRole("heading", { name: "Recents" })).toBeInTheDocument();
+    // Projects section header and project in Projects list
+    expect(await within(aside!).findByRole("heading", { name: "Projects" })).toBeInTheDocument();
     expect(await within(aside!).findByText("Comparative Analysis of In Vivo Cleavage")).toBeInTheDocument();
 
     // 3-dots More button opens options menu
@@ -398,7 +398,7 @@ describe("sidebar projects & platform navigation", () => {
     expect(within(aside!).getByRole("button", { name: /Add to Project/i })).toBeInTheDocument();
     expect(within(aside!).getByRole("button", { name: /Delete/i })).toBeInTheDocument();
 
-    // Recents item in sidebar allows direct workspace navigation
+    // Project item in sidebar allows direct workspace navigation
     const recentItem = await within(aside!).findByText("Comparative Analysis of In Vivo Cleavage");
     expect(recentItem).toBeInTheDocument();
 
@@ -406,7 +406,7 @@ describe("sidebar projects & platform navigation", () => {
     expect(onOpen).toHaveBeenCalledWith("proj-crispr-01");
   });
 
-  it("enforces ultra-subtle RECENTS typography and muted color hierarchy", async () => {
+  it("enforces ultra-subtle PROJECTS typography and muted color hierarchy", async () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
     const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
@@ -414,7 +414,7 @@ describe("sidebar projects & platform navigation", () => {
     expect(aside).toBeInTheDocument();
 
     // 1. Ultra-subtle header styling
-    const header = await within(aside!).findByRole("heading", { name: "Recents" });
+    const header = await within(aside!).findByRole("heading", { name: "Projects" });
     expect(header.className).toContain("text-xs");
     expect(header.className).toContain("font-semibold");
     expect(header.className).toContain("tracking-wider");
@@ -440,6 +440,33 @@ describe("sidebar projects & platform navigation", () => {
     expect(icon).toBeInTheDocument();
     expect(icon?.getAttribute("class")).toContain("text-neutral-500");
     expect(icon?.getAttribute("class")).toContain("group-hover:text-neutral-300");
+  });
+
+  it("places single Search Projects box directly below the Projects heading and removes it from above Knowledge Vault", async () => {
+    listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
+    const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const aside = container.querySelector("aside");
+    expect(aside).toBeInTheDocument();
+
+    // Exactly one Search Projects input exists in the entire sidebar
+    const searchInput = await within(aside!).findByPlaceholderText("Search projects...");
+    const searchInputs = within(aside!).getAllByPlaceholderText("Search projects...");
+    expect(searchInputs).toHaveLength(1);
+
+    const projectsHeading = await within(aside!).findByRole("heading", { name: "Projects" });
+
+    // The search box is positioned after the Projects heading in DOM order
+    expect(projectsHeading.compareDocumentPosition(searchInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // Verify Knowledge Vault button exists and is positioned BEFORE the Projects heading
+    const vaultBtn = within(aside!).getByRole("button", { name: /Knowledge Vault/i });
+    expect(vaultBtn.compareDocumentPosition(projectsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // New Project is before Knowledge Vault and search input is after Projects heading
+    const newProjectBtn = within(aside!).getByRole("button", { name: /\+.*New Project/i });
+    expect(newProjectBtn.compareDocumentPosition(vaultBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(projectsHeading.compareDocumentPosition(searchInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("renders distinct unique placeholders for multiple untitled projects in Recents and filters them via live search", async () => {
