@@ -8,6 +8,7 @@ import { LectureUploadDropzone } from "../components/LectureUploadDropzone";
 import {
   generateCuratedLiteratureSources,
   fetchMoreLiteratureSources,
+  areSourcesRelevantToQuestion,
 } from "../services/scholarlyDiscoveryService";
 import type {
   DiscoveredSource,
@@ -163,9 +164,20 @@ export default function AssignmentSourcesStage({
     sources.filter((s) => s.isExcluded || s.status === "removed").map((s) => s.id)
   );
 
-  // Initialize curated sources on first mount (ensure baseline of 30+ items)
+  // Check if existing sources are mismatched with the current question
+  const isMismatched = useMemo(() => {
+    if (!sources || sources.length === 0 || !question || question.trim().length < 4) return false;
+    return !areSourcesRelevantToQuestion(sources, question);
+  }, [sources, question]);
+
+  // Initialize curated sources on first mount (ensure baseline of 30+ items and domain alignment)
   useEffect(() => {
     if (sources.length === 0) {
+      const generated = generateCuratedLiteratureSources(question, citationStyle);
+      setSources(generated);
+    } else if (isMismatched && approvedSourceIds.length === 0) {
+      // If existing sources were for a different topic and user hasn't locked approved items,
+      // re-curate to align with the active question
       const generated = generateCuratedLiteratureSources(question, citationStyle);
       setSources(generated);
     } else if (sources.length < 30) {
@@ -175,7 +187,7 @@ export default function AssignmentSourcesStage({
       const additions = baseline.filter((b) => !existingIds.has(b.id));
       setSources([...sources, ...additions]);
     }
-  }, [sources.length, question, citationStyle, setSources]);
+  }, [sources.length, isMismatched, approvedSourceIds.length, question, citationStyle, setSources]);
 
   // Sync bookmarks & exclusions when sources change
   useEffect(() => {
@@ -188,6 +200,16 @@ export default function AssignmentSourcesStage({
       setExcludedIds((prev) => Array.from(new Set([...prev, ...excluded])));
     }
   }, [sources]);
+
+  // Re-curate literature for active assignment prompt
+  const handleReCurateForPrompt = async () => {
+    setIsFindingMore(true);
+    const generated = generateCuratedLiteratureSources(question, citationStyle);
+    await setSources(generated);
+    setIsFindingMore(false);
+    setDiscoverySuccessMsg(`Curated ${generated.length} literature sources matching your assignment prompt.`);
+    setTimeout(() => setDiscoverySuccessMsg(null), 4000);
+  };
 
   // Progressive Discovery: Find More Literature
   const handleFindMoreLiterature = async () => {
@@ -216,10 +238,16 @@ export default function AssignmentSourcesStage({
     await setSources(nextSources);
   };
 
-  // Dismiss / Replace source with item from replacement pool and dismissSource
+  // Dismiss / Replace source with item from replacement pool or dynamic pool matching question
   const handleDismissSource = async (sourceId: string) => {
-    const nextReplacement = REPLACEMENT_POOL[altPoolIndex % REPLACEMENT_POOL.length];
-    setAltPoolIndex((prev) => prev + 1);
+    let nextReplacement: DiscoveredSource | undefined;
+    if (question && (question.toLowerCase().includes("china") || question.toLowerCase().includes("geopolitic") || question.toLowerCase().includes("international order"))) {
+      const freshBatch = fetchMoreLiteratureSources(sources, question, 1);
+      nextReplacement = freshBatch[0];
+    } else {
+      nextReplacement = REPLACEMENT_POOL[altPoolIndex % REPLACEMENT_POOL.length];
+      setAltPoolIndex((prev) => prev + 1);
+    }
     await dismissSource(sourceId, nextReplacement);
   };
 
@@ -551,6 +579,27 @@ export default function AssignmentSourcesStage({
           </div>
         </div>
 
+        {/* Topic Mismatch Notice Banner if user changed prompt but has previously approved sources */}
+        {isMismatched && approvedSourceIds.length > 0 && (
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>
+                Your assignment question has changed. Would you like to curate fresh literature tailored to your research question?
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleReCurateForPrompt}
+              disabled={isFindingMore}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs shrink-0 cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isFindingMore ? "animate-spin" : ""}`} />
+              <span>Curate for Question</span>
+            </button>
+          </div>
+        )}
+
         {/* Filter Navigation Bar & Status Tabs */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
           {/* Status Tabs */}
@@ -654,6 +703,17 @@ export default function AssignmentSourcesStage({
                   {activeFilterCount}
                 </span>
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleReCurateForPrompt}
+              disabled={isFindingMore}
+              title="Re-curate literature specifically for your active assignment prompt"
+              className="px-2.5 py-1.5 rounded-xl text-xs font-medium border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-neutral-600 dark:text-neutral-300 hover:border-neutral-300 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isFindingMore ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">Re-curate</span>
             </button>
           </div>
         </div>

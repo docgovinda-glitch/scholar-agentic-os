@@ -6,6 +6,12 @@ import "@testing-library/jest-dom/vitest";
 import {
   generateCuratedLiteratureSources,
   fetchMoreLiteratureSources,
+  extractResearchIntent,
+  generateStructuredSearchQueries,
+  calculateScholarlyRelevance,
+  areSourcesRelevantToQuestion,
+  CORE_SCHOLARLY_CATALOG,
+  IR_CHINA_GEOPOLITICS_CATALOG,
 } from "../services/scholarlyDiscoveryService";
 import type { DiscoveredSource } from "../types";
 
@@ -317,6 +323,134 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
 
       // Verify bookmarked item is shown
       expect(screen.getByText(/Algorithmic Governance and the Politics of Predictive Accountability/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("6. Semantic Literature Discovery for 'How has the rise of China affected …'", () => {
+    const chinaQuestion = "How has the rise of China affected …";
+
+    it("parses assignment question into research intent, primary entities, and international relations domain", () => {
+      const intent = extractResearchIntent(chinaQuestion);
+      expect(intent.academicDomain).toBe("International Relations & Geopolitics");
+      expect(intent.primaryEntities).toContain("China");
+      expect(intent.coreThematicConcepts).toContain("Rise of China");
+      expect(intent.commandVerb).toBe("Causal & Systemic Impact Evaluation");
+    });
+
+    it("generates multi-angle structured search queries capturing meaning and research intent", () => {
+      const intent = extractResearchIntent(chinaQuestion);
+      const queries = generateStructuredSearchQueries(intent);
+      expect(queries.primary).toContain("China");
+      expect(queries.primary).toContain("effects");
+      expect(queries.theoretical).toMatch(/power transition|realism|liberalism/i);
+      expect(queries.institutional).toMatch(/institutions|global governance|Bretton Woods/i);
+      expect(queries.regional).toMatch(/Indo-Pacific|East Asia|security/i);
+      expect(queries.economic).toMatch(/economic statecraft|Belt and Road/i);
+    });
+
+    it("retrieves genuinely relevant literature addressing China's rise, global influence, and international relations", () => {
+      const sources = generateCuratedLiteratureSources(chinaQuestion, "apa7");
+      expect(sources.length).toBeGreaterThanOrEqual(30);
+
+      // Verify that literature directly addresses China, its rise, and geopolitics
+      const chinaSources = sources.filter(
+        (s) =>
+          s.title.toLowerCase().includes("china") ||
+          s.abstract?.toLowerCase().includes("china") ||
+          s.keyConcepts?.some((k) => k.toLowerCase().includes("china"))
+      );
+      expect(chinaSources.length).toBeGreaterThanOrEqual(28);
+
+      // Verify presence of seminal International Relations and China scholars
+      const allAuthors = sources.flatMap((s) => s.authors).join(" ");
+      expect(allAuthors).toMatch(/Allison|Johnston|Mearsheimer|Ikenberry|Shambaugh|Weiss|Economy/);
+
+      // Verify zero unprompted algorithmic governance or machine learning papers leaked
+      const leakedTechSources = sources.filter(
+        (s) =>
+          s.domain.toLowerCase().includes("computer science") ||
+          s.title.toLowerCase().includes("algorithmic") ||
+          s.title.toLowerCase().includes("machine learning")
+      );
+      expect(leakedTechSources.length).toBe(0);
+
+      // Ensure every source satisfies relevance threshold >= 70
+      sources.forEach((s) => {
+        expect(s.relevanceScore).toBeGreaterThanOrEqual(70);
+        expect(s.domain).toBe("International Relations & Geopolitics");
+        expect(s.isVerifiedAcademic).toBe(true);
+      });
+    });
+
+    it("detects mismatch when stale algorithmic governance sources exist for an IR China question", () => {
+      // Algorithmic governance catalog should NOT be deemed relevant to China question
+      const isRelevant = areSourcesRelevantToQuestion(CORE_SCHOLARLY_CATALOG as any, chinaQuestion);
+      expect(isRelevant).toBe(false);
+
+      // IR catalog should be deemed relevant
+      const isIrRelevant = areSourcesRelevantToQuestion(IR_CHINA_GEOPOLITICS_CATALOG as any, chinaQuestion);
+      expect(isIrRelevant).toBe(true);
+    });
+
+    it("progressively discovers additional non-duplicate China & IR literature on fetchMoreLiteratureSources", () => {
+      const initialSources = generateCuratedLiteratureSources(chinaQuestion, "apa7");
+      const moreSources = fetchMoreLiteratureSources(initialSources, chinaQuestion, 10);
+      expect(moreSources.length).toBe(10);
+
+      const initialIds = new Set(initialSources.map((s) => s.id));
+      const initialDois = new Set(initialSources.map((s) => s.doi).filter(Boolean));
+
+      moreSources.forEach((s) => {
+        expect(initialIds.has(s.id)).toBe(false);
+        if (s.doi) expect(initialDois.has(s.doi)).toBe(false);
+        expect(s.relevanceScore).toBeGreaterThanOrEqual(70);
+      });
+    });
+  });
+
+  describe("7. Question Variations and Domain Generalizability", () => {
+    it("handles specific variation: 'How has the rise of China affected the international order and US-China relations?'", () => {
+      const prompt = "How has the rise of China affected the international order and US-China relations?";
+      const sources = generateCuratedLiteratureSources(prompt, "apa7");
+      expect(sources.length).toBeGreaterThanOrEqual(30);
+
+      // Check top sources address international order and US-China relations
+      const top3 = sources.slice(0, 3);
+      const topTitles = top3.map((s) => s.title).join(" ");
+      expect(topTitles).toMatch(/Status Quo|Liberal System|Destined for War|Great-Power/i);
+    });
+
+    it("handles specific variation: 'The economic and geopolitical implications of the Belt and Road Initiative on developing nations'", () => {
+      const prompt = "The economic and geopolitical implications of the Belt and Road Initiative on developing nations";
+      const sources = generateCuratedLiteratureSources(prompt, "apa7");
+      expect(sources.length).toBeGreaterThanOrEqual(30);
+
+      const briSources = sources.filter(
+        (s) =>
+          s.title.toLowerCase().includes("belt and road") ||
+          s.abstract?.toLowerCase().includes("belt and road") ||
+          s.abstract?.toLowerCase().includes("eurasian") ||
+          s.title.toLowerCase().includes("economic") ||
+          s.keyConcepts?.some((k) =>
+            k.toLowerCase().includes("belt and road") ||
+            k.toLowerCase().includes("economic") ||
+            k.toLowerCase().includes("geoeconomic")
+          )
+      );
+      expect(briSources.length).toBeGreaterThanOrEqual(8);
+    });
+
+    it("generalizes to other domains such as Environmental Science & Climate Policy", () => {
+      const prompt = "Evaluating the efficacy of carbon pricing mechanisms and emissions trading in the European Union";
+      const intent = extractResearchIntent(prompt);
+      expect(intent.academicDomain).toBe("Environmental Science & Climate Policy");
+
+      const sources = generateCuratedLiteratureSources(prompt, "apa7");
+      expect(sources.length).toBeGreaterThanOrEqual(30);
+
+      // Should not contain China or Algorithmic Governance papers
+      const chinaPapers = sources.filter((s) => s.title.toLowerCase().includes("china"));
+      expect(chinaPapers.length).toBe(0);
     });
   });
 });
