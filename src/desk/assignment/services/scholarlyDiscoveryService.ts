@@ -15,6 +15,7 @@ import type {
   SourceCredibilityTier,
 } from "../types";
 import { UN_PEACE_SECURITY_CATALOG } from "./catalogs/unPeaceSecurityCatalog";
+import { QUANTUM_COMPUTING_CATALOG } from "./catalogs/quantumComputingCatalog";
 
 export interface ScholarlyCatalogItem {
   id: string;
@@ -62,6 +63,7 @@ export type AcademicDomain =
   | "Economics, Trade & Political Economy"
   | "Environmental Science & Climate Policy"
   | "Computer Science & AI Governance"
+  | "Quantum Information & Computational Physics"
   | "Public Health & Biomedical Sciences"
   | "Sociology & Critical Theory"
   | "General Academic Studies";
@@ -170,6 +172,12 @@ export function deconstructAssignmentQuestion(questionOrTopic?: string): Questio
   ];
 
   const countMatches = (signals: string[]) => signals.filter((s) => lower.includes(s)).length;
+  const quantumSignals = [
+    "quantum", "qubit", "qubits", "superconducting", "trapped-ion", "transmon", "shor", "grover",
+    "vqe", "qaoa", "nisq", "decoherence", "surface code", "threshold theorem", "magic state",
+    "qkd", "bb84", "pqc", "fips 203", "lattice-based", "bqp", "quantum computing", "quantum algorithm", "qec"
+  ];
+  const quantumScore = countMatches(quantumSignals);
   const irScore = countMatches(irSignals);
   const csScore = countMatches(csSignals);
   const lawScore = countMatches(lawSignals);
@@ -178,7 +186,9 @@ export function deconstructAssignmentQuestion(questionOrTopic?: string): Questio
   const healthScore = countMatches(healthSignals);
 
   let academicDiscipline: AcademicDomain = "General Academic Studies";
-  if (irScore > 0 && irScore >= csScore && irScore >= lawScore && irScore >= econScore) {
+  if (quantumScore > 0 && quantumScore >= csScore && quantumScore >= irScore) {
+    academicDiscipline = "Quantum Information & Computational Physics";
+  } else if (irScore > 0 && irScore >= csScore && irScore >= lawScore && irScore >= econScore) {
     academicDiscipline = "International Relations & Geopolitics";
   } else if (csScore > 0 && csScore >= irScore && csScore >= lawScore) {
     academicDiscipline = "Computer Science & AI Governance";
@@ -201,6 +211,15 @@ export function deconstructAssignmentQuestion(questionOrTopic?: string): Questio
   // 2. Geographic Scope & Cases
   const geographicScope: string[] = [];
   const cases: string[] = [];
+
+  if (academicDiscipline === "Quantum Information & Computational Physics" || quantumScore > 0) {
+    cases.push(
+      "NISQ Physical Realisations (Transmon vs Trapped-Ion)",
+      "Surface Code Fault-Tolerance & Magic State Distillation",
+      "Post-Quantum Cryptographic Migration (NIST Standards)"
+    );
+    geographicScope.push("Quantum Information Systems & Computational Physics");
+  }
 
   const geoRules: Array<{ test: RegExp; scope: string; cCase?: string }> = [
     { test: /\b(ukraine|russia|moscow|kyiv|donbas|crimea)\b/i, scope: "Eastern Europe & Transatlantic", cCase: "Russia-Ukraine War & European Security Architecture" },
@@ -227,7 +246,15 @@ export function deconstructAssignmentQuestion(questionOrTopic?: string): Questio
 
   // 3. Relevant Theories (discipline-aware)
   const theories: string[] = [];
-  if (academicDiscipline === "International Relations & Geopolitics") {
+  if (academicDiscipline === "Quantum Information & Computational Physics") {
+    theories.push(
+      "Circuit Quantum Electrodynamics (cQED) & Transmon Physics",
+      "Topological Quantum Error Correction (Surface Codes)",
+      "Stabilizer Formalism & Fault-Tolerant Threshold Theorem",
+      "Quantum Computational Complexity (BQP vs NP)",
+      "Information-Theoretic Security & Quantum Cryptography"
+    );
+  } else if (academicDiscipline === "International Relations & Geopolitics") {
     if (lower.includes("realis") || lower.includes("power") || lower.includes("anarch") || lower.includes("hegemon")) {
       theories.push("Structural Realism & Neorealism", "Offensive Realism");
     }
@@ -267,7 +294,11 @@ export function deconstructAssignmentQuestion(questionOrTopic?: string): Questio
   const dependent: string[] = [];
   const explanatory: string[] = [];
 
-  if (academicDiscipline === "International Relations & Geopolitics") {
+  if (academicDiscipline === "Quantum Information & Computational Physics") {
+    independent.push("Physical Qubit Modality (Superconducting Transmon vs Trapped-Ion)", "Physical Gate Infidelity & Coherence Times (T1/T2)", "Code Distance d & Syndrome Extraction Cycle");
+    dependent.push("Logical Error Rate per Cycle", "Fault-Tolerant Circuit Depth", "Cryptanalytic Threat Horizon (RSA-2048 Breakability)");
+    explanatory.push("Phase/Bit Flip Decoherence Mechanisms", "Minimum-Weight Perfect Matching Decoding", "Magic State Distillation Factory Overheads");
+  } else if (academicDiscipline === "International Relations & Geopolitics") {
     if (lower.includes("nuclear") || lower.includes("deterren")) {
       independent.push("Nuclear Arsenal Asymmetry", "Second-Strike Survivability", "Doctrinal Posture");
       dependent.push("Crisis Stability", "Deterrence Resilience", "Sub-Conventional Conflict Risks");
@@ -435,6 +466,12 @@ export function extractResearchIntent(questionOrTopic?: string): ResearchIntent 
   const countMatches = (signals: string[]) =>
     signals.filter((s) => lower.includes(s)).length;
 
+  const quantumSignals = [
+    "quantum", "qubit", "qubits", "superconducting", "trapped-ion", "transmon", "shor", "grover",
+    "vqe", "qaoa", "nisq", "decoherence", "surface code", "threshold theorem", "magic state",
+    "qkd", "bb84", "pqc", "fips 203", "lattice-based", "bqp", "quantum computing", "quantum algorithm", "qec"
+  ];
+  const quantumScore = countMatches(quantumSignals);
   const irScore = countMatches(irSignals);
   const csScore = countMatches(csSignals);
   const lawScore = countMatches(lawSignals);
@@ -443,7 +480,9 @@ export function extractResearchIntent(questionOrTopic?: string): ResearchIntent 
   const healthScore = countMatches(healthSignals);
 
   let academicDomain: AcademicDomain = "General Academic Studies";
-  if (irScore > 0 && irScore >= csScore && irScore >= lawScore && irScore >= econScore) {
+  if (quantumScore > 0 && quantumScore >= csScore && quantumScore >= irScore) {
+    academicDomain = "Quantum Information & Computational Physics";
+  } else if (irScore > 0 && irScore >= csScore && irScore >= lawScore && irScore >= econScore) {
     academicDomain = "International Relations & Geopolitics";
   } else if (csScore > 0 && csScore >= irScore && csScore >= lawScore) {
     academicDomain = "Computer Science & AI Governance";
@@ -466,6 +505,19 @@ export function extractResearchIntent(questionOrTopic?: string): ResearchIntent 
   // Sub-topic determination within or across domains
   let subTopic: string | undefined = undefined;
   if (
+    quantumScore > 0 ||
+    lower.includes("quantum") ||
+    lower.includes("qubit") ||
+    lower.includes("superconducting") ||
+    lower.includes("trapped-ion") ||
+    lower.includes("shor") ||
+    lower.includes("grover") ||
+    lower.includes("surface code") ||
+    lower.includes("qkd") ||
+    lower.includes("pqc")
+  ) {
+    subTopic = "quantum_computing";
+  } else if (
     lower.includes("united nations") ||
     lower.includes("security council") ||
     lower.includes("peacekeeping") ||
@@ -498,7 +550,9 @@ export function extractResearchIntent(questionOrTopic?: string): ResearchIntent 
 
   // Extract primary entities
   const primaryEntities: string[] = [];
-  if (subTopic === "un_peace_security") {
+  if (subTopic === "quantum_computing") {
+    primaryEntities.push("Superconducting Transmons", "Trapped-Ion Processors", "NISQ Architectures", "Surface Codes", "Post-Quantum Cryptography");
+  } else if (subTopic === "un_peace_security") {
     primaryEntities.push("United Nations", "UN Security Council", "General Assembly", "Permanent Five (P5)", "Department of Peace Operations");
   } else if (subTopic === "china_power_transition" || lower.includes("china") || lower.includes("chinese") || lower.includes("beijing") || lower.includes("sino")) {
     primaryEntities.push("China", "Beijing", "United States", "East Asia", "Global South");
@@ -2948,6 +3002,14 @@ export function calculateScholarlyRelevance(
     } else {
       score += 5;
     }
+  } else if (targetDomain.includes("quantum")) {
+    if (sourceDomain.includes("quantum") || sourceDomain.includes("computational physics")) {
+      score += 25;
+    } else if (sourceDomain.includes("computer science") || sourceDomain.includes("formal methods")) {
+      score += 15;
+    } else {
+      score += 0;
+    }
   } else if (targetDomain.includes("environmental")) {
     if (sourceDomain.includes("environment") || sourceDomain.includes("climate")) {
       score += 25;
@@ -3436,7 +3498,13 @@ export function generateCuratedLiteratureSources(
   // 1. Gather candidate catalog items based on domain & subtopic
   let candidatePool: ScholarlyCatalogItem[] = [];
 
-  if (intent.subTopic === "un_peace_security") {
+  if (
+    intent.subTopic === "quantum_computing" ||
+    intent.academicDomain === "Quantum Information & Computational Physics" ||
+    /quantum|qubit|superconducting|trapped-ion|shor|grover/i.test(topic || "")
+  ) {
+    candidatePool = [...QUANTUM_COMPUTING_CATALOG];
+  } else if (intent.subTopic === "un_peace_security") {
     candidatePool = [...UN_PEACE_SECURITY_CATALOG];
   } else if (intent.subTopic === "china_power_transition") {
     candidatePool = [...IR_CHINA_GEOPOLITICS_CATALOG];
@@ -3575,7 +3643,13 @@ export function fetchMoreLiteratureSources(
 
   // Pool of catalog items based on domain & subtopic
   let masterPool: ScholarlyCatalogItem[] = [];
-  if (intent.subTopic === "un_peace_security") {
+  if (
+    intent.subTopic === "quantum_computing" ||
+    intent.academicDomain === "Quantum Information & Computational Physics" ||
+    /quantum|qubit|superconducting|trapped-ion|shor|grover/i.test(topic || "")
+  ) {
+    masterPool = [...QUANTUM_COMPUTING_CATALOG, ...EXPANSION_SCHOLARLY_POOL];
+  } else if (intent.subTopic === "un_peace_security") {
     masterPool = [...UN_PEACE_SECURITY_CATALOG, ...EXPANSION_IR_POOL];
   } else if (intent.subTopic === "china_power_transition") {
     masterPool = [...IR_CHINA_GEOPOLITICS_CATALOG, ...EXPANSION_IR_POOL];

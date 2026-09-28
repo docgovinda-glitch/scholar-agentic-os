@@ -547,34 +547,48 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     }`;
 
     // 5. Concepts, Expected Response Type, Evidence Requirements, Summary
-    const keyConcepts = [
-      "Theoretical Framework",
-      "Empirical Evidence",
-      "Critical Synthesis",
-      "Methodological Rigor",
-      "Counterargument Evaluation",
-    ];
+    const isQuantum = /quantum|qubit|superconducting|trapped-ion|shor|grover|qec|surface code|nisq|post-quantum|qkd|qnt-4020/i.test(combinedContent);
+    const isExamOrQuestionnaire = /examination|questionnaire|question\s*1|part\s*1|marks\b/i.test(combinedContent);
 
-    const expectedResponseType =
-      assignmentType === "case_study"
-        ? "Strategic case analysis diagnosing root causes, evaluating alternatives, and proposing an implementation roadmap."
-        : assignmentType === "report" || assignmentType === "business_assignment"
-        ? "Structured professional report with numbered subheadings, empirical findings, and actionable SMART recommendations."
-        : assignmentType === "reflection"
-        ? "Critical reflective analysis connecting experiential practice with pedagogical and disciplinary theory (e.g. Gibbs' cycle)."
-        : assignmentType === "lab_report"
-        ? "Scientific laboratory report following IMRaD structure with empirical hypothesis testing and error analysis."
-        : "Dialectical academic essay advancing a central argumentative thesis substantiated by peer-reviewed evidence.";
+    const keyConcepts = isQuantum
+      ? [
+          "Superconducting Transmon vs Trapped-Ion Physical Realisations",
+          "NISQ Hardware Limits & Error Mitigation (ZNE/PEC/CDR)",
+          "Quantum Algorithmic Complexity (BQP, Shor & Grover)",
+          "Planar Surface Codes & Fault-Tolerant Threshold Theorem",
+          "Quantum Key Distribution (BB84) & Post-Quantum Cryptography (FIPS 203)",
+        ]
+      : [
+          "Theoretical Framework",
+          "Empirical Evidence",
+          "Critical Synthesis",
+          "Methodological Rigor",
+          "Counterargument Evaluation",
+        ];
 
-    const evidenceRequirements =
-      academicLevel === "postgraduate"
-        ? "High-impact peer-reviewed journal articles, foundational theoretical monographs, and authoritative empirical datasets."
-        : "Authoritative academic sources, scholarly peer-reviewed journals, and verified institutional benchmark data.";
+    const expectedResponseType = isExamOrQuestionnaire
+      ? "Rigorous, structured technical answers solving all examination questions systematically with theoretical frameworks, mathematical rigor, and standard Harvard referencing."
+      : assignmentType === "case_study"
+      ? "Strategic case analysis diagnosing root causes, evaluating alternatives, and proposing an implementation roadmap."
+      : assignmentType === "report" || assignmentType === "business_assignment"
+      ? "Structured professional report with numbered subheadings, empirical findings, and actionable SMART recommendations."
+      : assignmentType === "reflection"
+      ? "Critical reflective analysis connecting experiential practice with pedagogical and disciplinary theory (e.g. Gibbs' cycle)."
+      : assignmentType === "lab_report"
+      ? "Scientific laboratory report following IMRaD structure with empirical hypothesis testing and error analysis."
+      : "Dialectical academic essay advancing a central argumentative thesis substantiated by peer-reviewed evidence.";
 
-    const academicLevelNotes =
-      academicLevel === "postgraduate"
-        ? "Calibrated for Postgraduate / Masters study: demands high theoretical synthesis, methodological reflexivity, nuanced hedging, and original critical insight."
-        : "Calibrated for Undergraduate study: emphasizes conceptual clarity, structured logical flow, accurate evidence deployment, and clear thesis progression.";
+    const evidenceRequirements = isQuantum
+      ? "Authoritative quantum computing literature (e.g. Preskill 2018, Nielsen & Chuang 2010, Fowler et al. 2012, Shor 1994, Arute et al. 2019, Gidney & Ekerå 2021) adhering to Harvard style."
+      : academicLevel === "postgraduate"
+      ? "High-impact peer-reviewed journal articles, foundational theoretical monographs, and authoritative empirical datasets."
+      : "Authoritative academic sources, scholarly peer-reviewed journals, and verified institutional benchmark data.";
+
+    const academicLevelNotes = isQuantum
+      ? "Calibrated for Honours / Postgraduate Quantum Information Systems examination standards. Demands mathematical precision, physical circuit mechanics, and rigorous theoretical grounding."
+      : academicLevel === "postgraduate"
+      ? "Calibrated for Postgraduate / Masters study: demands high theoretical synthesis, methodological reflexivity, nuanced hedging, and original critical insight."
+      : "Calibrated for Undergraduate study: emphasizes conceptual clarity, structured logical flow, accurate evidence deployment, and clear thesis progression.";
 
     const penaltyNote = penaltyItems.length > 0 ? ` Note: ${penaltyItems.length} specific penalty clause(s) identified.` : "";
 
@@ -659,77 +673,159 @@ function buildDeterministicResearchPlan(
   } catch {
     parsedAnalysis = {};
   }
+
+  const isQuantum = /quantum|qubit|superconducting|trapped-ion|shor|grover|qec|surface code|nisq|post-quantum|qkd|qnt-4020/i.test(qClean);
+
   const concepts = parsedAnalysis.keyConcepts?.length > 0 
     ? parsedAnalysis.keyConcepts 
+    : isQuantum
+    ? [
+        "Superconducting Transmon vs Trapped-Ion Modalities",
+        "NISQ Constraints & Error Mitigation (ZNE/PEC)",
+        "BQP Complexity & Algorithmic Mechanics (Shor & Grover)",
+        "Planar Surface Codes & Fault-Tolerant Threshold Theorem",
+        "Quantum Cryptography (BB84 QKD) & Post-Quantum Cryptography (FIPS 203)",
+      ]
     : ["Theoretical Framework", "Empirical Accountability", "Governance & Regulation"];
 
-  const coreQuestions: CoreResearchQuestion[] = [
-    {
-      id: "q-1",
-      question: `What foundational theoretical frameworks and empirical mechanisms govern "${qClean.slice(0, 90)}"?`,
-      rationale: "Establishes conceptual boundaries and foundational academic terminology mandated by First-Class rubric criteria.",
-      category: "Theoretical Foundation",
-    },
-    {
-      id: "q-2",
-      question: `How do competing scholarly perspectives and empirical datasets evaluate tensions between operational efficiency and institutional accountability in ${concepts[0] || "this domain"}?`,
-      rationale: "Fulfills examiner command verb requirements for critical synthesis and debate.",
-      category: "Dialectical Tension",
-    },
-    {
-      id: "q-3",
-      question: `What methodological limitations, systemic risks, and unintended consequences arise when applying ${concepts[1] || "these models"} in practical settings?`,
-      rationale: "Demonstrates high-level evaluative critique and awareness of real-world constraints.",
-      category: "Empirical Reality",
-    },
-    {
-      id: "q-4",
-      question: `Which justified regulatory, ethical, or policy interventions best reconcile competing stakeholder demands and long-term public interest?`,
-      rationale: "Provides grounded, actionable synthesis necessary to conclude the inquiry with academic authority.",
-      category: "Policy & Resolution",
-    },
-  ];
+  const coreQuestions: CoreResearchQuestion[] = isQuantum
+    ? [
+        {
+          id: "q-1",
+          question: "How do physical qubit modalities (superconducting transmon vs trapped-ion) trade off gate speed against coherence times (T1, T2) and inter-qubit connectivity?",
+          rationale: "Evaluates microscopic physical mechanisms and architectural DiVincenzo criteria required for Part 1.",
+          category: "Hardware Architectures",
+        },
+        {
+          id: "q-2",
+          question: "What are the computational limits of NISQ processors, and why do error mitigation techniques (ZNE, PEC, CDR) fail on deep circuits compared to fault-tolerant error correction?",
+          rationale: "Synthesizes Preskill (2018) NISQ limits against scaling thresholds required for First-Class honors.",
+          category: "NISQ & Error Mitigation",
+        },
+        {
+          id: "q-3",
+          question: "How do Shor's (exponential) and Grover's (quadratic) algorithms demonstrate quantum advantage, and where does BQP sit relative to P, NP, and the Extended Church-Turing thesis?",
+          rationale: "Directly solves the algorithmic mechanics and complexity-theoretic foundations of Part 2.",
+          category: "Algorithmic Advantage",
+        },
+        {
+          id: "q-4",
+          question: "Under what physical gate error rates does the 2D surface code achieve fault tolerance, and what magic state distillation overheads govern cryptanalytic feasibility (e.g. RSA-2048)?",
+          rationale: "Analyzes stabilizer syndrome extraction cycles, threshold theorems (Fowler 2012), and physical-to-logical qubit ratios (Gidney & Ekerå 2021).",
+          category: "Fault Tolerance & QEC",
+        },
+      ]
+    : [
+        {
+          id: "q-1",
+          question: `What foundational theoretical frameworks and empirical mechanisms govern "${qClean.slice(0, 90)}"?`,
+          rationale: "Establishes conceptual boundaries and foundational academic terminology mandated by First-Class rubric criteria.",
+          category: "Theoretical Foundation",
+        },
+        {
+          id: "q-2",
+          question: `How do competing scholarly perspectives and empirical datasets evaluate tensions between operational efficiency and institutional accountability in ${concepts[0] || "this domain"}?`,
+          rationale: "Fulfills examiner command verb requirements for critical synthesis and debate.",
+          category: "Dialectical Tension",
+        },
+        {
+          id: "q-3",
+          question: `What methodological limitations, systemic risks, and unintended consequences arise when applying ${concepts[1] || "these models"} in practical settings?`,
+          rationale: "Demonstrates high-level evaluative critique and awareness of real-world constraints.",
+          category: "Empirical Reality",
+        },
+        {
+          id: "q-4",
+          question: `Which justified regulatory, ethical, or policy interventions best reconcile competing stakeholder demands and long-term public interest?`,
+          rationale: "Provides grounded, actionable synthesis necessary to conclude the inquiry with academic authority.",
+          category: "Policy & Resolution",
+        },
+      ];
 
-  const searchStrategies: RecommendedSearchStrategy[] = [
-    {
-      id: "strat-1",
-      database: "Google Scholar",
-      searchQuery: `"${concepts[0] || 'algorithmic governance'}" AND ("theoretical framework" OR "conceptual model") AND "peer-reviewed"`,
-      relevanceTarget: "Seminal papers and high-impact theoretical paradigms published in leading journals.",
-    },
-    {
-      id: "strat-2",
-      database: "JSTOR / Scopus",
-      searchQuery: `("${concepts[0] || 'algorithmic governance'}" OR "${concepts[1] || 'accountability'}") AND ("empirical analysis" OR "case study") AND (2020 OR 2021 OR 2022 OR 2023 OR 2024 OR 2025)`,
-      relevanceTarget: "Recent peer-reviewed empirical case studies measuring operational impact.",
-    },
-    {
-      id: "strat-3",
-      database: "CrossRef / Web of Science",
-      searchQuery: `"${concepts[1] || 'regulatory compliance'}" AND ("EU AI Act" OR "institutional oversight") AND NOT "non-academic"`,
-      relevanceTarget: "Statutory governance frameworks and institutional audit methodologies.",
-    },
-    {
-      id: "strat-4",
-      database: "SSRN / Academic Repositories",
-      searchQuery: `("${qClean.slice(0, 40)}" OR "${concepts[2] || 'systemic risk'}") AND ("counterarguments" OR "systemic bias")`,
-      relevanceTarget: "Dialectical counterarguments and stress-testing evidence against orthodox claims.",
-    },
-  ];
+  const searchStrategies: RecommendedSearchStrategy[] = isQuantum
+    ? [
+        {
+          id: "strat-1",
+          database: "arXiv (quant-ph) / Physical Review Letters",
+          searchQuery: '"quantum computing" AND ("superconducting transmon" OR "trapped ion") AND ("gate fidelity" OR "coherence")',
+          relevanceTarget: "Foundational hardware reviews (Kjaergaard 2020) and experimental demonstrations (Arute 2019).",
+        },
+        {
+          id: "strat-2",
+          database: "Physical Review A / IEEE FOCS",
+          searchQuery: '("Shor\'s algorithm" OR "Grover\'s algorithm") AND ("order finding" OR "phase estimation" OR "amplitude amplification")',
+          relevanceTarget: "Seminal algorithmic papers (Shor 1994, Grover 1996, Nielsen & Chuang 2010).",
+        },
+        {
+          id: "strat-3",
+          database: "Physical Review A / Quantum",
+          searchQuery: '"surface codes" AND ("threshold theorem" OR "magic state distillation") AND ("Fowler" OR "Gidney")',
+          relevanceTarget: "Topological quantum error correction benchmarks (Fowler 2012, Gidney & Ekerå 2021).",
+        },
+        {
+          id: "strat-4",
+          database: "Theoretical Computer Science / NIST Standards",
+          searchQuery: '("quantum key distribution" OR "BB84" OR "post-quantum cryptography" OR "FIPS 203" OR "ML-KEM")',
+          relevanceTarget: "Cryptographic protocol foundations (Bennett & Brassard 2014) and PQC standards (NIST 2024).",
+        },
+      ]
+    : [
+        {
+          id: "strat-1",
+          database: "Google Scholar",
+          searchQuery: `"${concepts[0] || 'algorithmic governance'}" AND ("theoretical framework" OR "conceptual model") AND "peer-reviewed"`,
+          relevanceTarget: "Seminal papers and high-impact theoretical paradigms published in leading journals.",
+        },
+        {
+          id: "strat-2",
+          database: "JSTOR / Scopus",
+          searchQuery: `("${concepts[0] || 'algorithmic governance'}" OR "${concepts[1] || 'accountability'}") AND ("empirical analysis" OR "case study") AND (2020 OR 2021 OR 2022 OR 2023 OR 2024 OR 2025)`,
+          relevanceTarget: "Recent peer-reviewed empirical case studies measuring operational impact.",
+        },
+        {
+          id: "strat-3",
+          database: "CrossRef / Web of Science",
+          searchQuery: `"${concepts[1] || 'regulatory compliance'}" AND ("EU AI Act" OR "institutional oversight") AND NOT "non-academic"`,
+          relevanceTarget: "Statutory governance frameworks and institutional audit methodologies.",
+        },
+        {
+          id: "strat-4",
+          database: "SSRN / Academic Repositories",
+          searchQuery: `("${qClean.slice(0, 40)}" OR "${concepts[2] || 'systemic risk'}") AND ("counterarguments" OR "systemic bias")`,
+          relevanceTarget: "Dialectical counterarguments and stress-testing evidence against orthodox claims.",
+        },
+      ];
+
+  const keyDebates = isQuantum
+    ? [
+        "NISQ error mitigation (ZNE/CDR) vs Fault-Tolerant Surface Codes (threshold theorem)",
+        "Physical qubit scaling: Transmon Josephson junction dielectric losses vs Trapped-Ion optical switching bottlenecks",
+        "Exponential quantum speedup (Shor) vs Quadratic quantum speedup (Grover) and cryptographic implications",
+        "QKD information-theoretic security (fiber attenuation/no-cloning) vs PQC lattice-based mathematical hardness (NIST FIPS 203)",
+      ]
+    : [
+        "Algorithmic efficiency vs transparent procedural fairness",
+        "Centralized statutory regulation vs agile self-governance standards",
+        "Individual rights and privacy vs collective security and optimization",
+      ];
+
+  const evidenceTypesNeeded = isQuantum
+    ? [
+        "Seminal quantum computing peer-reviewed journal papers (Physical Review A/Letters, Quantum, Nature)",
+        "Conference proceedings in theoretical computer science (IEEE FOCS, ACM STOC)",
+        "Official cryptographic standards publications (NIST FIPS 203/204/205)",
+      ]
+    : [
+        "Peer-reviewed academic journal publications (Q1/Q2 ranked journals)",
+        "Official institutional whitepapers (EU Commission, IEEE, OECD)",
+        "Empirical field audit data and audited corporate/public case studies",
+      ];
 
   return {
     coreQuestions,
     mainConcepts: concepts,
-    keyDebates: [
-      "Algorithmic efficiency vs transparent procedural fairness",
-      "Centralized statutory regulation vs agile self-governance standards",
-      "Individual rights and privacy vs collective security and optimization",
-    ],
-    evidenceTypesNeeded: [
-      "Peer-reviewed academic journal publications (Q1/Q2 ranked journals)",
-      "Official institutional whitepapers (EU Commission, IEEE, OECD)",
-      "Empirical field audit data and audited corporate/public case studies",
-    ],
+    keyDebates,
+    evidenceTypesNeeded,
     searchStrategies,
     outOfScopeTopics: [
       "Unverified blog posts, speculative trade journalism, or marketing collateral",
