@@ -126,23 +126,21 @@ Every discovered source is evaluated and tagged with:
 
 ---
 
-## 7. Workspace User Interface
+## 7. Workspace User Interface & Minimalist Card Grid
 
-### 7.1 Interactive Matrix Table View
-The Workspace Table View provides a side-by-side comparison matrix of discovered sources:
+### 7.1 Streamlined Apple & Airbnb-Grade Card Grid
+Step 02 eliminates dense view switchers, purple prose, and 41-source ghost states in favor of a clean, responsive 2-column card grid (`curated-sources-grid`):
 
-| Source | Year | Relevance | Role in Assignment | Venue / Publisher | Methodology | Citations | Actions |
-| :--- | :---: | :---: | :---: | :--- | :--- | :---: | :---: |
-| Recent relevant study | `2026 Recent` | `Very High` | `Empirical evidence` | International Security | Mixed-Methods | 42 | ⭐ Approve |
-| Recent theoretical study | `2025` | `High` | `Theoretical framework` | Foreign Affairs | Qualitative | 89 | ⭐ Approve |
-| Relevant comparative study | `2025` | `High` | `Comparative evidence` | World Politics | Comparative Case | 67 | ⭐ Approve |
-| Foundational study | `1999 Foundational` | `High` | `Core theory` | Cambridge University Press | Theoretical | 4,120 | ⭐ Approve |
+- **Clean Typography & Hierarchy**: Strict alignment with Airbnb Typography and Apple design tokens (`--surface-canvas` `#F7F5F0`, `--surface-raised` `#FFFFFF`, `--color-border-subtle`).
+- **Standardized Source Type Pills**: Clearly identifies `Journal`, `Book`, `Conference`, `Institutional`, or `Report` publications.
+- **Evidence Role Badges**: Contextual tags indicating assignment function (`Empirical evidence`, `Theoretical framework`, `Core theory`, etc.).
+- **Concise Scholarly Relevance**: Focused 2-line snippets explaining how the source contributes evidence directly to the student's assignment thesis.
+- **Instant Toggle Actions**: One-click `+ Add Source` or `✓ Added` buttons that dynamically update evidence metrics and the top-bar drafting gate counter.
 
-### 7.2 Multi-View Synchronized Surfaces
-- **Card View** ([`CuratedSourceCard.tsx`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/src/desk/assignment/components/CuratedSourceCard.tsx)): Features the "How it supports your assignment prompt" alignment box, role badge, 2026 recency tag, and expandable abstract.
-- **List View** ([`CuratedSourceListView.tsx`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/src/desk/assignment/components/CuratedSourceListView.tsx)): Compact row representation with prompt part indicator (`🎯 supportsPart`).
-- **Compact View** ([`CuratedSourceCompactView.tsx`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/src/desk/assignment/components/CuratedSourceCompactView.tsx)): High-density row view with status and role indicators.
-- **Lecture / Course Source Uploader** ([`LectureUploadDropzone.tsx`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/src/desk/assignment/components/LectureUploadDropzone.tsx)): Clean drag-and-drop workspace uploader with background evidence chunking and instant visible uploaded item status pills.
+### 7.2 Core Step 02 Components
+- **Curated Source Cards** ([`CuratedSourceCard.tsx`](file:///Users/aadityasah/Documents/Scholar%20Project/scholar-agentic-os/src/desk/assignment/components/CuratedSourceCard.tsx)): High-performance minimalist card rendering with author lists, year, venue, type pill, role badge, and toggle action.
+- **Lecture & Materials Dropzone** ([`LectureUploadDropzone.tsx`](file:///Users/aadityasah/Documents/Scholar%20Project/scholar-agentic-os/src/desk/assignment/components/LectureUploadDropzone.tsx)): Single unified dropzone for syllabus, readings, and lecture slides with background evidence extraction.
+- **Assignment Sources Stage** ([`AssignmentSourcesStage.tsx`](file:///Users/aadityasah/Documents/Scholar%20Project/scholar-agentic-os/src/desk/assignment/stages/AssignmentSourcesStage.tsx)): Step 02 stage manager orchestrating search query synthesis, literature generation, lecture chunking, and the `"Proceed to Drafting"` gate.
 
 ---
 
@@ -152,6 +150,7 @@ The Workspace Table View provides a side-by-side comparison matrix of discovered
 | :--- | :--- | :---: | :---: |
 | Question-Led Discovery | `src/desk/assignment/__tests__/Phase2QuestionLedLiteratureDiscovery.test.tsx` | 8 | ✅ Pass |
 | Curated Discovery & Quality | `src/desk/assignment/__tests__/AssignmentCuratedLiteratureDiscovery.test.tsx` | 17 | ✅ Pass |
+| Phase 1 & 2 Integrated Flow | `src/desk/assignment/__tests__/AssignmentPhase1And2Flow.test.tsx` | 6 | ✅ Pass |
 | End-to-End Workflow | `src/desk/assignment/__tests__/AssignmentE2EFlow.test.tsx` | 24 | ✅ Pass |
-| Full Assignment Suite | `src/desk/assignment/__tests__/*.test.tsx` | 144 | ✅ Pass (18/18 files) |
-| TypeScript Typecheck | `npx tsc --noEmit` | — | ✅ 0 errors |
+| Full Assignment Test Suite | `src/desk/assignment/__tests__/*.test.tsx` | **148** | ✅ **Pass (19/19 files)** |
+| TypeScript Production Build | `npm run build` | — | ✅ 0 errors |

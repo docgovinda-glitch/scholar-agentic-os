@@ -119,6 +119,6 @@ You can also copy the SQL from any pending migration file in `supabase/migration
 
 ## 5. Current Status (Verified & Synchronized)
 
-- **Database Migrations:** All 25 migrations (`20260811000000_code_review_fixes.sql` through `20260908000000_source_library_metadata_and_integrity.sql`) have been pushed and verified on the remote Supabase database (`scholarAgent` / `gfjhsijrwodjvkisouzw`). Output: `{"upToDate":true,"dryRun":false,"migrations":[],"message":"Remote database is up to date."}`.
+- **Database Migrations:** All 27 migrations (`20260811000000_code_review_fixes.sql` through `20260927183000_assignment_projects_schema.sql`) have been pushed and verified on the remote Supabase database (`scholarAgent` / `gfjhsijrwodjvkisouzw`). Output: `{"upToDate":true,"dryRun":false,"migrations":[],"seeds":[],"roles":[],"message":"Remote database is up to date."}`.
 - **Google Identity Services & Helmet COOP Fix:** Live in `main` branch ([`81bd620`](https://github.com/docgovinda-glitch/scholar-agentic-os/commit/81bd620)), configuring `crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }` to prevent popup freeze at `accounts.google.com/gsi/transform`.
 - **Google Sign-In Fallback:** Live in `src/desk/auth/GoogleIdentityButton.tsx`, providing instant redirect sign-in via Supabase OAuth if popups, third-party cookies, or cross-window messaging are blocked by browser privacy extensions.

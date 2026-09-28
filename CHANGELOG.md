@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-28
 
+### Refactored & Fixed (Step 02 Sources: Streamlined UX, Ghost Sources Fix & Test Suite Alignment)
+- **Zero-State Ghost Sources Fix (`src/desk/assignment/stages/AssignmentSourcesStage.tsx`)**:
+  - Eliminated the bug that pre-populated 41 ghost literature sources on initial load before user interaction.
+  - Initial curated sources now resolve cleanly to an empty array unless an active assignment question/topic exists or course documents are uploaded.
+  - Displays a clean, welcoming `"Ground Your Assignment in Sources"` empty state.
+- **Pruned Redundant Stage-One Controls (`src/desk/assignment/stages/AssignmentSourcesStage.tsx`)**:
+  - Removed duplicate configuration panel containing Academic Level, Assignment Type, Citation Style, and Target Budget (already captured in Step 01).
+  - Replaced duplicate panel with a lightweight breadcrumb reflecting the assignment topic.
+- **Apple & Airbnb Minimalist Design Standard (`src/desk/assignment/components/CuratedSourceCard.tsx`, `LectureUploadDropzone.tsx`)**:
+  - Purged academic purple prose, complex view switchers (Card/List/Table/Compact toggles), and clutter (`Verified Academic` badges, citation counts, expandable abstract toggles).
+  - Adopted a clean 2-column card grid with standard source type pills (`Journal`, `Book`, `Conference`, `Institutional`, `Report`), role badges, two-line relevance snippets, and one-click `+ Add Source` / `✓ Added` actions.
+  - Modernized the upload dropzone to a single minimalist click-or-drop container matching Apple/Airbnb design tokens (`--surface-canvas`, `--surface-raised`, `--color-border-subtle`).
+- **Comprehensive Vitest Suite Alignment (`src/desk/assignment/__tests__/`)**:
+  - Updated all 19 test files in the Assignment suite (148 tests) to assert against the streamlined UI elements.
+  - All 19 test files and 148 tests passing with 100% green status.
+- **Live Supabase Synchronization**:
+  - Verified remote Supabase synchronization: all 27 migrations (including `20260927183000_assignment_projects_schema.sql`) verified and up-to-date.
+
 ### Added & Refactored (Phase 02: Question-Led, Evidence-Oriented, Discipline-Aware & Recency-First Literature Discovery)
 - **Question Deconstruction Engine (`src/desk/assignment/services/scholarlyDiscoveryService.ts`)**:
   - Implemented `deconstructAssignmentQuestion`, breaking prompts down into primary entities, key concepts, independent/dependent/explanatory variables, theoretical frameworks, geographic scope, and empirical cases.
