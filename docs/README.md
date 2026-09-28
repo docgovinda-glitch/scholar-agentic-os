@@ -75,6 +75,7 @@ still carrying revision-1 assumptions are marked in the index below.
 |---|---|---|
 | [`30-ACADEMIC-WORKFLOW-ARCHITECTURE.md`](03-workflow/30-ACADEMIC-WORKFLOW-ARCHITECTURE.md) | The eight-gate model and the drafting pipeline | 1‡ |
 | [`JOURNAL_ARTICLE_WORKSPACE_25_STAGES.md`](JOURNAL_ARTICLE_WORKSPACE_25_STAGES.md) | **Journal Article Workspace**: 9-milestone streamlined / 25-stage sequential lifecycle, minimalist Zen mode, and camera-ready export | **2** |
+| [`PHASE_02_QUESTION_LED_LITERATURE_DISCOVERY.md`](PHASE_02_QUESTION_LED_LITERATURE_DISCOVERY.md) | **Phase 02 Curated Sources**: Question-led, evidence-oriented, discipline-aware & recency-first literature discovery | **4.1** |
 | [`31-SUBMISSION-COMPLIANCE-ARCHITECTURE.md`](03-workflow/31-SUBMISSION-COMPLIANCE-ARCHITECTURE.md) | Rubric: compiling requirements into continuous checks | 1‡ |
 | [`32-LANGUAGE-AND-VOICE-ARCHITECTURE.md`](03-workflow/32-LANGUAGE-AND-VOICE-ARCHITECTURE.md) | **The Studio**: five intervention levels, voice matching, second-language support, optional Writing History | **2** |
 | [`33-EXPORT-ARCHITECTURE.md`](03-workflow/33-EXPORT-ARCHITECTURE.md) | DOCX and ODT as first-class; other formats derived | 1‡ |

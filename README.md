@@ -16,7 +16,7 @@ Rather than generic forms, each academic format in Scholar Core operates through
         - **Dynamic Word Budget Planner (`+ Add Section`)**: Standard 10% Intro / 80% Body / 10% Conclusion baseline allocation, direct word count editing per section, auto-balancing, and interactive custom section adder (`+ Add Section`) with editable titles, live validation badge (`Allocated: X / Y words`), and delete actions.
         - **Academic Writing Tone & Style Selector**: 4 curated presets (*Scholarly & Rigorous*, *Critical & Evaluative*, *Objective & Analytical*, *Applied & Reflective*) plus *"Match My Writing Style"* (sample paste / document upload with automated vocabulary & sentence pacing analysis), persisted into `state.brief.writingTone` for Phase 3 voice matching.
         - **Collapsible Course Metadata & Rubric**: Optional module code, university, deadline, and weighted rubric indexing neatly tucked into an accordion.
-     2. **Phase 2 · Sources**: AI-curated literature cards, lecture/slide PDF dropzone, evidence approval, approved-source ledger.
+     2. **Phase 2 · Sources**: Question-led, evidence-oriented, discipline-aware & recency-first literature discovery engine (`deconstructAssignmentQuestion`), assigning each source an explicit `roleInAssignment` (Empirical evidence, Theoretical framework, Comparative evidence, Core theory) and `relevanceCategory` (Very High, High, Moderate), 2026/2025 recency prioritization with seminal core theory anchors, interactive matrix table view (`CuratedSourceTableView.tsx`), lecture/slide upload dropzone with background chunking, evidence approval ledger. (See [`docs/PHASE_02_QUESTION_LED_LITERATURE_DISCOVERY.md`](docs/PHASE_02_QUESTION_LED_LITERATURE_DISCOVERY.md)).
      3. **Phase 3 · Drafting**: Invisible chunker engine (`decomposeWordBudget`) for sub-section scaffolding, PEEL synthesis, live section index with per-section word trackers.
      4. **Phase 4 · Submission**: 10-point rubric compliance evaluator, citation reconciliation auditor (100% in-text → bibliography verification), one-click `.docx` and PDF export with title page, running headers, and formatted bibliography.
    - **Stage-Scoped Copilot Personas** (via `ContextPanel.tsx` → `/api/projects/:id/assignment/copilot-chat`):
@@ -25,7 +25,7 @@ Rather than generic forms, each academic format in Scholar Core operates through
      - Phase 3 → **Scribe** (drafting guidance & PEEL structure)
      - Phase 4 → **Examiner** (rubric scoring & citation audit)
    - **Database**: `public.assignment_projects` JSONB table (migration `20260927183000_assignment_projects_schema.sql`) stores full 4-phase state (`brief`, `sources`, `drafting`, `submission`) linked to `public.projects` via `project_id`.
-   - **Test Coverage**: 16 test suites (132/132 vitest tests passing, 0 TypeScript errors) including `AssignmentE2EFlow.test.tsx` (Phase 1→4 traversal + DOCX export verification).
+   - **Test Coverage**: 18 test suites (144 unit and integration tests passing, 0 TypeScript errors) including `Phase2QuestionLedLiteratureDiscovery.test.tsx` and `AssignmentE2EFlow.test.tsx` (Phase 1→4 traversal + DOCX export verification).
 
 2. **📄 Journal Article Workspace (`OT-10`)**:
    - **25-Stage Empirical Pipeline**: *Topic Selection → Literature Matrix → Claim-Evidence Graph → Methodological Framing → Empirical Generation → Double-Blind Adversarial Peer Review*.

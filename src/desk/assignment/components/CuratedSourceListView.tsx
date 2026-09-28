@@ -100,9 +100,29 @@ export const CuratedSourceListView: React.FC<CuratedSourceListViewProps> = ({
                       {source.type}
                     </span>
                   )}
-                  <span className="font-mono text-neutral-500 dark:text-neutral-400">
+                  <span className="font-mono font-medium text-neutral-500 dark:text-neutral-400">
                     {source.year}
                   </span>
+                  {parseInt(source.year || "0", 10) >= 2026 && (
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300/60">
+                      2026 Recent
+                    </span>
+                  )}
+                  {source.roleInAssignment && (
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                      source.roleInAssignment === "Empirical evidence"
+                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/40"
+                        : source.roleInAssignment === "Theoretical framework"
+                        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200/60 dark:border-indigo-800/40"
+                        : source.roleInAssignment === "Comparative evidence"
+                        ? "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 border-sky-200/60 dark:border-sky-800/40"
+                        : source.roleInAssignment === "Core theory"
+                        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200/60 dark:border-amber-800/40"
+                        : "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200/60 dark:border-purple-800/40"
+                    }`}>
+                      {source.roleInAssignment}
+                    </span>
+                  )}
                   {source.isVerifiedAcademic !== false && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/60 dark:border-blue-700/40 flex items-center gap-1">
                       <ShieldCheck className="w-2.5 h-2.5" />
@@ -188,12 +208,21 @@ export const CuratedSourceListView: React.FC<CuratedSourceListViewProps> = ({
                 )}
 
                 {/* Assignment Alignment Rationale */}
-                <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/5 flex items-start gap-2">
-                  <Sparkles className="w-3.5 h-3.5 text-neutral-400 mt-0.5 shrink-0" />
-                  <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
-                    <span className="font-semibold text-neutral-800 dark:text-neutral-200 mr-1">Relevance Rationale:</span>
-                    {source.suggestedUse || source.mainFinding}
-                  </p>
+                <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/5 space-y-1">
+                  <div className="flex items-start gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" />
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                      <span className="font-semibold text-neutral-800 dark:text-neutral-200 mr-1">
+                        Role: {source.roleInAssignment || "Empirical evidence"} ·
+                      </span>
+                      {source.suggestedUse || source.mainFinding}
+                    </p>
+                  </div>
+                  {source.questionAlignment?.supportsPart && (
+                    <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium pl-5.5">
+                      🎯 {source.questionAlignment.supportsPart}
+                    </p>
+                  )}
                 </div>
 
                 {/* Key Concepts Chips */}
@@ -233,6 +262,15 @@ export const CuratedSourceListView: React.FC<CuratedSourceListViewProps> = ({
               {/* Right Column: Relevance match & Action Controls */}
               <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2.5 shrink-0 sm:min-w-36 pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-100 dark:border-white/5">
                 <div className="flex items-center gap-2">
+                  {source.relevanceCategory && (
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                      source.relevanceCategory === "Very High"
+                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700"
+                        : "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 border-blue-300 dark:border-blue-700"
+                    }`}>
+                      {source.relevanceCategory}
+                    </span>
+                  )}
                   <span className="text-xs font-mono font-bold text-neutral-700 dark:text-neutral-300">
                     {source.relevanceScore}% match
                   </span>

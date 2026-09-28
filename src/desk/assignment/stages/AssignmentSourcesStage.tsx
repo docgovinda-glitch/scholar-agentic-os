@@ -6,7 +6,6 @@ import { CuratedSourceTableView } from "../components/CuratedSourceTableView";
 import { CuratedSourceCompactView } from "../components/CuratedSourceCompactView";
 import { LectureUploadDropzone } from "../components/LectureUploadDropzone";
 import { AssignmentBriefScopePanel } from "../components/AssignmentBriefScopePanel";
-import { ScholarlyResearchPipeline } from "../components/ScholarlyResearchPipeline";
 import {
   generateCuratedLiteratureSources,
   fetchMoreLiteratureSources,
@@ -161,11 +160,12 @@ export default function AssignmentSourcesStage({
   const [activeTab, setActiveTab] = useState<"all" | "curated" | "uploaded" | "approved" | "bookmarked" | "excluded">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
+  const [selectedRole, setSelectedRole] = useState<string>("all");
   const [selectedMethodology, setSelectedMethodology] = useState<string>("all");
   const [selectedYearRange, setSelectedYearRange] = useState<string>("all");
   const [minRelevance, setMinRelevance] = useState<number>(0);
   const [openAccessOnly, setOpenAccessOnly] = useState<boolean>(false);
-  const [sortBy, setSortBy] = useState<"relevance" | "citations" | "year" | "title">("relevance");
+  const [sortBy, setSortBy] = useState<"relevance" | "citations" | "year" | "title" | "role">("relevance");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
   // Progressive discovery state
@@ -525,13 +525,20 @@ export default function AssignmentSourcesStage({
       list = list.filter((s) => s.type === selectedType);
     }
 
-    // 4. Research Methodology filter
+    // 4. Role in Assignment filter
+    if (selectedRole !== "all") {
+      list = list.filter((s) => s.roleInAssignment === selectedRole);
+    }
+
+    // 5. Research Methodology filter
     if (selectedMethodology !== "all") {
       list = list.filter((s) => s.methodology === selectedMethodology);
     }
 
-    // 5. Publication Year filter
-    if (selectedYearRange === "recent") {
+    // 6. Publication Year filter
+    if (selectedYearRange === "2026") {
+      list = list.filter((s) => parseInt(s.year, 10) >= 2026);
+    } else if (selectedYearRange === "recent") {
       list = list.filter((s) => parseInt(s.year, 10) >= 2024);
     } else if (selectedYearRange === "2020-2023") {
       list = list.filter((s) => {
@@ -539,38 +546,39 @@ export default function AssignmentSourcesStage({
         return y >= 2020 && y <= 2023;
       });
     } else if (selectedYearRange === "seminal") {
-      list = list.filter((s) => parseInt(s.year, 10) < 2020);
+      list = list.filter((s) => parseInt(s.year, 10) < 2020 || s.roleInAssignment === "Core theory");
     }
 
-    // 6. Minimum Relevance filter
+    // 7. Minimum Relevance filter
     if (minRelevance > 0) {
       list = list.filter((s) => (s.relevanceScore || 0) >= minRelevance);
     }
 
-    // 7. Open Access Only filter
+    // 8. Open Access Only filter
     if (openAccessOnly) {
       list = list.filter((s) => !!s.isOpenAccess);
     }
 
-    // 8. Sorting
+    // 9. Sorting
     list = [...list].sort((a, b) => {
       // Keep uploaded sources near the top if on "all"
       if (a.isUserUploaded && !b.isUserUploaded) return -1;
       if (!a.isUserUploaded && b.isUserUploaded) return 1;
 
-      if (sortBy === "relevance") {
-        return (b.relevanceScore || 0) - (a.relevanceScore || 0);
-      }
       if (sortBy === "citations") {
         return (b.citationCount || 0) - (a.citationCount || 0);
       }
       if (sortBy === "year") {
         return parseInt(b.year || "0", 10) - parseInt(a.year || "0", 10);
       }
+      if (sortBy === "role") {
+        return (a.roleInAssignment || "").localeCompare(b.roleInAssignment || "");
+      }
       if (sortBy === "title") {
         return a.title.localeCompare(b.title);
       }
-      return 0;
+      // "relevance": preserve engine's question-led, recency-first ranking
+      return (b.relevanceScore || 0) - (a.relevanceScore || 0);
     });
 
     return list;
@@ -582,6 +590,7 @@ export default function AssignmentSourcesStage({
     activeTab,
     searchQuery,
     selectedType,
+    selectedRole,
     selectedMethodology,
     selectedYearRange,
     minRelevance,
@@ -591,6 +600,7 @@ export default function AssignmentSourcesStage({
 
   const activeFilterCount =
     (selectedType !== "all" ? 1 : 0) +
+    (selectedRole !== "all" ? 1 : 0) +
     (selectedMethodology !== "all" ? 1 : 0) +
     (selectedYearRange !== "all" ? 1 : 0) +
     (minRelevance > 0 ? 1 : 0) +
@@ -599,6 +609,7 @@ export default function AssignmentSourcesStage({
 
   const resetAllFilters = () => {
     setSelectedType("all");
+    setSelectedRole("all");
     setSelectedMethodology("all");
     setSelectedYearRange("all");
     setMinRelevance(0);
@@ -686,17 +697,6 @@ export default function AssignmentSourcesStage({
         />
       </section>
 
-      {/* Scholarly Research & Verification Pipeline Visualizer */}
-      <section className="space-y-2">
-        <ScholarlyResearchPipeline
-          question={question}
-          totalSourcesCount={allCuratedSources.length}
-          approvedCount={approvedCount}
-          isCurating={isFindingMore}
-          onTriggerResearch={handleReCurateForPrompt}
-          sources={allCuratedSources}
-        />
-      </section>
 
       {/* Section 1: Lecture Slide Dropzone */}
       <section className="space-y-3">
@@ -973,13 +973,15 @@ export default function AssignmentSourcesStage({
         {/* Expandable Advanced Filtering Drawer */}
         {showAdvancedFilters && (
           <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200/80 dark:border-white/10 space-y-3 animate-in fade-in duration-150">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
               {/* Filter 1: Source Type */}
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                <label htmlFor="filter-source-type" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
                   Source Type
                 </label>
                 <select
+                  id="filter-source-type"
+                  aria-label="Source Type"
                   value={selectedType}
                   onChange={(e) => setSelectedType(e.target.value)}
                   className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
@@ -993,12 +995,36 @@ export default function AssignmentSourcesStage({
                 </select>
               </div>
 
-              {/* Filter 2: Research Methodology */}
+              {/* Filter 2: Role in Assignment */}
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                <label htmlFor="filter-assignment-role" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                  Role in Assignment
+                </label>
+                <select
+                  id="filter-assignment-role"
+                  aria-label="Role in Assignment"
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                >
+                  <option value="all">All Assignment Roles</option>
+                  <option value="Empirical evidence">Empirical Evidence</option>
+                  <option value="Theoretical framework">Theoretical Framework</option>
+                  <option value="Comparative evidence">Comparative Evidence</option>
+                  <option value="Core theory">Core Theory (Seminal)</option>
+                  <option value="Methodological framework">Methodological Framework</option>
+                  <option value="Contextual evidence">Contextual Evidence</option>
+                </select>
+              </div>
+
+              {/* Filter 3: Research Methodology */}
+              <div className="space-y-1">
+                <label htmlFor="filter-methodology" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
                   Research Methodology
                 </label>
                 <select
+                  id="filter-methodology"
+                  aria-label="Research Methodology"
                   value={selectedMethodology}
                   onChange={(e) => setSelectedMethodology(e.target.value)}
                   className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
@@ -1015,36 +1041,42 @@ export default function AssignmentSourcesStage({
                 </select>
               </div>
 
-              {/* Filter 3: Publication Year */}
+              {/* Filter 4: Publication Year */}
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                <label htmlFor="filter-publication-year" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
                   Publication Year
                 </label>
                 <select
+                  id="filter-publication-year"
+                  aria-label="Publication Year"
                   value={selectedYearRange}
                   onChange={(e) => setSelectedYearRange(e.target.value)}
                   className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
                 >
                   <option value="all">All Publication Years</option>
-                  <option value="recent">Recent (2024–2025)</option>
+                  <option value="2026">Latest (2026)</option>
+                  <option value="recent">Recent (2024–2026)</option>
                   <option value="2020-2023">Contemporary (2020–2023)</option>
-                  <option value="seminal">Seminal & Classic (&lt; 2020)</option>
+                  <option value="seminal">Foundational (&lt; 2020)</option>
                 </select>
               </div>
 
-              {/* Filter 4: Sort Order */}
+              {/* Filter 5: Sort Order */}
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                <label htmlFor="filter-sort-order" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
                   Sort Order
                 </label>
                 <select
+                  id="filter-sort-order"
+                  aria-label="Sort Order"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
                   className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
                 >
-                  <option value="relevance">Highest Match % (Default)</option>
+                  <option value="relevance">Question Alignment & Recency (Default)</option>
+                  <option value="year">Newest First (2026 First)</option>
                   <option value="citations">Most Cited (Citation Impact)</option>
-                  <option value="year">Newest Publication Year</option>
+                  <option value="role">Role in Assignment</option>
                   <option value="title">Title (Alphabetical)</option>
                 </select>
               </div>

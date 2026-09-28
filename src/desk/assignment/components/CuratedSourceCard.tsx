@@ -88,9 +88,29 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
                 {source.type}
               </span>
             )}
-            <span className="text-neutral-400 dark:text-neutral-500 font-mono">
+            <span className="text-neutral-400 dark:text-neutral-500 font-mono font-medium">
               {source.year}
             </span>
+            {parseInt(source.year || "0", 10) >= 2026 && (
+              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300/60">
+                2026 Recent
+              </span>
+            )}
+            {source.roleInAssignment && (
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                source.roleInAssignment === "Empirical evidence"
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/40"
+                  : source.roleInAssignment === "Theoretical framework"
+                  ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200/60 dark:border-indigo-800/40"
+                  : source.roleInAssignment === "Comparative evidence"
+                  ? "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 border-sky-200/60 dark:border-sky-800/40"
+                  : source.roleInAssignment === "Core theory"
+                  ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200/60 dark:border-amber-800/40"
+                  : "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200/60 dark:border-purple-800/40"
+              }`}>
+                {source.roleInAssignment}
+              </span>
+            )}
             {source.isVerifiedAcademic !== false && (
               <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/60 dark:border-blue-700/40 flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3" />
@@ -106,6 +126,15 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {source.relevanceCategory && (
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                source.relevanceCategory === "Very High"
+                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700"
+                  : "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 border-blue-300 dark:border-blue-700"
+              }`}>
+                {source.relevanceCategory}
+              </span>
+            )}
             {source.relevanceScore && (
               <span className="text-neutral-600 dark:text-neutral-300 font-mono font-semibold text-xs">
                 {source.relevanceScore}% match
@@ -264,13 +293,27 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
 
         {/* How it supports assignment prompt */}
         <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/5 space-y-1.5">
-          <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-            <Sparkles className="w-3 h-3 text-neutral-400" />
-            <span>How it supports your assignment prompt</span>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+              <Sparkles className="w-3 h-3 text-neutral-400" />
+              <span>How it supports your assignment prompt</span>
+              <span className="text-neutral-300 dark:text-neutral-600">·</span>
+              <span className="text-purple-600 dark:text-purple-400 normal-case font-medium">Role: {source.roleInAssignment || "Empirical evidence"}</span>
+            </div>
+            {source.questionAlignment?.evidenceType && (
+              <span className="text-[10px] font-mono text-neutral-400">
+                Type: {source.questionAlignment.evidenceType}
+              </span>
+            )}
           </div>
           <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
             {source.suggestedUse || source.mainFinding}
           </p>
+          {source.questionAlignment?.supportsPart && (
+            <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium pt-0.5">
+              🎯 {source.questionAlignment.supportsPart}
+            </p>
+          )}
         </div>
 
 

@@ -86,6 +86,11 @@ export const CuratedSourceCompactView: React.FC<CuratedSourceCompactViewProps> =
                         {source.type}
                       </span>
                     )}
+                    {source.roleInAssignment && (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded font-medium border border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 hidden sm:inline-block">
+                        {source.roleInAssignment}
+                      </span>
+                    )}
                     {source.methodology && (
                       <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200/40 dark:border-purple-800/20 hidden md:inline-block">
                         {source.methodology}
@@ -97,6 +102,15 @@ export const CuratedSourceCompactView: React.FC<CuratedSourceCompactViewProps> =
 
               {/* Right: Score + Bookmark + Details Toggle + Dismiss */}
               <div className="flex items-center gap-2 shrink-0">
+                {source.relevanceCategory && (
+                  <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold border hidden sm:inline-block ${
+                    source.relevanceCategory === "Very High"
+                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700"
+                      : "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 border-blue-300 dark:border-blue-700"
+                  }`}>
+                    {source.relevanceCategory}
+                  </span>
+                )}
                 <span className="text-xs font-mono font-bold text-neutral-700 dark:text-neutral-300">
                   {source.relevanceScore}%
                 </span>

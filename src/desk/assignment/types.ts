@@ -328,6 +328,15 @@ export interface DiscoveredSource {
   sourceFormatBadge?: string;
   extractedEvidences?: ExtractedSourceEvidence[];
   structuredDataSummary?: string;
+
+  // Question-Led Alignment, Role in Assignment & Recency Metadata
+  roleInAssignment?: "Empirical evidence" | "Theoretical framework" | "Comparative evidence" | "Core theory" | "Methodological framework" | "Contextual evidence" | string;
+  relevanceCategory?: "Very High" | "High" | "Moderate";
+  questionAlignment?: {
+    directScore: number;
+    supportsPart?: string;
+    evidenceType?: string;
+  };
 }
 
 export interface EvidenceItem {
@@ -781,6 +790,19 @@ export interface UploadedSourceDocument {
   structuredDataSummary?: string;
   processingStatus?: "analyzing" | "extracted" | "error";
   error?: string;
+  abstract?: string;
+  keyFindings?: string[];
+  methodology?: string;
+  citationsList?: string[];
+  usedInAssignment?: {
+    passagesCount: number;
+    findingsCount: number;
+    citationsCount: number;
+    passages?: { text: string; location?: string; targetSection?: string }[];
+    findings?: string[];
+    citations?: string[];
+    mappedSections?: string[];
+  };
 }
 
 export interface AssignmentSourcesState {

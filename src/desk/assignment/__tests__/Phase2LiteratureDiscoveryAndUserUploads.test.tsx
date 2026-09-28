@@ -331,11 +331,30 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
       expect(within(curatedGrid).getByText(/Uploaded: SPREADSHEET/i)).toBeInTheDocument();
       expect(within(curatedGrid).getByText(/Dataset: 34 rows, 6 columns tracking annual peacekeeping budgets/i)).toBeInTheDocument();
       expect(within(curatedGrid).getByText(/📍 Sheet 'Financial Overview', Rows 2-35/i)).toBeInTheDocument();
+
+      // Verify the Evidence Knowledge Panel displays the 3 distinct layers for the uploaded file:
+      const knowledgePanel = screen.getByTestId("uploaded-materials-list");
+      expect(knowledgePanel).toBeInTheDocument();
+
+      // 1. Uploaded material layer
+      expect(within(knowledgePanel).getByText(/1. Uploaded Material/i)).toBeInTheDocument();
+      expect(within(knowledgePanel).getAllByText("UN_Peacekeeping_Budgets_And_Fatalities_1990_2024.xlsx").length).toBeGreaterThan(0);
+      expect(within(knowledgePanel).getAllByText(/Processed/i).length).toBeGreaterThan(0);
+
+      // 2. Engine extracted layer
+      expect(within(knowledgePanel).getByText(/2. Engine Extracted/i)).toBeInTheDocument();
+      expect(within(knowledgePanel).getByText(/Key Findings:/i)).toBeInTheDocument();
+
+      // 3. Used in assignment layer
+      expect(within(knowledgePanel).getByText(/3. Used in Assignment/i)).toBeInTheDocument();
+      expect(within(knowledgePanel).getByText(/relevant passages/i)).toBeInTheDocument();
+      expect(within(knowledgePanel).getAllByText(/findings/i).length).toBeGreaterThan(0);
+      expect(within(knowledgePanel).getAllByText(/citations/i).length).toBeGreaterThan(0);
     });
   });
 
-  describe("4. Scholarly Research & Verification Pipeline Visualizer", () => {
-    it("renders the 4-phase research lifecycle with live verification status", async () => {
+  describe("4. Scholarly Research Engine Background Processing & Clean UI", () => {
+    it("runs research processing automatically in the background without rendering the visible pipeline box", async () => {
       render(
         <AssignmentWorkspace
           projectId="proj-un-test"
@@ -344,22 +363,17 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
         />
       );
 
-      // Verify Pipeline component renders
-      expect(await screen.findByText(/Active Scholarly Research Engine/i)).toBeInTheDocument();
-      expect(screen.getByText(/UN Peace & Security, Collective Security & Veto Dynamics/i)).toBeInTheDocument();
-      expect(screen.getByText(/Semantic Extraction/i)).toBeInTheDocument();
-      expect(screen.getByText(/Repository Querying/i)).toBeInTheDocument();
-      expect(screen.getByText(/Rigor & DOI Check/i)).toBeInTheDocument();
-      expect(screen.getByText(/Thesis Alignment/i)).toBeInTheDocument();
+      // Verify the visible box from screenshot 1 is NOT rendered in the frontend UI
+      expect(screen.queryByText(/Active Scholarly Research Engine/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Semantic Extraction/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Repository Querying/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Rigor & DOI Check/i)).not.toBeInTheDocument();
 
-      // Trigger "Research & Refine Literature" button
-      const researchBtn = screen.getByRole("button", { name: /Research & Refine Literature/i });
-      expect(researchBtn).toBeInTheDocument();
-      fireEvent.click(researchBtn);
-
-      await waitFor(() => {
-        expect(saveIntakeAnswers).toHaveBeenCalled();
-      });
+      // Verify underlying research processing works in the background automatically:
+      // Topic-calibrated literature is populated and available in the workspace
+      expect(await screen.findByText(/Curated Scholarly Literature/i)).toBeInTheDocument();
+      const curatedGrid = await screen.findByTestId("curated-sources-grid");
+      expect(curatedGrid).toBeInTheDocument();
     });
   });
 });

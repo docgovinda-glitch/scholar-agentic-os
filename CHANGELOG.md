@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-28
 
+### Added & Refactored (Phase 02: Question-Led, Evidence-Oriented, Discipline-Aware & Recency-First Literature Discovery)
+- **Question Deconstruction Engine (`src/desk/assignment/services/scholarlyDiscoveryService.ts`)**:
+  - Implemented `deconstructAssignmentQuestion`, breaking prompts down into primary entities, key concepts, independent/dependent/explanatory variables, theoretical frameworks, geographic scope, and empirical cases.
+  - Generates multi-angle targeted search queries centered strictly on assignment requirements.
+- **Discipline as Contextual Constraint**:
+  - Academic discipline constrains venue credibility and peer-reviewed rigor rather than acting as a broad search term.
+  - Implemented entity-level topic guardrails preventing off-topic disciplinary literature (e.g. UN Security Council veto or BRI papers) from polluting prompts like Russia-Ukraine or nuclear deterrence.
+- **Recency-First Discovery with Seminal Core Theory Anchors**:
+  - Prioritizes 2026/2025/2024 recent peer-reviewed empirical studies and theoretical framework applications ahead of older literature.
+  - Preserves seminal classics (e.g. Waltz 1979, Mearsheimer 2001) as `Core theory` with anchor weighting.
+- **Role in Assignment & Relevance Categorization (`src/desk/assignment/types.ts`)**:
+  - Explicit assignment roles (`"Empirical evidence"` | `"Theoretical framework"` | `"Comparative evidence"` | `"Core theory"` | `"Methodological framework"` | `"Contextual evidence"`).
+  - Multi-tier relevance categories (`"Very High"` | `"High"` | `"Moderate"`).
+  - Explicit question alignment tracking (`directScore`, `supportsPart`, `evidenceType`).
+- **Interactive Matrix Table View & Badges (`src/desk/assignment/components/CuratedSourceTableView.tsx`, `CuratedSourceCard.tsx`, `CuratedSourceListView.tsx`, `CuratedSourceCompactView.tsx`)**:
+  - Enhanced Matrix Table View with columns: `Status | Source | Year | Relevance | Role in Assignment | Venue / Publisher | Methodology | Citations | Actions`.
+  - Added `2026 Recent` and `Foundational` year badges, colored role pills, and target prompt part indicators (`🎯 supportsPart`).
+  - Added Role in Assignment and 2026 Latest publication year filters to the advanced filters drawer in `AssignmentSourcesStage.tsx`.
+- **Lecture / Course Source Upload Clean Workspace (`src/desk/assignment/components/LectureUploadDropzone.tsx`, `src/desk/assignment/stages/AssignmentSourcesStage.tsx`)**:
+  - Streamlined lecture upload area: removed redundant manual input box while preserving underlying background parsing and evidence extraction.
+  - Added visible uploaded files list displaying name, file type, size, upload timestamp, and processing status.
+
 ### Added & Refactored (UI Layout, Alignment, Visual Hierarchy & Knowledge Vault Overhaul)
 - **Knowledge Vault Responsive Split-Pane Optimization (`src/desk/vault/KnowledgeVault.tsx`)**:
   - **Collision-Proof Project Card Architecture**: Resolved critical text overlapping where format badges (`Journal Article`), status tags (`Evidence intake`), and gate milestone counters (`{signedOff}/{totalGates} gates`) collided in split-screen/narrow container views. Decoupled badges into isolated flex containers with `min-w-0 flex-1` on the left and dedicated right-anchored milestone badges with emerald check indicators (`CheckCircle2`).
