@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { CuratedSourceCard } from "../components/CuratedSourceCard";
 import { CuratedSourceListView } from "../components/CuratedSourceListView";
 import { CuratedSourceTableView } from "../components/CuratedSourceTableView";
 import { CuratedSourceCompactView } from "../components/CuratedSourceCompactView";
 import { LectureUploadDropzone } from "../components/LectureUploadDropzone";
+import { AssignmentBriefScopePanel } from "../components/AssignmentBriefScopePanel";
+import { ScholarlyResearchPipeline } from "../components/ScholarlyResearchPipeline";
 import {
   generateCuratedLiteratureSources,
   fetchMoreLiteratureSources,
@@ -15,6 +17,9 @@ import type {
   UploadedSourceDocument,
   EvidenceItem,
   LiteratureViewMode,
+  AcademicLevel,
+  AssignmentType,
+  SourceAcademicType,
 } from "../types";
 import {
   Library,
@@ -36,6 +41,7 @@ import {
   Unlock,
   RotateCcw,
   BookOpen,
+  FolderOpen,
   X,
 } from "lucide-react";
 
@@ -126,7 +132,13 @@ export default function AssignmentSourcesStage({
   const {
     projectId,
     question,
+    setQuestion,
+    academicLevel,
+    assignmentType,
     citationStyle,
+    targetWordCount,
+    assignmentBriefText,
+    analysis,
     sources,
     setSources,
     approvedSourceIds,
@@ -138,13 +150,15 @@ export default function AssignmentSourcesStage({
     addEvidenceItem,
     advancePhase,
     setPhase,
+    saveAnswers,
+    ensurePersisted,
   } = useAssignmentWorkspace();
 
   // View mode state (defaults to card view, switches seamlessly)
   const [viewMode, setViewMode] = useState<LiteratureViewMode>("card");
 
   // Filter & Search states
-  const [activeTab, setActiveTab] = useState<"all" | "approved" | "bookmarked" | "excluded">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "curated" | "uploaded" | "approved" | "bookmarked" | "excluded">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedMethodology, setSelectedMethodology] = useState<string>("all");
@@ -204,6 +218,77 @@ export default function AssignmentSourcesStage({
     }
   }, [sources]);
 
+  // Handlers for Phase 1 Brief & Scope updates directly in Phase 2
+  const handleUpdateQuestion = useCallback(
+    async (newQuestion: string) => {
+      await setQuestion(newQuestion);
+      await saveAnswers({
+        instructions: newQuestion,
+        assignment_question: newQuestion,
+        rawPrompt: newQuestion,
+        raw_prompt: newQuestion,
+        research_topic: newQuestion,
+        assignment_brief_text: newQuestion,
+        assignment_brief: newQuestion,
+      });
+      const generated = generateCuratedLiteratureSources(newQuestion, citationStyle);
+      await setSources(generated);
+      setDiscoverySuccessMsg(`Curated ${generated.length} literature sources matching updated prompt.`);
+      setTimeout(() => setDiscoverySuccessMsg(null), 4000);
+    },
+    [citationStyle, saveAnswers, setQuestion, setSources]
+  );
+
+  const handleUpdateAcademicLevel = useCallback(
+    async (lvl: AcademicLevel) => {
+      await saveAnswers({
+        academicLevel: lvl,
+        academic_level: lvl,
+      });
+    },
+    [saveAnswers]
+  );
+
+  const handleUpdateAssignmentType = useCallback(
+    async (t: AssignmentType) => {
+      await saveAnswers({
+        assignmentType: t,
+        assignment_type: t,
+      });
+    },
+    [saveAnswers]
+  );
+
+  const handleUpdateCitationStyle = useCallback(
+    async (cs: string) => {
+      await saveAnswers({
+        citationStyle: cs,
+        citation_style: cs,
+      });
+      const updated = generateCuratedLiteratureSources(question, cs);
+      await setSources(updated);
+    },
+    [question, saveAnswers, setSources]
+  );
+
+  const handleUpdateWordCount = useCallback(
+    async (count: number) => {
+      const intro = Math.round(count * 0.1);
+      const conclusion = Math.round(count * 0.15);
+      const body = Math.max(0, count - intro - conclusion);
+      const budget = { intro, body, conclusion };
+      await saveAnswers({
+        targetWordCount: count,
+        target_word_count: count,
+        word_count: count,
+        word_limit: count,
+        wordBudget: budget,
+        word_budget: budget,
+      });
+    },
+    [saveAnswers]
+  );
+
   // Re-curate literature for active assignment prompt
   const handleReCurateForPrompt = async () => {
     setIsFindingMore(true);
@@ -243,8 +328,19 @@ export default function AssignmentSourcesStage({
 
   // Dismiss / Replace source with item from replacement pool or dynamic pool matching question
   const handleDismissSource = async (sourceId: string) => {
+    const isUserDoc = userUploadedSources.some((doc) => doc.id === sourceId);
+    if (isUserDoc) {
+      await removeUserUploadedSource(sourceId);
+      return;
+    }
     let nextReplacement: DiscoveredSource | undefined;
-    if (question && (question.toLowerCase().includes("china") || question.toLowerCase().includes("geopolitic") || question.toLowerCase().includes("international order"))) {
+    if (
+      question &&
+      (question.toLowerCase().includes("china") ||
+        question.toLowerCase().includes("geopolitic") ||
+        question.toLowerCase().includes("united nations") ||
+        question.toLowerCase().includes("peace"))
+    ) {
       const freshBatch = fetchMoreLiteratureSources(sources, question, 1);
       nextReplacement = freshBatch[0];
     } else {
@@ -315,7 +411,7 @@ export default function AssignmentSourcesStage({
     }
   };
 
-  // Base list of sources
+  // Base list of scholarly curated sources
   const allCuratedSources = useMemo(() => {
     if (sources && sources.length >= 30) return sources;
     if (sources && sources.length > 0) {
@@ -327,13 +423,71 @@ export default function AssignmentSourcesStage({
     return generateCuratedLiteratureSources(question, citationStyle);
   }, [sources, question, citationStyle]);
 
+  // Map user-uploaded documents to DiscoveredSource objects to unify into literature collection
+  const mappedUserSources = useMemo<DiscoveredSource[]>(() => {
+    return (userUploadedSources || []).map((doc) => {
+      const authorList = doc.author ? [doc.author] : ["Uploaded Material"];
+      const yearStr = doc.publicationDate
+        ? doc.publicationDate.slice(0, 4)
+        : new Date(doc.uploadedAt || Date.now()).getFullYear().toString();
+      const formatBadge = (doc.sourceType || "doc").toUpperCase();
+
+      return {
+        id: doc.id,
+        title: doc.name,
+        authors: authorList,
+        year: yearStr,
+        type: (doc.sourceType === "weblink"
+          ? "web"
+          : doc.sourceType === "spreadsheet"
+          ? "institutional"
+          : "report") as SourceAcademicType,
+        journal: `Course & User Materials (${formatBadge})`,
+        publisher: "Course Grounding Source",
+        relevanceScore: 98,
+        mainFinding:
+          doc.relevanceSummary ||
+          "User-uploaded course grounding material analyzed and indexed for specific evidence and assignment alignment.",
+        suggestedUse:
+          "Direct primary evidence, lecture slide grounding, professor rubric alignment, or case empirical data.",
+        citation: doc.citation || `${doc.name} (${yearStr}). Course Grounding Document.`,
+        abstract: doc.extractedText
+          ? doc.extractedText.slice(0, 400) + (doc.extractedText.length > 400 ? "..." : "")
+          : "Extracted document content indexed and cross-referenced with your assignment prompt.",
+        citationCount: 1,
+        citationImpact: "Course Material",
+        methodology: doc.sourceType === "spreadsheet" ? "Quantitative Dataset" : "Curricular / Primary Material",
+        keyConcepts: ["Course Grounding", "Primary Evidence", formatBadge],
+        domain: "Course Grounding & User Sources",
+        isOpenAccess: true,
+        isVerifiedAcademic: true,
+        sourceCredibility: "verified-academic",
+        status: "unreviewed",
+        isUserUploaded: true,
+        userDocumentId: doc.id,
+        sourceFormatBadge: formatBadge,
+        extractedEvidences: doc.extractedEvidences || [],
+        structuredDataSummary: doc.structuredDataSummary,
+      };
+    });
+  }, [userUploadedSources]);
+
+  // Master unified collection: User Uploaded + Curated Scholarly
+  const allMasterSources = useMemo<DiscoveredSource[]>(() => {
+    return [...mappedUserSources, ...allCuratedSources];
+  }, [mappedUserSources, allCuratedSources]);
+
   // Filter and sort sources
   const displayedSources = useMemo(() => {
-    let list = allCuratedSources;
+    let list = allMasterSources;
 
     // 1. Tab status filtering
     if (activeTab === "approved") {
       list = list.filter((s) => approvedSourceIds.includes(s.id));
+    } else if (activeTab === "uploaded") {
+      list = list.filter((s) => s.isUserUploaded);
+    } else if (activeTab === "curated") {
+      list = list.filter((s) => !s.isUserUploaded && !excludedIds.includes(s.id) && !s.isExcluded && s.status !== "removed");
     } else if (activeTab === "bookmarked") {
       list = list.filter((s) => bookmarkedIds.includes(s.id) || s.isBookmarked);
     } else if (activeTab === "excluded") {
@@ -354,7 +508,15 @@ export default function AssignmentSourcesStage({
           (s.mainFinding && s.mainFinding.toLowerCase().includes(q)) ||
           (s.abstract && s.abstract.toLowerCase().includes(q)) ||
           (s.methodology && s.methodology.toLowerCase().includes(q)) ||
-          (s.keyConcepts && s.keyConcepts.some((k) => k.toLowerCase().includes(q)))
+          (s.keyConcepts && s.keyConcepts.some((k) => k.toLowerCase().includes(q))) ||
+          (s.structuredDataSummary && s.structuredDataSummary.toLowerCase().includes(q)) ||
+          (s.extractedEvidences &&
+            s.extractedEvidences.some(
+              (e) =>
+                e.excerpt.toLowerCase().includes(q) ||
+                (e.claim && e.claim.toLowerCase().includes(q)) ||
+                (e.sourceLocation && e.sourceLocation.toLowerCase().includes(q))
+            ))
       );
     }
 
@@ -392,6 +554,10 @@ export default function AssignmentSourcesStage({
 
     // 8. Sorting
     list = [...list].sort((a, b) => {
+      // Keep uploaded sources near the top if on "all"
+      if (a.isUserUploaded && !b.isUserUploaded) return -1;
+      if (!a.isUserUploaded && b.isUserUploaded) return 1;
+
       if (sortBy === "relevance") {
         return (b.relevanceScore || 0) - (a.relevanceScore || 0);
       }
@@ -409,7 +575,7 @@ export default function AssignmentSourcesStage({
 
     return list;
   }, [
-    allCuratedSources,
+    allMasterSources,
     approvedSourceIds,
     bookmarkedIds,
     excludedIds,
@@ -441,12 +607,16 @@ export default function AssignmentSourcesStage({
     setSearchQuery("");
   };
 
-  const totalActiveSources = allCuratedSources.filter(
+  const totalActiveSources = allMasterSources.filter(
+    (s) => !excludedIds.includes(s.id) && !s.isExcluded && s.status !== "removed"
+  ).length;
+
+  const totalCuratedCount = allCuratedSources.filter(
     (s) => !excludedIds.includes(s.id) && !s.isExcluded && s.status !== "removed"
   ).length;
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8 animate-in fade-in duration-200">
+    <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 space-y-7 animate-in fade-in duration-200">
       {/* Stage Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200/80 dark:border-white/10 pb-5">
         <div className="space-y-1">
@@ -495,6 +665,39 @@ export default function AssignmentSourcesStage({
         </div>
       </div>
 
+      {/* Phase 1 Integration: Assignment Brief, Question, Word Budget & Rubric Guidance Panel */}
+      <section className="space-y-2">
+        <AssignmentBriefScopePanel
+          projectId={projectId}
+          question={question}
+          academicLevel={academicLevel}
+          assignmentType={assignmentType}
+          citationStyle={citationStyle}
+          targetWordCount={targetWordCount}
+          assignmentBriefText={assignmentBriefText}
+          analysis={analysis}
+          onUpdateQuestion={handleUpdateQuestion}
+          onUpdateAcademicLevel={handleUpdateAcademicLevel}
+          onUpdateAssignmentType={handleUpdateAssignmentType}
+          onUpdateCitationStyle={handleUpdateCitationStyle}
+          onUpdateWordCount={handleUpdateWordCount}
+          onRefreshLiterature={handleReCurateForPrompt}
+          ensurePersisted={ensurePersisted}
+        />
+      </section>
+
+      {/* Scholarly Research & Verification Pipeline Visualizer */}
+      <section className="space-y-2">
+        <ScholarlyResearchPipeline
+          question={question}
+          totalSourcesCount={allCuratedSources.length}
+          approvedCount={approvedCount}
+          isCurating={isFindingMore}
+          onTriggerResearch={handleReCurateForPrompt}
+          sources={allCuratedSources}
+        />
+      </section>
+
       {/* Section 1: Lecture Slide Dropzone */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -519,7 +722,7 @@ export default function AssignmentSourcesStage({
         />
       </section>
 
-      {/* Section 2: Curated Academic Literature Workspace */}
+      {/* Section 2: Curated Academic Literature & Source Collection */}
       <section className="space-y-4 pt-4 border-t border-neutral-200/60 dark:border-white/5">
         {/* Workspace Toolbar Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -528,11 +731,11 @@ export default function AssignmentSourcesStage({
               <Library className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
               <span>Curated Scholarly Literature</span>
               <span className="text-xs font-mono font-medium text-neutral-400">
-                ({allCuratedSources.length} identified)
+                ({allMasterSources.length} identified)
               </span>
             </h2>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-              Peer-reviewed journal articles, seminal academic books, and institutional research reports.
+              Peer-reviewed journal articles, seminal academic books, and user-uploaded course grounding materials.
             </p>
           </div>
 
@@ -634,7 +837,35 @@ export default function AssignmentSourcesStage({
                   : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
               }`}
             >
-              All Literature ({totalActiveSources})
+              All Sources ({totalActiveSources})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("curated")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                activeTab === "curated"
+                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs"
+                  : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+              }`}
+            >
+              Curated Literature ({totalCuratedCount})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("uploaded")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                activeTab === "uploaded"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+              }`}
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+              <span>My Uploads</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
+                {mappedUserSources.length}
+              </span>
             </button>
 
             <button
@@ -649,7 +880,7 @@ export default function AssignmentSourcesStage({
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>Approved</span>
               <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
-                {approvedSourceIds.filter((id) => allCuratedSources.some((s) => s.id === id)).length}
+                {approvedSourceIds.length}
               </span>
             </button>
 

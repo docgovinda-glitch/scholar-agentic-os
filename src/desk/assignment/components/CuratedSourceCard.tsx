@@ -13,6 +13,11 @@ import {
   ChevronUp,
   Quote,
   Unlock,
+  FileText,
+  Table,
+  Presentation,
+  Globe,
+  FileUp,
 } from "lucide-react";
 
 export interface CuratedSourceCardProps {
@@ -35,10 +40,13 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
   onToggleBookmark,
 }) => {
   const [showAbstract, setShowAbstract] = useState(false);
+  const [showEvidences, setShowEvidences] = useState(true);
 
   const authorDisplay =
     source.authors && source.authors.length > 0
       ? source.authors.slice(0, 3).join(", ") + (source.authors.length > 3 ? " et al." : "")
+      : source.isUserUploaded
+      ? "Course Materials / Uploaded Source"
       : "Scholarly Author";
 
   const venueDisplay =
@@ -55,6 +63,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
       : "Scholarly Publication");
 
   const effectiveBookmarked = source.isBookmarked ?? isBookmarked;
+  const evidences = source.extractedEvidences || [];
 
   return (
     <div
@@ -69,9 +78,16 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
         {/* Header Tags: Type, Year, Credibility, Match % and Bookmark */}
         <div className="flex items-center justify-between gap-2 flex-wrap text-[11px]">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="px-2.5 py-0.5 rounded-full font-medium uppercase tracking-wider bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-              {source.type}
-            </span>
+            {source.isUserUploaded ? (
+              <span className="px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/25 flex items-center gap-1 text-[10px]">
+                <FileUp className="w-3 h-3" />
+                <span>Uploaded: {source.sourceFormatBadge || "Course Material"}</span>
+              </span>
+            ) : (
+              <span className="px-2.5 py-0.5 rounded-full font-medium uppercase tracking-wider bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
+                {source.type}
+              </span>
+            )}
             <span className="text-neutral-400 dark:text-neutral-500 font-mono">
               {source.year}
             </span>
@@ -149,6 +165,11 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
               )}
             </span>
           )}
+          {source.isUserUploaded && evidences.length > 0 && (
+            <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/30 font-medium font-mono text-[10px]">
+              {evidences.length} Extracted Excerpt(s)
+            </span>
+          )}
         </div>
 
         {/* Key Concepts / Themes */}
@@ -165,8 +186,65 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
           </div>
         )}
 
-        {/* Abstract Expander */}
-        {source.abstract && (
+        {/* Structured Data Summary for Uploaded Spreadsheets */}
+        {source.structuredDataSummary && (
+          <div className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-900 dark:text-emerald-200 text-xs flex items-start gap-2">
+            <Table className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="leading-relaxed">{source.structuredDataSummary}</span>
+          </div>
+        )}
+
+        {/* Extracted Evidence Layer for User Uploaded Materials */}
+        {source.isUserUploaded && evidences.length > 0 && (
+          <div className="pt-1 border-t border-neutral-100 dark:border-white/5 space-y-2">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setShowEvidences(!showEvidences)}
+                className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Quote className="w-3 h-3 text-blue-500" />
+                <span>Extracted Content & Used References ({evidences.length})</span>
+                {showEvidences ? <ChevronUp className="w-3 h-3 text-neutral-400" /> : <ChevronDown className="w-3 h-3 text-neutral-400" />}
+              </button>
+              <span className="text-[10px] text-neutral-400 font-mono">Provenance & Evidence</span>
+            </div>
+
+            {showEvidences && (
+              <div className="space-y-2 pt-1">
+                {evidences.map((ev, eIdx) => (
+                  <div
+                    key={ev.id || eIdx}
+                    className="p-3 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/10 text-xs space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                        📍 {ev.sourceLocation || `Excerpt ${eIdx + 1}`}
+                      </span>
+                      {ev.claim && (
+                        <span className="text-[10px] text-neutral-500 dark:text-neutral-400 truncate max-w-xs">
+                          {ev.claim}
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-medium text-neutral-800 dark:text-neutral-200 text-xs leading-relaxed italic">
+                      "{ev.excerpt}"
+                    </p>
+                    {ev.context && ev.context !== ev.excerpt && (
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-normal">
+                        <span className="font-semibold text-neutral-600 dark:text-neutral-300">Context: </span>
+                        {ev.context}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Abstract Expander (for Academic sources) */}
+        {!source.isUserUploaded && source.abstract && (
           <div className="pt-1">
             <button
               type="button"
@@ -195,6 +273,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
           </p>
         </div>
 
+
         {/* DOI / External Link */}
         {(source.doi || source.url) && (
           <div className="pt-0.5">
@@ -204,7 +283,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-[11px] font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors"
             >
-              <span>{source.doi ? `DOI: ${source.doi}` : "View source article"}</span>
+              <span>{source.doi ? `DOI: ${source.doi}` : source.isUserUploaded ? "Open Linked Resource" : "View source article"}</span>
               <ExternalLink className="w-3 h-3" />
             </a>
           </div>
@@ -218,31 +297,31 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
           onClick={() => onDismiss(source.id)}
           disabled={isReplacing}
           aria-label={`Dismiss or replace ${source.title}`}
-          className="px-3 py-1.5 rounded-full border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+          className="text-xs text-neutral-400 hover:text-red-500 dark:hover:text-red-400 py-1.5 px-2 rounded-lg hover:bg-red-500/10 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
         >
           <X className="w-3.5 h-3.5" />
-          <span>Dismiss (Replace)</span>
+          <span>{source.isUserUploaded ? "Remove from project" : "Dismiss"}</span>
         </button>
 
         <button
           type="button"
           onClick={() => onToggleApproval(source.id)}
-          aria-label={isApproved ? `Remove ${source.title} from approved sources` : `Approve ${source.title}`}
-          className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs ${
+          aria-label={isApproved ? `Remove ${source.title} from approved` : `Approve ${source.title}`}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
             isApproved
-              ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-              : "bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 active:scale-[0.99]"
+              ? "bg-emerald-600 text-white hover:bg-emerald-700"
+              : "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100"
           }`}
         >
           {isApproved ? (
             <>
               <Check className="w-3.5 h-3.5" />
-              <span>Approved (Include)</span>
+              <span>Approved</span>
             </>
           ) : (
             <>
               <Plus className="w-3.5 h-3.5" />
-              <span>Approve (Include)</span>
+              <span>Approve Source</span>
             </>
           )}
         </button>
@@ -250,4 +329,3 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
     </div>
   );
 };
-

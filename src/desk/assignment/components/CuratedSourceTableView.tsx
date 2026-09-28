@@ -128,9 +128,15 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                   <td className="py-3 px-3 align-top max-w-sm">
                     <div className="space-y-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase tracking-wider bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
-                          {source.type}
-                        </span>
+                        {source.isUserUploaded ? (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-blue-500/15 text-blue-700 dark:text-blue-300">
+                            Uploaded: {source.sourceFormatBadge || "File"}
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase tracking-wider bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
+                            {source.type}
+                          </span>
+                        )}
                         {source.isVerifiedAcademic !== false && (
                           <span className="px-1.5 py-0.2 rounded text-[9px] bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/50 dark:border-blue-700/30 flex items-center gap-0.5">
                             <ShieldCheck className="w-2.5 h-2.5" />
@@ -239,6 +245,36 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                   <tr className="bg-neutral-50/80 dark:bg-white/[0.02]">
                     <td colSpan={8} className="py-3 px-4 sm:px-6">
                       <div className="space-y-2 text-xs">
+                        {/* Extracted Evidence for Uploaded Source */}
+                        {source.isUserUploaded && source.extractedEvidences && source.extractedEvidences.length > 0 && (
+                          <div className="bg-white dark:bg-[#1C1C1E] p-3 rounded-xl border border-neutral-200/60 dark:border-white/5 space-y-2">
+                            <span className="font-semibold text-neutral-900 dark:text-white block">
+                              Extracted Evidence & Used References ({source.extractedEvidences.length}):
+                            </span>
+                            <div className="space-y-1.5">
+                              {source.extractedEvidences.map((ev, eIdx) => (
+                                <div key={ev.id || eIdx} className="p-2 rounded bg-neutral-50 dark:bg-neutral-900/60 text-xs">
+                                  <div className="flex items-center justify-between font-mono text-[10px] text-blue-600 dark:text-blue-400 mb-1">
+                                    <span>📍 {ev.sourceLocation || `Excerpt ${eIdx + 1}`}</span>
+                                    {ev.claim && <span className="text-neutral-400 truncate max-w-xs">{ev.claim}</span>}
+                                  </div>
+                                  <p className="italic text-neutral-800 dark:text-neutral-200">"{ev.excerpt}"</p>
+                                  {ev.context && ev.context !== ev.excerpt && (
+                                    <p className="text-[11px] text-neutral-500 mt-1"><span className="font-semibold">Context:</span> {ev.context}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {source.structuredDataSummary && (
+                          <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 text-emerald-900 dark:text-emerald-200">
+                            <span className="font-semibold block mb-1">Spreadsheet Data Summary:</span>
+                            {source.structuredDataSummary}
+                          </div>
+                        )}
+
                         <div className="flex items-start gap-2 bg-white dark:bg-[#1C1C1E] p-3 rounded-xl border border-neutral-200/60 dark:border-white/5">
                           <Sparkles className="w-3.5 h-3.5 text-neutral-500 mt-0.5 shrink-0" />
                           <div>

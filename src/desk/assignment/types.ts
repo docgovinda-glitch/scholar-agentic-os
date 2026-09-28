@@ -321,6 +321,13 @@ export interface DiscoveredSource {
   citationImpact?: CitationImpactLevel | string;
   publisher?: string;
   volumeIssue?: string;
+
+  // Manually Added / User Uploaded Provenance & Extracted Evidence
+  isUserUploaded?: boolean;
+  userDocumentId?: string;
+  sourceFormatBadge?: string;
+  extractedEvidences?: ExtractedSourceEvidence[];
+  structuredDataSummary?: string;
 }
 
 export interface EvidenceItem {
@@ -528,6 +535,15 @@ export const ASSIGNMENT_TYPE_LABELS: Record<AssignmentType, string> = {
   short_answer: "Structured Short-Answer Assignment",
   other: "Custom Assignment Format",
 };
+
+export const CITATION_STYLES = [
+  { id: "apa7", name: "APA 7th Edition (Author, Year)" },
+  { id: "harvard", name: "Harvard Referencing (Author, Year)" },
+  { id: "mla9", name: "MLA 9th Edition (Author, Page)" },
+  { id: "chicago", name: "Chicago Manual of Style (Notes & Bibliography)" },
+  { id: "ieee", name: "IEEE (Numbered [1])" },
+  { id: "vancouver", name: "Vancouver (Numbered in-text)" },
+];
 
 export const COMMON_COMMAND_VERBS: Record<string, { definition: string; keyAction: string }> = {
   "critically discuss": {

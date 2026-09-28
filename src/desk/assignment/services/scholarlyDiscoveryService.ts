@@ -14,6 +14,7 @@ import type {
   CitationImpactLevel,
   SourceCredibilityTier,
 } from "../types";
+import { UN_PEACE_SECURITY_CATALOG } from "./catalogs/unPeaceSecurityCatalog";
 
 export interface ScholarlyCatalogItem {
   id: string;
@@ -55,6 +56,7 @@ export interface ResearchIntent {
   rawQuestion: string;
   cleanedQuestion: string;
   academicDomain: AcademicDomain;
+  subTopic?: string;
   primaryEntities: string[];
   coreThematicConcepts: string[];
   effectDimensions: string[];
@@ -95,7 +97,9 @@ export function extractResearchIntent(questionOrTopic?: string): ResearchIntent 
     "liberal international order", "security dilemma", "indo-pacific", "asia-pacific", "belt and road", "bri",
     "us-china", "great power", "multilateralism", "sovereignty", "diplomacy", "taiwan",
     "south china sea", "global governance", "unipolar", "bipolar", "multipolar", "east asia",
-    "global south", "grand strategy", "deterrence", "alliance"
+    "global south", "grand strategy", "deterrence", "alliance", "united nations", "peace and security",
+    "peacekeeping", "security council", "un charter", "collective security", "veto", "sanctions",
+    "humanitarian intervention", "r2p", "responsibility to protect", "general assembly"
   ];
   const csSignals = [
     "algorithmic", "machine learning", "neural network", "artificial intelligence",
@@ -152,9 +156,44 @@ export function extractResearchIntent(questionOrTopic?: string): ResearchIntent 
     academicDomain = "Computer Science & AI Governance";
   }
 
+  // Sub-topic determination within or across domains
+  let subTopic: string | undefined = undefined;
+  if (
+    lower.includes("united nations") ||
+    lower.includes("security council") ||
+    lower.includes("peacekeeping") ||
+    lower.includes("collective security") ||
+    lower.includes("un charter") ||
+    (lower.includes("un ") && (lower.includes("peace") || lower.includes("security") || lower.includes("limit"))) ||
+    lower.includes("r2p") ||
+    lower.includes("responsibility to protect")
+  ) {
+    subTopic = "un_peace_security";
+  } else if (
+    lower.includes("china") ||
+    lower.includes("chinese") ||
+    lower.includes("beijing") ||
+    lower.includes("sino") ||
+    lower.includes("rise of china") ||
+    lower.includes("belt and road") ||
+    lower.includes("indo-pacific")
+  ) {
+    subTopic = "china_power_transition";
+  } else if (
+    lower.includes("algorithm") ||
+    lower.includes("artificial intelligence") ||
+    lower.includes("machine learning") ||
+    lower.includes("autonomous decision") ||
+    lower.includes("predictive model")
+  ) {
+    subTopic = "ai_algorithmic_governance";
+  }
+
   // Extract primary entities
   const primaryEntities: string[] = [];
-  if (lower.includes("china") || lower.includes("chinese") || lower.includes("beijing") || lower.includes("sino")) {
+  if (subTopic === "un_peace_security") {
+    primaryEntities.push("United Nations", "UN Security Council", "General Assembly", "Permanent Five (P5)", "Department of Peace Operations");
+  } else if (subTopic === "china_power_transition" || lower.includes("china") || lower.includes("chinese") || lower.includes("beijing") || lower.includes("sino")) {
     primaryEntities.push("China", "Beijing", "United States", "East Asia", "Global South");
   } else if (lower.includes("united states") || lower.includes("u.s.") || lower.includes("america")) {
     primaryEntities.push("United States", "Western Alliances", "Global Order");
@@ -166,7 +205,7 @@ export function extractResearchIntent(questionOrTopic?: string): ResearchIntent 
       "examining", "examine", "discuss", "discussing", "analyzing", "analyze", "analysis",
       "investigate", "investigating", "what", "which", "where", "when", "with", "from",
       "that", "this", "have", "been", "does", "into", "their", "about", "between",
-      "through", "impact", "effects", "affect", "affected", "system", "systems"
+      "through", "impact", "effects", "affect", "affected", "system", "systems", "role"
     ]);
     const words = cleanedQuestion.split(/\s+/).filter((w) => w.length > 3 && !stopWords.has(w.toLowerCase()));
     primaryEntities.push(...words.slice(0, 3));
@@ -174,7 +213,16 @@ export function extractResearchIntent(questionOrTopic?: string): ResearchIntent 
 
   // Extract core thematic concepts
   const coreThematicConcepts: string[] = [];
-  if (academicDomain === "International Relations & Geopolitics") {
+  if (subTopic === "un_peace_security") {
+    coreThematicConcepts.push(
+      "Collective Security",
+      "Security Council Veto Power",
+      "Chapter VII Enforcement Mandates",
+      "Peacekeeping Operations",
+      "Sovereignty vs Humanitarian Intervention",
+      "Institutional Limitations & Reform"
+    );
+  } else if (subTopic === "china_power_transition") {
     coreThematicConcepts.push(
       "Rise of China",
       "Power Transition Theory",
@@ -182,6 +230,15 @@ export function extractResearchIntent(questionOrTopic?: string): ResearchIntent 
       "Strategic Balancing",
       "Offensive and Defensive Realism",
       "International Order Transformation"
+    );
+  } else if (academicDomain === "International Relations & Geopolitics") {
+    coreThematicConcepts.push(
+      "Multilateral Governance",
+      "Security Dilemma",
+      "International Order",
+      "Sovereignty and Non-Intervention",
+      "Diplomatic Conflict Resolution",
+      "Great Power Politics"
     );
   } else if (
     academicDomain === "Computer Science & AI Governance" ||
@@ -215,7 +272,15 @@ export function extractResearchIntent(questionOrTopic?: string): ResearchIntent 
 
   // Extract effect / impact dimensions
   const effectDimensions: string[] = [];
-  if (academicDomain === "International Relations & Geopolitics") {
+  if (subTopic === "un_peace_security") {
+    effectDimensions.push(
+      "Paralysis in Great Power Conflict",
+      "Troop and Financial Resource Shortfalls",
+      "Consensual Peacekeeping Efficacy",
+      "R2P Norm Contestation",
+      "Enforcement Dilemmas in Asymmetric Warfare"
+    );
+  } else if (subTopic === "china_power_transition") {
     effectDimensions.push(
       "International Order and Global Governance",
       "Regional Security Architecture in the Indo-Pacific",
@@ -223,6 +288,12 @@ export function extractResearchIntent(questionOrTopic?: string): ResearchIntent 
       "Multilateral Institutional Adaptation (UN, WTO, AIIB)",
       "Economic Statecraft and the Belt and Road Initiative",
       "Normative Contestation and Human Rights Regimes"
+    );
+  } else if (academicDomain === "International Relations & Geopolitics") {
+    effectDimensions.push(
+      "Multilateral Cooperation vs Sovereignty Friction",
+      "Institutional Reform and Legitimacy Deficits",
+      "Compliance and Enforcement Limitations"
     );
   } else if (
     academicDomain === "Computer Science & AI Governance" ||
@@ -265,7 +336,22 @@ export function extractResearchIntent(questionOrTopic?: string): ResearchIntent 
 
   let interdisciplinaryContext: string[] = [];
 
-  if (academicDomain === "International Relations & Geopolitics") {
+  if (subTopic === "un_peace_security") {
+    interdisciplinaryContext = [
+      "International Organization",
+      "Public International Law",
+      "Peace and Conflict Studies",
+      "Diplomatic History",
+    ];
+    searchSeeds = {
+      primary: "United Nations Security Council international peace and security limitations".trim(),
+      theoretical: "collective security theory UN Charter realism liberal institutionalism".trim(),
+      institutional: "Security Council P5 veto Chapter VI Chapter VII enforcement peacekeeping".trim(),
+      regional: "UN peace operations civil wars Africa Balkans Middle East".trim(),
+      economic: "peacekeeping budget assessment troop contributing countries logistics".trim(),
+      contemporary: "21st century UN reform great power paralysis Ukraine Syria peacebuilding".trim(),
+    };
+  } else if (academicDomain === "International Relations & Geopolitics") {
     interdisciplinaryContext = [
       "Security Studies",
       "International Political Economy",
@@ -334,6 +420,7 @@ export function extractResearchIntent(questionOrTopic?: string): ResearchIntent 
     rawQuestion,
     cleanedQuestion,
     academicDomain,
+    subTopic,
     primaryEntities,
     coreThematicConcepts,
     effectDimensions,
@@ -2588,7 +2675,8 @@ export function calculateScholarlyRelevance(
     (targetDomain.includes("law") && (sourceDomain.includes("law") || sourceDomain.includes("governance") || sourceDomain.includes("socio-technical") || sourceDomain.includes("computer"))) ||
     (targetDomain.includes("economic") && sourceDomain.includes("economic"));
 
-  if (score >= 45 && isDomainCongruent) {
+  const hasSubstantiveAlignment = entityMatched || conceptMatchCount >= 2;
+  if (score >= 45 && isDomainCongruent && hasSubstantiveAlignment) {
     score = Math.max(75, score);
   }
   return Math.min(99, Math.max(15, score));
@@ -2738,18 +2826,21 @@ export function generateCuratedLiteratureSources(
   // 1. Select candidate domain catalog
   let candidateCatalog: ScholarlyCatalogItem[] = [];
 
-  if (intent.academicDomain === "International Relations & Geopolitics") {
-    // For IR / China / Geopolitics, load the authentic IR catalog
+  if (intent.subTopic === "un_peace_security") {
+    candidateCatalog = [...UN_PEACE_SECURITY_CATALOG];
+  } else if (intent.subTopic === "china_power_transition") {
     candidateCatalog = [...IR_CHINA_GEOPOLITICS_CATALOG];
   } else if (
     intent.academicDomain === "Computer Science & AI Governance" ||
     intent.academicDomain === "Law, Governance & Technology"
   ) {
-    // For CS / Law / Tech, load the full 34 authentic Tech Governance catalog
     candidateCatalog = [...CORE_SCHOLARLY_CATALOG];
+  } else if (intent.academicDomain === "International Relations & Geopolitics") {
+    candidateCatalog = [...UN_PEACE_SECURITY_CATALOG, ...IR_CHINA_GEOPOLITICS_CATALOG];
   } else {
     // For general / other domains, select domain matches + synthesize rich domain corpus
     const baseDomainItems = [
+      ...UN_PEACE_SECURITY_CATALOG,
       ...IR_CHINA_GEOPOLITICS_CATALOG,
       ...CORE_SCHOLARLY_CATALOG,
     ].filter((item) => item.domain.toLowerCase().includes(intent.academicDomain.toLowerCase()));
@@ -2837,8 +2928,10 @@ export function fetchMoreLiteratureSources(
 
   // Choose appropriate pool based on domain
   let masterPool: ScholarlyCatalogItem[] = [];
-  if (intent.academicDomain === "International Relations & Geopolitics") {
-    masterPool = [...EXPANSION_IR_POOL, ...IR_CHINA_GEOPOLITICS_CATALOG];
+  if (intent.subTopic === "un_peace_security") {
+    masterPool = [...UN_PEACE_SECURITY_CATALOG, ...EXPANSION_IR_POOL];
+  } else if (intent.academicDomain === "International Relations & Geopolitics") {
+    masterPool = [...EXPANSION_IR_POOL, ...IR_CHINA_GEOPOLITICS_CATALOG, ...UN_PEACE_SECURITY_CATALOG];
   } else {
     masterPool = [...EXPANSION_SCHOLARLY_POOL, ...CORE_SCHOLARLY_CATALOG];
   }
