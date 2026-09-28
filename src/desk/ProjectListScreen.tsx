@@ -65,10 +65,20 @@ import {
   Zap,
   Scale,
   Info,
+  BookOpen,
+  BookmarkCheck,
 } from "lucide-react";
 import { getCloudProvider } from "../config/providerCatalog";
 import { loadUserAiSettings } from "../services/userAiSettings";
 import { PromptBarActionMenu, type PromptMode } from "./PromptBarActionMenu";
+import {
+  ASK_SCHOLAR_CITATION_STYLES,
+  getCitationStyleInfo,
+  formatAskScholarInText,
+  formatAskScholarBibliography,
+  stripRawReferencesSection,
+  type AskCitationStyleId,
+} from "./scholarCitationEngine";
 
 export interface Attachment {
   file: File;
@@ -187,6 +197,7 @@ export interface WebsiteAssistantMessage {
   provider?: string;
   model?: string;
   plan?: string[];
+  citationStyle?: string;
   citations?: Array<{
     title?: string;
     url?: string;
@@ -198,7 +209,11 @@ export interface WebsiteAssistantMessage {
     source?: string;
     venue?: string;
     year?: number | string;
+    author?: string;
+    authors?: string[];
+    doi?: string;
     isPrimary?: boolean;
+    sourceType?: "official" | "scholarly" | "media" | "web";
   }>;
   attachments?: Array<{ name: string; isImage: boolean; previewUrl?: string }>;
   error?: boolean;
@@ -327,12 +342,15 @@ export function InlineCitationBadge({
   num,
   url,
   citation,
+  label,
 }: {
   num: string | number;
   url?: string;
   citation?: WebsiteCitationItem;
+  label?: string;
 }) {
-  const targetUrl = url || citation?.url;
+  const targetUrl = url || (citation as any)?.doi || citation?.url;
+  const displayLabel = label || `[${num}]`;
   const domain =
     citation?.domain ||
     (targetUrl
@@ -356,14 +374,14 @@ export function InlineCitationBadge({
           e.stopPropagation();
         }}
         className="inline-flex items-center justify-center font-mono text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border border-blue-200/70 dark:border-blue-700/60 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-500 hover:scale-105 active:scale-95 transition-all shadow-2xs cursor-pointer"
-        title={targetUrl ? `Verified Citation [${num}] — ${targetUrl}` : `Verified Citation [${num}]`}
+        title={targetUrl ? `Verified Citation ${displayLabel} — ${targetUrl}` : `Verified Citation ${displayLabel}`}
       >
-        [{num}]
+        {displayLabel}
       </a>
 
-      {/* Perplexity-Grade Citation Hover Card Popover */}
+      {/* Citation Engine Verified Hover Card Popover */}
       {citation && (
-        <span className="pointer-events-none opacity-0 group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-all duration-200 ease-out absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 rounded-xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200 dark:border-white/15 shadow-xl text-left z-50 transform group-hover/cite:translate-y-0 translate-y-1 block">
+        <span className="pointer-events-none opacity-0 group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-all duration-200 ease-out absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 rounded-xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200 dark:border-white/15 shadow-xl text-left z-50 transform group-hover/cite:translate-y-0 translate-y-1 block">
           <span className="flex items-center justify-between gap-1.5 mb-1.5">
             <span className="flex items-center gap-1.5 min-w-0">
               {domain && (
@@ -399,7 +417,7 @@ export function InlineCitationBadge({
 
           <span className="flex items-center justify-between pt-1.5 border-t border-neutral-100 dark:border-white/10 text-[9px]">
             <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 font-medium border border-emerald-200 dark:border-emerald-800/40">
-              {citation.authorityBadge || "Verified"}
+              {citation.authorityBadge || "Citation Engine Verified"}
             </span>
             {targetUrl && (
               <a
@@ -421,7 +439,8 @@ export function InlineCitationBadge({
 
 export function renderFormattedGuideText(
   text: string,
-  citations?: WebsiteAssistantMessage["citations"]
+  citations?: WebsiteAssistantMessage["citations"],
+  citationStyle: string = "apa"
 ) {
   if (!text) return null;
 
@@ -449,11 +468,15 @@ export function renderFormattedGuideText(
           const num = parseInt(linkTitle.trim(), 10);
           const matchedCite =
             citations && num > 0 && num <= citations.length ? citations[num - 1] : undefined;
+          const formattedLabel = matchedCite
+            ? formatAskScholarInText(matchedCite, num - 1, citationStyle)
+            : `[${linkTitle}]`;
 
           nodes.push(
             <InlineCitationBadge
               key={`cite-num-${match.index}`}
               num={linkTitle}
+              label={formattedLabel}
               url={linkUrl}
               citation={matchedCite}
             />
@@ -485,10 +508,14 @@ export function renderFormattedGuideText(
               const num = parseInt(numStr, 10);
               const matchedCite =
                 citations && num > 0 && num <= citations.length ? citations[num - 1] : undefined;
+              const formattedLabel = matchedCite
+                ? formatAskScholarInText(matchedCite, num - 1, citationStyle)
+                : `[${numStr}]`;
               return (
                 <InlineCitationBadge
                   key={`cite-${mIdx}-${nIdx}`}
                   num={numStr}
+                  label={formattedLabel}
                   url={matchedCite?.url}
                   citation={matchedCite}
                 />
@@ -1340,6 +1367,17 @@ export default function ProjectListScreen({
   const [sidebarAttachments, setSidebarAttachments] = useState<AgentAttachmentItem[]>([]);
   const [isSidebarUploadingAttachment, setIsSidebarUploadingAttachment] = useState<boolean>(false);
   const [sidebarAiMode, setSidebarAiMode] = useState<PromptMode>("auto");
+  const [askCitationStyle, setAskCitationStyle] = useState<AskCitationStyleId>(() => {
+    try {
+      const saved = localStorage.getItem("scholar_ask_citation_style");
+      if (saved && ASK_SCHOLAR_CITATION_STYLES.some((s) => s.id === saved)) {
+        return saved as AskCitationStyleId;
+      }
+    } catch {
+      // ignore
+    }
+    return "apa";
+  });
   const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([]);
   const [isGuideThinking, setIsGuideThinking] = useState(false);
   const [expandedPlanIds, setExpandedPlanIds] = useState<Record<string, boolean>>({});
@@ -1582,19 +1620,21 @@ export default function ProjectListScreen({
           }));
 
         let agentResponse: any;
-        const systemPrompt = `You are Scholar Core Socratic Assistant, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers with clear citations.`;
+        const styleInfo = getCitationStyleInfo(askCitationStyle);
+        const systemPrompt = `You are Scholar Core Research Copilot, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers. Prioritize recently published (2020-2026), peer-reviewed, and credible sources. Format citations and references strictly according to ${styleInfo.name}. Ground all assertions in verified literature without fabricating sources or DOIs.`;
 
         if (currentAttachments.length === 0 && targetMode === "normal" && !query.toLowerCase().includes("deep research") && !query.toLowerCase().includes("search the web")) {
           // Standard text generation — calls executeAgenticLLM first (compatible with unit tests and client router)
           try {
             const txt = await executeAgenticLLM(systemPrompt, query, "simple");
-            agentResponse = { ok: true, text: txt, mode: "chat" };
+            agentResponse = { ok: true, text: txt, mode: "chat", citationStyle: askCitationStyle };
           } catch (llmErr) {
             // Server fallback
             agentResponse = await executeAgenticQuery({
               prompt: query,
               systemPrompt,
               mode: targetMode,
+              citationStyle: askCitationStyle,
               history,
             });
           }
@@ -1604,6 +1644,7 @@ export default function ProjectListScreen({
             prompt: query,
             systemPrompt,
             mode: targetMode,
+            citationStyle: askCitationStyle,
             files: currentAttachments.filter((a) => a.fileData).map((a) => a.fileData!),
             images: currentAttachments.filter((a) => a.imageData).map((a) => a.imageData!),
             history,
@@ -1620,6 +1661,7 @@ export default function ProjectListScreen({
             provider: agentResponse.provider,
             model: agentResponse.model,
             plan: agentResponse.plan,
+            citationStyle: agentResponse.citationStyle || askCitationStyle,
             citations: agentResponse.citations,
             followUps:
               agentResponse.followUps ||
@@ -2747,7 +2789,36 @@ export default function ProjectListScreen({
                 </div>
               </div>
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/10 text-xs">
+                  <BookOpen className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                  <label htmlFor="ask-scholar-header-citation-style" className="sr-only">
+                    Referencing Style
+                  </label>
+                  <select
+                    id="ask-scholar-header-citation-style"
+                    aria-label="Preferred Referencing Style"
+                    value={askCitationStyle}
+                    onChange={(e) => {
+                      const newStyle = e.target.value as AskCitationStyleId;
+                      setAskCitationStyle(newStyle);
+                      try {
+                        localStorage.setItem("scholar_ask_citation_style", newStyle);
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    className="bg-transparent text-[11px] font-medium text-neutral-700 dark:text-neutral-300 focus:outline-none cursor-pointer pr-1"
+                    title="Select referencing style (APA, MLA, Chicago, Harvard, IEEE, Vancouver)"
+                  >
+                    {ASK_SCHOLAR_CITATION_STYLES.map((s) => (
+                      <option key={s.id} value={s.id} className="bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100">
+                        {s.shortLabel}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => setIsAiSidebarOpen(false)}
@@ -2851,7 +2922,11 @@ export default function ProjectListScreen({
                       </div>
                     )}
 
-                    {msg.sender === "assistant" ? renderFormattedGuideText(msg.text, msg.citations) : (
+                    {msg.sender === "assistant" ? renderFormattedGuideText(
+                      msg.citations && msg.citations.length > 0 ? stripRawReferencesSection(msg.text) : msg.text,
+                      msg.citations,
+                      askCitationStyle
+                    ) : (
                       <div className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.text}</div>
                     )}
 
@@ -2890,94 +2965,168 @@ export default function ProjectListScreen({
                       </div>
                     )}
 
-                    {/* Verified Sources Tray in Sidebar */}
-                    {msg.citations && msg.citations.length > 0 && (
-                      <div className="mt-3.5 pt-3 border-t border-neutral-200/80 dark:border-white/10">
-                        <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2.5">
-                          <div className="flex items-center gap-1.5">
-                            <Globe className="w-3.5 h-3.5 text-blue-500" />
-                            <span>Verified Sources ({msg.citations.length})</span>
-                          </div>
-                          <span className="text-[10px] font-medium normal-case px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                            <ShieldCheck className="w-3 h-3" />
-                            <span>Authenticated</span>
-                          </span>
-                        </div>
-                        <div className="space-y-2 max-h-64 overflow-y-auto pr-1 scholar-scrollbar">
-                          {msg.citations.map((c, cIdx) => {
-                            const domain =
-                              c.domain ||
-                              (c.url
-                                ? (() => {
-                                    try {
-                                      return new URL(c.url).hostname.replace(/^www\./, "");
-                                    } catch {
-                                      return "source";
-                                    }
-                                  })()
-                                : "source");
-                            const badge = c.authorityBadge || (c.isPrimary ? "Primary Source" : c.venue || "Verified Web");
-                            const isGovOrAcademic =
-                              badge.toLowerCase().includes("gov") ||
-                              badge.toLowerCase().includes("peer-reviewed") ||
-                              badge.toLowerCase().includes("academic");
+                    {/* Citation Engine References & Bibliography */}
+                    {msg.citations && msg.citations.length > 0 && (() => {
+                      const styleInfo = getCitationStyleInfo(askCitationStyle);
+                      const formattedBib = formatAskScholarBibliography(msg.citations, askCitationStyle);
 
-                            return (
-                              <a
-                                key={cIdx}
-                                href={c.url || "#"}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex flex-col p-2.5 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 hover:border-blue-400 dark:hover:border-blue-500/60 hover:shadow-xs transition group text-left relative overflow-hidden"
+                      return (
+                        <div className="mt-3.5 pt-3 border-t border-neutral-200/80 dark:border-white/10">
+                          <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2.5">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <BookOpen className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                              <span className="truncate">
+                                References & Bibliography ({styleInfo.shortLabel})
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const allBibText = formattedBib
+                                    .map((b) => `${b.formattedText}${b.url ? ` ${b.url}` : ""}`)
+                                    .join("\n\n");
+                                  navigator.clipboard.writeText(allBibText);
+                                  setCopiedMessageId(`bib-${msg.id}`);
+                                  setTimeout(() => setCopiedMessageId(null), 2000);
+                                }}
+                                className="text-[10px] normal-case px-2 py-0.5 rounded-md hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-600 dark:text-neutral-300 border border-neutral-200/80 dark:border-white/10 flex items-center gap-1 cursor-pointer transition-colors"
+                                title={`Copy all references in ${styleInfo.shortLabel} format`}
                               >
-                                <div className="flex items-center justify-between gap-1.5 mb-1">
-                                  <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="flex-shrink-0 text-[10px] font-mono font-semibold px-1 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
-                                      {cIdx + 1}
-                                    </span>
-                                    <img
-                                      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
-                                      alt=""
-                                      className="w-3.5 h-3.5 rounded-xs flex-shrink-0 opacity-80 group-hover:opacity-100"
-                                      onError={(e) => {
-                                        (e.target as HTMLElement).style.display = "none";
-                                      }}
-                                    />
-                                    <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400 truncate">
-                                      {c.publisher || domain}
-                                    </span>
-                                  </div>
-                                  <ExternalLink className="w-3 h-3 text-neutral-400 group-hover:text-blue-500 shrink-0 transition-colors" />
-                                </div>
-
-                                <div className="text-xs font-medium text-neutral-800 dark:text-neutral-200 group-hover:text-blue-500 dark:group-hover:text-blue-400 line-clamp-2 leading-snug">
-                                  {c.title || c.url || "External Verified Source"}
-                                </div>
-
-                                {c.snippet && (
-                                  <div className="text-[10px] text-neutral-500 dark:text-neutral-400 line-clamp-2 mt-1 leading-normal">
-                                    {c.snippet}
-                                  </div>
+                                {copiedMessageId === `bib-${msg.id}` ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-500" />
+                                    <span className="text-emerald-600 dark:text-emerald-400">Copied!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3 h-3" />
+                                    <span>Copy All</span>
+                                  </>
                                 )}
+                              </button>
+                              <span className="text-[10px] font-medium normal-case px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3" />
+                                <span>Citation Engine</span>
+                              </span>
+                            </div>
+                          </div>
 
-                                <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t border-neutral-100 dark:border-white/5 text-[9px]">
-                                  <span
-                                    className={`px-1.5 py-0.2 rounded-full font-medium ${
-                                      isGovOrAcademic
-                                        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
-                                        : "bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300"
-                                    }`}
-                                  >
-                                    {badge}
-                                  </span>
-                                  {c.year && <span className="text-neutral-400">• {c.year}</span>}
+                          <div className="space-y-2 max-h-72 overflow-y-auto pr-1 scholar-scrollbar">
+                            {formattedBib.map((entry, bIdx) => {
+                              const c = entry.rawCitation;
+                              const domain =
+                                c.domain ||
+                                (entry.url
+                                  ? (() => {
+                                      try {
+                                        return new URL(entry.url).hostname.replace(/^www\./, "");
+                                      } catch {
+                                        return "source";
+                                      }
+                                    })()
+                                  : "source");
+                              const badge = c.authorityBadge || (c.isPrimary ? "Primary Source" : c.venue || "Verified Source");
+                              const isGovOrAcademic =
+                                badge.toLowerCase().includes("gov") ||
+                                badge.toLowerCase().includes("peer-reviewed") ||
+                                badge.toLowerCase().includes("academic");
+
+                              return (
+                                <div
+                                  key={bIdx}
+                                  className="flex flex-col p-2.5 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 hover:border-sky-400 dark:hover:border-sky-500/60 hover:shadow-xs transition text-left relative"
+                                >
+                                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      {styleInfo.isNumbered && (
+                                        <span className="flex-shrink-0 text-[10px] font-mono font-semibold px-1 rounded bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300">
+                                          {entry.displayIndex}
+                                        </span>
+                                      )}
+                                      <img
+                                        src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                                        alt=""
+                                        className="w-3.5 h-3.5 rounded-xs flex-shrink-0 opacity-80"
+                                        onError={(e) => {
+                                          (e.target as HTMLElement).style.display = "none";
+                                        }}
+                                      />
+                                      <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400 truncate">
+                                        {c.publisher || domain}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(entry.formattedText);
+                                          setCopiedMessageId(`ref-${msg.id}-${bIdx}`);
+                                          setTimeout(() => setCopiedMessageId(null), 2000);
+                                        }}
+                                        className="p-1 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition cursor-pointer"
+                                        title="Copy formatted citation"
+                                      >
+                                        {copiedMessageId === `ref-${msg.id}-${bIdx}` ? (
+                                          <Check className="w-3 h-3 text-emerald-500" />
+                                        ) : (
+                                          <Copy className="w-3 h-3" />
+                                        )}
+                                      </button>
+                                      {entry.url && (
+                                        <a
+                                          href={entry.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="p-1 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-400 hover:text-sky-500 transition cursor-pointer"
+                                          title="Open source link or DOI"
+                                        >
+                                          <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed font-serif pl-0.5">
+                                    {entry.formattedText}
+                                  </div>
+
+                                  <div className="flex items-center justify-between gap-1.5 mt-2 pt-1.5 border-t border-neutral-100 dark:border-white/5 text-[9px]">
+                                    <div className="flex items-center gap-1.5">
+                                      <span
+                                        className={`px-1.5 py-0.2 rounded-full font-medium ${
+                                          isGovOrAcademic
+                                            ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
+                                            : "bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300"
+                                        }`}
+                                      >
+                                        {badge}
+                                      </span>
+                                      {entry.doi && (
+                                        <span className="font-mono text-neutral-400 truncate max-w-[130px]">
+                                          DOI: {entry.doi.replace(/^https?:\/\/doi\.org\//, "")}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {entry.url && (
+                                      <a
+                                        href={entry.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sky-600 dark:text-sky-400 hover:underline inline-flex items-center gap-0.5 font-medium shrink-0"
+                                      >
+                                        <span>Visit Source</span>
+                                        <span className="text-[10px]">↗</span>
+                                      </a>
+                                    )}
+                                  </div>
                                 </div>
-                              </a>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Response Utility Action Bar */}
                     {msg.sender === "assistant" && !msg.error && (
@@ -3101,65 +3250,13 @@ export default function ProjectListScreen({
                 </div>
               ))}
 
-              {/* Contextual Research Launchpad (when thread is fresh) */}
-              {guideMessages.length <= 1 && !isGuideThinking && (
-                <div className="pt-1 animate-in fade-in duration-300">
-                  <div className="p-3.5 rounded-2xl bg-neutral-50/90 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 space-y-2.5">
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                      <Sparkles className="w-3.5 h-3.5 text-sky-500" />
-                      <span>Suggested Research Inquiries</span>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSidebarAiMode("deep_research");
-                          handleSendGuideMessage("Synthesize peer-reviewed literature on neural-symbolic reasoning and agentic workflows.", undefined, "deep-research");
-                        }}
-                        className="w-full text-left p-2 rounded-xl bg-white dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-500/30 text-xs text-neutral-700 dark:text-neutral-300 hover:text-purple-600 dark:hover:text-purple-300 transition-all flex items-center justify-between group cursor-pointer shadow-2xs"
-                      >
-                        <span className="truncate">🔬 Deep Research: Neural-symbolic reasoning</span>
-                        <span className="text-[10px] text-neutral-400 group-hover:text-purple-500 opacity-0 group-hover:opacity-100 transition-opacity">Launch ↗</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSidebarAiMode("search");
-                          handleSendGuideMessage("Compare conflicting clinical trial findings for prime editing vs CRISPR-Cas9.", undefined, "search");
-                        }}
-                        className="w-full text-left p-2 rounded-xl bg-white dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 hover:border-blue-300 dark:hover:border-blue-500/30 text-xs text-neutral-700 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-blue-300 transition-all flex items-center justify-between group cursor-pointer shadow-2xs"
-                      >
-                        <span className="truncate">🔍 Multi-Source Search: Prime editing trials</span>
-                        <span className="text-[10px] text-neutral-400 group-hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">Launch ↗</span>
-                      </button>
-
-                      {userEmail && recentProjectsList.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const pTitle = recentProjectsList[0].title;
-                            handleSendGuideMessage(`Analyze literature gaps and methodology for project: "${pTitle}"`);
-                          }}
-                          className="w-full text-left p-2 rounded-xl bg-white dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 hover:border-sky-300 dark:hover:border-sky-500/30 text-xs text-neutral-700 dark:text-neutral-300 hover:text-sky-600 dark:hover:text-sky-300 transition-all flex items-center justify-between group cursor-pointer shadow-2xs"
-                        >
-                          <span className="truncate">📄 Cross-reference recent: {recentProjectsList[0].title}</span>
-                          <span className="text-[10px] text-neutral-400 group-hover:text-sky-500 opacity-0 group-hover:opacity-100 transition-opacity">Analyze ↗</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {isGuideThinking && (
                 <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-sky-500/5 via-purple-500/5 to-transparent dark:from-sky-500/10 dark:via-purple-500/10 dark:to-transparent border border-sky-200/60 dark:border-white/10 shadow-xs animate-in fade-in">
                   <div className="relative flex items-center justify-center shrink-0 mt-0.5">
                     <div className="w-6 h-6 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 flex items-center justify-center shadow-xs">
                       <ScholarCoreLogo size="sm" withText={false} className="scale-75 animate-spin" />
                     </div>
-                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-sky-500 animate-ping" />
+                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-sky-500 animate-ping" />
                   </div>
                   <div className="flex flex-col gap-1 min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -3218,25 +3315,57 @@ export default function ProjectListScreen({
                     <span className="text-neutral-400 text-[10px] animate-pulse">• Checking AI...</span>
                   )}
                 </div>
-                <button
-                  type="button"
-                  aria-label="Reset Chat"
-                  onClick={() =>
-                    setGuideMessages([
-                      {
-                        id: "reset-assistant",
-                        sender: "assistant",
-                        text: "Hello! I am your Scholar Core Website Assistant. Ask me anything about how to navigate the platform, configure AI, manage your Knowledge Vault, or create research projects.",
-                        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                      },
-                    ])
-                  }
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Reset conversation"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Reset</span>
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/10 text-[11px] text-neutral-600 dark:text-neutral-400">
+                    <BookOpen className="w-3 h-3 text-sky-500 shrink-0" />
+                    <label htmlFor="ask-scholar-bar-citation-style" className="sr-only">
+                      Referencing Style
+                    </label>
+                    <select
+                      id="ask-scholar-bar-citation-style"
+                      aria-label="Prompt Bar Referencing Style"
+                      value={askCitationStyle}
+                      onChange={(e) => {
+                        const newStyle = e.target.value as AskCitationStyleId;
+                        setAskCitationStyle(newStyle);
+                        try {
+                          localStorage.setItem("scholar_ask_citation_style", newStyle);
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                      className="bg-transparent text-[10px] font-semibold text-neutral-700 dark:text-neutral-300 focus:outline-none cursor-pointer"
+                      title="Citation Style: APA, MLA, Chicago, Harvard, IEEE, Vancouver"
+                    >
+                      {ASK_SCHOLAR_CITATION_STYLES.map((s) => (
+                        <option key={s.id} value={s.id} className="bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100">
+                          {s.shortLabel}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    aria-label="Reset Chat"
+                    onClick={() =>
+                      setGuideMessages([
+                        {
+                          id: "reset-assistant",
+                          sender: "assistant",
+                          text: "Hello! I am your Scholar Core Website Assistant. Ask me anything about how to navigate the platform, configure AI, manage your Knowledge Vault, or create research projects.",
+                          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                        },
+                      ])
+                    }
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                    title="Reset conversation"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset</span>
+                  </button>
+                </div>
               </div>
 
               {/* Pending Attachments Chips in Sidebar */}

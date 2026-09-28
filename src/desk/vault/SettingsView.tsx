@@ -261,41 +261,43 @@ export default function SettingsView({
 
         <div className="flex flex-col gap-3">
           {/* Google Drive Item */}
-          <div className="flex items-center justify-between p-3.5 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">📁</span>
-              <div>
-                <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-4 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]">
+            <div className="flex items-start sm:items-center gap-3 min-w-0">
+              <span className="text-2xl shrink-0 mt-0.5 sm:mt-0">📁</span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="text-xs font-bold text-[color:var(--text-primary)]">Google Drive</h4>
                   {isGoogleConnected ? (
-                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20 shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       Connected &amp; Synced
                     </span>
                   ) : (
-                    <span className="text-[10px] text-[color:var(--text-muted)]">○ Not connected</span>
+                    <span className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800/80 px-2 py-0.5 rounded-full border border-neutral-200/60 dark:border-neutral-700/60 shrink-0">
+                      ○ Not connected
+                    </span>
                   )}
                 </div>
-                <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5">
+                <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5 truncate max-w-sm">
                   {googleAccount?.accountEmail || "Sync Google Docs, PDFs, & Sheets with zero file copies"}
                 </p>
               </div>
             </div>
 
             {isGoogleConnected ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap shrink-0 justify-start sm:justify-end w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-[color:var(--border-subtle)]">
                 <button
                   type="button"
                   onClick={() => handleVerifyConnection("google_drive")}
                   disabled={busy}
-                  className="px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                  className="px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer whitespace-nowrap"
                 >
                   Verify
                 </button>
                 <button
                   type="button"
                   onClick={() => window.open("https://drive.google.com", "_blank")}
-                  className="px-3 py-1.5 text-xs font-semibold text-[color:var(--accent)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-semibold text-[color:var(--accent)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer whitespace-nowrap"
                 >
                   Open Drive ↗
                 </button>
@@ -303,59 +305,63 @@ export default function SettingsView({
                   type="button"
                   onClick={() => handleDisconnect("google_drive")}
                   disabled={busy}
-                  className="px-3 py-1.5 text-xs font-semibold text-[color:var(--state-danger)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer disabled:opacity-50"
+                  className="px-3 py-1.5 text-xs font-semibold text-[color:var(--state-danger)] border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 rounded-[var(--radius-md)] cursor-pointer disabled:opacity-50 whitespace-nowrap"
                 >
                   Disconnect
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => handleConnect("google_drive")}
-                disabled={busy}
-                className="px-3.5 py-1.5 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] cursor-pointer shadow-xs disabled:opacity-50 transition-colors"
-              >
-                Connect
-              </button>
+              <div className="flex items-center justify-end w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-[color:var(--border-subtle)] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleConnect("google_drive")}
+                  disabled={busy}
+                  className="px-4 py-1.5 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] cursor-pointer shadow-xs disabled:opacity-50 transition-colors whitespace-nowrap"
+                >
+                  Connect
+                </button>
+              </div>
             )}
           </div>
 
           {/* OneDrive Item */}
-          <div className="flex items-center justify-between p-3.5 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">☁️</span>
-              <div>
-                <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-4 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]">
+            <div className="flex items-start sm:items-center gap-3 min-w-0">
+              <span className="text-2xl shrink-0 mt-0.5 sm:mt-0">☁️</span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="text-xs font-bold text-[color:var(--text-primary)]">Microsoft OneDrive</h4>
                   {isOneDriveConnected ? (
-                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20 shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       Connected &amp; Synced
                     </span>
                   ) : (
-                    <span className="text-[10px] text-[color:var(--text-muted)]">○ Not connected</span>
+                    <span className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800/80 px-2 py-0.5 rounded-full border border-neutral-200/60 dark:border-neutral-700/60 shrink-0">
+                      ○ Not connected
+                    </span>
                   )}
                 </div>
-                <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5">
+                <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5 truncate max-w-sm">
                   {oneDriveAccount?.accountEmail || "Sync Office 365, Word documents, & OneDrive"}
                 </p>
               </div>
             </div>
 
             {isOneDriveConnected ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap shrink-0 justify-start sm:justify-end w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-[color:var(--border-subtle)]">
                 <button
                   type="button"
                   onClick={() => handleVerifyConnection("onedrive")}
                   disabled={busy}
-                  className="px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                  className="px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer whitespace-nowrap"
                 >
                   Verify
                 </button>
                 <button
                   type="button"
                   onClick={() => window.open("https://onedrive.live.com", "_blank")}
-                  className="px-3 py-1.5 text-xs font-semibold text-[color:var(--accent)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-semibold text-[color:var(--accent)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer whitespace-nowrap"
                 >
                   Open OneDrive ↗
                 </button>
@@ -363,20 +369,22 @@ export default function SettingsView({
                   type="button"
                   onClick={() => handleDisconnect("onedrive")}
                   disabled={busy}
-                  className="px-3 py-1.5 text-xs font-semibold text-[color:var(--state-danger)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer disabled:opacity-50"
+                  className="px-3 py-1.5 text-xs font-semibold text-[color:var(--state-danger)] border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 rounded-[var(--radius-md)] cursor-pointer disabled:opacity-50 whitespace-nowrap"
                 >
                   Disconnect
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => handleConnect("onedrive")}
-                disabled={busy}
-                className="px-3.5 py-1.5 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] cursor-pointer shadow-xs disabled:opacity-50 transition-colors"
-              >
-                Connect
-              </button>
+              <div className="flex items-center justify-end w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-[color:var(--border-subtle)] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleConnect("onedrive")}
+                  disabled={busy}
+                  className="px-4 py-1.5 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] cursor-pointer shadow-xs disabled:opacity-50 transition-colors whitespace-nowrap"
+                >
+                  Connect
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -391,20 +399,20 @@ export default function SettingsView({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           {/* Universal Cloud Sync Mode */}
           <div
-            className={`p-4 rounded-[var(--radius-lg)] border transition-all flex flex-col justify-between gap-3 ${
+            className={`p-4 rounded-[var(--radius-lg)] border transition-all h-full flex flex-col justify-between gap-3 ${
               storageMode === "synced"
-                ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)]/20"
-                : "border-[color:var(--border-default)] bg-[color:var(--surface-inset)] opacity-80"
+                ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)]/20 shadow-2xs"
+                : "border-[color:var(--border-default)] bg-[color:var(--surface-inset)] opacity-85"
             }`}
           >
             <div>
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-bold text-[color:var(--text-primary)]">Universal Cloud Sync</span>
                 {storageMode === "synced" && (
-                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                     Active
                   </span>
                 )}
@@ -413,39 +421,46 @@ export default function SettingsView({
                 Metadata is synced to your Scholar account via Supabase. Available across all your computers, browsers, and mobile devices.
               </p>
             </div>
-            {storageMode !== "synced" && (
-              <button
-                type="button"
-                onClick={() => handleToggleStorageMode("synced")}
-                disabled={modeLoading}
-                aria-busy={modeLoading}
-                className="w-full py-1.5 text-xs font-semibold text-[color:var(--accent)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer transition-colors inline-flex items-center justify-center gap-1.5"
-              >
-                {modeLoading ? (
-                  <>
-                    <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                    <span>Switching…</span>
-                  </>
-                ) : (
-                  "Enable Cloud Sync"
-                )}
-              </button>
-            )}
+            <div className="pt-2">
+              {storageMode === "synced" ? (
+                <div className="w-full py-1.5 px-3 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-[var(--radius-md)] inline-flex items-center justify-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>Currently Active</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleToggleStorageMode("synced")}
+                  disabled={modeLoading}
+                  aria-busy={modeLoading}
+                  className="w-full py-1.5 text-xs font-semibold text-[color:var(--accent)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer transition-colors inline-flex items-center justify-center gap-1.5"
+                >
+                  {modeLoading ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                      <span>Switching…</span>
+                    </>
+                  ) : (
+                    "Enable Cloud Sync"
+                  )}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Device-Local Encrypted Mode */}
           <div
-            className={`p-4 rounded-[var(--radius-lg)] border transition-all flex flex-col justify-between gap-3 ${
+            className={`p-4 rounded-[var(--radius-lg)] border transition-all h-full flex flex-col justify-between gap-3 ${
               storageMode === "local"
-                ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)]/20"
-                : "border-[color:var(--border-default)] bg-[color:var(--surface-inset)] opacity-80"
+                ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)]/20 shadow-2xs"
+                : "border-[color:var(--border-default)] bg-[color:var(--surface-inset)] opacity-85"
             }`}
           >
             <div>
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-bold text-[color:var(--text-primary)]">Local Device Encrypted</span>
                 {storageMode === "local" && (
-                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
                     Active
                   </span>
                 )}
@@ -454,24 +469,31 @@ export default function SettingsView({
                 Stored exclusively in this device's IndexedDB, encrypted with AES-GCM-256 and passphrase. Zero metadata leaves this machine.
               </p>
             </div>
-            {storageMode !== "local" && (
-              <button
-                type="button"
-                onClick={() => handleToggleStorageMode("local")}
-                disabled={modeLoading}
-                aria-busy={modeLoading}
-                className="w-full py-1.5 text-xs font-semibold text-[color:var(--text-secondary)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer transition-colors inline-flex items-center justify-center gap-1.5"
-              >
-                {modeLoading ? (
-                  <>
-                    <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                    <span>Switching…</span>
-                  </>
-                ) : (
-                  "Switch to Local Mode"
-                )}
-              </button>
-            )}
+            <div className="pt-2">
+              {storageMode === "local" ? (
+                <div className="w-full py-1.5 px-3 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-[var(--radius-md)] inline-flex items-center justify-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <span>Currently Active</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleToggleStorageMode("local")}
+                  disabled={modeLoading}
+                  aria-busy={modeLoading}
+                  className="w-full py-1.5 text-xs font-semibold text-[color:var(--text-secondary)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer transition-colors inline-flex items-center justify-center gap-1.5"
+                >
+                  {modeLoading ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                      <span>Switching…</span>
+                    </>
+                  ) : (
+                    "Switch to Local Mode"
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -487,7 +509,7 @@ export default function SettingsView({
 
         <div className="flex flex-col gap-3">
           {/* Default Citation Format Selector */}
-          <div className="flex items-center justify-between p-3.5 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]">
             <div>
               <label htmlFor="citation-style-select" className="text-xs font-bold text-[color:var(--text-primary)] block">
                 Default Citation Style
@@ -500,7 +522,7 @@ export default function SettingsView({
               id="citation-style-select"
               value={defaultCitationStyle}
               onChange={(e) => handleSaveCitationStyle(e.target.value as CitationFormat)}
-              className="px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
+              className="px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden cursor-pointer shrink-0"
             >
               <option value="apa7">APA 7th Edition (Standard)</option>
               <option value="mla9">MLA 9th Edition</option>
@@ -511,26 +533,26 @@ export default function SettingsView({
           </div>
 
           {/* Academic Integrity Retraction Sentinel */}
-          <div className="flex items-center justify-between p-3.5 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]">
+          <div className="flex items-center justify-between gap-3 p-3.5 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]">
             <div>
               <div className="text-xs font-bold text-[color:var(--text-primary)]">Academic Integrity Sentinel</div>
               <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5">
                 Automatically check CrossRef and OpenAlex for retracted papers or expressions of concern.
               </p>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
               <input
                 type="checkbox"
                 checked={retractionSentinel}
                 onChange={(e) => handleToggleRetractionSentinel(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-9 h-5 bg-gray-300 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[color:var(--accent)]" />
+              <div className="w-9 h-5 bg-gray-300 dark:bg-neutral-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[color:var(--accent)]" />
             </label>
           </div>
 
           {/* Duplicate Detection Sensitivity */}
-          <div className="flex items-center justify-between p-3.5 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]">
             <div>
               <label htmlFor="duplicate-sensitivity-select" className="text-xs font-bold text-[color:var(--text-primary)] block">
                 Duplicate Detection Sensitivity
@@ -543,7 +565,7 @@ export default function SettingsView({
               id="duplicate-sensitivity-select"
               value={duplicateSensitivity}
               onChange={(e) => handleToggleDuplicateSensitivity(e.target.value as "standard" | "strict")}
-              className="px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
+              className="px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden cursor-pointer shrink-0"
             >
               <option value="standard">Standard (Title &amp; DOI)</option>
               <option value="strict">Strict (Title, DOI, Authors &amp; Year)</option>

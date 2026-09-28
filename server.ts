@@ -31,8 +31,9 @@ import {
   DIRECT_BROWSER_CALL_ORIGINS,
   type CloudProviderSpec,
 } from "./src/config/providerCatalog.ts";
+import http from "node:http";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
-import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerSupabaseProxy } from "./server/routes/index.ts";
+import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerSupabaseProxy, registerSupabaseWsProxy } from "./server/routes/index.ts";
 
 dotenv.config();
 
@@ -531,7 +532,9 @@ async function startServer() {
   });
 
   // Start Server
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = http.createServer(app);
+  registerSupabaseWsProxy(server);
+  server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
   });
 }

@@ -1330,6 +1330,7 @@ export interface AgenticQueryRequest {
   prompt: string;
   systemPrompt?: string;
   mode?: "normal" | "search" | "deep-research";
+  citationStyle?: string;
   files?: Array<{ name: string; text?: string; content?: string; type?: string; size?: number }>;
   images?: Array<{ data?: string; dataUrl?: string; mimeType?: string; name?: string }>;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
@@ -1343,7 +1344,7 @@ export interface AgenticQueryResponse {
   provider?: string;
   model?: string;
   plan?: string[];
-  citations?: Array<{ title?: string; url?: string; snippet?: string; source?: string; venue?: string; year?: number }>;
+  citations?: Array<{ title?: string; url?: string; snippet?: string; source?: string; venue?: string; year?: number | string; doi?: string; authorityBadge?: string }>;
   error?: string;
 }
 
@@ -1354,6 +1355,7 @@ export async function executeAgenticQuery(
     prompt: req.prompt,
     systemPrompt: req.systemPrompt,
     mode: req.mode && req.mode !== "normal" ? req.mode : undefined,
+    citationStyle: req.citationStyle,
     files: req.files,
     images: req.images,
     history: req.history,

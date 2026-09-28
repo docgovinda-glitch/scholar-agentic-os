@@ -58,7 +58,7 @@ function determineExecutionMode(
     return "deep-research";
   }
 
-  // Web search triggers: current events, temporal queries, facts, people, orgs, policies, statistics
+  // Web search triggers: academic literature, current events, temporal queries, facts, people, orgs, policies, statistics
   const currentYear = new Date().getFullYear();
   const searchTriggers = [
     "search the web",
@@ -73,7 +73,7 @@ function determineExecutionMode(
     "this month",
     "this year",
     "now",
-    "recent studies on",
+    "recent studies",
     "lookup online",
     "web search",
     "prime minister",
@@ -88,6 +88,21 @@ function determineExecutionMode(
     "what happened to",
     "who won",
     "current price",
+    "study",
+    "studies",
+    "paper",
+    "papers",
+    "research",
+    "literature",
+    "clinical",
+    "trial",
+    "findings",
+    "evidence",
+    "citation",
+    "citations",
+    "reference",
+    "references",
+    "bibliography",
     String(currentYear),
     String(currentYear - 1),
   ];
@@ -222,7 +237,7 @@ export function registerAIRoutes(
    * Primary unified research agent endpoint:
    * Handles text, files, images, web search, deep research, conversation context, and failover.
    */
-  router.post("/agent", async (req: Request, res: Response) => {
+    router.post("/agent", async (req: Request, res: Response) => {
     try {
       const {
         prompt,
@@ -231,6 +246,7 @@ export function registerAIRoutes(
         files = [],
         images = [],
         mode: requestedMode,
+        citationStyle = "apa",
       } = req.body || {};
 
       if (!prompt && (!files || files.length === 0) && (!images || images.length === 0)) {
@@ -286,6 +302,7 @@ export function registerAIRoutes(
           citations: research.allCitations,
           provider: "gemini",
           model: "gemini-3.1-flash-lite",
+          citationStyle,
         });
       }
 
@@ -316,9 +333,9 @@ export function registerAIRoutes(
 
       // 2. Process Web Search if required
       if (mode === "search") {
-        const searchResponse = await executeWebSearch(effectivePrompt, { maxResults: 5, fetchFullContent: true });
+        const searchResponse = await executeWebSearch(effectivePrompt, { maxResults: 6, fetchFullContent: true });
         citations = searchResponse.results;
-        contextBlocks.push(`=== LIVE WEB SEARCH RESULTS & SOURCES ===\n${formatSearchResultsForPrompt(searchResponse.results)}\n=== END OF LIVE SEARCH RESULTS ===`);
+        contextBlocks.push(`=== LIVE SCHOLARLY & WEB SEARCH RESULTS ===\n${formatSearchResultsForPrompt(searchResponse.results)}\n=== END OF SEARCH RESULTS ===`);
       }
 
       // 3. Assemble Conversation History
@@ -331,7 +348,18 @@ export function registerAIRoutes(
         conversationHistoryText += "\n";
       }
 
-      // 4. Build Final User Instruction Prompt
+      // 4. Build Final User Instruction Prompt with Citation Engine Guidelines
+      const styleNameMap: Record<string, string> = {
+        apa: "APA 7th Edition (Author-Date format, e.g., (Author, Year))",
+        mla: "MLA 9th Edition (Author format, e.g., (Author))",
+        chicago: "Chicago 17th Author-Date (e.g., (Author Year))",
+        harvard: "Harvard Referencing (e.g., (Author, Year))",
+        ieee: "IEEE Numbered Style (e.g., [1])",
+        vancouver: "Vancouver Numbered Style (e.g., [1])",
+      };
+      const cleanStyle = (citationStyle || "apa").toLowerCase();
+      const styleDescription = styleNameMap[cleanStyle] || styleNameMap.apa;
+
       let assembledUserPrompt = "";
       if (conversationHistoryText) {
         assembledUserPrompt += conversationHistoryText + "\n";
@@ -345,19 +373,18 @@ export function registerAIRoutes(
       } else if (normalizedImages.length > 0) {
         assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nCarefully examine the attached image(s) above. Directly describe, analyze, and answer the user's inquiry based on the visual contents, details, structures, and any text visible within the image(s).`;
       } else if (files.length > 0 && mode === "search") {
-        assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nNote: You have access to both the user's uploaded document(s) and live verified web search findings. Clearly distinguish facts derived from the uploaded file from facts obtained via web sources. Ground external facts in the retrieved sources and cite with inline [1], [2] or [Source Title](URL).`;
+        assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nNote: You have access to both the user's uploaded document(s) and live verified web search findings. Clearly distinguish facts derived from the uploaded file from facts obtained via web sources. Ground external facts in the retrieved sources and cite with proper in-text citations (${styleDescription}).`;
       } else if (files.length > 0) {
         assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nAnalyze the uploaded document above and directly answer the user's inquiry based on the document text.`;
       } else if (mode === "search") {
         assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nSynthesize an authoritative, research-grade answer using the live verified web search findings provided above.
 
-Formatting & Citation Rules:
-1. Answer / Summary: Directly and concisely answer the user's core inquiry first.
-2. Key Findings & Empirical Evidence: Ground every assertion in the retrieved sources using inline numeric citations [1], [2] or markdown links [Source Title](URL) placed directly beside the supported claims.
-3. Cross-Verification & Contradictions: If credible sources disagree or present different figures/methodologies, explicitly explain the divergence rather than presenting disputed information as established fact.
-4. Source Quality: Prioritize government (.gov), academic (.edu / peer-reviewed), and primary disclosures. Clearly state if any information is an estimate, opinion, or unverified.
-5. Absolute Citation Accuracy: Only cite the retrieved sources above. Never invent citations, statistics, or URLs.
-6. Conclude with a clean "## References & Evidence Base" section listing the consulted sources with their numbers [1], [2] and titles.`;
+Formatting & Academic Citation Rules:
+1. Prioritize Credibility & Recency: Emphasize recently published peer-reviewed literature, official reports (.gov/.edu), and authoritative sources.
+2. In-Text Citations: Ground every assertion in the retrieved sources above using proper in-text citations formatted in ${styleDescription}.
+3. Cross-Verification: If credible sources present different methodologies, figures, or perspectives, analyze the divergence clearly.
+4. Absolute Citation Accuracy: Only cite the retrieved sources above. Never invent citations, DOIs, or fabricated claims.
+5. Conclude with a clean "## References & Evidence Base" section formatted according to ${styleDescription} listing the consulted sources.`;
       } else {
         assembledUserPrompt += effectivePrompt;
       }
@@ -376,6 +403,7 @@ Formatting & Citation Rules:
         files,
         images: normalizedImages,
         requireSourcesSection: mode === "search",
+        citationStyle: cleanStyle,
       });
 
       res.json({
@@ -385,6 +413,7 @@ Formatting & Citation Rules:
         model: result.model,
         mode,
         citations: validated.citations,
+        citationStyle: cleanStyle,
       });
     } catch (err) {
       console.error("Agent execution error:", err);

@@ -99,3 +99,21 @@ In the **Add Source** dialog:
 * **Ask Your Sources (`groundedSynthesisService`)**:
   - Direct grounded Q&A across selected papers with strict AI isolation boundary.
   - Analytical presets: *Compare Methodologies*, *Common Consensus*, *Gaps & Divergences*, and *Evidence Summary*.
+
+---
+
+## 6. Knowledge Vault UI Layout & Responsive Split-Pane Architecture
+
+To maintain high visual quality when accessed alongside the Ask Scholar Copilot or on narrower displays:
+* **Decoupled Badge & Milestone Hierarchy**:
+  - The project format tag (`Journal Article`, `Assignment`, etc.) and pipeline stage badge (`Evidence intake`, `Drafting stage`) reside in an adaptive `min-w-0 flex-1` container.
+  - The gate milestone indicator (`{verified}/{total} gates`) is rendered in a dedicated right-aligned pill badge with an emerald check icon (`CheckCircle2`), preventing overlap or collision in split-screen viewports.
+* **Responsive Column Layout (`grid-cols-1 lg:grid-cols-2`)**:
+  - Automatically collapses to a spacious single-column card view when the Vault is docked beside the AI copilot drawer, avoiding 200px column compression.
+  - Dynamically scales to two balanced columns when full desktop width is available.
+* **Responsive Cloud Drive Controls**:
+  - Google Drive and Microsoft OneDrive accounts use responsive flex containers (`flex-col sm:flex-row`).
+  - Action buttons (`Verify`, `Open Drive ↗`, `Disconnect`) wrap cleanly without leaking out of the card borders.
+* **Symmetric Security Mode Cards**:
+  - `Universal Cloud Sync` and `Local Device Encrypted` cards feature matching vertical heights (`h-full flex flex-col justify-between`) and aligned bottom indicators/actions (`Currently Active` status bar vs. action button).
+

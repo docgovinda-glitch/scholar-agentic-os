@@ -113,5 +113,5 @@ export default function CaptchaWidget({ onTokenReady }: { onTokenReady: (token: 
     return null;
   }
 
-  return <div ref={containerRef} className="my-4" />;
+  return <div ref={containerRef} className="my-3 flex justify-center w-full min-h-[66px] overflow-hidden" />;
 }

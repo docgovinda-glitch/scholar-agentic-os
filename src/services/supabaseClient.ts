@@ -64,32 +64,54 @@ export function getSupabaseClient(): SupabaseClient {
   if (!client) {
     const url = resolveSupabaseUrl() || (rawUrl as string);
 
+    // Check if Realtime is explicitly disabled via env or local preference
+    const isRealtimeDisabled =
+      import.meta.env.VITE_DISABLE_REALTIME === "true" ||
+      (typeof window !== "undefined" && window.localStorage?.getItem("scholar_disable_realtime") === "true");
+
     const clientOptions: any = {
-      realtime: {
-        timeout: 15000,
-        reconnectAfterMs: (tries: number) => Math.min(1000 * 2 ** Math.min(tries, 5), 30000),
-      },
+      realtime: isRealtimeDisabled
+        ? false
+        : {
+            timeout: 10000,
+            reconnectAfterMs: (tries: number) => {
+              if (tries > 2) return null; // Cease reconnect loop after 2 attempts to prevent console storms
+              return 2000;
+            },
+          },
     };
 
-    // If running in browser and the REST base was rewritten to /api/supabase proxy,
-    // route Realtime WebSockets directly to the native Supabase host so the browser
-    // opens a native WSS connection to *.supabase.co rather than attempting to upgrade
-    // through the Express HTTP reverse proxy.
-    if (typeof window !== "undefined" && typeof WebSocket !== "undefined" && rawUrl && rawUrl.startsWith("http")) {
-      const rawWsOrigin = rawUrl.replace(/^http/i, "ws").replace(/\/+$/, "");
+    // If running in browser, route WebSockets safely through the same-origin proxy
+    // to preserve trusted domain SSL certificates and guard against certificate authority errors.
+    if (!isRealtimeDisabled && typeof window !== "undefined" && typeof WebSocket !== "undefined") {
+      let consecutiveWsErrors = 0;
 
-      class DirectSupabaseWebSocket extends WebSocket {
+      class SafeSupabaseWebSocket extends WebSocket {
         constructor(address: string | URL, protocols?: string | string[]) {
-          let addressStr = address.toString();
-          if (addressStr.includes("/api/supabase")) {
-            const currentOriginWs = `${window.location.origin.replace(/^http/i, "ws")}/api/supabase`;
-            addressStr = addressStr.replace(currentOriginWs, rawWsOrigin);
-          }
+          const addressStr = address.toString();
           super(addressStr, protocols);
+
+          this.addEventListener("error", () => {
+            consecutiveWsErrors++;
+            if (consecutiveWsErrors >= 2) {
+              try {
+                if (client?.realtime) {
+                  client.realtime.disconnect();
+                  (client.realtime as any).reconnectAfterMs = () => null;
+                }
+              } catch {
+                // ignore
+              }
+            }
+          });
+
+          this.addEventListener("open", () => {
+            consecutiveWsErrors = 0;
+          });
         }
       }
 
-      clientOptions.realtime.transport = DirectSupabaseWebSocket;
+      clientOptions.realtime.transport = SafeSupabaseWebSocket;
     }
 
     client = createClient(url, SUPABASE_ANON_KEY as string, clientOptions);

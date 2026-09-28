@@ -10,6 +10,8 @@
  */
 
 import type { SearchResultItem } from "./webSearchEngine.ts";
+import { CitationFormatterFactory } from "../../../src/citation_compliance/formattingEngine.ts";
+import type { CanonicalReference } from "../../../src/citation_compliance/model/reference.ts";
 
 export interface ValidationResult {
   text: string;
@@ -44,6 +46,7 @@ export function validateAndRefineCitations(
     files?: Array<{ name: string; text?: string }>;
     images?: Array<{ name?: string }>;
     requireSourcesSection?: boolean;
+    citationStyle?: string;
   } = {}
 ): ValidationResult {
   if (!rawText || verifiedSources.length === 0) {
@@ -138,13 +141,31 @@ export function validateAndRefineCitations(
   const finalCitationsList = actuallyCitedSources.size > 0 ? Array.from(actuallyCitedSources) : verifiedSources.slice(0, 6);
 
   if (!hasRefSection && options.requireSourcesSection !== false && finalCitationsList.length > 0) {
+    const styleId = (options.citationStyle || "apa").toLowerCase();
     let referencesBlock = "\n\n## References & Evidence Base\n";
     finalCitationsList.forEach((src, idx) => {
+      const canonicalRef: CanonicalReference = {
+        kind: src.sourceType === "official" ? "GovernmentPublication" : src.sourceType === "scholarly" ? "JournalArticle" : "Website",
+        title: src.title,
+        authors: src.author ? [{ firstName: "", lastName: src.author, order: 1 }] : [{ firstName: "", lastName: src.publisher || src.domain, order: 1 }],
+        source: src.publisher || src.domain || src.title,
+        journal: src.sourceType === "scholarly" ? src.publisher : undefined,
+        publisher: src.publisher,
+        year: src.publishedDate,
+        publicationDate: src.publishedDate ? `${src.publishedDate}-01-01` : undefined,
+        url: src.url,
+      };
+
+      let formattedEntry = "";
+      try {
+        formattedEntry = CitationFormatterFactory.formatBibliography(styleId, canonicalRef);
+      } catch {
+        formattedEntry = `${src.title}. ${src.publisher || src.domain}.`;
+      }
+
       const badge = src.authorityBadge ? ` **[${src.authorityBadge}]**` : "";
-      const date = src.publishedDate ? ` (${src.publishedDate})` : "";
-      const publisher = src.publisher ? ` — ${src.publisher}` : "";
       const snippetNote = src.snippet ? `\n   > *Evidence summary: ${src.snippet.slice(0, 180)}...*` : "";
-      referencesBlock += `${idx + 1}. [${src.title}](${src.url})${publisher}${date}${badge}${snippetNote}\n`;
+      referencesBlock += `${idx + 1}. [${src.title}](${src.url}) — ${formattedEntry}${badge}${snippetNote}\n`;
     });
 
     purifiedText = purifiedText.trim() + referencesBlock;

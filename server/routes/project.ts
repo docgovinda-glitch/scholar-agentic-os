@@ -1404,6 +1404,61 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
   }));
 
+  const userSavedAuthorsMap = new Map<string, any[]>();
+
+  /**
+   * Get the authenticated user's saved author roster.
+   */
+  app.get("/api/user/saved-authors", projectLimit, asyncRoute(async (req, res) => {
+    const userId = currentUserId(req);
+    const authors = userSavedAuthorsMap.get(userId) || [];
+    res.json({ authors });
+  }));
+
+  /**
+   * Add or update an author in the authenticated user's saved author roster.
+   */
+  app.post("/api/user/saved-authors", projectLimit, asyncRoute(async (req, res) => {
+    const userId = currentUserId(req);
+    const { author } = req.body ?? {};
+    if (!author) {
+      return res.status(400).json({ error: "Missing author object" });
+    }
+    const current = userSavedAuthorsMap.get(userId) || [];
+    const normalizedEmail = (author.email || "").trim().toLowerCase();
+    const normalizedName = `${author.firstName || ""} ${author.surname || ""}`.trim().toLowerCase();
+
+    const existingIdx = current.findIndex((a) => {
+      if (author.id && a.id === author.id) return true;
+      if (normalizedEmail && a.email && a.email.trim().toLowerCase() === normalizedEmail) return true;
+      if (normalizedName) {
+        const aName = `${a.firstName || ""} ${a.surname || ""}`.trim().toLowerCase();
+        if (aName === normalizedName) return true;
+      }
+      return false;
+    });
+
+    if (existingIdx >= 0) {
+      current[existingIdx] = { ...current[existingIdx], ...author };
+    } else {
+      current.unshift(author);
+    }
+    userSavedAuthorsMap.set(userId, current);
+    res.json({ ok: true, authors: current });
+  }));
+
+  /**
+   * Remove an author from the authenticated user's saved author roster.
+   */
+  app.delete("/api/user/saved-authors/:authorId", projectLimit, asyncRoute(async (req, res) => {
+    const userId = currentUserId(req);
+    const { authorId } = req.params;
+    const current = userSavedAuthorsMap.get(userId) || [];
+    const next = current.filter((a) => a.id !== authorId && a.email !== authorId);
+    userSavedAuthorsMap.set(userId, next);
+    res.json({ ok: true, authors: next });
+  }));
+
   /**
    * Update the structured authors array for the project.
    */
@@ -1420,6 +1475,28 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     if (corresponding.length > 1) {
       return res.status(400).json({ error: "Exactly one author can be designated as the corresponding author." });
     }
+
+    // Automatically synchronize valid authors into user's saved author pool
+    const userId = currentUserId(req);
+    const userCurrent = userSavedAuthorsMap.get(userId) || [];
+    for (const a of authors) {
+      if (a && (a.firstName?.trim() || a.surname?.trim() || a.email?.trim())) {
+        const normEmail = (a.email || "").trim().toLowerCase();
+        const normName = `${a.firstName || ""} ${a.surname || ""}`.trim().toLowerCase();
+        const idx = userCurrent.findIndex((ex) => {
+          if (a.id && ex.id === a.id) return true;
+          if (normEmail && ex.email && ex.email.trim().toLowerCase() === normEmail) return true;
+          if (normName && `${ex.firstName || ""} ${ex.surname || ""}`.trim().toLowerCase() === normName) return true;
+          return false;
+        });
+        if (idx >= 0) {
+          userCurrent[idx] = { ...userCurrent[idx], ...a };
+        } else {
+          userCurrent.push(a);
+        }
+      }
+    }
+    userSavedAuthorsMap.set(userId, userCurrent);
 
     const updated = await store.save({ ...record, authors });
     res.json(projectView(updated));

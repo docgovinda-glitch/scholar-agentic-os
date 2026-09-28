@@ -204,7 +204,7 @@ export function SignInScreen({
   }
 
   return (
-    <AuthShell className={embedded ? "w-full" : undefined}>
+    <AuthShell className={embedded ? "w-full" : undefined} maxWidth={embedded ? "w-full" : "max-w-md"}>
       <AuthHeading title="Sign in" subtitle="Reach your work." />
       <AuthForm onSubmit={handleSubmit}>
         <Field
@@ -216,22 +216,20 @@ export function SignInScreen({
           hint="Enter your username, email address, or mobile number in E.164 format (e.g., +15551234567)"
           autoFocus
         />
-        <Field
-          id="password"
-          label="Password"
-          type="password"
-          value={password}
-          onChange={setPassword}
-          autoComplete="current-password"
-        />
-        {/*
-          Sign-in needs the challenge too, not just sign-up: Supabase Auth's
-          CAPTCHA setting is per-project, so enabling it protects the password
-          grant at the same moment it protects signup. Without this the widget
-          would only exist on the registration screen and every existing user
-          would be locked out the moment CAPTCHA was switched on. Renders
-          nothing at all when VITE_CAPTCHA_SITE_KEY is unset.
-        */}
+        <div>
+          <Field
+            id="password"
+            label="Password"
+            type="password"
+            value={password}
+            onChange={setPassword}
+            autoComplete="current-password"
+            showPasswordToggle
+          />
+          <div className="flex justify-end mt-1.5">
+            <AuthLink onClick={onForgot}>Forgot your password?</AuthLink>
+          </div>
+        </div>
         <CaptchaWidget onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
         <SubmitButton busy={busy} busyLabel="Signing in…" disabled={!username.trim() || !password}>
@@ -245,9 +243,11 @@ export function SignInScreen({
       <div className="mt-4">
         <GoogleIdentityButton onSuccess={() => navigate("/desk")} onError={(msg) => setError(msg)} />
       </div>
-      <div className="mt-6 flex flex-col items-start gap-2">
-        <AuthLink onClick={onForgot}>Forgot your password?</AuthLink>
-        <AuthLink onClick={onRegister}>Create an account</AuthLink>
+      <div className="mt-6 pt-4 border-t border-slate-200/80 dark:border-neutral-800 text-center">
+        <p className="text-xs text-slate-500 dark:text-neutral-400">
+          Don't have an account?{" "}
+          <AuthLink onClick={onRegister}>Create an account</AuthLink>
+        </p>
       </div>
     </AuthShell>
   );
@@ -338,7 +338,6 @@ export function SignUpScreen({
       : null) ??
     (captchaRequired && !captchaToken ? "Complete the CAPTCHA challenge." : null);
 
-
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (problem) return setError(problem);
@@ -346,15 +345,6 @@ export function SignUpScreen({
     setBusy(true);
     setError(null);
     try {
-      // Defense-in-depth, not the primary check: re-verify all three
-      // identifiers are still free immediately before submitting, in case
-      // this screen never ran an on-blur check at all (e.g. every field was
-      // filled by browser autofill and the user went straight to submit —
-      // `problem` above only catches a check that already ran and came back
-      // "taken", not one that never ran) or because availability could have
-      // changed since an earlier check (someone else registered the same
-      // identifier in between). The database's own unique constraints are
-      // what actually prevent a duplicate no matter what this says.
       const [usernameOk, emailOk, phoneOk] = await Promise.all([
         checkUsernameAvailable(username),
         checkEmailAvailable(email),
@@ -395,66 +385,94 @@ export function SignUpScreen({
   }
 
   return (
-    <AuthShell className={embedded ? "w-full" : undefined}>
+    <AuthShell className={embedded ? "w-full" : undefined} maxWidth={embedded ? "w-full" : "max-w-2xl"}>
       <AuthHeading
         title="Create your account"
         subtitle="Verify your email to get started."
       />
       <AuthForm onSubmit={handleSubmit}>
-        {SIGN_UP_FIELDS.filter((f) => f.key !== "password").map((f, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <Field
-            key={f.key}
-            id={`signup-${f.key}`}
-            label={f.label}
-            type={f.type}
-            hint={f.hint}
-            autoComplete={f.autoComplete}
-            autoFocus={i === 0}
-            required={f.required ?? true}
-            value={fields[f.key]}
-            onChange={set(f.key)}
-            onBlur={f.key === "username" ? checkUsernameField : f.key === "email" ? checkEmailField : undefined}
-            error={
-              f.key === "username" && usernameStatus?.status === "taken"
-                ? USERNAME_TAKEN_MESSAGE
-                : f.key === "email" && emailStatus?.status === "taken"
-                  ? EMAIL_TAKEN_MESSAGE
-                  : null
-            }
+            id="signup-fullName"
+            label="Full name"
+            type="text"
+            autoComplete="name"
+            autoFocus
+            required
+            value={fields.fullName}
+            onChange={set("fullName")}
           />
-        ))}
-        <PhoneField
-          idPrefix="signup-phone"
-          countryCode={fields.phoneCountryCode}
-          onCountryCodeChange={set("phoneCountryCode")}
-          number={fields.phone}
-          onNumberChange={set("phone")}
-          onBlur={checkPhoneField}
-          error={phoneStatus?.status === "taken" ? PHONE_TAKEN_MESSAGE : null}
-        />
-        <SelectField
-          id="signup-userType"
-          label="User Type"
-          value={fields.userType}
-          onChange={set("userType")}
-          options={USER_TYPES}
-        />
-        <SelectField
-          id="signup-educationLevel"
-          label="Level of Education"
-          value={fields.educationLevel}
-          onChange={set("educationLevel")}
-          options={EDUCATION_LEVELS}
-        />
-        <Field
-          id="signup-password"
-          label="Password"
-          type="password"
-          autoComplete="new-password"
-          value={fields.password}
-          onChange={set("password")}
-          showPasswordToggle
-        />
+          <Field
+            id="signup-username"
+            label="Username"
+            type="text"
+            hint="You will sign in with this, not your email."
+            autoComplete="username"
+            required
+            value={fields.username}
+            onChange={set("username")}
+            onBlur={checkUsernameField}
+            error={usernameStatus?.status === "taken" ? USERNAME_TAKEN_MESSAGE : null}
+          />
+          <Field
+            id="signup-email"
+            label="Email"
+            type="email"
+            autoComplete="email"
+            required
+            value={fields.email}
+            onChange={set("email")}
+            onBlur={checkEmailField}
+            error={emailStatus?.status === "taken" ? EMAIL_TAKEN_MESSAGE : null}
+          />
+          <PhoneField
+            idPrefix="signup-phone"
+            countryCode={fields.phoneCountryCode}
+            onCountryCodeChange={set("phoneCountryCode")}
+            number={fields.phone}
+            onNumberChange={set("phone")}
+            onBlur={checkPhoneField}
+            error={phoneStatus?.status === "taken" ? PHONE_TAKEN_MESSAGE : null}
+          />
+          <div className="sm:col-span-2">
+            <Field
+              id="signup-affiliation"
+              label="Institution"
+              type="text"
+              autoComplete="organization"
+              hint="University, department, or organisation — leave blank if this doesn't apply to you."
+              required={false}
+              value={fields.affiliation}
+              onChange={set("affiliation")}
+            />
+          </div>
+          <SelectField
+            id="signup-userType"
+            label="User Type"
+            value={fields.userType}
+            onChange={set("userType")}
+            options={USER_TYPES}
+          />
+          <SelectField
+            id="signup-educationLevel"
+            label="Level of Education"
+            value={fields.educationLevel}
+            onChange={set("educationLevel")}
+            options={EDUCATION_LEVELS}
+          />
+          <div className="sm:col-span-2">
+            <Field
+              id="signup-password"
+              label="Password"
+              type="password"
+              autoComplete="new-password"
+              value={fields.password}
+              onChange={set("password")}
+              showPasswordToggle
+            />
+          </div>
+        </div>
+
         <CaptchaWidget onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
         <SubmitButton busy={busy} busyLabel="Creating account…" disabled={problem !== null}>
@@ -469,8 +487,11 @@ export function SignUpScreen({
         <GoogleIdentityButton onSuccess={() => navigate("/desk")} onError={(msg) => setError(msg)} />
       </div>
 
-      <div className="mt-6">
-        <AuthLink onClick={onBack}>Back to sign in</AuthLink>
+      <div className="mt-6 pt-4 border-t border-slate-200/80 dark:border-neutral-800 text-center">
+        <p className="text-xs text-slate-500 dark:text-neutral-400">
+          Already have an account?{" "}
+          <AuthLink onClick={onBack}>Back to sign in</AuthLink>
+        </p>
       </div>
     </AuthShell>
   );
@@ -506,16 +527,13 @@ export function ForgotScreen({
 
   if (sent) {
     return (
-      <AuthShell className={embedded ? "w-full" : undefined}>
+      <AuthShell className={embedded ? "w-full" : undefined} maxWidth={embedded ? "w-full" : "max-w-md"}>
         <AuthHeading title="Check your email" />
-        {/* Deliberately does not confirm whether the address has an account:
-            that would turn this form into a way to test which emails are
-            registered. */}
         <AuthNotice>
           If an account exists for {email.trim()}, a reset link is on its way. The link opens Scholar and lets you set
           a new password.
         </AuthNotice>
-        <div className="mt-6">
+        <div className="mt-6 pt-4 border-t border-slate-200/80 dark:border-neutral-800 text-center">
           <AuthLink onClick={onBack}>Back to sign in</AuthLink>
         </div>
       </AuthShell>
@@ -523,18 +541,17 @@ export function ForgotScreen({
   }
 
   return (
-    <AuthShell className={embedded ? "w-full" : undefined}>
+    <AuthShell className={embedded ? "w-full" : undefined} maxWidth={embedded ? "w-full" : "max-w-md"}>
       <AuthHeading title="Reset your password" subtitle="We will email you a link to set a new one." />
       <AuthForm onSubmit={handleSubmit}>
         <Field id="reset-email" label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" autoFocus />
-        {/* /recover is covered by the same project-wide CAPTCHA setting — see SignInScreen. */}
         <CaptchaWidget onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
         <SubmitButton busy={busy} busyLabel="Sending…" disabled={!email.trim()}>
           Send reset link
         </SubmitButton>
       </AuthForm>
-      <div className="mt-6">
+      <div className="mt-6 pt-4 border-t border-slate-200/80 dark:border-neutral-800 text-center">
         <AuthLink onClick={onBack}>Back to sign in</AuthLink>
       </div>
     </AuthShell>

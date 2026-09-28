@@ -142,6 +142,8 @@ export function ResearchProvider({
           if (import.meta.env.DEV) {
             console.warn(`[Realtime Sync] Project sync channel ${status}: ${err?.message || "connection error"}. Gracefully using REST.`);
           }
+          // Detach channel immediately to prevent retry storms
+          client.removeChannel(channel).catch(() => {});
         }
       });
 

@@ -5,17 +5,41 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-25
+## [Unreleased] - 2026-09-28
 
-### Removed & Refactored (Template Cards: Removal of Italicized Info Badges & Tooltips)
-- **Decluttered Card Top Row (`src/desk/ProjectListScreen.tsx`)**:
-  - Removed floating italicized info badges ("*i*"), hover tooltips (*"View methodology & stages blueprint"*), and secondary indicators from the top-right corner of all 4 template cards.
-  - Streamlined template card headers to display solely the category icon in its high-contrast badge container, eliminating visual noise and secondary click-target collisions.
-  - Cleaned up unused `previewFormatId` state and unreachable blueprint preview overlays.
-- **Test Suite Updates (`src/desk/__tests__/ProjectListScreen.test.tsx`)**:
-  - Added unit test asserting the complete absence of `span.font-serif`, blueprint tooltips, and methodology indicators across all 4 template cards.
+### Added & Refactored (UI Layout, Alignment, Visual Hierarchy & Knowledge Vault Overhaul)
+- **Knowledge Vault Responsive Split-Pane Optimization (`src/desk/vault/KnowledgeVault.tsx`)**:
+  - **Collision-Proof Project Card Architecture**: Resolved critical text overlapping where format badges (`Journal Article`), status tags (`Evidence intake`), and gate milestone counters (`{signedOff}/{totalGates} gates`) collided in split-screen/narrow container views. Decoupled badges into isolated flex containers with `min-w-0 flex-1` on the left and dedicated right-anchored milestone badges with emerald check indicators (`CheckCircle2`).
+  - **Responsive Column Widths**: Replaced rigid `md:grid-cols-2` with `grid-cols-1 lg:grid-cols-2 gap-4`, ensuring project cards retain generous width in split-screen/docked copilot layouts without cramped 200px columns.
+  - **Metric Tracking Ribbon Polish**: Upgraded the 3 top metric cards (`Active Projects`, `Quality Gates`, `Overall Progress Average`) with `grid-cols-1 md:grid-cols-3 gap-3.5`, standard `min-h-[104px]`, `whitespace-nowrap` labels, subtle color status pips (`blue-500`, `emerald-500`), and single-line truncated subtitles to eliminate single-word line breaks.
+  - **Header & Navigation Resilience**: Updated top header to `flex-wrap items-center justify-between gap-3`, preventing `Sources`, `Settings`, and `← Back` buttons from overflowing and being sliced off in split-pane views.
+  - **Visual Hierarchy & Elevated Aesthetics**: Unified progress bars across cards to `bg-blue-600 dark:bg-blue-500` and standardized button heights and hover states.
 
-## [2026-09-24]
+### Added & Refactored (Settings View: Responsive Cloud Storage & Card Height Symmetry)
+- **Zero-Overflow Cloud Storage Controls (`src/desk/vault/SettingsView.tsx`)**:
+  - Refactored Google Drive and OneDrive connection rows into responsive flex cards (`flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-4`).
+  - Action buttons (`Verify`, `Open Drive ↗`, `Disconnect`) wrap cleanly on narrower viewports, preventing the `Disconnect` button from overflowing past the card border.
+  - Formatted OneDrive's `○ Not connected` status into a structured pill badge beside the title rather than floating awkwardly between headings and action buttons.
+- **Symmetric Vault Storage & Security Mode Cards (`src/desk/vault/SettingsView.tsx`)**:
+  - Enforced `h-full flex flex-col justify-between gap-3` across both `Universal Cloud Sync` and `Local Device Encrypted` cards.
+  - Introduced matching bottom indicator bars (`Currently Active` status bar vs. action button), establishing 100% equal card heights and perfectly aligned bottom baselines.
+- **Citation Preference Form Spacing (`src/desk/vault/SettingsView.tsx`)**:
+  - Standardized form rows to `flex-col sm:flex-row sm:items-center justify-between gap-3` with `shrink-0` selects.
+
+### Added (Journal Article Persistent Author Roster Per User)
+- **User-Specific Author Persistence (`src/desk/userAuthorService.ts`, `src/desk/workspace/stages/DefinitionStage.tsx`)**:
+  - Implemented persistent author management for Journal Article projects. Once authors are defined or saved, they are automatically stored in the user's permanent author roster.
+  - Supports adding and removing authors across projects, automatically loading previously saved authors for existing users while supporting isolated guest fallbacks.
+  - Full automated integration and unit test coverage in `src/desk/__tests__/userAuthorService.test.ts` and `src/desk/workspace/__tests__/userAuthorJournalIntegration.test.tsx`.
+
+### Added & Fixed (Supabase Realtime WebSocket Proxy & Multi-Style Citation Engine)
+- **Supabase Realtime Proxy (`server/routes/supabaseProxy.ts`, `server.ts`)**:
+  - Added dedicated WebSocket and HTTP proxy for Supabase Realtime channels, eliminating `ERR_CERT_AUTHORITY_INVALID` errors and enabling seamless cross-device synchronization.
+- **Ask Scholar Multi-Style Academic Citation Engine (`src/desk/scholarCitationEngine.ts`, `src/desk/ProjectListScreen.tsx`)**:
+  - Integrated referencing engine supporting APA 7th, MLA 9th, Chicago 17th, Harvard, IEEE, and Vancouver format transformations.
+  - Added one-click clipboard copying for formatted bibliographies and completely excised legacy "Suggested Research Inquiries" UI.
+
+## [2026-09-25]
 
 ### Added & Refactored (Bottom-Anchored Dashboard Layout: ChatGPT & Google Gemini Architecture)
 - **Bottom-Anchored Viewport Structure (`src/desk/ProjectListScreen.tsx`)**:

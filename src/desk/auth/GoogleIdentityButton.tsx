@@ -145,7 +145,7 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
 
       {/* Loading placeholder while GIS script is downloading */}
       {!gsiLoaded && (
-        <div className="flex w-full items-center justify-center gap-3 rounded-[var(--radius-md)] border border-[color:var(--border)] bg-transparent px-4 py-2.5 text-sm font-medium text-[color:var(--text-muted)]">
+        <div className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-4 py-2.5 text-sm font-medium text-slate-500 dark:text-neutral-400 shadow-2xs">
           <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
           <span>Loading Google Sign-In…</span>
         </div>
@@ -155,7 +155,7 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
         <button
           type="button"
           onClick={handleOAuthFallback}
-          className="mt-2 text-xs text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] transition-colors underline cursor-pointer"
+          className="mt-2.5 text-[11px] font-medium text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
         >
           Having trouble with popup? Use redirect sign-in →
         </button>

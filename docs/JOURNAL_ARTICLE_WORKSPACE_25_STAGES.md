@@ -28,6 +28,7 @@ The **Journal Article Workspace** is a 25-stage sequential academic pipeline des
   * Establishes working title, research domain, methodology, and study design.
   * Bidirectionally synchronizes alias keys (`working_title` ↔ `title`, `research_area` ↔ `research_domain`, `study_design` ↔ `methodology`).
   * Features local FINER and PICO appraisal heuristics with guest mode support.
+  * **User Author Roster & Persistence (`userAuthorService.ts`)**: Authors configured for any journal article are saved to the user's permanent roster. When creating or configuring future journal articles, saved co-authors are automatically loaded, with full options to add and remove authors per project.
 * **Stage 2: Literature Discovery (`LiteratureStage.tsx`)**
   * Synthesizes domain-tailored citation matrices across primary keywords.
   * Employs multi-seed retrieval algorithms with automated deduplication.

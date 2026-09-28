@@ -13,6 +13,14 @@ import {
 } from "../agentPrompts/definitionPrompts";
 import { parseJsonFromLlm } from "../../../utils/jsonParser";
 import { AllAiResourcesExhaustedModal } from "../../aiAccess/AllAiResourcesExhaustedModal";
+import {
+  getLocalSavedAuthors,
+  saveAuthorForUser,
+  saveAuthorsListForUser,
+  removeSavedAuthorForUser,
+  syncSavedAuthors,
+} from "../../userAuthorService.ts";
+import { useDeskSession } from "../../useDeskSession.ts";
 
 const ARTICLE_TYPES = [
   "Original Research",
@@ -105,6 +113,30 @@ export default function DefinitionStage({
   });
   const [authors, setAuthors] = useState<Author[]>(project.authors ?? []);
   const [activeTab, setActiveTab] = useState<DefinitionTab>("inquiry");
+
+  const session = useDeskSession();
+  const userEmail = session.status === "signed-in" || session.status === "email-verified" ? session.email : null;
+  const [savedAuthors, setSavedAuthors] = useState<Author[]>(() => getLocalSavedAuthors(userEmail));
+  const [showSavedAuthorsModal, setShowSavedAuthorsModal] = useState(false);
+  const [savedAuthorSearch, setSavedAuthorSearch] = useState("");
+
+  // Synchronize saved authors with user profile
+  useEffect(() => {
+    setSavedAuthors(getLocalSavedAuthors(userEmail));
+    syncSavedAuthors(userEmail).then((remote) => {
+      if (remote && remote.length > 0) {
+        setSavedAuthors(remote);
+      }
+    });
+
+    const handleAuthorsChanged = () => {
+      setSavedAuthors(getLocalSavedAuthors(userEmail));
+    };
+    window.addEventListener("scholar_saved_authors_changed", handleAuthorsChanged);
+    return () => {
+      window.removeEventListener("scholar_saved_authors_changed", handleAuthorsChanged);
+    };
+  }, [userEmail]);
   
   // Save status & Debounced Auto-save
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved" | "error">("saved");
@@ -178,6 +210,10 @@ export default function DefinitionStage({
 
       const updatedAnswers = await saveIntakeAnswers(projectId, synchronizedAnswers);
       const updatedAuthors = await saveAuthors(projectId, authorsRef.current);
+      // Automatically store valid authors for this specific user
+      saveAuthorsListForUser(authorsRef.current, userEmail);
+      setSavedAuthors(getLocalSavedAuthors(userEmail));
+
       const merged: ProjectView = {
         ...updatedAnswers,
         answers: synchronizedAnswers,
@@ -193,7 +229,7 @@ export default function DefinitionStage({
       setError((e as Error).message);
       return false;
     }
-  }, [projectId, onSaved]);
+  }, [projectId, onSaved, userEmail]);
 
   // Debounced auto-save scheduler
   const scheduleAutoSave = useCallback(() => {
@@ -216,9 +252,10 @@ export default function DefinitionStage({
       if (isDirtyRef.current) {
         saveIntakeAnswers(projectId, answersRef.current).catch(() => {});
         saveAuthors(projectId, authorsRef.current).catch(() => {});
+        saveAuthorsListForUser(authorsRef.current, userEmail);
       }
     };
-  }, [projectId]);
+  }, [projectId, userEmail]);
 
   // Answer updater with bidirectional field synchronization
   function updateAnswer(key: string, value: string) {
@@ -244,6 +281,46 @@ export default function DefinitionStage({
   }
 
   // Author management
+  function insertSavedAuthor(author: Author) {
+    const normalizedEmail = (author.email || "").trim().toLowerCase();
+    const normalizedName = `${author.firstName || ""} ${author.surname || ""}`.trim().toLowerCase();
+    const exists = authors.some((a) => {
+      if (a.id && a.id === author.id) return true;
+      if (normalizedEmail && a.email && a.email.trim().toLowerCase() === normalizedEmail) return true;
+      if (normalizedName) {
+        const aName = `${a.firstName || ""} ${a.surname || ""}`.trim().toLowerCase();
+        if (aName === normalizedName) return true;
+      }
+      return false;
+    });
+
+    if (exists) return;
+
+    const newAuthor: Author = {
+      ...author,
+      id: "auth-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+      isCorresponding: authors.length === 0,
+      creditRoles: Array.isArray(author.creditRoles) ? [...author.creditRoles] : [],
+    };
+
+    setAuthors((prev) => {
+      const next = [...prev, newAuthor];
+      authorsRef.current = next;
+      return next;
+    });
+    scheduleAutoSave();
+  }
+
+  function handleSaveAuthorToRoster(author: Author) {
+    saveAuthorForUser(author, userEmail);
+    setSavedAuthors(getLocalSavedAuthors(userEmail));
+  }
+
+  function handleRemoveSavedAuthor(authorId: string) {
+    removeSavedAuthorForUser(authorId, userEmail);
+    setSavedAuthors(getLocalSavedAuthors(userEmail));
+  }
+
   function updateAuthor(id: string, updates: Partial<Author>) {
     setAuthors((prev) => {
       const next = prev.map((a) => (a.id === id ? { ...a, ...updates } : a));
@@ -1139,29 +1216,110 @@ export default function DefinitionStage({
                     Define formal manuscript authorship and granular contributor roles according to the standard CRediT taxonomy.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={addAuthor}
-                  className="px-4 py-2 text-xs font-bold text-[color:var(--accent)] bg-[color:var(--accent-subtle)] rounded-full hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  <span>Add Author</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  {savedAuthors.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSavedAuthorsModal(true)}
+                      className="px-3.5 py-2 text-xs font-bold text-[color:var(--text-secondary)] bg-[color:var(--surface-raised)] rounded-full hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-default)] transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      title="View and manage your personal saved author roster"
+                    >
+                      <span>👥 My Saved Authors ({savedAuthors.length})</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={addAuthor}
+                    className="px-4 py-2 text-xs font-bold text-[color:var(--accent)] bg-[color:var(--accent-subtle)] rounded-full hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Add Author</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Quick Add from Saved Authors Chip Bar (only show authors not yet in this manuscript) */}
+              {(() => {
+                const unaddedSavedAuthors = savedAuthors.filter(
+                  (sa) =>
+                    !authors.some(
+                      (a) =>
+                        (a.id && a.id === sa.id) ||
+                        (a.email && sa.email && a.email.toLowerCase() === sa.email.toLowerCase()) ||
+                        (a.firstName &&
+                          a.surname &&
+                          sa.firstName &&
+                          sa.surname &&
+                          `${a.firstName} ${a.surname}`.toLowerCase() === `${sa.firstName} ${sa.surname}`.toLowerCase())
+                    )
+                );
+
+                if (unaddedSavedAuthors.length === 0) return null;
+
+                return (
+                  <div className="p-3.5 rounded-2xl bg-[color:var(--surface-base)] border border-[color:var(--border-subtle)] space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-[color:var(--text-primary)] flex items-center gap-1.5">
+                        <span>⚡ Quick Add from Saved Authors:</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowSavedAuthorsModal(true)}
+                        className="text-[11px] text-[color:var(--accent)] hover:underline font-semibold cursor-pointer"
+                      >
+                        Manage Roster ({savedAuthors.length}) ↗
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {unaddedSavedAuthors.map((sa) => {
+                        const displayName = `${sa.title ? sa.title + " " : ""}${sa.firstName} ${sa.surname}`.trim() || sa.email;
+                        return (
+                          <button
+                            key={sa.id}
+                            type="button"
+                            onClick={() => insertSavedAuthor(sa)}
+                            className="px-3 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-1.5 transition-all cursor-pointer bg-[color:var(--surface-raised)] border-[color:var(--border-default)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)] shadow-2xs hover:shadow-xs active:scale-95"
+                            title={`Click to add ${displayName} to manuscript`}
+                          >
+                            <span className="font-bold">+</span>
+                            <span>{displayName}</span>
+                            {sa.affiliation && (
+                              <span className="text-[10px] text-[color:var(--text-muted)] truncate max-w-[120px]">
+                                ({sa.affiliation})
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {authors.length === 0 ? (
                 <div className="p-12 text-center border-2 border-dashed border-[color:var(--border-subtle)] rounded-2xl bg-[color:var(--surface-raised)]">
                   <p className="text-sm font-semibold text-[color:var(--text-secondary)]">No authors registered yet.</p>
                   <p className="text-xs text-[color:var(--text-muted)] mt-1 mb-4">Every journal article requires at least one primary author.</p>
-                  <button
-                    type="button"
-                    onClick={addAuthor}
-                    className="px-4 py-2 text-xs font-bold text-white bg-[color:var(--accent)] rounded-full cursor-pointer hover:bg-[color:var(--accent-hover)]"
-                  >
-                    Add Lead Author
-                  </button>
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    {savedAuthors.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowSavedAuthorsModal(true)}
+                        className="px-4 py-2 text-xs font-bold text-[color:var(--text-primary)] bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded-full cursor-pointer hover:bg-[color:var(--surface-hover)]"
+                      >
+                        Select from Saved Authors ({savedAuthors.length})
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={addAuthor}
+                      className="px-4 py-2 text-xs font-bold text-white bg-[color:var(--accent)] rounded-full cursor-pointer hover:bg-[color:var(--accent-hover)]"
+                    >
+                      Add Lead Author
+                    </button>
+                  </div>
                 </div>
               ) : (
                 authors.map((author, index) => (
@@ -1171,7 +1329,7 @@ export default function DefinitionStage({
                   >
                     {/* Header bar of Author Card */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[color:var(--border-subtle)] pb-3 gap-2 sm:gap-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="w-6 h-6 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--text-primary)] text-xs font-bold flex items-center justify-center shrink-0">
                           {index + 1}
                         </span>
@@ -1185,6 +1343,34 @@ export default function DefinitionStage({
                             Corresponding
                           </span>
                         )}
+                        {/* Saved author status or Save to Profile button */}
+                        {(() => {
+                          const isSaved = savedAuthors.some(
+                            (sa) =>
+                              (sa.id && sa.id === author.id) ||
+                              (sa.email && author.email && sa.email.toLowerCase() === author.email.toLowerCase()) ||
+                              (sa.firstName && sa.surname && author.firstName && author.surname && `${sa.firstName} ${sa.surname}`.toLowerCase() === `${author.firstName} ${author.surname}`.toLowerCase())
+                          );
+                          return isSaved ? (
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0"
+                              title="This author profile is permanently stored for your user account"
+                            >
+                              ✓ Saved Profile
+                            </span>
+                          ) : (
+                            (author.firstName || author.surname || author.email) && (
+                              <button
+                                type="button"
+                                onClick={() => handleSaveAuthorToRoster(author)}
+                                className="px-2 py-0.5 rounded-full text-[10px] font-semibold text-[color:var(--accent)] hover:bg-[color:var(--accent-subtle)] border border-[color:var(--border-subtle)] shrink-0 cursor-pointer transition-colors"
+                                title="Store this author in your user profile for future journal articles"
+                              >
+                                💾 Save to My Authors
+                              </button>
+                            )
+                          );
+                        })()}
                       </div>
 
                       {/* Reordering and removal controls */}
@@ -1866,6 +2052,161 @@ export default function DefinitionStage({
           reason={exhaustedReason || "All configured AI model endpoints are currently exhausted or unavailable."}
         />
       )}
+
+      {/* 7. My Saved Authors Directory Modal */}
+      {showSavedAuthorsModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="saved-authors-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setShowSavedAuthorsModal(false)}
+        >
+          <div
+            className="w-full max-w-xl rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col animate-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-3">
+              <div>
+                <h3 id="saved-authors-modal-title" className="text-base font-bold text-[color:var(--text-primary)] flex items-center gap-2">
+                  <span>👥 My Saved Authors</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] font-semibold">
+                    {savedAuthors.length}
+                  </span>
+                </h3>
+                <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
+                  Authors stored permanently for your account {userEmail ? `(${userEmail})` : ""}. Add them with 1 click to any Journal Article.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSavedAuthorsModal(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Search filter */}
+            {savedAuthors.length > 2 && (
+              <div>
+                <input
+                  type="text"
+                  placeholder="Filter saved authors by name, affiliation, or email..."
+                  value={savedAuthorSearch}
+                  onChange={(e) => setSavedAuthorSearch(e.target.value)}
+                  className="w-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded-xl px-3.5 py-2 text-xs text-[color:var(--text-primary)] focus:outline-none"
+                />
+              </div>
+            )}
+
+            {/* List of saved authors */}
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 scholar-scrollbar min-h-[140px]">
+              {savedAuthors.length === 0 ? (
+                <div className="text-center py-8 text-xs text-[color:var(--text-muted)] space-y-2">
+                  <p className="font-semibold text-sm">No saved authors yet.</p>
+                  <p>Authors entered and saved in any Journal Article are automatically stored here for your future manuscripts.</p>
+                </div>
+              ) : (
+                savedAuthors
+                  .filter((sa) => {
+                    if (!savedAuthorSearch.trim()) return true;
+                    const query = savedAuthorSearch.toLowerCase();
+                    const name = `${sa.title || ""} ${sa.firstName} ${sa.middleName || ""} ${sa.surname}`.toLowerCase();
+                    return (
+                      name.includes(query) ||
+                      (sa.email && sa.email.toLowerCase().includes(query)) ||
+                      (sa.affiliation && sa.affiliation.toLowerCase().includes(query))
+                    );
+                  })
+                  .map((sa) => {
+                    const inManuscript = authors.some(
+                      (a) =>
+                        (a.id && a.id === sa.id) ||
+                        (a.email && sa.email && a.email.toLowerCase() === sa.email.toLowerCase()) ||
+                        (a.firstName &&
+                          a.surname &&
+                          sa.firstName &&
+                          sa.surname &&
+                          `${a.firstName} ${a.surname}`.toLowerCase() === `${sa.firstName} ${sa.surname}`.toLowerCase())
+                    );
+                    const fullName =
+                      `${sa.title ? sa.title + " " : ""}${sa.firstName} ${sa.middleName ? sa.middleName + " " : ""}${sa.surname}`.trim() ||
+                      sa.email;
+
+                    return (
+                      <div
+                        key={sa.id}
+                        className="p-3 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-base)] flex items-center justify-between gap-3 shadow-2xs hover:border-[color:var(--border-default)] transition-all"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-xs text-[color:var(--text-primary)] truncate">
+                              {fullName}
+                            </span>
+                            {sa.orcid && (
+                              <span className="text-[10px] font-mono text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] px-1.5 py-0.2 rounded border border-[color:var(--border-subtle)]">
+                                ORCID: {sa.orcid}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-[11px] text-[color:var(--text-secondary)] mt-0.5 truncate">
+                            {sa.email && <span>{sa.email}</span>}
+                            {sa.affiliation && <span>• {sa.affiliation}</span>}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            disabled={inManuscript}
+                            onClick={() => {
+                              insertSavedAuthor(sa);
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                              inManuscript
+                                ? "bg-[color:var(--surface-inset)] text-[color:var(--text-muted)] border border-transparent cursor-default"
+                                : "bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] shadow-xs"
+                            }`}
+                          >
+                            {inManuscript ? "✓ In Article" : "+ Add to Article"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSavedAuthor(sa.id)}
+                            className="p-1.5 text-[color:var(--text-muted)] hover:text-red-500 rounded-lg hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
+                            title="Remove from your saved authors roster"
+                            aria-label={`Remove ${fullName} from saved authors`}
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-[color:var(--border-subtle)] flex items-center justify-between">
+              <span className="text-[11px] text-[color:var(--text-muted)]">
+                {savedAuthors.length} total saved {savedAuthors.length === 1 ? "author" : "authors"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowSavedAuthorsModal(false)}
+                className="px-4 py-1.5 text-xs font-bold rounded-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+export { DefinitionStage };

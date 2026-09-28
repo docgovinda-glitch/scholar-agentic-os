@@ -6,6 +6,13 @@
  */
 
 import type { CanonicalReference, ReferenceKind } from "./model/reference";
+import { APA7Formatter } from "./formatters/apa7";
+import { MLA9Formatter } from "./formatters/mla9";
+import { ChicagoFormatter } from "./formatters/chicago";
+import { ChicagoNotesFormatter } from "./formatters/chicagoNotes";
+import { HarvardFormatter } from "./formatters/harvard";
+import { IEEEFormatter } from "./formatters/ieee";
+import { VancouverFormatter } from "./formatters/vancouver";
 
 // ============================================================================
 // Citation Style Interface
@@ -39,12 +46,7 @@ export interface CitationStyle {
 
   /**
    * Notes-style citation support (Chicago 17 Notes-Bibliography, and any
-   * future footnote/endnote style). Optional: every style that cites
-   * in-text via author-date or a numbered marker (the rest of this
-   * registry) has no use for it, and implementing it does not change how
-   * they're called — `formatInText` still returns the in-text marker,
-   * e.g. the footnote number, via `options.position` (see VancouverFormatter
-   * for the same convention with `[n]` markers).
+   * future footnote/endnote style).
    */
   formatNote?(reference: CanonicalReference, options?: NoteOptions): string;
   /** The shortened form used for the second and later citations of the same source (CMOS 17 §14.34). */
@@ -77,7 +79,7 @@ export interface NoteOptions {
 
 /**
  * Registry for citation styles.
- * Supports dependency injection and version management.
+ * Supports dependency injection, version management, and default formatters.
  */
 export class CitationStyleRegistry {
   private static instance: CitationStyleRegistry;
@@ -88,8 +90,49 @@ export class CitationStyleRegistry {
   static getInstance(): CitationStyleRegistry {
     if (!CitationStyleRegistry.instance) {
       CitationStyleRegistry.instance = new CitationStyleRegistry();
+      CitationStyleRegistry.instance.registerDefaults();
     }
     return CitationStyleRegistry.instance;
+  }
+
+  /**
+   * Register the core canonical academic citation formatters with primary IDs and aliases.
+   */
+  registerDefaults(): void {
+    const apa = new APA7Formatter();
+    const mla = new MLA9Formatter();
+    const chicago = new ChicagoFormatter();
+    const chicagoNotes = new ChicagoNotesFormatter();
+    const harvard = new HarvardFormatter();
+    const ieee = new IEEEFormatter();
+    const vancouver = new VancouverFormatter();
+
+    this.register(apa);
+    this.styles.set("apa", apa);
+    this.styles.set("apa7", apa);
+    this.styles.set("apa-7", apa);
+
+    this.register(mla);
+    this.styles.set("mla", mla);
+    this.styles.set("mla9", mla);
+    this.styles.set("mla-9", mla);
+
+    this.register(chicago);
+    this.styles.set("chicago", chicago);
+    this.styles.set("chicago-author-date", chicago);
+
+    this.register(chicagoNotes);
+    this.styles.set("chicago-notes", chicagoNotes);
+    this.styles.set("chicago-notes-bibliography", chicagoNotes);
+
+    this.register(harvard);
+    this.styles.set("harvard", harvard);
+
+    this.register(ieee);
+    this.styles.set("ieee", ieee);
+
+    this.register(vancouver);
+    this.styles.set("vancouver", vancouver);
   }
 
   /**
@@ -100,10 +143,11 @@ export class CitationStyleRegistry {
   }
 
   /**
-   * Get a citation style by ID.
+   * Get a citation style by ID or alias.
    */
   get(id: string): CitationStyle | undefined {
-    return this.styles.get(id);
+    const cleanId = (id || "").toLowerCase().trim();
+    return this.styles.get(cleanId) || this.styles.get(id);
   }
 
   /**
@@ -124,7 +168,8 @@ export class CitationStyleRegistry {
    * Check if style exists.
    */
   has(id: string): boolean {
-    return this.styles.has(id);
+    const cleanId = (id || "").toLowerCase().trim();
+    return this.styles.has(cleanId) || this.styles.has(id);
   }
 
   /**
@@ -149,7 +194,12 @@ export class CitationFormatterFactory {
    * Get formatter for a style.
    */
   static getFormatter(styleId: string): CitationStyle | undefined {
-    return CitationFormatterFactory.defaultRegistry.get(styleId);
+    const normalized = (styleId || "apa").toLowerCase().trim();
+    return (
+      CitationFormatterFactory.defaultRegistry.get(normalized) ||
+      CitationFormatterFactory.defaultRegistry.get("apa") ||
+      CitationFormatterFactory.defaultRegistry.get("apa-7")
+    );
   }
 
   /**
@@ -172,5 +222,16 @@ export class CitationFormatterFactory {
       return reference.title || "Unknown Reference";
     }
     return formatter.formatBibliography(reference);
+  }
+
+  /**
+   * Format full reference list.
+   */
+  static formatReferenceList(styleId: string, references: CanonicalReference[]): string {
+    const formatter = CitationFormatterFactory.getFormatter(styleId);
+    if (!formatter) {
+      return references.map((r) => r.title || "Unknown Reference").join("\n\n");
+    }
+    return formatter.formatReferenceList(references);
   }
 }

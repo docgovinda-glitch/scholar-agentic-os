@@ -1,6 +1,8 @@
 import type { Express, Request, Response } from "express";
 import https from "node:https";
 import http from "node:http";
+import tls from "node:tls";
+import net from "node:net";
 import { URL } from "node:url";
 
 /**
@@ -117,3 +119,89 @@ export function registerSupabaseProxy(app: Express): void {
     req.pipe(proxyReq);
   });
 }
+
+/**
+ * Registers an HTTP WebSocket upgrade proxy on the underlying Node http.Server.
+ *
+ * Intercepts incoming WebSocket upgrades targeting `/api/supabase/realtime/*`
+ * and transparently forwards them to the upstream Supabase Realtime endpoint.
+ * Because the browser connects to the same-origin URL (e.g. wss://scholar.gkshah.com.np/api/supabase/...),
+ * this completely eliminates browser-level `ERR_CERT_AUTHORITY_INVALID` certificate errors caused by
+ * corporate/institutional proxies intercepting direct connections to `*.supabase.co`.
+ */
+export function registerSupabaseWsProxy(server: http.Server): void {
+  const remoteUrlStr = getRemoteSupabaseUrl();
+  let targetUrl: URL;
+  try {
+    targetUrl = new URL(remoteUrlStr);
+  } catch {
+    targetUrl = new URL("https://gfjhsijrwodjvkisouzw.supabase.co");
+  }
+
+  const isHttps = targetUrl.protocol === "https:";
+  const defaultPort = isHttps ? 443 : 80;
+  const targetPort = targetUrl.port ? Number(targetUrl.port) : defaultPort;
+
+  server.on("upgrade", (req: http.IncomingMessage, clientSocket: net.Socket, head: Buffer) => {
+    if (!req.url || !req.url.startsWith("/api/supabase")) {
+      return;
+    }
+
+    const subpath = req.url.replace(/^\/api\/supabase/, "") || "/";
+
+    const connectOptions: tls.ConnectionOptions = {
+      host: targetUrl.hostname,
+      port: targetPort,
+      servername: targetUrl.hostname,
+      rejectUnauthorized: false,
+    };
+
+    const upstreamSocket: net.Socket = isHttps
+      ? tls.connect(connectOptions)
+      : net.connect(connectOptions as net.NetConnectOpts);
+
+    const onConnected = () => {
+      let reqLines = `${req.method} ${subpath} HTTP/${req.httpVersion}\r\n`;
+      if (req.rawHeaders) {
+        for (let i = 0; i < req.rawHeaders.length; i += 2) {
+          const key = req.rawHeaders[i];
+          const val = req.rawHeaders[i + 1];
+          if (key.toLowerCase() === "host") {
+            reqLines += `Host: ${targetUrl.hostname}\r\n`;
+          } else {
+            reqLines += `${key}: ${val}\r\n`;
+          }
+        }
+      }
+      reqLines += "\r\n";
+
+      try {
+        upstreamSocket.write(reqLines);
+        if (head && head.length > 0) {
+          upstreamSocket.write(head);
+        }
+
+        clientSocket.pipe(upstreamSocket);
+        upstreamSocket.pipe(clientSocket);
+      } catch {
+        clientSocket.destroy();
+        upstreamSocket.destroy();
+      }
+    };
+
+    if (isHttps) {
+      (upstreamSocket as tls.TLSSocket).on("secureConnect", onConnected);
+    } else {
+      upstreamSocket.on("connect", onConnected);
+    }
+
+    upstreamSocket.on("error", () => {
+      clientSocket.destroy();
+    });
+
+    clientSocket.on("error", () => {
+      upstreamSocket.destroy();
+    });
+  });
+}
+

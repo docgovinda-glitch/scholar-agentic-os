@@ -303,9 +303,9 @@ function SectionPane({
 
 function SectionHeading({ title, blurb }: { title: string; blurb: string }) {
   return (
-    <div className="mb-4">
-      <h2 className="text-lg font-semibold tracking-tight text-[color:var(--text-primary)]">{title}</h2>
-      <p className="mt-0.5 text-sm text-[color:var(--text-secondary)]">{blurb}</p>
+    <div className="mb-5 text-left">
+      <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">{title}</h2>
+      <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400 max-w-2xl leading-relaxed">{blurb}</p>
     </div>
   );
 }
@@ -332,25 +332,27 @@ function OverviewSection({
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 text-left">
       <SectionHeading
         title="Overview"
         blurb="Scholar picks the best available AI for each task from whatever you have connected — you never choose per request."
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3.5 sm:grid-cols-3">
         <button
           type="button"
           onClick={() => onGo("providers")}
-          className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4 text-left transition-colors hover:border-[color:var(--border-strong)]"
+          className="group rounded-2xl border border-slate-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-4 sm:p-5 text-left transition-all hover:border-slate-300 dark:hover:border-neutral-700 hover:shadow-xs flex flex-col justify-between gap-3 shadow-2xs cursor-pointer h-full"
         >
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-sm font-semibold text-[color:var(--text-primary)]">Providers</span>
-            <span className="text-xs font-medium text-[color:var(--text-secondary)]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
+              Providers
+            </span>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60 whitespace-nowrap shrink-0">
               {totalConnected > 0 ? `${totalConnected} connected` : "None"}
             </span>
           </div>
-          <p className="mt-1 text-xs text-[color:var(--text-muted)]">
+          <p className="text-xs text-slate-500 dark:text-neutral-400 leading-normal">
             {counts.local} local, {counts.free + counts.byok} cloud accounts
           </p>
         </button>
@@ -358,19 +360,23 @@ function OverviewSection({
         <button
           type="button"
           onClick={() => onGo("subscription")}
-          className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4 text-left transition-colors hover:border-[color:var(--border-strong)]"
+          className="group rounded-2xl border border-slate-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-4 sm:p-5 text-left transition-all hover:border-slate-300 dark:hover:border-neutral-700 hover:shadow-xs flex flex-col justify-between gap-3 shadow-2xs cursor-pointer h-full"
         >
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-sm font-semibold text-[color:var(--text-primary)]">Subscription</span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
+              Subscription
+            </span>
             <span
-              className={`text-xs font-medium ${
-                access.premiumActive ? "text-[color:var(--state-success)]" : "text-[color:var(--text-secondary)]"
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 border ${
+                access.premiumActive
+                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200/80 dark:border-emerald-800/60"
+                  : "bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 border-slate-200 dark:border-neutral-700"
               }`}
             >
               {access.premiumActive ? "Active" : "Not subscribed"}
             </span>
           </div>
-          <p className="mt-1 text-xs text-[color:var(--text-muted)]">
+          <p className="text-xs text-slate-500 dark:text-neutral-400 leading-normal">
             {access.premiumActive ? "Provided by Scholar Core" : "Core-hosted model pool"}
           </p>
         </button>
@@ -378,52 +384,72 @@ function OverviewSection({
         <button
           type="button"
           onClick={() => onGo("preferences")}
-          className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4 text-left transition-colors hover:border-[color:var(--border-strong)]"
+          className="group rounded-2xl border border-slate-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-4 sm:p-5 text-left transition-all hover:border-slate-300 dark:hover:border-neutral-700 hover:shadow-xs flex flex-col justify-between gap-3 shadow-2xs cursor-pointer h-full"
         >
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-sm font-semibold text-[color:var(--text-primary)]">Preferences</span>
-            <span className="text-xs font-medium text-[color:var(--text-secondary)]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
+              Preferences
+            </span>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 border border-slate-200 dark:border-neutral-700 whitespace-nowrap shrink-0 capitalize">
               {access.settings.provider || "Default"}
             </span>
           </div>
-          <p className="mt-1 text-xs text-[color:var(--text-muted)]">Routing, models & privacy</p>
+          <p className="text-xs text-slate-500 dark:text-neutral-400 leading-normal">
+            Routing, models & privacy
+          </p>
         </button>
       </div>
 
       {access.connected.length > 0 ? (
-        <section>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">Your connections</h3>
+        <section className="pt-2">
+          <div className="mb-3.5 flex items-center justify-between">
+            <h3 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+              Your connections
+            </h3>
             <button
               type="button"
               onClick={() => onGo("providers")}
-              className="text-xs font-medium text-[color:var(--accent-solid)] hover:underline"
+              className="text-xs font-semibold text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white flex items-center gap-1 transition-colors cursor-pointer group"
             >
-              Browse all providers →
+              <span>Browse all providers</span>
+              <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {access.connected.map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => onOpen(p.id)}
-                className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3 text-left transition-colors hover:border-[color:var(--border-strong)] cursor-pointer"
+                className="group flex items-center justify-between gap-3.5 rounded-2xl border border-slate-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-3.5 sm:p-4 text-left transition-all hover:border-slate-300 dark:hover:border-neutral-700 hover:shadow-xs focus:outline-hidden cursor-pointer shadow-2xs"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span aria-hidden className="text-lg" style={p.spec ? { color: p.spec.color } : undefined}>
+                <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                  <div
+                    aria-hidden
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100/90 dark:bg-neutral-800 border border-slate-200/70 dark:border-neutral-700/70 text-lg shadow-2xs transition-transform group-hover:scale-105"
+                    style={p.spec?.color ? { color: p.spec.color } : undefined}
+                  >
                     {p.icon}
-                  </span>
-                  <div className="min-w-0">
-                    <span className="truncate text-sm font-medium text-[color:var(--text-primary)]">{p.name}</span>
-                    <span className="block truncate text-xs text-[color:var(--text-muted)]">
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-bold text-slate-900 dark:text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
+                        {p.name}
+                      </span>
+                      {p.isDefault && (
+                        <span className="inline-flex items-center rounded-md px-1.5 py-0.25 text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-neutral-700 shrink-0">
+                          Default
+                        </span>
+                      )}
+                    </div>
+                    <span className="block truncate text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
                       {p.selectedModel ? p.selectedModel : p.kind === "local" ? "Local Runner" : "Default model"}
                     </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {p.isDefault && <Chip tone="good">Default</Chip>}
-                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border border-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]">
+                  <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                     Connected
                   </span>
                 </div>
@@ -432,25 +458,25 @@ function OverviewSection({
           </div>
         </section>
       ) : (
-        <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-5">
-          <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">Nothing connected yet</h3>
-          <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+        <section className="rounded-2xl border border-slate-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-6 text-left shadow-2xs">
+          <h3 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Nothing connected yet</h3>
+          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400 max-w-xl leading-relaxed">
             Connect a local runner or cloud AI provider to power generation, synthesis, and research drafting.
           </p>
           <div className="mt-4 flex flex-wrap gap-2.5">
             <button
               type="button"
               onClick={() => onGo("providers")}
-              className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-3.5 py-1.5 text-xs font-semibold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] cursor-pointer"
+              className="rounded-xl bg-slate-900 hover:bg-black dark:bg-white dark:hover:bg-slate-100 dark:text-slate-950 text-white px-4 py-2 text-xs font-semibold transition-all shadow-sm cursor-pointer"
             >
               Browse Providers
             </button>
             <button
               type="button"
               onClick={() => onGo("subscription")}
-              className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] px-3.5 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+              className="rounded-xl border border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-800/80 hover:bg-slate-50 dark:hover:bg-neutral-800 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-all cursor-pointer"
             >
-              View Subscription
+              Learn about Premium
             </button>
           </div>
         </section>
