@@ -323,4 +323,155 @@ describe("KnowledgeVault component", () => {
     // saveIntakeAnswers should NOT have been called
     expect(saveIntakeAnswers).not.toHaveBeenCalled();
   });
+
+  describe("Project View Options (List vs Card View)", () => {
+    beforeEach(() => {
+      window.localStorage.clear();
+    });
+
+    it("renders the view toggle switcher with Card and List buttons", async () => {
+      render(
+        <KnowledgeVault
+          userId="user-123"
+          onClose={vi.fn()}
+          onOpenProject={vi.fn()}
+        />
+      );
+
+      await screen.findByText("Genome Editing in Marine Diatoms");
+
+      const cardBtn = screen.getByTestId("project-view-card-btn");
+      const listBtn = screen.getByTestId("project-view-list-btn");
+      expect(cardBtn).toBeInTheDocument();
+      expect(listBtn).toBeInTheDocument();
+
+      // Card view is default
+      expect(screen.getByTestId("project-card-grid")).toBeInTheDocument();
+      expect(screen.queryByTestId("project-list-view")).not.toBeInTheDocument();
+    });
+
+    it("switches to List View upon toggle click and persists to localStorage", async () => {
+      render(
+        <KnowledgeVault
+          userId="user-123"
+          onClose={vi.fn()}
+          onOpenProject={vi.fn()}
+        />
+      );
+
+      await screen.findByText("Genome Editing in Marine Diatoms");
+
+      const listBtn = screen.getByTestId("project-view-list-btn");
+      fireEvent.click(listBtn);
+
+      // Verify list view is rendered and card grid is removed
+      expect(screen.getByTestId("project-list-view")).toBeInTheDocument();
+      expect(screen.queryByTestId("project-card-grid")).not.toBeInTheDocument();
+      expect(window.localStorage.getItem("scholar_vault_project_view_mode")).toBe("list");
+
+      // Verify both projects are rendered as list items
+      expect(screen.getByTestId("project-list-item-proj-1")).toBeInTheDocument();
+      expect(screen.getByTestId("project-list-item-proj-2")).toBeInTheDocument();
+
+      // Switch back to Card View
+      const cardBtn = screen.getByTestId("project-view-card-btn");
+      fireEvent.click(cardBtn);
+
+      expect(screen.getByTestId("project-card-grid")).toBeInTheDocument();
+      expect(screen.queryByTestId("project-list-view")).not.toBeInTheDocument();
+      expect(window.localStorage.getItem("scholar_vault_project_view_mode")).toBe("card");
+    });
+
+    it("restores List View from localStorage on mount", async () => {
+      window.localStorage.setItem("scholar_vault_project_view_mode", "list");
+
+      render(
+        <KnowledgeVault
+          userId="user-123"
+          onClose={vi.fn()}
+          onOpenProject={vi.fn()}
+        />
+      );
+
+      await screen.findByText("Genome Editing in Marine Diatoms");
+
+      expect(screen.getByTestId("project-list-view")).toBeInTheDocument();
+      expect(screen.queryByTestId("project-card-grid")).not.toBeInTheDocument();
+    });
+
+    it("supports opening workspace from List View via button, icon, and title", async () => {
+      window.localStorage.setItem("scholar_vault_project_view_mode", "list");
+      const onOpenProject = vi.fn();
+
+      render(
+        <KnowledgeVault
+          userId="user-123"
+          onClose={vi.fn()}
+          onOpenProject={onOpenProject}
+        />
+      );
+
+      await screen.findByText("Genome Editing in Marine Diatoms");
+
+      const listItem = screen.getByTestId("project-list-item-proj-1");
+      const openBtn = within(listItem).getByRole("button", { name: /Open Workspace/i });
+      fireEvent.click(openBtn);
+
+      expect(onOpenProject).toHaveBeenCalledWith("proj-1");
+
+      // Clicking title also triggers open
+      const title = within(listItem).getByText("Genome Editing in Marine Diatoms");
+      fireEvent.click(title);
+      expect(onOpenProject).toHaveBeenCalledWith("proj-1");
+    });
+
+    it("supports inline rename and delete in List View", async () => {
+      window.localStorage.setItem("scholar_vault_project_view_mode", "list");
+      saveIntakeAnswers.mockResolvedValue({ success: true });
+      deleteProject.mockResolvedValue({ success: true });
+      const onProjectRenamed = vi.fn();
+
+      render(
+        <KnowledgeVault
+          userId="user-123"
+          onClose={vi.fn()}
+          onOpenProject={vi.fn()}
+          onProjectRenamed={onProjectRenamed}
+        />
+      );
+
+      await screen.findByText("Philosophy of Science Essay");
+
+      const listItem = screen.getByTestId("project-list-item-proj-2");
+
+      // Test inline rename
+      const editBtn = within(listItem).getByRole("button", { name: "Edit project heading" });
+      fireEvent.click(editBtn);
+
+      const input = screen.getByDisplayValue("Philosophy of Science Essay");
+      fireEvent.change(input, { target: { value: "Karl Popper and Falsification" } });
+      const saveBtn = screen.getByRole("button", { name: "Save heading" });
+      fireEvent.click(saveBtn);
+
+      expect(await screen.findByText("Karl Popper and Falsification")).toBeInTheDocument();
+      expect(saveIntakeAnswers).toHaveBeenCalledWith("proj-2", expect.objectContaining({
+        title: "Karl Popper and Falsification",
+      }));
+
+      // Test delete modal trigger from List View
+      const deleteBtn = within(listItem).getByRole("button", { name: "Delete Project" });
+      fireEvent.click(deleteBtn);
+
+      // Confirmation modal should be visible
+      const modal = await screen.findByRole("dialog");
+      expect(within(modal).getByRole("heading", { name: "Delete Project" })).toBeInTheDocument();
+
+      const confirmDeleteBtn = within(modal).getByRole("button", { name: "Delete" });
+      fireEvent.click(confirmDeleteBtn);
+
+      await waitFor(() => {
+        expect(deleteProject).toHaveBeenCalledWith("proj-2");
+      });
+    });
+  });
 });
