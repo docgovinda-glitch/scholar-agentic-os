@@ -72,10 +72,9 @@ describe("Evidence & Knowledge Panel Traceability", () => {
       />
     );
 
-    expect(screen.getByText(/Drop your lecture slides, class notes, or required syllabus PDFs here/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Browse Files/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Add Web Link \/ URL/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Paste Notes/i })).toBeInTheDocument();
+    expect(screen.getByText(/Drop lecture slides, syllabus, or readings here, or browse files/i)).toBeInTheDocument();
+    // Single-click-to-browse pattern — split Add Web Link / Paste Notes buttons removed per UX refactor
+    expect(screen.getByTestId("lecture-file-input")).toBeInTheDocument();
   });
 
   it("displays the uploaded item directly in the workspace Evidence Knowledge Panel with 3 distinct layers", () => {

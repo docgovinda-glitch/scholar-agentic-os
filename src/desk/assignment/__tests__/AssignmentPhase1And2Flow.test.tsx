@@ -143,8 +143,8 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
       );
 
       // Phase 2 Header & Section Headings
-      expect(await screen.findByText(/Curated Literature & Course Sources/i)).toBeInTheDocument();
-      expect(screen.getByText(/Course Materials & Syllabus Upload/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
+      expect(screen.getByText(/Course Materials \& Syllabus Upload/i)).toBeInTheDocument();
       expect(screen.getByText(/Curated Scholarly Literature/i)).toBeInTheDocument();
 
       // Curated Literature Cards (Titles, Authors, Venue)
@@ -153,15 +153,18 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
       expect(screen.getByText(/Harvard Law Review/i)).toBeInTheDocument();
       expect(screen.getByText(/Critical Synthesis of Empirical Evidence in Socio-Technical Decision Making/i)).toBeInTheDocument();
 
-      // Exit Gate Counter & initial disabled Proceed to Drafting button
+      // Exit Gate Counter (visible when sources are present) & unblocked Proceed to Drafting & Skip to Drafting buttons
       const counter = screen.getByTestId("evidence-counter");
-      expect(counter).toHaveTextContent("0 / 4 minimum");
+      expect(counter).toHaveTextContent("0 / 4 recommended");
 
       const proceedDraftingBtn = screen.getByTestId("proceed-to-drafting-btn");
-      expect(proceedDraftingBtn).toBeDisabled();
+      expect(proceedDraftingBtn).not.toBeDisabled();
+
+      const skipDraftingBtn = screen.getByTestId("skip-to-drafting-btn");
+      expect(skipDraftingBtn).toBeInTheDocument();
     });
 
-    it("allows one-click approve and dismiss actions on curated cards", async () => {
+    it("allows one-click approve and remove actions on curated cards", async () => {
       render(
         <AssignmentWorkspace
           projectId="proj-sources-1"
@@ -170,7 +173,7 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
         />
       );
 
-      await screen.findByText(/Curated Literature & Course Sources/i);
+      await screen.findByText(/Sources & Course Materials/i);
 
       // Approve card 1
       const approveBtn1 = screen.getByRole("button", { name: /Approve Algorithmic Governance and the Politics of Predictive Accountability/i });
@@ -185,23 +188,21 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
         );
       });
 
-      // Dismiss card 2
-      const dismissBtn = screen.getByRole("button", { name: /Dismiss or replace Critical Synthesis of Empirical Evidence in Socio-Technical Decision Making/i });
-      fireEvent.click(dismissBtn);
+      // Toggle off card 1 (Remove from approved)
+      const removeBtn1 = screen.getByRole("button", { name: /Remove Algorithmic Governance and the Politics of Predictive Accountability from approved/i });
+      fireEvent.click(removeBtn1);
 
       await waitFor(() => {
         expect(saveIntakeAnswers).toHaveBeenCalledWith(
           "proj-sources-1",
           expect.objectContaining({
-            assignment_sources: expect.arrayContaining([
-              expect.objectContaining({ id: "src-curated-alt-1" }),
-            ]),
+            approved_source_ids: expect.not.arrayContaining(["src-curated-1"]),
           })
         );
       });
     });
 
-    it("accepts lecture file uploads, auto-approves them, and unlocks Proceed to Drafting at 4 approved sources", async () => {
+    it("accepts lecture file uploads, auto-approves them, and tracks progress towards recommended sources", async () => {
       getProject.mockResolvedValueOnce({
         projectId: "proj-sources-1",
         outputTypeId: "OT-01",
@@ -226,15 +227,15 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
         />
       );
 
-      await screen.findByText(/Curated Literature & Course Sources/i);
+      await screen.findByText(/Sources & Course Materials/i);
 
-      // Check current count: 3 / 4 minimum
+      // Check current count: 3 / 4 recommended
       const counter = screen.getByTestId("evidence-counter");
-      expect(counter).toHaveTextContent("3 / 4 minimum");
+      expect(counter).toHaveTextContent("3 / 4 recommended");
       const proceedDraftingBtn = screen.getByTestId("proceed-to-drafting-btn");
-      expect(proceedDraftingBtn).toBeDisabled();
+      expect(proceedDraftingBtn).not.toBeDisabled();
 
-      // Upload 1 lecture slides PDF to meet 4 minimum threshold
+      // Upload 1 lecture slides PDF to meet 4 recommended threshold
       const fileInput = screen.getByTestId("lecture-file-input");
       const file = new File(["lecture notes content"], "Week_04_Algorithmic_Ethics_Slides.pdf", {
         type: "application/pdf",
@@ -258,6 +259,45 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
           })
         );
       });
+    });
+
+    it("renders empty state container with 0 source cards when project is untitled with no uploads", async () => {
+      getProject.mockResolvedValueOnce({
+        projectId: "proj-sources-blank",
+        outputTypeId: "OT-01",
+        title: "Untitled Assignment",
+        hasDocument: false,
+        answers: {
+          assignment_question: "",
+          word_count: 0,
+          citation_style: "",
+          approved_source_ids: [],
+          assignment_sources: [],
+          assignment_user_uploaded_sources: [],
+        },
+        gates: [],
+      });
+
+      render(
+        <AssignmentWorkspace
+          projectId="proj-sources-blank"
+          initialStage="sources"
+          onStageChange={vi.fn()}
+        />
+      );
+
+      // Verify empty state container renders with new simplified copy
+      expect(await screen.findByTestId("sources-empty-state")).toBeInTheDocument();
+      expect(screen.getByText(/Ground Your Assignment in Sources/i)).toBeInTheDocument();
+      // Upload Course Materials / Define Assignment Topic buttons removed per UX refactor —
+      // the dropzone itself is the CTA, and sources are optional.
+
+      // Verify 0 literature cards are displayed
+      expect(screen.queryByTestId("curated-sources-grid")).not.toBeInTheDocument();
+
+      // Verify Skip to Drafting button is available
+      const skipBtns = screen.getAllByTestId("skip-to-drafting-btn");
+      expect(skipBtns.length).toBeGreaterThan(0);
     });
   });
 });

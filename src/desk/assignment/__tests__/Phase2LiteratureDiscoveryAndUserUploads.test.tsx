@@ -131,8 +131,11 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
     });
   });
 
-  describe("2. Phase 1 Functionality Directly Embedded in Phase 2", () => {
-    it("renders the Assignment Brief & Research Scope Panel with active question and calibration badges", async () => {
+  describe("2. Phase 1 Context Visible in Phase 2 (Topic Breadcrumb)", () => {
+    // AssignmentBriefScopePanel was removed per UX refactor directive (task 6).
+    // Phase 1 parameters (Academic Level, Assignment Type etc.) are defined in Phase 1 only.
+    // Phase 2 shows an unobtrusive single-line topic breadcrumb and the h1 heading.
+    it("renders the Sources stage heading and topic breadcrumb from Phase 1", async () => {
       render(
         <AssignmentWorkspace
           projectId="proj-un-test"
@@ -141,70 +144,17 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
         />
       );
 
-      // Prompt and section header
-      expect(await screen.findByText(/Assignment Research Prompt/i)).toBeInTheDocument();
+      // New Phase 2 h1 heading
+      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
+
+      // Topic breadcrumb shows the assignment question from Phase 1 context
       expect(screen.getByText(unQuestion)).toBeInTheDocument();
 
-      // Academic level toggle, assignment type, citation style, and budget
-      expect(screen.getByText("Undergrad")).toBeInTheDocument();
-      expect(screen.getByText("Postgrad / Masters")).toBeInTheDocument();
-      expect(screen.getByText("2,000 words")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Upload Brief/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Rubric & Command Verbs/i })).toBeInTheDocument();
-    });
-
-    it("allows switching Academic Level to Postgraduate directly from Phase 2", async () => {
-      render(
-        <AssignmentWorkspace
-          projectId="proj-un-test"
-          initialStage="sources"
-          onStageChange={vi.fn()}
-        />
-      );
-
-      await screen.findByText(/Assignment Research Prompt/i);
-
-      const postgradBtn = screen.getByText("Postgrad / Masters");
-      fireEvent.click(postgradBtn);
-
-      await waitFor(() => {
-        expect(saveIntakeAnswers).toHaveBeenCalledWith(
-          "proj-un-test",
-          expect.objectContaining({
-            academicLevel: "postgraduate",
-            academic_level: "postgraduate",
-          })
-        );
-      });
-    });
-
-    it("opens Rubric & Command Verbs Guidance modal with academic actions and boundaries", async () => {
-      render(
-        <AssignmentWorkspace
-          projectId="proj-un-test"
-          initialStage="sources"
-          onStageChange={vi.fn()}
-        />
-      );
-
-      await screen.findByText(/Assignment Research Prompt/i);
-
-      const rubricBtn = screen.getByRole("button", { name: /Rubric & Command Verbs/i });
-      fireEvent.click(rubricBtn);
-
-      expect(await screen.findByText(/Rubric Criteria & Command Verbs Analysis/i)).toBeInTheDocument();
-      expect(screen.getByText(/Scope & Analytical Boundaries/i)).toBeInTheDocument();
-      expect(screen.getByText(/Included Focus/i)).toBeInTheDocument();
-      expect(screen.getByText(/Excluded from Scope/i)).toBeInTheDocument();
-
-      // Close modal
-      const closeBtn = screen.getByRole("button", { name: /Close Guidance/i });
-      fireEvent.click(closeBtn);
-      await waitFor(() => {
-        expect(screen.queryByText(/Rubric Criteria & Command Verbs Analysis/i)).not.toBeInTheDocument();
-      });
+      // Proceed to Drafting is always available (unblocked)
+      expect(screen.getByTestId("proceed-to-drafting-btn")).not.toBeDisabled();
     });
   });
+
 
   describe("3. Unified Literature & Source Collection (Scholarly + User Uploads)", () => {
     it("displays user-uploaded documents in the literature collection alongside scholarly works", async () => {
@@ -255,11 +205,12 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
         />
       );
 
-      await screen.findByText(/Curated Literature & Course Sources/i);
+      await screen.findByText(/Sources & Course Materials/i);
       const curatedGrid = await screen.findByTestId("curated-sources-grid");
       expect(within(curatedGrid).getByText("Week_05_UN_Security_Council_Veto.pptx")).toBeInTheDocument();
       expect(screen.getByText(/Uploaded: PPTX/i)).toBeInTheDocument();
-      expect(screen.getByText(/1 Extracted Excerpt\(s\)/i)).toBeInTheDocument();
+      // Card now renders "Extracted Content & Used References (N)" not "N Extracted Excerpt(s)"
+      expect(screen.getByRole("button", { name: /Extracted Content & Used References/i })).toBeInTheDocument();
 
       // Verify Tab Filtering: "My Uploads" tab
       const myUploadsTab = screen.getByRole("button", { name: /My Uploads/i });
@@ -325,7 +276,7 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
         />
       );
 
-      await screen.findByText(/Curated Literature & Course Sources/i);
+      await screen.findByText(/Sources & Course Materials/i);
       const curatedGrid = await screen.findByTestId("curated-sources-grid");
       expect(within(curatedGrid).getByText("UN_Peacekeeping_Budgets_And_Fatalities_1990_2024.xlsx")).toBeInTheDocument();
       expect(within(curatedGrid).getByText(/Uploaded: SPREADSHEET/i)).toBeInTheDocument();

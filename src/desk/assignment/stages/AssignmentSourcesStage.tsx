@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { CuratedSourceCard } from "../components/CuratedSourceCard";
-import { CuratedSourceListView } from "../components/CuratedSourceListView";
-import { CuratedSourceTableView } from "../components/CuratedSourceTableView";
-import { CuratedSourceCompactView } from "../components/CuratedSourceCompactView";
 import { LectureUploadDropzone } from "../components/LectureUploadDropzone";
-import { AssignmentBriefScopePanel } from "../components/AssignmentBriefScopePanel";
+import { ScholarlyResearchPipeline } from "../components/ScholarlyResearchPipeline";
 import {
   generateCuratedLiteratureSources,
   fetchMoreLiteratureSources,
@@ -15,9 +12,6 @@ import type {
   DiscoveredSource,
   UploadedSourceDocument,
   EvidenceItem,
-  LiteratureViewMode,
-  AcademicLevel,
-  AssignmentType,
   SourceAcademicType,
 } from "../types";
 import {
@@ -31,10 +25,6 @@ import {
   RefreshCw,
   AlertCircle,
   FileCheck,
-  LayoutGrid,
-  List,
-  Table as TableIcon,
-  Rows,
   Star,
   SlidersHorizontal,
   Unlock,
@@ -131,13 +121,7 @@ export default function AssignmentSourcesStage({
   const {
     projectId,
     question,
-    setQuestion,
-    academicLevel,
-    assignmentType,
     citationStyle,
-    targetWordCount,
-    assignmentBriefText,
-    analysis,
     sources,
     setSources,
     approvedSourceIds,
@@ -149,12 +133,7 @@ export default function AssignmentSourcesStage({
     addEvidenceItem,
     advancePhase,
     setPhase,
-    saveAnswers,
-    ensurePersisted,
   } = useAssignmentWorkspace();
-
-  // View mode state (defaults to card view, switches seamlessly)
-  const [viewMode, setViewMode] = useState<LiteratureViewMode>("card");
 
   // Filter & Search states
   const [activeTab, setActiveTab] = useState<"all" | "curated" | "uploaded" | "approved" | "bookmarked" | "excluded">("all");
@@ -187,24 +166,27 @@ export default function AssignmentSourcesStage({
     return !areSourcesRelevantToQuestion(sources, question);
   }, [sources, question]);
 
-  // Initialize curated sources on first mount (ensure baseline of 30+ items and domain alignment)
+  const hasTopic = Boolean(question && question.trim().length >= 4);
+  const hasUploadedDocs = Boolean(userUploadedSources && userUploadedSources.length > 0);
+
+  // Initialize curated sources on first mount
+  // Strict Empty State: If no question/topic and no uploaded materials, render 0 cards.
   useEffect(() => {
+    if (!hasTopic && !hasUploadedDocs) {
+      if (sources.length > 0) {
+        setSources([]);
+      }
+      return;
+    }
+
     if (sources.length === 0) {
       const generated = generateCuratedLiteratureSources(question, citationStyle);
       setSources(generated);
     } else if (isMismatched && approvedSourceIds.length === 0) {
-      // If existing sources were for a different topic and user hasn't locked approved items,
-      // re-curate to align with the active question
       const generated = generateCuratedLiteratureSources(question, citationStyle);
       setSources(generated);
-    } else if (sources.length < 30) {
-      // Seamlessly upgrade legacy small pools to the full 30+ curated library
-      const existingIds = new Set(sources.map((s) => s.id));
-      const baseline = generateCuratedLiteratureSources(question, citationStyle);
-      const additions = baseline.filter((b) => !existingIds.has(b.id));
-      setSources([...sources, ...additions]);
     }
-  }, [sources.length, isMismatched, approvedSourceIds.length, question, citationStyle, setSources]);
+  }, [sources.length, isMismatched, approvedSourceIds.length, question, citationStyle, setSources, hasTopic, hasUploadedDocs]);
 
   // Sync bookmarks & exclusions when sources change
   useEffect(() => {
@@ -217,77 +199,6 @@ export default function AssignmentSourcesStage({
       setExcludedIds((prev) => Array.from(new Set([...prev, ...excluded])));
     }
   }, [sources]);
-
-  // Handlers for Phase 1 Brief & Scope updates directly in Phase 2
-  const handleUpdateQuestion = useCallback(
-    async (newQuestion: string) => {
-      await setQuestion(newQuestion);
-      await saveAnswers({
-        instructions: newQuestion,
-        assignment_question: newQuestion,
-        rawPrompt: newQuestion,
-        raw_prompt: newQuestion,
-        research_topic: newQuestion,
-        assignment_brief_text: newQuestion,
-        assignment_brief: newQuestion,
-      });
-      const generated = generateCuratedLiteratureSources(newQuestion, citationStyle);
-      await setSources(generated);
-      setDiscoverySuccessMsg(`Curated ${generated.length} literature sources matching updated prompt.`);
-      setTimeout(() => setDiscoverySuccessMsg(null), 4000);
-    },
-    [citationStyle, saveAnswers, setQuestion, setSources]
-  );
-
-  const handleUpdateAcademicLevel = useCallback(
-    async (lvl: AcademicLevel) => {
-      await saveAnswers({
-        academicLevel: lvl,
-        academic_level: lvl,
-      });
-    },
-    [saveAnswers]
-  );
-
-  const handleUpdateAssignmentType = useCallback(
-    async (t: AssignmentType) => {
-      await saveAnswers({
-        assignmentType: t,
-        assignment_type: t,
-      });
-    },
-    [saveAnswers]
-  );
-
-  const handleUpdateCitationStyle = useCallback(
-    async (cs: string) => {
-      await saveAnswers({
-        citationStyle: cs,
-        citation_style: cs,
-      });
-      const updated = generateCuratedLiteratureSources(question, cs);
-      await setSources(updated);
-    },
-    [question, saveAnswers, setSources]
-  );
-
-  const handleUpdateWordCount = useCallback(
-    async (count: number) => {
-      const intro = Math.round(count * 0.1);
-      const conclusion = Math.round(count * 0.15);
-      const body = Math.max(0, count - intro - conclusion);
-      const budget = { intro, body, conclusion };
-      await saveAnswers({
-        targetWordCount: count,
-        target_word_count: count,
-        word_count: count,
-        word_limit: count,
-        wordBudget: budget,
-        word_budget: budget,
-      });
-    },
-    [saveAnswers]
-  );
 
   // Re-curate literature for active assignment prompt
   const handleReCurateForPrompt = async () => {
@@ -393,7 +304,6 @@ export default function AssignmentSourcesStage({
   const progressPercent = Math.min(100, Math.round((approvedCount / minimumRequired) * 100));
 
   const handleContinue = () => {
-    if (!isExitGateUnlocked) return;
     if (onProceed) {
       onProceed();
     } else if (advancePhase) {
@@ -413,15 +323,19 @@ export default function AssignmentSourcesStage({
 
   // Base list of scholarly curated sources
   const allCuratedSources = useMemo(() => {
-    if (sources && sources.length >= 30) return sources;
-    if (sources && sources.length > 0) {
-      const existingIds = new Set(sources.map((s) => s.id));
-      const baseline = generateCuratedLiteratureSources(question, citationStyle);
-      const additions = baseline.filter((b) => !existingIds.has(b.id));
-      return [...sources, ...additions];
+    // Strict empty-state guard:
+    // If no brief/prompt has been submitted and no course files have been uploaded, literature count must strictly equal 0.
+    if (!hasTopic && !hasUploadedDocs) {
+      return [];
     }
-    return generateCuratedLiteratureSources(question, citationStyle);
-  }, [sources, question, citationStyle]);
+    if (sources && sources.length > 0) {
+      return sources;
+    }
+    if (hasTopic || hasUploadedDocs) {
+      return generateCuratedLiteratureSources(question, citationStyle);
+    }
+    return [];
+  }, [sources, question, citationStyle, hasTopic, hasUploadedDocs]);
 
   // Map user-uploaded documents to DiscoveredSource objects to unify into literature collection
   const mappedUserSources = useMemo<DiscoveredSource[]>(() => {
@@ -631,530 +545,502 @@ export default function AssignmentSourcesStage({
       {/* Stage Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200/80 dark:border-white/10 pb-5">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wider uppercase bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
               Phase 02
             </span>
             <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
               Evidence Discovery & Course Grounding
             </span>
+            <ScholarlyResearchPipeline question={question} />
           </div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
-            Curated Literature & Course Sources
+            Sources & Course Materials
           </h1>
           <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-2xl leading-relaxed">
-            Discover peer-reviewed scholarship, seminal monographs, conference proceedings, and institutional reports matched to your assessment brief.
+            Upload course slides, syllabus, or readings to ground your citations.
           </p>
-        </div>
-
-        {/* Exit Gate Widget (Top Header View) */}
-        <div className="flex flex-col items-end gap-1.5 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
-              Approved Sources:
-            </span>
-            <span
-              data-testid="evidence-counter"
-              className={`px-3 py-1 rounded-full text-xs font-bold font-mono ${
-                isExitGateUnlocked
-                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
-                  : "bg-neutral-100 text-neutral-700 dark:bg-white/10 dark:text-neutral-300"
-              }`}
-            >
-              {approvedCount} / {minimumRequired} minimum
-            </span>
-          </div>
-
-          <div className="w-36 h-1.5 bg-neutral-200/80 dark:bg-white/10 rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-300 ${
-                isExitGateUnlocked ? "bg-emerald-500" : "bg-neutral-900 dark:bg-white"
-              }`}
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Phase 1 Integration: Assignment Brief, Question, Word Budget & Rubric Guidance Panel */}
-      <section className="space-y-2">
-        <AssignmentBriefScopePanel
-          projectId={projectId}
-          question={question}
-          academicLevel={academicLevel}
-          assignmentType={assignmentType}
-          citationStyle={citationStyle}
-          targetWordCount={targetWordCount}
-          assignmentBriefText={assignmentBriefText}
-          analysis={analysis}
-          onUpdateQuestion={handleUpdateQuestion}
-          onUpdateAcademicLevel={handleUpdateAcademicLevel}
-          onUpdateAssignmentType={handleUpdateAssignmentType}
-          onUpdateCitationStyle={handleUpdateCitationStyle}
-          onUpdateWordCount={handleUpdateWordCount}
-          onRefreshLiterature={handleReCurateForPrompt}
-          ensurePersisted={ensurePersisted}
-        />
-      </section>
-
-
-      {/* Section 1: Lecture Slide Dropzone */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
-              <span>Course Materials & Syllabus Upload</span>
-              <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">(Optional)</span>
-            </h2>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">
-              Upload your professor's slides, reading packs, or rubric notes to anchor specific citations directly to lecture content.
+          {question && (
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 font-medium truncate max-w-2xl pt-1">
+              <span className="text-neutral-400 dark:text-neutral-500 font-normal">Topic: </span>
+              <span className="text-neutral-700 dark:text-neutral-300">{question}</span>
             </p>
-          </div>
+          )}
         </div>
 
-        <LectureUploadDropzone
-          uploadedFiles={userUploadedSources}
-          onUpload={handleLectureUpload}
-          onRemove={handleLectureRemove}
-          assignmentQuestion={question}
-          citationStyle={citationStyle}
-          projectId={projectId}
-        />
-      </section>
-
-      {/* Section 2: Curated Academic Literature & Source Collection */}
-      <section className="space-y-4 pt-4 border-t border-neutral-200/60 dark:border-white/5">
-        {/* Workspace Toolbar Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
-              <Library className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
-              <span>Curated Scholarly Literature</span>
-              <span className="text-xs font-mono font-medium text-neutral-400">
-                ({allMasterSources.length} identified)
+        {/* Exit Gate Widget (Top Header View) - Only displayed when sources exist */}
+        {allMasterSources.length > 0 && (
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                Approved Sources:
               </span>
-            </h2>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-              Peer-reviewed journal articles, seminal academic books, and user-uploaded course grounding materials.
-            </p>
-          </div>
-
-          {/* Viewing Mode Switcher */}
-          <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-white/5 p-1 rounded-xl self-start md:self-auto">
-            <button
-              type="button"
-              onClick={() => setViewMode("card")}
-              title="Card View (Visual Cards)"
-              aria-label="Card View"
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
-                viewMode === "card"
-                  ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-              }`}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Cards</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode("list")}
-              title="List View (Bibliographic Details & Abstracts)"
-              aria-label="List View"
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
-                viewMode === "list"
-                  ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-              }`}
-            >
-              <List className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">List</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode("table")}
-              title="Table View (Comparison Matrix)"
-              aria-label="Table View"
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
-                viewMode === "table"
-                  ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-              }`}
-            >
-              <TableIcon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Table</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode("compact")}
-              title="Compact View (High-Speed Scanning)"
-              aria-label="Compact View"
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
-                viewMode === "compact"
-                  ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-              }`}
-            >
-              <Rows className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Compact</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Topic Mismatch Notice Banner if user changed prompt but has previously approved sources */}
-        {isMismatched && approvedSourceIds.length > 0 && (
-          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
-            <div className="flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span>
-                Your assignment question has changed. Would you like to curate fresh literature tailored to your research question?
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleReCurateForPrompt}
-              disabled={isFindingMore}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs shrink-0 cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isFindingMore ? "animate-spin" : ""}`} />
-              <span>Curate for Question</span>
-            </button>
-          </div>
-        )}
-
-        {/* Filter Navigation Bar & Status Tabs */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-          {/* Status Tabs */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-            <button
-              type="button"
-              onClick={() => setActiveTab("all")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                activeTab === "all"
-                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs"
-                  : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-              }`}
-            >
-              All Sources ({totalActiveSources})
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("curated")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                activeTab === "curated"
-                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs"
-                  : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-              }`}
-            >
-              Curated Literature ({totalCuratedCount})
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("uploaded")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                activeTab === "uploaded"
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-              }`}
-            >
-              <FolderOpen className="w-3.5 h-3.5" />
-              <span>My Uploads</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
-                {mappedUserSources.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("approved")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                activeTab === "approved"
-                  ? "bg-emerald-600 text-white shadow-xs"
-                  : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-              }`}
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Approved</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
-                {approvedSourceIds.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("bookmarked")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                activeTab === "bookmarked"
-                  ? "bg-amber-500 text-white shadow-xs"
-                  : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-              }`}
-            >
-              <Star className="w-3.5 h-3.5 fill-current" />
-              <span>Bookmarked</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
-                {bookmarkedIds.length}
-              </span>
-            </button>
-
-            {excludedIds.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setActiveTab("excluded")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                  activeTab === "excluded"
-                    ? "bg-neutral-700 text-white shadow-xs"
-                    : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+              <span
+                data-testid="evidence-counter"
+                className={`px-3 py-1 rounded-full text-xs font-bold font-mono ${
+                  isExitGateUnlocked
+                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
+                    : "bg-neutral-100 text-neutral-700 dark:bg-white/10 dark:text-neutral-300"
                 }`}
               >
-                <span>Excluded ({excludedIds.length})</span>
-              </button>
-            )}
-          </div>
-
-          {/* Search Input & Advanced Filter Toggle */}
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 sm:w-64">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search authors, title, keyword..."
-                aria-label="Search curated literature"
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-neutral-100 dark:bg-white/5 border border-transparent focus:border-neutral-300 dark:focus:border-white/20 text-neutral-900 dark:text-white placeholder-neutral-400 outline-none transition-colors"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
+                {approvedCount} / {minimumRequired} recommended
+              </span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              aria-label="Toggle advanced filters"
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-1.5 transition-colors cursor-pointer ${
-                showAdvancedFilters || activeFilterCount > 0
-                  ? "border-neutral-900 dark:border-white bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold"
-                  : "border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-neutral-600 dark:text-neutral-300 hover:border-neutral-300"
-              }`}
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Filters</span>
-              {activeFilterCount > 0 && (
-                <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center font-bold">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
+            <div className="w-36 h-1.5 bg-neutral-200/80 dark:bg-white/10 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 ${
+                  isExitGateUnlocked ? "bg-emerald-500" : "bg-neutral-900 dark:bg-white"
+                }`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
-            <button
-              type="button"
-              onClick={handleReCurateForPrompt}
-              disabled={isFindingMore}
-              title="Re-curate literature specifically for your active assignment prompt"
-              className="px-2.5 py-1.5 rounded-xl text-xs font-medium border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-neutral-600 dark:text-neutral-300 hover:border-neutral-300 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isFindingMore ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Re-curate</span>
-            </button>
+      {allMasterSources.length === 0 ? (
+        <div
+          data-testid="sources-empty-state"
+          className="bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-2xl p-8 sm:p-12 shadow-xs dark:shadow-none space-y-6"
+        >
+          <div className="max-w-xl space-y-2">
+            <h2 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">
+              Ground Your Assignment in Sources
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed">
+              Upload your course slides, syllabus, or readings to ground your citations, or proceed to drafting directly.
+            </p>
+          </div>
+
+          <LectureUploadDropzone
+            uploadedFiles={userUploadedSources}
+            onUpload={handleLectureUpload}
+            onRemove={handleLectureRemove}
+            assignmentQuestion={question}
+            citationStyle={citationStyle}
+            projectId={projectId}
+          />
+
+          {/* Quick Skip to Drafting option */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-neutral-200/60 dark:border-white/10">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Citing sources is optional. You can draft freely and add citations at any time.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleContinue}
+                data-testid="skip-to-drafting-btn"
+                className="px-5 py-2.5 rounded-full text-xs font-semibold border border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                Skip to Drafting
+              </button>
+              <button
+                type="button"
+                onClick={handleContinue}
+                data-testid="proceed-to-drafting-btn"
+                className="px-6 py-2.5 rounded-full text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer flex items-center gap-2 shadow-xs dark:shadow-none"
+              >
+                <span>Proceed to Drafting</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* Expandable Advanced Filtering Drawer */}
-        {showAdvancedFilters && (
-          <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200/80 dark:border-white/10 space-y-3 animate-in fade-in duration-150">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
-              {/* Filter 1: Source Type */}
-              <div className="space-y-1">
-                <label htmlFor="filter-source-type" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                  Source Type
-                </label>
-                <select
-                  id="filter-source-type"
-                  aria-label="Source Type"
-                  value={selectedType}
-                  onChange={(e) => setSelectedType(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
-                >
-                  <option value="all">All Source Types</option>
-                  <option value="journal">Peer-Reviewed Journals</option>
-                  <option value="book">Academic Books & Presses</option>
-                  <option value="conference">Conference Proceedings</option>
-                  <option value="institutional">Institutional Research</option>
-                  <option value="report">Policy & Intergov Reports</option>
-                </select>
-              </div>
-
-              {/* Filter 2: Role in Assignment */}
-              <div className="space-y-1">
-                <label htmlFor="filter-assignment-role" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                  Role in Assignment
-                </label>
-                <select
-                  id="filter-assignment-role"
-                  aria-label="Role in Assignment"
-                  value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
-                >
-                  <option value="all">All Assignment Roles</option>
-                  <option value="Empirical evidence">Empirical Evidence</option>
-                  <option value="Theoretical framework">Theoretical Framework</option>
-                  <option value="Comparative evidence">Comparative Evidence</option>
-                  <option value="Core theory">Core Theory (Seminal)</option>
-                  <option value="Methodological framework">Methodological Framework</option>
-                  <option value="Contextual evidence">Contextual Evidence</option>
-                </select>
-              </div>
-
-              {/* Filter 3: Research Methodology */}
-              <div className="space-y-1">
-                <label htmlFor="filter-methodology" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                  Research Methodology
-                </label>
-                <select
-                  id="filter-methodology"
-                  aria-label="Research Methodology"
-                  value={selectedMethodology}
-                  onChange={(e) => setSelectedMethodology(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
-                >
-                  <option value="all">All Methodologies</option>
-                  <option value="Empirical Study">Empirical Study</option>
-                  <option value="Quantitative Meta-Analysis">Quantitative Meta-Analysis</option>
-                  <option value="Qualitative Case Study">Qualitative Case Study</option>
-                  <option value="Systematic Review">Systematic Review</option>
-                  <option value="Theoretical Framework">Theoretical Framework</option>
-                  <option value="Doctrinal Analysis">Doctrinal Analysis</option>
-                  <option value="Comparative Analysis">Comparative Analysis</option>
-                  <option value="Mixed-Methods">Mixed-Methods</option>
-                </select>
-              </div>
-
-              {/* Filter 4: Publication Year */}
-              <div className="space-y-1">
-                <label htmlFor="filter-publication-year" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                  Publication Year
-                </label>
-                <select
-                  id="filter-publication-year"
-                  aria-label="Publication Year"
-                  value={selectedYearRange}
-                  onChange={(e) => setSelectedYearRange(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
-                >
-                  <option value="all">All Publication Years</option>
-                  <option value="2026">Latest (2026)</option>
-                  <option value="recent">Recent (2024–2026)</option>
-                  <option value="2020-2023">Contemporary (2020–2023)</option>
-                  <option value="seminal">Foundational (&lt; 2020)</option>
-                </select>
-              </div>
-
-              {/* Filter 5: Sort Order */}
-              <div className="space-y-1">
-                <label htmlFor="filter-sort-order" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                  Sort Order
-                </label>
-                <select
-                  id="filter-sort-order"
-                  aria-label="Sort Order"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
-                >
-                  <option value="relevance">Question Alignment & Recency (Default)</option>
-                  <option value="year">Newest First (2026 First)</option>
-                  <option value="citations">Most Cited (Citation Impact)</option>
-                  <option value="role">Role in Assignment</option>
-                  <option value="title">Title (Alphabetical)</option>
-                </select>
+      ) : (
+        <>
+          {/* Section 1: Lecture Slide Dropzone */}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+                  <span>Course Materials & Syllabus Upload</span>
+                  <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">(Optional)</span>
+                </h2>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Upload your professor's slides, reading packs, or rubric notes to anchor specific citations directly to lecture content.
+                </p>
               </div>
             </div>
 
-            {/* Row 2: Toggles and Reset */}
-            <div className="flex items-center justify-between gap-4 pt-2 border-t border-neutral-200/50 dark:border-white/5 flex-wrap">
-              <div className="flex items-center gap-4 flex-wrap">
-                <label className="flex items-center gap-2 cursor-pointer text-xs text-neutral-700 dark:text-neutral-300">
-                  <input
-                    type="checkbox"
-                    checked={openAccessOnly}
-                    onChange={(e) => setOpenAccessOnly(e.target.checked)}
-                    className="w-4 h-4 rounded text-neutral-900 focus:ring-0 cursor-pointer"
-                  />
-                  <span className="flex items-center gap-1 font-medium">
-                    <Unlock className="w-3 h-3 text-amber-500" />
-                    <span>Open-Access Sources Only</span>
+            <LectureUploadDropzone
+              uploadedFiles={userUploadedSources}
+              onUpload={handleLectureUpload}
+              onRemove={handleLectureRemove}
+              assignmentQuestion={question}
+              citationStyle={citationStyle}
+              projectId={projectId}
+            />
+          </section>
+
+          {/* Section 2: Curated Academic Literature & Source Collection */}
+          <section className="space-y-4 pt-4 border-t border-neutral-200/60 dark:border-white/5">
+            {/* Workspace Toolbar Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+                  <Library className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
+                  <span>Curated Scholarly Literature</span>
+                  <span className="text-xs font-mono font-medium text-neutral-400">
+                    ({allMasterSources.length} identified)
                   </span>
-                </label>
-
-                <div className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
-                  <span>Min Relevance:</span>
-                  {[0, 85, 90, 95].map((thresh) => (
-                    <button
-                      key={thresh}
-                      type="button"
-                      onClick={() => setMinRelevance(thresh)}
-                      className={`px-2 py-0.5 rounded text-[11px] font-mono cursor-pointer transition-colors ${
-                        minRelevance === thresh
-                          ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-bold"
-                          : "bg-neutral-200/60 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200"
-                      }`}
-                    >
-                      {thresh === 0 ? "Any" : `${thresh}%+`}
-                    </button>
-                  ))}
-                </div>
+                </h2>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  Peer-reviewed journal articles, seminal academic books, and user-uploaded course grounding materials.
+                </p>
               </div>
+            </div>
 
-              {activeFilterCount > 0 && (
+            {/* Topic Mismatch Notice Banner if user changed prompt but has previously approved sources */}
+            {isMismatched && approvedSourceIds.length > 0 && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>
+                    Your assignment question has changed. Would you like to curate fresh literature tailored to your research question?
+                  </span>
+                </div>
                 <button
                   type="button"
-                  onClick={resetAllFilters}
-                  className="text-xs text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                  onClick={handleReCurateForPrompt}
+                  disabled={isFindingMore}
+                  className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs shrink-0 cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs dark:shadow-none"
                 >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Reset all filters</span>
+                  <RefreshCw className={`w-3.5 h-3.5 ${isFindingMore ? "animate-spin" : ""}`} />
+                  <span>Curate for Question</span>
                 </button>
-              )}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {/* Notification Toast when discovering more literature */}
-        {discoverySuccessMsg && (
-          <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/50 text-xs flex items-center justify-between gap-2 animate-in fade-in duration-200">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />
-              <span className="font-medium">{discoverySuccessMsg}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setDiscoverySuccessMsg(null)}
-              className="text-blue-600 dark:text-blue-400 hover:opacity-75"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
+            {/* Filter Navigation Bar & Status Tabs */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+              {/* Status Tabs */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("all")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                    activeTab === "all"
+                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs dark:shadow-none"
+                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  }`}
+                >
+                  All Sources ({totalActiveSources})
+                </button>
 
-        {/* Literature Display Container (Multiple Viewing Modes) */}
-        {displayedSources.length > 0 ? (
-          <div>
-            {/* View Mode 1: Card View (Default) */}
-            {viewMode === "card" && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("curated")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                    activeTab === "curated"
+                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs dark:shadow-none"
+                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  }`}
+                >
+                  Curated Literature ({totalCuratedCount})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("uploaded")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                    activeTab === "uploaded"
+                      ? "bg-blue-600 text-white shadow-xs dark:shadow-none"
+                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  }`}
+                >
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  <span>My Uploads</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
+                    {mappedUserSources.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("approved")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                    activeTab === "approved"
+                      ? "bg-emerald-600 text-white shadow-xs dark:shadow-none"
+                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Approved</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
+                    {approvedSourceIds.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("bookmarked")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                    activeTab === "bookmarked"
+                      ? "bg-amber-500 text-white shadow-xs dark:shadow-none"
+                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  }`}
+                >
+                  <Star className="w-3.5 h-3.5 fill-current" />
+                  <span>Bookmarked</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
+                    {bookmarkedIds.length}
+                  </span>
+                </button>
+
+                {excludedIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("excluded")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                      activeTab === "excluded"
+                        ? "bg-neutral-700 text-white shadow-xs dark:shadow-none"
+                        : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>Excluded ({excludedIds.length})</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Search Input & Advanced Filter Toggle */}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1 sm:w-64">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search authors, title, keyword..."
+                    aria-label="Search curated literature"
+                    className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-neutral-100 dark:bg-white/5 border border-transparent focus:border-neutral-300 dark:focus:border-white/20 text-neutral-900 dark:text-white placeholder-neutral-400 outline-none transition-colors"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  aria-label="Toggle advanced filters"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    showAdvancedFilters || activeFilterCount > 0
+                      ? "border-neutral-900 dark:border-white bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold"
+                      : "border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-neutral-600 dark:text-neutral-300 hover:border-neutral-300"
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>Filters</span>
+                  {activeFilterCount > 0 && (
+                    <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center font-bold">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleReCurateForPrompt}
+                  disabled={isFindingMore}
+                  title="Re-curate literature specifically for your active assignment prompt"
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-medium border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-neutral-600 dark:text-neutral-300 hover:border-neutral-300 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isFindingMore ? "animate-spin" : ""}`} />
+                  <span className="hidden sm:inline">Re-curate</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Expandable Advanced Filtering Drawer */}
+            {showAdvancedFilters && (
+              <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200/80 dark:border-white/10 space-y-3 animate-in fade-in duration-150">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
+                  {/* Filter 1: Source Type */}
+                  <div className="space-y-1">
+                    <label htmlFor="filter-source-type" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                      Source Type
+                    </label>
+                    <select
+                      id="filter-source-type"
+                      aria-label="Source Type"
+                      value={selectedType}
+                      onChange={(e) => setSelectedType(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                    >
+                      <option value="all">All Source Types</option>
+                      <option value="journal">Peer-Reviewed Journals</option>
+                      <option value="book">Academic Books & Presses</option>
+                      <option value="conference">Conference Proceedings</option>
+                      <option value="institutional">Institutional Research</option>
+                      <option value="report">Policy & Intergov Reports</option>
+                    </select>
+                  </div>
+
+                  {/* Filter 2: Role in Assignment */}
+                  <div className="space-y-1">
+                    <label htmlFor="filter-assignment-role" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                      Role in Assignment
+                    </label>
+                    <select
+                      id="filter-assignment-role"
+                      aria-label="Role in Assignment"
+                      value={selectedRole}
+                      onChange={(e) => setSelectedRole(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                    >
+                      <option value="all">All Assignment Roles</option>
+                      <option value="Empirical evidence">Empirical Evidence</option>
+                      <option value="Theoretical framework">Theoretical Framework</option>
+                      <option value="Comparative evidence">Comparative Evidence</option>
+                      <option value="Core theory">Core Theory (Seminal)</option>
+                      <option value="Methodological framework">Methodological Framework</option>
+                      <option value="Contextual evidence">Contextual Evidence</option>
+                    </select>
+                  </div>
+
+                  {/* Filter 3: Research Methodology */}
+                  <div className="space-y-1">
+                    <label htmlFor="filter-methodology" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                      Research Methodology
+                    </label>
+                    <select
+                      id="filter-methodology"
+                      aria-label="Research Methodology"
+                      value={selectedMethodology}
+                      onChange={(e) => setSelectedMethodology(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                    >
+                      <option value="all">All Methodologies</option>
+                      <option value="Empirical Study">Empirical Study</option>
+                      <option value="Quantitative Meta-Analysis">Quantitative Meta-Analysis</option>
+                      <option value="Qualitative Case Study">Qualitative Case Study</option>
+                      <option value="Systematic Review">Systematic Review</option>
+                      <option value="Theoretical Framework">Theoretical Framework</option>
+                      <option value="Doctrinal Analysis">Doctrinal Analysis</option>
+                      <option value="Comparative Analysis">Comparative Analysis</option>
+                      <option value="Mixed-Methods">Mixed-Methods</option>
+                    </select>
+                  </div>
+
+                  {/* Filter 4: Publication Year */}
+                  <div className="space-y-1">
+                    <label htmlFor="filter-publication-year" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                      Publication Year
+                    </label>
+                    <select
+                      id="filter-publication-year"
+                      aria-label="Publication Year"
+                      value={selectedYearRange}
+                      onChange={(e) => setSelectedYearRange(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                    >
+                      <option value="all">All Publication Years</option>
+                      <option value="2026">Latest (2026)</option>
+                      <option value="recent">Recent (2024–2026)</option>
+                      <option value="2020-2023">Contemporary (2020–2023)</option>
+                      <option value="seminal">Foundational (&lt; 2020)</option>
+                    </select>
+                  </div>
+
+                  {/* Filter 5: Sort Order */}
+                  <div className="space-y-1">
+                    <label htmlFor="filter-sort-order" className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                      Sort Order
+                    </label>
+                    <select
+                      id="filter-sort-order"
+                      aria-label="Sort Order"
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as any)}
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                    >
+                      <option value="relevance">Question Alignment & Recency (Default)</option>
+                      <option value="year">Newest First (2026 First)</option>
+                      <option value="citations">Most Cited (Citation Impact)</option>
+                      <option value="role">Role in Assignment</option>
+                      <option value="title">Title (Alphabetical)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Row 2: Toggles and Reset */}
+                <div className="flex items-center justify-between gap-4 pt-2 border-t border-neutral-200/50 dark:border-white/5 flex-wrap">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs text-neutral-700 dark:text-neutral-300">
+                      <input
+                        type="checkbox"
+                        checked={openAccessOnly}
+                        onChange={(e) => setOpenAccessOnly(e.target.checked)}
+                        className="w-4 h-4 rounded text-neutral-900 focus:ring-0 cursor-pointer"
+                      />
+                      <span className="flex items-center gap-1 font-medium">
+                        <Unlock className="w-3 h-3 text-amber-500" />
+                        <span>Open-Access Sources Only</span>
+                      </span>
+                    </label>
+
+                    <div className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
+                      <span>Min Relevance:</span>
+                      {[0, 85, 90, 95].map((thresh) => (
+                        <button
+                          key={thresh}
+                          type="button"
+                          onClick={() => setMinRelevance(thresh)}
+                          className={`px-2 py-0.5 rounded text-[11px] font-mono cursor-pointer transition-colors ${
+                            minRelevance === thresh
+                              ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-bold"
+                              : "bg-neutral-200/60 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200"
+                          }`}
+                        >
+                          {thresh === 0 ? "Any" : `${thresh}%+`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {activeFilterCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={resetAllFilters}
+                      className="text-xs text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Reset all filters</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Notification Toast when discovering more literature */}
+            {discoverySuccessMsg && (
+              <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/50 text-xs flex items-center justify-between gap-2 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                  <span className="font-medium">{discoverySuccessMsg}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDiscoverySuccessMsg(null)}
+                  className="text-blue-600 dark:text-blue-400 hover:opacity-75"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Literature Display Container (Standardized Responsive Grid) */}
+            {displayedSources.length > 0 ? (
               <div
-                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
                 data-testid="curated-sources-grid"
               >
                 {displayedSources.map((source) => (
@@ -1169,117 +1055,83 @@ export default function AssignmentSourcesStage({
                   />
                 ))}
               </div>
-            )}
-
-            {/* View Mode 2: List View (Bibliographic & Detailed) */}
-            {viewMode === "list" && (
-              <CuratedSourceListView
-                sources={displayedSources}
-                approvedSourceIds={approvedSourceIds}
-                bookmarkedSourceIds={bookmarkedIds}
-                onToggleApproval={toggleSourceApproval}
-                onDismiss={handleDismissSource}
-                onToggleBookmark={handleToggleBookmark}
-              />
-            )}
-
-            {/* View Mode 3: Table View (Matrix Comparison) */}
-            {viewMode === "table" && (
-              <CuratedSourceTableView
-                sources={displayedSources}
-                approvedSourceIds={approvedSourceIds}
-                bookmarkedSourceIds={bookmarkedIds}
-                onToggleApproval={toggleSourceApproval}
-                onDismiss={handleDismissSource}
-                onToggleBookmark={handleToggleBookmark}
-              />
-            )}
-
-            {/* View Mode 4: Compact View (High-Speed Scanning) */}
-            {viewMode === "compact" && (
-              <CuratedSourceCompactView
-                sources={displayedSources}
-                approvedSourceIds={approvedSourceIds}
-                bookmarkedSourceIds={bookmarkedIds}
-                onToggleApproval={toggleSourceApproval}
-                onDismiss={handleDismissSource}
-                onToggleBookmark={handleToggleBookmark}
-              />
-            )}
-          </div>
-        ) : (
-          <div className="p-10 text-center rounded-2xl border border-dashed border-neutral-200 dark:border-white/10 space-y-3">
-            <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
-              No literature sources match your current filter parameters.
-            </p>
-            <p className="text-xs text-neutral-400 dark:text-neutral-500">
-              Try clearing active filters or searching for broader conceptual keywords.
-            </p>
-            <button
-              type="button"
-              onClick={resetAllFilters}
-              className="px-4 py-2 rounded-full text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-1.5"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset all filters to view all literature</span>
-            </button>
-          </div>
-        )}
-
-        {/* Find More Literature Action Section */}
-        <div className="pt-4 flex flex-col items-center justify-center gap-2 border-t border-neutral-100 dark:border-white/5">
-          <button
-            type="button"
-            onClick={handleFindMoreLiterature}
-            disabled={isFindingMore}
-            data-testid="find-more-literature-btn"
-            className="px-6 py-3 rounded-full text-xs font-semibold border border-neutral-300 dark:border-white/20 bg-white dark:bg-[#1C1C1E] text-neutral-800 dark:text-white hover:bg-neutral-50 dark:hover:bg-white/5 hover:border-neutral-400 transition-all cursor-pointer flex items-center gap-2 shadow-xs disabled:opacity-50"
-          >
-            {isFindingMore ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Querying scholarly indices & cross-referencing citations...</span>
-              </>
             ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5 text-neutral-500" />
-                <span>Find More Literature (+10 Sources)</span>
-              </>
+              <div className="p-10 text-center rounded-2xl border border-dashed border-neutral-200 dark:border-white/10 space-y-3">
+                <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
+                  No literature sources match your current filter parameters.
+                </p>
+                <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                  Try clearing active filters or searching for broader conceptual keywords.
+                </p>
+                <button
+                  type="button"
+                  onClick={resetAllFilters}
+                  className="px-4 py-2 rounded-full text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-1.5 shadow-xs dark:shadow-none"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset all filters to view all literature</span>
+                </button>
+              </div>
             )}
-          </button>
-          <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
-            Progressively discovers additional peer-reviewed articles, books, and reports without duplicating existing sources.
-          </p>
-        </div>
-      </section>
+
+            {/* Find More Literature Action Section */}
+            <div className="pt-4 flex flex-col items-center justify-center gap-2 border-t border-neutral-100 dark:border-white/5">
+              <button
+                type="button"
+                onClick={handleFindMoreLiterature}
+                disabled={isFindingMore}
+                data-testid="find-more-literature-btn"
+                className="px-6 py-3 rounded-full text-xs font-semibold border border-neutral-300 dark:border-white/20 bg-white dark:bg-[#1C1C1E] text-neutral-800 dark:text-white hover:bg-neutral-50 dark:hover:bg-white/5 hover:border-neutral-400 transition-all cursor-pointer flex items-center gap-2 shadow-xs dark:shadow-none disabled:opacity-50"
+              >
+                {isFindingMore ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Querying scholarly indices & cross-referencing citations...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-neutral-500" />
+                    <span>Find More Literature (+10 Sources)</span>
+                  </>
+                )}
+              </button>
+              <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
+                Progressively discovers additional peer-reviewed articles, books, and reports without duplicating existing sources.
+              </p>
+            </div>
+          </section>
+        </>
+      )}
 
       {/* Phase 2 Exit Gate Banner & Actions */}
-      <div className="rounded-2xl p-6 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-5">
+      <div className="rounded-2xl p-6 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs dark:shadow-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-5">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
-              Phase 2 Exit Gate: Evidence Threshold
+              Phase 2: Evidence Grounding
             </h3>
-            {isExitGateUnlocked ? (
+            {approvedCount > 0 ? (
               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 flex items-center gap-1 border border-emerald-500/20">
                 <CheckCircle2 className="w-3 h-3" />
-                <span>Threshold Met</span>
+                <span>{approvedCount} Approved</span>
               </span>
             ) : (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center gap-1 border border-amber-500/20">
-                <AlertCircle className="w-3 h-3" />
-                <span>{minimumRequired - approvedCount} More Required</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-400 flex items-center gap-1 border border-neutral-200 dark:border-white/10">
+                <Sparkles className="w-3 h-3 text-neutral-500" />
+                <span>Optional Grounding</span>
               </span>
             )}
           </div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            {isExitGateUnlocked
-              ? `You have approved ${approvedCount} sources. You are ready to proceed to Phase 3 section-by-section drafting.`
-              : `Approve at least ${minimumRequired - approvedCount} more scholarly or lecture source${minimumRequired - approvedCount === 1 ? "" : "s"} to proceed to drafting.`}
+            {approvedCount >= 4
+              ? `You have approved ${approvedCount} sources. You are fully grounded to proceed to Phase 3 drafting.`
+              : approvedCount > 0
+              ? `You have approved ${approvedCount} source${approvedCount === 1 ? "" : "s"} (${approvedCount}/4 recommended). You can continue approving or proceed to drafting anytime.`
+              : `Citing sources is recommended (0/4 recommended) but optional. You can attach sources now or proceed directly to drafting.`}
           </p>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
           <button
             type="button"
             onClick={handleReturn}
@@ -1291,10 +1143,18 @@ export default function AssignmentSourcesStage({
 
           <button
             type="button"
-            disabled={!isExitGateUnlocked}
+            onClick={handleContinue}
+            data-testid="skip-to-drafting-btn"
+            className="px-5 py-2.5 rounded-full text-xs font-semibold border border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+          >
+            Skip to Drafting
+          </button>
+
+          <button
+            type="button"
             onClick={handleContinue}
             data-testid="proceed-to-drafting-btn"
-            className="px-7 py-2.5 rounded-full text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-2 shadow-xs"
+            className="px-7 py-2.5 rounded-full text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer flex items-center gap-2 shadow-xs dark:shadow-none"
           >
             <span>Proceed to Drafting</span>
             <ArrowRight className="w-4 h-4" />

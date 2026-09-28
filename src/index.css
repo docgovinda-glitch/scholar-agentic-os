@@ -64,8 +64,10 @@
   --theme-border: var(--border-subtle);
 
   /* Surfaces — Sand Off-White baseline (warm, low-strain academic paper ground) */
+  --surface-base:    var(--surface-canvas);
   --surface-canvas:  #F7F5F0; /* page ground — Sand Off-White */
   --surface-raised:  #FFFFFF; /* cards, panels, popovers */
+  --surface-input:   #FFFFFF; /* inputs, textareas */
   --surface-inset:   #EFECE6; /* wells, nested panels, input backgrounds */
   --surface-sunken:  #E5E1D6; /* deepest recess, track backgrounds */
   --surface-hover:   #EFECE6; /* hover on an otherwise transparent row */
@@ -114,6 +116,7 @@
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
+  --radius-xl: 20px;
   --radius-full: 9999px;
 }
 
@@ -138,8 +141,10 @@
   --theme-border: var(--border-subtle);
 
   /* Surfaces — Day Mode Baseline */
+  --surface-base:    var(--surface-canvas);
   --surface-canvas:  #FAFAFA; /* page ground — Day Mode */
   --surface-raised:  #FFFFFF; /* cards, panels, popovers */
+  --surface-input:   #FFFFFF;
   --surface-inset:   #F4F4F5; /* wells, nested panels, input backgrounds */
   --surface-sunken:  #E4E4E7; /* deepest recess, track backgrounds */
   --surface-hover:   #F4F4F5; /* hover on an otherwise transparent row */
@@ -177,6 +182,12 @@
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
 }
 
 /* ----------------------------------------------------------------------------
@@ -204,8 +215,10 @@
     --theme-border: var(--border-subtle);
 
     /* Surfaces — Pure neutral grays, ZERO navy/blue */
+    --surface-base:    var(--surface-canvas);
     --surface-canvas:  #171717; /* Deep neutral gray (ChatGPT canvas) */
     --surface-raised:  #212121; /* Slightly lighter gray (ChatGPT elevated cards) */
+    --surface-input:   #1C1C1E; /* Dark input surfaces */
     --surface-inset:   #1A1A1A; /* Inset wells */
     --surface-sunken:  #141414; /* Elevated soft charcoal gray */
     --surface-hover:   #2A2A2A; /* Subtle hover */
@@ -242,6 +255,7 @@
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
+    --radius-xl: 20px;
     --radius-full: 9999px;
   }
 }
@@ -267,8 +281,10 @@
   --theme-border: var(--border-subtle);
 
   /* Surfaces — Pure neutral grays, ZERO navy/blue */
+  --surface-base:    var(--surface-canvas);
   --surface-canvas:  #171717; /* Deep neutral gray (ChatGPT canvas) */
   --surface-raised:  #212121; /* Slightly lighter gray (ChatGPT elevated cards) */
+  --surface-input:   #1C1C1E; /* Dark input surfaces */
   --surface-inset:   #1A1A1A; /* Inset wells */
   --surface-sunken:  #141414; /* Elevated soft charcoal gray */
   --surface-hover:   #2A2A2A; /* Subtle hover */
@@ -305,6 +321,7 @@
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
+  --radius-xl: 20px;
   --radius-full: 9999px;
 }
 
@@ -324,8 +341,10 @@
   --theme-bg: var(--bg-canvas);
   --theme-fg: var(--text-primary);
   --theme-border: var(--border-subtle);
+  --surface-base: var(--surface-canvas);
   --surface-canvas: #171717;
   --surface-raised: #1C1C1E;
+  --surface-input: #1C1C1E;
   --surface-inset: #1A1A1A;
   --surface-sunken: #141414;
   --surface-hover: #2A2A2A;
@@ -342,6 +361,11 @@
   --accent-solid: #FFFFFF;
   --accent-subtle: #262626;
   --accent-border: #404040;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
 }
 
 /* ----------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import {
   generateCuratedLiteratureSources,
@@ -133,7 +133,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
       );
 
       // Stage header should load
-      expect(await screen.findByText(/Curated Literature & Course Sources/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
 
       // Check header source counter indicates at least 30 identified
       const sourceCountMatches = screen.getAllByText(/\(\d+\s+identified\)/i);
@@ -174,7 +174,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
         />
       );
 
-      expect(await screen.findByText(/Curated Literature & Course Sources/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
 
       const findMoreBtn = screen.getByTestId("find-more-literature-btn");
       expect(findMoreBtn).toBeInTheDocument();
@@ -195,8 +195,10 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
     });
   });
 
-  describe("3. Multiple Literature Viewing Modes", () => {
-    it("supports switching between Card, List, Table, and Compact views while preserving context", async () => {
+  describe("3. Literature Card Grid", () => {
+    // View-mode switcher (Card/List/Table/Compact) removed per UX refactor.
+    // All sources are shown in a single responsive card grid.
+    it("renders all sources in the card grid and the grid is always visible", async () => {
       render(
         <AssignmentWorkspace
           projectId="proj-lit-1"
@@ -205,37 +207,23 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
         />
       );
 
-      expect(await screen.findByText(/Curated Literature & Course Sources/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
 
-      // Default view is Card View
-      expect(screen.getByTestId("curated-sources-grid")).toBeInTheDocument();
+      // Grid is always rendered when sources exist (no view-mode switcher)
+      const grid = screen.getByTestId("curated-sources-grid");
+      expect(grid).toBeInTheDocument();
 
-      // Switch to List View
-      const listBtn = screen.getByRole("button", { name: /List View/i });
-      fireEvent.click(listBtn);
-      expect(await screen.findByTestId("curated-sources-list-view")).toBeInTheDocument();
-      expect(screen.queryByTestId("curated-sources-grid")).not.toBeInTheDocument();
-
-      // Switch to Table View
-      const tableBtn = screen.getByRole("button", { name: /Table View/i });
-      fireEvent.click(tableBtn);
-      expect(await screen.findByTestId("curated-sources-table")).toBeInTheDocument();
-      expect(screen.queryByTestId("curated-sources-list-view")).not.toBeInTheDocument();
-
-      // Switch to Compact View
-      const compactBtn = screen.getByRole("button", { name: /Compact View/i });
-      fireEvent.click(compactBtn);
-      expect(await screen.findByTestId("curated-sources-compact-view")).toBeInTheDocument();
-
-      // Switch back to Card View
-      const cardBtn = screen.getByRole("button", { name: /Card View/i });
-      fireEvent.click(cardBtn);
-      expect(await screen.findByTestId("curated-sources-grid")).toBeInTheDocument();
+      // Source type pill and role badge visible on cards (types: journal|book|conference|institutional|report)
+      const typePills = within(grid).getAllByText(/journal|book|conference|institutional|report/i);
+      expect(typePills.length).toBeGreaterThan(0);
     });
   });
 
-  describe("4. Literature Quality, Abstracts, & Academic Badges", () => {
-    it("renders verified academic badges, methodology tags, and citation counts", async () => {
+  describe("4. Literature Card Content & Actions", () => {
+    // 'Verified Academic' badges, citation count, and 'Read scholarly abstract' toggle
+    // were removed per UX refactor. Cards now show type pill, role badge, relevance snippet,
+    // and a single approve/dismiss pill action.
+    it("renders source type pills, role badges, relevance snippet, and approve actions", async () => {
       render(
         <AssignmentWorkspace
           projectId="proj-lit-1"
@@ -244,22 +232,23 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
         />
       );
 
-      expect(await screen.findByText(/Curated Literature & Course Sources/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
 
-      // Check for verified academic badges
-      const verifiedBadges = screen.getAllByText(/Verified Academic/i);
-      expect(verifiedBadges.length).toBeGreaterThan(0);
+      const grid = screen.getByTestId("curated-sources-grid");
 
-      // Check for citation count display
-      const citationMatches = screen.getAllByText(/citations/i);
-      expect(citationMatches.length).toBeGreaterThan(0);
+      // Source type pills rendered on each card (types: journal|book|conference|institutional|report)
+      const typePills = within(grid).getAllByText(/journal|book|conference|institutional|report/i);
+      expect(typePills.length).toBeGreaterThan(0);
 
-      // Check for prompt alignment rationale
-      const rationaleHeaders = screen.getAllByText(/How it supports your assignment prompt/i);
-      expect(rationaleHeaders.length).toBeGreaterThan(0);
+      // Approve action buttons rendered
+      const approveBtns = within(grid).getAllByText(/\+ Add Source/i);
+      expect(approveBtns.length).toBeGreaterThan(0);
+
+      // Specific first card title visible
+      expect(within(grid).getByText(/Algorithmic Governance and the Politics of Predictive Accountability/i)).toBeInTheDocument();
     });
 
-    it("allows expanding scholarly abstract", async () => {
+    it("toggles approve / added state on a source card", async () => {
       render(
         <AssignmentWorkspace
           projectId="proj-lit-1"
@@ -268,16 +257,22 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
         />
       );
 
-      expect(await screen.findByText(/Curated Literature & Course Sources/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
 
-      // Find first "Read scholarly abstract" button
-      const abstractBtns = screen.getAllByText(/Read scholarly abstract/i);
-      expect(abstractBtns.length).toBeGreaterThan(0);
+      const approveBtn = screen.getByRole("button", {
+        name: /Approve Algorithmic Governance and the Politics of Predictive Accountability/i,
+      });
+      fireEvent.click(approveBtn);
 
-      fireEvent.click(abstractBtns[0]);
-
-      // "Hide abstract" should now appear
-      expect(screen.getByText(/Hide abstract/i)).toBeInTheDocument();
+      // Button label should update to ✓ Added
+      await waitFor(() => {
+        expect(saveIntakeAnswers).toHaveBeenCalledWith(
+          "proj-lit-1",
+          expect.objectContaining({
+            approved_source_ids: expect.arrayContaining(["src-curated-1"]),
+          })
+        );
+      });
     });
   });
 
@@ -291,7 +286,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
         />
       );
 
-      expect(await screen.findByText(/Curated Literature & Course Sources/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
 
       const searchInput = screen.getByLabelText(/Search curated literature/i);
       fireEvent.change(searchInput, { target: { value: "Pasquale" } });
@@ -310,7 +305,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
         />
       );
 
-      expect(await screen.findByText(/Curated Literature & Course Sources/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
 
       // Bookmark first source
       const bookmarkBtns = screen.getAllByLabelText(/Bookmark this source/i);

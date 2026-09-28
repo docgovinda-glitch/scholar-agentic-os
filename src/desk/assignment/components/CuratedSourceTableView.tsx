@@ -95,7 +95,7 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
     : sources;
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-xs">
+    <div className="overflow-x-auto rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-xs dark:shadow-none">
       <table className="w-full text-left text-xs border-collapse min-w-[860px]" data-testid="curated-sources-table">
         <thead>
           <tr className="border-b border-neutral-200 dark:border-white/10 bg-neutral-50/70 dark:bg-white/[0.02] text-neutral-600 dark:text-neutral-400 font-semibold uppercase tracking-wider text-[10px]">

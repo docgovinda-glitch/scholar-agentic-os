@@ -92,7 +92,7 @@ export const CuratedSourceCompactView: React.FC<CuratedSourceCompactViewProps> =
                       </span>
                     )}
                     {source.methodology && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200/40 dark:border-purple-800/20 hidden md:inline-block">
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300 hidden md:inline-block">
                         {source.methodology}
                       </span>
                     )}

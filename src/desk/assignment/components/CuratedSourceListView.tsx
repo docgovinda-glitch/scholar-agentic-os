@@ -109,45 +109,35 @@ export const CuratedSourceListView: React.FC<CuratedSourceListViewProps> = ({
                     </span>
                   )}
                   {source.roleInAssignment && (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                      source.roleInAssignment === "Empirical evidence"
-                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/40"
-                        : source.roleInAssignment === "Theoretical framework"
-                        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200/60 dark:border-indigo-800/40"
-                        : source.roleInAssignment === "Comparative evidence"
-                        ? "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 border-sky-200/60 dark:border-sky-800/40"
-                        : source.roleInAssignment === "Core theory"
-                        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200/60 dark:border-amber-800/40"
-                        : "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200/60 dark:border-purple-800/40"
-                    }`}>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
                       {source.roleInAssignment}
                     </span>
                   )}
                   {source.isVerifiedAcademic !== false && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/60 dark:border-blue-700/40 flex items-center gap-1">
-                      <ShieldCheck className="w-2.5 h-2.5" />
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300 flex items-center gap-1">
+                      <ShieldCheck className="w-2.5 h-2.5 text-neutral-500" />
                       <span>Verified Academic</span>
                     </span>
                   )}
                   {source.methodology && (
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/30">
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
                       {source.methodology}
                     </span>
                   )}
                   {source.citationCount !== undefined && (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 flex items-center gap-1">
-                      <Quote className="w-2.5 h-2.5" />
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300 flex items-center gap-1">
+                      <Quote className="w-2.5 h-2.5 text-neutral-400" />
                       <span>{source.citationCount.toLocaleString()} cit.</span>
                     </span>
                   )}
                   {source.isUserUploaded && evidences.length > 0 && (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200/50">
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
                       {evidences.length} Excerpt(s) Extracted
                     </span>
                   )}
                   {source.isOpenAccess && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200/60 dark:border-amber-700/40 flex items-center gap-1">
-                      <Unlock className="w-2.5 h-2.5" />
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300 flex items-center gap-1">
+                      <Unlock className="w-2.5 h-2.5 text-neutral-500" />
                       <span>Open Access</span>
                     </span>
                   )}
@@ -263,11 +253,7 @@ export const CuratedSourceListView: React.FC<CuratedSourceListViewProps> = ({
               <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2.5 shrink-0 sm:min-w-36 pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-100 dark:border-white/5">
                 <div className="flex items-center gap-2">
                   {source.relevanceCategory && (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                      source.relevanceCategory === "Very High"
-                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700"
-                        : "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 border-blue-300 dark:border-blue-700"
-                    }`}>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
                       {source.relevanceCategory}
                     </span>
                   )}
@@ -293,10 +279,10 @@ export const CuratedSourceListView: React.FC<CuratedSourceListViewProps> = ({
                   type="button"
                   onClick={() => onToggleApproval(source.id)}
                   aria-label={isApproved ? `Remove ${source.title}` : `Approve ${source.title}`}
-                  className={`w-full sm:w-auto px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs ${
+                  className={`w-full sm:w-auto px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs dark:shadow-none ${
                     isApproved
                       ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                      : "bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 active:scale-[0.99]"
+                      : "bg-neutral-900 hover:opacity-90 text-white dark:bg-white dark:text-neutral-900 active:scale-[0.99]"
                   }`}
                 >
                   {isApproved ? (

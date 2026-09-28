@@ -187,8 +187,10 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
     });
   });
 
-  describe("3. Workspace Table View & Evidence Badges", () => {
-    it("renders the curated sources in Table view mode with Source, Year, Relevance, and Role in Assignment columns", async () => {
+  describe("3. Workspace Card Grid & Evidence Badges", () => {
+    // Table/List/Compact view-mode switcher was removed per UX refactor (task 6).
+    // Sources are now displayed in a single standardised responsive card grid.
+    it("renders the curated sources grid with Relevance and Role badges visible", async () => {
       render(
         <AssignmentWorkspace
           projectId="proj-ir-ukraine-1"
@@ -197,28 +199,14 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
         />
       );
 
-      expect(await screen.findByText(/Curated Literature & Course Sources/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
 
-      // Switch to Table view
-      const tableBtn = screen.getByRole("button", { name: /Table View/i });
-      fireEvent.click(tableBtn);
+      // Verify standardised grid is rendered
+      const grid = await screen.findByTestId("curated-sources-grid");
+      expect(grid).toBeInTheDocument();
 
-      // Verify Table View rendered
-      const table = await screen.findByTestId("curated-sources-table");
-      expect(table).toBeInTheDocument();
-
-      // Verify expected table columns
-      expect(within(table).getByText(/^Source$/i)).toBeInTheDocument();
-      expect(within(table).getByText(/^Year$/i)).toBeInTheDocument();
-      expect(within(table).getByText(/^Relevance$/i)).toBeInTheDocument();
-      expect(within(table).getByText(/^Role in Assignment$/i)).toBeInTheDocument();
-
-      // Verify 2026 Recent badges are rendered in table
-      const recentBadges = within(table).getAllByText(/2026 Recent/i);
-      expect(recentBadges.length).toBeGreaterThan(0);
-
-      // Verify Role badges are rendered (e.g. Empirical evidence)
-      const empiricalBadges = within(table).getAllByText(/Empirical evidence/i);
+      // Role badges are rendered in card grid (e.g. Empirical evidence)
+      const empiricalBadges = within(grid).getAllByText(/Empirical evidence/i);
       expect(empiricalBadges.length).toBeGreaterThan(0);
     });
 
@@ -231,7 +219,7 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
         />
       );
 
-      expect(await screen.findByText(/Curated Literature & Course Sources/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
 
       // Open advanced filters drawer
       const filterToggle = screen.getByRole("button", { name: /Filters/i });
@@ -255,7 +243,7 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
         />
       );
 
-      expect(await screen.findByText(/Curated Literature & Course Sources/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
 
       // Open advanced filters drawer
       const filterToggle = screen.getByRole("button", { name: /Filters/i });
@@ -265,9 +253,14 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
       const yearSelect = screen.getByLabelText(/Publication Year/i);
       fireEvent.change(yearSelect, { target: { value: "2026" } });
 
-      // Verify only 2026 sources are visible
-      const year2026Badges = screen.getAllByText(/2026 Recent/i);
-      expect(year2026Badges.length).toBeGreaterThan(0);
+      // "2026 Recent" recency badge removed per UX refactor.
+      // Verify that grid still renders (filter applied but sources for this question have 2026 sources)
+      // and that year "2026" appears as source metadata in the grid
+      const grid = screen.getByTestId("curated-sources-grid");
+      expect(grid).toBeInTheDocument();
+      // Filtered sources show year "2026" in card metadata
+      const year2026Items = within(grid).getAllByText("2026");
+      expect(year2026Items.length).toBeGreaterThan(0);
     });
   });
 });
