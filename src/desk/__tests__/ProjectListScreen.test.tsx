@@ -441,6 +441,55 @@ describe("sidebar projects & platform navigation", () => {
     expect(icon?.getAttribute("class")).toContain("text-neutral-500");
     expect(icon?.getAttribute("class")).toContain("group-hover:text-neutral-300");
   });
+
+  it("renders distinct unique placeholders for multiple untitled projects in Recents and filters them via live search", async () => {
+    const multiProjects = [
+      {
+        projectId: "p-assign-1",
+        outputTypeId: "OT-01",
+        answers: {},
+        intakeCompleteness: 0,
+        hasDocument: false,
+        gates: [],
+      },
+      {
+        projectId: "p-assign-2",
+        outputTypeId: "OT-01",
+        answers: {},
+        intakeCompleteness: 0,
+        hasDocument: false,
+        gates: [],
+      },
+      {
+        projectId: "p-pres",
+        outputTypeId: "OT-22",
+        answers: {},
+        intakeCompleteness: 0,
+        hasDocument: false,
+        gates: [],
+      },
+    ];
+
+    listProjects.mockResolvedValue({ items: multiProjects });
+    const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const aside = container.querySelector("aside");
+    expect(aside).toBeInTheDocument();
+
+    // Verify all distinct headings appear in Recents
+    expect(await within(aside!).findByText("Untitled Assignment 1")).toBeInTheDocument();
+    expect(await within(aside!).findByText("Untitled Assignment 2")).toBeInTheDocument();
+    expect(await within(aside!).findByText("Untitled Presentation")).toBeInTheDocument();
+
+    // Test Search input filtering in sidebar
+    const searchInput = within(aside!).getByPlaceholderText("Search projects...");
+    fireEvent.change(searchInput, { target: { value: "Presentation" } });
+
+    // "Untitled Presentation" should match, while assignments should be filtered out
+    expect(within(aside!).getByText("Untitled Presentation")).toBeInTheDocument();
+    expect(within(aside!).queryByText("Untitled Assignment 1")).not.toBeInTheDocument();
+    expect(within(aside!).queryByText("Untitled Assignment 2")).not.toBeInTheDocument();
+  });
 });
 
 describe("landing workspace hero & academic workspace cards", () => {

@@ -6,6 +6,10 @@ import {
   getProjectTitle,
   isBlankProject,
   deriveHeuristicTitle,
+  getProjectDisplayName,
+  getProjectHeadingPlaceholder,
+  matchesProjectSearch,
+  getFormatLabel,
 } from "../projectNaming";
 
 describe("projectNaming utilities", () => {
@@ -226,6 +230,150 @@ describe("projectNaming utilities", () => {
     it("falls back gracefully for empty or short text", () => {
       expect(deriveHeuristicTitle("")).toBe("Academic Assignment");
       expect(deriveHeuristicTitle("   \n\n  ")).toBe("Academic Assignment");
+    });
+  });
+
+  describe("getFormatLabel", () => {
+    it("returns correct labels for standard output type IDs", () => {
+      expect(getFormatLabel("OT-01")).toBe("Assignment");
+      expect(getFormatLabel("OT-10")).toBe("Journal Article");
+      expect(getFormatLabel("OT-19")).toBe("Research Proposal");
+      expect(getFormatLabel("OT-22")).toBe("Presentation");
+      expect(getFormatLabel("OT-06")).toBe("Thesis / Dissertation");
+    });
+
+    it("falls back to Project for missing ID or returns unknown ID", () => {
+      expect(getFormatLabel(undefined)).toBe("Project");
+      expect(getFormatLabel("CUSTOM-99")).toBe("CUSTOM-99");
+    });
+  });
+
+  describe("getProjectDisplayName", () => {
+    it("returns explicit user title when present", () => {
+      const p = {
+        projectId: "p1",
+        outputTypeId: "OT-10",
+        answers: { title: "Rta and Rashi in Sanskrit Epistemology" },
+      };
+      expect(getProjectDisplayName(p)).toBe("Rta and Rashi in Sanskrit Epistemology");
+    });
+
+    it("checks working_title and assignment_title when title is missing", () => {
+      expect(
+        getProjectDisplayName({
+          projectId: "p1",
+          outputTypeId: "OT-10",
+          answers: { working_title: "Working Draft on Quantum Mechanics" },
+        })
+      ).toBe("Working Draft on Quantum Mechanics");
+
+      expect(
+        getProjectDisplayName({
+          projectId: "p2",
+          outputTypeId: "OT-01",
+          answers: { assignment_title: "Ethics in Generative AI Essay" },
+        })
+      ).toBe("Ethics in Generative AI Essay");
+    });
+
+    it("falls back to research topic or question if non-provisional", () => {
+      expect(
+        getProjectDisplayName({
+          projectId: "p1",
+          outputTypeId: "OT-19",
+          answers: { topic: "CRISPR-Cas9 Gene Editing Efficiency" },
+        })
+      ).toBe("CRISPR-Cas9 Gene Editing Efficiency");
+    });
+
+    it("generates distinct format-aware placeholder when untitled", () => {
+      expect(
+        getProjectDisplayName({
+          projectId: "p-assign",
+          outputTypeId: "OT-01",
+          answers: {},
+        })
+      ).toBe("Untitled Assignment");
+
+      expect(
+        getProjectDisplayName({
+          projectId: "p-pres",
+          outputTypeId: "OT-22",
+          answers: {},
+        })
+      ).toBe("Untitled Presentation");
+    });
+
+    it("replaces bare format label with distinct format-aware placeholder", () => {
+      expect(
+        getProjectDisplayName({
+          projectId: "p-bare",
+          outputTypeId: "OT-01",
+          answers: { title: "Assignment" },
+        })
+      ).toBe("Untitled Assignment");
+    });
+
+    it("disambiguates multiple untitled projects of the same format", () => {
+      const projects = [
+        { projectId: "p-1", outputTypeId: "OT-01", answers: {} },
+        { projectId: "p-2", outputTypeId: "OT-01", answers: {} },
+        { projectId: "p-3", outputTypeId: "OT-22", answers: {} },
+      ];
+
+      expect(getProjectDisplayName(projects[0], projects)).toBe("Untitled Assignment 1");
+      expect(getProjectDisplayName(projects[1], projects)).toBe("Untitled Assignment 2");
+      // p-3 is the only presentation so it stays Untitled Presentation
+      expect(getProjectDisplayName(projects[2], projects)).toBe("Untitled Presentation");
+    });
+  });
+
+  describe("getProjectHeadingPlaceholder", () => {
+    it("returns format-specific heading placeholder", () => {
+      expect(getProjectHeadingPlaceholder({ outputTypeId: "OT-01" })).toBe("e.g. Untitled Assignment");
+      expect(getProjectHeadingPlaceholder({ outputTypeId: "OT-22" })).toBe("e.g. Untitled Presentation");
+      expect(getProjectHeadingPlaceholder({ outputTypeId: "OT-10" })).toBe("e.g. Untitled Journal Article");
+    });
+  });
+
+  describe("matchesProjectSearch", () => {
+    const project = {
+      projectId: "proj-crispr",
+      outputTypeId: "OT-10",
+      answers: {
+        title: "Genome Editing in Marine Diatoms",
+        research_question: "How does Cas12a improve off-target fidelity?",
+        topic: "Marine Biotechnology",
+      },
+    };
+
+    it("matches query on title", () => {
+      expect(matchesProjectSearch(project, "Marine Diatoms")).toBe(true);
+      expect(matchesProjectSearch(project, "genome")).toBe(true);
+    });
+
+    it("matches query on format label", () => {
+      expect(matchesProjectSearch(project, "Journal Article")).toBe(true);
+      expect(matchesProjectSearch(project, "journal")).toBe(true);
+    });
+
+    it("matches query on research question and topic", () => {
+      expect(matchesProjectSearch(project, "Cas12a")).toBe(true);
+      expect(matchesProjectSearch(project, "Biotechnology")).toBe(true);
+    });
+
+    it("returns false when query does not match anything", () => {
+      expect(matchesProjectSearch(project, "Quantum Electrodynamics")).toBe(false);
+    });
+
+    it("matches untitled project by its distinct heading placeholder", () => {
+      const untitled = {
+        projectId: "p-empty",
+        outputTypeId: "OT-01",
+        answers: {},
+      };
+      expect(matchesProjectSearch(untitled, "Assignment")).toBe(true);
+      expect(matchesProjectSearch(untitled, "Untitled")).toBe(true);
     });
   });
 });

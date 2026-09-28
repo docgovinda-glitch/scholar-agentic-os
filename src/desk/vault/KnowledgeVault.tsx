@@ -28,9 +28,18 @@ import {
   X,
   Plus,
   RefreshCw,
+  Pencil,
+  Check,
 } from "lucide-react";
-import { listProjects, deleteProject, listOutputTypes } from "../api";
+import { listProjects, deleteProject, listOutputTypes, saveIntakeAnswers } from "../api";
 import type { ProjectView, OutputTypeSummary } from "../types";
+import {
+  getProjectDisplayName,
+  getProjectHeadingPlaceholder,
+  matchesProjectSearch,
+  isDuplicateProjectTitle,
+  getFormatLabel,
+} from "../projectNaming";
 import SourceLibraryScreen from "./SourceLibraryScreen";
 import SettingsView from "./SettingsView";
 import { getConnectedCloudDrives, type CloudDriveAccount } from "../../services/vault/cloudDriveService";
@@ -41,6 +50,7 @@ export interface KnowledgeVaultProps {
   initialTab?: "projects" | "sources" | "settings";
   onClose: () => void;
   onOpenProject?: (projectId: string) => void;
+  onProjectRenamed?: (projectId: string, newTitle: string) => void;
   onLock?: () => void;
   onResetVault?: () => void;
 }
@@ -77,6 +87,7 @@ export default function KnowledgeVault({
   initialTab = "projects",
   onClose,
   onOpenProject,
+  onProjectRenamed,
   onLock,
   onResetVault,
 }: KnowledgeVaultProps) {
@@ -90,6 +101,9 @@ export default function KnowledgeVault({
   const [projectToDelete, setProjectToDelete] = useState<ProjectView | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [connectedDrives, setConnectedDrives] = useState<CloudDriveAccount[]>([]);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState<string>("");
+  const [renameError, setRenameError] = useState<string | null>(null);
 
   // Load projects and types
   const loadData = async () => {
@@ -120,7 +134,6 @@ export default function KnowledgeVault({
     }
   };
 
-
   useEffect(() => {
     loadData();
     getConnectedCloudDrives(userId)
@@ -136,7 +149,7 @@ export default function KnowledgeVault({
     return map;
   }, [types]);
 
-  // Filter projects by format and search query
+  // Filter projects by format and search query using canonical search matching
   const filteredProjects = useMemo(() => {
     if (!projects) return [];
     let list = projects;
@@ -144,20 +157,60 @@ export default function KnowledgeVault({
       list = list.filter((p) => p.outputTypeId === selectedTypeFilter);
     }
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter((p) => {
-        const title = (
-          p.answers?.title ||
-          p.answers?.research_question ||
-          p.answers?.topic ||
-          ""
-        ).toLowerCase();
-        const label = (typeMap.get(p.outputTypeId)?.label || p.outputTypeId).toLowerCase();
-        return title.includes(q) || label.includes(q);
-      });
+      list = list.filter((p) => matchesProjectSearch(p, searchQuery, projects));
     }
     return list;
-  }, [projects, selectedTypeFilter, searchQuery, typeMap]);
+  }, [projects, selectedTypeFilter, searchQuery]);
+
+  // Save renamed project heading inline
+  const handleSaveRename = async (projectId: string) => {
+    const targetProject = projects?.find((p) => p.projectId === projectId);
+    if (!targetProject) return;
+
+    const trimmed = editingTitle.trim();
+    const finalTitle = trimmed || getProjectDisplayName(targetProject, projects || []);
+
+    if (isDuplicateProjectTitle(finalTitle, projectId, projects || [])) {
+      setRenameError(`A project named "${finalTitle}" already exists. Please choose a unique name.`);
+      return;
+    }
+
+    const previousProjects = projects;
+    setProjects((prev) =>
+      prev
+        ? prev.map((p) =>
+            p.projectId === projectId
+              ? {
+                  ...p,
+                  title: finalTitle,
+                  answers: {
+                    ...p.answers,
+                    title: finalTitle,
+                    working_title: finalTitle,
+                    assignment_title: finalTitle,
+                  },
+                }
+              : p
+          )
+        : []
+    );
+
+    setEditingProjectId(null);
+    setRenameError(null);
+    onProjectRenamed?.(projectId, finalTitle);
+
+    try {
+      await saveIntakeAnswers(projectId, {
+        title: finalTitle,
+        working_title: finalTitle,
+        assignment_title: finalTitle,
+      });
+    } catch (err) {
+      console.error("Failed to rename project:", err);
+      setProjects(previousProjects);
+      alert("Failed to save project heading. Please try again.");
+    }
+  };
 
   // Progress metrics
   const metrics = useMemo(() => {
@@ -498,26 +551,21 @@ export default function KnowledgeVault({
                   const percent = Math.round((project.intakeCompleteness || 0) * 100);
                   const signedOff = project.gates?.filter((g) => g.status === "signed_off").length || 0;
                   const totalGates = project.gates?.length || 5;
-                  const displayTitle =
-                    project.answers?.title?.trim() ||
-                    project.answers?.research_question?.trim() ||
-                    project.answers?.topic?.trim() ||
-                    typeMap.get(project.outputTypeId)?.label ||
-                    project.outputTypeId;
-                  const typeLabel = typeMap.get(project.outputTypeId)?.label || project.outputTypeId;
+                  const displayTitle = getProjectDisplayName(project, projects || []);
+                  const typeLabel = typeMap.get(project.outputTypeId)?.label || getFormatLabel(project.outputTypeId);
+                  const isEditing = editingProjectId === project.projectId;
 
                   return (
                     <div
                       key={project.projectId}
                       className="relative group border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-[#1C1C1E] rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-gray-300 dark:hover:border-neutral-700 transition-all flex flex-col justify-between"
                     >
-                      <button
-                        type="button"
-                        onClick={() => onOpenProject?.(project.projectId)}
-                        className="w-full text-left cursor-pointer"
-                      >
+                      <div className="w-full text-left">
                         {/* Card Top Badges */}
-                        <div className="flex items-center gap-2 mb-3 pr-16">
+                        <div
+                          onClick={() => onOpenProject?.(project.projectId)}
+                          className="flex items-center gap-2 mb-3 pr-16 cursor-pointer"
+                        >
                           <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-neutral-800 border border-gray-200/60 dark:border-neutral-700">
                             {typeLabel}
                           </span>
@@ -526,29 +574,115 @@ export default function KnowledgeVault({
                           </span>
                         </div>
 
-                        {/* Title */}
-                        <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 leading-snug line-clamp-2 mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                          {displayTitle}
-                        </h3>
-
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                          {signedOff} of {totalGates} quality gates verified
-                        </p>
-
-                        {/* Workflow Completion Progress Bar */}
-                        <div className="pt-3 border-t border-gray-100 dark:border-neutral-800/80 w-full">
-                          <div className="flex justify-between text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-                            <span>Workflow Completion</span>
-                            <span className="font-semibold text-gray-900 dark:text-gray-100">{percent}%</span>
+                        {/* Distinct Editable Heading */}
+                        {isEditing ? (
+                          <div
+                            className="mb-3 w-full"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                          >
+                            <div className="flex items-center gap-1.5 w-full">
+                              <input
+                                type="text"
+                                value={editingTitle}
+                                onChange={(e) => {
+                                  setEditingTitle(e.target.value);
+                                  if (renameError) setRenameError(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    void handleSaveRename(project.projectId);
+                                  } else if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    setEditingProjectId(null);
+                                    setRenameError(null);
+                                  }
+                                }}
+                                placeholder={getProjectHeadingPlaceholder(project)}
+                                autoFocus
+                                className="flex-1 px-3 py-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-[#121212] border border-blue-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => void handleSaveRename(project.projectId)}
+                                className="p-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer flex-shrink-0"
+                                title="Save heading"
+                                aria-label="Save heading"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingProjectId(null);
+                                  setRenameError(null);
+                                }}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer flex-shrink-0"
+                                title="Cancel"
+                                aria-label="Cancel"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            {renameError && (
+                              <span className="text-[11px] text-red-500 font-medium mt-1 block">
+                                {renameError}
+                              </span>
+                            )}
                           </div>
-                          <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-neutral-800 overflow-hidden">
-                            <div
-                              className="h-full bg-gray-900 dark:bg-gray-100 rounded-full transition-all duration-300"
-                              style={{ width: `${percent}%` }}
-                            />
+                        ) : (
+                          <div className="flex items-start justify-between gap-2 mb-2 group/heading">
+                            <h3
+                              onClick={() => onOpenProject?.(project.projectId)}
+                              className="text-base font-bold text-gray-900 dark:text-gray-100 leading-snug line-clamp-2 group-hover/heading:text-blue-600 dark:group-hover/heading:text-blue-400 transition-colors cursor-pointer flex-1"
+                              title={displayTitle}
+                            >
+                              {displayTitle}
+                            </h3>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setEditingProjectId(project.projectId);
+                                setEditingTitle(displayTitle);
+                                setRenameError(null);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md cursor-pointer flex-shrink-0"
+                              title="Edit project heading"
+                              aria-label="Edit project heading"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+
+                        <div
+                          onClick={() => onOpenProject?.(project.projectId)}
+                          className="cursor-pointer"
+                        >
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                            {signedOff} of {totalGates} quality gates verified
+                          </p>
+
+                          {/* Workflow Completion Progress Bar */}
+                          <div className="pt-3 border-t border-gray-100 dark:border-neutral-800/80 w-full">
+                            <div className="flex justify-between text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                              <span>Workflow Completion</span>
+                              <span className="font-semibold text-gray-900 dark:text-gray-100">{percent}%</span>
+                            </div>
+                            <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-neutral-800 overflow-hidden">
+                              <div
+                                className="h-full bg-gray-900 dark:bg-gray-100 rounded-full transition-all duration-300"
+                                style={{ width: `${percent}%` }}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </button>
+                      </div>
 
                       {/* Card Bottom Actions */}
                       <div className="mt-4 pt-3 border-t border-gray-100 dark:border-neutral-800/80 flex items-center justify-between">

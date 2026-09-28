@@ -17,6 +17,8 @@ import {
   getNextUntitledProjectTitle,
   findReusableEmptyProject,
   isBlankProject,
+  getProjectDisplayName,
+  matchesProjectSearch,
 } from "./projectNaming";
 import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
@@ -1232,42 +1234,14 @@ export default function ProjectListScreen({
     if (!userEmail || !projects || projects.length === 0) {
       return [];
     }
-    // Filter out completely blank untouched projects (0 word count, no text, no brief)
-    // Exception: If all projects are blank, keep at most the newest one
-    const active = projects.filter((p) => !isBlankProject(p));
-    const candidateList = active.length > 0 ? active : (projects.length > 0 ? [projects[0]] : []);
 
-    let filtered = candidateList;
+    let filtered = projects;
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      filtered = candidateList.filter((p) => {
-        const t = (p.answers?.title || "").toLowerCase();
-        return t.includes(q);
-      });
+      filtered = projects.filter((p) => matchesProjectSearch(p, searchQuery, projects));
     }
 
-    const seenTitles = new Map<string, number>();
-
     return filtered.map((p) => {
-      let rawTitle = p.title?.trim() || p.answers?.title?.trim() || (p.answers as any)?.assignment_title?.trim() || "";
-      let title = rawTitle;
-
-      if (!title) {
-        const typeTile = FORMAT_TILES.find((t) => t.id === p.outputTypeId);
-        const typeLabel = typeTile?.id === "OT-01" ? "Essay" : (typeTile ? typeTile.label : "Project");
-        const dateStr = (p as any).updatedAt
-          ? new Date((p as any).updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-          : new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        title = `Untitled ${typeLabel} (${dateStr})`;
-      }
-
-      // Disambiguate duplicate identical names in recents list
-      const count = seenTitles.get(title) || 0;
-      seenTitles.set(title, count + 1);
-      if (count > 0) {
-        title = `${title} (${count + 1})`;
-      }
-
+      const title = getProjectDisplayName(p, projects);
       return {
         id: p.projectId,
         projectId: p.projectId,
@@ -1796,8 +1770,10 @@ export default function ProjectListScreen({
         prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id]
       );
     } else if (action === "rename") {
-      const newTitle = window.prompt("Rename research project:", item.title);
-      if (newTitle && newTitle.trim() && newTitle.trim() !== item.title && item.projectId) {
+      const currentProj = projects?.find((p) => p.projectId === item.projectId);
+      const currentDisplayTitle = getProjectDisplayName(currentProj, projects || []);
+      const newTitle = window.prompt("Rename research project:", currentDisplayTitle || item.title);
+      if (newTitle && newTitle.trim() && newTitle.trim() !== currentDisplayTitle && item.projectId) {
         const trimmed = newTitle.trim();
         // Check for duplicate title against other existing projects (case-insensitive)
         if (isDuplicateProjectTitle(trimmed, item.projectId, projects || [])) {
@@ -1810,14 +1786,27 @@ export default function ProjectListScreen({
           curr
             ? curr.map((p) =>
                 p.projectId === item.projectId
-                  ? { ...p, answers: { ...p.answers, title: trimmed } }
+                  ? {
+                      ...p,
+                      title: trimmed,
+                      answers: {
+                        ...p.answers,
+                        title: trimmed,
+                        working_title: trimmed,
+                        assignment_title: trimmed,
+                      },
+                    }
                   : p
               )
             : []
         );
 
         // Handle backend database operations asynchronously in the background
-        saveIntakeAnswers(item.projectId, { title: trimmed }).catch((err) => {
+        saveIntakeAnswers(item.projectId, {
+          title: trimmed,
+          working_title: trimmed,
+          assignment_title: trimmed,
+        }).catch((err) => {
           console.error("Failed to rename project:", err);
           // Rollback on failure
           setProjects(previousProjects);
@@ -1847,6 +1836,27 @@ export default function ProjectListScreen({
       }
     }
   }
+
+  const handleProjectRenamed = useCallback((projectId: string, newTitle: string) => {
+    setProjects((curr) =>
+      curr
+        ? curr.map((p) =>
+            p.projectId === projectId
+              ? {
+                  ...p,
+                  title: newTitle,
+                  answers: {
+                    ...p.answers,
+                    title: newTitle,
+                    working_title: newTitle,
+                    assignment_title: newTitle,
+                  },
+                }
+              : p
+          )
+        : []
+    );
+  }, []);
 
   async function handleConfirmDelete() {
     if (!projectToDelete) return;
@@ -2373,6 +2383,7 @@ export default function ProjectListScreen({
               initialTab="projects"
               onClose={handleCloseCentralView}
               onOpenProject={(pId) => onOpen(pId)}
+              onProjectRenamed={handleProjectRenamed}
             />
           </div>
         ) : activeView === "ai-access" ? (

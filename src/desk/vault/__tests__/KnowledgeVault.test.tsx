@@ -8,10 +8,12 @@ import type { ProjectView } from "../../types";
 const listProjects = vi.fn();
 const listOutputTypes = vi.fn();
 const deleteProject = vi.fn();
+const saveIntakeAnswers = vi.fn();
 vi.mock("../../api", () => ({
   listProjects: (...a: unknown[]) => listProjects(...a),
   listOutputTypes: (...a: unknown[]) => listOutputTypes(...a),
   deleteProject: (...a: unknown[]) => deleteProject(...a),
+  saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
 }));
 
 vi.mock("../../../services/vault/cloudDriveService", () => ({
@@ -213,5 +215,112 @@ describe("KnowledgeVault component", () => {
     const settingsTab = screen.getByRole("button", { name: /Settings/i });
     fireEvent.click(settingsTab);
     expect(screen.getByRole("button", { name: /Settings/i })).toHaveClass("bg-white");
+  });
+
+  it("displays distinct format-aware placeholder heading for untitled projects", async () => {
+    const untitledProjects: ProjectView[] = [
+      {
+        projectId: "proj-untitled-assign",
+        outputTypeId: "OT-01",
+        answers: {},
+        intakeCompleteness: 0,
+        hasDocument: false,
+        gates: [],
+      },
+      {
+        projectId: "proj-untitled-pres",
+        outputTypeId: "OT-22",
+        answers: {},
+        intakeCompleteness: 0,
+        hasDocument: false,
+        gates: [],
+      },
+    ];
+
+    listProjects.mockResolvedValue({ items: untitledProjects });
+
+    render(
+      <KnowledgeVault
+        userId="user-123"
+        onClose={vi.fn()}
+        onOpenProject={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByText("Untitled Assignment")).toBeInTheDocument();
+    expect(await screen.findByText("Untitled Presentation")).toBeInTheDocument();
+  });
+
+  it("allows inline editing of project heading directly on Vault card and saves via saveIntakeAnswers", async () => {
+    saveIntakeAnswers.mockResolvedValue({ success: true });
+    const onProjectRenamed = vi.fn();
+
+    render(
+      <KnowledgeVault
+        userId="user-123"
+        onClose={vi.fn()}
+        onOpenProject={vi.fn()}
+        onProjectRenamed={onProjectRenamed}
+      />
+    );
+
+    // Initial heading is rendered
+    const titleEl = await screen.findByText("Philosophy of Science Essay");
+    expect(titleEl).toBeInTheDocument();
+
+    // Click the Edit project heading pencil button
+    const editBtns = screen.getAllByRole("button", { name: "Edit project heading" });
+    fireEvent.click(editBtns[1]); // second project "Philosophy of Science Essay"
+
+    // Input field should now appear with the current title
+    const input = screen.getByDisplayValue("Philosophy of Science Essay");
+    expect(input).toBeInTheDocument();
+
+    // Type a new heading
+    fireEvent.change(input, { target: { value: "Epistemology and Scientific Realism" } });
+
+    // Click the Save button (checkmark)
+    const saveBtn = screen.getByRole("button", { name: "Save heading" });
+    fireEvent.click(saveBtn);
+
+    // Assert that the title optimistically updates in UI
+    expect(await screen.findByText("Epistemology and Scientific Realism")).toBeInTheDocument();
+
+    // Assert saveIntakeAnswers and onProjectRenamed were called with new heading
+    expect(saveIntakeAnswers).toHaveBeenCalledWith("proj-2", {
+      title: "Epistemology and Scientific Realism",
+      working_title: "Epistemology and Scientific Realism",
+      assignment_title: "Epistemology and Scientific Realism",
+    });
+    expect(onProjectRenamed).toHaveBeenCalledWith("proj-2", "Epistemology and Scientific Realism");
+  });
+
+  it("prevents saving duplicate project headings with an inline error message", async () => {
+    render(
+      <KnowledgeVault
+        userId="user-123"
+        onClose={vi.fn()}
+        onOpenProject={vi.fn()}
+      />
+    );
+
+    await screen.findByText("Philosophy of Science Essay");
+
+    // Click edit on the second project
+    const editBtns = screen.getAllByRole("button", { name: "Edit project heading" });
+    fireEvent.click(editBtns[1]);
+
+    const input = screen.getByDisplayValue("Philosophy of Science Essay");
+
+    // Change title to match the first project's title ("Genome Editing in Marine Diatoms")
+    fireEvent.change(input, { target: { value: "genome editing in marine diatoms" } });
+
+    const saveBtn = screen.getByRole("button", { name: "Save heading" });
+    fireEvent.click(saveBtn);
+
+    // Duplicate error message should appear
+    expect(await screen.findByText(/already exists/i)).toBeInTheDocument();
+    // saveIntakeAnswers should NOT have been called
+    expect(saveIntakeAnswers).not.toHaveBeenCalled();
   });
 });

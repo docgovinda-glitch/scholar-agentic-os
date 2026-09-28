@@ -48,6 +48,25 @@ export function isBlankProject(p: ProjectTitleItem | null | undefined): boolean 
 }
 
 /**
+ * Canonical Format Labels for Academic Workspaces.
+ */
+export const DEFAULT_FORMAT_LABELS: Record<string, string> = {
+  "OT-01": "Assignment",
+  "OT-02": "Essay",
+  "OT-06": "Thesis / Dissertation",
+  "OT-09": "Doctoral Dissertation",
+  "OT-10": "Journal Article",
+  "OT-19": "Research Proposal",
+  "OT-20": "Dissertation",
+  "OT-22": "Presentation",
+};
+
+export function getFormatLabel(outputTypeId?: string): string {
+  if (!outputTypeId) return "Project";
+  return DEFAULT_FORMAT_LABELS[outputTypeId] || outputTypeId;
+}
+
+/**
  * Extracts the user-visible title from any project representation.
  */
 export function getProjectTitle(p: ProjectTitleItem | null | undefined): string {
@@ -55,9 +74,151 @@ export function getProjectTitle(p: ProjectTitleItem | null | undefined): string 
   const raw =
     p.title?.trim() ||
     (typeof p.answers?.title === "string" ? p.answers.title.trim() : "") ||
+    (typeof (p.answers as any)?.working_title === "string" ? (p.answers as any).working_title.trim() : "") ||
+    (typeof (p.answers as any)?.assignment_title === "string" ? (p.answers as any).assignment_title.trim() : "") ||
     (typeof p.document?.title === "string" ? p.document.title.trim() : "") ||
     "";
   return raw;
+}
+
+/**
+ * Canonical display heading for a project.
+ * Ensures consistent rendering across Vault cards, Recents sidebar, Command Palette,
+ * and Workspace headers.
+ * If user has entered or kept an explicit heading, returns that.
+ * Otherwise, generates a distinct, unique heading placeholder (e.g. "Untitled Assignment 1").
+ */
+export function getProjectDisplayName(
+  p: ProjectTitleItem | null | undefined,
+  existingProjects?: ProjectTitleItem[]
+): string {
+  if (!p) return "Untitled Project";
+
+  // Check explicit title sources
+  const titleCandidate =
+    p.title?.trim() ||
+    (typeof p.answers?.title === "string" ? p.answers.title.trim() : "") ||
+    (typeof (p.answers as any)?.working_title === "string" ? (p.answers as any).working_title.trim() : "") ||
+    (typeof (p.answers as any)?.assignment_title === "string" ? (p.answers as any).assignment_title.trim() : "") ||
+    (typeof p.document?.title === "string" ? p.document.title.trim() : "") ||
+    (typeof (p.answers as any)?.researchQuestion === "string" ? (p.answers as any).researchQuestion.trim() : "") ||
+    (typeof (p.answers as any)?.research_question === "string" ? (p.answers as any).research_question.trim() : "") ||
+    (typeof (p.answers as any)?.topic === "string" ? (p.answers as any).topic.trim() : "") ||
+    (typeof (p.answers as any)?.research_topic === "string" ? (p.answers as any).research_topic.trim() : "") ||
+    "";
+
+  const formatLabel = getFormatLabel(p.outputTypeId);
+  const normalizedCandidate = titleCandidate.toLowerCase();
+  const isBareFormatLabel =
+    normalizedCandidate === formatLabel.toLowerCase() ||
+    normalizedCandidate === (p.outputTypeId || "").toLowerCase() ||
+    normalizedCandidate === "essay" ||
+    normalizedCandidate === "project";
+
+  const isProvisional = normalizedCandidate === "provisional";
+
+  // If candidate is a valid distinct user title, return it directly
+  if (titleCandidate && !isBareFormatLabel && !isProvisional) {
+    return titleCandidate;
+  }
+
+  // Generate distinct, unique format-aware placeholder heading
+  const baseTitle = `Untitled ${formatLabel}`;
+
+  if (!existingProjects || existingProjects.length <= 1) {
+    return baseTitle;
+  }
+
+  // Disambiguate among multiple projects sharing this format when untitled
+  const currentId = getProjectId(p);
+  const sameFormatUntitled = existingProjects.filter((item) => {
+    const raw =
+      item.title?.trim() ||
+      (typeof item.answers?.title === "string" ? item.answers.title.trim() : "") ||
+      (typeof (item.answers as any)?.working_title === "string" ? (item.answers as any).working_title.trim() : "") ||
+      (typeof (item.answers as any)?.assignment_title === "string" ? (item.answers as any).assignment_title.trim() : "");
+    const rawLower = raw.toLowerCase();
+    const matchesFormat = (item.outputTypeId || "") === (p.outputTypeId || "");
+    const isUntitle =
+      !raw ||
+      rawLower === "provisional" ||
+      rawLower === formatLabel.toLowerCase() ||
+      rawLower === (item.outputTypeId || "").toLowerCase() ||
+      rawLower.startsWith("untitled");
+    return matchesFormat && isUntitle;
+  });
+
+  if (sameFormatUntitled.length <= 1) {
+    return baseTitle;
+  }
+
+  // Sort deterministically by id/creation order
+  const index = sameFormatUntitled.findIndex((item) => getProjectId(item) === currentId);
+  if (index <= 0) {
+    return `${baseTitle} 1`;
+  }
+  return `${baseTitle} ${index + 1}`;
+}
+
+/**
+ * Returns a placeholder prompt for project heading input.
+ */
+export function getProjectHeadingPlaceholder(p: ProjectTitleItem | null | undefined): string {
+  const formatLabel = getFormatLabel(p?.outputTypeId);
+  return `e.g. Untitled ${formatLabel}`;
+}
+
+/**
+ * Universal project search matching predicate.
+ * Evaluates canonical display name, raw titles, format label, research question, and topic.
+ */
+export function matchesProjectSearch(
+  p: ProjectTitleItem | null | undefined,
+  query: string,
+  existingProjects?: ProjectTitleItem[]
+): boolean {
+  if (!p) return false;
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+
+  const displayName = getProjectDisplayName(p, existingProjects).toLowerCase();
+  if (displayName.includes(q)) return true;
+
+  const rawTitle = (p.title || "").toLowerCase();
+  if (rawTitle.includes(q)) return true;
+
+  const answers = (p.answers || {}) as Record<string, unknown>;
+  const title = (typeof answers.title === "string" ? answers.title : "").toLowerCase();
+  if (title.includes(q)) return true;
+
+  const workingTitle = (typeof answers.working_title === "string" ? answers.working_title : "").toLowerCase();
+  if (workingTitle.includes(q)) return true;
+
+  const assignmentTitle = (typeof answers.assignment_title === "string" ? answers.assignment_title : "").toLowerCase();
+  if (assignmentTitle.includes(q)) return true;
+
+  const formatLabel = getFormatLabel(p.outputTypeId).toLowerCase();
+  if (formatLabel.includes(q)) return true;
+
+  const rq = (
+    typeof answers.researchQuestion === "string"
+      ? answers.researchQuestion
+      : typeof answers.research_question === "string"
+      ? answers.research_question
+      : ""
+  ).toLowerCase();
+  if (rq.includes(q)) return true;
+
+  const topic = (
+    typeof answers.topic === "string"
+      ? answers.topic
+      : typeof answers.research_topic === "string"
+      ? answers.research_topic
+      : ""
+  ).toLowerCase();
+  if (topic.includes(q)) return true;
+
+  return false;
 }
 
 /**
@@ -84,7 +245,7 @@ export function isDuplicateProjectTitle(
     if (currentProjectId && id && id === currentProjectId) {
       return false;
     }
-    const existingTitle = getProjectTitle(p).trim().toLowerCase();
+    const existingTitle = (getProjectTitle(p) || getProjectDisplayName(p, existingProjects)).trim().toLowerCase();
     return existingTitle === normalizedNew;
   });
 }

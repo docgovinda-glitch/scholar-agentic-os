@@ -17,6 +17,7 @@ import {
   Clock,
 } from "lucide-react";
 import type { ProjectView } from "../types";
+import { getProjectDisplayName, matchesProjectSearch, getFormatLabel } from "../projectNaming";
 
 export interface CommandPaletteProps {
   isOpen: boolean;
@@ -133,21 +134,21 @@ export function CommandPalette({
       "OT-01": "Coursework & Essays",
       "OT-10": "Journal Article",
       "OT-19": "Research Proposal",
-      "OT-22": "Dissertation / Thesis",
+      "OT-22": "Presentation",
+      "OT-06": "Thesis / Dissertation",
     };
 
     const matchingProjects = projects.filter((p) => {
-      const title = (p.answers?.title || p.answers?.researchQuestion || "Untitled Project").toLowerCase();
-      return !q || title.includes(q);
+      return !q || matchesProjectSearch(p, q, projects);
     });
 
-    for (const p of matchingProjects.slice(0, 5)) {
-      const title = p.answers?.title || p.answers?.researchQuestion || "Untitled Project";
+    for (const p of matchingProjects.slice(0, 8)) {
+      const title = getProjectDisplayName(p, projects);
       list.push({
         id: `proj-${p.projectId}`,
         category: "Projects",
         title,
-        subtitle: formatLabels[p.outputTypeId] || p.outputTypeId || "Academic Workspace",
+        subtitle: formatLabels[p.outputTypeId] || getFormatLabel(p.outputTypeId) || "Academic Workspace",
         icon: <FileText className="w-4 h-4 text-neutral-400" />,
         badge: "Open",
         action: () => {
