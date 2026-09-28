@@ -22,6 +22,9 @@ import {
   AlertCircle,
   FileText,
   X,
+  Plus,
+  Trash2,
+  Edit2,
 } from "lucide-react";
 import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
 import SectionBudgetPlanner from "../components/SectionBudgetPlanner";
@@ -214,6 +217,103 @@ export default function AssignmentUnderstandStage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [uploadingBrief, setUploadingBrief] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+
+  // Editable Scope Boundary States
+  const [editingIncludedIdx, setEditingIncludedIdx] = useState<number | null>(null);
+  const [editingIncludedText, setEditingIncludedText] = useState("");
+  const [isAddingIncluded, setIsAddingIncluded] = useState(false);
+  const [newIncludedText, setNewIncludedText] = useState("");
+
+  const [editingExcludedIdx, setEditingExcludedIdx] = useState<number | null>(null);
+  const [editingExcludedText, setEditingExcludedText] = useState("");
+  const [isAddingExcluded, setIsAddingExcluded] = useState(false);
+  const [newExcludedText, setNewExcludedText] = useState("");
+
+  const handleSaveIncludedEdit = (idx: number) => {
+    if (!analysis || !editingIncludedText.trim()) {
+      setEditingIncludedIdx(null);
+      return;
+    }
+    const updated = [...(analysis.scopeBoundaries?.included || [])];
+    updated[idx] = editingIncludedText.trim();
+    setAnalysis({
+      ...analysis,
+      scopeBoundaries: {
+        ...analysis.scopeBoundaries,
+        included: updated,
+      },
+    });
+    setEditingIncludedIdx(null);
+  };
+
+  const handleDeleteIncluded = (idx: number) => {
+    if (!analysis) return;
+    const updated = (analysis.scopeBoundaries?.included || []).filter((_, i) => i !== idx);
+    setAnalysis({
+      ...analysis,
+      scopeBoundaries: {
+        ...analysis.scopeBoundaries,
+        included: updated,
+      },
+    });
+  };
+
+  const handleAddIncluded = () => {
+    if (!analysis || !newIncludedText.trim()) return;
+    const updated = [...(analysis.scopeBoundaries?.included || []), newIncludedText.trim()];
+    setAnalysis({
+      ...analysis,
+      scopeBoundaries: {
+        ...analysis.scopeBoundaries,
+        included: updated,
+      },
+    });
+    setNewIncludedText("");
+    setIsAddingIncluded(false);
+  };
+
+  const handleSaveExcludedEdit = (idx: number) => {
+    if (!analysis || !editingExcludedText.trim()) {
+      setEditingExcludedIdx(null);
+      return;
+    }
+    const updated = [...(analysis.scopeBoundaries?.excluded || [])];
+    updated[idx] = editingExcludedText.trim();
+    setAnalysis({
+      ...analysis,
+      scopeBoundaries: {
+        ...analysis.scopeBoundaries,
+        excluded: updated,
+      },
+    });
+    setEditingExcludedIdx(null);
+  };
+
+  const handleDeleteExcluded = (idx: number) => {
+    if (!analysis) return;
+    const updated = (analysis.scopeBoundaries?.excluded || []).filter((_, i) => i !== idx);
+    setAnalysis({
+      ...analysis,
+      scopeBoundaries: {
+        ...analysis.scopeBoundaries,
+        excluded: updated,
+      },
+    });
+  };
+
+  const handleAddExcluded = () => {
+    if (!analysis || !newExcludedText.trim()) return;
+    const updated = [...(analysis.scopeBoundaries?.excluded || []), newExcludedText.trim()];
+    setAnalysis({
+      ...analysis,
+      scopeBoundaries: {
+        ...analysis.scopeBoundaries,
+        excluded: updated,
+      },
+    });
+    setNewExcludedText("");
+    setIsAddingExcluded(false);
+  };
 
   // Compute 3-part budget representation for backwards compatibility
   const computeWordBudgetFromSections = (
@@ -1274,133 +1374,323 @@ export default function AssignmentUnderstandStage() {
         )}
       </div>
 
-      {/* Analysis Breakdown Results */}
+      {/* Analysis Breakdown Results - Focused on Editable Research Scope */}
       {analysis && (
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/70 dark:border-white/10 p-6 sm:p-8 shadow-xs space-y-7 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-4">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/70 dark:border-white/10 p-6 sm:p-8 shadow-xs space-y-6 animate-in fade-in duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 dark:border-white/5 pb-4">
             <div>
               <h2 className="text-lg font-semibold text-neutral-900 dark:text-white tracking-tight">
                 Assignment Analysis Breakdown
               </h2>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                Target expectations, command verbs, and academic scope boundaries unpacked by the Socratic Agent.
+                Calibrated research scope boundaries. Click any item to edit, remove, or add custom research requirements.
               </p>
             </div>
-            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 shrink-0 self-start sm:self-auto">
               ✓ Analysis Ready{analysis.briefLedger && analysis.briefLedger.length > 0 ? ` · ${analysis.briefLedger.length} Rules Indexed` : ""}
             </span>
           </div>
 
-          {/* Command Verbs & Examiner Demands */}
-          {analysis.commandVerbs && analysis.commandVerbs.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                Command Verbs & Examiner Demands
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {analysis.commandVerbs.map((cv, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] space-y-1.5"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full bg-neutral-200/80 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold text-xs">
-                        {cv.verb}
-                      </span>
-                      <span className="text-xs text-neutral-500 dark:text-neutral-400 italic">{cv.meaning}</span>
-                    </div>
-                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed pt-1">
-                      <span className="font-semibold text-neutral-900 dark:text-neutral-100">Requirement:</span> {cv.academicExpectation}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Scope Boundaries: Included vs Excluded */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-2.5">
-              <h4 className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-                ✓ What Must Be Researched & Included
-              </h4>
-              <ul className="text-xs text-neutral-700 dark:text-neutral-300 space-y-1.5 list-disc list-inside leading-relaxed">
-                {analysis.scopeBoundaries?.included?.map((inc, i) => (
-                  <li key={i}>{inc}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="p-5 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-2.5">
-              <h4 className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
-                ✕ Out of Scope (Do Not Waste Word Budget On)
-              </h4>
-              <ul className="text-xs text-neutral-700 dark:text-neutral-300 space-y-1.5 list-disc list-inside leading-relaxed">
-                {analysis.scopeBoundaries?.excluded?.map((exc, i) => (
-                  <li key={i}>{exc}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* Summary & Core Specifications */}
-          <div className="p-5 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] space-y-3">
-            <div>
-              <span className="text-xs uppercase font-semibold text-neutral-500 dark:text-neutral-400 block tracking-wider">
-                Summary & Expected Response
-              </span>
-              <p className="text-xs text-neutral-800 dark:text-neutral-200 mt-1 leading-relaxed">
-                {analysis.summary}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-neutral-200/60 dark:border-white/5">
-              <div>
-                <span className="text-[11px] uppercase font-semibold text-neutral-400 block tracking-wider">Evidence Requirements</span>
-                <p className="text-xs text-neutral-700 dark:text-neutral-300 mt-1">{analysis.evidenceRequirements}</p>
-              </div>
-              <div>
-                <span className="text-[11px] uppercase font-semibold text-neutral-400 block tracking-wider">Word Budget Guidance</span>
-                <p className="text-xs text-neutral-700 dark:text-neutral-300 mt-1">{analysis.wordCountImplications}</p>
-              </div>
-              <div>
-                <span className="text-[11px] uppercase font-semibold text-neutral-400 block tracking-wider">Referencing Style</span>
-                <p className="text-xs text-neutral-700 dark:text-neutral-300 mt-1">{analysis.citationGuidance}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Rubric Insights & Penalty Clauses */}
+          {/* Detected Critical Penalty Alerts (if any present in markingCriteriaInsights) */}
           {analysis.markingCriteriaInsights && analysis.markingCriteriaInsights.length > 0 && (
-            <div className="space-y-2.5">
-              <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                Marking Rubric Insights & Assessment Standards
-              </h3>
-              <div className="space-y-2">
-                {analysis.markingCriteriaInsights.map((insight, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-3.5 rounded-xl border text-xs leading-relaxed ${
-                      insight.includes("🚨") || insight.toLowerCase().includes("penalty")
-                        ? "border-rose-500/30 bg-rose-500/5 text-rose-700 dark:text-rose-300 font-medium"
-                        : "border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] text-neutral-700 dark:text-neutral-300"
-                    }`}
-                  >
-                    {insight}
-                  </div>
-                ))}
-              </div>
+            <div className="space-y-2">
+              {analysis.markingCriteriaInsights.map((insight, idx) => (
+                <div
+                  key={idx}
+                  className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2.5"
+                >
+                  <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <span>{insight}</span>
+                </div>
+              ))}
             </div>
           )}
+
+          {/* Interactive Editable Scope Boundaries: Included (Green) vs Excluded (Amber) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Green Box: Included Scope */}
+            <div className="p-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/10 space-y-3 flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20">
+                  <h4 className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>✓ What Must Be Researched & Included</span>
+                  </h4>
+                  <span className="text-[11px] font-medium text-emerald-700/80 dark:text-emerald-400/80">
+                    {analysis.scopeBoundaries?.included?.length || 0} items · Editable
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {analysis.scopeBoundaries?.included?.map((inc, i) => (
+                    <div
+                      key={i}
+                      className="group relative flex items-start gap-2.5 p-2 rounded-xl hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 transition-colors"
+                    >
+                      {editingIncludedIdx === i ? (
+                        <div className="flex-1 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={editingIncludedText}
+                            onChange={(e) => setEditingIncludedText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSaveIncludedEdit(i);
+                              if (e.key === "Escape") setEditingIncludedIdx(null);
+                            }}
+                            autoFocus
+                            className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-emerald-500 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveIncludedEdit(i)}
+                            className="p-1 rounded-md text-emerald-700 hover:bg-emerald-200 dark:text-emerald-300 dark:hover:bg-emerald-800 cursor-pointer"
+                            title="Save"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingIncludedIdx(null)}
+                            className="p-1 rounded-md text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 cursor-pointer"
+                            title="Cancel"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                          <span
+                            onClick={() => {
+                              setEditingIncludedIdx(i);
+                              setEditingIncludedText(inc);
+                            }}
+                            className="text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed flex-1 cursor-text select-text hover:underline decoration-emerald-500/40"
+                            title="Click to edit"
+                          >
+                            {inc}
+                          </span>
+                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingIncludedIdx(i);
+                                setEditingIncludedText(inc);
+                              }}
+                              className="p-1 rounded hover:bg-emerald-200/80 dark:hover:bg-emerald-900/40 text-neutral-600 dark:text-neutral-300 cursor-pointer"
+                              title="Edit item"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteIncluded(i)}
+                              className="p-1 rounded hover:bg-rose-200/80 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 cursor-pointer"
+                              title="Remove item"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add Custom Item */}
+              <div className="pt-2 border-t border-emerald-500/15">
+                {isAddingIncluded ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Add research requirement..."
+                      value={newIncludedText}
+                      onChange={(e) => setNewIncludedText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddIncluded();
+                        if (e.key === "Escape") setIsAddingIncluded(false);
+                      }}
+                      autoFocus
+                      className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-emerald-500 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddIncluded}
+                      disabled={!newIncludedText.trim()}
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer disabled:opacity-40"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingIncluded(false);
+                        setNewIncludedText("");
+                      }}
+                      className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingIncluded(true)}
+                    className="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer py-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Research Requirement</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Amber/Orange Box: Excluded Scope */}
+            <div className="p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-950/10 space-y-3 flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-amber-500/20">
+                  <h4 className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>✕ Out of Scope (Do Not Waste Word Budget On)</span>
+                  </h4>
+                  <span className="text-[11px] font-medium text-amber-700/80 dark:text-amber-400/80">
+                    {analysis.scopeBoundaries?.excluded?.length || 0} items · Editable
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {analysis.scopeBoundaries?.excluded?.map((exc, i) => (
+                    <div
+                      key={i}
+                      className="group relative flex items-start gap-2.5 p-2 rounded-xl hover:bg-amber-500/10 dark:hover:bg-amber-500/15 transition-colors"
+                    >
+                      {editingExcludedIdx === i ? (
+                        <div className="flex-1 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={editingExcludedText}
+                            onChange={(e) => setEditingExcludedText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSaveExcludedEdit(i);
+                              if (e.key === "Escape") setEditingExcludedIdx(null);
+                            }}
+                            autoFocus
+                            className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-amber-500 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveExcludedEdit(i)}
+                            className="p-1 rounded-md text-amber-700 hover:bg-amber-200 dark:text-amber-300 dark:hover:bg-amber-800 cursor-pointer"
+                            title="Save"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingExcludedIdx(null)}
+                            className="p-1 rounded-md text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 cursor-pointer"
+                            title="Cancel"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                          <span
+                            onClick={() => {
+                              setEditingExcludedIdx(i);
+                              setEditingExcludedText(exc);
+                            }}
+                            className="text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed flex-1 cursor-text select-text hover:underline decoration-amber-500/40"
+                            title="Click to edit"
+                          >
+                            {exc}
+                          </span>
+                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingExcludedIdx(i);
+                                setEditingExcludedText(exc);
+                              }}
+                              className="p-1 rounded hover:bg-amber-200/80 dark:hover:bg-amber-900/40 text-neutral-600 dark:text-neutral-300 cursor-pointer"
+                              title="Edit item"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteExcluded(i)}
+                              className="p-1 rounded hover:bg-rose-200/80 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 cursor-pointer"
+                              title="Remove item"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add Custom Out of Scope */}
+              <div className="pt-2 border-t border-amber-500/15">
+                {isAddingExcluded ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Add out-of-scope topic..."
+                      value={newExcludedText}
+                      onChange={(e) => setNewExcludedText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddExcluded();
+                        if (e.key === "Escape") setIsAddingExcluded(false);
+                      }}
+                      autoFocus
+                      className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-amber-500 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddExcluded}
+                      disabled={!newExcludedText.trim()}
+                      className="px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium cursor-pointer disabled:opacity-40"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingExcluded(false);
+                        setNewExcludedText("");
+                      }}
+                      className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingExcluded(true)}
+                    className="text-xs font-medium text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer py-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Out-of-Scope Topic</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
 
           {/* Student Approval & Confirmation Banner */}
           <div className="pt-4 border-t border-neutral-100 dark:border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
-                Is my understanding of the assignment correct?
+                Is this research scope correct?
               </h3>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                Approve to lock this understanding and proceed to source discovery.
+                Lock this research scope to proceed to curated literature discovery.
               </p>
             </div>
             <button
