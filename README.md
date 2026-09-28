@@ -8,19 +8,24 @@
 
 Rather than generic forms, each academic format in Scholar Core operates through its own purpose-built workspace tailored to the exact cognitive process of researchers. The primary UI highlights four curated formats, with deep long-form milestone architectures preserved in the underlying codebase:
 
-1. **📝 Coursework & Essay Engine (`OT-01`)** — **v4.0 — 4-Phase Architecture**:
+1. **📝 Coursework & Essay Engine (`OT-01`)** — **v4.1 — 4-Phase Architecture**:
    - **4-Phase Lifecycle** (supersedes the legacy 8-stage flow):
-     1. **Phase 1 · Understand**: Brief intake wizard, 10/75/15 word-budget split, rubric criteria capture (JSON JSONB-persisted in `assignment_projects`).
+     1. **Phase 1 · Understand**:
+        - **Decluttered Dual-Tab Intake**: Seamlessly switch between `[ Paste Prompt ]` and `[ Upload Brief Document (.pdf, .docx) ]`.
+        - **Compact Calibration Controls**: Unified single-row selectors for Academic Level (Undergraduate / Postgraduate), Assignment Type, and Citation Style.
+        - **Dynamic Word Budget Planner (`+ Add Section`)**: Standard 10% Intro / 80% Body / 10% Conclusion baseline allocation, direct word count editing per section, auto-balancing, and interactive custom section adder (`+ Add Section`) with editable titles, live validation badge (`Allocated: X / Y words`), and delete actions.
+        - **Academic Writing Tone & Style Selector**: 4 curated presets (*Scholarly & Rigorous*, *Critical & Evaluative*, *Objective & Analytical*, *Applied & Reflective*) plus *"Match My Writing Style"* (sample paste / document upload with automated vocabulary & sentence pacing analysis), persisted into `state.brief.writingTone` for Phase 3 voice matching.
+        - **Collapsible Course Metadata & Rubric**: Optional module code, university, deadline, and weighted rubric indexing neatly tucked into an accordion.
      2. **Phase 2 · Sources**: AI-curated literature cards, lecture/slide PDF dropzone, evidence approval, approved-source ledger.
      3. **Phase 3 · Drafting**: Invisible chunker engine (`decomposeWordBudget`) for sub-section scaffolding, PEEL synthesis, live section index with per-section word trackers.
      4. **Phase 4 · Submission**: 10-point rubric compliance evaluator, citation reconciliation auditor (100% in-text → bibliography verification), one-click `.docx` and PDF export with title page, running headers, and formatted bibliography.
    - **Stage-Scoped Copilot Personas** (via `ContextPanel.tsx` → `/api/projects/:id/assignment/copilot-chat`):
-     - Phase 1 → **Advisor** (brief & rubric grounding)
+     - Phase 1 → **Advisor** (official Scholar Core logo branding, refined quick actions for prompt command verbs, writing tone recommendations, and rubric criteria detection)
      - Phase 2 → **Librarian** (source curation & citation strategy)
      - Phase 3 → **Scribe** (drafting guidance & PEEL structure)
      - Phase 4 → **Examiner** (rubric scoring & citation audit)
    - **Database**: `public.assignment_projects` JSONB table (migration `20260927183000_assignment_projects_schema.sql`) stores full 4-phase state (`brief`, `sources`, `drafting`, `submission`) linked to `public.projects` via `project_id`.
-   - **Test Coverage**: 15 test suites including `AssignmentE2EFlow.test.tsx` (Phase 1→4 traversal + DOCX export verification).
+   - **Test Coverage**: 16 test suites (132/132 vitest tests passing, 0 TypeScript errors) including `AssignmentE2EFlow.test.tsx` (Phase 1→4 traversal + DOCX export verification).
 
 2. **📄 Journal Article Workspace (`OT-10`)**:
    - **25-Stage Empirical Pipeline**: *Topic Selection → Literature Matrix → Claim-Evidence Graph → Methodological Framing → Empirical Generation → Double-Blind Adversarial Peer Review*.

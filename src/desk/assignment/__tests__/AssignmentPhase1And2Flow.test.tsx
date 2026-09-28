@@ -89,8 +89,8 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
             targetWordCount: 2000,
             wordBudget: expect.objectContaining({
               intro: 200,
-              conclusion: 300,
-              body: 1500,
+              conclusion: 200,
+              body: 1600,
             }),
             citationStyle: "apa7",
             rubricCriteria: expect.arrayContaining([

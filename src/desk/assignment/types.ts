@@ -69,9 +69,9 @@ export const ASSIGNMENT_AGENT_CONFIGS: Record<AssignmentPhaseId, AssignmentAgent
     description: "I'll guide your understanding of the assignment brief, unpack command verbs, and align with rubric expectations.",
     iconPath: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253",
     quickActions: [
-      "Analyze prompt command verbs",
-      "Clarify rubric criteria",
-      "Suggest research questions",
+      "Analyze prompt & key command verbs",
+      "Recommend writing tone for this brief",
+      "Auto-detect rubric grading criteria",
     ],
   },
   sources: {
@@ -702,6 +702,27 @@ export interface AssignmentBriefRubricCriterion {
   expectedStandard?: string;
 }
 
+export interface SectionBudgetItem {
+  id: string;
+  title: string;
+  targetWordCount: number;
+  isCustom?: boolean;
+}
+
+export type WritingTonePreset =
+  | "scholarly_rigorous"
+  | "critical_evaluative"
+  | "objective_analytical"
+  | "applied_reflective"
+  | "custom_match";
+
+export interface WritingToneConfig {
+  preset: WritingTonePreset;
+  customSampleText?: string;
+  customFileName?: string;
+  description?: string;
+}
+
 export interface AssignmentWordBudget {
   intro: number;
   body: number;
@@ -714,6 +735,8 @@ export interface AssignmentBriefState {
   assignmentTopic?: string;
   targetWordCount: number;
   wordBudget?: AssignmentWordBudget;
+  sectionBudgets?: SectionBudgetItem[];
+  writingTone?: WritingToneConfig;
   minWordCount?: number;
   maxWordCount?: number;
   academicLevel: AcademicLevel;

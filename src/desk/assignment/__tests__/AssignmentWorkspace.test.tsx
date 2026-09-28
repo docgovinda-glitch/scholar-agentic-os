@@ -91,9 +91,9 @@ describe("Scholar Core Assignment Workspace", () => {
     const tutorPanel = await screen.findByRole("complementary");
     expect(within(tutorPanel).getByText("Advisor")).toBeInTheDocument();
     expect(within(tutorPanel).getByText(/Assignment Brief & Rubric Guidance/i)).toBeInTheDocument();
-    expect(within(tutorPanel).getByRole("button", { name: /Analyze prompt command verbs/i })).toBeInTheDocument();
-    expect(within(tutorPanel).getByRole("button", { name: /Clarify rubric criteria/i })).toBeInTheDocument();
-    expect(within(tutorPanel).getByRole("button", { name: /Suggest research questions/i })).toBeInTheDocument();
+    expect(within(tutorPanel).getByRole("button", { name: /Analyze prompt & key command verbs/i })).toBeInTheDocument();
+    expect(within(tutorPanel).getByRole("button", { name: /Recommend writing tone for this brief/i })).toBeInTheDocument();
+    expect(within(tutorPanel).getByRole("button", { name: /Auto-detect rubric grading criteria/i })).toBeInTheDocument();
     expect(within(tutorPanel).getByPlaceholderText(/Ask Advisor a question\.\.\./i)).toBeInTheDocument();
 
     // Verify right sidebar purged header and duplicate word count are not present
@@ -170,8 +170,10 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(tutorToggle).toBeInTheDocument();
     expect(within(header).queryByText("AI Tutor")).not.toBeInTheDocument();
 
-    // 4. Compact status badge: 0 / 2,000 words
-    expect(within(header).getByText(/0 \/ 2,000 words/i)).toBeInTheDocument();
+    // 4. Duplicate counter removed from top header; lives exclusively in stage navigation
+    expect(within(header).queryByText(/0 \/ 2,000 words/i)).not.toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: /Assignment Workflow Phases/i });
+    expect(within(nav).getByText(/2,000 words/i)).toBeInTheDocument();
   });
 
   it("completes full brief upload and sequential analysis flow with exact line citations without visual regressions", async () => {

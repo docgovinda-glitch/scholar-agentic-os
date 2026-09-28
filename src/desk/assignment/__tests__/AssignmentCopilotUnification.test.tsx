@@ -128,7 +128,7 @@ describe("Round 5: Context Panel Copilot Unification", () => {
     it("defines distinct personas for all 4 assignment phases", () => {
       expect(ASSIGNMENT_AGENT_CONFIGS.understand.name).toBe("Advisor");
       expect(ASSIGNMENT_AGENT_CONFIGS.understand.role).toContain("Rubric Guidance");
-      expect(ASSIGNMENT_AGENT_CONFIGS.understand.quickActions).toContain("Analyze prompt command verbs");
+      expect(ASSIGNMENT_AGENT_CONFIGS.understand.quickActions).toContain("Analyze prompt & key command verbs");
 
       expect(ASSIGNMENT_AGENT_CONFIGS.sources.name).toBe("Librarian");
       expect(ASSIGNMENT_AGENT_CONFIGS.sources.role).toContain("Literature & Sourcing");
@@ -166,7 +166,7 @@ describe("Round 5: Context Panel Copilot Unification", () => {
       const res = await sendAssignmentCopilotMessage(
         "proj-123",
         "understand",
-        "Analyze prompt command verbs",
+        "Analyze prompt & key command verbs",
         [],
         { currentPhase: "understand" }
       );
@@ -176,7 +176,7 @@ describe("Round 5: Context Panel Copilot Unification", () => {
         "POST",
         expect.objectContaining({
           phase: "understand",
-          message: "Analyze prompt command verbs",
+          message: "Analyze prompt & key command verbs",
           history: [],
           projectState: { currentPhase: "understand" },
         })
@@ -245,8 +245,7 @@ describe("Round 5: Context Panel Copilot Unification", () => {
       expect(screen.getByText("Suggested Actions")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Deepen analytical critique/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Strengthen PEEL structure/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Synthesize counterargument/i })).toBeInTheDocument();
-      expect(screen.getByText(/Phase 3: Drafting/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Stage Context/i)).not.toBeInTheDocument();
     });
 
     it("triggers onSendMessage when a suggested action chip is clicked", async () => {
@@ -329,7 +328,7 @@ describe("Round 5: Context Panel Copilot Unification", () => {
       const sidebar = await screen.findByRole("complementary");
       expect(within(sidebar).getByText("Advisor")).toBeInTheDocument();
       expect(within(sidebar).getByText(/Assignment Brief & Rubric Guidance/i)).toBeInTheDocument();
-      expect(within(sidebar).getByRole("button", { name: /Analyze prompt command verbs/i })).toBeInTheDocument();
+      expect(within(sidebar).getByRole("button", { name: /Analyze prompt & key command verbs/i })).toBeInTheDocument();
 
       // Click Phase 2: Sources button in the top navigation bar
       const sourcesNavBtn = screen.getByRole("button", { name: /Phase 2: Sources/i });

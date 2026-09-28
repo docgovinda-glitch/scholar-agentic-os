@@ -33,6 +33,9 @@ import type {
   AssignmentBriefRubricCriterion,
   CitationAuditResult,
   RubricScoreReport,
+  SectionBudgetItem,
+  WritingToneConfig,
+  WritingTonePreset,
 } from "../types";
 import {
   ASSIGNMENT_PHASES,
@@ -79,6 +82,13 @@ export interface AssignmentContextValue {
   citationStyle: string;
   sections?: SectionBreakdown;
   setSections: (sections: SectionBreakdown) => Promise<void>;
+  writingTone: WritingToneConfig;
+  setWritingTone: (tone: WritingToneConfig) => Promise<void>;
+  sectionBudgets: SectionBudgetItem[];
+  addCustomSection: (title: string, targetWordCount: number) => Promise<void>;
+  updateSectionBudget: (id: string, updates: Partial<{ title: string; targetWordCount: number }>) => Promise<void>;
+  removeCustomSection: (id: string) => Promise<void>;
+  resetSectionBudgets: (totalWords?: number) => Promise<void>;
   question: string;
   assignmentBriefText: string;
 
@@ -327,6 +337,16 @@ export function AssignmentProvider({
       if (updates.sections !== undefined) {
         standardized.sections = updates.sections;
       }
+      if (updates.writingTone !== undefined || updates.writing_tone !== undefined) {
+        const wt = updates.writingTone ?? updates.writing_tone;
+        standardized.writingTone = wt;
+        standardized.writing_tone = wt;
+      }
+      if (updates.sectionBudgets !== undefined || updates.section_budgets !== undefined) {
+        const sb = updates.sectionBudgets ?? updates.section_budgets;
+        standardized.sectionBudgets = sb;
+        standardized.section_budgets = sb;
+      }
 
       if (updates.title !== undefined || updates.assignment_title !== undefined || updates.updatedTitle !== undefined) {
         const titleVal = String(updates.title ?? updates.assignment_title ?? updates.updatedTitle ?? "").trim();
@@ -448,6 +468,107 @@ export function AssignmentProvider({
       await saveAnswers({ sections: newSections });
     },
     [saveAnswers]
+  );
+
+  const writingTone: WritingToneConfig = useMemo(() => {
+    const raw = answers["writingTone"] || answers["writing_tone"];
+    if (raw) {
+      try {
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (parsed && parsed.preset) return parsed;
+      } catch {}
+    }
+    return {
+      preset: "scholarly_rigorous",
+      description: "Formal, authoritative third-person, dense academic vocabulary",
+    };
+  }, [answers]);
+
+  const setWritingTone = useCallback(
+    async (tone: WritingToneConfig) => {
+      await saveAnswers({ writingTone: tone, writing_tone: tone });
+    },
+    [saveAnswers]
+  );
+
+  const sectionBudgets: SectionBudgetItem[] = useMemo(() => {
+    const raw = answers["sectionBudgets"] || answers["section_budgets"];
+    if (raw) {
+      try {
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
+    // Baseline allocation: Introduction (~10%), Body (~80%), Conclusion (~10%)
+    const total = targetWordCount > 0 ? targetWordCount : 2000;
+    const intro = Math.round(total * 0.10);
+    const conclusion = Math.round(total * 0.10);
+    const body = Math.max(0, total - intro - conclusion);
+    return [
+      { id: "intro", title: "Introduction", targetWordCount: intro, isCustom: false },
+      { id: "body", title: "Body Paragraphs", targetWordCount: body, isCustom: false },
+      { id: "conclusion", title: "Conclusion", targetWordCount: conclusion, isCustom: false },
+    ];
+  }, [answers, targetWordCount]);
+
+  const addCustomSection = useCallback(
+    async (title: string, targetWordCountVal: number) => {
+      const newSection: SectionBudgetItem = {
+        id: `section-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        title: title.trim() || "Custom Section",
+        targetWordCount: Math.max(0, targetWordCountVal),
+        isCustom: true,
+      };
+      const updated = [...sectionBudgets, newSection];
+      await saveAnswers({
+        sectionBudgets: updated,
+        section_budgets: updated,
+      });
+    },
+    [sectionBudgets, saveAnswers]
+  );
+
+  const updateSectionBudget = useCallback(
+    async (id: string, updates: Partial<{ title: string; targetWordCount: number }>) => {
+      const updated = sectionBudgets.map((sec) =>
+        sec.id === id ? { ...sec, ...updates } : sec
+      );
+      await saveAnswers({
+        sectionBudgets: updated,
+        section_budgets: updated,
+      });
+    },
+    [sectionBudgets, saveAnswers]
+  );
+
+  const removeCustomSection = useCallback(
+    async (id: string) => {
+      const updated = sectionBudgets.filter((sec) => sec.id !== id);
+      await saveAnswers({
+        sectionBudgets: updated,
+        section_budgets: updated,
+      });
+    },
+    [sectionBudgets, saveAnswers]
+  );
+
+  const resetSectionBudgets = useCallback(
+    async (totalWords?: number) => {
+      const total = totalWords || targetWordCount || 2000;
+      const intro = Math.round(total * 0.10);
+      const conclusion = Math.round(total * 0.10);
+      const body = Math.max(0, total - intro - conclusion);
+      const defaults: SectionBudgetItem[] = [
+        { id: "intro", title: "Introduction", targetWordCount: intro, isCustom: false },
+        { id: "body", title: "Body Paragraphs", targetWordCount: body, isCustom: false },
+        { id: "conclusion", title: "Conclusion", targetWordCount: conclusion, isCustom: false },
+      ];
+      await saveAnswers({
+        sectionBudgets: defaults,
+        section_budgets: defaults,
+      });
+    },
+    [targetWordCount, saveAnswers]
   );
 
   const question = extractStandardizedInstructions(answers);
@@ -1161,6 +1282,8 @@ export function AssignmentProvider({
         assignmentType,
         citationStyle,
         sections,
+        sectionBudgets,
+        writingTone,
         rubricCriteria: rubricCriteriaList,
         analysis,
         briefLedger: analysis?.briefLedger,
@@ -1213,6 +1336,8 @@ export function AssignmentProvider({
     assignmentType,
     citationStyle,
     sections,
+    sectionBudgets,
+    writingTone,
     rubricCriteriaList,
     analysis,
     sources,
@@ -1317,6 +1442,13 @@ export function AssignmentProvider({
         citationStyle,
         sections,
         setSections,
+        writingTone,
+        setWritingTone,
+        sectionBudgets,
+        addCustomSection,
+        updateSectionBudget,
+        removeCustomSection,
+        resetSectionBudgets,
         question,
         assignmentBriefText,
         analysis,

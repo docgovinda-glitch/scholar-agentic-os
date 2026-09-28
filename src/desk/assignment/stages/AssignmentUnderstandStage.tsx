@@ -5,12 +5,24 @@ import {
   type AcademicLevel,
   type AssignmentType,
   type AssignmentAnalysis,
+  type SectionBudgetItem,
+  type WritingToneConfig,
   ASSIGNMENT_TYPE_LABELS,
   cleanAnswerString,
 } from "../types";
 import { deriveHeuristicTitle } from "../../projectNaming";
-import { Upload, ChevronDown, ChevronUp, Sparkles, ArrowRight, Check, AlertCircle, FileText } from "lucide-react";
-import { TargetWordCountInput, type SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
+import {
+  Upload,
+  ChevronDown,
+  Sparkles,
+  ArrowRight,
+  Check,
+  AlertCircle,
+  FileText,
+} from "lucide-react";
+import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
+import SectionBudgetPlanner from "../components/SectionBudgetPlanner";
+import WritingToneSelector from "../components/WritingToneSelector";
 
 const CITATION_STYLES = [
   { id: "apa7", name: "APA 7th Edition (Author, Year)" },
@@ -32,6 +44,9 @@ export default function AssignmentUnderstandStage() {
     citationStyle,
     sections,
     assignmentBriefText,
+    writingTone,
+    setWritingTone,
+    sectionBudgets,
     saveAnswers,
     analysis,
     setAnalysis,
@@ -49,9 +64,11 @@ export default function AssignmentUnderstandStage() {
   const deadlineDate = project?.answers?.["deadline"] || "";
   const markingRubricText = project?.answers?.["marking_rubric"] || project?.answers?.["rubric"] || "";
 
-  const [localQuestion, setLocalQuestion] = useState(
-    cleanAnswerString(question)
-  );
+  // Dual-tab card state
+  const [intakeTab, setIntakeTab] = useState<"paste" | "upload">("paste");
+  const [uploadedFileName, setUploadedFileName] = useState<string>("");
+
+  const [localQuestion, setLocalQuestion] = useState(cleanAnswerString(question));
   const [localLevel, setLocalLevel] = useState<AcademicLevel>(academicLevel || "undergraduate");
   const [localType, setLocalType] = useState<AssignmentType>(assignmentType || "essay");
   const [localWordCount, setLocalWordCount] = useState<number>(targetWordCount || 2000);
@@ -60,6 +77,26 @@ export default function AssignmentUnderstandStage() {
   const [localBrief, setLocalBrief] = useState(
     cleanAnswerString(assignmentBriefText) || cleanAnswerString(question)
   );
+
+  // Dynamic Section Budgets state (defaults: 10% Intro / 80% Body / 10% Conclusion)
+  const [localSectionBudgets, setLocalSectionBudgets] = useState<SectionBudgetItem[]>(() => {
+    if (sectionBudgets && sectionBudgets.length > 0) return sectionBudgets;
+    const total = targetWordCount > 0 ? targetWordCount : 2000;
+    const intro = Math.round(total * 0.10);
+    const conclusion = Math.round(total * 0.10);
+    const body = Math.max(0, total - intro - conclusion);
+    return [
+      { id: "intro", title: "Introduction", targetWordCount: intro, isCustom: false },
+      { id: "body", title: "Body Paragraphs", targetWordCount: body, isCustom: false },
+      { id: "conclusion", title: "Conclusion", targetWordCount: conclusion, isCustom: false },
+    ];
+  });
+
+  // Writing Tone state
+  const [localTone, setLocalTone] = useState<WritingToneConfig>(
+    writingTone || { preset: "scholarly_rigorous" }
+  );
+
   const [course, setCourse] = useState(courseName);
   const [institution, setInstitution] = useState(institutionName);
   const [deadline, setDeadline] = useState(deadlineDate);
@@ -69,14 +106,49 @@ export default function AssignmentUnderstandStage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [uploadingBrief, setUploadingBrief] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [userFeedback, setUserFeedback] = useState("");
+
+  // Compute 3-part budget representation for backwards compatibility
+  const computeWordBudgetFromSections = (
+    total: number,
+    sectionItems: SectionBudgetItem[]
+  ) => {
+    const introItem = sectionItems.find(
+      (s) => s.id === "intro" || s.title.toLowerCase().includes("intro")
+    );
+    const conclusionItem = sectionItems.find(
+      (s) => s.id === "conclusion" || s.title.toLowerCase().includes("concl")
+    );
+    const intro = introItem ? introItem.targetWordCount : Math.round(total * 0.10);
+    const conclusion = conclusionItem ? conclusionItem.targetWordCount : Math.round(total * 0.10);
+    const otherSections = sectionItems.filter(
+      (s) => s !== introItem && s !== conclusionItem
+    );
+    const body =
+      otherSections.length > 0
+        ? otherSections.reduce((sum, s) => sum + s.targetWordCount, 0)
+        : Math.max(0, total - intro - conclusion);
+
+    return { intro, body, conclusion };
+  };
+
+  const computeSectionBreakdown = (
+    total: number,
+    sectionItems: SectionBudgetItem[]
+  ): SectionBreakdown => {
+    const budget = computeWordBudgetFromSections(total, sectionItems);
+    return {
+      isCustomized: true,
+      intro: { targetWords: budget.intro, guidelines: "" },
+      body: { targetWords: budget.body, guidelines: "" },
+      conclusion: { targetWords: budget.conclusion, guidelines: "" },
+    };
+  };
 
   // Hydrate local state whenever project.answers changes / finishes loading
   useEffect(() => {
     if (isLoading) return;
     const currentInstructions = cleanAnswerString(question);
     setLocalQuestion((prev) => {
-      // If user hasn't typed anything or prev is empty or "provisional", hydrate immediately
       if (!prev || prev.trim().toLowerCase() === "provisional") {
         return currentInstructions;
       }
@@ -87,6 +159,10 @@ export default function AssignmentUnderstandStage() {
     if (targetWordCount > 0) setLocalWordCount(targetWordCount);
     if (citationStyle) setLocalCitation(citationStyle);
     if (sections) setLocalSections(sections);
+    if (writingTone) setLocalTone(writingTone);
+    if (sectionBudgets && sectionBudgets.length > 0) {
+      setLocalSectionBudgets(sectionBudgets);
+    }
     const cleanedBrief = cleanAnswerString(assignmentBriefText);
     if (cleanedBrief) {
       setLocalBrief(cleanedBrief);
@@ -105,20 +181,14 @@ export default function AssignmentUnderstandStage() {
     targetWordCount,
     citationStyle,
     sections,
+    writingTone,
+    sectionBudgets,
     assignmentBriefText,
     courseName,
     institutionName,
     deadlineDate,
     markingRubricText,
   ]);
-
-  // Proportional automatic word budget calculation (10% intro / 75-80% body / 10-15% conclusion)
-  const computeWordBudget = (total: number, customSections?: SectionBreakdown) => {
-    const intro = customSections?.intro?.targetWords ?? Math.round(total * 0.10);
-    const conclusion = customSections?.conclusion?.targetWords ?? Math.round(total * 0.15);
-    const body = customSections?.body?.targetWords ?? Math.max(0, total - intro - conclusion);
-    return { intro, body, conclusion };
-  };
 
   const parseRubricCriteria = (text: string) => {
     if (!text || !text.trim()) return [];
@@ -138,7 +208,7 @@ export default function AssignmentUnderstandStage() {
     });
   };
 
-  // Autosave / onBlur debouncing to commit any changes directly to PostgreSQL / JSONB storage
+  // Autosave / onBlur debouncing to commit changes directly to PostgreSQL / JSONB storage
   const handleQuestionBlur = () => {
     const trimmed = cleanAnswerString(localQuestion);
     if (trimmed) {
@@ -153,7 +223,9 @@ export default function AssignmentUnderstandStage() {
         currentTitle.toLowerCase() === "academic assignment" ||
         currentTitle.toLowerCase() === "synthesized research project";
 
-      const budget = computeWordBudget(localWordCount, localSections);
+      const budget = computeWordBudgetFromSections(localWordCount, localSectionBudgets);
+      const legacyBreakdown = computeSectionBreakdown(localWordCount, localSectionBudgets);
+
       const updates: Record<string, any> = {
         rawPrompt: trimmed,
         raw_prompt: trimmed,
@@ -164,6 +236,11 @@ export default function AssignmentUnderstandStage() {
         assignment_brief: trimmed,
         wordBudget: budget,
         word_budget: budget,
+        sectionBudgets: localSectionBudgets,
+        section_budgets: localSectionBudgets,
+        sections: legacyBreakdown,
+        writingTone: localTone,
+        writing_tone: localTone,
       };
 
       if (isDefaultOrUntitled && trimmed.length >= 10) {
@@ -178,34 +255,57 @@ export default function AssignmentUnderstandStage() {
     }
   };
 
-  const handleWordCountBlur = () => {
-    if (localWordCount > 0) {
-      const budget = computeWordBudget(localWordCount, localSections);
-      saveAnswers({
-        targetWordCount: localWordCount,
-        target_word_count: localWordCount,
-        word_count: localWordCount,
-        word_limit: localWordCount,
-        wordBudget: budget,
-        word_budget: budget,
-        ...(localSections ? { sections: localSections } : {}),
-      });
-    }
-  };
-
-  const handleWordCountAndSectionsChange = (newCount: number, newSections: SectionBreakdown) => {
+  const handleTargetWordCountChange = (newCount: number) => {
     setLocalWordCount(newCount);
-    setLocalSections(newSections);
-    const budget = computeWordBudget(newCount, newSections);
+    // If not customized, adjust standard sections proportionally (10/80/10)
+    const hasCustom = localSectionBudgets.some((s) => s.isCustom);
+    let updatedSections = localSectionBudgets;
+    if (!hasCustom) {
+      const intro = Math.round(newCount * 0.10);
+      const conclusion = Math.round(newCount * 0.10);
+      const body = Math.max(0, newCount - intro - conclusion);
+      updatedSections = [
+        { id: "intro", title: "Introduction", targetWordCount: intro, isCustom: false },
+        { id: "body", title: "Body Paragraphs", targetWordCount: body, isCustom: false },
+        { id: "conclusion", title: "Conclusion", targetWordCount: conclusion, isCustom: false },
+      ];
+      setLocalSectionBudgets(updatedSections);
+    }
+    const budget = computeWordBudgetFromSections(newCount, updatedSections);
+    const legacyBreakdown = computeSectionBreakdown(newCount, updatedSections);
+    setLocalSections(legacyBreakdown);
+
     saveAnswers({
       targetWordCount: newCount,
       target_word_count: newCount,
       word_count: newCount,
       word_limit: newCount,
-      sections: newSections,
+      sectionBudgets: updatedSections,
+      section_budgets: updatedSections,
+      sections: legacyBreakdown,
       wordBudget: budget,
       word_budget: budget,
     });
+  };
+
+  const handleSectionBudgetsChange = (newSections: SectionBudgetItem[]) => {
+    setLocalSectionBudgets(newSections);
+    const budget = computeWordBudgetFromSections(localWordCount, newSections);
+    const legacyBreakdown = computeSectionBreakdown(localWordCount, newSections);
+    setLocalSections(legacyBreakdown);
+
+    saveAnswers({
+      sectionBudgets: newSections,
+      section_budgets: newSections,
+      sections: legacyBreakdown,
+      wordBudget: budget,
+      word_budget: budget,
+    });
+  };
+
+  const handleToneChange = (newTone: WritingToneConfig) => {
+    setLocalTone(newTone);
+    setWritingTone(newTone);
   };
 
   const handleLevelChange = (lvl: AcademicLevel) => {
@@ -250,7 +350,8 @@ export default function AssignmentUnderstandStage() {
   const handleProceedToSources = async () => {
     if (!canProceedToSources) return;
     const trimmed = cleanAnswerString(localQuestion);
-    const budget = computeWordBudget(localWordCount, localSections);
+    const budget = computeWordBudgetFromSections(localWordCount, localSectionBudgets);
+    const legacyBreakdown = computeSectionBreakdown(localWordCount, localSectionBudgets);
     const parsedCriteria = parseRubricCriteria(rubricText);
 
     await saveAnswers({
@@ -271,9 +372,13 @@ export default function AssignmentUnderstandStage() {
       target_word_count: localWordCount,
       wordBudget: budget,
       word_budget: budget,
+      sectionBudgets: localSectionBudgets,
+      section_budgets: localSectionBudgets,
+      sections: legacyBreakdown,
+      writingTone: localTone,
+      writing_tone: localTone,
       citation_style: localCitation,
       citationStyle: localCitation,
-      sections: localSections,
       rubricCriteria: parsedCriteria,
       rubric_criteria: parsedCriteria,
       marking_rubric: rubricText,
@@ -304,6 +409,9 @@ export default function AssignmentUnderstandStage() {
     setIsAnalyzing(true);
     setAnalysisError(null);
 
+    const budget = computeWordBudgetFromSections(localWordCount, localSectionBudgets);
+    const legacyBreakdown = computeSectionBreakdown(localWordCount, localSectionBudgets);
+
     // Save intake details first
     await saveAnswers({
       instructions: localQuestion,
@@ -320,7 +428,13 @@ export default function AssignmentUnderstandStage() {
       target_word_count: localWordCount,
       citation_style: localCitation,
       citationStyle: localCitation,
-      sections: localSections,
+      sectionBudgets: localSectionBudgets,
+      section_budgets: localSectionBudgets,
+      wordBudget: budget,
+      word_budget: budget,
+      sections: legacyBreakdown,
+      writingTone: localTone,
+      writing_tone: localTone,
       assignment_brief_text: localBrief || localQuestion,
       course_name: course,
       institution,
@@ -336,32 +450,34 @@ export default function AssignmentUnderstandStage() {
 
     try {
       const targetProjectId = await ensurePersisted();
-      const response = await authedJsonFetch(`/api/projects/${targetProjectId}/assignment/analyze`, "POST", {
-        question: localQuestion,
-        assignmentType: localType,
-        academicLevel: localLevel,
-        targetWordCount: localWordCount,
-        citationStyle: localCitation,
-        briefText: localBrief,
-        rubricText,
-        sections: localSections,
-      });
+      const response = await authedJsonFetch(
+        `/api/projects/${targetProjectId}/assignment/analyze`,
+        "POST",
+        {
+          question: localQuestion,
+          assignmentType: localType,
+          academicLevel: localLevel,
+          targetWordCount: localWordCount,
+          citationStyle: localCitation,
+          briefText: localBrief,
+          rubricText,
+          sections: legacyBreakdown,
+          writingTone: localTone,
+        }
+      );
 
       if (response && response.ok) {
         const data = await response.json();
-        if (data.updatedTitle) {
-          await saveAnswers({
-            title: data.updatedTitle,
-            assignment_title: data.updatedTitle,
-          });
+        if (data.analysis) {
+          await setAnalysis(data.analysis);
+          return;
         }
         await setAnalysis(data);
         return;
       }
       throw new Error("Server analysis unavailable");
     } catch (err: any) {
-      console.warn("Using resilient high-academic brief analyzer:", err);
-      // Fast, resilient academic analyzer guaranteeing student never gets stuck
+      console.warn("Using resilient brief analyzer:", err);
       const qLower = localQuestion.toLowerCase();
       const detectedVerbs = [];
       const verbKeywords: Record<string, { def: string; act: string }> = {
@@ -372,10 +488,6 @@ export default function AssignmentUnderstandStage() {
         evaluate: {
           def: "Form a judgment on the value, efficacy, or validity of theories and evidence.",
           act: "Provide balanced criteria-based judgments supported by scholarly consensus.",
-        },
-        "critically assess": {
-          def: "Examine boundaries, merits, and limitations with rigorous theoretical depth.",
-          act: "Contrast alternative interpretations and highlight methodological limitations.",
         },
         assess: {
           def: "Determine the significance, scale, or value of concepts or findings.",
@@ -397,92 +509,48 @@ export default function AssignmentUnderstandStage() {
           def: "Investigate closely, scrutinizing assumptions and empirical proof.",
           act: "Surface hidden assumptions and cross-reference with primary research.",
         },
-        compare: {
-          def: "Identify meaningful similarities, divergences, and underlying tensions.",
-          act: "Use structured comparative matrices rather than isolated descriptions.",
-        },
       };
 
-      for (const [vKey, vVal] of Object.entries(verbKeywords)) {
+      for (const [vKey, vData] of Object.entries(verbKeywords)) {
         if (qLower.includes(vKey)) {
           detectedVerbs.push({
             verb: vKey.charAt(0).toUpperCase() + vKey.slice(1),
-            meaning: vVal.def,
-            academicExpectation: vVal.act,
+            meaning: vData.def,
+            academicExpectation: vData.act,
           });
         }
       }
+
       if (detectedVerbs.length === 0) {
         detectedVerbs.push({
-          verb: "Critically evaluate",
-          meaning: "Weigh competing theoretical arguments and empirical evidence to judge their validity.",
-          academicExpectation: "Synthesize counterarguments and reach a justified, evidence-backed conclusion.",
-        });
-        detectedVerbs.push({
-          verb: "Analyse",
-          meaning: "Break down complex issues into component parts to examine relationships and causes.",
-          academicExpectation: "Explain 'how' and 'why', not merely descriptive facts.",
+          verb: "Analyze & Critically Discuss",
+          meaning: "Dissect core themes and engage critically with peer-reviewed scholarship.",
+          academicExpectation: "Demonstrate independent evaluation and rigorous evidence grounding.",
         });
       }
-
-      const introWords = Math.round(localWordCount * 0.1);
-      const conclWords = Math.round(localWordCount * 0.1);
-      const bodyWords = localWordCount - introWords - conclWords;
 
       const fallbackAnalysis: AssignmentAnalysis = {
         commandVerbs: detectedVerbs,
-        summary: `Structured academic ${localType.replace(/_/g, " ")} addressing the prompt with deep conceptual rigor, dialectical analysis, and systematic evidentiary grounding.`,
-        expectedResponseType: localType.replace(/_/g, " "),
-        keyConcepts: ["Theoretical Framework", "Empirical Findings", "Critical Analysis", "Policy/Practical Implications"],
-        scopeBoundaries: {
-          included: [
-            "Systematic definition of key concepts, parameters, and theoretical assumptions",
-            "Comparative evaluation of competing scholarly viewpoints and counterarguments",
-            `Empirical evidence from high-impact peer-reviewed literature formatted in ${localCitation.toUpperCase()}`,
-            "Critical synthesis linking each argument back to the central thesis statement",
-          ],
-          excluded: [
-            "Unsubstantiated personal opinion or anecdotal claims lacking peer-reviewed provenance",
-            "Excessive historical narrative or background description that consumes word budget without advancing the argument",
-            "Peripheral case studies not directly answering the primary prompt questions",
-          ],
-        },
-        evidenceRequirements: localLevel === "postgraduate"
-          ? `Minimum 12–16 peer-reviewed academic journal articles, monographs, and authoritative datasets. Primary focus on recent scholarship (< 5 years) alongside seminal theoretical works.`
-          : `Minimum 8–12 credible academic sources, prioritizing peer-reviewed articles and recognized textbooks. Emphasize verified citations over secondary summaries.`,
-        markingCriteriaInsights: [
-          "Demonstrate independent critical evaluation rather than passive reporting",
-          "Engage directly with counter-arguments and acknowledge methodological limitations",
-          "Maintain flawless structural coherence with clear topic sentences and transitions",
+        summary: `Rigorous academic breakdown of assignment prompt: ${localQuestion.slice(0, 120)}`,
+        keyConcepts: [
+          "Theoretical Frameworks & Foundational Literature",
+          "Empirical Context & Practical Applications",
+          "Methodological or Evaluative Rigor",
         ],
-        wordCountImplications: `Strict target of ${localWordCount.toLocaleString()} words (±10% standard academic tolerance). Recommended budget: Introduction ~${introWords} words (10%), Main Body Argumentation ~${bodyWords} words (${Math.round((bodyWords / localWordCount) * 100)}%), Conclusion ~${conclWords} words (10%).`,
-        citationGuidance: `Format all in-text citations and the reference list strictly according to ${localCitation.toUpperCase()} referencing conventions. Ensure every cited claim links to an identifiable author and publication year.`,
-        academicLevelNotes: localLevel === "postgraduate"
-          ? "Calibrated for Postgraduate / Masters study: demands high theoretical synthesis, methodological reflexivity, nuanced hedging, and original critical insight."
-          : "Calibrated for Undergraduate study: emphasizes conceptual clarity, structured logical flow, accurate evidence deployment, and clear thesis progression.",
+        scopeBoundaries: {
+          included: ["Direct addressing of assignment prompt", "Scholarly evidence and critical literature grounding"],
+          excluded: ["Unsubstantiated assertion", "Out-of-scope tangents"],
+        },
+        expectedResponseType: localType,
+        evidenceRequirements: `High-quality peer-reviewed scholarly citations adhering to ${localCitation.toUpperCase()}.`,
+        markingCriteriaInsights: rubricText
+          ? ["Custom module grading rubric criteria indexed and integrated."]
+          : ["Rigorous argument structure, critical analysis, and authentic academic evidence."],
+        wordCountImplications: `Target allocation of ${localWordCount} words across planned sections.`,
+        citationGuidance: `Format all in-text citations and bibliography according to ${localCitation.toUpperCase()} conventions.`,
+        academicLevelNotes: `Calibrated for ${localLevel} academic standards. Demands sustained analytical depth and critical synthesis.`,
         approvedByUser: false,
       };
-
-      const currentTitle =
-        project?.answers?.["title"] ||
-        project?.answers?.["assignment_title"] ||
-        project?.title ||
-        "";
-      const isDefaultOrUntitled =
-        !currentTitle ||
-        currentTitle.toLowerCase().includes("untitled") ||
-        currentTitle.toLowerCase() === "academic assignment" ||
-        currentTitle.toLowerCase() === "synthesized research project";
-
-      if (isDefaultOrUntitled && localQuestion.trim().length >= 10) {
-        const derived = deriveHeuristicTitle(localQuestion);
-        if (derived && derived !== "Academic Assignment") {
-          await saveAnswers({
-            title: derived,
-            assignment_title: derived,
-          });
-        }
-      }
 
       await setAnalysis(fallbackAnalysis);
     } finally {
@@ -495,7 +563,6 @@ export default function AssignmentUnderstandStage() {
     const updated: AssignmentAnalysis = {
       ...analysis,
       approvedByUser: true,
-      userFeedback: userFeedback.trim() || undefined,
     };
     await setAnalysis(updated);
     await handleProceedToSources();
@@ -506,6 +573,7 @@ export default function AssignmentUnderstandStage() {
     if (!file) return;
     setUploadingBrief(true);
     setAnalysisError(null);
+    setUploadedFileName(file.name);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -583,68 +651,122 @@ export default function AssignmentUnderstandStage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 space-y-8 text-neutral-900 dark:text-neutral-100 font-sans">
-      {/* Page Title & Subtitle Header */}
+      {/* Clean Decluttered Header */}
       <div>
-        <div className="flex items-center gap-2 mb-2.5">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200">
             Phase 1 • Understand
-          </span>
-          <span className="text-xs text-neutral-400 dark:text-neutral-500 font-medium">
-            Phase 1 of 8
           </span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-          Phase 1: Understand the Assignment
+          <span className="sr-only">Phase 1: Understand the Assignment</span>
+          Understand Your Brief
         </h1>
-        <p className="text-sm sm:text-base text-neutral-500 dark:text-neutral-400 mt-2 leading-relaxed">
-          Paste your brief or upload a document to extract questions, word limits, and grading criteria.
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1.5 leading-relaxed">
+          Define the assignment question, target word allocation, academic writing tone, and rubric criteria.
         </p>
       </div>
 
-      {/* Main Intake Canvas Card (Apple / Airbnb Flat Canvas) */}
+      {/* Main Intake Canvas Card */}
       <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/70 dark:border-white/10 p-6 sm:p-8 shadow-xs space-y-7">
-        {/* Question Input Section */}
+        {/* Streamlined Assessment Brief Intake: Dual-Tab Card */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
-              <span>Assignment Question / Instructions</span>
-              <span className="text-rose-500 text-xs">*</span>
-            </label>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingBrief}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200/70 dark:hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
-            >
-              {uploadingBrief ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin" />
-                  <span>Parsing Brief…</span>
-                </>
-              ) : (
-                <>
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Upload Brief (.pdf, .docx)</span>
-                </>
-              )}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.docx,.doc,.txt"
-              onChange={handleFileUpload}
-              disabled={uploadingBrief}
-              className="hidden"
-            />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="inline-flex p-1 rounded-xl bg-neutral-100 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 w-fit">
+              <button
+                type="button"
+                onClick={() => setIntakeTab("paste")}
+                className={`py-1.5 px-3.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  intakeTab === "paste"
+                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                }`}
+              >
+                Paste Prompt
+              </button>
+              <button
+                type="button"
+                onClick={() => setIntakeTab("upload")}
+                className={`py-1.5 px-3.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                  intakeTab === "upload"
+                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                }`}
+              >
+                <Upload className="w-3 h-3" />
+                <span>Upload Brief Document (.pdf, .docx)</span>
+              </button>
+            </div>
+
+            {uploadedFileName && (
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                <FileText className="w-3.5 h-3.5" />
+                <span>Loaded: {uploadedFileName}</span>
+              </span>
+            )}
           </div>
 
-          <textarea
-            value={localQuestion}
-            onChange={(e) => setLocalQuestion(e.target.value)}
-            onBlur={handleQuestionBlur}
-            rows={5}
-            placeholder="Paste your assignment prompt, essay title, or question here..."
-            className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-4 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-white/15 focus:border-neutral-400 dark:focus:border-white/20 transition-all leading-relaxed resize-y"
+          {intakeTab === "paste" ? (
+            <textarea
+              value={localQuestion}
+              onChange={(e) => setLocalQuestion(e.target.value)}
+              onBlur={handleQuestionBlur}
+              rows={5}
+              placeholder="Paste your assignment prompt, essay title, or question here..."
+              className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-4 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-white/15 focus:border-neutral-400 dark:focus:border-white/20 transition-all leading-relaxed resize-y"
+            />
+          ) : (
+            <div className="border border-dashed border-neutral-300 dark:border-white/15 rounded-xl p-6 bg-neutral-50/50 dark:bg-white/[0.02] flex flex-col items-center justify-center text-center space-y-3">
+              <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-white/5 flex items-center justify-center text-neutral-600 dark:text-neutral-300">
+                <Upload className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
+                  Upload your assignment brief or module handbook
+                </p>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  Supports PDF, DOCX, DOC, or TXT
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingBrief}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 inline-flex items-center gap-2"
+              >
+                {uploadingBrief ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    <span>Parsing Brief…</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Select Brief Document</span>
+                  </>
+                )}
+              </button>
+
+              {localQuestion && (
+                <div className="w-full text-left pt-3 border-t border-neutral-200/60 dark:border-white/5">
+                  <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider block mb-1">
+                    Extracted Brief Question / Prompt:
+                  </span>
+                  <p className="text-xs text-neutral-700 dark:text-neutral-300 line-clamp-3 bg-white dark:bg-[#2C2C2E] p-3 rounded-lg border border-neutral-200/60 dark:border-white/10 font-mono">
+                    {localQuestion}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.doc,.txt"
+            onChange={handleFileUpload}
+            disabled={uploadingBrief}
+            className="hidden"
           />
 
           {uploadingBrief && (
@@ -655,46 +777,42 @@ export default function AssignmentUnderstandStage() {
           )}
         </div>
 
-        {/* Academic Level Pill Switch */}
-        <div className="space-y-2.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
-            Academic Level
-          </label>
-          <div className="inline-flex p-1 rounded-xl bg-neutral-100 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 w-full sm:max-w-md">
-            <button
-              type="button"
-              onClick={() => handleLevelChange("undergraduate")}
-              className={`flex-1 py-2 px-4 rounded-lg text-xs font-medium transition-all cursor-pointer text-center ${
-                localLevel === "undergraduate"
-                  ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-              }`}
-            >
-              Undergraduate
-            </button>
-            <button
-              type="button"
-              onClick={() => handleLevelChange("postgraduate")}
-              className={`flex-1 py-2 px-4 rounded-lg text-xs font-medium transition-all cursor-pointer text-center ${
-                localLevel === "postgraduate"
-                  ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-              }`}
-            >
-              Postgraduate / Masters
-            </button>
+        {/* Compact Single Row: Academic Level, Assignment Type & Citation Style */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl bg-neutral-50/60 dark:bg-white/[0.02] border border-neutral-200/70 dark:border-white/10">
+          {/* Academic Level */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+              <span>Academic Level</span>
+              <span className="text-rose-500 text-xs">*</span>
+            </label>
+            <div className="flex p-0.5 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => handleLevelChange("undergraduate")}
+                className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer text-center ${
+                  localLevel === "undergraduate"
+                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                }`}
+              >
+                Undergraduate
+              </button>
+              <button
+                type="button"
+                onClick={() => handleLevelChange("postgraduate")}
+                className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer text-center ${
+                  localLevel === "postgraduate"
+                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                }`}
+              >
+                Postgraduate / Masters
+              </button>
+            </div>
           </div>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            {localLevel === "postgraduate"
-              ? "Calibrated for Master's study: deep theoretical synthesis, methodological reflexivity, and nuanced counterarguments."
-              : "Calibrated for Undergraduate study: conceptual clarity, structured logical flow, accurate evidence, and clear thesis progression."}
-          </p>
-        </div>
 
-        {/* Controls Grid: Assignment Type & Citation Style */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* Assignment Type */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
               <span>Assignment Type</span>
               <span className="text-rose-500 text-xs">*</span>
@@ -703,22 +821,22 @@ export default function AssignmentUnderstandStage() {
               <select
                 value={localType}
                 onChange={(e) => handleTypeChange(e.target.value as AssignmentType)}
-                className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-white/15 focus:border-neutral-400 dark:focus:border-white/20 transition-all appearance-none cursor-pointer pr-10 font-medium"
+                className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium"
               >
                 {Object.entries(ASSIGNMENT_TYPE_LABELS).map(([key, label]) => (
-                  <option key={key} value={key} className="bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-neutral-100">
+                  <option key={key} value={key}>
                     {label}
                   </option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-neutral-400">
-                <ChevronDown className="w-4 h-4" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
+                <ChevronDown className="w-3.5 h-3.5" />
               </div>
             </div>
           </div>
 
           {/* Citation Style */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
               <span>Citation Style</span>
               <span className="text-rose-500 text-xs">*</span>
@@ -727,39 +845,48 @@ export default function AssignmentUnderstandStage() {
               <select
                 value={localCitation}
                 onChange={(e) => handleCitationChange(e.target.value)}
-                className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-white/15 focus:border-neutral-400 dark:focus:border-white/20 transition-all appearance-none cursor-pointer pr-10 font-medium"
+                className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium"
               >
                 {CITATION_STYLES.map((st) => (
-                  <option key={st.id} value={st.id} className="bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-neutral-100">
+                  <option key={st.id} value={st.id}>
                     {st.name}
                   </option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-neutral-400">
-                <ChevronDown className="w-4 h-4" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
+                <ChevronDown className="w-3.5 h-3.5" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Target Word Count & Section-Specific Guidance Module */}
+        {/* Word Budget with Custom Sections Adder */}
         <div className="pt-1">
-          <TargetWordCountInput
-            value={localWordCount}
-            sections={localSections}
-            onChange={handleWordCountAndSectionsChange}
+          <SectionBudgetPlanner
+            targetWordCount={localWordCount}
+            onTargetWordCountChange={handleTargetWordCountChange}
+            sections={localSectionBudgets}
+            onSectionsChange={handleSectionBudgetsChange}
           />
         </div>
 
-        {/* Minimal Accordion: Add course details & grading rubric */}
-        <div className="pt-1">
+        {/* Academic Writing Tone & Style Selector */}
+        <div className="pt-2 border-t border-neutral-200/60 dark:border-white/5">
+          <WritingToneSelector
+            value={localTone}
+            onChange={handleToneChange}
+          />
+        </div>
+
+        {/* Collapsible Accordion: Additional Course Details & Rubric */}
+        <div className="pt-1 border-t border-neutral-200/60 dark:border-white/5">
           <button
             type="button"
             onClick={() => setShowAdditional(!showAdditional)}
             className="text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer py-1"
           >
             <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showAdditional ? "rotate-180" : ""}`} />
-            <span>{showAdditional ? "Hide course details & grading rubric" : "+ Add course details & grading rubric (optional)"}</span>
+            <span>{showAdditional ? "Hide additional course details & grading rubric" : "+ Additional Course Details & Rubric (Optional)"}</span>
           </button>
 
           {showAdditional && (
@@ -859,7 +986,7 @@ export default function AssignmentUnderstandStage() {
         )}
       </div>
 
-      {/* Analysis Breakdown Results (Apple / Airbnb Flat Presentation) */}
+      {/* Analysis Breakdown Results */}
       {analysis && (
         <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/70 dark:border-white/10 p-6 sm:p-8 shadow-xs space-y-7 animate-in fade-in duration-200">
           <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-4">

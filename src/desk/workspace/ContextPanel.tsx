@@ -3,6 +3,7 @@ import type { ResearchStage } from "./types";
 import { STAGE_MAP } from "./types";
 import { useOptionalResearchWorkspace } from "./ResearchContext";
 import { sendCopilotMessage } from "../api";
+import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 
 export interface AgentInfo {
   name: string;
@@ -283,11 +284,17 @@ export default function ContextPanel({
         <div className="p-6 pb-4 border-b border-[color:var(--border-subtle)]">
           <div className="flex items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)] shrink-0">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={agent.iconPath} />
-                </svg>
-              </div>
+              {agent.name === "Advisor" ? (
+                <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+                  <ScholarCoreLogo size="sm" withText={false} />
+                </div>
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)] shrink-0">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={agent.iconPath} />
+                  </svg>
+                </div>
+              )}
               <div>
                 <h3 className="font-bold text-[color:var(--text-primary)]">{agent.name}</h3>
                 <p className="text-[10px] uppercase tracking-wider text-[color:var(--text-muted)] font-bold">
@@ -336,19 +343,6 @@ export default function ContextPanel({
                     </button>
                   ))}
                 </div>
-              </div>
-
-              {/* Current Stage Context Info */}
-              <div className="bg-[color:var(--surface-raised)] rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)] p-4 text-sm">
-                <div className="flex items-center gap-2 mb-2 text-[color:var(--text-primary)] font-semibold">
-                  <svg className="w-4 h-4 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Stage Context
-                </div>
-                <p className="text-[color:var(--text-secondary)]">
-                  You are currently working in <strong className="text-[color:var(--text-primary)]">{propStageName || stageDef?.label || agent.role}</strong>. Any documents or data you upload here will be scoped to this stage's processing parameters.
-                </p>
               </div>
             </>
           ) : (

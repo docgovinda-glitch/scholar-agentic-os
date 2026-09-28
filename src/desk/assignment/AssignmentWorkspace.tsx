@@ -602,14 +602,8 @@ function AssignmentWorkspaceInner({
             </div>
           </div>
 
-          {/* Right Section: Compact Status Badge & Socratic Tutor Drawer Toggle */}
-          <div className="flex items-center gap-3 shrink-0">
-            {/* Apple-grade compact status badge: 0 / 2,000 words */}
-            <div className="px-3 py-1 rounded-full text-[12px] font-medium text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 tabular-nums flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span>{currentWordCount.toLocaleString()} / {targetWordCount.toLocaleString()} words</span>
-            </div>
-
+          {/* Right Section: Socratic Tutor Drawer Toggle */}
+          <div className="flex items-center gap-2 shrink-0">
             {/* Socratic Tutor Drawer Toggle Button */}
             <button
               type="button"
