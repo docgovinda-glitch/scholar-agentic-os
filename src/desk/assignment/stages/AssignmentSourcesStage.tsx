@@ -13,6 +13,7 @@ import {
 import type {
   DiscoveredSource,
   UploadedSourceDocument,
+  EvidenceItem,
   LiteratureViewMode,
 } from "../types";
 import {
@@ -123,6 +124,7 @@ export default function AssignmentSourcesStage({
   onBack,
 }: AssignmentSourcesStageProps) {
   const {
+    projectId,
     question,
     citationStyle,
     sources,
@@ -133,6 +135,7 @@ export default function AssignmentSourcesStage({
     userUploadedSources,
     addUserUploadedSource,
     removeUserUploadedSource,
+    addEvidenceItem,
     advancePhase,
     setPhase,
   } = useAssignmentWorkspace();
@@ -262,9 +265,24 @@ export default function AssignmentSourcesStage({
     await setSources(nextSources);
   };
 
-  const handleLectureUpload = async (docs: UploadedSourceDocument[]) => {
+  const handleLectureUpload = async (docs: UploadedSourceDocument[], newEvidences?: EvidenceItem[]) => {
     for (const doc of docs) {
       await addUserUploadedSource(doc);
+    }
+    if (newEvidences && newEvidences.length > 0 && addEvidenceItem) {
+      for (const ev of newEvidences) {
+        await addEvidenceItem({
+          claim: ev.claim,
+          evidenceSnippet: ev.evidenceSnippet,
+          sourceTitle: ev.sourceTitle,
+          sourceType: ev.sourceType,
+          citation: ev.citation,
+          theme: ev.theme,
+          status: ev.status,
+          authors: ev.authors,
+          year: ev.year,
+        });
+      }
     }
   };
 
@@ -495,6 +513,9 @@ export default function AssignmentSourcesStage({
           uploadedFiles={userUploadedSources}
           onUpload={handleLectureUpload}
           onRemove={handleLectureRemove}
+          assignmentQuestion={question}
+          citationStyle={citationStyle}
+          projectId={projectId}
         />
       </section>
 

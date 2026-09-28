@@ -711,14 +711,37 @@ export interface AssignmentBriefState {
   courseDetails?: CourseDetails;
 }
 
+export interface ExtractedSourceEvidence {
+  id: string;
+  excerpt: string;
+  context?: string;
+  relevanceExplanation?: string;
+  sourceLocation?: string;
+  pageNumber?: number | string;
+  section?: string;
+  tableOrFigure?: string;
+  claim?: string;
+}
+
 export interface UploadedSourceDocument {
   id: string;
   name: string;
+  sourceType?: "pdf" | "docx" | "pptx" | "spreadsheet" | "image" | "weblink" | "text" | "other";
   fileUrl?: string;
   fileSize?: number;
   uploadedAt: string;
   mimeType?: string;
   extractedText?: string;
+  url?: string;
+  author?: string;
+  publicationDate?: string;
+  citation?: string;
+  evidenceCount?: number;
+  extractedEvidences?: ExtractedSourceEvidence[];
+  relevanceSummary?: string;
+  structuredDataSummary?: string;
+  processingStatus?: "analyzing" | "extracted" | "error";
+  error?: string;
 }
 
 export interface AssignmentSourcesState {
