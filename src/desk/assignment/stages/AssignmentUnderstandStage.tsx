@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { authedJsonFetch, authedFetch } from "../../api";
 import {
@@ -21,10 +21,51 @@ import {
   Check,
   AlertCircle,
   FileText,
+  X,
 } from "lucide-react";
 import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
 import SectionBudgetPlanner from "../components/SectionBudgetPlanner";
-import WritingStyleSelector from "../components/WritingStyleSelector";
+import WritingStyleSelector, { TONE_SUGGESTION_CHIPS } from "../components/WritingStyleSelector";
+import { useSubscriptionLimits } from "../../../hooks/useSubscriptionLimits";
+import { UpgradeModal } from "../../../components/modals/UpgradeModal";
+import { isDeepEqual, stripCircularReferences } from "../../../utils/briefExtractor";
+import { validateBriefFile } from "../../../services/documentParser";
+
+class DropzoneErrorBoundary extends React.Component<
+  { children: React.ReactNode; onError?: (error: Error) => void },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("Caught dropzone error inline:", error);
+    this.props.onError?.(error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="border border-neutral-200 dark:border-white/10 rounded-xl p-6 bg-neutral-50/50 dark:bg-white/[0.02] text-center space-y-3 font-sans">
+          <p className="text-xs text-neutral-600 dark:text-neutral-400">
+            Could not parse this document. Please verify the file format or paste the brief text manually.
+          </p>
+          <button
+            type="button"
+            onClick={() => this.setState({ hasError: false })}
+            className="px-4 py-1.5 rounded-full text-xs font-medium bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 cursor-pointer"
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const CITATION_STYLES = [
   { id: "apa7", name: "APA 7th Edition (Author, Year)" },
@@ -72,6 +113,20 @@ export default function AssignmentUnderstandStage() {
   const [intakeTab, setIntakeTab] = useState<"paste" | "upload">("paste");
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
 
+  // Role-based subscription limits & upgrade modal state
+  const {
+    isAdmin,
+    isPremium,
+    tier,
+    maxFileSizeMB,
+    canUploadBrief,
+  } = useSubscriptionLimits();
+
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeModalDescription, setUpgradeModalDescription] = useState<string | undefined>();
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [parseNotice, setParseNotice] = useState<string | null>(null);
+
   const [localQuestion, setLocalQuestion] = useState(cleanAnswerString(question));
   const [localLevel, setLocalLevel] = useState<AcademicLevel>(academicLevel || "undergraduate");
   const [localType, setLocalType] = useState<AssignmentType>(assignmentType || "essay");
@@ -105,6 +160,50 @@ export default function AssignmentUnderstandStage() {
       description: "Breaks down causes, patterns, and connections between concepts.",
     };
   });
+
+  // Tone & Style section ref for intersection and focus detection
+  const toneSectionRef = useRef<HTMLDivElement>(null);
+
+  const dispatchToneAssistantSuggestions = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("scholar:copilot-suggested-actions", {
+        detail: {
+          actions: TONE_SUGGESTION_CHIPS,
+          source: "tone-calibration",
+        },
+      })
+    );
+    window.dispatchEvent(
+      new CustomEvent("scholar:advisor-suggested-actions", {
+        detail: {
+          actions: TONE_SUGGESTION_CHIPS,
+          source: "tone-calibration",
+        },
+      })
+    );
+  }, []);
+
+  useEffect(() => {
+    const el = toneSectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            dispatchToneAssistantSuggestions();
+          }
+        });
+      },
+      { threshold: 0.15 }
+    );
+
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+    };
+  }, [dispatchToneAssistantSuggestions]);
 
   const [course, setCourse] = useState(courseName);
   const [institution, setInstitution] = useState(institutionName);
@@ -158,31 +257,35 @@ export default function AssignmentUnderstandStage() {
     if (isLoading) return;
     const currentInstructions = cleanAnswerString(question);
     setLocalQuestion((prev) => {
+      const cleanCur = currentInstructions || "";
       if (!prev || prev.trim().toLowerCase() === "provisional") {
-        return currentInstructions;
+        return cleanCur;
       }
       return prev;
     });
-    if (academicLevel) setLocalLevel(academicLevel);
-    if (assignmentType) setLocalType(assignmentType);
-    if (targetWordCount > 0) setLocalWordCount(targetWordCount);
-    if (citationStyle) setLocalCitation(citationStyle);
-    if (sections) setLocalSections(sections);
-    if (writingStyle) setLocalStyle(writingStyle);
-    else if (writingTone) setLocalStyle(writingTone as WritingStyleConfig);
+    if (academicLevel) setLocalLevel((prev) => (prev !== academicLevel ? academicLevel : prev));
+    if (assignmentType) setLocalType((prev) => (prev !== assignmentType ? assignmentType : prev));
+    if (targetWordCount > 0) setLocalWordCount((prev) => (prev !== targetWordCount ? targetWordCount : prev));
+    if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
+    if (sections) setLocalSections((prev) => (isDeepEqual(prev, sections) ? prev : sections));
+    if (writingStyle) {
+      setLocalStyle((prev) => (isDeepEqual(prev, writingStyle) ? prev : writingStyle));
+    } else if (writingTone) {
+      setLocalStyle((prev) => (isDeepEqual(prev, writingTone) ? prev : (writingTone as WritingStyleConfig)));
+    }
     if (sectionBudgets && sectionBudgets.length > 0) {
-      setLocalSectionBudgets(sectionBudgets);
+      setLocalSectionBudgets((prev) => (isDeepEqual(prev, sectionBudgets) ? prev : sectionBudgets));
     }
     const cleanedBrief = cleanAnswerString(assignmentBriefText);
     if (cleanedBrief) {
-      setLocalBrief(cleanedBrief);
+      setLocalBrief((prev) => (prev !== cleanedBrief ? cleanedBrief : prev));
     } else if (currentInstructions) {
-      setLocalBrief(currentInstructions);
+      setLocalBrief((prev) => (prev !== currentInstructions ? currentInstructions : prev));
     }
-    if (courseName) setCourse(courseName);
-    if (institutionName) setInstitution(institutionName);
-    if (deadlineDate) setDeadline(deadlineDate);
-    if (markingRubricText) setRubricText(markingRubricText);
+    if (courseName) setCourse((prev) => (prev !== courseName ? courseName : prev));
+    if (institutionName) setInstitution((prev) => (prev !== institutionName ? institutionName : prev));
+    if (deadlineDate) setDeadline((prev) => (prev !== deadlineDate ? deadlineDate : prev));
+    if (markingRubricText) setRubricText((prev) => (prev !== markingRubricText ? markingRubricText : prev));
   }, [
     isLoading,
     question,
@@ -591,11 +694,34 @@ export default function AssignmentUnderstandStage() {
     await handleProceedToSources();
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const processUploadedFile = async (file: File) => {
     if (!file) return;
-    setUploadingBrief(true);
+
+    // Reset previous errors and notices
     setAnalysisError(null);
+    setParseNotice(null);
+
+    // 1. Check subscription limits
+    const existingBriefCount = (uploadedFileName || project?.answers?.["assignment_brief_file"]) ? 1 : 0;
+    const check = canUploadBrief(file, existingBriefCount);
+
+    if (!check.allowed) {
+      setUpgradeModalDescription(check.message);
+      setShowUpgradeModal(true);
+      return;
+    }
+
+    // 2. Client-side file type and size validation
+    const fileValidation = validateBriefFile(file, {
+      isAdmin,
+      maxBytes: isPremium ? 50 * 1024 * 1024 : 5 * 1024 * 1024,
+    });
+    if (!fileValidation.valid) {
+      setParseNotice(fileValidation.error || "Unsupported file format.");
+      return;
+    }
+
+    setUploadingBrief(true);
     setUploadedFileName(file.name);
 
     const formData = new FormData();
@@ -607,68 +733,117 @@ export default function AssignmentUnderstandStage() {
         method: "POST",
         body: formData,
       });
-      if (!res.ok) throw new Error("Failed to parse brief file");
+
+      if (!res.ok) {
+        throw new Error("Could not parse this document. Please verify the file format or paste the brief text manually.");
+      }
+
       const data = await res.json();
       const extractedText = data.text || "";
-      if (extractedText) {
-        setLocalQuestion(extractedText);
-        setLocalBrief(extractedText);
-        const updates: Record<string, any> = {
-          instructions: extractedText,
-          assignment_question: extractedText,
-          assignment_brief_text: extractedText,
-          research_topic: extractedText,
-          assignment_brief: extractedText,
-        };
-        if (data.detectedWordCount && data.detectedWordCount >= 200) {
-          setLocalWordCount(data.detectedWordCount);
-          updates.word_count = data.detectedWordCount;
-          updates.word_limit = data.detectedWordCount;
-          updates.targetWordCount = data.detectedWordCount;
-          updates.target_word_count = data.detectedWordCount;
-        }
-        if (data.detectedLevel) {
-          setLocalLevel(data.detectedLevel);
-          updates.academic_level = data.detectedLevel;
-          updates.academicLevel = data.detectedLevel;
-        }
-        if (data.detectedCitation) {
-          setLocalCitation(data.detectedCitation);
-          updates.citation_style = data.detectedCitation;
-          updates.citationStyle = data.detectedCitation;
-        }
-        if (data.updatedTitle) {
-          updates.title = data.updatedTitle;
-          updates.assignment_title = data.updatedTitle;
-        } else {
-          const currentTitle =
-            project?.answers?.["title"] ||
-            project?.answers?.["assignment_title"] ||
-            project?.title ||
-            "";
-          const isDefaultOrUntitled =
-            !currentTitle ||
-            currentTitle.toLowerCase().includes("untitled") ||
-            currentTitle.toLowerCase() === "academic assignment" ||
-            currentTitle.toLowerCase() === "synthesized research project";
 
-          if (isDefaultOrUntitled && extractedText.length >= 10) {
-            const derived = deriveHeuristicTitle(extractedText);
-            if (derived && derived !== "Academic Assignment") {
-              updates.title = derived;
-              updates.assignment_title = derived;
-            }
+      if (!extractedText || extractedText.trim().length === 0) {
+        throw new Error("Could not parse this document. Please verify the file format or paste the brief text manually.");
+      }
+
+      const cleanPrompt = cleanAnswerString(extractedText);
+      setLocalQuestion(cleanPrompt);
+      setLocalBrief(cleanPrompt);
+
+      // Determine updated target word count and synchronized section budgets atomically
+      const newWordCount =
+        data.detectedWordCount && data.detectedWordCount >= 200
+          ? data.detectedWordCount
+          : localWordCount;
+      const intro = Math.round(newWordCount * 0.10);
+      const conclusion = Math.round(newWordCount * 0.10);
+      const body = Math.max(0, newWordCount - intro - conclusion);
+      const updatedSections: SectionBudgetItem[] = [
+        { id: "intro", title: "Introduction", targetWordCount: intro, isCustom: false },
+        { id: "body", title: "Body Paragraphs", targetWordCount: body, isCustom: false },
+        { id: "conclusion", title: "Conclusion", targetWordCount: conclusion, isCustom: false },
+      ];
+      const budget = computeWordBudgetFromSections(newWordCount, updatedSections);
+      const legacyBreakdown = computeSectionBreakdown(newWordCount, updatedSections);
+
+      if (data.detectedWordCount && data.detectedWordCount >= 200) {
+        setLocalWordCount(newWordCount);
+        setLocalSectionBudgets(updatedSections);
+        setLocalSections(legacyBreakdown);
+      }
+
+      const nextLevel = data.detectedLevel || localLevel;
+      if (data.detectedLevel) {
+        setLocalLevel(data.detectedLevel);
+      }
+
+      const nextCitation = data.detectedCitation || localCitation;
+      if (data.detectedCitation) {
+        setLocalCitation(data.detectedCitation);
+      }
+
+      const updates: Record<string, any> = {
+        instructions: cleanPrompt,
+        assignment_question: cleanPrompt,
+        assignment_brief_text: cleanPrompt,
+        research_topic: cleanPrompt,
+        assignment_brief: cleanPrompt,
+        assignment_brief_file: file.name,
+        targetWordCount: newWordCount,
+        target_word_count: newWordCount,
+        word_count: newWordCount,
+        word_limit: newWordCount,
+        sectionBudgets: updatedSections,
+        section_budgets: updatedSections,
+        sections: legacyBreakdown,
+        wordBudget: budget,
+        word_budget: budget,
+        academic_level: nextLevel,
+        academicLevel: nextLevel,
+        citation_style: nextCitation,
+        citationStyle: nextCitation,
+      };
+
+      if (data.updatedTitle) {
+        updates.title = data.updatedTitle;
+        updates.assignment_title = data.updatedTitle;
+      } else {
+        const currentTitle =
+          project?.answers?.["title"] ||
+          project?.answers?.["assignment_title"] ||
+          project?.title ||
+          "";
+        const isDefaultOrUntitled =
+          !currentTitle ||
+          currentTitle.toLowerCase().includes("untitled") ||
+          currentTitle.toLowerCase() === "academic assignment" ||
+          currentTitle.toLowerCase() === "synthesized research project";
+
+        if (isDefaultOrUntitled && cleanPrompt.length >= 10) {
+          const derived = deriveHeuristicTitle(cleanPrompt);
+          if (derived && derived !== "Academic Assignment") {
+            updates.title = derived;
+            updates.assignment_title = derived;
           }
         }
-        await saveAnswers(updates);
       }
+
+      const safeUpdates = stripCircularReferences(updates);
+      await saveAnswers(safeUpdates);
     } catch (err: any) {
-      setAnalysisError(err.message || "Failed to parse brief file");
+      console.warn("Brief parsing error caught safely:", err);
+      setParseNotice("Could not parse this document. Please verify the file format or paste the brief text manually.");
     } finally {
       setUploadingBrief(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processUploadedFile(file);
     }
   };
 
@@ -739,48 +914,109 @@ export default function AssignmentUnderstandStage() {
               className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-4 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-white/15 focus:border-neutral-400 dark:focus:border-white/20 transition-all leading-relaxed resize-y"
             />
           ) : (
-            <div className="border border-dashed border-neutral-300 dark:border-white/15 rounded-xl p-6 bg-neutral-50/50 dark:bg-white/[0.02] flex flex-col items-center justify-center text-center space-y-3">
-              <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-white/5 flex items-center justify-center text-neutral-600 dark:text-neutral-300">
-                <Upload className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
-                  Upload your assignment brief or module handbook
-                </p>
-                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-                  Supports PDF, DOCX, DOC, or TXT
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingBrief}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 inline-flex items-center gap-2"
+            <DropzoneErrorBoundary onError={() => setParseNotice("Could not parse this document. Please verify the file format or paste the brief text manually.")}>
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingOver(true);
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingOver(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingOver(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingOver(false);
+                  const dropped = e.dataTransfer.files?.[0];
+                  if (dropped) {
+                    processUploadedFile(dropped);
+                  }
+                }}
+                className={`border border-dashed rounded-xl p-6 transition-all flex flex-col items-center justify-center text-center space-y-3 cursor-pointer ${
+                  isDraggingOver
+                    ? "border-neutral-900 bg-neutral-100/70 dark:border-white dark:bg-white/10"
+                    : "border-neutral-300 dark:border-white/15 bg-neutral-50/50 dark:bg-white/[0.02]"
+                }`}
+                onClick={() => {
+                  if (!uploadingBrief) {
+                    fileInputRef.current?.click();
+                  }
+                }}
               >
-                {uploadingBrief ? (
-                  <>
-                    <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    <span>Parsing Brief…</span>
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Select Brief Document</span>
-                  </>
-                )}
-              </button>
-
-              {localQuestion && (
-                <div className="w-full text-left pt-3 border-t border-neutral-200/60 dark:border-white/5">
-                  <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider block mb-1">
-                    Extracted Brief Question / Prompt:
-                  </span>
-                  <p className="text-xs text-neutral-700 dark:text-neutral-300 line-clamp-3 bg-white dark:bg-[#2C2C2E] p-3 rounded-lg border border-neutral-200/60 dark:border-white/10 font-mono">
-                    {localQuestion}
+                <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-white/5 flex items-center justify-center text-neutral-600 dark:text-neutral-300">
+                  <Upload className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
+                    Upload your assignment brief or module handbook
+                  </p>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                    Supports PDF, DOCX, DOC, or TXT {isAdmin ? "(Unlimited size · Admin)" : isPremium ? "(Up to 50MB · Pro)" : "(Up to 5MB · Free)"}
                   </p>
                 </div>
-              )}
-            </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  disabled={uploadingBrief}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 inline-flex items-center gap-2"
+                >
+                  {uploadingBrief ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      <span>Parsing Brief…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Select Brief Document</span>
+                    </>
+                  )}
+                </button>
+
+                {parseNotice && (
+                  <div
+                    role="alert"
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-3 w-full p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-start justify-between gap-3 text-left animate-in fade-in"
+                  >
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <span>{parseNotice}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setParseNotice(null)}
+                      className="text-amber-700 dark:text-amber-300 hover:opacity-80 p-0.5 rounded cursor-pointer"
+                      aria-label="Dismiss notice"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {localQuestion && (
+                  <div className="w-full text-left pt-3 border-t border-neutral-200/60 dark:border-white/5">
+                    <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider block mb-1">
+                      Extracted Brief Question / Prompt:
+                    </span>
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300 line-clamp-3 bg-white dark:bg-[#2C2C2E] p-3 rounded-lg border border-neutral-200/60 dark:border-white/10 font-mono">
+                      {localQuestion}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </DropzoneErrorBoundary>
           )}
 
           <input
@@ -893,11 +1129,18 @@ export default function AssignmentUnderstandStage() {
           />
         </div>
 
-        {/* Academic Writing Tone & Style Selector */}
-        <div className="pt-2 border-t border-neutral-200/60 dark:border-white/5">
+        {/* Writing Tone Selector with Scroll/Focus Assistant Synchronization */}
+        <div
+          ref={toneSectionRef}
+          data-testid="tone-section-wrapper"
+          onFocusCapture={dispatchToneAssistantSuggestions}
+          onClickCapture={dispatchToneAssistantSuggestions}
+          className="pt-2 border-t border-neutral-200/60 dark:border-white/5"
+        >
           <WritingStyleSelector
             value={localStyle}
             onChange={handleStyleChange}
+            onFocus={dispatchToneAssistantSuggestions}
           />
         </div>
 
@@ -1148,6 +1391,13 @@ export default function AssignmentUnderstandStage() {
           </div>
         </div>
       )}
+
+      {/* Role-Aware Tier Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        description={upgradeModalDescription}
+      />
     </div>
   );
 }

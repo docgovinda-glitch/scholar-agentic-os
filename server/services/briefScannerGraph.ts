@@ -265,20 +265,50 @@ export async function auditDocumentLineByLine(rawFileText: string): Promise<Docu
     return [];
   }
 
-  const result = await briefScannerGraph.invoke({
-    rawLines: indexed,
-    cursor: 0,
-    batchSize: 30,
-    overlap: 5,
-    extractedLedger: [],
-    isComplete: false,
-  });
+  let ledger: DocumentRequirement[] = [];
+
+  try {
+    const result = await briefScannerGraph.invoke(
+      {
+        rawLines: indexed,
+        cursor: 0,
+        batchSize: 50,
+        overlap: 5,
+        extractedLedger: [],
+        isComplete: false,
+      },
+      { recursionLimit: 2000 }
+    );
+    ledger = result.extractedLedger || [];
+  } catch (err) {
+    console.warn("LangGraph recursion limit or execution warning, switching to iterative scan:", err);
+    // Iterative batch scan fallback to guarantee 0 recursion crashes on massive documents
+    let cursor = 0;
+    const batchSize = 50;
+    const overlap = 5;
+    const step = Math.max(1, batchSize - overlap);
+
+    while (cursor < indexed.length) {
+      const batchResult = scanBatch({
+        rawLines: indexed,
+        cursor,
+        batchSize,
+        overlap,
+        extractedLedger: [],
+        isComplete: false,
+      });
+      if (batchResult.extractedLedger && batchResult.extractedLedger.length > 0) {
+        ledger.push(...batchResult.extractedLedger);
+      }
+      cursor += step;
+    }
+  }
 
   // Deduplicate ledger based on lineRange + category + verbatimText
   const seen = new Set<string>();
   const deduplicated: DocumentRequirement[] = [];
 
-  for (const item of result.extractedLedger || []) {
+  for (const item of ledger) {
     const key = `${item.lineRange}::${item.category}::${item.verbatimText.trim().toLowerCase()}`;
     if (!seen.has(key)) {
       seen.add(key);

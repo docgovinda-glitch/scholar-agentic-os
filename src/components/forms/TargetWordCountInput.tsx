@@ -48,6 +48,7 @@ export const TargetWordCountInput: React.FC<TargetWordCountInputProps> = ({
 
   const handleTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextTotal = Math.max(0, parseInt(e.target.value, 10) || 0);
+    if (nextTotal === value) return;
     if (!currentSections.isCustomized) {
       onChange(nextTotal, computeDefaults(nextTotal));
     } else {
@@ -59,12 +60,14 @@ export const TargetWordCountInput: React.FC<TargetWordCountInputProps> = ({
     key: 'intro' | 'body' | 'conclusion',
     words: number
   ) => {
+    const nextWords = Math.max(0, words);
+    if (currentSections[key].targetWords === nextWords) return;
     onChange(value, {
       ...currentSections,
       isCustomized: true,
       [key]: {
         ...currentSections[key],
-        targetWords: Math.max(0, words),
+        targetWords: nextWords,
       },
     });
   };
@@ -73,6 +76,7 @@ export const TargetWordCountInput: React.FC<TargetWordCountInputProps> = ({
     key: 'intro' | 'body' | 'conclusion',
     guidelines: string
   ) => {
+    if (currentSections[key].guidelines === guidelines) return;
     onChange(value, {
       ...currentSections,
       isCustomized: true,

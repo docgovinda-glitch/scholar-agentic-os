@@ -235,6 +235,7 @@ export default function ContextPanel({
   const [history, setHistory] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [dynamicActions, setDynamicActions] = useState<string[] | null>(null);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -274,6 +275,45 @@ export default function ContextPanel({
       setIsTyping(false);
     }
   };
+
+  const handleSendRef = useRef(handleSend);
+  handleSendRef.current = handleSend;
+
+  useEffect(() => {
+    const handleDynamicActions = (e: Event) => {
+      const customEvent = e as CustomEvent<{ actions?: string[]; reset?: boolean }>;
+      if (customEvent.detail?.actions && Array.isArray(customEvent.detail.actions)) {
+        setDynamicActions(customEvent.detail.actions);
+      } else if (customEvent.detail?.reset) {
+        setDynamicActions(null);
+      }
+    };
+
+    const handleExternalSend = (e: Event) => {
+      const customEvent = e as CustomEvent<{ query?: string }>;
+      if (customEvent.detail?.query) {
+        handleSendRef.current(customEvent.detail.query);
+      }
+    };
+
+    window.addEventListener("scholar:copilot-suggested-actions", handleDynamicActions);
+    window.addEventListener("scholar:advisor-suggested-actions", handleDynamicActions);
+    window.addEventListener("scholar:copilot-send-query", handleExternalSend);
+    window.addEventListener("scholar:advisor-send-query", handleExternalSend);
+
+    return () => {
+      window.removeEventListener("scholar:copilot-suggested-actions", handleDynamicActions);
+      window.removeEventListener("scholar:advisor-suggested-actions", handleDynamicActions);
+      window.removeEventListener("scholar:copilot-send-query", handleExternalSend);
+      window.removeEventListener("scholar:advisor-send-query", handleExternalSend);
+    };
+  }, []);
+
+  useEffect(() => {
+    setDynamicActions(null);
+  }, [effectiveStage]);
+
+  const activeActions = dynamicActions && dynamicActions.length > 0 ? dynamicActions : agent.quickActions;
 
   return (
       <aside
@@ -326,15 +366,23 @@ export default function ContextPanel({
             <>
               {/* Clean Minimalist Suggested Prompts */}
               <div className="space-y-2">
-                <span className="text-[10px] font-semibold text-[color:var(--text-muted)] uppercase tracking-wider block">
-                  Suggested Actions
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold text-[color:var(--text-muted)] uppercase tracking-wider block">
+                    {dynamicActions ? "Tone Calibration Suggestions" : "Suggested Actions"}
+                  </span>
+                  {dynamicActions && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">
+                      Active Section
+                    </span>
+                  )}
+                </div>
                 <div className="flex flex-col gap-1.5">
-                  {agent.quickActions.map((action, idx) => (
+                  {activeActions.map((action, idx) => (
                     <button
                       key={idx}
                       type="button"
                       onClick={() => handleSend(action)}
+                      data-testid={`copilot-action-pill-${idx}`}
                       className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-all text-left text-xs cursor-pointer shadow-2xs dark:shadow-none"
                     >
                       <span className="font-medium">{action}</span>
@@ -378,6 +426,26 @@ export default function ContextPanel({
             </div>
           )}
         </div>
+
+        {/* Dynamic Contextual Suggestion Chips (when chatting) */}
+        {dynamicActions && dynamicActions.length > 0 && history.length > 0 && (
+          <div className="px-4 py-2 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] flex flex-wrap gap-1.5 shrink-0">
+            <span className="w-full text-[9px] font-semibold text-[color:var(--text-muted)] uppercase tracking-wider block mb-0.5">
+              Tone Suggestions
+            </span>
+            {dynamicActions.map((action, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleSend(action)}
+                data-testid={`copilot-chat-chip-${idx}`}
+                className="text-xs px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-all text-left cursor-pointer"
+              >
+                {action}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Chat Input */}
         <div className="p-4 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] shrink-0">

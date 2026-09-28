@@ -1,92 +1,69 @@
 import React, { useState, useRef } from "react";
 import {
-  Feather,
-  Check,
+  ChevronDown,
   Upload,
   FileText,
   Sparkles,
-  Quote,
-  Layers,
-  ShieldAlert,
-  BookOpen,
-  MessageSquare,
   Wand2,
   X,
-  AlertCircle,
 } from "lucide-react";
 import type { WritingStyleConfig, WritingStylePreset } from "../types";
 
 export interface WritingStyleSelectorProps {
   value?: WritingStyleConfig;
   onChange: (style: WritingStyleConfig) => void;
+  onFocus?: () => void;
 }
 
-interface StyleOption {
+export interface StyleOption {
   id: WritingStylePreset;
   title: string;
-  badge?: string;
-  icon: React.ComponentType<{ className?: string }>;
   description: string;
-  example: string;
 }
 
 export const WRITING_STYLE_OPTIONS: StyleOption[] = [
   {
     id: "analytical",
     title: "Analytical",
-    icon: Layers,
-    description: "Breaks down causes, patterns, and connections between concepts.",
-    example:
-      "Local grocers lose market share primarily because digital platforms eliminate travel and checkout friction for suburban households.",
+    description: "Breaks down causes, patterns, and connections.",
   },
   {
     id: "argumentative",
     title: "Argumentative",
-    icon: MessageSquare,
-    description: "Takes a clear stance, defends a thesis, and addresses counter-arguments.",
-    example:
-      "While physical stores emphasize personalized service, convenience and price discounts consistently override customer loyalty.",
+    description: "Defends a thesis and addresses counter-arguments.",
   },
   {
     id: "critical",
     title: "Critical",
-    icon: ShieldAlert,
-    description: "Questions assumptions, weighs trade-offs, and exposes flaws or limitations.",
-    example:
-      "Reports celebrating delivery convenience overlook hidden trade-offs; platform subscription fees frequently make online orders more expensive than local shopping.",
+    description: "Questions assumptions and exposes trade-offs/limitations.",
   },
   {
     id: "expository",
     title: "Expository",
-    icon: BookOpen,
-    description: "Explains concepts clearly, directly, and authoritatively without dense jargon.",
-    example:
-      "Online platforms dominate grocery retail through bulk purchasing, centralized warehousing, and automated dispatch systems.",
+    description: "Explains concepts clearly without dense jargon.",
   },
   {
     id: "natural",
-    title: "Natural & Engaging (Human Voice)",
-    badge: "Human Voice",
-    icon: Feather,
-    description:
-      "Authentic, conversational academic rhythm. Avoids predictable AI clichés (\"delve\", \"testament\", \"multifaceted\") while remaining credible.",
-    example:
-      "Most shoppers leave local grocers for a simple reason: after a long workday, seamless doorstep delivery beats community loyalty every time.",
+    title: "Natural & Engaging",
+    description: "Human academic voice avoiding AI clichés.",
   },
   {
     id: "custom",
-    title: "Match My Writing (Custom Voice)",
-    badge: "Voice Cloning",
-    icon: Wand2,
-    description: "Clones your natural sentence structure, pacing, and vocabulary level.",
-    example:
-      "Analyzes your sample excerpt to match sentence lengths, transitions, and vocabulary density.",
+    title: "Match My Writing",
+    description: "Clones cadence and structure from uploaded samples.",
   },
+];
+
+export const TONE_SUGGESTION_CHIPS = [
+  "Which tone best matches my assignment brief?",
+  "Compare Analytical vs. Argumentative for this topic",
+  "How can I calibrate custom voice cloning?",
 ];
 
 export default function WritingStyleSelector({
   value,
   onChange,
+  onFocus,
 }: WritingStyleSelectorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isReadingFile, setIsReadingFile] = useState(false);
@@ -107,12 +84,36 @@ export default function WritingStyleSelector({
     return "analytical";
   })();
 
+  const currentOption =
+    WRITING_STYLE_OPTIONS.find((o) => o.id === currentPreset) || WRITING_STYLE_OPTIONS[0];
+
   const customText = value?.customSampleText || "";
   const customFileName = value?.customFileName || "";
 
   const wordCount = customText.trim()
     ? customText.trim().split(/\s+/).filter(Boolean).length
     : 0;
+
+  const triggerToneAssistantContext = () => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("scholar:copilot-suggested-actions", {
+          detail: {
+            actions: TONE_SUGGESTION_CHIPS,
+            source: "tone-calibration",
+          },
+        })
+      );
+      window.dispatchEvent(
+        new CustomEvent("scholar:advisor-suggested-actions", {
+          detail: {
+            actions: TONE_SUGGESTION_CHIPS,
+            source: "tone-calibration",
+          },
+        })
+      );
+    }
+  };
 
   const handleSelect = (preset: WritingStylePreset) => {
     const opt = WRITING_STYLE_OPTIONS.find((o) => o.id === preset);
@@ -122,12 +123,18 @@ export default function WritingStyleSelector({
       customSampleText: preset === "custom" ? customText : undefined,
       customFileName: preset === "custom" ? customFileName : undefined,
     });
+    triggerToneAssistantContext();
+  };
+
+  const handleFocus = () => {
+    onFocus?.();
+    triggerToneAssistantContext();
   };
 
   const handleTextChange = (text: string) => {
     onChange({
       preset: "custom",
-      description: "Clones your natural sentence structure, pacing, and vocabulary level.",
+      description: "Clones cadence and structure from uploaded samples.",
       customSampleText: text,
       customFileName: customFileName || undefined,
     });
@@ -145,7 +152,6 @@ export default function WritingStyleSelector({
           customSampleText: text.slice(0, 10000),
         });
       } else {
-        // For binary documents (.docx, .pdf), register file attachment
         const placeholderNotice = `[Sample document attached: ${file.name} (${Math.round(
           file.size / 1024
         )} KB)]. The drafting engine will calibrate stylistic pacing, syntactic complexity, and vocabulary register against this writing sample.`;
@@ -156,6 +162,7 @@ export default function WritingStyleSelector({
           customSampleText: customText.trim() ? customText : placeholderNotice,
         });
       }
+      triggerToneAssistantContext();
     } catch (err) {
       console.error("Failed to read sample file:", err);
     } finally {
@@ -185,121 +192,60 @@ export default function WritingStyleSelector({
   const handleRemoveFile = () => {
     onChange({
       preset: "custom",
-      description: "Clones your natural sentence structure, pacing, and vocabulary level.",
+      description: "Clones cadence and structure from uploaded samples.",
       customSampleText: customText.startsWith("[Sample document attached:") ? "" : customText,
       customFileName: undefined,
     });
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-        <div>
-          <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
-            <Feather className="w-3.5 h-3.5 text-neutral-500" />
-            <span>Academic Writing Tone & Style</span>
-            <span className="text-neutral-400 font-normal">· Phase 3 Voice Calibration</span>
-          </label>
-          <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-            Select a tailored academic voice or provide past writing to clone your personal cadence and phrasing.
-          </p>
+    <div className="space-y-2">
+      {/* Surface & Label Header */}
+      <div>
+        <label
+          htmlFor="writing-tone-select"
+          className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 block"
+        >
+          Writing Tone
+        </label>
+        <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+          Select an academic voice or match your personal writing style.
+        </p>
+      </div>
+
+      {/* Minimal Apple/Airbnb Dropdown Selector */}
+      <div className="relative w-full max-w-lg">
+        <select
+          id="writing-tone-select"
+          aria-label="Writing Tone"
+          value={currentPreset}
+          onChange={(e) => handleSelect(e.target.value as WritingStylePreset)}
+          onFocus={handleFocus}
+          className="w-full max-w-lg bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-3 pr-10 text-sm text-neutral-900 dark:text-neutral-100 shadow-xs dark:shadow-none hover:border-neutral-300 dark:hover:border-white/20 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white appearance-none"
+        >
+          {WRITING_STYLE_OPTIONS.map((opt) => (
+            <option
+              key={opt.id}
+              value={opt.id}
+              className="bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-neutral-100 py-1"
+            >
+              {opt.title} — {opt.description}
+            </option>
+          ))}
+        </select>
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-neutral-400 dark:text-neutral-500">
+          <ChevronDown className="w-4 h-4" />
         </div>
       </div>
 
-      {/* 6 Selection Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {WRITING_STYLE_OPTIONS.map((style) => {
-          const isSelected = currentPreset === style.id;
-          const Icon = style.icon;
-
-          return (
-            <button
-              key={style.id}
-              type="button"
-              onClick={() => handleSelect(style.id)}
-              className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between relative group ${
-                isSelected
-                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-xs ring-1 ring-neutral-900/10 dark:ring-white/20"
-                  : "bg-white dark:bg-[#2C2C2E] border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 hover:border-neutral-300 dark:hover:border-white/20 hover:bg-neutral-50/50 dark:hover:bg-white/[0.04]"
-              }`}
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
-                        isSelected
-                          ? "bg-white/20 text-white dark:bg-black/10 dark:text-neutral-900"
-                          : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white"
-                      }`}
-                    >
-                      <Icon className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="font-semibold text-xs tracking-tight">
-                      {style.title}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    {style.badge && (
-                      <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          isSelected
-                            ? "bg-white/25 text-white dark:bg-black/15 dark:text-neutral-900"
-                            : "bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300"
-                        }`}
-                      >
-                        {style.badge}
-                      </span>
-                    )}
-                    <div
-                      className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-                        isSelected
-                          ? "bg-white text-neutral-900 dark:bg-neutral-900 dark:text-white border-transparent"
-                          : "border-neutral-300 dark:border-white/20 bg-transparent"
-                      }`}
-                    >
-                      {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                    </div>
-                  </div>
-                </div>
-
-                <p
-                  className={`text-[11px] leading-relaxed mb-3 ${
-                    isSelected
-                      ? "text-neutral-200 dark:text-neutral-700"
-                      : "text-neutral-500 dark:text-neutral-400"
-                  }`}
-                >
-                  {style.description}
-                </p>
-              </div>
-
-              {/* Real-world Preview Example */}
-              <div
-                className={`p-2.5 rounded-lg border text-[11px] transition-colors ${
-                  isSelected
-                    ? "bg-white/10 dark:bg-black/5 border-white/20 dark:border-black/10 text-neutral-100 dark:text-neutral-800"
-                    : "bg-neutral-50 dark:bg-white/[0.03] border-neutral-200/60 dark:border-white/5 text-neutral-600 dark:text-neutral-300"
-                }`}
-              >
-                <div className="flex items-center gap-1 mb-1 opacity-70 text-[10px] font-medium uppercase tracking-wider">
-                  <Quote className="w-2.5 h-2.5" />
-                  <span>Preview Example</span>
-                </div>
-                <p className="italic leading-snug font-serif">
-                  &ldquo;{style.example}&rdquo;
-                </p>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      {/* Single-line descriptor of active selection */}
+      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
+        {currentOption.description}
+      </p>
 
       {/* Voice Cloning: Match My Writing Input Area */}
       {currentPreset === "custom" && (
-        <div className="p-5 rounded-2xl border border-neutral-300/80 dark:border-white/15 bg-neutral-50/70 dark:bg-white/[0.02] space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="p-5 rounded-2xl border border-neutral-300/80 dark:border-white/15 bg-neutral-50/70 dark:bg-white/[0.02] space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 mt-3">
           <div className="flex items-center justify-between border-b border-neutral-200/60 dark:border-white/5 pb-3">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-neutral-200/80 dark:bg-white/10 flex items-center justify-center text-neutral-800 dark:text-neutral-200">

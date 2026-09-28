@@ -467,6 +467,8 @@ export function AssignmentProvider({
     rawCitation !== undefined ? cleanAnswerString(rawCitation) : "apa7";
 
   const rawSections = answers["sections"];
+  const rawSectionsKey =
+    typeof rawSections === "object" ? JSON.stringify(rawSections) : String(rawSections ?? "");
   const sections: SectionBreakdown | undefined = useMemo(() => {
     if (rawSections) {
       try {
@@ -476,7 +478,8 @@ export function AssignmentProvider({
     }
     const normalized = normalizeProjectAnswers({ ...answers, targetWordCount });
     return normalized?.sections;
-  }, [answers, targetWordCount, rawSections]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawSectionsKey, targetWordCount]);
 
   const setSections = useCallback(
     async (newSections: SectionBreakdown) => {
@@ -485,15 +488,17 @@ export function AssignmentProvider({
     [saveAnswers]
   );
 
+  const rawStyle =
+    answers["writingStyle"] ||
+    answers["writing_style"] ||
+    answers["writingTone"] ||
+    answers["writing_tone"];
+  const rawStyleKey =
+    typeof rawStyle === "object" ? JSON.stringify(rawStyle) : String(rawStyle ?? "");
   const writingStyle: WritingStyleConfig = useMemo(() => {
-    const raw =
-      answers["writingStyle"] ||
-      answers["writing_style"] ||
-      answers["writingTone"] ||
-      answers["writing_tone"];
-    if (raw) {
+    if (rawStyle) {
       try {
-        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        const parsed = typeof rawStyle === "string" ? JSON.parse(rawStyle) : rawStyle;
         if (parsed && parsed.preset) return parsed;
       } catch {}
     }
@@ -501,7 +506,7 @@ export function AssignmentProvider({
       preset: "analytical",
       description: "Breaks down causes, patterns, and connections between concepts.",
     };
-  }, [answers]);
+  }, [rawStyleKey]);
 
   const setWritingStyle = useCallback(
     async (style: WritingStyleConfig) => {
@@ -526,11 +531,13 @@ export function AssignmentProvider({
     [setWritingStyle]
   );
 
+  const rawBudgets = answers["sectionBudgets"] || answers["section_budgets"];
+  const rawBudgetsKey =
+    typeof rawBudgets === "object" ? JSON.stringify(rawBudgets) : String(rawBudgets ?? "");
   const sectionBudgets: SectionBudgetItem[] = useMemo(() => {
-    const raw = answers["sectionBudgets"] || answers["section_budgets"];
-    if (raw) {
+    if (rawBudgets) {
       try {
-        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        const parsed = typeof rawBudgets === "string" ? JSON.parse(rawBudgets) : rawBudgets;
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch {}
     }
@@ -544,7 +551,7 @@ export function AssignmentProvider({
       { id: "body", title: "Body Paragraphs", targetWordCount: body, isCustom: false },
       { id: "conclusion", title: "Conclusion", targetWordCount: conclusion, isCustom: false },
     ];
-  }, [answers, targetWordCount]);
+  }, [rawBudgetsKey, targetWordCount]);
 
   const addCustomSection = useCallback(
     async (title: string, targetWordCountVal: number) => {

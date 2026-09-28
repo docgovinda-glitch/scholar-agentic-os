@@ -236,7 +236,7 @@ export async function autoUpdateProjectTitleIfUntitled(
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 15 * 1024 * 1024, // 15MB limit
+    fileSize: 50 * 1024 * 1024, // 50MB limit to support Pro and Admin high-capacity uploads
   },
 });
 
@@ -301,11 +301,12 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
     // Clean whitespace and normalize line breaks
     text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
 
-    // Detect metadata
+    // Detect metadata within first 50,000 characters to eliminate regex backtracking on multi-MB documents
+    const searchSlice = text.slice(0, 50000);
     let detectedWordCount: number | undefined;
     const wordMatch =
-      text.match(/(?:word\s*count|target|limit|length)\s*(?:is|of|:)?\s*([1-9]\d{2,4})/i) ||
-      text.match(/\b([1-9]\d{2,4})\s*words\b/i);
+      searchSlice.match(/(?:word\s*count|target|limit|length)\s*(?:is|of|:)?\s*([1-9]\d{2,4})/i) ||
+      searchSlice.match(/\b([1-9]\d{2,4})\s*words\b/i);
     if (wordMatch) {
       const parsed = parseInt(wordMatch[1], 10);
       if (parsed >= 200 && parsed <= 50000) {
@@ -314,19 +315,19 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
     }
 
     let detectedLevel: "undergraduate" | "postgraduate" | undefined;
-    if (/\b(postgraduate|masters|master's|msc|ma|mba|llm|phd|level\s*7)\b/i.test(text)) {
+    if (/\b(postgraduate|masters|master's|msc|ma|mba|llm|phd|level\s*7)\b/i.test(searchSlice)) {
       detectedLevel = "postgraduate";
-    } else if (/\b(undergraduate|bachelor|bachelor's|bsc|ba|level\s*[456])\b/i.test(text)) {
+    } else if (/\b(undergraduate|bachelor|bachelor's|bsc|ba|level\s*[456])\b/i.test(searchSlice)) {
       detectedLevel = "undergraduate";
     }
 
     let detectedCitation: string | undefined;
-    if (/\b(apa\s*7|\bapa\b)/i.test(text)) detectedCitation = "apa7";
-    else if (/\bharvard\b/i.test(text)) detectedCitation = "harvard";
-    else if (/\bieee\b/i.test(text)) detectedCitation = "ieee";
-    else if (/\bmla\b/i.test(text)) detectedCitation = "mla9";
-    else if (/\bchicago\b/i.test(text)) detectedCitation = "chicago";
-    else if (/\boscola\b/i.test(text)) detectedCitation = "oscola";
+    if (/\b(apa\s*7|\bapa\b)/i.test(searchSlice)) detectedCitation = "apa7";
+    else if (/\bharvard\b/i.test(searchSlice)) detectedCitation = "harvard";
+    else if (/\bieee\b/i.test(searchSlice)) detectedCitation = "ieee";
+    else if (/\bmla\b/i.test(searchSlice)) detectedCitation = "mla9";
+    else if (/\bchicago\b/i.test(searchSlice)) detectedCitation = "chicago";
+    else if (/\boscola\b/i.test(searchSlice)) detectedCitation = "oscola";
 
     const lines = text.split("\n").filter((l) => l.trim().length > 0);
 
