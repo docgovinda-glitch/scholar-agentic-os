@@ -9,6 +9,9 @@ import {
   Quote,
   Table,
   FileUp,
+  Edit2,
+  Copy,
+  BookOpen,
 } from "lucide-react";
 
 export interface CuratedSourceCardProps {
@@ -19,6 +22,7 @@ export interface CuratedSourceCardProps {
   isReplacing?: boolean;
   isBookmarked?: boolean;
   onToggleBookmark?: (sourceId: string) => void;
+  onEdit?: (source: DiscoveredSource) => void;
 }
 
 export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
@@ -27,8 +31,11 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
   onToggleApproval,
   isBookmarked = false,
   onToggleBookmark,
+  onEdit,
 }) => {
   const [showEvidences, setShowEvidences] = useState(true);
+  const [showCiteBox, setShowCiteBox] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const authorDisplay =
     source.authors && source.authors.length > 0
@@ -129,6 +136,33 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
           {relevanceSnippet}
         </p>
 
+        {/* Expandable Harvard Reference Box */}
+        {showCiteBox && (
+          <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/10 text-[11px] leading-relaxed text-neutral-800 dark:text-neutral-200 font-serif">
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-sans font-semibold text-[9px] uppercase tracking-wider text-neutral-400">
+                Harvard Reference:
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const citationText = source.citation || `${authorDisplay} (${source.year}). ${source.title}. ${venueDisplay}.`;
+                  navigator.clipboard?.writeText(citationText);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-sans cursor-pointer"
+              >
+                {copied ? <Check className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
+                <span>{copied ? "Copied" : "Copy"}</span>
+              </button>
+            </div>
+            <span className="select-all block">
+              {source.citation || `${authorDisplay} (${source.year}). ${source.title}. ${venueDisplay}.`}
+            </span>
+          </div>
+        )}
+
         {/* Structured Data Summary for Uploaded Spreadsheets */}
         {source.structuredDataSummary && (
           <div className="px-3 py-2 rounded-xl bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/10 text-neutral-700 dark:text-neutral-300 text-xs flex items-start gap-2 mt-1">
@@ -180,8 +214,36 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
         )}
       </div>
 
-      {/* Single Primary Action: Clean pill toggle (+ Add Source / ✓ Added) */}
-      <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-end">
+      {/* Action Row: Edit & Copy on left, Pill toggle (+ Add Source / ✓ Added) on right */}
+      <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(source)}
+              className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-50 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs flex items-center gap-1"
+              title="Edit citation and source details"
+            >
+              <Edit2 className="w-3 h-3" />
+              <span>Edit</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowCiteBox(!showCiteBox)}
+            className={`px-2.5 py-1 rounded-lg border text-xs flex items-center gap-1 transition-colors cursor-pointer ${
+              showCiteBox
+                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-neutral-900 dark:border-white font-medium"
+                : "border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-50 dark:hover:bg-white/5"
+            }`}
+            title="Toggle formatted Harvard citation"
+          >
+            <BookOpen className="w-3 h-3" />
+            <span>Cite</span>
+          </button>
+        </div>
+
         <button
           type="button"
           onClick={() => onToggleApproval(source.id)}

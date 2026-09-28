@@ -32,7 +32,30 @@ import {
   BookOpen,
   FolderOpen,
   X,
+  Copy,
+  Edit2,
+  Plus,
+  Trash2,
+  Check,
+  FileUp,
 } from "lucide-react";
+
+export function formatHarvardCitation(source: Partial<DiscoveredSource>): string {
+  if (source.citation && source.citation.trim()) {
+    return source.citation.trim();
+  }
+  const authorsStr =
+    source.authors && source.authors.length > 0
+      ? source.authors.join(", ")
+      : "Author, A.";
+  const yearStr = source.year || "2024";
+  const titleStr = source.title ? `'${source.title}'` : "Untitled";
+  const venueStr = source.journal || source.publisher || "Academic Publication";
+  const volStr = source.volumeIssue ? `, ${source.volumeIssue}` : "";
+  const doiStr = source.doi ? `. doi: ${source.doi}` : source.url ? `. Available at: ${source.url}` : "";
+
+  return `${authorsStr} (${yearStr}) ${titleStr}, ${venueStr}${volStr}${doiStr}.`;
+}
 
 const REPLACEMENT_POOL: DiscoveredSource[] = [
   {
@@ -125,6 +148,7 @@ export default function AssignmentSourcesStage({
     sources,
     setSources,
     approvedSourceIds,
+    setApprovedSourceIds,
     toggleSourceApproval,
     dismissSource,
     userUploadedSources,
@@ -151,6 +175,154 @@ export default function AssignmentSourcesStage({
   const [isFindingMore, setIsFindingMore] = useState(false);
   const [discoverySuccessMsg, setDiscoverySuccessMsg] = useState<string | null>(null);
   const [altPoolIndex, setAltPoolIndex] = useState(0);
+
+  // Reference editing & copy state
+  const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    authors: "",
+    year: "",
+    journal: "",
+    volumeIssue: "",
+    doi: "",
+    citation: "",
+    roleInAssignment: "",
+  });
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
+  const [customForm, setCustomForm] = useState({
+    title: "",
+    authors: "",
+    year: `${new Date().getFullYear()}`,
+    type: "journal" as SourceAcademicType,
+    journal: "",
+    volumeIssue: "",
+    doi: "",
+    citation: "",
+    roleInAssignment: "Empirical evidence",
+  });
+  const [copiedSourceId, setCopiedSourceId] = useState<string | null>(null);
+  const [copiedAll, setCopiedAll] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+
+  const handleStartEditSource = (source: DiscoveredSource) => {
+    setEditingSourceId(source.id);
+    setEditForm({
+      title: source.title || "",
+      authors: (source.authors || []).join(", "),
+      year: source.year || "",
+      journal: source.journal || source.publisher || "",
+      volumeIssue: source.volumeIssue || "",
+      doi: source.doi || "",
+      citation: source.citation || formatHarvardCitation(source),
+      roleInAssignment: source.roleInAssignment || "Empirical evidence",
+    });
+  };
+
+  const handleSaveSourceEdit = async () => {
+    if (!editingSourceId) return;
+
+    const authorsList = editForm.authors
+      .split(",")
+      .map((a) => a.trim())
+      .filter(Boolean);
+
+    const updatedSources = sources.map((s) => {
+      if (s.id === editingSourceId) {
+        return {
+          ...s,
+          title: editForm.title.trim() || s.title,
+          authors: authorsList.length > 0 ? authorsList : s.authors,
+          year: editForm.year.trim() || s.year,
+          journal: editForm.journal.trim() || s.journal,
+          volumeIssue: editForm.volumeIssue.trim() || s.volumeIssue,
+          doi: editForm.doi.trim() || s.doi,
+          citation: editForm.citation.trim() || s.citation,
+          roleInAssignment: editForm.roleInAssignment || s.roleInAssignment,
+        };
+      }
+      return s;
+    });
+
+    await setSources(updatedSources);
+    setEditingSourceId(null);
+    setDiscoverySuccessMsg("Reference updated successfully.");
+    setTimeout(() => setDiscoverySuccessMsg(null), 3000);
+  };
+
+  const handleAddCustomSource = async () => {
+    if (!customForm.title.trim()) return;
+
+    const authorsList = customForm.authors
+      .split(",")
+      .map((a) => a.trim())
+      .filter(Boolean);
+
+    const autoCitation =
+      customForm.citation.trim() ||
+      `${customForm.authors || "Author"} (${customForm.year || "2024"}) '${customForm.title}', ${
+        customForm.journal || "Scholarly Publication"
+      }${customForm.volumeIssue ? `, ${customForm.volumeIssue}` : ""}${
+        customForm.doi ? `. doi: ${customForm.doi}` : ""
+      }.`;
+
+    const newSource: DiscoveredSource = {
+      id: `src-custom-${Date.now()}`,
+      title: customForm.title.trim(),
+      authors: authorsList.length > 0 ? authorsList : ["Scholarly Author"],
+      year: customForm.year.trim() || "2024",
+      type: customForm.type,
+      journal: customForm.journal.trim(),
+      volumeIssue: customForm.volumeIssue.trim(),
+      doi: customForm.doi.trim(),
+      citation: autoCitation,
+      roleInAssignment: customForm.roleInAssignment,
+      relevanceScore: 98,
+      mainFinding: "Custom reference added to substantiate assignment analysis.",
+      suggestedUse: "Direct evidentiary and theoretical citation in assignment body.",
+      status: "kept",
+      isVerifiedAcademic: true,
+      sourceCredibility: "peer-reviewed",
+    };
+
+    const nextSources = [newSource, ...sources];
+    await setSources(nextSources);
+    const nextApproved = Array.from(new Set([...approvedSourceIds, newSource.id]));
+    if (setApprovedSourceIds) {
+      await setApprovedSourceIds(nextApproved);
+    }
+    setIsAddingCustom(false);
+    setCustomForm({
+      title: "",
+      authors: "",
+      year: `${new Date().getFullYear()}`,
+      type: "journal",
+      journal: "",
+      volumeIssue: "",
+      doi: "",
+      citation: "",
+      roleInAssignment: "Empirical evidence",
+    });
+    setDiscoverySuccessMsg("Custom reference added and approved.");
+    setTimeout(() => setDiscoverySuccessMsg(null), 3000);
+  };
+
+  const handleCopyCitation = (source: DiscoveredSource) => {
+    const text = source.citation || formatHarvardCitation(source);
+    navigator.clipboard?.writeText(text);
+    setCopiedSourceId(source.id);
+    setTimeout(() => setCopiedSourceId(null), 2000);
+  };
+
+  const handleCopyAllReferences = () => {
+    const approved = allMasterSources.filter((s) => approvedSourceIds.includes(s.id));
+    const text = approved
+      .map((s) => s.citation || formatHarvardCitation(s))
+      .sort((a, b) => a.localeCompare(b))
+      .join("\n\n");
+    navigator.clipboard?.writeText(text);
+    setCopiedAll(true);
+    setTimeout(() => setCopiedAll(false), 2500);
+  };
 
   // Bookmarks and exclusions
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() =>
@@ -650,29 +822,50 @@ export default function AssignmentSourcesStage({
         </div>
       ) : (
         <>
-          {/* Section 1: Lecture Slide Dropzone */}
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
-                  <span>Course Materials & Syllabus Upload</span>
-                  <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">(Optional)</span>
-                </h2>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                  Upload your professor's slides, reading packs, or rubric notes to anchor specific citations directly to lecture content.
-                </p>
+          {/* Section 1: Course Materials & Syllabus Upload (Sleek Collapsible Card) */}
+          <div className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] p-4 transition-all shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 rounded-xl bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 shrink-0">
+                  <FileUp className="w-4 h-4" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xs font-semibold text-neutral-900 dark:text-white">
+                      Course Materials & Syllabus Upload
+                    </h2>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-white/10 text-neutral-500 font-medium">
+                      Optional
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                    {userUploadedSources.length > 0
+                      ? `${userUploadedSources.length} course material(s) uploaded and anchored into evidence.`
+                      : "Upload lecture slides, reading packs, or syllabus notes to anchor specific citations."}
+                  </p>
+                </div>
               </div>
+
+              <button
+                type="button"
+                onClick={() => setIsUploadOpen(!isUploadOpen)}
+                className="px-3.5 py-1.5 rounded-full text-xs font-medium border border-neutral-200 dark:border-white/10 hover:bg-neutral-50 dark:hover:bg-white/5 transition-colors cursor-pointer text-neutral-700 dark:text-neutral-300 self-start sm:self-auto shrink-0"
+              >
+                {isUploadOpen ? "Hide Dropzone" : userUploadedSources.length > 0 ? "Manage Files" : "+ Upload Files"}
+              </button>
             </div>
 
-            <LectureUploadDropzone
-              uploadedFiles={userUploadedSources}
-              onUpload={handleLectureUpload}
-              onRemove={handleLectureRemove}
-              assignmentQuestion={question}
-              citationStyle={citationStyle}
-              projectId={projectId}
-            />
-          </section>
+            <div className={isUploadOpen || userUploadedSources.length > 0 ? "mt-4 pt-4 border-t border-neutral-100 dark:border-white/5" : "hidden"}>
+              <LectureUploadDropzone
+                uploadedFiles={userUploadedSources}
+                onUpload={handleLectureUpload}
+                onRemove={handleLectureRemove}
+                assignmentQuestion={question}
+                citationStyle={citationStyle}
+                projectId={projectId}
+              />
+            </div>
+          </div>
 
           {/* Section 2: Curated Academic Literature & Source Collection */}
           <section className="space-y-4 pt-4 border-t border-neutral-200/60 dark:border-white/5">
@@ -804,9 +997,18 @@ export default function AssignmentSourcesStage({
                 )}
               </div>
 
-              {/* Search Input & Advanced Filter Toggle */}
+              {/* Search Input, Filters, and Add Custom Reference Action */}
               <div className="flex items-center gap-2">
-                <div className="relative flex-1 sm:w-64">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingCustom(true)}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Add Reference</span>
+                </button>
+
+                <div className="relative flex-1 sm:w-60">
                   <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                   <input
                     type="text"
@@ -838,7 +1040,7 @@ export default function AssignmentSourcesStage({
                   }`}
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5" />
-                  <span>Filters</span>
+                  <span className="hidden sm:inline">Filters</span>
                   {activeFilterCount > 0 && (
                     <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center font-bold">
                       {activeFilterCount}
@@ -858,6 +1060,157 @@ export default function AssignmentSourcesStage({
                 </button>
               </div>
             </div>
+
+            {/* Expandable Custom Reference Creation Form */}
+            {isAddingCustom && (
+              <div className="p-5 rounded-2xl border-2 border-neutral-900 dark:border-white bg-white dark:bg-[#1C1C1E] shadow-md space-y-4 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-emerald-600" />
+                    <h3 className="text-xs font-bold text-neutral-900 dark:text-white uppercase tracking-wider">
+                      Add Custom Academic Reference
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingCustom(false)}
+                    className="p-1 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                  <div className="sm:col-span-2 md:col-span-3 space-y-1">
+                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                      Source Title *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Quantum Computation and Quantum Information"
+                      value={customForm.title}
+                      onChange={(e) => setCustomForm({ ...customForm, title: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                      Authors (comma-separated)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Nielsen, M. A., Chuang, I. L."
+                      value={customForm.authors}
+                      onChange={(e) => setCustomForm({ ...customForm, authors: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                      Publication Year
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2010"
+                      value={customForm.year}
+                      onChange={(e) => setCustomForm({ ...customForm, year: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                      Source Type
+                    </label>
+                    <select
+                      value={customForm.type}
+                      onChange={(e) => setCustomForm({ ...customForm, type: e.target.value as any })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    >
+                      <option value="journal">Peer-Reviewed Journal</option>
+                      <option value="book">Academic Book / University Press</option>
+                      <option value="conference">Conference Proceedings</option>
+                      <option value="institutional">Institutional / Government Report</option>
+                      <option value="report">Policy Report / Working Paper</option>
+                      <option value="web">Academic Web Resource / Dataset</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                      Journal / Publisher / Venue
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Cambridge University Press"
+                      value={customForm.journal}
+                      onChange={(e) => setCustomForm({ ...customForm, journal: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                      Volume, Issue, or Pages
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 10th Anniversary edn. pp. 124–134"
+                      value={customForm.volumeIssue}
+                      onChange={(e) => setCustomForm({ ...customForm, volumeIssue: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                      DOI or URL
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 10.1017/CBO9780511976667"
+                      value={customForm.doi}
+                      onChange={(e) => setCustomForm({ ...customForm, doi: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 md:col-span-3 space-y-1">
+                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                      Full Citation String (Harvard Reference Format)
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Nielsen, M. A. and Chuang, I. L. (2010) Quantum Computation and Quantum Information. 10th Anniversary edn. Cambridge: Cambridge University Press."
+                      value={customForm.citation}
+                      onChange={(e) => setCustomForm({ ...customForm, citation: e.target.value })}
+                      className="w-full text-xs font-serif p-2.5 rounded-xl border border-neutral-300 dark:border-white/20 bg-neutral-50/50 dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 leading-relaxed"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingCustom(false)}
+                    className="px-4 py-2 rounded-lg text-xs font-medium border border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-white/5 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddCustomSource}
+                    disabled={!customForm.title.trim()}
+                    className="px-5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer transition-colors shadow-xs disabled:opacity-40"
+                  >
+                    Add & Approve Reference
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Expandable Advanced Filtering Drawer */}
             {showAdvancedFilters && (
@@ -1037,23 +1390,301 @@ export default function AssignmentSourcesStage({
               </div>
             )}
 
-            {/* Literature Display Container (Standardized Responsive Grid) */}
+            {/* Dedicated Bibliography Header when on Approved Tab */}
+            {activeTab === "approved" && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                <div>
+                  <h3 className="text-xs font-bold text-emerald-900 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Your Selected References ({approvedCount})</span>
+                  </h3>
+                  <p className="text-[11px] text-emerald-800/80 dark:text-emerald-300/70 mt-0.5">
+                    All citations formatted in Harvard referencing (Author, Year). Click <strong>Edit Reference</strong> on any item to customize citation text or metadata.
+                  </p>
+                </div>
+                {approvedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleCopyAllReferences}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-[#1C1C1E] border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
+                  >
+                    {copiedAll ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-emerald-600" />}
+                    <span>{copiedAll ? "Copied All!" : "Copy Bibliography"}</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Literature Display Container (Standardized Responsive Grid or Dedicated Bibliography List) */}
             {displayedSources.length > 0 ? (
               <div
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                className={
+                  activeTab === "approved"
+                    ? "space-y-4"
+                    : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                }
                 data-testid="curated-sources-grid"
               >
-                {displayedSources.map((source) => (
-                  <CuratedSourceCard
-                    key={source.id}
-                    source={source}
-                    isApproved={approvedSourceIds.includes(source.id)}
-                    isBookmarked={bookmarkedIds.includes(source.id)}
-                    onToggleApproval={toggleSourceApproval}
-                    onDismiss={handleDismissSource}
-                    onToggleBookmark={handleToggleBookmark}
-                  />
-                ))}
+                {displayedSources.map((source) => {
+                  const isEditing = editingSourceId === source.id;
+
+                  // Inline Editor Mode for this source
+                  if (isEditing) {
+                    return (
+                      <div
+                        key={source.id}
+                        data-testid={`curated-source-${source.id}`}
+                        className="rounded-2xl border-2 border-emerald-500 bg-white dark:bg-[#1C1C1E] p-5 shadow-sm space-y-4 col-span-full"
+                      >
+                        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-3">
+                          <div className="flex items-center gap-2">
+                            <Edit2 className="w-4 h-4 text-emerald-600" />
+                            <h4 className="text-xs font-bold text-neutral-900 dark:text-white uppercase tracking-wider">
+                              Edit Reference & Citation Details
+                            </h4>
+                          </div>
+                          <span className="text-[11px] text-neutral-400">
+                            Changes sync to in-text citations and your bibliography
+                          </span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                            Full Citation String (Harvard Reference Format)
+                          </label>
+                          <textarea
+                            value={editForm.citation}
+                            onChange={(e) => setEditForm({ ...editForm, citation: e.target.value })}
+                            rows={3}
+                            className="w-full text-xs font-serif p-2.5 rounded-xl border border-neutral-300 dark:border-white/20 bg-neutral-50/50 dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 leading-relaxed"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                          <div className="sm:col-span-2 space-y-1">
+                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                              Article / Paper Title
+                            </label>
+                            <input
+                              type="text"
+                              value={editForm.title}
+                              onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                              Authors (comma-separated)
+                            </label>
+                            <input
+                              type="text"
+                              value={editForm.authors}
+                              onChange={(e) => setEditForm({ ...editForm, authors: e.target.value })}
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                              Publication Year
+                            </label>
+                            <input
+                              type="text"
+                              value={editForm.year}
+                              onChange={(e) => setEditForm({ ...editForm, year: e.target.value })}
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                              Journal / Publisher / Venue
+                            </label>
+                            <input
+                              type="text"
+                              value={editForm.journal}
+                              onChange={(e) => setEditForm({ ...editForm, journal: e.target.value })}
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                              Volume, Issue, or Pages
+                            </label>
+                            <input
+                              type="text"
+                              value={editForm.volumeIssue}
+                              onChange={(e) => setEditForm({ ...editForm, volumeIssue: e.target.value })}
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                              DOI or URL
+                            </label>
+                            <input
+                              type="text"
+                              value={editForm.doi}
+                              onChange={(e) => setEditForm({ ...editForm, doi: e.target.value })}
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                              Role in Assignment
+                            </label>
+                            <select
+                              value={editForm.roleInAssignment}
+                              onChange={(e) => setEditForm({ ...editForm, roleInAssignment: e.target.value })}
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            >
+                              <option value="Empirical evidence">Empirical Evidence</option>
+                              <option value="Theoretical framework">Theoretical Framework</option>
+                              <option value="Comparative evidence">Comparative Evidence</option>
+                              <option value="Core theory">Core Theory (Seminal)</option>
+                              <option value="Methodological framework">Methodological Framework</option>
+                              <option value="Contextual evidence">Contextual Evidence</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => setEditingSourceId(null)}
+                            className="px-3.5 py-1.5 rounded-lg text-xs font-medium border border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-white/5 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveSourceEdit}
+                            className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer transition-colors shadow-xs"
+                          >
+                            Save Reference
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Dedicated Selected Reference Card when activeTab === "approved"
+                  if (activeTab === "approved") {
+                    return (
+                      <div
+                        key={source.id}
+                        data-testid={`curated-source-${source.id}`}
+                        className="rounded-2xl border border-emerald-500/30 bg-white dark:bg-[#1C1C1E] p-5 shadow-xs space-y-3.5 hover:border-emerald-500/60 transition-all group"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                              {source.type}
+                            </span>
+                            {source.roleInAssignment && (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
+                                {source.roleInAssignment}
+                              </span>
+                            )}
+                            {source.year && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-white/5">
+                                {source.year}
+                              </span>
+                            )}
+                            {source.doi && (
+                              <span className="text-[11px] font-mono text-neutral-400 truncate max-w-[200px]">
+                                doi:{source.doi}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditSource(source)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 flex items-center gap-1 cursor-pointer transition-colors"
+                              title="Edit citation and source details"
+                            >
+                              <Edit2 className="w-3 h-3 text-neutral-500" />
+                              <span>Edit Reference</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleCopyCitation(source)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 flex items-center gap-1 cursor-pointer transition-colors"
+                              title="Copy citation"
+                            >
+                              {copiedSourceId === source.id ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                  <span className="text-emerald-600 font-semibold">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3 text-neutral-500" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => toggleSourceApproval(source.id)}
+                              aria-label={`Remove ${source.title} from approved`}
+                              className="px-2.5 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-rose-200 dark:border-rose-900/30 flex items-center gap-1 cursor-pointer transition-colors"
+                              title="Remove from paper references"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Remove</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Academic Reference Citation Box */}
+                        <div className="p-3.5 rounded-xl bg-neutral-50/90 dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/10 text-xs sm:text-sm leading-relaxed text-neutral-900 dark:text-white font-serif">
+                          <span className="font-semibold text-neutral-500 dark:text-neutral-400 font-sans text-[10px] uppercase tracking-wider block mb-1">
+                            {citationStyle === "harvard" ? "Harvard Reference" : `${citationStyle.toUpperCase()} Reference`}:
+                          </span>
+                          <span className="select-all">
+                            {source.citation || formatHarvardCitation(source)}
+                          </span>
+                        </div>
+
+                        {/* Title & Grounding Rationale */}
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                            {source.title}
+                          </h4>
+                          {(source.suggestedUse || source.mainFinding) && (
+                            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                              <span className="font-medium text-neutral-700 dark:text-neutral-300">Grounding Rationale: </span>
+                              {source.suggestedUse || source.mainFinding}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Default CuratedSourceCard for other tabs
+                  return (
+                    <CuratedSourceCard
+                      key={source.id}
+                      source={source}
+                      isApproved={approvedSourceIds.includes(source.id)}
+                      isBookmarked={bookmarkedIds.includes(source.id)}
+                      onToggleApproval={toggleSourceApproval}
+                      onDismiss={handleDismissSource}
+                      onToggleBookmark={handleToggleBookmark}
+                      onEdit={(s) => handleStartEditSource(s)}
+                    />
+                  );
+                })}
               </div>
             ) : (
               <div className="p-10 text-center rounded-2xl border border-dashed border-neutral-200 dark:border-white/10 space-y-3">
