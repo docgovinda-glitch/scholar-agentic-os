@@ -7,6 +7,8 @@ import {
   type AssignmentAnalysis,
   type SectionBudgetItem,
   type WritingToneConfig,
+  type WritingStyleConfig,
+  type WritingStylePreset,
   ASSIGNMENT_TYPE_LABELS,
   cleanAnswerString,
 } from "../types";
@@ -22,7 +24,7 @@ import {
 } from "lucide-react";
 import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
 import SectionBudgetPlanner from "../components/SectionBudgetPlanner";
-import WritingToneSelector from "../components/WritingToneSelector";
+import WritingStyleSelector from "../components/WritingStyleSelector";
 
 const CITATION_STYLES = [
   { id: "apa7", name: "APA 7th Edition (Author, Year)" },
@@ -44,6 +46,8 @@ export default function AssignmentUnderstandStage() {
     citationStyle,
     sections,
     assignmentBriefText,
+    writingStyle,
+    setWritingStyle,
     writingTone,
     setWritingTone,
     sectionBudgets,
@@ -92,10 +96,15 @@ export default function AssignmentUnderstandStage() {
     ];
   });
 
-  // Writing Tone state
-  const [localTone, setLocalTone] = useState<WritingToneConfig>(
-    writingTone || { preset: "scholarly_rigorous" }
-  );
+  // Academic Writing Style state
+  const [localStyle, setLocalStyle] = useState<WritingStyleConfig>(() => {
+    if (writingStyle) return writingStyle;
+    if (writingTone) return writingTone as WritingStyleConfig;
+    return {
+      preset: "analytical",
+      description: "Breaks down causes, patterns, and connections between concepts.",
+    };
+  });
 
   const [course, setCourse] = useState(courseName);
   const [institution, setInstitution] = useState(institutionName);
@@ -159,7 +168,8 @@ export default function AssignmentUnderstandStage() {
     if (targetWordCount > 0) setLocalWordCount(targetWordCount);
     if (citationStyle) setLocalCitation(citationStyle);
     if (sections) setLocalSections(sections);
-    if (writingTone) setLocalTone(writingTone);
+    if (writingStyle) setLocalStyle(writingStyle);
+    else if (writingTone) setLocalStyle(writingTone as WritingStyleConfig);
     if (sectionBudgets && sectionBudgets.length > 0) {
       setLocalSectionBudgets(sectionBudgets);
     }
@@ -181,6 +191,7 @@ export default function AssignmentUnderstandStage() {
     targetWordCount,
     citationStyle,
     sections,
+    writingStyle,
     writingTone,
     sectionBudgets,
     assignmentBriefText,
@@ -239,8 +250,10 @@ export default function AssignmentUnderstandStage() {
         sectionBudgets: localSectionBudgets,
         section_budgets: localSectionBudgets,
         sections: legacyBreakdown,
-        writingTone: localTone,
-        writing_tone: localTone,
+        writingStyle: localStyle,
+        writing_style: localStyle,
+        writingTone: localStyle,
+        writing_tone: localStyle,
       };
 
       if (isDefaultOrUntitled && trimmed.length >= 10) {
@@ -303,9 +316,14 @@ export default function AssignmentUnderstandStage() {
     });
   };
 
-  const handleToneChange = (newTone: WritingToneConfig) => {
-    setLocalTone(newTone);
-    setWritingTone(newTone);
+  const handleStyleChange = (newStyle: WritingStyleConfig) => {
+    setLocalStyle(newStyle);
+    if (setWritingStyle) {
+      setWritingStyle(newStyle);
+    }
+    if (setWritingTone) {
+      setWritingTone(newStyle as WritingToneConfig);
+    }
   };
 
   const handleLevelChange = (lvl: AcademicLevel) => {
@@ -375,8 +393,10 @@ export default function AssignmentUnderstandStage() {
       sectionBudgets: localSectionBudgets,
       section_budgets: localSectionBudgets,
       sections: legacyBreakdown,
-      writingTone: localTone,
-      writing_tone: localTone,
+      writingStyle: localStyle,
+      writing_style: localStyle,
+      writingTone: localStyle,
+      writing_tone: localStyle,
       citation_style: localCitation,
       citationStyle: localCitation,
       rubricCriteria: parsedCriteria,
@@ -433,8 +453,10 @@ export default function AssignmentUnderstandStage() {
       wordBudget: budget,
       word_budget: budget,
       sections: legacyBreakdown,
-      writingTone: localTone,
-      writing_tone: localTone,
+      writingStyle: localStyle,
+      writing_style: localStyle,
+      writingTone: localStyle,
+      writing_tone: localStyle,
       assignment_brief_text: localBrief || localQuestion,
       course_name: course,
       institution,
@@ -462,7 +484,8 @@ export default function AssignmentUnderstandStage() {
           briefText: localBrief,
           rubricText,
           sections: legacyBreakdown,
-          writingTone: localTone,
+          writingStyle: localStyle,
+          writingTone: localStyle,
         }
       );
 
@@ -872,9 +895,9 @@ export default function AssignmentUnderstandStage() {
 
         {/* Academic Writing Tone & Style Selector */}
         <div className="pt-2 border-t border-neutral-200/60 dark:border-white/5">
-          <WritingToneSelector
-            value={localTone}
-            onChange={handleToneChange}
+          <WritingStyleSelector
+            value={localStyle}
+            onChange={handleStyleChange}
           />
         </div>
 

@@ -36,6 +36,8 @@ import type {
   SectionBudgetItem,
   WritingToneConfig,
   WritingTonePreset,
+  WritingStyleConfig,
+  WritingStylePreset,
 } from "../types";
 import {
   ASSIGNMENT_PHASES,
@@ -82,6 +84,8 @@ export interface AssignmentContextValue {
   citationStyle: string;
   sections?: SectionBreakdown;
   setSections: (sections: SectionBreakdown) => Promise<void>;
+  writingStyle: WritingStyleConfig;
+  setWritingStyle: (style: WritingStyleConfig) => Promise<void>;
   writingTone: WritingToneConfig;
   setWritingTone: (tone: WritingToneConfig) => Promise<void>;
   sectionBudgets: SectionBudgetItem[];
@@ -337,10 +341,21 @@ export function AssignmentProvider({
       if (updates.sections !== undefined) {
         standardized.sections = updates.sections;
       }
+      if (updates.writingStyle !== undefined || updates.writing_style !== undefined) {
+        const ws = updates.writingStyle ?? updates.writing_style;
+        standardized.writingStyle = ws;
+        standardized.writing_style = ws;
+        standardized.writingTone = ws;
+        standardized.writing_tone = ws;
+      }
       if (updates.writingTone !== undefined || updates.writing_tone !== undefined) {
         const wt = updates.writingTone ?? updates.writing_tone;
         standardized.writingTone = wt;
         standardized.writing_tone = wt;
+        if (!standardized.writingStyle) {
+          standardized.writingStyle = wt;
+          standardized.writing_style = wt;
+        }
       }
       if (updates.sectionBudgets !== undefined || updates.section_budgets !== undefined) {
         const sb = updates.sectionBudgets ?? updates.section_budgets;
@@ -470,8 +485,12 @@ export function AssignmentProvider({
     [saveAnswers]
   );
 
-  const writingTone: WritingToneConfig = useMemo(() => {
-    const raw = answers["writingTone"] || answers["writing_tone"];
+  const writingStyle: WritingStyleConfig = useMemo(() => {
+    const raw =
+      answers["writingStyle"] ||
+      answers["writing_style"] ||
+      answers["writingTone"] ||
+      answers["writing_tone"];
     if (raw) {
       try {
         const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -479,16 +498,32 @@ export function AssignmentProvider({
       } catch {}
     }
     return {
-      preset: "scholarly_rigorous",
-      description: "Formal, authoritative third-person, dense academic vocabulary",
+      preset: "analytical",
+      description: "Breaks down causes, patterns, and connections between concepts.",
     };
   }, [answers]);
 
-  const setWritingTone = useCallback(
-    async (tone: WritingToneConfig) => {
-      await saveAnswers({ writingTone: tone, writing_tone: tone });
+  const setWritingStyle = useCallback(
+    async (style: WritingStyleConfig) => {
+      await saveAnswers({
+        writingStyle: style,
+        writing_style: style,
+        writingTone: style,
+        writing_tone: style,
+      });
     },
     [saveAnswers]
+  );
+
+  const writingTone: WritingToneConfig = useMemo(() => {
+    return writingStyle;
+  }, [writingStyle]);
+
+  const setWritingTone = useCallback(
+    async (tone: WritingToneConfig) => {
+      await setWritingStyle(tone as WritingStyleConfig);
+    },
+    [setWritingStyle]
   );
 
   const sectionBudgets: SectionBudgetItem[] = useMemo(() => {
@@ -1283,6 +1318,7 @@ export function AssignmentProvider({
         citationStyle,
         sections,
         sectionBudgets,
+        writingStyle,
         writingTone,
         rubricCriteria: rubricCriteriaList,
         analysis,
@@ -1337,6 +1373,7 @@ export function AssignmentProvider({
     citationStyle,
     sections,
     sectionBudgets,
+    writingStyle,
     writingTone,
     rubricCriteriaList,
     analysis,
@@ -1442,6 +1479,8 @@ export function AssignmentProvider({
         citationStyle,
         sections,
         setSections,
+        writingStyle,
+        setWritingStyle,
         writingTone,
         setWritingTone,
         sectionBudgets,

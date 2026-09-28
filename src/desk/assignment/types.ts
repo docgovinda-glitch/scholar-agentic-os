@@ -718,7 +718,23 @@ export interface SectionBudgetItem {
   isCustom?: boolean;
 }
 
+export type WritingStylePreset =
+  | "analytical"
+  | "argumentative"
+  | "critical"
+  | "expository"
+  | "natural"
+  | "custom";
+
+export interface WritingStyleConfig {
+  preset: WritingStylePreset;
+  customSampleText?: string;
+  customFileName?: string;
+  description?: string;
+}
+
 export type WritingTonePreset =
+  | WritingStylePreset
   | "scholarly_rigorous"
   | "critical_evaluative"
   | "objective_analytical"
@@ -745,6 +761,7 @@ export interface AssignmentBriefState {
   targetWordCount: number;
   wordBudget?: AssignmentWordBudget;
   sectionBudgets?: SectionBudgetItem[];
+  writingStyle?: WritingStyleConfig;
   writingTone?: WritingToneConfig;
   minWordCount?: number;
   maxWordCount?: number;

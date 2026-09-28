@@ -42,16 +42,21 @@ Phase 1 (`AssignmentUnderstandStage.tsx`) of the Coursework & Essay Engine (`OT-
 
 ---
 
-### 2.3 Academic Writing Tone & Style Selector (`WritingToneSelector.tsx`)
-Configures writing style parameters persisted into `state.brief.writingTone` to guide the Phase 3 drafting engine and AI copilot:
-- **Preset Academic Tones**:
-  1. **Scholarly & Rigorous** (Default): Formal, authoritative third-person, dense academic vocabulary.
-  2. **Critical & Evaluative**: Interrogates theoretical frameworks, emphasizes counter-arguments and methodological limitations.
-  3. **Objective & Analytical**: Data-focused, empirical, neutral syntax, clear causal linkages.
-  4. **Applied & Reflective**: Balanced first/third-person tailored for professional practice, education, clinical nursing, or case studies.
-- **"Match My Writing Style" (Custom Upload / Paste)**:
-  - Allows students to paste a sample excerpt (~200–500 words) from their past writing or upload a sample document (`.docx`, `.pdf`, `.txt`).
-  - Automatically analyzes word count, lexical density, and register notes to replicate the student's authentic academic voice in Phase 3.
+### 2.3 Academic Writing Tone & Style Selector (`WritingStyleSelector.tsx`)
+Configures writing style parameters persisted into `state.brief.writingStyle` and `state.brief.writingTone` to guide the Phase 3 drafting engine and AI copilot:
+- **6 Human-Sounding Academic Styles**:
+  1. **Analytical**: Breaks down causes, patterns, and connections between concepts.
+     - *Example*: *"Local grocers lose market share primarily because digital platforms eliminate travel and checkout friction for suburban households."*
+  2. **Argumentative**: Takes a clear stance, defends a thesis, and addresses counter-arguments.
+     - *Example*: *"While physical stores emphasize personalized service, convenience and price discounts consistently override customer loyalty."*
+  3. **Critical**: Questions assumptions, weighs trade-offs, and exposes flaws or limitations.
+     - *Example*: *"Reports celebrating delivery convenience overlook hidden trade-offs; platform subscription fees frequently make online orders more expensive than local shopping."*
+  4. **Expository**: Explains concepts clearly, directly, and authoritatively without dense jargon.
+     - *Example*: *"Online platforms dominate grocery retail through bulk purchasing, centralized warehousing, and automated dispatch systems."*
+  5. **Natural & Engaging (Human Voice)**: Authentic, conversational academic rhythm. Avoids predictable AI clichés ("delve", "testament", "multifaceted") while remaining credible.
+     - *Example*: *"Most shoppers leave local grocers for a simple reason: after a long workday, seamless doorstep delivery beats community loyalty every time."*
+  6. **Match My Writing (Custom Voice)**: Clones your natural sentence structure, pacing, and vocabulary level.
+     - *Interface*: Clean dual-input area with paste textarea (200–500 words) and file dropzone (`.docx`, `.pdf`, `.txt`, `.md`).
 
 ---
 
@@ -70,25 +75,26 @@ Configures writing style parameters persisted into `state.brief.writingTone` to 
 All new fields are fully serializable and safely persisted into the `brief` column of the `assignment_projects` PostgreSQL table (Supabase JSONB):
 
 ```typescript
+export type WritingStylePreset =
+  | 'analytical'
+  | 'argumentative'
+  | 'critical'
+  | 'expository'
+  | 'natural'
+  | 'custom';
+
+export interface WritingStyleConfig {
+  preset: WritingStylePreset;
+  customSampleText?: string;
+  customFileName?: string;
+  description?: string;
+}
+
 export interface SectionBudgetItem {
   id: string;
   title: string;
   targetWordCount: number;
   isCustom?: boolean;
-}
-
-export type WritingTonePreset =
-  | 'scholarly_rigorous'
-  | 'critical_evaluative'
-  | 'objective_analytical'
-  | 'applied_reflective'
-  | 'custom_sample';
-
-export interface WritingToneConfig {
-  preset: WritingTonePreset;
-  customSampleText?: string;
-  customSampleFileName?: string;
-  styleNotes?: string;
 }
 
 export interface AssignmentBriefState {
@@ -98,6 +104,7 @@ export interface AssignmentBriefState {
   targetWordCount: number;
   wordBudget: AssignmentWordBudget;
   sectionBudgets?: SectionBudgetItem[];
+  writingStyle?: WritingStyleConfig;
   writingTone?: WritingToneConfig;
   citationStyle: string;
   // ... course & rubric details
@@ -109,6 +116,6 @@ export interface AssignmentBriefState {
 ## 4. Verification & Testing
 
 - **TypeScript Typecheck**: `npx tsc --noEmit` → **0 errors**.
-- **Vitest Suite**: `npx vitest run src/desk/assignment` → **16/16 test files passed, 132/132 tests passing**.
-- **Production Build**: `npm run build` → **Compiled cleanly in 5.19s**.
+- **Vitest Suite**: `npx vitest run src/desk/assignment` → **17/17 test files passed, 137/137 tests passing**.
+- **Production Build**: `npm run build` → **Compiled cleanly in 4.85s**.
 - **Database Migrations**: `SUPABASE_ACCESS_TOKEN=... npx supabase db push` → **Remote database up to date**.
