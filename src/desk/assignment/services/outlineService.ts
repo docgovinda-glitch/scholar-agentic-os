@@ -22,6 +22,7 @@ import type {
   AssignmentMainHeading,
   AssignmentSubheading,
 } from "../types";
+import { executeAgenticLLM } from "../../api";
 
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
@@ -473,17 +474,237 @@ interface HeadingSpec {
 /**
  * Generate a dynamic, tone-calibrated academic thesis statement or central problem formulation.
  */
+/** Known academic acronyms to preserve in uppercase */
+const ACADEMIC_ACRONYMS = new Set([
+  "AI", "ML", "DL", "NLP", "LLM", "LLMS", "CNN", "CNNS", "RNN", "RNNS",
+  "SVM", "SVMS", "RL", "RLHF", "GAN", "GANS", "API", "APIS", "UI", "UX",
+  "EU", "UN", "US", "UK", "WTO", "IMF", "WHO", "NATO", "ASEAN", "BRICS",
+  "GDP", "FDI", "ESG", "CSR", "HRM", "KPI", "KPIS", "ROI",
+  "DNA", "RNA", "CRISPR", "CAR-T", "MHC", "FDA", "EMA", "NHS",
+  "BQP", "QEC", "NISQ", "BB84", "FIPS", "IPE", "IR", "BRI"
+]);
+
+/** Format an extracted phrase into clean, academic title case while respecting acronyms */
+export function formatAcademicTopicTitle(raw: string): string {
+  if (!raw) return "";
+  const cleaned = raw
+    .trim()
+    .replace(/^['"]+|['"]+$/g, "")
+    .replace(/[?.!]+$/, "")
+    .trim();
+
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  const formatted = words.map((w, idx) => {
+    const cleanWord = w.replace(/^[^\w]+|[^\w]+$/g, "");
+    const upper = cleanWord.toUpperCase();
+    if (ACADEMIC_ACRONYMS.has(upper)) {
+      return w.replace(new RegExp(cleanWord, "i"), upper);
+    }
+    // Lowercase small grammatical prepositions/conjunctions unless first word
+    if (
+      idx > 0 &&
+      /^(a|an|and|as|at|but|by|for|if|in|nor|of|on|or|so|the|to|up|yet|with|within|versus|vs|via)$/i.test(cleanWord)
+    ) {
+      return w.toLowerCase();
+    }
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  });
+
+  return formatted.join(" ");
+}
+
+export interface DeconstructedQuestion {
+  raw: string;
+  cleanedQuestion: string;
+  subjectA: string;
+  subjectB?: string;
+  relationType: "role_in" | "impact_on" | "comparative" | "evaluative" | "development_over_time" | "exploratory";
+  subjectFormattedA: string;
+  subjectFormattedB?: string;
+  topicA: string;
+  topicB: string;
+}
+
+/**
+ * Linguistically deconstruct an assignment question into semantic components
+ * to generate tightly tailored headings, subheadings, and thesis statements.
+ */
+export function deconstructQuestionSemantics(question: string): DeconstructedQuestion {
+  const qStr = typeof question === "string" ? question : String(question || "");
+  const cleanPrompt = qStr
+    .replace(/^(critically\s+)?(examine|evaluate|assess|analyze|analyse|discuss|investigate|explore|to\s+what\s+extent\s+does|what\s+is\s+the\s+role\s+of|the\s+role\s+of|an\s+analysis\s+of|how\s+does|in\s+what\s+ways\s+does)\s+/i, "")
+    .replace(/[?.!]+$/, "")
+    .trim();
+
+  // Pattern 1: Role of A in / within B
+  // e.g. "Role of AI in machine learning" -> A = "AI", B = "machine learning"
+  const roleMatch = qStr.match(/(?:role|function|place|significance|position)\s+of\s+(.+?)\s+(?:in|within)\s+(.+?)(?:\.|\?|$)/i);
+  if (roleMatch) {
+    const a = roleMatch[1].trim();
+    const b = roleMatch[2].trim();
+    const fA = formatAcademicTopicTitle(a);
+    const fB = formatAcademicTopicTitle(b);
+    return {
+      raw: qStr,
+      cleanedQuestion: cleanPrompt,
+      subjectA: a,
+      subjectB: b,
+      relationType: "role_in",
+      subjectFormattedA: fA,
+      subjectFormattedB: fB,
+      topicA: fA,
+      topicB: fB,
+    };
+  }
+
+  // Pattern 2: Impact / Effect / Influence of A on / upon B
+  const impactMatch = qStr.match(/(?:impact|effect|influence|consequence|implications)\s+of\s+(.+?)\s+(?:on|upon|across)\s+(.+?)(?:\.|\?|$)/i);
+  if (impactMatch) {
+    const a = impactMatch[1].trim();
+    const b = impactMatch[2].trim();
+    const fA = formatAcademicTopicTitle(a);
+    const fB = formatAcademicTopicTitle(b);
+    return {
+      raw: qStr,
+      cleanedQuestion: cleanPrompt,
+      subjectA: a,
+      subjectB: b,
+      relationType: "impact_on",
+      subjectFormattedA: fA,
+      subjectFormattedB: fB,
+      topicA: fA,
+      topicB: fB,
+    };
+  }
+
+  // Pattern 3: Comparing / Contrast / Versus
+  const vsMatch =
+    qStr.match(/(?:compare|contrast|distinction\s+between|relationship\s+between|interplay\s+between|nexus\s+between)\s+(.+?)\s+(?:and|with|versus|vs\.?)\s+(.+?)(?:\.|\?|$)/i) ||
+    qStr.match(/(.+?)\s+(?:versus|vs\.?)\s+(.+?)(?:\.|\?|$)/i);
+  if (vsMatch) {
+    const a = vsMatch[1].replace(/^(?:the\s+)/i, "").trim();
+    const b = vsMatch[2].trim();
+    const fA = formatAcademicTopicTitle(a);
+    const fB = formatAcademicTopicTitle(b);
+    return {
+      raw: qStr,
+      cleanedQuestion: cleanPrompt,
+      subjectA: a,
+      subjectB: b,
+      relationType: "comparative",
+      subjectFormattedA: fA,
+      subjectFormattedB: fB,
+      topicA: fA,
+      topicB: fB,
+    };
+  }
+
+  // Pattern 4: Evaluative / "To what extent..."
+  const evalMatch = qStr.match(/(?:evaluate|assess|appraise|effectiveness\s+of|success\s+of|limitations\s+of)\s+(.+?)(?:\.|\?|$)/i);
+  if (evalMatch) {
+    const a = evalMatch[1].trim();
+    const fA = formatAcademicTopicTitle(a);
+    return {
+      raw: qStr,
+      cleanedQuestion: cleanPrompt,
+      subjectA: a,
+      relationType: "evaluative",
+      subjectFormattedA: fA,
+      topicA: fA,
+      topicB: "",
+    };
+  }
+
+  // Pattern 5: Evolution / Development of X
+  const evolMatch = qStr.match(/(?:evolution|development|history|future|emergence)\s+of\s+(.+?)(?:\.|\?|$)/i);
+  if (evolMatch) {
+    const a = evolMatch[1].trim();
+    const fA = formatAcademicTopicTitle(a);
+    return {
+      raw: qStr,
+      cleanedQuestion: cleanPrompt,
+      subjectA: a,
+      relationType: "development_over_time",
+      subjectFormattedA: fA,
+      topicA: fA,
+      topicB: "",
+    };
+  }
+
+  // Fallback: extract nominal groups
+  const words = cleanPrompt.split(/\s+/).filter((w) => w.length > 2 && !/^(the|and|for|with|from|that|this|these|those|into|about)$/i.test(w));
+  const subjectA = words.slice(0, 4).join(" ") || cleanPrompt || "Primary Phenomenon";
+  const subjectB = words.length > 4 ? words.slice(4, 8).join(" ") : undefined;
+  const fA = formatAcademicTopicTitle(subjectA);
+  const fB = subjectB ? formatAcademicTopicTitle(subjectB) : "";
+
+  return {
+    raw: qStr,
+    cleanedQuestion: cleanPrompt,
+    subjectA,
+    subjectB,
+    relationType: "exploratory",
+    subjectFormattedA: fA,
+    subjectFormattedB: subjectB ? fB : undefined,
+    topicA: fA,
+    topicB: fB,
+  };
+}
+
+/**
+ * Generate a dynamic, tone-calibrated academic thesis statement or central problem formulation.
+ * Tailors claims specifically to the assignment question and academic tone.
+ */
 export function generateThesisStatement(
   question: string,
   tone?: string,
   academicLevel?: AcademicLevel
 ): string {
   const qStr = typeof question === "string" ? question : String(question || "");
-  const qClean = qStr.trim().replace(/[.?]+$/, "");
+  const qLower = qStr.toLowerCase();
   const rawTone = typeof tone === "string" ? tone : (tone as any)?.preset || (tone as any)?.id || "formal_academic";
   const toneLower = String(rawTone || "formal_academic").toLowerCase();
 
-  if (qClean.toLowerCase().includes("economic interdependence")) {
+  const isAIMachineLearning =
+    ((qLower.includes("ai") || qLower.includes("artificial intelligence")) &&
+      (qLower.includes("machine learning") || qLower.includes("deep learning") || qLower.includes("neural network") || qLower.includes("algorithm") || qLower.includes("data science"))) ||
+    qLower.includes("machine learning") ||
+    qLower.includes("deep learning") ||
+    qLower.includes("neural network") ||
+    qLower.includes("reinforcement learning") ||
+    qLower.includes("large language model") ||
+    qLower.includes("llm");
+
+  const isAIEthicsOrLaw =
+    (qLower.includes("ai") || qLower.includes("algorithm") || qLower.includes("technology")) &&
+    (qLower.includes("ethic") || qLower.includes("bias") || qLower.includes("fairness") || qLower.includes("regulation") || qLower.includes("regulatory") || qLower.includes("privacy") || qLower.includes("surveillance") || qLower.includes("jurispruden") || qLower.includes("human right"));
+
+  // 1. AI & Machine Learning Foundations
+  if (isAIMachineLearning && !isAIEthicsOrLaw) {
+    if (toneLower.includes("persuasive") || toneLower.includes("argumentative")) {
+      return "This paper contends that Machine Learning represents the indispensable computational engine of modern Artificial Intelligence, without which autonomous systems remain confined to rigid, non-generalizable symbolic heuristics.";
+    } else if (toneLower.includes("critical")) {
+      return "This critique interrogates the convergence of Artificial Intelligence and Machine Learning, demonstrating that current reliance on high-dimensional statistical pattern matching creates systemic vulnerabilities in causal reasoning, sample efficiency, and mechanistic interpretability.";
+    } else if (toneLower.includes("analytical")) {
+      return "This study examines the foundational relationship between Artificial Intelligence and Machine Learning, analyzing how statistical learning theory, empirical loss minimization, and deep representation architectures operationalize synthetic cognitive reasoning.";
+    } else {
+      return "This paper examines the taxonomic and methodological integration of Artificial Intelligence within Machine Learning, evaluating the interplay between symbolic reasoning principles, neural representations, and empirical generalization bounds.";
+    }
+  }
+
+  // 2. AI Ethics, Bias & Regulation
+  if (isAIEthicsOrLaw) {
+    if (toneLower.includes("critical")) {
+      return "This critique challenges prevailing voluntary governance paradigms in artificial intelligence, arguing that self-regulatory industry frameworks fail to mitigate systemic disparate impact, data provenance abuses, and democratic accountability deficits.";
+    } else if (toneLower.includes("persuasive") || toneLower.includes("argumentative")) {
+      return "This paper argues that the rapid deployment of algorithmic decision systems necessitates enforceable, statutory risk-tiered regulation to safeguard fundamental civil liberties against automated discrimination.";
+    } else {
+      return "This analysis investigates the governance and ethical frameworks governing automated decision systems, evaluating the structural tensions between algorithmic opacity, fairness metrics, and enforceable legal accountability.";
+    }
+  }
+
+  // 3. Economic Interdependence
+  if (qLower.includes("economic interdependence") || (qLower.includes("interdependence") && (qLower.includes("conflict") || qLower.includes("peace")))) {
     if (toneLower.includes("persuasive") || toneLower.includes("argumentative")) {
       return "This paper contends that while economic interdependence substantially raises the direct costs of interstate military conflict, asymmetric network vulnerabilities create powerful incentives for weaponized economic coercion.";
     } else if (toneLower.includes("critical")) {
@@ -493,7 +714,8 @@ export function generateThesisStatement(
     }
   }
 
-  if (qClean.toLowerCase().includes("nepal")) {
+  // 4. Nepal Foreign Policy
+  if (qLower.includes("nepal") && (qLower.includes("india") || qLower.includes("foreign policy") || qLower.includes("2015"))) {
     if (toneLower.includes("critical")) {
       return "This evaluation critically assesses Nepal's foreign policy post-2015, arguing that structural asymmetric dependencies and transit bottlenecks have limited Kathmandu's strategic autonomy despite active diplomatic hedging.";
     } else if (toneLower.includes("persuasive") || toneLower.includes("argumentative")) {
@@ -503,7 +725,8 @@ export function generateThesisStatement(
     }
   }
 
-  if (qClean.toLowerCase().includes("cell therapy") || qClean.toLowerCase().includes("cancer")) {
+  // 5. Oncology & Cell Therapy
+  if (qLower.includes("cell therapy") || qLower.includes("cancer") || qLower.includes("car-t") || qLower.includes("immunotherapy")) {
     if (toneLower.includes("critical")) {
       return "This critique evaluates the translational barriers of adoptive cell therapy in oncology, demonstrating how the immunosuppressive tumor microenvironment and on-target off-tumor toxicities challenge therapeutic scalability.";
     } else {
@@ -511,13 +734,56 @@ export function generateThesisStatement(
     }
   }
 
+  // 6. China & Geopolitics
+  if (qLower.includes("china") && (qLower.includes("security") || qLower.includes("belt and road") || qLower.includes("bri") || qLower.includes("foreign policy") || qLower.includes("south asia"))) {
+    if (toneLower.includes("critical")) {
+      return "This study critically assesses China's expanding geostrategic footprint in South Asia, arguing that dual-use infrastructure investments and asymmetric economic leverage compound regional security dilemmas and constrain small-state autonomy.";
+    } else {
+      return "This analysis evaluates China's regional security and infrastructure strategy across South Asia, examining the interplay between Belt and Road connectivity initiatives, institutional security cooperation, and strategic balancing dynamics.";
+    }
+  }
+
+  // 7. Dynamic Semantic Formulation for Any Question
+  const deconstructed = deconstructQuestionSemantics(qStr);
+  const topicA = deconstructed.subjectFormattedA;
+  const topicB = deconstructed.subjectFormattedB;
+
+  if (deconstructed.relationType === "role_in" && topicB) {
+    if (toneLower.includes("persuasive") || toneLower.includes("argumentative")) {
+      return `This paper contends that ${topicA} serves as the decisive operational catalyst within ${topicB}, establishing that its structural integration is essential to achieving sustainable efficacy.`;
+    }
+    if (toneLower.includes("critical")) {
+      return `This critique problematizes the presumed efficacy of ${topicA} within ${topicB}, demonstrating that underlying structural constraints and institutional frictions fundamentally limit its practical impact.`;
+    }
+    return `This study investigates the integral role of ${topicA} within ${topicB}, systematically evaluating the theoretical mechanisms, operational dynamics, and empirical outcomes that govern their interaction.`;
+  }
+
+  if (deconstructed.relationType === "impact_on" && topicB) {
+    if (toneLower.includes("persuasive") || toneLower.includes("argumentative")) {
+      return `This paper argues that the impact of ${topicA} on ${topicB} produces profound systemic transformation, necessitating a fundamental recalibration of existing strategic and theoretical paradigms.`;
+    }
+    if (toneLower.includes("critical")) {
+      return `This critique challenges optimistic accounts regarding the influence of ${topicA} on ${topicB}, highlighting systemic disparities, unintended externalities, and empirical inconsistencies across contemporary environments.`;
+    }
+    return `This analysis examines the multi-faceted impact of ${topicA} on ${topicB}, analyzing direct empirical evidence, mediating variables, and broader disciplinary implications.`;
+  }
+
+  if (deconstructed.relationType === "comparative" && topicB) {
+    if (toneLower.includes("critical")) {
+      return `This comparative critique interrogates the core dichotomy between ${topicA} and ${topicB}, demonstrating that rigid paradigmatic divisions obscure shared structural vulnerabilities and implementation constraints.`;
+    }
+    return `This comparative study evaluates the contrasting theoretical foundations, operational trade-offs, and empirical efficacy of ${topicA} versus ${topicB} across contemporary practice.`;
+  }
+
+  // General Tone-Calibrated Fallbacks
+  const topicText = topicB ? `${topicA} in relation to ${topicB}` : topicA;
   if (toneLower.includes("persuasive") || toneLower.includes("argumentative")) {
-    return `This investigation argues that a rigorous analysis of ${qClean.toLowerCase()} reveals systemic tensions that demand a fundamental recalibration of existing theoretical and practical frameworks.`;
+    return `This investigation argues that an evidence-based analysis of ${topicText} demonstrates decisive systemic advantages, challenging conventional assumptions and substantiating a revised analytical paradigm.`;
   }
   if (toneLower.includes("critical")) {
-    return `This critique challenges conventional interpretations of ${qClean.toLowerCase()}, interrogating prevailing empirical assumptions and foregrounding structural limitations.`;
+    return `This critique problematizes prevailing assumptions surrounding ${topicText}, demonstrating how underlying structural inequalities, methodological limitations, and institutional blind spots undermine purported outcomes.`;
   }
-  return `This study provides an evidence-based academic investigation into ${qClean.toLowerCase()}, systematically evaluating theoretical assumptions and empirical outcomes.`;
+  return `This study provides a systematic academic investigation into ${topicText}, synthesizing authoritative theoretical frameworks and empirical evidence to evaluate contemporary outcomes.`;
 }
 
 /**
@@ -567,18 +833,54 @@ export function generateDynamicAssignmentStructure(
       qLower.includes("belt and road") ||
       qLower.includes("bri") ||
       qLower.includes("geopolitic") ||
-      qLower.includes("security") ||
+      qLower.includes("regional security") ||
+      qLower.includes("international security") ||
+      qLower.includes("security dilemma") ||
       qLower.includes("foreign policy") ||
       qLower.includes("south asia") ||
       qLower.includes("international relations"));
 
-  const isTechOrAI =
-    qLower.includes("ai") ||
-    qLower.includes("algorithm") ||
-    qLower.includes("machine learning") ||
-    qLower.includes("technology") ||
-    qLower.includes("privacy") ||
-    qLower.includes("digital");
+  const isAIEthicsOrLaw =
+    (qLower.includes("ai") || qLower.includes("machine learning") || qLower.includes("algorithm") || qLower.includes("artificial intelligence")) &&
+    (qLower.includes("ethic") ||
+      qLower.includes("bias") ||
+      qLower.includes("fairness") ||
+      qLower.includes("discriminat") ||
+      qLower.includes("human rights") ||
+      qLower.includes("regulat") ||
+      qLower.includes("law") ||
+      qLower.includes("legal") ||
+      qLower.includes("jurispruden") ||
+      qLower.includes("governance") ||
+      qLower.includes("surveillance") ||
+      qLower.includes("privacy") ||
+      qLower.includes("accountab"));
+
+  const isAIInHealthcare =
+    (qLower.includes("ai") || qLower.includes("machine learning") || qLower.includes("deep learning") || qLower.includes("algorithm") || qLower.includes("artificial intelligence")) &&
+    (qLower.includes("health") ||
+      qLower.includes("clinic") ||
+      qLower.includes("medic") ||
+      qLower.includes("hospital") ||
+      qLower.includes("patient") ||
+      qLower.includes("diagnos") ||
+      qLower.includes("pharma") ||
+      qLower.includes("drug discovery"));
+
+  const isAIMachineLearning =
+    !isAIEthicsOrLaw &&
+    !isAIInHealthcare &&
+    (qLower.includes("machine learning") ||
+      qLower.includes("deep learning") ||
+      qLower.includes("neural network") ||
+      qLower.includes("representation learning") ||
+      qLower.includes("reinforcement learning") ||
+      qLower.includes("supervised learning") ||
+      qLower.includes("natural language processing") ||
+      qLower.includes("computer vision") ||
+      qLower.includes("transformer") ||
+      qLower.includes("foundation model") ||
+      (qLower.includes("ai") && (qLower.includes("model") || qLower.includes("algorithm") || qLower.includes("training") || qLower.includes("data") || qLower.includes("architecture") || qLower.includes("role of ai"))));
 
   const isCaseStudyOrBusiness =
     assignmentType === "case_study" ||
@@ -586,7 +888,8 @@ export function generateDynamicAssignmentStructure(
     assignmentType === "report" ||
     qLower.includes("case study") ||
     qLower.includes("firm") ||
-    qLower.includes("company");
+    qLower.includes("company") ||
+    qLower.includes("market strategy");
 
   const isLitReview =
     assignmentType === "literature_review" ||
@@ -845,59 +1148,245 @@ export function generateDynamicAssignmentStructure(
         ],
       },
     ];
-  } else if (isTechOrAI) {
+  } else if (isAIMachineLearning) {
     specs = [
       {
-        title: "Conceptual, Ethical and Regulatory Foundations",
-        notes: "Establish normative principles, definitions, and technical boundaries.",
+        title: "Foundational Paradigms: The Symbiosis of Artificial Intelligence and Machine Learning",
+        notes: "Establish core theoretical taxonomies distinguishing symbolic AI, statistical learning, and autonomous agentic systems.",
         subheadings: [
           {
-            title: "Technical Scope and Core Definitions",
+            title: "Taxonomic Delineation: Symbolic Reasoning vs. Empirical Induction",
             ratio: 0.12,
-            guidance: "Clarify technical definitions, algorithmic architectures, and analytical scope.",
-            keyPoints: ["Technical taxonomy", "System architecture", "Scope boundaries"],
+            guidance: "Define the fundamental paradigms contrasting rule-based symbolic AI (GOFAI) with data-driven statistical learning frameworks.",
+            keyPoints: [
+              "Symbolic manipulation (GOFAI) vs. statistical learning",
+              "Deductive heuristics vs. inductive optimization",
+              "Historical paradigm shifts in cognitive architectures",
+            ],
           },
           {
-            title: "Ethical & Jurisprudential Frameworks",
+            title: "Mathematical Formulations and Loss Optimization Landscapes",
             ratio: 0.18,
-            guidance: "Examine competing philosophical frameworks (utilitarian, deontological, human rights) and legal standards.",
-            keyPoints: ["Human rights standards", "Accountability principles", "Normative foundations"],
+            guidance: "Analyze gradient-based optimization, empirical risk minimization (ERM), loss surfaces, and statistical convergence bounds.",
+            keyPoints: [
+              "Empirical risk minimization (ERM) & loss functions",
+              "Stochastic gradient descent & backpropagation mechanics",
+              "Generalization bounds and structural complexity",
+            ],
           },
         ],
       },
       {
-        title: "Empirical Application & Systemic Risks",
-        notes: "Scrutinize operational deployments and observed impacts.",
+        title: "Algorithmic Architectures, Representation Learning, and Scaling Frontiers",
+        notes: "Critically evaluate neural representation paradigms, modern architectures, and computational scaling laws.",
         subheadings: [
           {
-            title: "Empirical Evidence & Operational Case Studies",
+            title: "Deep Representation Learning and Latent Space Topology",
             ratio: 0.20,
-            guidance: "Analyze real-world deployments, testing theoretical assumptions against measurable outcomes.",
-            keyPoints: ["Case evidence", "Performance metrics", "Observed disparities"],
+            guidance: "Evaluate how multilayered nonlinear mappings capture hierarchical features without manual feature engineering.",
+            keyPoints: [
+              "Hierarchical feature extraction in deep neural networks",
+              "Manifold hypothesis and latent representation geometry",
+              "Self-supervised representations and contrastive learning",
+            ],
           },
           {
-            title: "Critical Analysis of Bias, Discretion & Governance Gaps",
+            title: "Attention Mechanisms, Transformer Architectures, and Scaling Dynamics",
             ratio: 0.20,
-            guidance: "Dissect underlying structural flaws, opacity, and regulatory blind spots.",
-            keyPoints: ["Algorithmic opacity", "Due process concerns", "Enforcement deficits"],
+            guidance: "Analyze self-attention mechanisms, foundation models, and empirical compute-data-parameter scaling laws.",
+            keyPoints: [
+              "Scaled dot-product attention and quadratic complexity trade-offs",
+              "Empirical scaling laws (Kaplan/Chinchilla parameters vs compute)",
+              "Emergent capabilities vs hallucination phenomena",
+            ],
           },
         ],
       },
       {
-        title: "Regulatory Solutions & Policy Horizon",
-        notes: "Propose actionable governance mechanisms and synthesize implications.",
+        title: "Systemic Bottlenecks, Mechanistic Interpretability, and Neuro-Symbolic Horizons",
+        notes: "Scrutinize technical failure modes, interpretability challenges, and convergence toward hybrid intelligent systems.",
         subheadings: [
           {
-            title: "Evaluation of Governance & Policy Alternatives",
-            ratio: 0.18,
-            guidance: "Critique existing legislative approaches and proposed multilateral standards.",
-            keyPoints: ["Statutory proposals", "Compliance trade-offs", "Institutional mechanisms"],
+            title: "Generalization Vulnerabilities, Data Poisoning, and Black-Box Opacity",
+            ratio: 0.16,
+            guidance: "Dissect distributional shift, out-of-distribution (OOD) failure modes, adversarial vulnerability, and mechanistic interpretability techniques.",
+            keyPoints: [
+              "Out-of-distribution (OOD) generalization failure modes",
+              "Mechanistic interpretability (probing circuits & activation spaces)",
+              "Data drift, distribution collapse, and shortcut learning",
+            ],
           },
           {
-            title: "Synthesis & Long-Term Trajectory",
+            title: "Neuro-Symbolic Integration and the Trajectory Toward Robust Generalization",
+            ratio: 0.14,
+            guidance: "Synthesize the convergence of deep statistical models with symbolic formal logic, causal inference, and robust generalization.",
+            keyPoints: [
+              "Hybrid neuro-symbolic reasoning architectures",
+              "Pearl's causal ladder vs purely associative statistical learning",
+              "Energy efficiency and computational scalability constraints",
+            ],
+          },
+        ],
+      },
+    ];
+  } else if (isAIEthicsOrLaw) {
+    specs = [
+      {
+        title: "Epistemological and Normative Foundations of Algorithmic Justice",
+        notes: "Establish philosophical paradigms, mathematical definitions of fairness, and regulatory baselines.",
+        subheadings: [
+          {
+            title: "Mathematical Formulations of Fairness vs. Substantive Justice",
             ratio: 0.12,
-            guidance: "Synthesize findings into coherent academic conclusions and future trajectories.",
-            keyPoints: ["Overarching conclusions", "Unresolved challenges", "Future research agenda"],
+            guidance: "Contrast technical parity metrics (demographic parity, equalized odds) with legal and philosophical concepts of fairness.",
+            keyPoints: [
+              "Demographic parity vs equalized odds trade-offs",
+              "Rawlsian justice and egalitarian normative ethics",
+              "Incompatibility theorems in fairness metrics",
+            ],
+          },
+          {
+            title: "Normative and Jurisprudential Standards Governing Automated Systems",
+            ratio: 0.18,
+            guidance: "Examine international human rights baselines, constitutional due process protections, and legal duties of care.",
+            keyPoints: [
+              "Due process rights against automated decision-making",
+              "Tort liability and algorithmic negligence doctrines",
+              "Proportionality standards in institutional deployment",
+            ],
+          },
+        ],
+      },
+      {
+        title: "Empirical Vulnerabilities: Disparate Impact, Opacity, and Structural Bias",
+        notes: "Scrutinize operational case studies, data provenance, and opacity barriers.",
+        subheadings: [
+          {
+            title: "Historical Training Data Bias and Compounding Disparities",
+            ratio: 0.20,
+            guidance: "Analyze empirical manifestations of bias across criminal justice, credit scoring, hiring, and predictive policing systems.",
+            keyPoints: [
+              "Feedback loops and runaway data bias",
+              "Disparate impact doctrine across protected classes",
+              "Proxy variables and intersectional blind spots",
+            ],
+          },
+          {
+            title: "Algorithmic Opacity, Due Process, and the Right to Explanation",
+            ratio: 0.20,
+            guidance: "Dissect black-box decision systems, trade secret protections, and the epistemic barrier to challenging automated outputs.",
+            keyPoints: [
+              "Epistemic opacity of deep neural networks",
+              "Commercial secrecy vs algorithmic transparency",
+              "Enforceability of the 'right to explanation'",
+            ],
+          },
+        ],
+      },
+      {
+        title: "Regulatory Architectures, Auditing Frameworks, and Institutional Horizons",
+        notes: "Propose actionable governance mechanisms, compliance frameworks, and long-term trajectory.",
+        subheadings: [
+          {
+            title: "Comparative Regulatory Frameworks: EU AI Act vs. Sectoral Governance",
+            ratio: 0.16,
+            guidance: "Critique tiered risk-based regulatory models (EU AI Act) compared to sectoral agency enforcement (FTC, CFPB, UK approach).",
+            keyPoints: [
+              "Risk-tiered classification under the EU AI Act",
+              "Pre-market conformity assessments and red-teaming",
+              "Regulatory arbitrage and enforcement limitations",
+            ],
+          },
+          {
+            title: "Technical Auditing, Counterfactual Explanations, and Policy Enforcement",
+            ratio: 0.14,
+            guidance: "Synthesize empirical auditing methodologies, counterfactual explanations, and institutional accountability architectures.",
+            keyPoints: [
+              "Independent algorithmic impact assessments (AIA)",
+              "Counterfactual explanations and actionable recourse",
+              "Long-term policy alignment and ethical stewardship",
+            ],
+          },
+        ],
+      },
+    ];
+  } else if (isAIInHealthcare) {
+    specs = [
+      {
+        title: "Clinical Informatics and Algorithmic Paradigms in Modern Medicine",
+        notes: "Establish technological frameworks for medical imaging, genomics, and clinical decision support.",
+        subheadings: [
+          {
+            title: "Deep Learning Architectures in Medical Imaging and Pathological Screening",
+            ratio: 0.14,
+            guidance: "Analyze convolutional and vision-transformer networks in radiology, histopathology, and oncology screening.",
+            keyPoints: [
+              "Convolutional neural networks & vision transformers in radiology",
+              "Sensitivity vs specificity optimization in oncology screening",
+              "Multimodal fusion of genomic and radiological biomarkers",
+            ],
+          },
+          {
+            title: "Clinical Decision Support Systems (CDSS) and EHR Integration",
+            ratio: 0.16,
+            guidance: "Examine natural language processing models for electronic health record (EHR) extraction and real-time clinical triage.",
+            keyPoints: [
+              "Clinical NLP for unstructured health record parsing",
+              "Sepsis and hemodynamic deterioration early-warning models",
+              "Interoperability standards (FHIR and HL7 protocols)",
+            ],
+          },
+        ],
+      },
+      {
+        title: "Empirical Translation: Diagnostic Efficacy, Cohort Bias, and Clinician Agency",
+        notes: "Evaluate prospective clinical trial validation, demographic generalizability, and human-in-the-loop workflows.",
+        subheadings: [
+          {
+            title: "Out-of-Distribution Generalizability and Demographic Shift in Patient Cohorts",
+            ratio: 0.20,
+            guidance: "Evaluate failure modes when models encounter underserved demographic groups or varying institutional scanner hardware.",
+            keyPoints: [
+              "Site-specific scanner artifacts and dataset shift",
+              "Underrepresentation of minority cohorts in clinical training sets",
+              "Prospective vs retrospective trial performance divergence",
+            ],
+          },
+          {
+            title: "Automation Bias, Clinician Epistemic Agency, and Diagnostic Liability",
+            ratio: 0.20,
+            guidance: "Analyze cognitive overreliance on machine outputs, bedside decision authority, and legal malpractice liabilities.",
+            keyPoints: [
+              "Automation bias and cognitive deskilling among clinicians",
+              "Shared decision-making and clinician override protocols",
+              "Medical malpractice liability and learned intermediary doctrine",
+            ],
+          },
+        ],
+      },
+      {
+        title: "Regulatory Compliance, Privacy Preservation, and Prospective Horizons",
+        notes: "Synthesize FDA/EMA Software as a Medical Device (SaMD) oversight, privacy, and precision medicine horizons.",
+        subheadings: [
+          {
+            title: "SaMD Regulatory Approval, Federated Learning, and HIPAA Compliance",
+            ratio: 0.16,
+            guidance: "Detail FDA Software as a Medical Device pathways (510(k), De Novo), federated learning privacy architectures, and HIPAA constraints.",
+            keyPoints: [
+              "FDA Good Machine Learning Practice (GMLP) for SaMD",
+              "Privacy-preserving federated learning across hospital networks",
+              "Continuous learning models vs static locked algorithms",
+            ],
+          },
+          {
+            title: "Precision Therapeutics, Generative Drug Discovery, and Implementation Roadmap",
+            ratio: 0.14,
+            guidance: "Synthesize the frontier of generative molecular design, personalized oncology dosing, and clinical deployment guidelines.",
+            keyPoints: [
+              "Generative de novo molecular design and protein folding",
+              "Real-world clinical workflow integration protocols",
+              "Future trajectories in decentralized precision medicine",
+            ],
           },
         ],
       },
@@ -1017,75 +1506,95 @@ export function generateDynamicAssignmentStructure(
       },
     ];
   } else {
-    // Dynamic question-specific decomposition for arbitrary questions
-    // Extracts substantive themes rather than hardcoding static placeholder titles
-    const cleanPrompt = question
-      .replace(/^(critically\s+)?(examine|evaluate|assess|analyze|analyse|discuss|investigate|explore|to\s+what\s+extent\s+does|what\s+is\s+the\s+role\s+of|the\s+role\s+of|an\s+analysis\s+of)\s+/i, "")
-      .replace(/[?.!]+$/, "")
-      .trim();
-
-    const words = cleanPrompt
-      .split(/\s+/)
-      .filter((w) => w.length > 2 && !/^(the|and|for|with|from|that|this|these|those|into|about)$/i.test(w));
-
-    const primarySubject = words.slice(0, 4).join(" ") || "Core Conceptual Focus";
-    const secondaryFocus = words.slice(4, 8).join(" ") || "Substantive Context";
-
-    const subjectTitle = primarySubject.charAt(0).toUpperCase() + primarySubject.slice(1);
-    const contextTitle = secondaryFocus.charAt(0).toUpperCase() + secondaryFocus.slice(1);
+    // Dynamic universal semantic question deconstruction
+    const semantics = deconstructQuestionSemantics(question);
+    const titleA = semantics.topicA;
+    const titleB = semantics.topicB;
 
     specs = [
       {
-        title: `Theoretical & Conceptual Foundations of ${subjectTitle}`,
-        notes: `Establish the disciplinary framing and theoretical perspectives governing ${subjectTitle}.`,
+        title: `Theoretical and Conceptual Foundations of ${titleA}${titleB ? ` in ${titleB}` : ""}`,
+        notes: `Establish foundational definitions, theoretical models, and analytical scope governing ${titleA}.`,
         subheadings: [
           {
-            title: `Conceptual Scope and Key Definitions in ${subjectTitle}`,
+            title: `Conceptual Delineation and Disciplinary Taxonomy: ${titleA}`,
             ratio: 0.14,
-            guidance: `Define primary concepts and analytical boundaries addressing ${cleanPrompt || "the assignment question"}.`,
-            keyPoints: ["Core definitions", "Analytical scope", "Disciplinary grounding"],
+            guidance: `Define primary concepts, taxonomical frameworks, and analytical boundaries addressing ${titleA}.`,
+            keyPoints: [
+              `Foundational taxonomy of ${titleA}`,
+              "Methodological measurement criteria",
+              "Disciplinary theoretical framing",
+            ],
           },
           {
-            title: "Theoretical Frameworks and Analytical Perspectives",
+            title: titleB
+              ? `Theoretical Paradigms Governing the Relationship with ${titleB}`
+              : `Major Competing Theoretical Paradigms and Models`,
             ratio: 0.18,
-            guidance: "Articulate authoritative theoretical models through which the central question is critically examined.",
-            keyPoints: ["Primary theoretical lens", "Underlying assumptions", "Explanatory mechanisms"],
+            guidance: titleB
+              ? `Synthesize the primary theoretical mechanisms linking ${titleA} directly to ${titleB}.`
+              : `Analyze the dominant theoretical perspectives explaining causal and functional dynamics.`,
+            keyPoints: [
+              "Primary theoretical paradigms",
+              "Underlying causal mechanisms",
+              "Structural assumptions and scope conditions",
+            ],
           },
         ],
       },
       {
-        title: `Empirical Analysis and Case Evidence: ${contextTitle}`,
-        notes: `Investigate empirical evidence, operational dynamics, and substantive developments.`,
+        title: titleB
+          ? `Substantive Evidence and Operational Dynamics: ${titleA} and ${titleB}`
+          : `Empirical Evidence, Operational Realities, and Case Analysis`,
+        notes: `Investigate primary empirical findings, real-world case evidence, and operational dynamics.`,
         subheadings: [
           {
-            title: `Primary Evidentiary Analysis and Substantive Developments`,
-            ratio: 0.22,
-            guidance: `Substantiate the central analytical arguments with contemporary peer-reviewed research.`,
-            keyPoints: ["Primary empirical findings", "Evidence synthesis", "Analytical significance"],
+            title: titleB
+              ? `Empirical Manifestations and Observed Dynamics in ${titleB}`
+              : `Primary Empirical Findings and Field Evidence`,
+            ratio: 0.20,
+            guidance: `Critically analyze peer-reviewed evidence and quantitative/qualitative data substantiating core arguments.`,
+            keyPoints: [
+              "Authoritative empirical data points",
+              "Observed systemic outcomes",
+              "Comparative variance across sectors/regions",
+            ],
           },
           {
-            title: `Contextual Dynamics and Operational Implications`,
+            title: `Structural Challenges, Heterogeneity, and Contextual Variance`,
             ratio: 0.18,
-            guidance: `Examine concrete applications, sectoral case evidence, and contextual nuances.`,
-            keyPoints: ["Case application", "Comparative evidence", "Contextual variance"],
+            guidance: `Scrutinize systemic friction points, institutional heterogeneity, and contextual disparities.`,
+            keyPoints: [
+              "Structural bottlenecks and constraints",
+              "Differential impact across sub-groups",
+              "Institutional and operational friction",
+            ],
           },
         ],
       },
       {
-        title: "Critical Counter-Perspectives, Limitations and Scholarly Synthesis",
-        notes: "Weigh competing arguments, address limitations, and reach justified conclusion.",
+        title: "Critical Counter-Perspectives, Policy Synthesis, and Future Horizons",
+        notes: "Rigorously test counterarguments, address methodological limitations, and chart future directions.",
         subheadings: [
           {
-            title: "Critical Counterarguments and Contested Assumptions",
+            title: "Contested Assumptions, Counter-Evidence, and Critical Critique",
             ratio: 0.16,
-            guidance: "Critically evaluate competing perspectives, methodological limitations, or counter-evidence.",
-            keyPoints: ["Counter-arguments", "Critique of assumptions", "Nuanced dialectical evaluation"],
+            guidance: `Weigh conflicting perspectives, methodological limitations in contemporary research, and alternative interpretations.`,
+            keyPoints: [
+              "Competing evidentiary interpretations",
+              "Methodological and data limitations",
+              "Unintended secondary externalities",
+            ],
           },
           {
-            title: "Scholarly Synthesis and Broader Academic Implications",
-            ratio: 0.12,
-            guidance: "Synthesize findings to articulate evidence-based conclusions and broader disciplinary implications.",
-            keyPoints: ["Synthesis of findings", "Broader academic implications", "Concluding evaluation"],
+            title: "Scholarly Synthesis, Strategic Interventions, and Future Horizons",
+            ratio: 0.14,
+            guidance: `Synthesize analytical conclusions into coherent academic arguments and forward-looking strategic recommendations.`,
+            keyPoints: [
+              "Overarching synthesis of findings",
+              "Evidence-based policy or practice recommendations",
+              "Prospective scholarly research agenda",
+            ],
           },
         ],
       },
@@ -1152,6 +1661,156 @@ export function generateDynamicAssignmentStructure(
     writingTone: typeof options.writingTone === "string" ? options.writingTone : (options.writingTone as any)?.preset || "formal_academic",
     rationale: `AI-proposed academic structure tailored to '${question.slice(0, 100)}' at ${academicLevel} level.`,
   };
+}
+
+/**
+ * Asynchronously generate an AI-enhanced outline using the Agentic LLM if available,
+ * falling back gracefully to the enhanced deterministic structure generator.
+ */
+export async function generateAiEnhancedOutline(
+  options: DynamicStructureOptions
+): Promise<AssignmentStructure> {
+  const fallbackStructure = generateDynamicAssignmentStructure(options);
+  const { question = "", academicLevel = "undergraduate", targetWordCount = 2000, writingTone = "analytical" } = options;
+
+  if (!question || question.trim().length < 5) {
+    return fallbackStructure;
+  }
+
+  try {
+    const systemPrompt = `You are a world-class academic curriculum and thesis director for top-tier universities.
+Your task is to generate a comprehensive, rigorous, and highly tailored academic outline for an assignment.
+
+CRITICAL RULES:
+1. NEVER use generic structural headings like "Introduction", "Body Paragraphs", "Conclusion", "Overview", or "Background".
+2. Create EXACTLY 3 Main Headings that directly reflect the core themes of the question.
+3. Under each Main Heading, provide EXACTLY 2 Subheadings with descriptive, intellectually rigorous titles.
+4. Under each Subheading, provide EXACTLY 3 specific H3 argument/evidence focus points (concrete academic concepts, models, empirical metrics, or theoretical debates).
+5. Provide a strong, definitive, tone-calibrated Working Thesis Statement answering the prompt.
+6. Allocate realistic target percentage ratios across the 6 subheadings summing to 1.0 (e.g. 0.12, 0.18, 0.20, 0.20, 0.16, 0.14).
+7. Return ONLY valid JSON with this exact schema:
+{
+  "thesisStatement": "string",
+  "headings": [
+    {
+      "title": "string",
+      "notes": "string",
+      "subheadings": [
+        {
+          "title": "string",
+          "guidance": "string",
+          "ratio": number,
+          "keyPoints": ["string", "string", "string"]
+        }
+      ]
+    }
+  ]
+}`;
+
+    const userPrompt = `Assignment Brief:
+- Prompt/Question: "${question}"
+- Academic Level: ${academicLevel}
+- Writing Tone: ${typeof writingTone === "string" ? writingTone : (writingTone as any)?.preset || "analytical"}
+- Target Word Count: ${targetWordCount} words
+
+Generate the tailored academic outline JSON now:`;
+
+    // Timeout after specified ms (default 1800ms) to keep UI responsive and snappy
+    const timeoutMs = (options as any).timeoutMs ?? 1800;
+    const llmPromise = executeAgenticLLM(systemPrompt, userPrompt, "reasoning");
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("AI outline timeout")), timeoutMs)
+    );
+
+    const rawResponse = (await Promise.race([llmPromise, timeoutPromise])) as string;
+    if (!rawResponse || typeof rawResponse !== "string") {
+      return fallbackStructure;
+    }
+
+    const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return fallbackStructure;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!parsed.headings || !Array.isArray(parsed.headings) || parsed.headings.length === 0) {
+      return fallbackStructure;
+    }
+
+    // Convert parsed structure to full AssignmentStructure with correct word counts
+    const total = Math.max(300, Number(targetWordCount) || 2000);
+    let allocatedSoFar = 0;
+    const totalSubheadingsCount = parsed.headings.reduce(
+      (sum: number, h: any) => sum + (Array.isArray(h.subheadings) ? h.subheadings.length : 0),
+      0
+    );
+
+    let subIndexGlobal = 0;
+    const headings: AssignmentMainHeading[] = parsed.headings.map((hSpec: any, hIdx: number) => {
+      const headingId = `heading-${hIdx + 1}`;
+      const headingNumber = hIdx + 1;
+      const subs = Array.isArray(hSpec.subheadings) ? hSpec.subheadings : [];
+
+      const subheadings: AssignmentSubheading[] = subs.map((sSpec: any, sIdx: number) => {
+        subIndexGlobal++;
+        const isLast = subIndexGlobal === totalSubheadingsCount;
+        const ratio = typeof sSpec.ratio === "number" && sSpec.ratio > 0 ? sSpec.ratio : 1 / totalSubheadingsCount;
+        let words = Math.round(total * ratio);
+        if (isLast) {
+          words = Math.max(50, total - allocatedSoFar);
+        } else {
+          allocatedSoFar += words;
+        }
+
+        return {
+          id: `sub-${headingNumber}-${sIdx + 1}`,
+          headingId,
+          numberStr: `${headingNumber}.${sIdx + 1}`,
+          title: sSpec.title || `Section ${headingNumber}.${sIdx + 1}`,
+          targetWordCount: words,
+          currentWordCount: 0,
+          notes: "",
+          guidance: sSpec.guidance || "",
+          keyPoints:
+            Array.isArray(sSpec.keyPoints) && sSpec.keyPoints.length > 0
+              ? sSpec.keyPoints
+              : ["Core concept", "Empirical evidence", "Analytical synthesis"],
+          researchStatus: "not_researched" as const,
+          sourcesCount: 0,
+          boundSourceIds: [],
+          draftContent: "",
+          draftStatus: "not_started" as const,
+        };
+      });
+
+      const headingTotal = subheadings.reduce((sum, s) => sum + s.targetWordCount, 0);
+
+      return {
+        id: headingId,
+        number: headingNumber,
+        title: hSpec.title || `Main Heading ${headingNumber}`,
+        notes: hSpec.notes || "",
+        targetWordCount: headingTotal,
+        subheadings,
+      };
+    });
+
+    const totalAllocated = headings.reduce((sum, h) => sum + h.targetWordCount, 0);
+
+    return {
+      version: options.currentStructure ? (options.currentStructure.version || 1) + 1 : 1,
+      isConfirmed: false,
+      targetWordCount: total,
+      totalAllocated,
+      headings,
+      thesisStatement: parsed.thesisStatement || fallbackStructure.thesisStatement,
+      writingTone: typeof writingTone === "string" ? writingTone : (writingTone as any)?.preset || "formal_academic",
+      rationale: `AI-synthesized bespoke outline tailored specifically for: "${question}" (${academicLevel} level).`,
+    };
+  } catch (err) {
+    console.warn("generateAiEnhancedOutline: LLM failed or timed out, returning high-precision local outline", err);
+    return fallbackStructure;
+  }
 }
 
 /**
