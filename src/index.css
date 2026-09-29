@@ -4,19 +4,16 @@
 
 /* ============================================================================
    SCHOLAR OS — DESIGN SYSTEM
-   Authority: docs/06-decisions/60-DESIGN-DIRECTION.md
+   Specification: docs/UI-UX.md
 
-   One token generation, replacing the three that previously coexisted here
-   (original brand, sci-fi v2 grey, sci-fi v3 navy). See the ADR for why a
-   single sweep was chosen over a fourth per-component migration.
-
+   Scientific Monochrome / Minimalist Standard.
    Structure:
      1. Typography tokens          (@theme)
      2. Semantic colour — light    (:root)
      3. Semantic colour — dark     (media + [data-theme])
-     4. Legacy token compatibility (maps old names onto the new system)
+     4. Theme token aliases
      5. Base elements
-     6. Utilities still in use
+     6. Utility styles
    ========================================================================= */
 
 @theme {

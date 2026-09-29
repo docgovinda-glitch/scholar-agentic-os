@@ -2,11 +2,8 @@
  * Local AI runner catalog — the programs a user can install on their own
  * computer to run models locally.
  *
- * Why this file exists (2026-07-31): the app previously knew about exactly two
- * local runners (Ollama, and "custom" standing in for LM Studio and everything
- * else), with their ports and install steps scattered between
- * src/config/aiModes.ts and src/services/aiGateway.ts. Adding a runner now
- * means adding one entry here.
+ * Defines catalog entries, discovery endpoints, and configuration for local
+ * model runners (Ollama, LM Studio, vLLM, LocalAI).
  *
  * Like providerCatalog.ts this module is imported by both the browser bundle
  * and server.ts, so it must contain pure data and pure functions only — no

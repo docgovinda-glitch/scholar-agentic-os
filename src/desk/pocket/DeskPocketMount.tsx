@@ -6,19 +6,10 @@ import type { PocketProject } from "../../pocket/types";
 import { syncManager, type SyncStatus } from "../../services/offline/syncManager";
 
 /**
- * Pocket's mount point inside Desk (docs 23-MOBILE-WEB-UX-SPECIFICATION.md).
+ * Pocket's mount point for mobile viewports.
  *
- * Pocket previously only existed as a tab inside the legacy client
- * (src/App.tsx), fed by src/pocket/adapters.ts's translation from legacy's
- * PaperProject model. With legacy retired, Pocket had nowhere to mount at
- * all — this closes that gap using Desk's own project list directly, no
- * adapter needed since Pocket's PocketProject type already extends Desk's
- * own ProjectView (src/pocket/types.ts).
- *
- * Pocket is deliberately a narrower companion than the desktop DeskShell —
- * "Approve, Read, Ask, Know" (docs 23 §1), not a mobile port of intake forms
- * or the editor — so this replaces the whole mobile experience (both the
- * project list and an open project) rather than nesting inside DeskShell.
+ * Pocket serves as a streamlined mobile companion ("Approve, Read, Ask, Know")
+ * tailored for on-the-go review, reading lists, and quick Copilot queries.
  */
 export default function DeskPocketMount({ projectId }: { projectId: string | null }) {
   const [projects, setProjects] = useState<PocketProject[] | null>(null);

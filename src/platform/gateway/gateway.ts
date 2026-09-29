@@ -69,7 +69,7 @@ function resolveAdapter(providerId: string) {
   if (!adapter) {
     throw new Error(
       `No gateway adapter for provider "${providerId}". ` +
-        `See docs/01-product/13-MODULE-SPECIFICATIONS.md §8.1 for the migration gap.`
+        `See docs/AI-SYSTEM.md for supported providers.`
     );
   }
   return adapter;

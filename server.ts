@@ -37,117 +37,23 @@ import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, register
 
 dotenv.config();
 
-// Honour $PORT rather than hardcoding. Render assigns the port it expects the
-// service to listen on through this variable; the literal 3000 happened to
-// work only because render.yaml pins PORT=3000 to match. Reading the variable
-// removes that coupling — a platform-assigned port now just works instead of
-// producing a service that binds somewhere nothing is routed to.
+// Bind to environment $PORT if provided (e.g. Render), defaulting to 3000.
 const PORT = Number(process.env.PORT) || 3000;
 
-// Production-readiness pass (2026-07-24): this used to be
-// `const __filename = fileURLToPath(import.meta.url); const __dirname =
-// path.dirname(__filename);` unconditionally — which crashes on startup
-// under the CJS build `npm start` actually runs (`dist/server.cjs`,
-// produced by esbuild --format=cjs): `import.meta.url` is empty in CJS, so
-// `fileURLToPath(undefined)` threw ERR_INVALID_ARG_TYPE immediately
-// (confirmed by actually running `node dist/server.cjs`, not just reading
-// the build warning). Node/esbuild's CJS output already provides a real,
-// working `__dirname` binding for free — this only needs to compute one
-// from `import.meta.url` in the ESM path (`tsx server.ts`, used by `npm run
-// dev`), and defer to the ambient one otherwise. Resolved once, at module
-// load, not per-request.
-//
-// Warning cleanup (2026-07-30): the `npm run build` esbuild invocation now
-// passes `--define:import.meta={}` — this is NOT a behavior change, only a
-// way to silence esbuild's own "import.meta is not available with the cjs
-// output format" warning. Confirmed by diffing the compiled output with and
-// without the flag: esbuild already substitutes bare `{}` for `import.meta`
-// in the CJS bundle by default (undocumented but consistent), so `--define`
-// just makes that existing substitution explicit instead of implicit,
-// producing identical compiled code either way. `typeof import.meta` stays
-// `"object"` (not `"undefined"`), `import.meta.url` stays `undefined`
-// (there's no `.url` property on `{}`), so this function's `if` branch is
-// exactly as unreachable in the CJS bundle as it always was — only the
-// dev/tsx ESM path (where esbuild's --define never applies) still takes it.
-// This does NOT migrate the server bundle to ESM output — `dist/server.cjs`
-// stays CJS, matching `"start": "node dist/server.cjs"` and this repo's
-// `--packages=external` choice (externals are `require()`'d, not
-// `import`'d, avoiding any CJS/ESM interop risk for the ~15 npm packages
-// server.ts pulls in). A full ESM migration was considered and rejected as
-// out of scope for a warning-only fix — it would change the actual output
-// format/interop behavior of every external import, not just silence a
-// cosmetic warning.
+// Resolve server directory across both dev ESM (`tsx server.ts`) and production CJS (`dist/server.cjs`).
 function resolveServerDirname(): string {
   if (typeof import.meta !== "undefined" && import.meta.url) {
     return path.dirname(fileURLToPath(import.meta.url));
   }
-  // @ts-ignore — __dirname is a real binding injected by Node's CJS module
-  // wrapper at runtime in the esbuild-bundled dist/server.cjs; it isn't a
-  // declared identifier in this ESM-authored source file.
+  // @ts-ignore - __dirname is provided by Node's CJS runtime in the bundled dist/server.cjs
   return __dirname;
 }
 const serverDirname = resolveServerDirname();
 
 const app = express();
 
-// Security headers (helmet) — previously entirely absent from this server.
-// CSP is skipped in dev: Vite's middleware-mode HMR needs inline
-// scripts/eval and a websocket connection that a strict default CSP would
-// block; production serves pre-built static assets instead and gets the
-// full default policy.
-//
-// Bug fix (2026-07-31): this used to pass `contentSecurityPolicy: undefined`
-// in production, which makes helmet apply its bare default directives —
-// including `connect-src` falling back to `default-src 'self'` (same-origin
-// only). That silently blocked every browser-side fetch() to any other
-// origin, confirmed live in production: registration failed with a generic
-// "Load failed" (Safari) / "TypeError: Failed to fetch" (Chrome) because
-// the client's calls to Supabase Auth/REST/Edge Functions
-// (`*.supabase.co`) never left the browser. The same gap also silently
-// broke every literature/citation/dataset-discovery feature that fetches
-// directly from the browser (OpenAlex, Crossref, DataCite, World Bank,
-// OECD SDMX) — none of these go through server.ts as a proxy. Explicit
-// `connect-src` added on top of helmet's other defaults (left unchanged)
-// to allow exactly the origins this app's client-side code actually calls.
-//
-// `form-action` fix (2026-07-31): helmet's default directives
-// include `form-action 'self'`. Allowed Supabase source origin to support
-// direct browser form submissions to Supabase endpoints.
-//
-// Wildcard-to-exact-origin fix (2026-07-31, same day): `https://*.supabase.co`
-// worked in Chrome but confirmed live to NOT match in Safari — WebKit's CSP
-// wildcard-matching didn't recognize the project's actual hostname
-// (gfjhsijrwodjvkisouzw.supabase.co) against that pattern, so Safari
-// refused the form-action with a CSP violation while Chrome allowed it
-// silently. A single-tenant deployment only ever talks to one specific
-// Supabase project anyway, so the wildcard bought nothing — replaced with
-// the exact origin (derived from VITE_SUPABASE_URL, already required) in
-// both directives, which is unambiguous across every browser.
-// Gemini BYOK fix (2026-07-31): every cloud provider except Gemini is called
-// through this server's own /api/generate proxy, so `'self'` covered them.
-// Gemini is the one exception — GeminiAdapter.generate() in
-// src/services/aiGateway.ts calls generativelanguage.googleapis.com DIRECTLY
-// from the browser whenever the user has supplied their own Gemini key, and
-// only falls back to the proxy when no client key is set. That origin was
-// missing here, so "Bring Your Own Gemini key" was silently CSP-blocked in
-// production (a bare `TypeError: Failed to fetch`) while leaving the key blank
-// worked fine — an inversion that made the failure very hard to interpret.
-// DIRECT_BROWSER_CALL_ORIGINS in src/config/providerCatalog.ts is the list any
-// future direct-from-browser provider must be added to as well.
-// Local AI fix (2026-07-31): "Local AI" is one of this app's five advertised
-// AI modes, but production CSP had no localhost source — so a user running
-// Ollama on their own machine could never connect from the deployed site, and
-// the failure surfaced as a bare "could not reach" with no hint that the
-// policy, not the program, was the obstacle. Local AI was effectively dead in
-// production while being offered in the UI.
-//
-// Allowing localhost in connect-src only lets THIS app's own pages talk to
-// the user's own machine, which is precisely the feature; it grants nothing
-// to any other origin. Both a port wildcard and the catalog's explicit
-// default ports are listed: the wildcard covers custom ports, and the
-// explicit entries are the safety net after `https://*.supabase.co` was
-// confirmed live not to match in Safari — if WebKit treats a port wildcard
-// the same way, the default runner ports still work.
+// Security headers: CSP is enforced in production while disabled in dev to allow Vite HMR.
+// The policy explicitly permits Supabase endpoints, Gemini BYOK, scholarly discovery APIs, and local AI loopback runners.
 const localRunnerSources = Array.from(
   new Set(
     LOCAL_RUNNERS.flatMap((runner) => {
@@ -157,27 +63,7 @@ const localRunnerSources = Array.from(
   )
 );
 
-// upgrade-insecure-requests fix (2026-07-31): allowing localhost in
-// connect-src above was necessary but did nothing on its own. Helmet's default
-// directives include `upgrade-insecure-requests`, which rewrites every http://
-// request to https:// BEFORE it is sent — so the browser never asked for
-// http://localhost:11434 at all, it asked for https://localhost:11434 and got
-// "An SSL error has occurred" (confirmed in a user's Safari console against
-// every runner port). Local AI programs serve plain HTTP on loopback and have
-// no certificate, so the upgrade can never succeed.
-//
-// The directive is dropped rather than overridden because it is all-or-nothing
-// — there is no per-source exemption. The protection lost is small here: every
-// other source in this policy is already an explicit https:// origin, and the
-// app's own assets are same-origin HTTPS, so there is no http:// subresource
-// left for it to upgrade. Loopback is exempt from mixed-content blocking by
-// spec precisely because it is not attacker-reachable.
-//
-// It MUST be set to null rather than simply omitted from the spread: helmet
-// defaults to `useDefaults: true` and merges its default directives back over
-// whatever is supplied, so leaving the key out silently reinstates it. Checked
-// against helmet directly — omitting keeps the directive in the header, null
-// removes it.
+// upgrade-insecure-requests is explicitly set to null so local runners (Ollama, LM Studio) on plain HTTP loopback can connect.
 // index.html's inline theme-flash-prevention <script> (the one wrapped in
 // try/catch, setting data-theme from localStorage before first paint) has no
 // nonce, so `script-src 'self'` alone silently blocks it in production —

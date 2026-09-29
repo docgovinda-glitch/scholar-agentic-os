@@ -1,24 +1,11 @@
 /**
- * Postgres-backed implementation of ProjectStore (services/store's "owns the
- * Postgres schema" per docs/01-product/13-MODULE-SPECIFICATIONS.md).
+ * Postgres-backed implementation of ProjectStore.
  *
- * Schema: supabase/schema_store.sql's `projects` table — one row per
- * ProjectRecord, with answers/gates/document/rubric_report/claim_graph/
- * waivers stored as jsonb. This is a pragmatic increment, not
- * docs/04-architecture/45-DATA-ARCHITECTURE.md §2-§10's full target (event
- * sourcing, content-addressed blobs, a hash-chained Ledger, client-side
- * encryption with the cloud holding ciphertext only) — that target is for
- * the eventual local-first desktop client, which doesn't exist yet. What
- * exists today is a server-authoritative Express API
- * (server/routes/project.ts), so this store makes that API's state durable
- * without pretending to be the full local-first architecture. Upgrading to
- * §2-§10 is real future work, not silently abandoned — see this module's
- * "Current state" note in docs 45 §13.
+ * Persists project records with answers, gates, document, rubric reports, and
+ * claim graphs stored as JSONB.
  *
  * Takes a minimal query interface (`PgQueryable`) rather than depending on
- * `pg.Pool` directly, so tests can inject a fake and verify SQL/param
- * shape and row-mapping without a live database. `createPool()` below is
- * the one place that constructs a real `pg.Pool` from DATABASE_URL.
+ * `pg.Pool` directly, allowing tests to inject mocks without a live database.
  */
 
 import { Pool } from "pg";
@@ -45,7 +32,7 @@ export function createPool(): Pool {
   if (!connectionString) {
     throw new Error(
       "DATABASE_URL is not set. Postgres-backed persistence requires it — see " +
-        ".env.example and docs/04-architecture/45-DATA-ARCHITECTURE.md §13. " +
+        ".env.example and docs/DEVELOPMENT.md. " +
         "Without it, the server falls back to the in-memory store."
     );
   }

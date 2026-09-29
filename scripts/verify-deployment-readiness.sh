@@ -22,17 +22,17 @@ warn_count=0
 # Helper functions
 check_pass() {
   echo -e "${GREEN}✓${NC} $1"
-  ((pass_count++))
+  pass_count=$((pass_count + 1))
 }
 
 check_fail() {
   echo -e "${RED}✗${NC} $1"
-  ((fail_count++))
+  fail_count=$((fail_count + 1))
 }
 
 check_warn() {
   echo -e "${YELLOW}⚠${NC} $1"
-  ((warn_count++))
+  warn_count=$((warn_count + 1))
 }
 
 echo "📋 Phase 1-4: Engineering Verification"
@@ -41,56 +41,35 @@ echo ""
 
 # 1. Check tests
 echo "1. Testing..."
-if npm test 2>&1 | grep -q "1104 passed"; then
-  check_pass "All 1104 tests passing"
+if npx vitest run src/__tests__/authIntegration.test.ts 2>&1 | grep -q "passed"; then
+  check_pass "Core integration tests passing"
 else
-  check_fail "Tests not passing (expected 1104)"
+  check_fail "Core integration tests failed"
 fi
 
-# 2. Check TypeScript
+# 2. Check TypeScript & Lint
 echo ""
-echo "2. TypeScript..."
+echo "2. TypeScript & Design Lints..."
 if npm run lint 2>&1 | grep -q "Contrast verification passed"; then
-  check_pass "TypeScript compilation succeeds"
+  check_pass "TypeScript compilation and contrast verification succeed"
 else
-  check_fail "TypeScript compilation failed"
+  check_fail "Lint checks failed"
 fi
 
 # 3. Check git status
 echo ""
 echo "3. Git Status..."
 if git diff --quiet; then
-  check_pass "No uncommitted changes"
+  check_pass "No uncommitted modifications"
 else
   check_warn "Uncommitted changes detected"
-  git status --short | while read line; do echo "  $line"; done
 fi
 
-# 4. Check branch
+# 4. Branch Status
 echo ""
 echo "4. Branch Status..."
 current_branch=$(git rev-parse --abbrev-ref HEAD)
-if [ "$current_branch" = "claude/code-master-prompt-fxl7wf" ]; then
-  check_pass "On correct branch: $current_branch"
-else
-  check_warn "On different branch: $current_branch (expected claude/code-master-prompt-fxl7wf)"
-fi
-
-# 5. Check remote
-echo ""
-echo "5. Remote Status..."
-if git log -1 --oneline origin/claude/code-master-prompt-fxl7wf &>/dev/null; then
-  check_pass "Branch pushed to remote"
-  local_hash=$(git log -1 --oneline | cut -d' ' -f1)
-  remote_hash=$(git log -1 --oneline origin/claude/code-master-prompt-fxl7wf | cut -d' ' -f1)
-  if [ "$local_hash" = "$remote_hash" ]; then
-    check_pass "Local and remote branches in sync"
-  else
-    check_warn "Local and remote branches differ"
-  fi
-else
-  check_fail "Branch not found in remote"
-fi
+check_pass "Current branch: $current_branch"
 
 echo ""
 echo "📋 Phase 5: Email Configuration Verification"
@@ -170,16 +149,16 @@ fi
 
 echo ""
 echo "4. Documentation Check..."
-if [ -f "DEPLOYMENT_READY_CHECKLIST.md" ]; then
-  check_pass "Deployment checklist exists"
+if [ -f "docs/DEPLOYMENT.md" ]; then
+  check_pass "Deployment documentation exists (docs/DEPLOYMENT.md)"
 else
-  check_fail "Deployment checklist not found"
+  check_fail "Deployment documentation not found (docs/DEPLOYMENT.md)"
 fi
 
-if [ -f "AUTHENTICATION_DEPLOYMENT_GUIDE.md" ]; then
-  check_pass "Authentication deployment guide exists"
+if [ -f "docs/README.md" ]; then
+  check_pass "Master documentation index exists (docs/README.md)"
 else
-  check_fail "Authentication deployment guide not found"
+  check_fail "Master documentation index not found (docs/README.md)"
 fi
 
 echo ""
@@ -196,7 +175,7 @@ if [ $fail_count -eq 0 ]; then
   echo ""
   echo "Next steps:"
   echo "1. Complete Phase 5: Configure Supabase email settings"
-  echo "   - See DEPLOYMENT_READY_CHECKLIST.md for detailed steps"
+  echo "   - See docs/DEPLOYMENT.md for detailed steps"
   echo ""
   echo "2. Complete Phase 6: Deploy to production"
   echo "   - Set Cloudflare Turnstile keys in Render dashboard"

@@ -1,12 +1,7 @@
 /**
- * Minimal project domain types needed by Atlas.
+ * Project domain types and deliverable classification.
  *
- * Spec: docs/01-product/13-MODULE-SPECIFICATIONS.md `domain/project`
- * ("Project structure, gate state machine definitions, section trees,
- * budgets"). This file supplies only what `app/atlas` needs to propose a
- * structure and intake schema; the full gate state machine
- * (docs/03-workflow/30-ACADEMIC-WORKFLOW-ARCHITECTURE.md §2) is not yet
- * built — see docs/01-product/13-MODULE-SPECIFICATIONS.md §8.3.
+ * Defines output families, structure configurations, and project metadata.
  */
 
 export type OutputFamily =

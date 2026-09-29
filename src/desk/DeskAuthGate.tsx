@@ -7,16 +7,11 @@ import { getProfile } from "../services/supabaseAuthService";
 /**
  * Route guards for Desk's authentication boundary.
  *
- * Previously a single component (DeskAuthGate) that decided *whether* to
- * render its children at all, swapping in <AuthFlow/> for every
- * unauthenticated case regardless of what the user actually wanted to do —
- * which is exactly why the "Get Started" bug existed: AuthFlow's own screens
- * were plain React state with no URL of their own, so Back skipped past all
- * of them in one step. This file now exports route-level guards instead:
- * RequireAuth protects the authenticated app's routes, PublicOnly protects
- * the unauthenticated auth routes (redirecting a signed-in visitor away
- * rather than showing them a stale sign-in form), each real screen gets its
- * own URL, and ordinary browser history does the rest.
+ * Exports route-level guards:
+ * - RequireAuth protects authenticated routes (redirecting guests to /signin)
+ * - PublicOnly protects guest auth routes (redirecting authenticated visitors to /projects)
+ * - RequireOnboarding ensures profile setup is completed before workspace access
+ * - RequireRecovery protects password recovery flows
  */
 
 /** Exported for VerifyEmailRoute (AuthFlow.tsx), which needs the same loading/unconfigured treatment while it does its own status-specific guarding. */

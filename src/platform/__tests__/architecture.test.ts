@@ -1,19 +1,7 @@
 /**
- * Architectural tests — enforce the module boundaries documented in
- * docs/01-product/13-MODULE-SPECIFICATIONS.md §4.
+ * Architectural tests — enforce module boundaries and security invariants.
  *
- * These are cheap, static-analysis-style checks. They don't prove the whole
- * system is correct, but they prevent the two specific regressions the
- * design depends on nobody introducing quietly: a provider call that skips
- * the Warden, and a NEW server-side module reaching for a raw HTTP client
- * instead of going through platform/gateway.
- *
- * Scope note (docs 13-MODULE-SPECIFICATIONS.md §8.1 / 41-AI-ARCHITECTURE.md
- * §12 "current state"): the legacy src/services/aiGateway.ts and
- * server/routes/ai.ts predate this module boundary and are NOT yet migrated
- * — they are the documented next migration target, not a silent gap. This
- * test therefore scopes its "no raw fetch to a provider host" check to the
- * NEW platform/ and app/ trees, where the rule is actually enforced today.
+ * Verifies that platform and app code route provider calls through the platform gateway.
  */
 
 import { describe, it, expect } from "vitest";

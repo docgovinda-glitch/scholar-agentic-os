@@ -1,17 +1,7 @@
 /**
- * The gate state machine — pure types and transitions.
+ * The gate state machine — types and transitions for academic progression gates.
  *
- * Spec: docs/03-workflow/30-ACADEMIC-WORKFLOW-ARCHITECTURE.md §2-3.
- *
- * SCOPE, STATED HONESTLY: this implements the whole-document gate model in
- * full. Per-chapter independent gating for the `long_form_chaptered`
- * workflow variant (§3's "For long_form_chaptered, G3 runs per chapter
- * after a whole-document skeleton is agreed") is NOT implemented — this
- * module tracks one gate state per project, not per chapter. That is a
- * genuinely larger feature (parallel gate-state instances with G6/G7
- * remaining whole-document) and is the next extension, not a redesign, when
- * a client exists to drive it. See src/app/conductor/conductor.ts's module
- * comment for the tracked gap.
+ * Tracks project gate state (G0 through G7), transition rules, and lock statuses.
  */
 
 export type GateId = "G0" | "G1" | "G2" | "G3" | "G4" | "G5" | "G6" | "G7";

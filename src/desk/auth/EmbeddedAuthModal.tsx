@@ -141,7 +141,7 @@ export default function EmbeddedAuthModal({
             </div>
           )}
 
-          {/* Directly wires the previously engineered screens */}
+          {/* Embedded Auth Screens */}
           {screen === "signin" && (
             <SignInScreen
               embedded

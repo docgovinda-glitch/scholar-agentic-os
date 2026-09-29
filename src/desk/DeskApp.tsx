@@ -86,13 +86,7 @@ interface OnboardingContext {
 }
 
 /**
- * The forced interstitials between sign-in and the workspace (docs 25 §1):
- * Login -> AI Access (if never configured) -> Knowledge Vault (offered once)
- * -> everything else. Deliberately not routes of their own (see the plan's
- * "left as state" list) — whatever URL under RequireAuth the visitor is
- * headed to, these gate it exactly the same way DeskRoutes' early returns
- * used to, before any of /projects, /settings, /vault, /ai-access existed as
- * real destinations.
+ * Resolves root navigation: signed-in users navigate to /projects, unauthenticated visitors to ProjectsIndexRoute.
  */
 function RootOrProjectsRoute() {
   const session = useDeskSession();
@@ -109,14 +103,7 @@ function OnboardingGate() {
   // Gated on AI setup being finished so the two stages cannot render at once,
   // and so the Vault query does not run before it is reachable.
   const vaultSetup = useVaultSetupStatus(userId, aiSetup.status === "ready");
-  /**
-   * Section 11: true for exactly the one transition out of the Knowledge
-   * Vault stage (declined or completed) — Knowledge is always the last
-   * onboarding gate before the workspace, so that transition is the single
-   * place "onboarding just finished" is really true. A returning user whose
-   * onboarding was already done in a past session never sees vaultSetup's
-   * "offer" branch at all, so this never fires for them.
-   */
+  // Tracks the transition when onboarding completes to show initial greeting on the dashboard.
   const [justFinishedOnboarding, setJustFinishedOnboarding] = useState(false);
 
   if (session.status !== "signed-in") {
@@ -134,8 +121,7 @@ function OnboardingGate() {
     return <AiAccessPage mode="onboarding" onContinue={aiSetup.complete} onSkip={aiSetup.skip} />;
   }
 
-  // Knowledge Vault (docs 25 §6) — optional, and offered once. Declining is a
-  // peer option, not a lesser one, and is remembered.
+  // Knowledge Vault setup step - optional, offered once during onboarding.
   if (vaultSetup.status === "offer") {
     return (
       <VaultSetupScreen
@@ -159,13 +145,7 @@ function OnboardingGate() {
 }
 
 /**
- * Pocket (docs 23) is a deliberately narrower companion — Approve/Read/Ask/
- * Know, not a mobile port of intake forms or the editor — so it replaces the
- * whole mobile experience (list and open project alike) rather than nesting
- * inside DeskShell's desktop layout. Its own project-switching UI
- * (ProjectsTab) stays local state, same as before this migration — only the
- * outer list/project boundary now comes from the URL, the same one Desktop
- * uses, rather than a separately-read source.
+ * Projects dashboard route: displays project list, search, filter tabs, and creation modal.
  */
 function ProjectsIndexRoute() {
   const navigate = useNavigate();
@@ -374,7 +354,7 @@ function SettingsRoute() {
   );
 }
 
-/** A Vault is "your long-term library... across future projects" (docs 25 §6.2) — a peer destination to a project, not something folded inside one. */
+/** Knowledge Vault route: global cross-project literature repository. */
 function VaultRoute() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -394,12 +374,7 @@ function VaultRoute() {
 }
 
 /**
- * AI Access (Section 20), revisited — "manage" mode (the default): every
- * provider/model/Premium control a user needs, reached from a nav item
- * rather than the onboarding gate in OnboardingGate. The SAME page that gate
- * renders for a first-time user, just in "manage" instead of "onboarding"
- * mode, so there is exactly one AI-configuration surface, not two that could
- * drift apart.
+ * AI Access route: provider configuration, BYOK credentials, and local runner discovery.
  */
 function AiAccessRoute() {
   const navigate = useNavigate();
@@ -423,15 +398,7 @@ function AiAccessRoute() {
 }
 
 /**
- * Root route tree for everything except /admin/* (see main.tsx).
- *
- * Every screen Desk can show now has its own URL — Back/Forward/refresh/
- * direct-link all work the way they would for any other web app. The public
- * auth routes fix the originally reported bug (clicking "Get Started" used
- * to change only in-memory state, invisible to Back/Forward/refresh); the
- * authenticated ones below (project list, an open project, Settings, Vault,
- * AI Access) retire the old `?project=` query param + manual pushState/
- * popstate scheme in favor of real nested routes.
+ * Root route tree for Desk application components.
  */
 export default function DeskApp() {
   return (
