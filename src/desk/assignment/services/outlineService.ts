@@ -22,7 +22,6 @@ import type {
   AssignmentMainHeading,
   AssignmentSubheading,
 } from "../types";
-import { executeAgenticLLM } from "../../api";
 
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
@@ -458,6 +457,8 @@ export interface DynamicStructureOptions {
   citationStyle?: string;
   writingTone?: string;
   currentStructure?: AssignmentStructure;
+  timeoutMs?: number;
+  llmCaller?: (systemPrompt: string, userPrompt: string, mode?: "reasoning" | "fast") => Promise<string>;
 }
 
 interface HeadingSpec {
@@ -1717,7 +1718,12 @@ Generate the tailored academic outline JSON now:`;
 
     // Timeout after specified ms (default 1800ms) to keep UI responsive and snappy
     const timeoutMs = (options as any).timeoutMs ?? 1800;
-    const llmPromise = executeAgenticLLM(systemPrompt, userPrompt, "reasoning");
+    const llmCaller = (options as any).llmCaller;
+    if (typeof llmCaller !== "function") {
+      return fallbackStructure;
+    }
+
+    const llmPromise = Promise.resolve(llmCaller(systemPrompt, userPrompt, "reasoning"));
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("AI outline timeout")), timeoutMs)
     );

@@ -11,8 +11,15 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const rawUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const env =
+  (typeof import.meta !== "undefined" && import.meta && import.meta.env)
+    ? import.meta.env
+    : (typeof process !== "undefined" && process && process.env)
+      ? (process.env as unknown as Record<string, string | undefined>)
+      : ({} as Record<string, string | undefined>);
+
+const rawUrl = (env.VITE_SUPABASE_URL || env.SUPABASE_URL) as string | undefined;
+const SUPABASE_ANON_KEY = (env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY) as string | undefined;
 
 /**
  * Resolves the Supabase URL.
@@ -66,7 +73,7 @@ export function getSupabaseClient(): SupabaseClient {
 
     // Check if Realtime is explicitly disabled via env or local preference
     const isRealtimeDisabled =
-      import.meta.env.VITE_DISABLE_REALTIME === "true" ||
+      env.VITE_DISABLE_REALTIME === "true" ||
       (typeof window !== "undefined" && window.localStorage?.getItem("scholar_disable_realtime") === "true");
 
     const clientOptions: any = {

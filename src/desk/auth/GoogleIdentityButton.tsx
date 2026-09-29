@@ -3,7 +3,8 @@ import { loadGoogleGsiScript, signInWithGoogleIdToken, signInWithGoogle } from "
 import { GoogleSignInButton } from "./AuthLayout";
 
 const GOOGLE_CLIENT_ID =
-  (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ||
+  (typeof import.meta !== "undefined" && (import.meta?.env?.VITE_GOOGLE_CLIENT_ID as string | undefined)) ||
+  (typeof process !== "undefined" && (process?.env?.VITE_GOOGLE_CLIENT_ID as string | undefined)) ||
   "321279128437-m3pm3b0qk9kli39mv2em8t5fq2io841p.apps.googleusercontent.com";
 
 interface GoogleIdentityButtonProps {

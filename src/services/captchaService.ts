@@ -16,7 +16,9 @@ export interface CaptchaConfig {
  * If VITE_CAPTCHA_SITE_KEY is not set, CAPTCHA is disabled.
  */
 export function getCaptchaConfig(): CaptchaConfig {
-  const siteKey = import.meta.env.VITE_CAPTCHA_SITE_KEY as string | undefined;
+  const siteKey =
+    (typeof import.meta !== "undefined" && import.meta?.env?.VITE_CAPTCHA_SITE_KEY) ||
+    (typeof process !== "undefined" && (process?.env?.VITE_CAPTCHA_SITE_KEY as string | undefined));
   return {
     siteKey: siteKey || "",
     enabled: Boolean(siteKey),
