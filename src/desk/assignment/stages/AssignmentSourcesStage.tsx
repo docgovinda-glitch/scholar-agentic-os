@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { ReferenceBarItem } from "../ReferenceBarItem";
 import { ApprovedReferencesShelf } from "../ApprovedReferencesShelf";
@@ -388,7 +388,10 @@ export default function AssignmentSourcesStage({
   const hasTopic = Boolean(question && question.trim().length >= 4);
   const hasUploadedDocs = Boolean(userUploadedSources && userUploadedSources.length > 0);
 
-  // Initialize curated sources on first mount
+  // Track the question we have already auto-curated for to prevent re-entrant loops
+  const lastAutoCuratedQuestionRef = useRef<string | null>(null);
+
+  // Initialize curated sources on first mount or when question topic meaningfully shifts
   // Strict Empty State: If no question/topic and no uploaded materials, render 0 cards.
   useEffect(() => {
     if (!hasTopic && !hasUploadedDocs) {
@@ -398,10 +401,13 @@ export default function AssignmentSourcesStage({
       return;
     }
 
+    const currentNormalizedTopic = (question || "").trim();
     if (sources.length === 0) {
+      lastAutoCuratedQuestionRef.current = currentNormalizedTopic;
       const generated = generateCuratedLiteratureSources(question, citationStyle);
       setSources(generated);
-    } else if (isMismatched) {
+    } else if (isMismatched && lastAutoCuratedQuestionRef.current !== currentNormalizedTopic) {
+      lastAutoCuratedQuestionRef.current = currentNormalizedTopic;
       const generated = generateCuratedLiteratureSources(question, citationStyle);
       setSources(generated);
     }

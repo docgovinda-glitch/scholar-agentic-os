@@ -90,8 +90,18 @@ export default class ErrorBoundary extends Component<Props, State> {
             </p>
 
             {this.state.error && (
-              <div className="w-full mb-6 p-3 rounded-xl bg-slate-50 dark:bg-neutral-900 border border-slate-200/80 dark:border-neutral-800 text-left overflow-x-auto max-h-28 text-[11px] font-mono text-slate-600 dark:text-neutral-400">
-                {this.state.error.message || String(this.state.error)}
+              <div className="w-full mb-6 p-3 rounded-xl bg-slate-50 dark:bg-neutral-900 border border-slate-200/80 dark:border-neutral-800 text-left overflow-x-auto text-[11px] font-mono text-slate-600 dark:text-neutral-400">
+                <div className="font-semibold text-rose-500 dark:text-rose-400">
+                  {this.state.error.message || String(this.state.error)}
+                </div>
+                {this.state.error.stack && (
+                  <details className="mt-2 text-[10px] text-slate-500 dark:text-neutral-500">
+                    <summary className="cursor-pointer hover:underline">View call stack trace</summary>
+                    <pre className="mt-1 whitespace-pre-wrap max-h-40 overflow-y-auto font-mono text-[10px] text-slate-700 dark:text-neutral-300">
+                      {this.state.error.stack}
+                    </pre>
+                  </details>
+                )}
               </div>
             )}
 

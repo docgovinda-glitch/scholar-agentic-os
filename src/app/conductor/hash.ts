@@ -7,11 +7,14 @@
  * stay on, even though no client exists yet to exercise the browser side.
  */
 
-function stableStringify(value: unknown): string {
+function stableStringify(value: unknown, seen = new WeakSet(), depth = 0): string {
+  if (depth > 64) return '"[MaxDepth]"';
   if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  if (seen.has(value)) return '"[Circular]"';
+  seen.add(value);
+  if (Array.isArray(value)) return `[${value.map((v) => stableStringify(v, seen, depth + 1)).join(",")}]`;
   const keys = Object.keys(value as Record<string, unknown>).sort();
-  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`).join(",")}}`;
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k], seen, depth + 1)}`).join(",")}}`;
 }
 
 /**

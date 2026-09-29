@@ -112,6 +112,7 @@ export default function Rail({
 
 /** Recursive: chapter_based types (e.g. a doctoral dissertation) nest sections inside chapters via SectionSpec.children. */
 function PlannedStructureList({ sections, depth = 0 }: { sections: SectionSpec[]; depth?: number }) {
+  if (depth >= 8) return null;
   return (
     <ul className={depth === 0 ? "flex flex-col gap-0.5" : "flex flex-col gap-0.5 mt-0.5"}>
       {sections.map((s) => (

@@ -81,16 +81,20 @@ export function stripCircularReferences<T>(input: T): T {
  * Deep equality comparator for state guards.
  * Prevents unnecessary re-render cycles and cascading updates.
  */
-export function isDeepEqual(a: any, b: any): boolean {
+export function isDeepEqual(a: any, b: any, seenA = new WeakSet(), depth = 0): boolean {
   if (a === b) return true;
+  if (depth > 64) return true;
   if (a === null || b === null || typeof a !== "object" || typeof b !== "object") {
     return false;
   }
 
+  if (seenA.has(a)) return true;
+  seenA.add(a);
+
   if (Array.isArray(a)) {
     if (!Array.isArray(b) || a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) {
-      if (!isDeepEqual(a[i], b[i])) return false;
+      if (!isDeepEqual(a[i], b[i], seenA, depth + 1)) return false;
     }
     return true;
   }
@@ -103,7 +107,7 @@ export function isDeepEqual(a: any, b: any): boolean {
 
   for (const key of keysA) {
     if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
-    if (!isDeepEqual(a[key], b[key])) return false;
+    if (!isDeepEqual(a[key], b[key], seenA, depth + 1)) return false;
   }
 
   return true;

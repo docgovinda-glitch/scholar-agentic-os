@@ -153,15 +153,19 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
   return await originalFetch(input, { ...init, headers });
 }
 
-/** POST/PUT/PATCH with a JSON body. */
-export async function authedJsonFetch(input: string, method: string, body: unknown): Promise<Response> {
+export async function authedJsonFetch(
+  input: string,
+  method: string,
+  body: unknown,
+  options?: { skipLlmFallback?: boolean }
+): Promise<Response> {
   let res = await authedFetch(input, {
     method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
 
-  if (res.status === 426) {
+  if (res.status === 426 && !options?.skipLlmFallback && !input.includes("/api/ai/")) {
     const data = await res.json().catch(() => null);
     if (data && data.requireFrontendLLM) {
       const llmResult = await executeAgenticLLM(data.systemPrompt, data.userPrompt, data.taskType || "reasoning");
@@ -457,11 +461,16 @@ export async function executeAgenticLLM(
   if (candidates.length === 0) {
     // Graceful fallback: Delegate to server-side AI execution route
     try {
-      const serverRes = await authedJsonFetch("/api/ai/agent", "POST", {
-        prompt: userPrompt,
-        systemPrompt,
-        taskType,
-      });
+      const serverRes = await authedJsonFetch(
+        "/api/ai/agent",
+        "POST",
+        {
+          prompt: userPrompt,
+          systemPrompt,
+          taskType,
+        },
+        { skipLlmFallback: true }
+      );
       if (serverRes.ok) {
         const data = await serverRes.json();
         if (data && data.ok && data.text) {

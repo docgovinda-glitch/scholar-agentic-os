@@ -24,8 +24,12 @@ export interface StructureProposal {
  */
 export function proposeStructure(spec: OutputTypeSpec): StructureProposal[] {
   const total = spec.budget.totalWords.typical ?? spec.budget.totalWords.max;
-  const flatten = (sections: SectionSpec[]): SectionSpec[] =>
-    sections.flatMap((s) => [s, ...(s.children ? flatten(s.children) : [])]);
+  const flatten = (sections: SectionSpec[], seen = new Set<string>()): SectionSpec[] =>
+    sections.flatMap((s) => {
+      if (seen.has(s.key)) return [];
+      seen.add(s.key);
+      return [s, ...(s.children ? flatten(s.children, seen) : [])];
+    });
 
   return flatten(spec.structure.sections).map((section) => {
     const fraction = spec.budget.distribution[section.key];
