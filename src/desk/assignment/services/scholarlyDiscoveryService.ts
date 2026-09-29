@@ -3036,7 +3036,12 @@ export function calculateScholarlyRelevance(
   // 2. Direct Question Alignment (Key Concepts, Variables, Cases, Theories) (up to 45 pts)
   const titleLower = (source.title || "").toLowerCase();
   const abstractLower = (source.abstract || "").toLowerCase();
-  const conceptsLower = (source.keyConcepts || []).map((c) => c.toLowerCase()).join(" ");
+  const rawConcepts = Array.isArray(source.keyConcepts)
+    ? source.keyConcepts
+    : typeof source.keyConcepts === "string"
+    ? (source.keyConcepts as string).split(/[,;]\s*/)
+    : [];
+  const conceptsLower = rawConcepts.map((c) => String(c || "").toLowerCase()).join(" ");
   const findingLower = (source.mainFinding || "").toLowerCase();
   const fullText = `${titleLower} ${abstractLower} ${conceptsLower} ${findingLower}`;
 

@@ -75,53 +75,66 @@ export {
 };
 
 
+const committingProjects = new Set<string>();
+
 /**
- * Commits an ephemeral project to the database when user triggers an explicit commit
+ * Commit an ephemeral in-memory project into permanent PostgreSQL database
  * (e.g. clicking "Analyze Assignment Brief with AI").
  * Executes the backend database INSERT and saves all accumulated intake answers.
  */
 export async function commitProjectToDatabase(projectId: string): Promise<ProjectView> {
+  if (committingProjects.has(projectId)) {
+    const existing = getEphemeralProject(projectId);
+    if (existing) return existing;
+    throw new Error(`Project ${projectId} is already in the process of committing`);
+  }
+
   const ephemeral = getEphemeralProject(projectId);
   if (!ephemeral) {
-    return getProject(projectId);
+    throw new Error(`Cannot commit ephemeral project ${projectId}: not found in ephemeral store`);
   }
 
-  // 1. Single clean database INSERT
-  const created = await authedJsonFetch("/api/projects", "POST", { outputTypeId: ephemeral.outputTypeId }).then((r) =>
-    json<ProjectView>(r)
-  );
-
-  // 2. Save any collected intake answers
-  let finalProject = created;
-  if (ephemeral.answers && Object.keys(ephemeral.answers).length > 0) {
-    try {
-      finalProject = await authedJsonFetch(
-        `/api/projects/${encodeURIComponent(created.projectId)}/intake`,
-        "PATCH",
-        { answers: ephemeral.answers }
-      ).then((r) => json<ProjectView>(r));
-    } catch (e) {
-      console.warn("Failed to persist intake answers after project commit:", e);
-    }
-  }
-
-  // 3. Remove from local memory
-  deleteEphemeralProject(projectId);
-
-  // 4. Update browser URL history if on the draft page
-  if (typeof window !== "undefined") {
-    if (window.location.pathname.includes(projectId)) {
-      const updatedPath = window.location.pathname.replace(projectId, created.projectId);
-      window.history.replaceState(null, "", updatedPath);
-    }
-    window.dispatchEvent(
-      new CustomEvent("scholar:project-persisted", {
-        detail: { draftId: projectId, realId: created.projectId, project: finalProject },
-      })
+  committingProjects.add(projectId);
+  try {
+    // 1. Single clean database INSERT
+    const created = await authedJsonFetch("/api/projects", "POST", { outputTypeId: ephemeral.outputTypeId }).then((r) =>
+      json<ProjectView>(r)
     );
-  }
 
-  return finalProject;
+    // 2. Save any collected intake answers
+    let finalProject = created;
+    if (ephemeral.answers && Object.keys(ephemeral.answers).length > 0) {
+      try {
+        finalProject = await authedJsonFetch(
+          `/api/projects/${encodeURIComponent(created.projectId)}/intake`,
+          "PATCH",
+          { answers: ephemeral.answers }
+        ).then((r) => json<ProjectView>(r));
+      } catch (e) {
+        console.warn("Failed to persist intake answers after project commit:", e);
+      }
+    }
+
+    // 3. Remove from local memory
+    deleteEphemeralProject(projectId);
+
+    // 4. Update browser URL history if on the draft page
+    if (typeof window !== "undefined") {
+      if (window.location.pathname.includes(projectId)) {
+        const updatedPath = window.location.pathname.replace(projectId, created.projectId);
+        window.history.replaceState(null, "", updatedPath);
+      }
+      window.dispatchEvent(
+        new CustomEvent("scholar:project-persisted", {
+          detail: { draftId: projectId, realId: created.projectId, project: finalProject },
+        })
+      );
+    }
+
+    return finalProject;
+  } finally {
+    committingProjects.delete(projectId);
+  }
 }
 
 /**
@@ -145,8 +158,14 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
   const draftMatch = typeof input === "string" ? input.match(/\/api\/projects\/(draft-[^/]+)(\/.*)?/) : null;
   if (draftMatch && isEphemeralProject(draftMatch[1])) {
     const draftId = draftMatch[1];
-    const committed = await commitProjectToDatabase(draftId);
-    input = input.replace(draftId, committed.projectId);
+    if (!committingProjects.has(draftId)) {
+      try {
+        const committed = await commitProjectToDatabase(draftId);
+        input = input.replace(draftId, committed.projectId);
+      } catch (e) {
+        console.warn(`[authedFetch] Failed to auto-commit draft ${draftId}:`, e);
+      }
+    }
   }
 
   const headers = { ...(init.headers as Record<string, string> | undefined), ...(await authHeaders()) };
@@ -844,6 +863,7 @@ export function getProject(projectId: string): Promise<ProjectView> {
   if (isEphemeralProject(projectId)) {
     const draft = getEphemeralProject(projectId);
     if (draft) return Promise.resolve(draft);
+    return Promise.reject(new Error(`Draft project ${projectId} not found in ephemeral memory`));
   }
   return authedFetch(`/api/projects/${encodeURIComponent(projectId)}`).then((r) => json(r));
 }

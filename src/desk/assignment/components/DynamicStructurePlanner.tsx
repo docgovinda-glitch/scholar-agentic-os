@@ -40,6 +40,7 @@ import {
   removeKeyPoint,
   updateKeyPoint,
 } from "../services/outlineService";
+import { safeFormatLabel } from "../../../utils/briefExtractor";
 
 export interface DynamicStructurePlannerProps {
   structure: AssignmentStructure;
@@ -306,7 +307,7 @@ export function DynamicStructurePlanner({
                   <span>Introduction &amp; Core Working Thesis</span>
                   {writingTone && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 capitalize">
-                      {writingTone.replace(/_/g, " ")} tone
+                      {safeFormatLabel(writingTone)} tone
                     </span>
                   )}
                 </h4>

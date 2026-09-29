@@ -38,7 +38,7 @@ import WritingStyleSelector, { TONE_SUGGESTION_CHIPS } from "../components/Writi
 import { generateDynamicAssignmentStructure } from "../services/outlineService";
 import { useSubscriptionLimits } from "../../../hooks/useSubscriptionLimits";
 import { UpgradeModal } from "../../../components/modals/UpgradeModal";
-import { isDeepEqual, stripCircularReferences } from "../../../utils/briefExtractor";
+import { isDeepEqual, stripCircularReferences, safeFormatLabel } from "../../../utils/briefExtractor";
 import { validateBriefFile } from "../../../services/documentParser";
 
 class DropzoneErrorBoundary extends React.Component<
@@ -175,13 +175,11 @@ export default function AssignmentUnderstandStage() {
   );
 
   const [localTone, setLocalTone] = useState<string>(() => {
-    if (project?.answers?.["writing_tone"]) return project.answers["writing_tone"];
-    if (project?.answers?.["writingTone"]) {
-      const wt: any = project.answers["writingTone"];
-      return typeof wt === "string" ? wt : wt?.preset || "analytical";
-    }
-    if (writingTone) {
-      return typeof writingTone === "string" ? writingTone : (writingTone as any)?.preset || "analytical";
+    const raw = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone;
+    if (typeof raw === "string") return raw;
+    if (raw && typeof raw === "object") {
+      const obj = raw as any;
+      return obj.preset || obj.id || "analytical";
     }
     if (writingStyle?.preset) return writingStyle.preset;
     return "analytical";
@@ -435,8 +433,11 @@ export default function AssignmentUnderstandStage() {
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
     if (writingStyle) {
       setLocalStyle((prev) => (isDeepEqual(prev, writingStyle) ? prev : writingStyle));
-    } else if (writingTone) {
-      setLocalStyle((prev) => (isDeepEqual(prev, writingTone) ? prev : (writingTone as WritingStyleConfig)));
+    }
+    const resolvedTone = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone;
+    const toneStr = typeof resolvedTone === "string" ? resolvedTone : (resolvedTone as any)?.preset || (resolvedTone as any)?.id;
+    if (toneStr && typeof toneStr === "string") {
+      setLocalTone((prev) => (prev !== toneStr ? toneStr : prev));
     }
     if (structure && structure.headings && structure.headings.length > 0) {
       setLocalStructure(structure);
@@ -1660,16 +1661,16 @@ export default function AssignmentUnderstandStage() {
             {/* Parameter Badges */}
             <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
               <span className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 font-medium">
-                Level: <strong className="font-semibold capitalize">{localLevel.replace(/_/g, " ")}</strong>
+                Level: <strong className="font-semibold capitalize">{safeFormatLabel(localLevel)}</strong>
               </span>
               <span className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 font-medium">
-                Type: <strong className="font-semibold capitalize">{localType.replace(/_/g, " ")}</strong>
+                Type: <strong className="font-semibold capitalize">{safeFormatLabel(localType)}</strong>
               </span>
               <span className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 font-medium">
                 Citation: <strong className="font-semibold uppercase">{localCitation}</strong>
               </span>
               <span className="px-2.5 py-1 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-medium">
-                Tone: <strong className="font-semibold capitalize">{localTone.replace(/_/g, " ")}</strong>
+                Tone: <strong className="font-semibold capitalize">{safeFormatLabel(localTone)}</strong>
               </span>
               <span className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 font-medium">
                 Target: <strong className="font-semibold">{localWordCount.toLocaleString()} words</strong>

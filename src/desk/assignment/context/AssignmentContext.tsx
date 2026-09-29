@@ -58,6 +58,7 @@ import {
   type InternalSectionPlan,
 } from "../services/invisibleChunkerService";
 import { auditCitations, evaluateRubricCompliance } from "../services/submissionAuditService";
+import { stripCircularReferences } from "../../../utils/briefExtractor";
 
 export interface AssignmentContextValue {
   projectId: string;
@@ -361,16 +362,18 @@ export function AssignmentProvider({
         const ws = updates.writingStyle ?? updates.writing_style;
         standardized.writingStyle = ws;
         standardized.writing_style = ws;
-        standardized.writingTone = ws;
-        standardized.writing_tone = ws;
+        const toneStr = typeof ws === "string" ? ws : ws?.preset || ws?.id || "analytical";
+        standardized.writingTone = toneStr;
+        standardized.writing_tone = toneStr;
       }
       if (updates.writingTone !== undefined || updates.writing_tone !== undefined) {
         const wt = updates.writingTone ?? updates.writing_tone;
-        standardized.writingTone = wt;
-        standardized.writing_tone = wt;
+        const toneStr = typeof wt === "string" ? wt : wt?.preset || wt?.id || "analytical";
+        standardized.writingTone = toneStr;
+        standardized.writing_tone = toneStr;
         if (!standardized.writingStyle) {
-          standardized.writingStyle = wt;
-          standardized.writing_style = wt;
+          standardized.writingStyle = { preset: toneStr as any, label: toneStr };
+          standardized.writing_style = { preset: toneStr as any, label: toneStr };
         }
       }
       if (updates.sectionBudgets !== undefined || updates.section_budgets !== undefined) {
@@ -389,20 +392,21 @@ export function AssignmentProvider({
 
       const baseAnswers = projectRef.current?.answers || project?.answers || {};
       const mergedAnswers = { ...baseAnswers, ...standardized };
+      const safeAnswers = stripCircularReferences(mergedAnswers);
       if (projectRef.current) {
         projectRef.current = {
           ...projectRef.current,
-          answers: mergedAnswers,
+          answers: safeAnswers,
           title: standardized.title || projectRef.current.title,
         };
       }
       setProject((prev) => {
         if (!prev) return null;
-        return { ...prev, answers: mergedAnswers, title: standardized.title || prev.title };
+        return { ...prev, answers: safeAnswers, title: standardized.title || prev.title };
       });
 
       try {
-        await saveIntakeAnswers(activeProjectId, mergedAnswers);
+        await saveIntakeAnswers(activeProjectId, safeAnswers);
       } catch (err) {
         console.error("Failed to persist assignment answers:", err);
       }

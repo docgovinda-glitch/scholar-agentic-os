@@ -249,4 +249,48 @@ describe("Diagnose Maximum Call Stack Size Exceeded", () => {
 
     expect(() => proposeStructure(spec)).not.toThrow();
   });
+
+  it("safely formats tone and labels using safeFormatLabel without throwing TypeError: replace is not a function", async () => {
+    const { safeFormatLabel } = await import("../utils/briefExtractor");
+    expect(safeFormatLabel("formal_academic")).toBe("formal academic");
+    expect(safeFormatLabel({ preset: "analytical", description: "test" })).toBe("analytical");
+    expect(safeFormatLabel({ label: "Persuasive Tone" })).toBe("Persuasive Tone");
+    expect(safeFormatLabel({ title: "Custom Title" })).toBe("Custom Title");
+    expect(safeFormatLabel({ id: "critical" })).toBe("critical");
+    expect(safeFormatLabel(null)).toBe("");
+    expect(safeFormatLabel(undefined)).toBe("");
+    expect(safeFormatLabel(2000)).toBe("2000");
+  });
+
+  it("renders AssignmentWorkspace safely when project.answers.writing_tone is an object", async () => {
+    const api = await import("../desk/api");
+    (api.getProject as any).mockResolvedValue({
+      projectId: "proj-tone-obj",
+      outputTypeId: "OT-01",
+      title: "Tone Object Test",
+      hasDocument: false,
+      answers: {
+        assignment_question: "Discuss the ramifications of artificial intelligence in jurisprudence.",
+        academic_level: "undergraduate",
+        assignment_type: "essay",
+        citation_style: "apa7",
+        writing_tone: { preset: "analytical", description: "Detailed analytical mode." },
+        writingTone: { preset: "analytical", description: "Detailed analytical mode." },
+        writing_style: { preset: "analytical", description: "Detailed analytical mode." },
+      },
+      gates: [],
+    });
+
+    const { screen } = await import("@testing-library/react");
+    render(
+      <AssignmentWorkspace
+        projectId="proj-tone-obj"
+        initialStage="understand"
+        onStageChange={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByText(/Phase 1: Understand the Assignment Brief/i)).toBeInTheDocument();
+  });
 });
+

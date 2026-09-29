@@ -478,8 +478,10 @@ export function generateThesisStatement(
   tone?: string,
   academicLevel?: AcademicLevel
 ): string {
-  const qClean = question.trim().replace(/[.?]+$/, "");
-  const toneLower = (tone || "formal_academic").toLowerCase();
+  const qStr = typeof question === "string" ? question : String(question || "");
+  const qClean = qStr.trim().replace(/[.?]+$/, "");
+  const rawTone = typeof tone === "string" ? tone : (tone as any)?.preset || (tone as any)?.id || "formal_academic";
+  const toneLower = String(rawTone || "formal_academic").toLowerCase();
 
   if (qClean.toLowerCase().includes("economic interdependence")) {
     if (toneLower.includes("persuasive") || toneLower.includes("argumentative")) {
@@ -1147,7 +1149,7 @@ export function generateDynamicAssignmentStructure(
     totalAllocated,
     headings,
     thesisStatement,
-    writingTone: options.writingTone || "formal_academic",
+    writingTone: typeof options.writingTone === "string" ? options.writingTone : (options.writingTone as any)?.preset || "formal_academic",
     rationale: `AI-proposed academic structure tailored to '${question.slice(0, 100)}' at ${academicLevel} level.`,
   };
 }

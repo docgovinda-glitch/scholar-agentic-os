@@ -17,7 +17,10 @@ export function stripCircularReferences<T>(input: T): T {
 
   const seen = new WeakSet();
 
-  function sanitize(val: any): any {
+  function sanitize(val: any, depth = 0): any {
+    if (depth > 64) {
+      return undefined;
+    }
     if (val === null || typeof val !== "object") {
       // Exclude functions and symbols
       if (typeof val === "function" || typeof val === "symbol") {
@@ -57,7 +60,7 @@ export function stripCircularReferences<T>(input: T): T {
     seen.add(val);
 
     if (Array.isArray(val)) {
-      return val.map((item) => sanitize(item)).filter((item) => item !== undefined);
+      return val.map((item) => sanitize(item, depth + 1)).filter((item) => item !== undefined);
     }
 
     const cleanObj: Record<string, any> = {};
@@ -66,7 +69,7 @@ export function stripCircularReferences<T>(input: T): T {
       if (key.startsWith("_react") || key === "nativeEvent") {
         continue;
       }
-      const cleaned = sanitize(item);
+      const cleaned = sanitize(item, depth + 1);
       if (cleaned !== undefined) {
         cleanObj[key] = cleaned;
       }
@@ -74,7 +77,23 @@ export function stripCircularReferences<T>(input: T): T {
     return cleanObj;
   }
 
-  return sanitize(input);
+  return sanitize(input, 0);
+}
+
+/**
+ * Safely format labels or configuration values for UI display.
+ * Handles strings, objects with preset/label/title/id, numbers, or null/undefined,
+ * preventing 'TypeError: E.replace is not a function'.
+ */
+export function safeFormatLabel(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "string") return val.replace(/_/g, " ");
+  if (typeof val === "object") {
+    const obj = val as Record<string, any>;
+    const extracted = obj.preset ?? obj.label ?? obj.title ?? obj.id ?? "";
+    return typeof extracted === "string" ? extracted.replace(/_/g, " ") : String(extracted);
+  }
+  return String(val).replace(/_/g, " ");
 }
 
 /**

@@ -61,9 +61,14 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
   const [showNotesEditor, setShowNotesEditor] = useState(false);
   const [noteText, setNoteText] = useState(source.userNotes || "");
 
+  const authorsList = Array.isArray(source.authors)
+    ? source.authors
+    : typeof source.authors === "string" && source.authors.trim()
+    ? [source.authors.trim()]
+    : [];
   const authorDisplay =
-    source.authors && source.authors.length > 0
-      ? source.authors.slice(0, 3).join(", ") + (source.authors.length > 3 ? " et al." : "")
+    authorsList.length > 0
+      ? authorsList.slice(0, 3).join(", ") + (authorsList.length > 3 ? " et al." : "")
       : source.isUserUploaded
       ? "Course Materials / Uploaded Source"
       : "Scholarly Author";

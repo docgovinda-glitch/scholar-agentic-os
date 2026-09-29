@@ -51,8 +51,10 @@ export function formatHarvardCitation(source: Partial<DiscoveredSource>): string
     return source.citation.trim();
   }
   const authorsStr =
-    source.authors && source.authors.length > 0
+    Array.isArray(source.authors) && source.authors.length > 0
       ? source.authors.join(", ")
+      : typeof source.authors === "string" && source.authors.trim()
+      ? source.authors.trim()
       : "Author, A.";
   const yearStr = source.year || "2024";
   const titleStr = source.title ? `'${source.title}'` : "Untitled";
@@ -651,12 +653,12 @@ export default function AssignmentSourcesStage({
       list = list.filter(
         (s) =>
           s.title.toLowerCase().includes(q) ||
-          (s.authors && s.authors.some((a) => a.toLowerCase().includes(q))) ||
+          (s.authors && (Array.isArray(s.authors) ? s.authors.some((a) => a.toLowerCase().includes(q)) : String(s.authors).toLowerCase().includes(q))) ||
           (s.journal && s.journal.toLowerCase().includes(q)) ||
           (s.mainFinding && s.mainFinding.toLowerCase().includes(q)) ||
           (s.abstract && s.abstract.toLowerCase().includes(q)) ||
           (s.methodology && s.methodology.toLowerCase().includes(q)) ||
-          (s.keyConcepts && s.keyConcepts.some((k) => k.toLowerCase().includes(q))) ||
+          (s.keyConcepts && (Array.isArray(s.keyConcepts) ? s.keyConcepts.some((k) => k.toLowerCase().includes(q)) : String(s.keyConcepts).toLowerCase().includes(q))) ||
           (s.structuredDataSummary && s.structuredDataSummary.toLowerCase().includes(q)) ||
           (s.extractedEvidences &&
             s.extractedEvidences.some(
