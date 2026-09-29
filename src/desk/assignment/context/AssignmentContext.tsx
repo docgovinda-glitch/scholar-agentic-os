@@ -418,7 +418,9 @@ export function AssignmentProvider({
         assignment_current_phase: phase,
         assignment_current_stage: phase,
       });
-      onStageChangeCallback(phase, options);
+      if (typeof onStageChangeCallback === "function") {
+        onStageChangeCallback(phase, options);
+      }
     },
     [onStageChangeCallback, saveAnswers]
   );
@@ -432,7 +434,9 @@ export function AssignmentProvider({
         assignment_current_phase: mappedPhase,
         assignment_current_stage: stage,
       });
-      onStageChangeCallback(stage, options);
+      if (typeof onStageChangeCallback === "function") {
+        onStageChangeCallback(stage, options);
+      }
     },
     [onStageChangeCallback, saveAnswers]
   );

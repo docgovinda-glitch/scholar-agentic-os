@@ -200,9 +200,15 @@ export function DynamicStructurePlanner({
       <div className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] p-4 sm:p-5 space-y-4">
         {/* Status Bar & Quick Actions */}
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-neutral-200/60 dark:border-white/5">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap text-xs">
+            <span className="px-2.5 py-1 rounded-md bg-neutral-200/60 dark:bg-white/10 font-mono text-neutral-700 dark:text-neutral-300 font-semibold">
+              Target: {targetWordCount.toLocaleString()} words
+            </span>
+            <span className="px-2.5 py-1 rounded-md bg-neutral-200/60 dark:bg-white/10 font-mono text-neutral-700 dark:text-neutral-300 font-semibold">
+              Allocated: {totalAllocated.toLocaleString()} words
+            </span>
             <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium tabular-nums ${
+              className={`px-2.5 py-1 rounded-md font-mono font-semibold flex items-center gap-1.5 ${
                 isBalanced
                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                   : isOver
@@ -211,22 +217,18 @@ export function DynamicStructurePlanner({
               }`}
             >
               {isBalanced ? (
-                <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                <Check className="w-3 h-3 stroke-[2.5]" />
               ) : (
-                <AlertCircle className="w-3.5 h-3.5" />
+                <AlertCircle className="w-3 h-3" />
               )}
               <span>
-                Allocated: {totalAllocated.toLocaleString()} / {targetWordCount.toLocaleString()} words ({allocationPercent}%)
+                {isBalanced
+                  ? "Remaining: 0 words (Balanced)"
+                  : isOver
+                  ? `Over: ${Math.abs(difference).toLocaleString()} words`
+                  : `Remaining: ${difference.toLocaleString()} words`}
               </span>
             </span>
-
-            {!isBalanced && (
-              <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                {isOver
-                  ? `(${Math.abs(difference).toLocaleString()} words over target)`
-                  : `(${difference.toLocaleString()} words unassigned)`}
-              </span>
-            )}
           </div>
 
           {/* Quick Action Buttons */}

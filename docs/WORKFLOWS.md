@@ -92,25 +92,23 @@ Phase 4: Submission & Verification Audit
 ---
 
 ### 3.1 Phase 1: Understand & Structure
-
-1. **Intake**:
-   - **User Action**: Pastes assignment prompt text or uploads brief document (`.pdf`, `.docx`).
-   - **System Processing**: If a document is uploaded, server parses text and auto-extracts headings and requirements.
-   - **Result**: Prompt and word budget are loaded into the intake workspace.
-2. **Calibration**:
-   - **User Action**: Adjusts Academic Level, Assignment Type, Citation Style, and Target Word Count.
-3. **Dynamic Outline Generation**:
-   - **User Action**: Clicks `Generate Analytical Outline`.
-   - **System Processing**: Server calls `outlineService.ts` via `/api/projects/:id/assignment/generate-outline`. The AI deconstructs the prompt's command verbs, theoretical context, and research questions to produce analytical main headings and subheadings with recommended word allocations.
-   - **Result**: Outline renders in the interactive `DynamicStructurePlanner`.
-4. **Outline Refinement & Word Allocation**:
-   - **User Action**: User edits heading titles, adds/deletes subheadings, reorders sections, and tunes word allocations using `+50` / `-50` controls or `Auto-Balance`.
-5. **Voice & Tone Selection**:
-   - **User Action**: Selects an academic style (e.g. *Analytical*, *Argumentative*, *Critical*, *Natural & Engaging*, or *Match My Writing*). If custom voice is selected, user pastes a past paper sample.
-6. **Phase Progression**:
-   - **User Action**: Clicks `Lock Structure & Continue to Sources`.
-   - **System Processing**: State is validated and persisted via `PUT /api/projects/:id/assignment`.
-   - **Result**: Phase 1 is marked complete; Phase 2 unlocks.
+ 
+1. **Unified Setup & Question Input**:
+   - **User Action**: Pastes the assignment question/prompt (or uploads brief document `.pdf`, `.docx`), and selects Academic Level, Assignment Type, and Citation Style within the unified setup box.
+   - **Result**: Context parameters and prompt are staged cleanly in a single workspace component without distracting helper text or cards.
+2. **Question-Specific Structure Generation**:
+   - **User Action**: Clicks `Generate Structure`.
+   - **System Processing**: Server and client outline services analyze the substantive assignment requirements, command verbs, and academic level. The AI generates substantive, question-specific Main Headings, Subheadings, and target word counts (without generic Introduction/Body/Conclusion templates or conversational AI commentary).
+   - **Result**: The generated structure displays immediately in the unified workspace via `DynamicStructurePlanner`.
+3. **Structure Customization & Word Count Allocation**:
+   - **User Action**: User edits heading/subheading titles, adds/deletes sections, reorders headings/subheadings, and calibrates word allocations using `+50` / `-50` buttons, direct numeric inputs, or `Auto-Balance`.
+   - **Dynamic Word Status**: Live status bar tracks `Target: X words · Allocated: Y words · Remaining: Z words (or Over: W words / Balanced)`.
+4. **Voice & Tone Selection**:
+   - **User Action**: Selects an academic style (e.g. *Analytical*, *Argumentative*, *Critical*, *Natural & Engaging*, or *Match My Writing*).
+5. **Phase Progression & Canonical Persistence**:
+   - **User Action**: Clicks `Confirm Structure & Proceed to Sources`.
+   - **System Processing**: The confirmed structure with stable internal IDs is saved into canonical project keys (`assignment_structure`, `structure`, `sectionBudgets`, `assignment_internal_sections`).
+   - **Result**: Phase 1 is completed; Phase 2 unlocks using the exact confirmed structure.
 
 ---
 

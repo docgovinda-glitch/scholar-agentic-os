@@ -489,15 +489,36 @@ export function generateDynamicAssignmentStructure(
 
   let specs: HeadingSpec[] = [];
 
+  const isEconomicInterdependence =
+    qLower.includes("economic interdependence") ||
+    (qLower.includes("interdependence") && (qLower.includes("conflict") || qLower.includes("peace") || qLower.includes("interstate"))) ||
+    qLower.includes("capitalist peace") ||
+    (qLower.includes("trade") && qLower.includes("conflict"));
+
+  const isNepalIndia =
+    qLower.includes("nepal") &&
+    (qLower.includes("india") || qLower.includes("foreign policy") || qLower.includes("2015"));
+
+  const isCellTherapyCancer =
+    qLower.includes("cell therapy") ||
+    qLower.includes("cellular therapy") ||
+    (qLower.includes("cancer") &&
+      (qLower.includes("remedy") ||
+        qLower.includes("car-t") ||
+        qLower.includes("immunotherapy") ||
+        qLower.includes("oncology") ||
+        qLower.includes("tumor")));
+
   const isChinaOrGeopolitics =
-    qLower.includes("china") ||
-    qLower.includes("belt and road") ||
-    qLower.includes("bri") ||
-    qLower.includes("geopolitic") ||
-    qLower.includes("security") ||
-    qLower.includes("foreign policy") ||
-    qLower.includes("south asia") ||
-    qLower.includes("international relations");
+    !isNepalIndia &&
+    (qLower.includes("china") ||
+      qLower.includes("belt and road") ||
+      qLower.includes("bri") ||
+      qLower.includes("geopolitic") ||
+      qLower.includes("security") ||
+      qLower.includes("foreign policy") ||
+      qLower.includes("south asia") ||
+      qLower.includes("international relations"));
 
   const isTechOrAI =
     qLower.includes("ai") ||
@@ -520,7 +541,190 @@ export function generateDynamicAssignmentStructure(
     assignmentType === "annotated_bibliography" ||
     qLower.includes("literature review");
 
-  if (isChinaOrGeopolitics) {
+  if (isEconomicInterdependence) {
+    specs = [
+      {
+        title: "Theoretical Foundations of Economic Interdependence and Interstate Conflict",
+        notes: "Analyze classical liberal and realist paradigms regarding commercial peace and conflict mitigation.",
+        subheadings: [
+          {
+            title: "Conceptualising Economic Interdependence and Trade Asymmetry",
+            ratio: 0.15,
+            guidance: "Define economic interdependence, trade density, asymmetric dependence, and analytical parameters.",
+            keyPoints: ["Conceptual definitions", "Trade asymmetry & density", "Disciplinary grounding in IPE"],
+          },
+          {
+            title: "Relevant Theoretical Perspectives: Liberal Commercialism vs. Realist Vulnerability",
+            ratio: 0.18,
+            guidance: "Contrast the liberal commercial peace proposition against structural realist theories of strategic vulnerability.",
+            keyPoints: ["Liberal commercial peace", "Realist vulnerability theory", "Competing explanatory assumptions"],
+          },
+          {
+            title: "Analytical Mechanisms Linking Interdependence to Conflict Reduction",
+            ratio: 0.15,
+            guidance: "Examine specific transmission mechanisms: opportunity costs of conflict, costly signaling, and domestic trade interests.",
+            keyPoints: ["Opportunity cost mechanism", "Costly signaling & transparency", "Domestic transnational coalitions"],
+          },
+        ],
+      },
+      {
+        title: "Empirical Case Analysis and Interstate Conflict Dynamics",
+        notes: "Examine empirical evidence and comparative cases linking trade networks to conflict outcomes.",
+        subheadings: [
+          {
+            title: "Historical and Contemporary Empirical Cases of Commercial Peace",
+            ratio: 0.20,
+            guidance: "Evaluate empirical datasets and bilateral case studies demonstrating the pacifying effect of high economic integration.",
+            keyPoints: ["Comparative bilateral cases", "Empirical conflict incidence data", "Systemic conflict mitigation"],
+          },
+          {
+            title: "Financial Networks, Supply Chains, and Strategic Vulnerabilities",
+            ratio: 0.14,
+            guidance: "Analyze modern dimensions of interdependence including capital flows, supply chain bottlenecks, and coercive vulnerability.",
+            keyPoints: ["Global value chains", "Financial sanctions & capital integration", "Resource interdependence"],
+          },
+        ],
+      },
+      {
+        title: "Critical Counterarguments, Structural Limitations, and Assessment",
+        notes: "Weigh counterarguments and structural limitations to reach an evidence-based assessment.",
+        subheadings: [
+          {
+            title: "Critical Limitations: Weaponized Interdependence and Escalation Risks",
+            ratio: 0.10,
+            guidance: "Critique the pacifying thesis: how asymmetric networks can be weaponized to precipitate bilateral friction or conflict.",
+            keyPoints: ["Weaponized interdependence", "Chokepoint leverage", "Preemptive conflict incentives"],
+          },
+          {
+            title: "Evidence-Based Assessment: Scope Conditions for Conflict Mitigation",
+            ratio: 0.08,
+            guidance: "Synthesize findings to articulate when and under what institutional scope conditions economic interdependence reduces conflict.",
+            keyPoints: ["Institutional preconditions", "Scope conditions & boundaries", "Concluding analytical assessment"],
+          },
+        ],
+      },
+    ];
+  } else if (isNepalIndia) {
+    specs = [
+      {
+        title: "Nepal's Foreign-Policy Context and Strategic Architecture",
+        notes: "Examine geopolitical imperatives, structural constraints, and foreign policy objectives in Kathmandu.",
+        subheadings: [
+          {
+            title: "Geopolitical Context: Small-State Asymmetric Buffer Realities",
+            ratio: 0.15,
+            guidance: "Analyze Nepal's landlocked buffer geography between India and China and structural small-state dilemmas.",
+            keyPoints: ["Geopolitical buffer dynamics", "Asymmetric interdependence", "Small-state security architecture"],
+          },
+          {
+            title: "Core Foreign Policy Objectives and Strategic Autonomy in Kathmandu",
+            ratio: 0.15,
+            guidance: "Examine constitutional mandates, national interest definitions, and strategic diversification goals.",
+            keyPoints: ["Constitutional provisions", "Sovereign autonomy", "Foreign policy principles"],
+          },
+        ],
+      },
+      {
+        title: "Nepal–India Bilateral Relations: Major Developments Since 2015",
+        notes: "Investigate key bilateral developments, friction points, and cooperative frameworks since 2015.",
+        subheadings: [
+          {
+            title: "The 2015 Border Blockade, Diplomatic Ruptures, and Territorial Friction",
+            ratio: 0.18,
+            guidance: "Trace the catalyst of the 2015 border blockade, constitutional tensions, and subsequent territorial re-examinations (Kalapani/Lipulekh).",
+            keyPoints: ["2015 economic blockade", "Border disputes & map revision", "Treaty of Peace and Friendship (1950) re-evaluation"],
+          },
+          {
+            title: "Cross-Border Connectivity, Trade, Transit, and Energy Cooperation",
+            ratio: 0.18,
+            guidance: "Analyze infrastructure, petroleum pipelines, cross-border transmission lines, and hydropower trade frameworks.",
+            keyPoints: ["Cross-border rail & road corridors", "Hydropower power trade agreements", "Trade and transit protocols"],
+          },
+          {
+            title: "Strategic Diversification Toward China and Multi-Alignment Hedging",
+            ratio: 0.14,
+            guidance: "Assess Nepal's transit protocols with China (BRI) as a strategic counter-weight and hedging mechanism.",
+            keyPoints: ["Transit and Transport Agreement with China", "Belt and Road Initiative (BRI) projects", "Equi-proximity vs. pragmatic hedging"],
+          },
+        ],
+      },
+      {
+        title: "Evidence-Based Evaluation of Foreign Policy Effectiveness",
+        notes: "Provide a balanced, evidence-based assessment of foreign policy successes, persistent challenges, and outlook.",
+        subheadings: [
+          {
+            title: "Assessing Policy Successes: Diplomatic Agency and Diversification",
+            ratio: 0.12,
+            guidance: "Evaluate tangible successes in expanding diplomatic maneuverability, transit alternatives, and national leverage.",
+            keyPoints: ["Assertion of diplomatic agency", "Diversified transit access", "Enhanced bargaining posture"],
+          },
+          {
+            title: "Persistent Structural Challenges, Asymmetric Dependencies, and Bilateral Outlook",
+            ratio: 0.08,
+            guidance: "Critique unresolved vulnerabilities: economic dependency, trade deficits, implementation delays, and future strategic trajectories.",
+            keyPoints: ["Structural economic imbalance", "Domestic political instability impact", "Future bilateral trajectory"],
+          },
+        ],
+      },
+    ];
+  } else if (isCellTherapyCancer) {
+    specs = [
+      {
+        title: "Foundations of Cell-Based Immunotherapy in Oncology",
+        notes: "Establish cellular therapeutics fundamentals, engineering principles, and immune modulation mechanisms.",
+        subheadings: [
+          {
+            title: "Conceptual Foundations of Cellular Therapeutics and T-Cell Engineering",
+            ratio: 0.14,
+            guidance: "Examine the scientific evolution from traditional oncology to living cellular immunotherapeutics.",
+            keyPoints: ["Adoptive cell transfer history", "T-cell receptor (TCR) vs CAR mechanics", "Genetic transduction & cell processing"],
+          },
+          {
+            title: "Mechanisms of Tumor Antigen Recognition and Immune System Modulation",
+            ratio: 0.16,
+            guidance: "Detail how engineered cells recognize tumor antigens and overcome immunological tolerance.",
+            keyPoints: ["MHC-independent recognition", "Costimulatory signaling domains (CD28/4-1BB)", "Overcoming immunological tolerance"],
+          },
+        ],
+      },
+      {
+        title: "Clinical Modalities and Therapeutic Efficacy in Cancer Remedy",
+        notes: "Analyze clinical applications, response rates, and empirical outcomes across malignancy types.",
+        subheadings: [
+          {
+            title: "CAR-T Cell Therapy in Hematologic and Solid Malignancies",
+            ratio: 0.20,
+            guidance: "Evaluate clinical trial outcomes and approved therapies (e.g., anti-CD19, anti-BCMA) in hematologic and solid tumors.",
+            keyPoints: ["FDA/EMA approved CAR-T platforms", "Complete response rates in hematology", "Solid tumor delivery challenges"],
+          },
+          {
+            title: "Adoptive Cell Transfer, Tumor-Infiltrating Lymphocytes, and NK Platforms",
+            ratio: 0.18,
+            guidance: "Contrast CAR-T with alternative cell platforms including TIL therapy in melanoma and natural killer (NK) cells.",
+            keyPoints: ["TIL mechanisms in solid tumors", "Allogeneic NK cell therapies", "Comparative cytotoxicity profiles"],
+          },
+        ],
+      },
+      {
+        title: "Translational Challenges, Toxicity Management, and Future Frontiers",
+        notes: "Critically evaluate clinical toxicities, tumor microenvironment barriers, and next-generation engineering.",
+        subheadings: [
+          {
+            title: "Overcoming Cytokine Release Syndrome and On-Target Off-Tumor Toxicities",
+            ratio: 0.18,
+            guidance: "Address major clinical barriers: CRS pathophysiology, neurotoxicity (ICANS), and intervention protocols.",
+            keyPoints: ["CRS & ICANS management", "On-target off-tumor risks", "Suicide gene safety switches"],
+          },
+          {
+            title: "Tumor Microenvironment Resistance and Next-Generation Allogeneic Innovations",
+            ratio: 0.14,
+            guidance: "Synthesize innovations addressing physical stroma barriers, immunosuppressive cytokines, and universal allogeneic donor platforms.",
+            keyPoints: ["Immunosuppressive microenvironment", "Allogeneic 'off-the-shelf' gene editing", "Long-term curative outlook"],
+          },
+        ],
+      },
+    ];
+  } else if (isChinaOrGeopolitics) {
     specs = [
       {
         title: "Conceptual and Theoretical Framework",
@@ -761,67 +965,74 @@ export function generateDynamicAssignmentStructure(
       },
     ];
   } else {
-    // Default Analytical Academic Essay structure (responsive to question themes)
-    const promptKeywords = question
-      .replace(/[^\w\s]/g, "")
-      .split(/\s+/)
-      .filter((w) => w.length > 3)
-      .slice(0, 3)
-      .join(" ");
+    // Dynamic question-specific decomposition for arbitrary questions
+    // Extracts substantive themes rather than hardcoding static placeholder titles
+    const cleanPrompt = question
+      .replace(/^(critically\s+)?(examine|evaluate|assess|analyze|analyse|discuss|investigate|explore|to\s+what\s+extent\s+does|what\s+is\s+the\s+role\s+of|the\s+role\s+of|an\s+analysis\s+of)\s+/i, "")
+      .replace(/[?.!]+$/, "")
+      .trim();
 
-    const contextTheme = promptKeywords ? `Focus: ${promptKeywords}` : "Contextual Investigation";
+    const words = cleanPrompt
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !/^(the|and|for|with|from|that|this|these|those|into|about)$/i.test(w));
+
+    const primarySubject = words.slice(0, 4).join(" ") || "Core Conceptual Focus";
+    const secondaryFocus = words.slice(4, 8).join(" ") || "Substantive Context";
+
+    const subjectTitle = primarySubject.charAt(0).toUpperCase() + primarySubject.slice(1);
+    const contextTitle = secondaryFocus.charAt(0).toUpperCase() + secondaryFocus.slice(1);
 
     specs = [
       {
-        title: "Conceptual and Theoretical Foundations",
-        notes: "Establish conceptual boundaries and theoretical framework for the essay.",
+        title: `Theoretical & Conceptual Foundations of ${subjectTitle}`,
+        notes: `Establish the disciplinary framing and theoretical perspectives governing ${subjectTitle}.`,
         subheadings: [
           {
-            title: "Conceptual Scope and Key Definitions",
-            ratio: 0.12,
-            guidance: "Define core terminology with academic precision and delineate scope of inquiry.",
+            title: `Conceptual Scope and Key Definitions in ${subjectTitle}`,
+            ratio: 0.14,
+            guidance: `Define primary concepts and analytical boundaries addressing ${cleanPrompt || "the assignment question"}.`,
             keyPoints: ["Core definitions", "Analytical scope", "Disciplinary grounding"],
           },
           {
-            title: "Theoretical Frameworks & Academic Lenses",
+            title: "Theoretical Frameworks and Analytical Perspectives",
             ratio: 0.18,
-            guidance: "Articulate the theoretical perspectives through which the central question is analyzed.",
-            keyPoints: ["Primary theoretical lens", "Underlying assumptions", "Explanatory mechanism"],
+            guidance: "Articulate authoritative theoretical models through which the central question is critically examined.",
+            keyPoints: ["Primary theoretical lens", "Underlying assumptions", "Explanatory mechanisms"],
           },
         ],
       },
       {
-        title: "Empirical Analysis & Thematic Evidence",
-        notes: "Substantive evidentiary analysis addressing primary claims.",
+        title: `Empirical Analysis and Case Evidence: ${contextTitle}`,
+        notes: `Investigate empirical evidence, operational dynamics, and substantive developments.`,
         subheadings: [
           {
-            title: "Primary Argument & Supporting Evidence",
+            title: `Primary Evidentiary Analysis and Substantive Developments`,
             ratio: 0.22,
-            guidance: "Develop primary affirmative analytical line substantiated with peer-reviewed scholarship.",
-            keyPoints: ["Primary thesis argument", "Empirical evidence synthesis", "Analytical significance"],
+            guidance: `Substantiate the central analytical arguments with contemporary peer-reviewed research.`,
+            keyPoints: ["Primary empirical findings", "Evidence synthesis", "Analytical significance"],
           },
           {
-            title: "Contextual Investigation & Case Application",
-            ratio: 0.20,
-            guidance: `Apply theoretical framework to concrete evidence and contemporary examples (${contextTheme}).`,
-            keyPoints: ["Case application", "Comparative evidence", "Contextual nuance"],
+            title: `Contextual Dynamics and Operational Implications`,
+            ratio: 0.18,
+            guidance: `Examine concrete applications, sectoral case evidence, and contextual nuances.`,
+            keyPoints: ["Case application", "Comparative evidence", "Contextual variance"],
           },
         ],
       },
       {
-        title: "Critical Synthesis & Counter-Perspectives",
+        title: "Critical Counter-Perspectives, Limitations and Scholarly Synthesis",
         notes: "Weigh competing arguments, address limitations, and reach justified conclusion.",
         subheadings: [
           {
-            title: "Critical Counter-Perspectives & Dialectical Evaluation",
+            title: "Critical Counterarguments and Contested Assumptions",
             ratio: 0.16,
-            guidance: "Evaluate the strongest scholarly counterarguments or alternative interpretations.",
-            keyPoints: ["Counter-arguments", "Critique of assumptions", "Nuanced defence"],
+            guidance: "Critically evaluate competing perspectives, methodological limitations, or counter-evidence.",
+            keyPoints: ["Counter-arguments", "Critique of assumptions", "Nuanced dialectical evaluation"],
           },
           {
-            title: "Scholarly Synthesis & Academic Implications",
+            title: "Scholarly Synthesis and Broader Academic Implications",
             ratio: 0.12,
-            guidance: "Synthesize the tension between viewpoints and articulate broader implications of the findings.",
+            guidance: "Synthesize findings to articulate evidence-based conclusions and broader disciplinary implications.",
             keyPoints: ["Synthesis of findings", "Broader academic implications", "Concluding evaluation"],
           },
         ],

@@ -1139,7 +1139,9 @@ CRITICAL: You MUST divide the target word counts across the sections to strictly
   try {
     const prompt = `You are the Scholar Core Outline & Word Count Planning Agent.
 Create an academic structure tailored strictly to the assignment question and format.
-Do NOT use a generic or hardcoded Introduction / Body Paragraphs / Conclusion structure.
+CRITICAL INSTRUCTION: The structure must be question-specific and substantive based on the assignment question: "${question}".
+Do NOT use generic templates, and do NOT automatically generate generic "Introduction", "Body", or "Conclusion" headings unless explicitly required by the brief format.
+The headings and subheadings must directly reflect the substantive concepts, actors, mechanisms, theories, and empirical requirements of the question.
 Each main heading must represent a major analytical component required to answer the assignment.
 Under each main heading, generate 2-3 relevant analytical subheadings with allocated word counts.
 The sum of all subheading targetWordCounts MUST equal approximately ${targetWordCount}.

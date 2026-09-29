@@ -159,6 +159,18 @@ export default function AssignmentUnderstandStage() {
     });
   });
 
+  const [hasGeneratedStructure, setHasGeneratedStructure] = useState<boolean>(() => {
+    if (structure && structure.headings && structure.headings.length > 0) {
+      return true;
+    }
+    if (question && cleanAnswerString(question).length >= 10 && targetWordCount > 0) {
+      return true;
+    }
+    return false;
+  });
+  const [isGeneratingStructure, setIsGeneratingStructure] = useState(false);
+  const [structureError, setStructureError] = useState<string | null>(null);
+
   // Academic Writing Style state
   const [localStyle, setLocalStyle] = useState<WritingStyleConfig>(() => {
     if (writingStyle) return writingStyle;
@@ -379,6 +391,7 @@ export default function AssignmentUnderstandStage() {
     }
     if (structure && structure.headings && structure.headings.length > 0) {
       setLocalStructure(structure);
+      setHasGeneratedStructure(true);
     }
 
     const cleanedBrief = cleanAnswerString(assignmentBriefText);
@@ -616,35 +629,78 @@ export default function AssignmentUnderstandStage() {
     }
   };
 
-  const canAnalyze =
+  const canGenerate =
     localQuestion.trim().length >= 10 &&
     localWordCount > 0 &&
     Boolean(localCitation) &&
     Boolean(localLevel) &&
     Boolean(localType);
 
-  const handleAnalyze = async () => {
-    if (!canAnalyze || isAnalyzing) return;
+  const canAnalyze = canGenerate;
+
+  const handleGenerateStructure = async () => {
+    if (!canGenerate || isGeneratingStructure) return;
+    setIsGeneratingStructure(true);
     setIsAnalyzing(true);
+    setStructureError(null);
     setAnalysisError(null);
 
     // Generate dynamic structure directly from question
-    const proposedStructure = generateDynamicAssignmentStructure({
+    let proposedStructure = generateDynamicAssignmentStructure({
       question: localQuestion,
       assignmentType: localType,
       academicLevel: localLevel,
       targetWordCount: localWordCount,
-      currentStructure: localStructure,
     });
+
+    let serverAnalysis: AssignmentAnalysis | null = null;
+
+    try {
+      const targetProjectId = await ensurePersisted();
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Structure generation timeout")), 6000)
+      );
+
+      const response = await Promise.race([
+        authedJsonFetch(
+          `/api/projects/${targetProjectId}/assignment/analyze`,
+          "POST",
+          {
+            question: localQuestion,
+            assignmentType: localType,
+            academicLevel: localLevel,
+            targetWordCount: localWordCount,
+            citationStyle: localCitation,
+            briefText: localBrief,
+          }
+        ),
+        timeoutPromise,
+      ]);
+
+      if (response && response.ok) {
+        const data = await response.json();
+        const incomingAnalysis: AssignmentAnalysis = data.analysis || data;
+        if (data.structure && data.structure.headings?.length > 0) {
+          proposedStructure = data.structure;
+        }
+        if (incomingAnalysis && (incomingAnalysis.commandVerbs || incomingAnalysis.briefLedger || incomingAnalysis.summary)) {
+          serverAnalysis = incomingAnalysis;
+        }
+      }
+    } catch (err: any) {
+      console.warn("Using resilient client question-specific structure decomposition:", err);
+    }
+
     setLocalStructure(proposedStructure);
+    setStructure(proposedStructure);
+    setHasGeneratedStructure(true);
 
     const internalSecs = structureToInternalSections(proposedStructure);
     const budgets = structureToSectionBudgets(proposedStructure);
     const budget = computeWordBudgetFromSections(localWordCount, budgets);
     const legacyBreakdown = computeSectionBreakdown(localWordCount, budgets);
 
-    // Save intake details first
-    await saveAnswers({
+    const updates: Record<string, any> = {
       instructions: localQuestion,
       research_topic: localQuestion,
       assignment_question: localQuestion,
@@ -683,69 +739,12 @@ export default function AssignmentUnderstandStage() {
         deadline,
         rubric: rubricText,
       },
-    });
+    };
 
-    try {
-      const targetProjectId = await ensurePersisted();
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Analysis timeout: falling back to client decomposition")), 10000)
-      );
-
-      const response = await Promise.race([
-        authedJsonFetch(
-          `/api/projects/${targetProjectId}/assignment/analyze`,
-          "POST",
-          {
-            question: localQuestion,
-            assignmentType: localType,
-            academicLevel: localLevel,
-            targetWordCount: localWordCount,
-            citationStyle: localCitation,
-            briefText: localBrief,
-            rubricText,
-            sections: legacyBreakdown,
-            writingStyle: localStyle,
-            writingTone: localStyle,
-          }
-        ),
-        timeoutPromise,
-      ]);
-
-      if (response && response.ok) {
-        const data = await response.json();
-        const incomingAnalysis: AssignmentAnalysis = data.analysis || data;
-        const struct = (data.structure?.headings?.length > 0)
-          ? data.structure
-          : generateDynamicAssignmentStructure({
-              question: localQuestion,
-              targetWordCount: localWordCount,
-              assignmentType: localType,
-              academicLevel: localLevel,
-            });
-
-        setLocalStructure(struct);
-        const internalSecs = structureToInternalSections(struct);
-        const budgets = structureToSectionBudgets(struct);
-
-        await saveAnswers({
-          assignment_analysis: typeof incomingAnalysis === "string" ? incomingAnalysis : JSON.stringify(incomingAnalysis),
-          assignment_structure: struct,
-          structure: struct,
-          sectionBudgets: budgets,
-          section_budgets: budgets,
-          assignment_internal_sections: internalSecs,
-          assignment_outline: internalSecs,
-        });
-        return;
-      }
-    } catch (err: any) {
-      console.warn("Using resilient client brief analyzer and structure generator:", err);
-    } finally {
-      setIsAnalyzing(false);
-    }
-
-    // Client-side fallback analysis
-    if (!analysis) {
+    if (serverAnalysis) {
+      updates.assignment_analysis = typeof serverAnalysis === "string" ? serverAnalysis : JSON.stringify(serverAnalysis);
+      setAnalysis(serverAnalysis);
+    } else if (uploadedFileName || !analysis) {
       const qLower = localQuestion.toLowerCase();
       const detectedVerbs = [];
       const verbKeywords: Record<string, { def: string; act: string }> = {
@@ -824,7 +823,7 @@ export default function AssignmentUnderstandStage() {
           ? "Rigorous technical solutions solving all examination questions systematically with theoretical frameworks, mathematical proofs, and standard Harvard referencing."
           : localType,
         evidenceRequirements: isQuantum
-          ? "Authoritative quantum computing literature (Preskill 2018, Nielsen & Chuang 2010, Fowler 2012, Shor 1994, Arute 2019, Gidney & Ekerå 2021) adhering to HARVARD style."
+          ? "Authoritative quantum computing literature adhering to HARVARD style."
           : `High-quality peer-reviewed scholarly citations adhering to ${localCitation.toUpperCase()}.`,
         markingCriteriaInsights: rubricText
           ? ["Custom module grading rubric criteria indexed and integrated."]
@@ -835,9 +834,23 @@ export default function AssignmentUnderstandStage() {
         approvedByUser: false,
       };
 
-      await setAnalysis(fallbackAnalysis);
+      if (!analysis) {
+        updates.assignment_analysis = JSON.stringify(fallbackAnalysis);
+        setAnalysis(fallbackAnalysis);
+      }
+    }
+
+    try {
+      await saveAnswers(updates);
+    } catch (saveErr) {
+      console.warn("Could not save answers during structure generation:", saveErr);
+    } finally {
+      setIsGeneratingStructure(false);
+      setIsAnalyzing(false);
     }
   };
+
+  const handleAnalyze = handleGenerateStructure;
 
   const handleApproveAnalysis = async () => {
     if (!analysis) return;
@@ -927,6 +940,7 @@ export default function AssignmentUnderstandStage() {
         targetWordCount: newWordCount,
       });
       setLocalStructure(dynamicStruct);
+      setHasGeneratedStructure(true);
 
       const budgets = structureToSectionBudgets(dynamicStruct);
       const internalSecs = structureToInternalSections(dynamicStruct);
@@ -1009,24 +1023,25 @@ export default function AssignmentUnderstandStage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 space-y-6 text-neutral-900 dark:text-neutral-100 font-sans">
-      {/* Clean Decluttered Header */}
+      {/* Clean Minimal Header */}
       <div>
         <div className="flex items-center gap-2 mb-1.5">
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200">
             Phase 1: Understand the Assignment Brief
           </span>
+          <span className="text-xs text-neutral-400 font-medium hidden sm:inline-block">· Coursework & Essay</span>
         </div>
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
           Understand Your Brief
         </h1>
         <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
-          Define the assignment question, target word allocation, academic writing tone, and rubric criteria.
+          Define your assignment question, academic parameters, and generate an analytical structure.
         </p>
       </div>
 
-      {/* Main Intake Canvas Card */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-6">
-        {/* Streamlined Assessment Brief Intake: Dual-Tab Card */}
+      {/* Unified Assignment Setup Box */}
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-5">
+        {/* Assignment Question Section */}
         <div className="space-y-2.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="inline-flex p-1 rounded-xl bg-neutral-100 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 w-fit">
@@ -1056,7 +1071,7 @@ export default function AssignmentUnderstandStage() {
             </div>
 
             <div className="flex items-center gap-2">
-              {promptWordCount > 0 && (
+              {promptWordCount > 0 && intakeTab === "paste" && (
                 <span className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500">
                   {promptWordCount} words entered
                 </span>
@@ -1202,8 +1217,8 @@ export default function AssignmentUnderstandStage() {
           )}
         </div>
 
-        {/* Compact Single Row: Academic Level, Assignment Type & Citation Style */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 p-3.5 sm:p-4 rounded-xl bg-neutral-50/60 dark:bg-white/[0.02] border border-neutral-200/70 dark:border-white/10">
+        {/* Academic Parameters: Academic Level, Assignment Type & Citation Style */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
           {/* Academic Level */}
           <div className="space-y-1">
             <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
@@ -1285,145 +1300,217 @@ export default function AssignmentUnderstandStage() {
           </div>
         </div>
 
-        {/* Dynamic Assignment Structure & Word Allocation Planner */}
-        <div className="pt-1">
-          <DynamicStructurePlanner
-            structure={localStructure}
-            targetWordCount={localWordCount}
-            onStructureChange={handleStructureChange}
-            onTargetWordCountChange={handleTargetWordCountChange}
-            question={localQuestion}
-            assignmentType={localType}
-            academicLevel={localLevel}
-            isConfirmed={localStructure.isConfirmed}
-          />
-        </div>
+        {/* Primary Action Button Bar Before Structure Generation */}
+        {!hasGeneratedStructure && (
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-neutral-100 dark:border-white/5">
+            <div className="text-xs">
+              {!canProceedToSources ? (
+                <p className="text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span>Please provide the assignment question, word count, and citation style to continue.</span>
+                </p>
+              ) : (
+                <p className="text-neutral-500 dark:text-neutral-400">
+                  Ready to analyze assignment prompt and generate custom academic structure.
+                </p>
+              )}
+            </div>
 
-        {/* Writing Tone Selector with Scroll/Focus Assistant Synchronization */}
-        <div
-          ref={toneSectionRef}
-          data-testid="tone-section-wrapper"
-          onFocusCapture={dispatchToneAssistantSuggestions}
-          onClickCapture={dispatchToneAssistantSuggestions}
-          className="pt-2 border-t border-neutral-200/60 dark:border-white/5"
-        >
-          <WritingStyleSelector
-            value={localStyle}
-            onChange={handleStyleChange}
-            onFocus={dispatchToneAssistantSuggestions}
-          />
-        </div>
+            <div className="flex items-center gap-2.5 w-full sm:w-auto">
+              <button
+                type="button"
+                disabled={!canGenerate || isGeneratingStructure}
+                onClick={handleGenerateStructure}
+                aria-label="Generate Structure (Analyze Assignment Brief)"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {isGeneratingStructure ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    <span>Generating structure…</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Generate Structure</span>
+                  </>
+                )}
+              </button>
 
-        {/* Collapsible Accordion: Additional Course Details & Rubric */}
-        <div className="pt-1 border-t border-neutral-200/60 dark:border-white/5">
+              <button
+                type="button"
+                disabled={!canProceedToSources || !hasGeneratedStructure}
+                onClick={handleProceedToSources}
+                aria-label="Confirm Structure & Proceed to Sources"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-white/10 text-neutral-400 dark:text-neutral-500 font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs flex items-center justify-center gap-1.5 cursor-not-allowed"
+                title={!hasGeneratedStructure ? "Generate structure first" : "Proceed to Sources"}
+              >
+                <span>Proceed to Sources</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {structureError && (
+          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-center justify-between gap-2 animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{structureError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleGenerateStructure}
+              className="px-3 py-1 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Dynamic Assignment Structure & Word Allocation Planner (Unified in same card) */}
+        {hasGeneratedStructure && (
+          <div className="pt-4 border-t border-neutral-100 dark:border-white/5 space-y-4 animate-in fade-in duration-200">
+            <DynamicStructurePlanner
+              structure={localStructure}
+              targetWordCount={localWordCount}
+              onStructureChange={handleStructureChange}
+              onTargetWordCountChange={handleTargetWordCountChange}
+              question={localQuestion}
+              assignmentType={localType}
+              academicLevel={localLevel}
+              isConfirmed={localStructure.isConfirmed}
+            />
+
+            {/* Primary Action Button Bar after generation */}
+            <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-xs">
+                {!canProceedToSources ? (
+                  <p className="text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>Please provide the assignment question, word count, and citation style to continue.</span>
+                  </p>
+                ) : localStructure.totalAllocated !== localWordCount ? (
+                  <p className="text-amber-600 dark:text-amber-400 font-medium">
+                    Note: {Math.abs(localWordCount - localStructure.totalAllocated)} words {localStructure.totalAllocated > localWordCount ? "over target" : "unallocated"}. You can auto-balance or proceed.
+                  </p>
+                ) : (
+                  <p className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Structure calibrated and word count balanced.</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
+                <button
+                  type="button"
+                  disabled={!canGenerate || isGeneratingStructure}
+                  onClick={handleGenerateStructure}
+                  aria-label="Generate Structure (Analyze Assignment Brief)"
+                  className="w-full sm:w-auto px-4 py-2 rounded-xl border border-neutral-300 dark:border-white/15 hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-semibold text-neutral-800 dark:text-neutral-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                >
+                  {isGeneratingStructure ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      <span>Generating structure…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Regenerate Structure</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!canProceedToSources || isGeneratingStructure}
+                  onClick={handleProceedToSources}
+                  aria-label="Confirm Structure & Proceed to Sources"
+                  className="w-full sm:w-auto px-5 py-2 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>Confirm Structure & Proceed to Sources</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Collapsible Accordion: Additional Course Details & Rubric (Optional) */}
+        <div className="pt-2 border-t border-neutral-100 dark:border-white/5">
           <button
             type="button"
             onClick={() => setShowAdditional(!showAdditional)}
-            className="text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer py-1"
+            className="text-xs font-medium text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 inline-flex items-center gap-1.5 transition-colors cursor-pointer py-1"
           >
             <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showAdditional ? "rotate-180" : ""}`} />
-            <span>{showAdditional ? "Hide additional course details & grading rubric" : "+ Additional Course Details & Rubric (Optional)"}</span>
+            <span>{showAdditional ? "Hide optional tone and course details" : "+ Writing Tone & Course Details (Optional)"}</span>
           </button>
 
           {showAdditional && (
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3.5 p-4 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] animate-in fade-in duration-150">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Course / Module Code</label>
-                <input
-                  type="text"
-                  value={course}
-                  onChange={(e) => setCourse(e.target.value)}
-                  onBlur={handleCourseDetailsBlur}
-                  placeholder="e.g. POLI3002 International Security"
-                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
+            <div className="mt-3 space-y-4 pt-3 border-t border-neutral-100 dark:border-white/5 animate-in fade-in duration-150">
+              <div
+                ref={toneSectionRef}
+                data-testid="tone-section-wrapper"
+                onFocusCapture={dispatchToneAssistantSuggestions}
+                onClickCapture={dispatchToneAssistantSuggestions}
+              >
+                <WritingStyleSelector
+                  value={localStyle}
+                  onChange={handleStyleChange}
+                  onFocus={dispatchToneAssistantSuggestions}
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">University / Institution</label>
-                <input
-                  type="text"
-                  value={institution}
-                  onChange={(e) => setInstitution(e.target.value)}
-                  onBlur={handleCourseDetailsBlur}
-                  placeholder="e.g. University of Oxford"
-                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Deadline</label>
-                <input
-                  type="date"
-                  value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                  onBlur={handleCourseDetailsBlur}
-                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
-                />
-              </div>
-              <div className="md:col-span-3 space-y-1 pt-1">
-                <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Marking Rubric / Assessment Criteria</label>
-                <textarea
-                  value={rubricText}
-                  onChange={(e) => setRubricText(e.target.value)}
-                  onBlur={handleCourseDetailsBlur}
-                  rows={3}
-                  placeholder="Paste marking criteria or grade band descriptions to index..."
-                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg p-2.5 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 leading-relaxed"
-                />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 p-3.5 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02]">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Course / Module Code</label>
+                  <input
+                    type="text"
+                    value={course}
+                    onChange={(e) => setCourse(e.target.value)}
+                    onBlur={handleCourseDetailsBlur}
+                    placeholder="e.g. POLI3002 International Security"
+                    className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">University / Institution</label>
+                  <input
+                    type="text"
+                    value={institution}
+                    onChange={(e) => setInstitution(e.target.value)}
+                    onBlur={handleCourseDetailsBlur}
+                    placeholder="e.g. University of Oxford"
+                    className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Deadline</label>
+                  <input
+                    type="date"
+                    value={deadline}
+                    onChange={(e) => setDeadline(e.target.value)}
+                    onBlur={handleCourseDetailsBlur}
+                    className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
+                  />
+                </div>
+                <div className="md:col-span-3 space-y-1 pt-1">
+                  <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Marking Rubric / Assessment Criteria</label>
+                  <textarea
+                    value={rubricText}
+                    onChange={(e) => setRubricText(e.target.value)}
+                    onBlur={handleCourseDetailsBlur}
+                    rows={3}
+                    placeholder="Paste marking criteria or grade band descriptions to index..."
+                    className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg p-2.5 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 leading-relaxed"
+                  />
+                </div>
               </div>
             </div>
           )}
-        </div>
-
-        {/* Primary Action Button Bar */}
-        <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-xs">
-            {!canProceedToSources ? (
-              <p className="text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>Please provide the assignment question, word count, and citation style to continue.</span>
-              </p>
-            ) : localStructure.totalAllocated !== localWordCount ? (
-              <p className="text-amber-600 dark:text-amber-400 font-medium">
-                Note: {Math.abs(localWordCount - localStructure.totalAllocated)} words {localStructure.totalAllocated > localWordCount ? "over target" : "unallocated"}. You can auto-balance or proceed.
-              </p>
-            ) : (
-              <p className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5" />
-                <span>Structure calibrated and word count balanced.</span>
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
-            <button
-              type="button"
-              disabled={!canAnalyze || isAnalyzing}
-              onClick={handleAnalyze}
-              className="w-full sm:w-auto px-4 py-2 rounded-xl border border-neutral-300 dark:border-white/15 hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-semibold text-neutral-800 dark:text-neutral-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
-            >
-              {isAnalyzing ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  <span>Analyzing Brief…</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{analysis ? "Re-Analyze Assignment Brief" : "Analyze Assignment Brief"}</span>
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              disabled={!canProceedToSources || isAnalyzing}
-              onClick={handleProceedToSources}
-              className="w-full sm:w-auto px-5 py-2 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>Confirm Structure & Proceed to Sources</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
         </div>
 
         {analysisError && (
@@ -1434,8 +1521,8 @@ export default function AssignmentUnderstandStage() {
         )}
       </div>
 
-      {/* Analysis Breakdown Results - Focused on Editable Research Scope */}
-      {analysis && (
+      {/* Analysis Breakdown Results - Only for Uploaded Briefs with Indexed Rules */}
+      {analysis && analysis.briefLedger && analysis.briefLedger.length > 0 && (
         <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/70 dark:border-white/10 p-6 sm:p-8 shadow-xs space-y-6 animate-in fade-in duration-200">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 dark:border-white/5 pb-4">
             <div>

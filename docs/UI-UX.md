@@ -113,42 +113,40 @@ Phase 4: Submission & Verification Audit
 ### 4.2 Phase 1 · Understand & Structure (`AssignmentUnderstandStage.tsx`)
 
 #### Purpose
-Captures assignment parameters, decomposes the brief, dynamically generates an analytical outline tailored to the specific assignment question, and establishes voice/tone settings.
+Captures assignment parameters in a single unified workspace, decomposes the question, dynamically generates question-specific analytical headings and subheadings with calibrated word allocations (without generic Intro/Body/Conclusion templates), and establishes the canonical structure for all subsequent phases.
 
 #### Layout
-1. **Intake Section (Dual-Tab)**:
-   - `[ Paste Prompt ]` Tab: Large text area with auto-resize for pasting prompt text and instructions.
-   - `[ Upload Brief Document ]` Tab: Drag-and-drop zone accepting `.pdf`, `.docx`, `.txt`, `.md` files. Parsing extracts text and auto-populates the prompt field.
-2. **Unified Calibration Bar**:
-   - Single horizontal row with compact segmented controls:
-     - **Academic Level**: `Undergraduate` | `Postgraduate`
-     - **Assignment Type**: `Analytical Essay` | `Argumentative Essay` | `Critical Review` | `Report` | `Case Study`
-     - **Citation Style**: `APA 7th` | `Harvard` | `MLA 9th` | `Chicago (Author-Date)` | `IEEE`
-     - **Target Word Budget**: Numeric input with quick presets (`1,500`, `2,000`, `3,000`, `5,000`).
-3. **Collapsible Course Metadata & Rubric**:
-   - Accordion panel containing optional inputs: Module Code, Module Name, Institution, Due Date, and Rubric Criteria breakdown.
-4. **Dynamic Analytical Structure Planner (`DynamicStructurePlanner.tsx`)**:
-   - **No Fixed Templates**: Generates analytical Main Headings and Subheadings reflecting the unique themes of the assignment prompt rather than generic "Introduction/Body/Conclusion" blocks.
-   - **Controls**:
-     - Inline editable heading titles.
-     - Section reordering (drag handles or up/down controls).
-     - Add Main Heading / Add Subheading buttons.
-     - Live word allocation per subheading: `+50` / `-50` buttons and direct numeric inputs.
-     - One-click `Auto-Balance`: Proportionally distributes total target words across all subheadings based on typical academic weighting.
-     - `Distribute Remaining`: Automatically assigns unallocated budget words to active sections.
-     - Section Author Notes: Expandable text box on each section to pass specific instructions to AskScholar and drafting copilot.
-5. **Academic Writing Tone & Style Selector (`WritingStyleSelector.tsx`)**:
+1. **Unified Assignment Setup Workspace**:
+   - Single cohesive card containing all initial inputs in a clean, logical sequence:
+     - **Header Tab Switcher**: Minimal toggles for `[ Paste Prompt ]` and `[ Upload Brief Document (.pdf, .docx) ]` with live entered word count.
+     - **Assignment Question**: Prominent, auto-expanding text area for the complete assignment prompt or question.
+     - **Compact Parameters Row**: 3-column inline controls for **Academic Level** (`Undergraduate` | `Postgraduate / Masters`), **Assignment Type** (`General Academic Essay` | `Critical Review` | `Report` | `Case Study` | `Policy Brief` | `Literature Review`), and **Citation Style** (`APA 7th` | `Harvard` | `Chicago` | `IEEE` | `MLA 9th` | `OSCOLA`).
+     - **Single Primary CTA**: Prominent `[ Generate Structure ]` trigger button with concise loading state (`Generating structure…`) and retry handling.
+2. **Dynamic Analytical Structure Planner (`DynamicStructurePlanner.tsx`)**:
+   - Transitions directly inside the unified workspace once generated.
+   - **Question-Specific Generation**: Produces substantive, analytical Main Headings and Subheadings tailored specifically to the assignment question (no hardcoded Introduction/Body/Conclusion outlines).
+   - **Dynamic Word Allocation Status Bar**: Real-time allocation metrics displaying `Target: X words · Allocated: Y words · Remaining: Z words` (or `Over: W words` / `Balanced`).
+   - **Controls & Interactivity**:
+     - Inline editable main headings and subheadings.
+     - Add and delete headings and subheadings.
+     - Reorder sections with Up/Down buttons.
+     - Live word allocation per subheading: `+50` / `-50` buttons and direct numeric input.
+     - `Auto-Balance`: Proportionally distributes total target words across all subheadings to achieve a balanced allocation.
+     - `Distribute Remaining`: Automatically assigns unallocated budget words across all subheadings.
+     - Section Author Notes: Expandable text box for subheading-level research notes and writing guidance.
+     - Stable Internal Identifiers: Generates and preserves stable internal IDs (`headingId`, `subheadingId`) across renames for Phase 2 source attachment and Phase 3 drafting.
+3. **Academic Writing Tone & Style Selector (`WritingStyleSelector.tsx`)**:
    - 6 distinct academic voice profiles:
      - *Analytical*: Objective, measured, hypothesis-driven.
      - *Argumentative*: Persuasive, thesis-first, counter-argument addressing.
      - *Critical*: Evaluative, questioning methodology and assumptions.
      - *Expository*: Informative, explanatory, clear definition-focused.
      - *Natural & Engaging*: Fluent, rhythmically varied, human-authored feel.
-     - *Match My Writing (Custom Voice)*: Paste a sample past essay or drop a file to extract syntactic complexity, sentence length variance, and transition frequency.
+     - *Match My Writing (Custom Voice)*: Paste a sample past essay to mirror syntactic complexity and transition patterns.
 
 #### User Actions
-- `Generate Outline`: Triggers AI generation of analytical structure based on prompt.
-- `Lock Structure & Continue to Phase 2`: Validates word allocation matches budget and advances to Sources stage.
+- `Generate Structure`: Primary Phase 1 action; triggers question-specific structural decomposition.
+- `Confirm Structure & Proceed to Sources`: Validates the structure, commits canonical structure keys (`assignment_structure`, `structure`, `sectionBudgets`, `assignment_internal_sections`), and advances to Phase 2.
 
 ---
 
