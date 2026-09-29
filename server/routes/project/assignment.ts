@@ -27,7 +27,13 @@ import {
   getSectionPromptGuidelines,
   structureToInternalSections,
 } from "../../../src/desk/assignment/types.ts";
-import { generateDynamicAssignmentStructure } from "../../../src/desk/assignment/services/outlineService.ts";
+import {
+  generateDynamicAssignmentStructure,
+  extractTargetFrameworks,
+  sanitizeOutlineHeadings,
+  assignmentStructureToOutlineTree,
+  outlineTreeToAssignmentStructure,
+} from "../../../src/desk/assignment/services/outlineService.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(rejectClientCredentials);
@@ -653,12 +659,29 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       ...(parsedSections ? { sections: parsedSections } : {}),
       ...(updatedTitle ? { title: updatedTitle, assignment_title: updatedTitle } : {}),
     };
+
+    const structure = generateDynamicAssignmentStructure({
+      question,
+      assignmentType: assignmentType as any,
+      academicLevel: academicLevel as any,
+      targetWordCount: targetWords,
+      citationStyle,
+      briefText,
+    });
+
+    project.answers.assignment_structure = JSON.stringify(structure);
+    project.answers.structure = JSON.stringify(structure);
+    project.answers.target_frameworks = JSON.stringify(structure.targetFrameworks || []);
+
     await getProjectStore().save(project);
 
     res.json({
       ...finalAnalysis,
       briefLedger: ledger,
       updatedTitle: updatedTitle || project.answers?.["title"] || (project as any).title,
+      structure,
+      targetFrameworks: structure.targetFrameworks || [],
+      sections: assignmentStructureToOutlineTree(structure).sections,
     });
   } catch (err: any) {
     console.error("Assignment deconstruction error:", err);
@@ -1137,25 +1160,46 @@ CRITICAL: You MUST divide the target word counts across the sections to strictly
     : `Divide the ${targetWordCount} target words proportionally across the sections (e.g. Introduction ~10%, Body sections ~75%, Conclusion ~15%). The sum of targetWordCounts MUST equal approximately ${targetWordCount}.`;
 
   try {
-    const prompt = `You are the Scholar Core Outline & Word Count Planning Agent.
-Create an academic structure tailored strictly to the assignment question and format.
-CRITICAL INSTRUCTION: The structure must be question-specific and substantive based on the assignment question: "${question}".
-Do NOT use generic templates, and do NOT automatically generate generic "Introduction", "Body", or "Conclusion" headings unless explicitly required by the brief format.
-The headings and subheadings must directly reflect the substantive concepts, actors, mechanisms, theories, and empirical requirements of the question.
-Each main heading must represent a major analytical component required to answer the assignment.
-Under each main heading, generate 2-3 relevant analytical subheadings with allocated word counts.
-The sum of all subheading targetWordCounts MUST equal approximately ${targetWordCount}.
+    const briefText = cleanAnswerString(project.answers["assignment_brief_text"]) || question;
+    const isCourseworkWorkspace =
+      assignmentType === "coursework" ||
+      assignmentType === "business_assignment" ||
+      assignmentType === "report" ||
+      assignmentType === "case_study" ||
+      question.toLowerCase().includes("coursework");
+
+    const prompt = `You are the Scholar Core AskScholar Outline & Analytical Planning Agent.
+Create a deeply synthesized, context-specific academic structure rooted directly in the assignment question, academic rigor, and domain nuance.
+
+CRITICAL INSTRUCTIONS:
+1. STRICT BAN ON GENERIC PLACEHOLDERS: NEVER generate generic titles like "Section 1: Introduction", "Body Paragraph 1", "Main Argument", "Analysis", "Discussion", "Overview", or "Conclusion". All headings must be content-rich and domain-specific.
+2. EXTRACTION OF CORE INQUIRY DIMENSIONS: Deconstruct the brief into primary thesis/debates, counter-arguments, and domain theoretical frameworks.
+3. STRUCTURE DEPTH:
+   - H1 (Main Headings): Core thematic/analytical dimensions required to answer the assignment.
+   - H2 (Subheadings): Sub-argument or case focus.
+   - H3 (Evidence/Mechanism Descriptors): 3 concrete evidence points, models, empirical metrics, or counter-perspectives per subheading under keyPoints.
+4. WORKSPACE ADAPTATION:
+   ${
+     isCourseworkWorkspace
+       ? `COURSEWORK WORKSPACE: Align with rubric compliance, module learning objectives, diagnostic problem decomposition, applied analytical methodology/frameworks, empirical evaluation, and actionable policy/managerial recommendations.`
+       : `ESSAY WORKSPACE: Enforce a rigorous dialectical argument progression (thesis formulation, antithesis/counter-arguments & contested evidence, dialectical synthesis & critical refutation).`
+   }
+5. ALLOCATIONS:
+   The sum of all subheading targetWordCounts MUST equal approximately ${targetWordCount}.
 
 Question: "${question}"
 Assignment Type: ${assignmentType}
 Level: ${academicLevel}
 Target Word Count: ${targetWordCount} words
 Central Thesis: "${thesis}"
+Brief Context: "${briefText.slice(0, 1000)}"
 
 ${customAllocationPrompt}
 
 Return ONLY valid JSON matching:
 {
+  "thesis_statement": "Working thesis answering the prompt",
+  "target_frameworks": ["Framework/Model 1", "Framework/Model 2"],
   "structure": {
     "version": 1,
     "isConfirmed": false,
@@ -1166,36 +1210,43 @@ Return ONLY valid JSON matching:
       {
         "id": "heading-1",
         "number": 1,
-        "title": "Conceptual and Theoretical Framework",
-        "notes": "",
+        "title": "Substantive Domain H1 Title",
+        "notes": "Guidance notes",
         "targetWordCount": 700,
         "subheadings": [
           {
             "id": "sub-1-1",
             "headingId": "heading-1",
             "numberStr": "1.1",
-            "title": "Definition and Analytical Scope",
-            "targetWordCount": 300,
+            "title": "Substantive Analytical H2 Title",
+            "targetWordCount": 350,
             "currentWordCount": 0,
             "notes": "",
             "guidance": "Detailed analytical guidance",
-            "keyPoints": ["Key point 1", "Key point 2"],
+            "keyPoints": ["H3 Evidence/Model Descriptor 1", "H3 Descriptor 2", "H3 Descriptor 3"],
             "researchStatus": "not_researched"
           }
         ]
       }
     ]
   },
-  "outline": [
+  "sections": [
     {
-      "id": "sub-1-1",
-      "title": "1.1 Definition and Analytical Scope",
-      "targetWordCount": 300,
-      "currentWordCount": 0,
-      "guidance": "Detailed analytical guidance",
-      "keyPoints": ["Key point 1"],
-      "linkedEvidenceIds": [],
-      "status": "not_started"
+      "level": "h1",
+      "title": "Substantive Domain H1 Title",
+      "guidance": "Guidance notes",
+      "children": [
+        {
+          "level": "h2",
+          "title": "Substantive Analytical H2 Title",
+          "guidance": "Detailed analytical guidance",
+          "children": [
+            { "level": "h3", "title": "H3 Evidence/Model Descriptor 1" },
+            { "level": "h3", "title": "H3 Descriptor 2" },
+            { "level": "h3", "title": "H3 Descriptor 3" }
+          ]
+        }
+      ]
     }
   ]
 }`;
@@ -1203,30 +1254,50 @@ Return ONLY valid JSON matching:
     const data: any = await callOpenRouterJSON(
       req,
       res,
-      "You are the Scholar Core Outline & Word Count Planning Agent.",
+      "You are the Scholar Core AskScholar Outline & Analytical Planning Agent.",
       prompt,
       "openrouter/auto",
       "planning"
     );
     if (!data) return;
 
-    if (data.structure && data.outline) {
-      return res.json(data);
+    let finalStructure: any = null;
+
+    if (data.sections && Array.isArray(data.sections) && (!data.structure || !data.structure.headings)) {
+      finalStructure = outlineTreeToAssignmentStructure(
+        {
+          thesis_statement: data.thesis_statement || data.thesisStatement || thesis,
+          target_frameworks: data.target_frameworks || data.targetFrameworks || [],
+          sections: data.sections,
+          targetWordCount: Number(targetWordCount) || 2000,
+        },
+        Number(targetWordCount) || 2000
+      );
+    } else if (data.structure && data.structure.headings && Array.isArray(data.structure.headings)) {
+      finalStructure = data.structure;
     }
 
-    if (data.structure && !data.outline) {
-      data.outline = structureToInternalSections(data.structure);
-      return res.json(data);
-    }
+    if (finalStructure) {
+      finalStructure.headings = sanitizeOutlineHeadings(finalStructure.headings, question, assignmentType);
+      finalStructure.targetFrameworks =
+        data.target_frameworks ||
+        data.targetFrameworks ||
+        finalStructure.targetFrameworks ||
+        extractTargetFrameworks(question, assignmentType, briefText);
+      finalStructure.thesisStatement =
+        data.thesis_statement ||
+        data.thesisStatement ||
+        finalStructure.thesisStatement ||
+        thesis;
 
-    if (data.outline && !data.structure) {
-      const fallbackStructure = generateDynamicAssignmentStructure({
-        question,
-        assignmentType,
-        academicLevel,
-        targetWordCount: Number(targetWordCount) || 2000,
+      const tree = assignmentStructureToOutlineTree(finalStructure);
+      return res.json({
+        structure: finalStructure,
+        outline: structureToInternalSections(finalStructure),
+        sections: tree.sections,
+        target_frameworks: finalStructure.targetFrameworks,
+        thesis_statement: finalStructure.thesisStatement,
       });
-      return res.json({ structure: fallbackStructure, outline: data.outline });
     }
 
     const fallbackStructure = generateDynamicAssignmentStructure({
@@ -1234,35 +1305,44 @@ Return ONLY valid JSON matching:
       assignmentType,
       academicLevel,
       targetWordCount: Number(targetWordCount) || 2000,
+      briefText,
     });
+    const fallbackTree = assignmentStructureToOutlineTree(fallbackStructure);
     return res.json({
       structure: fallbackStructure,
       outline: structureToInternalSections(fallbackStructure),
+      sections: fallbackTree.sections,
+      target_frameworks: fallbackStructure.targetFrameworks || [],
+      thesis_statement: fallbackStructure.thesisStatement,
     });
   } catch (err: any) {
+    const briefText = cleanAnswerString(project.answers["assignment_brief_text"]) || question;
+    const fallbackStructure = generateDynamicAssignmentStructure({
+      question,
+      assignmentType,
+      academicLevel,
+      targetWordCount: Number(targetWordCount) || 2000,
+      briefText,
+    });
+    const fallbackTree = assignmentStructureToOutlineTree(fallbackStructure);
+
     if (err?.message === "RequireFrontendLLMException") {
-      const fallbackStructure = generateDynamicAssignmentStructure({
-        question,
-        assignmentType,
-        academicLevel,
-        targetWordCount: Number(targetWordCount) || 2000,
-      });
       return res.json({
         structure: fallbackStructure,
         outline: structureToInternalSections(fallbackStructure),
+        sections: fallbackTree.sections,
+        target_frameworks: fallbackStructure.targetFrameworks || [],
+        thesis_statement: fallbackStructure.thesisStatement,
       });
     }
     console.error("Structure generation error:", err);
     if (!res.headersSent) {
-      const fallbackStructure = generateDynamicAssignmentStructure({
-        question,
-        assignmentType,
-        academicLevel,
-        targetWordCount: Number(targetWordCount) || 2000,
-      });
       res.json({
         structure: fallbackStructure,
         outline: structureToInternalSections(fallbackStructure),
+        sections: fallbackTree.sections,
+        target_frameworks: fallbackStructure.targetFrameworks || [],
+        thesis_statement: fallbackStructure.thesisStatement,
       });
     }
   }

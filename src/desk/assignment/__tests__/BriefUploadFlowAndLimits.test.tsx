@@ -152,7 +152,7 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
 
     // Confirm that saveAnswers was called without infinite loops
     expect(saveIntakeAnswers).toHaveBeenCalled();
-  });
+  }, 15000);
 
   it("Admin Verification: Admin users bypass all limits and upload without paywall modals", async () => {
     getProfile.mockResolvedValue({

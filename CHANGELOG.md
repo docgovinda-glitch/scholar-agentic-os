@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-29
 
+### Added & Enhanced (AskScholar Outline Generation Enrichment for Coursework & Essay, Landing Page UI Fix)
+- **Dynamic Outline Generation Enrichment for Coursework & Essay (`outlineService.ts`, `assignment.ts`)**:
+  - Integrated AskScholar analytical patterns: core inquiry dimensions, counterarguments, and theoretical frameworks extracted from raw assignment briefs.
+  - Strictly banned generic placeholders ("Section 1: Introduction", "Body Paragraph 1", "Analysis", "Discussion", "Conclusion") with automated fallback sanitization (`sanitizeOutlineHeadings`).
+  - Enforced deep H1/H2/H3 structural hierarchy (H1 thematic dimension, H2 analytical sub-argument/case focus, H3 evidence/model/mechanism descriptors).
+  - Implemented workspace-specific dialectical & applied adaptations:
+    - **Essay**: Dialectical progression (thesis, antithesis, synthesis, refutation).
+    - **Coursework**: Applied rubric compliance, learning objectives, problem decomposition, diagnostic evaluation, and actionable recommendations.
+  - Added bidirectional AskScholar outline tree conversion (`assignmentStructureToOutlineTree`, `outlineTreeToAssignmentStructure`) supporting `{ thesis_statement, target_frameworks, sections: [ { level, title, guidance, children } ] }`.
+  - Added "Target Theoretical Frameworks & Models" interactive chip manager to `DynamicStructurePlanner.tsx` allowing framework addition and removal prior to outline approval.
+  - Extended backend `/api/assignment/structure` and `/deconstruct` endpoints to parse and return AskScholar hierarchical section trees and target frameworks.
+- **Landing Page AI Sidebar Layout Squish Fix (`src/desk/ProjectListScreen.tsx`)**:
+  - Resolved layout squishing where the AI sidebar occupied 50% flex width even when closed.
+  - Applied conditional CSS hiding (`hidden w-0 max-w-0`) when sidebar is inactive and expanded center content width to `max-w-5xl`.
+- **Test Coverage**:
+  - Added comprehensive test suite `src/desk/assignment/__tests__/AskScholarOutlineEnrichment.test.tsx` (11 tests passing).
+  - Verified 100% pass across all 26 assignment test suites (192 passing tests).
+
 ### Added & Fixed (Full-Screen Ask Scholar, Tailored Outline Generation, Server Bundle Fix & DB Sync)
 - **Full-Screen Conversational Ask Scholar (`src/desk/ProjectListScreen.tsx`)**:
   - Transformed Ask Scholar on the landing page into an immersive full-screen chat experience.

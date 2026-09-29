@@ -39,6 +39,8 @@ import {
   addKeyPoint,
   removeKeyPoint,
   updateKeyPoint,
+  addTargetFramework,
+  removeTargetFramework,
 } from "../services/outlineService";
 import { safeFormatLabel } from "../../../utils/briefExtractor";
 
@@ -81,12 +83,25 @@ export function DynamicStructurePlanner({
   const [newHeadingTitle, setNewHeadingTitle] = useState("");
   const [isAddingHeading, setIsAddingHeading] = useState(false);
   const [activeSubheadingId, setActiveSubheadingId] = useState<string | null>(null);
+  const [newFramework, setNewFramework] = useState("");
 
   const effectiveQuestion = question || assignmentQuestion || "";
 
   const notifyChange = (updated: AssignmentStructure) => {
     onStructureChange?.(updated);
     onChange?.(updated);
+  };
+
+  const handleAddFramework = (name: string) => {
+    if (!name.trim()) return;
+    const updated = addTargetFramework(structure, name.trim());
+    notifyChange(updated);
+    setNewFramework("");
+  };
+
+  const handleRemoveFramework = (index: number) => {
+    const updated = removeTargetFramework(structure, index);
+    notifyChange(updated);
   };
 
   const totalAllocated = structure.totalAllocated || 0;
@@ -327,6 +342,66 @@ export function DynamicStructurePlanner({
             rows={2}
             className="w-full text-xs p-2.5 rounded-lg bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/90 dark:border-white/10 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-purple-500 resize-y font-normal leading-relaxed"
           />
+        </div>
+
+        {/* Target Theoretical Frameworks & Analytical Models */}
+        <div className="p-3.5 sm:px-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E20] shadow-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-md bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                <Layers className="w-3.5 h-3.5" />
+              </span>
+              <div>
+                <h4 className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+                  <span>Target Theoretical Frameworks &amp; Models</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                    {(structure.targetFrameworks || []).length} active
+                  </span>
+                </h4>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  Theoretical lenses and analytical models grounding your inquiry, problem decomposition, and evidence synthesis.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Frameworks Chip List */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            {(structure.targetFrameworks || []).map((framework, fIdx) => (
+              <span
+                key={fIdx}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-neutral-100 dark:bg-white/[0.05] border border-neutral-200/80 dark:border-white/10 text-neutral-800 dark:text-neutral-200 group/chip"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                <span>{framework}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveFramework(fIdx)}
+                  className="p-0.5 text-neutral-400 hover:text-rose-500 transition-colors cursor-pointer"
+                  title={`Remove ${framework}`}
+                  aria-label={`Remove framework ${framework}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+
+            {/* Inline input to add framework */}
+            <input
+              type="text"
+              value={newFramework}
+              onChange={(e) => setNewFramework(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newFramework.trim()) {
+                  e.preventDefault();
+                  handleAddFramework(newFramework);
+                }
+              }}
+              placeholder="+ Add theoretical framework or model (Press Enter)..."
+              className="text-xs px-2.5 py-1 rounded-lg bg-neutral-50/80 dark:bg-white/[0.02] border border-dashed border-neutral-300 dark:border-white/15 text-neutral-800 dark:text-neutral-200 placeholder-neutral-400 focus:outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-[#2C2C2E] transition-colors min-w-[240px]"
+              aria-label="Add theoretical framework"
+            />
+          </div>
         </div>
 
         {/* Dynamic Main Headings & Subheadings List */}

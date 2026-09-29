@@ -40,7 +40,7 @@ Scholar Core provides purpose-built workspaces tailored to specific deliverable 
 - **Status**: Production Active.
 - **Target Deliverables**: Academic Essays, Module Coursework, Analytical Papers, Policy Briefs, Case Studies, Lab Reports.
 - **Core Architecture**: 4-Phase Lifecycle:
-  1. **Phase 1 · Understand & Structure**: Dual-tab brief intake (paste prompt or upload PDF/DOCX brief document), level and citation style calibration, dynamic analytical outline generation with custom word allocations (`DynamicStructurePlanner`), and voice/style selection (`WritingStyleSelector`).
+  1. **Phase 1 · Understand & Structure**: Dual-tab brief intake (paste prompt or upload PDF/DOCX brief document), level and citation style calibration, AskScholar-enriched dynamic analytical outline generation (banning generic placeholders, enforcing H1/H2/H3 depth, dialectical progression for essays, and applied problem decomposition for coursework), target theoretical frameworks chip manager, custom word allocations (`DynamicStructurePlanner`), and voice/style selection (`WritingStyleSelector`).
   2. **Phase 2 · Sources & Discovery**: Question deconstruction, multi-angle scholarly discovery, lecture/slide dropzone with automatic chunking, relevance scoring, and approved evidence shelf.
   3. **Phase 3 · Drafting**: Subheading-by-subheading drafting alignment, live word count progress tracking against section budgets, citation insertion, and evidence passage binding.
   4. **Phase 4 · Submission**: 10-point rubric evaluator, citation audit reconciliation, and formatted `.docx` and PDF export.

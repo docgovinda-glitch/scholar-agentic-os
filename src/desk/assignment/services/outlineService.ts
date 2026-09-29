@@ -21,6 +21,8 @@ import type {
   AssignmentStructure,
   AssignmentMainHeading,
   AssignmentSubheading,
+  OutlineTreeSection,
+  AskScholarOutlineResponse,
 } from "../types";
 
 export function generateAdaptiveDefaultOutline(
@@ -456,6 +458,8 @@ export interface DynamicStructureOptions {
   targetWordCount?: number;
   citationStyle?: string;
   writingTone?: string;
+  briefText?: string;
+  targetFrameworks?: string[];
   currentStructure?: AssignmentStructure;
   timeoutMs?: number;
   llmCaller?: (systemPrompt: string, userPrompt: string, mode?: "reasoning" | "fast") => Promise<string>;
@@ -512,6 +516,363 @@ export function formatAcademicTopicTitle(raw: string): string {
   });
 
   return formatted.join(" ");
+}
+
+/** Helper to add a framework if not already in array */
+function addIfNotPresent(arr: string[], item: string): void {
+  if (!arr.includes(item)) {
+    arr.push(item);
+  }
+}
+
+/**
+ * Extract target academic, theoretical, and analytical frameworks from the assignment question and brief.
+ * Adheres to AskScholar academic domain patterns.
+ */
+export function extractTargetFrameworks(
+  question: string = "",
+  assignmentType?: string,
+  briefText?: string
+): string[] {
+  const combined = `${question} ${briefText || ""}`.toLowerCase();
+  const frameworks: string[] = [];
+
+  const knownExplicit: [RegExp, string][] = [
+    [/\bporter(?:'s)?\s*(?:five\s*forces|value\s*chain)?\b/i, "Porter's Five Forces & Value Chain Analysis"],
+    [/\bvrio\b/i, "VRIO Framework"],
+    [/\brbv\b|\bresource[- ]based\s*view\b/i, "Resource-Based View (RBV)"],
+    [/\bpestle?\b/i, "PESTLE Environmental Scanning"],
+    [/\bswot\b/i, "SWOT Strategic Framework"],
+    [/\brawls(?:ian)?\b|\bveil\s*of\s*ignorance\b/i, "Rawlsian Distributive Justice & Fairness Parity"],
+    [/\bkant(?:ian)?\b|\bdeontolog/i, "Kantian Deontological Ethics"],
+    [/\butilitarian(?:ism)?\b/i, "Utilitarian Consequentialism"],
+    [/\bfoucault\b|\bbiopolitics\b|\bpanopticon\b/i, "Foucauldian Power-Knowledge & Biopolitics"],
+    [/\bbourdieu\b|\bhabitus\b|\bcultural\s*capital\b/i, "Bourdieu's Cultural Capital & Habitus"],
+    [/\bhabermas\b|\bcommunicative\s*action\b/i, "Habermasian Communicative Action"],
+    [/\b(structural\s*realism|neorealism|mearsheimer|waltz)\b/i, "Structural Realism (Waltz & Mearsheimer)"],
+    [/\b(liberal\s*institutionalism|keohane|neoliberalism)\b/i, "Liberal Institutionalism (Keohane)"],
+    [/\b(constructivism|wendt)\b/i, "Social Constructivism (Wendt)"],
+    [/\bweaponized\s*interdependence\b/i, "Weaponized Interdependence (Farrell & Newman)"],
+    [/\bcommercial\s*peace\b/i, "Liberal Commercial Peace Theory"],
+    [/\bsecurity\s*dilemma\b/i, "Security Dilemma (Jervis)"],
+    [/\binterdependence\b/i, "Complex Interdependence (Keohane & Nye)"],
+    [/\bcar[- ]t\b|\bcellular\s*therapy\b|\badoptive\s*cell\b/i, "Adoptive Cellular Transfer (ACT) Mechanics"],
+    [/\btumor\s*microenvironment\b|\btme\b/i, "Tumor Microenvironment (TME) Immunosuppression"],
+    [/\bempirical\s*risk\s*minimization\b|\berm\b/i, "Empirical Risk Minimization (ERM)"],
+    [/\brepresentation\s*learning\b|\bmanifold\b/i, "Latent Manifold Representation Theory"],
+    [/\bscaling\s*law/i, "Compute-Optimal Neural Scaling Laws (Chinchilla)"],
+    [/\bmechanistic\s*interpretability\b/i, "Mechanistic Interpretability Circuit Analysis"],
+    [/\beu\s*ai\s*act\b|\brisk[- ]tiered\b/i, "EU AI Act Risk-Tiered Governance Architecture"],
+    [/\bdisparate\s*impact\b|\bequalized\s*odds\b/i, "Statistical Fairness & Equalized Odds Parity"],
+    [/\bipcc\b|\bshared\s*socioeconomic\b|\bssp\b/i, "IPCC Shared Socioeconomic Pathways (SSPs)"],
+    [/\bplanetary\s*boundaries\b/i, "Planetary Boundaries Framework (Rockström)"],
+    [/\bostrom\b|\bcommons\b|\bcollective\s*action\b/i, "Polycentric Governance & Commons Theory (Ostrom)"],
+  ];
+
+  for (const [pattern, label] of knownExplicit) {
+    if (pattern.test(combined)) {
+      addIfNotPresent(frameworks, label);
+    }
+  }
+
+  // Domain heuristics if fewer than 3 frameworks found
+  if (frameworks.length < 3) {
+    if (
+      combined.includes("economic interdependence") ||
+      combined.includes("commercial peace") ||
+      (combined.includes("trade") && (combined.includes("conflict") || combined.includes("peace") || combined.includes("friction") || combined.includes("war") || combined.includes("interstate"))) ||
+      (combined.includes("interdependence") && (combined.includes("conflict") || combined.includes("trade") || combined.includes("peace")))
+    ) {
+      addIfNotPresent(frameworks, "Liberal Commercial Peace Theory");
+      addIfNotPresent(frameworks, "Realist Strategic Vulnerability");
+      addIfNotPresent(frameworks, "Weaponized Interdependence (Farrell & Newman)");
+    } else if (combined.includes("nepal") || (combined.includes("foreign policy") && combined.includes("india"))) {
+      addIfNotPresent(frameworks, "Small-State Asymmetric Buffer Theory");
+      addIfNotPresent(frameworks, "Equi-Proximity & Strategic Hedging");
+      addIfNotPresent(frameworks, "Regional Security Complex Theory (Buzan & Wæver)");
+    } else if (
+      combined.includes("cancer") ||
+      combined.includes("cell therapy") ||
+      combined.includes("cellular therapy") ||
+      combined.includes("immunotherapy") ||
+      combined.includes("oncology") ||
+      combined.includes("lymphoma") ||
+      combined.includes("tumor") ||
+      combined.includes("car-t")
+    ) {
+      addIfNotPresent(frameworks, "Adoptive Cellular Transfer (ACT) Mechanics");
+      addIfNotPresent(frameworks, "Tumor Microenvironment (TME) Immunosuppression");
+      addIfNotPresent(frameworks, "On-Target Off-Tumor Cytotoxicity Profiling");
+    } else if (combined.includes("machine learning") || (combined.includes("ai") && combined.includes("model"))) {
+      addIfNotPresent(frameworks, "Empirical Risk Minimization (ERM)");
+      addIfNotPresent(frameworks, "Latent Manifold Representation Theory");
+      addIfNotPresent(frameworks, "Compute-Optimal Scaling Laws");
+    } else if (
+      combined.includes("ethic") ||
+      combined.includes("bias") ||
+      combined.includes("fairness") ||
+      combined.includes("regulat") ||
+      combined.includes("discriminat") ||
+      (combined.includes("algorithm") && (combined.includes("governance") || combined.includes("accountab") || combined.includes("justice")))
+    ) {
+      addIfNotPresent(frameworks, "Rawlsian Distributive Justice & Fairness Parity");
+      addIfNotPresent(frameworks, "EU AI Act Risk-Tiered Governance Architecture");
+      addIfNotPresent(frameworks, "Algorithmic Accountability & Disparate Impact");
+    } else if (combined.includes("climate") || combined.includes("food security") || combined.includes("environment")) {
+      addIfNotPresent(frameworks, "IPCC Shared Socioeconomic Pathways (SSPs)");
+      addIfNotPresent(frameworks, "Planetary Boundaries Framework (Rockström)");
+      addIfNotPresent(frameworks, "Socio-Ecological Systems Resilience (Ostrom)");
+    } else if (
+      assignmentType === "coursework" ||
+      combined.includes("coursework") ||
+      assignmentType === "case_study" ||
+      assignmentType === "business_assignment" ||
+      assignmentType === "report"
+    ) {
+      addIfNotPresent(frameworks, "Porter's Five Forces & Value Chain Analysis");
+      addIfNotPresent(frameworks, "Resource-Based View (RBV) & VRIO");
+      addIfNotPresent(frameworks, "Strategic Alignment & Stakeholder Salience Theory");
+    } else {
+      addIfNotPresent(frameworks, "Dialectical Thesis-Antithesis-Synthesis Progression");
+      addIfNotPresent(frameworks, "Comparative Institutional Analysis");
+      addIfNotPresent(frameworks, "Critical Epistemic & Methodological Deconstruction");
+    }
+  }
+
+  return frameworks.slice(0, 4);
+}
+
+/** Check if a heading title is a generic banned placeholder */
+export function isGenericPlaceholderTitle(title: string): boolean {
+  if (!title || typeof title !== "string") return true;
+  const t = title.trim().toLowerCase().replace(/^[\d.]+\s*/, "").trim();
+  const bannedPatterns = [
+    /^introduction$/i,
+    /^body$/i,
+    /^body\s*paragraph(?:\s*\d+)?$/i,
+    /^body\s*section(?:\s*\d+)?$/i,
+    /^section(?:\s*\d+)?$/i,
+    /^main\s*argument(?:\s*\d+)?$/i,
+    /^analysis$/i,
+    /^discussion$/i,
+    /^conclusion$/i,
+    /^overview$/i,
+    /^background$/i,
+    /^summary$/i,
+    /^findings$/i,
+    /^literature\s*review$/i,
+    /^methodology$/i,
+  ];
+  return bannedPatterns.some((pattern) => pattern.test(t));
+}
+
+/** Sanitize outline headings to ensure no generic placeholders remain */
+export function sanitizeOutlineHeadings(
+  headings: AssignmentMainHeading[],
+  question: string,
+  assignmentType?: string
+): AssignmentMainHeading[] {
+  const deconstructed = deconstructQuestionSemantics(question);
+  const topicA = deconstructed.subjectFormattedA || "Core Subject";
+  const topicB = deconstructed.subjectFormattedB || "";
+  const isCoursework =
+    assignmentType === "coursework" ||
+    assignmentType === "business_assignment" ||
+    assignmentType === "report" ||
+    assignmentType === "case_study";
+
+  return headings.map((h, hIdx) => {
+    let sanitizedH1Title = h.title;
+    if (isGenericPlaceholderTitle(h.title)) {
+      if (hIdx === 0) {
+        sanitizedH1Title = isCoursework
+          ? `Problem Formulation and Methodological Scope: ${topicA}`
+          : `Foundational Stakes and Theoretical Framing: ${topicA}${topicB ? ` in ${topicB}` : ""}`;
+      } else if (hIdx === 1) {
+        sanitizedH1Title = isCoursework
+          ? `Applied Empirical Investigation & Diagnostic Analysis: ${topicB || topicA}`
+          : `Antithesis, Competing Paradigms & Contested Evidence in ${topicB || topicA}`;
+      } else {
+        sanitizedH1Title = isCoursework
+          ? `Strategic Recommendations, Interventions & Academic Reflection`
+          : `Dialectical Synthesis, Critical Refutation & Resolution`;
+      }
+    }
+
+    const sanitizedSubheadings = (h.subheadings || []).map((sub, sIdx) => {
+      let sanitizedSubTitle = sub.title;
+      if (isGenericPlaceholderTitle(sub.title)) {
+        sanitizedSubTitle = `${sanitizedH1Title} - Dimension ${sIdx + 1}: ${topicA}`;
+      }
+      return {
+        ...sub,
+        title: sanitizedSubTitle,
+      };
+    });
+
+    return {
+      ...h,
+      title: sanitizedH1Title,
+      subheadings: sanitizedSubheadings,
+    };
+  });
+}
+
+/**
+ * Convert internal AssignmentStructure to AskScholar structured outline tree format.
+ */
+export function assignmentStructureToOutlineTree(structure: AssignmentStructure): AskScholarOutlineResponse {
+  return {
+    thesis_statement: structure.thesisStatement || "",
+    target_frameworks: structure.targetFrameworks || [],
+    targetWordCount: structure.targetWordCount,
+    writingTone: structure.writingTone,
+    academicLevel: (structure as any).academicLevel,
+    sections: structure.headings.map((h) => ({
+      level: "h1" as const,
+      title: h.title,
+      guidance: h.notes,
+      targetWordCount: h.targetWordCount,
+      children: (h.subheadings || []).map((sub) => ({
+        level: "h2" as const,
+        title: sub.title,
+        guidance: sub.guidance,
+        targetWordCount: sub.targetWordCount,
+        children: (sub.keyPoints || []).map((pt) => ({
+          level: "h3" as const,
+          title: pt,
+        })),
+      })),
+    })),
+  };
+}
+
+/**
+ * Convert AskScholar structured outline tree format back to internal AssignmentStructure.
+ */
+export function outlineTreeToAssignmentStructure(
+  data: AskScholarOutlineResponse,
+  targetWordCount: number = 2000
+): AssignmentStructure {
+  const total = Math.max(300, Number(data.targetWordCount || targetWordCount) || 2000);
+  const rawSections = Array.isArray(data.sections) ? data.sections : [];
+
+  const h1Sections = rawSections.filter((s) => s.level === "h1" || !s.level);
+
+  let allocatedSoFar = 0;
+  const headings: AssignmentMainHeading[] = (h1Sections.length > 0
+    ? h1Sections
+    : [{ level: "h1" as const, title: "Foundational Inquiry & Core Dimension", guidance: "", children: [] }]
+  ).map((h1, hIdx) => {
+    const headingId = `heading-${hIdx + 1}`;
+    const headingNumber = hIdx + 1;
+    const h2Sections = Array.isArray(h1.children)
+      ? h1.children.filter((s) => s.level === "h2" || !s.level)
+      : [];
+
+    const subheadings: AssignmentSubheading[] = (h2Sections.length > 0
+      ? h2Sections
+      : [{ level: "h2" as const, title: `${h1.title} - Investigation`, guidance: h1.guidance, children: [] }]
+    ).map((h2, sIdx) => {
+      const subId = `sub-${headingNumber}-${sIdx + 1}`;
+      const subNumberStr = `${headingNumber}.${sIdx + 1}`;
+      const keyPoints = Array.isArray(h2.children)
+        ? h2.children.map((c) => (typeof c === "string" ? c : c.title)).filter(Boolean)
+        : (h2 as any).keyPoints || [];
+
+      const words =
+        h2.targetWordCount ||
+        Math.round(total / (h1Sections.length * (h2Sections.length || 1)));
+      allocatedSoFar += words;
+
+      return {
+        id: subId,
+        headingId,
+        numberStr: subNumberStr,
+        title: h2.title,
+        targetWordCount: words,
+        currentWordCount: 0,
+        notes: "",
+        guidance: h2.guidance || "",
+        keyPoints:
+          keyPoints.length > 0
+            ? keyPoints
+            : [
+                "Empirical evidence and primary case observations",
+                "Theoretical mechanism and framework application",
+                "Methodological limitations and scope boundaries",
+              ],
+        researchStatus: "not_researched" as const,
+        sourcesCount: 0,
+        boundSourceIds: [],
+        draftContent: "",
+        draftStatus: "not_started" as const,
+      };
+    });
+
+    const headingTotal = subheadings.reduce((sum, s) => sum + s.targetWordCount, 0);
+
+    return {
+      id: headingId,
+      number: headingNumber,
+      title: h1.title,
+      notes: h1.guidance || "",
+      targetWordCount: headingTotal,
+      subheadings,
+    };
+  });
+
+  const totalAllocated = headings.reduce((sum, h) => sum + h.targetWordCount, 0);
+
+  return {
+    version: 1,
+    isConfirmed: false,
+    targetWordCount: total,
+    totalAllocated,
+    headings,
+    thesisStatement: data.thesis_statement || "",
+    targetFrameworks: Array.isArray(data.target_frameworks) ? data.target_frameworks : [],
+    writingTone: data.writingTone || "formal_academic",
+    rationale: "Synthesized from AskScholar structured outline tree.",
+  };
+}
+
+/** Update target frameworks in an existing structure */
+export function updateTargetFrameworks(
+  structure: AssignmentStructure,
+  frameworks: string[]
+): AssignmentStructure {
+  return {
+    ...structure,
+    targetFrameworks: frameworks,
+  };
+}
+
+/** Add a single target framework */
+export function addTargetFramework(
+  structure: AssignmentStructure,
+  framework: string
+): AssignmentStructure {
+  const trimmed = framework.trim();
+  if (!trimmed) return structure;
+  const current = structure.targetFrameworks || [];
+  if (current.includes(trimmed)) return structure;
+  return {
+    ...structure,
+    targetFrameworks: [...current, trimmed],
+  };
+}
+
+/** Remove a target framework by index */
+export function removeTargetFramework(
+  structure: AssignmentStructure,
+  frameworkIndex: number
+): AssignmentStructure {
+  const current = structure.targetFrameworks || [];
+  return {
+    ...structure,
+    targetFrameworks: current.filter((_, idx) => idx !== frameworkIndex),
+  };
 }
 
 export interface DeconstructedQuestion {
@@ -801,7 +1162,14 @@ export function generateDynamicAssignmentStructure(
     academicLevel = "undergraduate",
     targetWordCount = 2000,
     currentStructure,
+    briefText,
+    targetFrameworks: inputFrameworks,
   } = options;
+
+  const targetFrameworks =
+    inputFrameworks && inputFrameworks.length > 0
+      ? inputFrameworks
+      : extractTargetFrameworks(question, assignmentType, briefText);
 
   const total = Math.max(300, Number(targetWordCount) || 2000);
   const qLower = question.toLowerCase();
@@ -882,6 +1250,14 @@ export function generateDynamicAssignmentStructure(
       qLower.includes("transformer") ||
       qLower.includes("foundation model") ||
       (qLower.includes("ai") && (qLower.includes("model") || qLower.includes("algorithm") || qLower.includes("training") || qLower.includes("data") || qLower.includes("architecture") || qLower.includes("role of ai"))));
+
+  const isCoursework =
+    assignmentType === "coursework" ||
+    assignmentType === "business_assignment" ||
+    assignmentType === "report" ||
+    assignmentType === "case_study" ||
+    qLower.includes("coursework") ||
+    qLower.includes("module assignment");
 
   const isCaseStudyOrBusiness =
     assignmentType === "case_study" ||
@@ -1512,101 +1888,188 @@ export function generateDynamicAssignmentStructure(
     const titleA = semantics.topicA;
     const titleB = semantics.topicB;
 
-    specs = [
-      {
-        title: `Theoretical and Conceptual Foundations of ${titleA}${titleB ? ` in ${titleB}` : ""}`,
-        notes: `Establish foundational definitions, theoretical models, and analytical scope governing ${titleA}.`,
-        subheadings: [
-          {
-            title: `Conceptual Delineation and Disciplinary Taxonomy: ${titleA}`,
-            ratio: 0.14,
-            guidance: `Define primary concepts, taxonomical frameworks, and analytical boundaries addressing ${titleA}.`,
-            keyPoints: [
-              `Foundational taxonomy of ${titleA}`,
-              "Methodological measurement criteria",
-              "Disciplinary theoretical framing",
-            ],
-          },
-          {
-            title: titleB
-              ? `Theoretical Paradigms Governing the Relationship with ${titleB}`
-              : `Major Competing Theoretical Paradigms and Models`,
-            ratio: 0.18,
-            guidance: titleB
-              ? `Synthesize the primary theoretical mechanisms linking ${titleA} directly to ${titleB}.`
-              : `Analyze the dominant theoretical perspectives explaining causal and functional dynamics.`,
-            keyPoints: [
-              "Primary theoretical paradigms",
-              "Underlying causal mechanisms",
-              "Structural assumptions and scope conditions",
-            ],
-          },
-        ],
-      },
-      {
-        title: titleB
-          ? `Substantive Evidence and Operational Dynamics: ${titleA} and ${titleB}`
-          : `Empirical Evidence, Operational Realities, and Case Analysis`,
-        notes: `Investigate primary empirical findings, real-world case evidence, and operational dynamics.`,
-        subheadings: [
-          {
-            title: titleB
-              ? `Empirical Manifestations and Observed Dynamics in ${titleB}`
-              : `Primary Empirical Findings and Field Evidence`,
-            ratio: 0.20,
-            guidance: `Critically analyze peer-reviewed evidence and quantitative/qualitative data substantiating core arguments.`,
-            keyPoints: [
-              "Authoritative empirical data points",
-              "Observed systemic outcomes",
-              "Comparative variance across sectors/regions",
-            ],
-          },
-          {
-            title: `Structural Challenges, Heterogeneity, and Contextual Variance`,
-            ratio: 0.18,
-            guidance: `Scrutinize systemic friction points, institutional heterogeneity, and contextual disparities.`,
-            keyPoints: [
-              "Structural bottlenecks and constraints",
-              "Differential impact across sub-groups",
-              "Institutional and operational friction",
-            ],
-          },
-        ],
-      },
-      {
-        title: "Critical Counter-Perspectives, Policy Synthesis, and Future Horizons",
-        notes: "Rigorously test counterarguments, address methodological limitations, and chart future directions.",
-        subheadings: [
-          {
-            title: "Contested Assumptions, Counter-Evidence, and Critical Critique",
-            ratio: 0.16,
-            guidance: `Weigh conflicting perspectives, methodological limitations in contemporary research, and alternative interpretations.`,
-            keyPoints: [
-              "Competing evidentiary interpretations",
-              "Methodological and data limitations",
-              "Unintended secondary externalities",
-            ],
-          },
-          {
-            title: "Scholarly Synthesis, Strategic Interventions, and Future Horizons",
-            ratio: 0.14,
-            guidance: `Synthesize analytical conclusions into coherent academic arguments and forward-looking strategic recommendations.`,
-            keyPoints: [
-              "Overarching synthesis of findings",
-              "Evidence-based policy or practice recommendations",
-              "Prospective scholarly research agenda",
-            ],
-          },
-        ],
-      },
-    ];
+    if (isCoursework) {
+      // Coursework: Rubric compliance, applied problem decomposition & strategic interventions
+      specs = [
+        {
+          title: `Problem Formulation, Learning Objective Alignment & Methodological Scope: ${titleA}${titleB ? ` in ${titleB}` : ""}`,
+          notes: `Deconstruct the assignment problem statement against module learning objectives, diagnostic benchmarks, and methodological protocol.`,
+          subheadings: [
+            {
+              title: `Diagnostic Problem Decomposition and Scope Boundaries: ${titleA}`,
+              ratio: 0.15,
+              guidance: `Decompose core assignment brief directives, establish the operational baseline, and define diagnostic compliance parameters.`,
+              keyPoints: [
+                `Deconstruction of primary assignment brief criteria for ${titleA}`,
+                "Contextual baseline and diagnostic problem parameters",
+                "Compliance benchmarks and performance indicators",
+              ],
+            },
+            {
+              title: `Applied Analytical Framework and Methodological Protocol: ${targetFrameworks[0] || "Target Analytical Model"}`,
+              ratio: 0.17,
+              guidance: `Detail and justify the analytical models (${targetFrameworks.join(", ") || "Selected Frameworks"}), secondary data sources, and investigative procedures.`,
+              keyPoints: [
+                `Methodological justification for ${targetFrameworks[0] || "primary analytical framework"}`,
+                "Empirical data gathering and evidence protocol",
+                "Analytical validity, reliability, and scope constraints",
+              ],
+            },
+          ],
+        },
+        {
+          title: `Applied Empirical Investigation, Diagnostic Evaluation & Scenario Analysis: ${titleA}${titleB ? ` and ${titleB}` : ""}`,
+          notes: `Execute rigorous applied evaluation using selected models against real-world evidence, organizational scenarios, or empirical datasets.`,
+          subheadings: [
+            {
+              title: titleB
+                ? `In-Depth Diagnostic Model Application to Empirical Evidence in ${titleB}`
+                : `In-Depth Diagnostic Model Application to Empirical Evidence`,
+              ratio: 0.22,
+              guidance: `Apply diagnostic frameworks directly to primary evidence and case dynamics to evaluate operational and systemic performance.`,
+              keyPoints: [
+                "Diagnostic application of models to empirical data",
+                "Identification of core operational friction and performance deficits",
+                "Comparative benchmarking against industry standards",
+              ],
+            },
+            {
+              title: `Critical Evaluation of Institutional Constraints, Systemic Bottlenecks, and Risk Factors`,
+              ratio: 0.18,
+              guidance: `Scrutinize operational vulnerabilities, institutional resistance, compliance risks, and feasibility barriers.`,
+              keyPoints: [
+                "Institutional bottlenecks and operational constraints",
+                "Resource deficits and structural feasibility barriers",
+                "Multi-variable risk assessment and trade-offs",
+              ],
+            },
+          ],
+        },
+        {
+          title: `Strategic Interventions, Implementation Roadmap & Critical Reflection`,
+          notes: `Synthesize diagnostic findings into actionable SMART interventions, risk-mitigated rollout plans, and academic self-evaluation.`,
+          subheadings: [
+            {
+              title: `Prioritized Evidence-Based Recommendations and Strategic Interventions`,
+              ratio: 0.16,
+              guidance: `Formulate concrete, prioritized SMART recommendations justified by diagnostic evidence and theoretical models.`,
+              keyPoints: [
+                "Actionable SMART intervention measures",
+                "Resource allocation, budget priorities, and phased timeline",
+                "Measurable KPIs and governance monitoring mechanisms",
+              ],
+            },
+            {
+              title: `Implementation Roadmap, Risk Mitigation Matrix, and Critical Self-Evaluation`,
+              ratio: 0.12,
+              guidance: `Construct a phased rollout plan with contingency buffers, stakeholder management protocols, and critical evaluation of module learnings.`,
+              keyPoints: [
+                "Contingency planning for strategic and operational risks",
+                "Stakeholder engagement and change management protocols",
+                "Critical self-reflection on analytical limits and learning outcomes",
+              ],
+            },
+          ],
+        },
+      ];
+    } else {
+      // Essay: Dialectical argument progression (thesis, antithesis, synthesis, refutation)
+      specs = [
+        {
+          title: `Theoretical and Conceptual Foundations of ${titleA}${titleB ? ` in ${titleB}` : ""}`,
+          notes: `Establish foundational definitions, theoretical models, and analytical scope governing ${titleA}.`,
+          subheadings: [
+            {
+              title: `Conceptual Parameters and Intellectual Tensions Surrounding ${titleA}`,
+              ratio: 0.14,
+              guidance: `Define primary concepts, taxonomical frameworks, and analytical boundaries addressing ${titleA}.`,
+              keyPoints: [
+                `Foundational taxonomy and theoretical stakes of ${titleA}`,
+                "Epistemological definitions and scope boundaries",
+                "Primary causal mechanisms and analytical criteria",
+              ],
+            },
+            {
+              title: titleB
+                ? `Theoretical Paradigms Governing the Relationship with ${titleB}`
+                : `Dominant Theoretical Frameworks and Explanatory Mechanisms`,
+              ratio: 0.18,
+              guidance: titleB
+                ? `Synthesize the primary theoretical mechanisms linking ${titleA} directly to ${titleB}.`
+                : `Analyze the dominant theoretical perspectives explaining causal and functional dynamics.`,
+              keyPoints: [
+                `Core orthodox theoretical models (${targetFrameworks[0] || "prevailing paradigms"})`,
+                "Explanatory causal claims and structural assumptions",
+                "Scope conditions, transmission channels, and mediating variables",
+              ],
+            },
+          ],
+        },
+        {
+          title: titleB
+            ? `Substantive Evidence and Operational Dynamics: ${titleA} and ${titleB}`
+            : `Empirical Evidence, Operational Realities, and Case Analysis`,
+          notes: `Investigate primary empirical findings, real-world case evidence, and operational dynamics.`,
+          subheadings: [
+            {
+              title: titleB
+                ? `Antithesis: Counter-Arguments and Dissenting Perspectives in ${titleB}`
+                : `Antithesis: Counter-Arguments and Dissenting Perspectives on ${titleA}`,
+              ratio: 0.20,
+              guidance: `Critically unpack rival perspectives, empirical anomalies, and counter-arguments challenging prevailing assumptions.`,
+              keyPoints: [
+                "Primary counter-arguments and dissenting schools of thought",
+                "Empirical counter-evidence and systemic anomalies",
+                "Contextual heterogeneity and comparative divergence",
+              ],
+            },
+            {
+              title: `Structural Vulnerabilities, Boundary Conditions, and Methodological Contestation`,
+              ratio: 0.18,
+              guidance: `Scrutinize systemic friction points, boundary conditions, and methodological contestation in the scholarship.`,
+              keyPoints: [
+                "Measurement limitations and methodological vulnerabilities",
+                "Confounding variables and endogeneity concerns",
+                "Structural boundary conditions and contextual disparities",
+              ],
+            },
+          ],
+        },
+        {
+          title: `Critical Counter-Perspectives, Policy Synthesis, and Future Horizons`,
+          notes: `Rigorously weigh counterarguments, address methodological limitations, and reach an evidence-based dialectical resolution.`,
+          subheadings: [
+            {
+              title: `Critical Refutation of Counter-Claims and Reconciliation of Dialectical Tensions`,
+              ratio: 0.16,
+              guidance: `Weigh conflicting perspectives, refute flawed objections, and synthesize a nuanced reconciliation of the core debate.`,
+              keyPoints: [
+                "Evidence-based rebuttal of competing objections",
+                "Reconciliation of dialectical thesis-antithesis tensions",
+                "Refined causal framework and analytical resolution",
+              ],
+            },
+            {
+              title: `Scholarly Synthesis, Strategic Interventions, and Future Horizons`,
+              ratio: 0.14,
+              guidance: `Synthesize analytical conclusions into coherent academic arguments and forward-looking strategic recommendations.`,
+              keyPoints: [
+                "Overarching scholarly contribution and thesis vindication",
+                "Evidence-based policy, practice, or theoretical implications",
+                "Prospective research agenda and emerging analytical horizons",
+              ],
+            },
+          ],
+        },
+      ];
+    }
   }
 
   // Calculate word allocations per subheading
   const allSubheadings = specs.flatMap((h) => h.subheadings);
   let allocatedSoFar = 0;
 
-  const headings: AssignmentMainHeading[] = specs.map((spec, hIdx) => {
+  const rawHeadings: AssignmentMainHeading[] = specs.map((spec, hIdx) => {
     const headingId = `heading-${hIdx + 1}`;
     const headingNumber = hIdx + 1;
 
@@ -1649,6 +2112,7 @@ export function generateDynamicAssignmentStructure(
     };
   });
 
+  const headings = sanitizeOutlineHeadings(rawHeadings, question, assignmentType);
   const totalAllocated = headings.reduce((sum, h) => sum + h.targetWordCount, 0);
   const thesisStatement = generateThesisStatement(question, options.writingTone, academicLevel);
 
@@ -1659,6 +2123,7 @@ export function generateDynamicAssignmentStructure(
     totalAllocated,
     headings,
     thesisStatement,
+    targetFrameworks,
     writingTone: typeof options.writingTone === "string" ? options.writingTone : (options.writingTone as any)?.preset || "formal_academic",
     rationale: `AI-proposed academic structure tailored to '${question.slice(0, 100)}' at ${academicLevel} level.`,
   };
@@ -1683,15 +2148,19 @@ export async function generateAiEnhancedOutline(
 Your task is to generate a comprehensive, rigorous, and highly tailored academic outline for an assignment.
 
 CRITICAL RULES:
-1. NEVER use generic structural headings like "Introduction", "Body Paragraphs", "Conclusion", "Overview", or "Background".
-2. Create EXACTLY 3 Main Headings that directly reflect the core themes of the question.
+1. NEVER use generic placeholder headings like "Introduction", "Body Paragraphs", "Conclusion", "Overview", "Background", "Analysis", or "Discussion".
+2. Create EXACTLY 3 Main Headings that directly reflect the substantive analytical topics of the question.
 3. Under each Main Heading, provide EXACTLY 2 Subheadings with descriptive, intellectually rigorous titles.
 4. Under each Subheading, provide EXACTLY 3 specific H3 argument/evidence focus points (concrete academic concepts, models, empirical metrics, or theoretical debates).
-5. Provide a strong, definitive, tone-calibrated Working Thesis Statement answering the prompt.
-6. Allocate realistic target percentage ratios across the 6 subheadings summing to 1.0 (e.g. 0.12, 0.18, 0.20, 0.20, 0.16, 0.14).
-7. Return ONLY valid JSON with this exact schema:
+5. For Essays: enforce a dialectical progression (thesis, antithesis, synthesis, refutation).
+6. For Coursework: enforce problem decomposition, applied analytical frameworks, diagnostic evaluation, and actionable recommendations.
+7. Identify 2-4 target academic theoretical frameworks or models.
+8. Provide a definitive, tone-calibrated Working Thesis Statement answering the prompt.
+9. Allocate realistic target percentage ratios across the 6 subheadings summing to 1.0 (e.g. 0.12, 0.18, 0.20, 0.20, 0.16, 0.14).
+10. Return ONLY valid JSON with this exact schema:
 {
   "thesisStatement": "string",
+  "targetFrameworks": ["Framework A", "Framework B"],
   "headings": [
     {
       "title": "string",
@@ -1711,6 +2180,7 @@ CRITICAL RULES:
     const userPrompt = `Assignment Brief:
 - Prompt/Question: "${question}"
 - Academic Level: ${academicLevel}
+- Assignment Type: ${options.assignmentType || "essay"}
 - Writing Tone: ${typeof writingTone === "string" ? writingTone : (writingTone as any)?.preset || "analytical"}
 - Target Word Count: ${targetWordCount} words
 
@@ -1739,6 +2209,23 @@ Generate the tailored academic outline JSON now:`;
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
+
+    // Handle AskScholar outline tree format (sections array)
+    if (parsed.sections && Array.isArray(parsed.sections) && parsed.sections.length > 0) {
+      const treeStructure = outlineTreeToAssignmentStructure(
+        {
+          thesis_statement: parsed.thesis_statement || parsed.thesisStatement || fallbackStructure.thesisStatement || "",
+          target_frameworks: parsed.target_frameworks || parsed.targetFrameworks || fallbackStructure.targetFrameworks || [],
+          sections: parsed.sections,
+          writingTone: typeof writingTone === "string" ? writingTone : (writingTone as any)?.preset || "formal_academic",
+          academicLevel,
+        },
+        targetWordCount
+      );
+      treeStructure.headings = sanitizeOutlineHeadings(treeStructure.headings, question, options.assignmentType);
+      return treeStructure;
+    }
+
     if (!parsed.headings || !Array.isArray(parsed.headings) || parsed.headings.length === 0) {
       return fallbackStructure;
     }
@@ -1752,7 +2239,7 @@ Generate the tailored academic outline JSON now:`;
     );
 
     let subIndexGlobal = 0;
-    const headings: AssignmentMainHeading[] = parsed.headings.map((hSpec: any, hIdx: number) => {
+    const rawHeadings: AssignmentMainHeading[] = parsed.headings.map((hSpec: any, hIdx: number) => {
       const headingId = `heading-${hIdx + 1}`;
       const headingNumber = hIdx + 1;
       const subs = Array.isArray(hSpec.subheadings) ? hSpec.subheadings : [];
@@ -1801,7 +2288,13 @@ Generate the tailored academic outline JSON now:`;
       };
     });
 
+    const headings = sanitizeOutlineHeadings(rawHeadings, question, options.assignmentType);
     const totalAllocated = headings.reduce((sum, h) => sum + h.targetWordCount, 0);
+    const targetFrameworks =
+      parsed.targetFrameworks ||
+      parsed.target_frameworks ||
+      fallbackStructure.targetFrameworks ||
+      extractTargetFrameworks(question, options.assignmentType, options.briefText);
 
     return {
       version: options.currentStructure ? (options.currentStructure.version || 1) + 1 : 1,
@@ -1809,7 +2302,8 @@ Generate the tailored academic outline JSON now:`;
       targetWordCount: total,
       totalAllocated,
       headings,
-      thesisStatement: parsed.thesisStatement || fallbackStructure.thesisStatement,
+      thesisStatement: parsed.thesisStatement || parsed.thesis_statement || fallbackStructure.thesisStatement,
+      targetFrameworks,
       writingTone: typeof writingTone === "string" ? writingTone : (writingTone as any)?.preset || "formal_academic",
       rationale: `AI-synthesized bespoke outline tailored specifically for: "${question}" (${academicLevel} level).`,
     };

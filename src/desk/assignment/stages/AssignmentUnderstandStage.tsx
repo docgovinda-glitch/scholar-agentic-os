@@ -741,6 +741,7 @@ export default function AssignmentUnderstandStage() {
       targetWordCount: localWordCount,
       writingTone: localTone,
       citationStyle: localCitation,
+      briefText: localBrief,
     });
 
     let serverAnalysis: AssignmentAnalysis | null = null;

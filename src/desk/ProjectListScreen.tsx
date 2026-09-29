@@ -2458,7 +2458,7 @@ export default function ProjectListScreen({
           <>
             {/* Scrollable / Flexible Center Area */}
             <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-y-auto scholar-scrollbar">
-              <div className="w-full max-w-4xl flex flex-col items-center gap-6 my-auto pb-4">
+              <div className="w-full max-w-5xl flex flex-col items-center gap-6 my-auto pb-4">
                 {/* Onboarding welcome banner */}
                 {welcomeVisible && (
                   <div
@@ -2774,17 +2774,13 @@ export default function ProjectListScreen({
             : undefined
         }
         className={`h-full bg-white dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 flex flex-col relative transition-all duration-300 ease-in-out ${
-          isLandingPage
-            ? "flex-1 w-full min-w-0 border-none shadow-none z-20"
-            : "shrink-0 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 z-30"
-        } ${
-          isResizingAiSidebar ? "transition-none select-none" : ""
-        } ${
           isAiSidebarOpen
             ? isLandingPage
-              ? "w-full translate-x-0"
-              : "w-full max-w-[calc(100vw-1rem)] translate-x-0"
-            : "w-0 translate-x-full overflow-hidden border-none pointer-events-none"
+              ? "flex-1 w-full min-w-0 border-none shadow-none z-20 translate-x-0"
+              : "shrink-0 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 z-30 w-full max-w-[calc(100vw-1rem)] translate-x-0"
+            : "hidden w-0 max-w-0 translate-x-full overflow-hidden border-none pointer-events-none"
+        } ${
+          isResizingAiSidebar ? "transition-none select-none" : ""
         }`}
         aria-hidden={!isAiSidebarOpen}
       >

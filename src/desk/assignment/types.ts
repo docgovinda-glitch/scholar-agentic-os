@@ -158,6 +158,7 @@ export type AcademicLevel = "high_school" | "undergraduate" | "postgraduate" | "
 
 export type AssignmentType =
   | "essay"
+  | "coursework"
   | "analytical_essay"
   | "critical_essay"
   | "argumentative_essay"
@@ -534,6 +535,7 @@ export const ASSIGNMENT_STAGES: StageDefinition[] = [
 
 
 export const ASSIGNMENT_TYPE_LABELS: Record<AssignmentType, string> = {
+  coursework: "Coursework / Applied Assignment",
   essay: "General Academic Essay",
   analytical_essay: "Analytical Essay",
   critical_essay: "Critical Essay",
@@ -789,6 +791,25 @@ export interface AssignmentStructure {
   thesisStatement?: string;
   writingTone?: string;
   rationale?: string;
+  targetFrameworks?: string[];
+}
+
+export interface OutlineTreeSection {
+  level: "h1" | "h2" | "h3";
+  title: string;
+  guidance?: string;
+  targetWordCount?: number;
+  ratio?: number;
+  children?: OutlineTreeSection[];
+}
+
+export interface AskScholarOutlineResponse {
+  thesis_statement: string;
+  target_frameworks: string[];
+  sections: OutlineTreeSection[];
+  targetWordCount?: number;
+  writingTone?: string;
+  academicLevel?: string;
 }
 
 export function flattenStructureSubheadings(structure?: AssignmentStructure | null): AssignmentSubheading[] {
