@@ -1051,7 +1051,7 @@ export function AssignmentProvider({
 
   const tuneOutlineWithQuestion = useCallback(async (): Promise<AssignmentDraftingSection[]> => {
     const topicToUse = question || project?.title || "Academic Assignment";
-    const existing = internalSections.length > 0 ? internalSections : outline;
+    const existing = (internalSections.length > 0 ? internalSections : outline) as (AssignmentDraftingSection | InternalSectionPlan)[];
     const tuned = tuneSectionsToQuestion({
       existingSections: existing,
       assignmentTopic: topicToUse,

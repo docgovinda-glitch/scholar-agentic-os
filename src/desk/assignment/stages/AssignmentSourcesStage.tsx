@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
+import { ReferenceBarItem } from "../ReferenceBarItem";
+import { ApprovedReferencesShelf } from "../ApprovedReferencesShelf";
 import { CuratedSourceCard } from "../components/CuratedSourceCard";
 import { LectureUploadDropzone } from "../components/LectureUploadDropzone";
 import { ScholarlyResearchPipeline } from "../components/ScholarlyResearchPipeline";
@@ -248,6 +250,24 @@ export default function AssignmentSourcesStage({
     setDiscoverySuccessMsg("Reference updated successfully.");
     setTimeout(() => setDiscoverySuccessMsg(null), 3000);
   };
+
+  const handleSaveSourceUpdates = useCallback(
+    async (sourceId: string, updates: Partial<DiscoveredSource>) => {
+      const updatedSources = sources.map((s) => {
+        if (s.id === sourceId) {
+          return {
+            ...s,
+            ...updates,
+          };
+        }
+        return s;
+      });
+      await setSources(updatedSources);
+      setDiscoverySuccessMsg("Reference updated successfully.");
+      setTimeout(() => setDiscoverySuccessMsg(null), 3000);
+    },
+    [sources, setSources]
+  );
 
   const handleAddCustomSource = async () => {
     if (!customForm.title.trim()) return;
@@ -562,6 +582,10 @@ export default function AssignmentSourcesStage({
   const allMasterSources = useMemo<DiscoveredSource[]>(() => {
     return [...mappedUserSources, ...allCuratedSources];
   }, [mappedUserSources, allCuratedSources]);
+
+  const approvedSourcesList = useMemo<DiscoveredSource[]>(() => {
+    return allMasterSources.filter((s) => approvedSourceIds.includes(s.id));
+  }, [allMasterSources, approvedSourceIds]);
 
   // Filter and sort sources
   const displayedSources = useMemo(() => {
@@ -1415,276 +1439,25 @@ export default function AssignmentSourcesStage({
               </div>
             )}
 
-            {/* Literature Display Container (Standardized Responsive Grid or Dedicated Bibliography List) */}
+            {/* Streamlined Literature Catalog (Apple-Inspired Minimalist Horizontal Reference Bars) */}
             {displayedSources.length > 0 ? (
               <div
-                className={
-                  activeTab === "approved"
-                    ? "space-y-4"
-                    : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-                }
+                className="flex flex-col gap-1.5"
                 data-testid="curated-sources-grid"
               >
-                {displayedSources.map((source) => {
-                  const isEditing = editingSourceId === source.id;
-
-                  // Inline Editor Mode for this source
-                  if (isEditing) {
-                    return (
-                      <div
-                        key={source.id}
-                        data-testid={`curated-source-${source.id}`}
-                        className="rounded-2xl border-2 border-emerald-500 bg-white dark:bg-[#1C1C1E] p-5 shadow-sm space-y-4 col-span-full"
-                      >
-                        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-3">
-                          <div className="flex items-center gap-2">
-                            <Edit2 className="w-4 h-4 text-emerald-600" />
-                            <h4 className="text-xs font-bold text-neutral-900 dark:text-white uppercase tracking-wider">
-                              Edit Reference & Citation Details
-                            </h4>
-                          </div>
-                          <span className="text-[11px] text-neutral-400">
-                            Changes sync to in-text citations and your bibliography
-                          </span>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
-                            Full Citation String (Harvard Reference Format)
-                          </label>
-                          <textarea
-                            value={editForm.citation}
-                            onChange={(e) => setEditForm({ ...editForm, citation: e.target.value })}
-                            rows={3}
-                            className="w-full text-xs font-serif p-2.5 rounded-xl border border-neutral-300 dark:border-white/20 bg-neutral-50/50 dark:bg-white/5 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 leading-relaxed"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-                          <div className="sm:col-span-2 space-y-1">
-                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                              Article / Paper Title
-                            </label>
-                            <input
-                              type="text"
-                              value={editForm.title}
-                              onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                              Authors (comma-separated)
-                            </label>
-                            <input
-                              type="text"
-                              value={editForm.authors}
-                              onChange={(e) => setEditForm({ ...editForm, authors: e.target.value })}
-                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                              Publication Year
-                            </label>
-                            <input
-                              type="text"
-                              value={editForm.year}
-                              onChange={(e) => setEditForm({ ...editForm, year: e.target.value })}
-                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                              Journal / Publisher / Venue
-                            </label>
-                            <input
-                              type="text"
-                              value={editForm.journal}
-                              onChange={(e) => setEditForm({ ...editForm, journal: e.target.value })}
-                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                              Volume, Issue, or Pages
-                            </label>
-                            <input
-                              type="text"
-                              value={editForm.volumeIssue}
-                              onChange={(e) => setEditForm({ ...editForm, volumeIssue: e.target.value })}
-                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                              DOI or URL
-                            </label>
-                            <input
-                              type="text"
-                              value={editForm.doi}
-                              onChange={(e) => setEditForm({ ...editForm, doi: e.target.value })}
-                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                              Role in Assignment
-                            </label>
-                            <select
-                              value={editForm.roleInAssignment}
-                              onChange={(e) => setEditForm({ ...editForm, roleInAssignment: e.target.value })}
-                              className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                            >
-                              <option value="Empirical evidence">Empirical Evidence</option>
-                              <option value="Theoretical framework">Theoretical Framework</option>
-                              <option value="Comparative evidence">Comparative Evidence</option>
-                              <option value="Core theory">Core Theory (Seminal)</option>
-                              <option value="Methodological framework">Methodological Framework</option>
-                              <option value="Contextual evidence">Contextual Evidence</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-white/5">
-                          <button
-                            type="button"
-                            onClick={() => setEditingSourceId(null)}
-                            className="px-3.5 py-1.5 rounded-lg text-xs font-medium border border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-white/5 cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleSaveSourceEdit}
-                            className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer transition-colors shadow-xs"
-                          >
-                            Save Reference
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Dedicated Selected Reference Card when activeTab === "approved"
-                  if (activeTab === "approved") {
-                    return (
-                      <div
-                        key={source.id}
-                        data-testid={`curated-source-${source.id}`}
-                        className="rounded-2xl border border-emerald-500/30 bg-white dark:bg-[#1C1C1E] p-5 shadow-xs space-y-3.5 hover:border-emerald-500/60 transition-all group"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                              {source.type}
-                            </span>
-                            {source.roleInAssignment && (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
-                                {source.roleInAssignment}
-                              </span>
-                            )}
-                            {source.year && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-white/5">
-                                {source.year}
-                              </span>
-                            )}
-                            {source.doi && (
-                              <span className="text-[11px] font-mono text-neutral-400 truncate max-w-[200px]">
-                                doi:{source.doi}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                            <button
-                              type="button"
-                              onClick={() => handleStartEditSource(source)}
-                              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 flex items-center gap-1 cursor-pointer transition-colors"
-                              title="Edit citation and source details"
-                            >
-                              <Edit2 className="w-3 h-3 text-neutral-500" />
-                              <span>Edit Reference</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleCopyCitation(source)}
-                              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 flex items-center gap-1 cursor-pointer transition-colors"
-                              title="Copy citation"
-                            >
-                              {copiedSourceId === source.id ? (
-                                <>
-                                  <Check className="w-3 h-3 text-emerald-600" />
-                                  <span className="text-emerald-600 font-semibold">Copied!</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-3 h-3 text-neutral-500" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => toggleSourceApproval(source.id)}
-                              aria-label={`Remove ${source.title} from approved`}
-                              className="px-2.5 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-rose-200 dark:border-rose-900/30 flex items-center gap-1 cursor-pointer transition-colors"
-                              title="Remove from paper references"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              <span>Remove</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Academic Reference Citation Box */}
-                        <div className="p-3.5 rounded-xl bg-neutral-50/90 dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/10 text-xs sm:text-sm leading-relaxed text-neutral-900 dark:text-white font-serif">
-                          <span className="font-semibold text-neutral-500 dark:text-neutral-400 font-sans text-[10px] uppercase tracking-wider block mb-1">
-                            {citationStyle === "harvard" ? "Harvard Reference" : `${citationStyle.toUpperCase()} Reference`}:
-                          </span>
-                          <span className="select-all">
-                            {source.citation || formatHarvardCitation(source)}
-                          </span>
-                        </div>
-
-                        {/* Title & Grounding Rationale */}
-                        <div className="space-y-1">
-                          <h4 className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                            {source.title}
-                          </h4>
-                          {(source.suggestedUse || source.mainFinding) && (
-                            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                              <span className="font-medium text-neutral-700 dark:text-neutral-300">Grounding Rationale: </span>
-                              {source.suggestedUse || source.mainFinding}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Default CuratedSourceCard for other tabs
-                  return (
-                    <CuratedSourceCard
-                      key={source.id}
-                      source={source}
-                      isApproved={approvedSourceIds.includes(source.id)}
-                      isBookmarked={bookmarkedIds.includes(source.id)}
-                      onToggleApproval={toggleSourceApproval}
-                      onDismiss={handleDismissSource}
-                      onToggleBookmark={handleToggleBookmark}
-                      onEdit={(s) => handleStartEditSource(s)}
-                    />
-                  );
-                })}
+                {displayedSources.map((source) => (
+                  <ReferenceBarItem
+                    key={source.id}
+                    source={source}
+                    isApproved={approvedSourceIds.includes(source.id)}
+                    isBookmarked={bookmarkedIds.includes(source.id)}
+                    onToggleApproval={toggleSourceApproval}
+                    onDismiss={handleDismissSource}
+                    onToggleBookmark={handleToggleBookmark}
+                    onSaveEdit={handleSaveSourceUpdates}
+                    showDismiss={true}
+                  />
+                ))}
               </div>
             ) : (
               <div className="p-10 text-center rounded-2xl border border-dashed border-neutral-200 dark:border-white/10 space-y-3">
@@ -1792,6 +1565,14 @@ export default function AssignmentSourcesStage({
           </button>
         </div>
       </div>
+      {/* Floating Bottom Reference Shelf Dock */}
+      <ApprovedReferencesShelf
+        approvedSources={approvedSourcesList}
+        recommendedCount={4}
+        onToggleApproval={toggleSourceApproval}
+        onProceedToDrafting={handleContinue}
+        onSaveEditSource={handleSaveSourceUpdates}
+      />
     </div>
   );
 }
