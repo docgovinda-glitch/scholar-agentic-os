@@ -13,7 +13,15 @@
  * No React dependencies — pure TypeScript.
  */
 
-import type { OutlineSection, AssignmentType, SectionBreakdown } from "../types";
+import type {
+  OutlineSection,
+  AssignmentType,
+  AcademicLevel,
+  SectionBreakdown,
+  AssignmentStructure,
+  AssignmentMainHeading,
+  AssignmentSubheading,
+} from "../types";
 
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
@@ -439,4 +447,880 @@ export function generateAdaptiveDefaultOutline(
       status: "not_started" as const,
     };
   });
+}
+
+export interface DynamicStructureOptions {
+  question: string;
+  assignmentType?: AssignmentType;
+  academicLevel?: AcademicLevel;
+  targetWordCount?: number;
+  currentStructure?: AssignmentStructure;
+}
+
+interface HeadingSpec {
+  title: string;
+  notes?: string;
+  subheadings: {
+    title: string;
+    ratio: number;
+    guidance: string;
+    keyPoints: string[];
+  }[];
+}
+
+/**
+ * Generate a dynamic, question-led academic structure tailored to the user's prompt.
+ * Strictly avoids hardcoded "Introduction / Body Paragraphs / Conclusion" labels.
+ * Produces analytical Main Headings and Subheadings tailored to the assignment task.
+ */
+export function generateDynamicAssignmentStructure(
+  options: DynamicStructureOptions
+): AssignmentStructure {
+  const {
+    question = "",
+    assignmentType = "essay",
+    academicLevel = "undergraduate",
+    targetWordCount = 2000,
+    currentStructure,
+  } = options;
+
+  const total = Math.max(300, Number(targetWordCount) || 2000);
+  const qLower = question.toLowerCase();
+
+  let specs: HeadingSpec[] = [];
+
+  const isChinaOrGeopolitics =
+    qLower.includes("china") ||
+    qLower.includes("belt and road") ||
+    qLower.includes("bri") ||
+    qLower.includes("geopolitic") ||
+    qLower.includes("security") ||
+    qLower.includes("foreign policy") ||
+    qLower.includes("south asia") ||
+    qLower.includes("international relations");
+
+  const isTechOrAI =
+    qLower.includes("ai") ||
+    qLower.includes("algorithm") ||
+    qLower.includes("machine learning") ||
+    qLower.includes("technology") ||
+    qLower.includes("privacy") ||
+    qLower.includes("digital");
+
+  const isCaseStudyOrBusiness =
+    assignmentType === "case_study" ||
+    assignmentType === "business_assignment" ||
+    assignmentType === "report" ||
+    qLower.includes("case study") ||
+    qLower.includes("firm") ||
+    qLower.includes("company");
+
+  const isLitReview =
+    assignmentType === "literature_review" ||
+    assignmentType === "annotated_bibliography" ||
+    qLower.includes("literature review");
+
+  if (isChinaOrGeopolitics) {
+    specs = [
+      {
+        title: "Conceptual and Theoretical Framework",
+        notes: "Establish analytical lens using international relations theories (e.g., realism, liberalism, constructivism).",
+        subheadings: [
+          {
+            title: "Definition and Analytical Scope",
+            ratio: 0.10,
+            guidance: "Define the core analytical terms, geographic boundaries, and institutional scope of the investigation.",
+            keyPoints: ["Conceptual definition", "Geographic delimitations", "Scope of analytical inquiry"],
+          },
+          {
+            title: "Relevant Theoretical Perspectives",
+            ratio: 0.14,
+            guidance: "Examine competing theoretical paradigms (realism, institutionalism, regional security complexes) explaining state behavior.",
+            keyPoints: ["Structural realism & balance of power", "Liberal institutionalism", "Constructivist identity and norms"],
+          },
+          {
+            title: "Analytical Framework & Core Debates",
+            ratio: 0.11,
+            guidance: "Formulate the structured analytical framework through which empirical evidence will be interpreted.",
+            keyPoints: ["Analytical criteria", "Hypotheses / core propositions", "Methodological approach"],
+          },
+        ],
+      },
+      {
+        title: "Historical and Contextual Analysis",
+        notes: "Trace historical precedents and contemporary background shaping current dynamics.",
+        subheadings: [
+          {
+            title: "Historical Background & Strategic Genesis",
+            ratio: 0.13,
+            guidance: "Contextualize historical precedents, past bilateral engagements, and initial strategic drivers.",
+            keyPoints: ["Historical precedents", "Initial diplomatic agreements", "Early strategic motivations"],
+          },
+          {
+            title: "Key Institutional & Policy Developments",
+            ratio: 0.12,
+            guidance: "Detail major policy milestones, bilateral agreements, and infrastructural/economic milestones.",
+            keyPoints: ["Major treaties & agreements", "Institutional frameworks", "Milestone developments"],
+          },
+          {
+            title: "Contemporary Context & Emerging Realities",
+            ratio: 0.12,
+            guidance: "Analyze contemporary geopolitical shifts, regional responses, and current operational realities.",
+            keyPoints: ["Current geopolitical shifts", "Stakeholder reactions", "Immediate regional tensions"],
+          },
+        ],
+      },
+      {
+        title: "Empirical Security Dynamics & Bilateral Implications",
+        notes: "Examine direct empirical evidence, strategic footprints, and diplomatic impacts.",
+        subheadings: [
+          {
+            title: "Regional Security Dynamics & Strategic Infrastructure",
+            ratio: 0.14,
+            guidance: "Evaluate security implications of investments, infrastructure projects, and strategic access.",
+            keyPoints: ["Maritime & overland infrastructure", "Strategic dual-use implications", "Security perceptions"],
+          },
+          {
+            title: "Bilateral Relations & Small-State Diplomatic Agency",
+            ratio: 0.14,
+            guidance: "Analyze how regional states balance, hedge, or align in response to external power competition.",
+            keyPoints: ["Hedging strategies", "Domestic political contestation", "Bilateral leverage"],
+          },
+        ],
+      },
+    ];
+  } else if (isTechOrAI) {
+    specs = [
+      {
+        title: "Conceptual, Ethical and Regulatory Foundations",
+        notes: "Establish normative principles, definitions, and technical boundaries.",
+        subheadings: [
+          {
+            title: "Technical Scope and Core Definitions",
+            ratio: 0.12,
+            guidance: "Clarify technical definitions, algorithmic architectures, and analytical scope.",
+            keyPoints: ["Technical taxonomy", "System architecture", "Scope boundaries"],
+          },
+          {
+            title: "Ethical & Jurisprudential Frameworks",
+            ratio: 0.18,
+            guidance: "Examine competing philosophical frameworks (utilitarian, deontological, human rights) and legal standards.",
+            keyPoints: ["Human rights standards", "Accountability principles", "Normative foundations"],
+          },
+        ],
+      },
+      {
+        title: "Empirical Application & Systemic Risks",
+        notes: "Scrutinize operational deployments and observed impacts.",
+        subheadings: [
+          {
+            title: "Empirical Evidence & Operational Case Studies",
+            ratio: 0.20,
+            guidance: "Analyze real-world deployments, testing theoretical assumptions against measurable outcomes.",
+            keyPoints: ["Case evidence", "Performance metrics", "Observed disparities"],
+          },
+          {
+            title: "Critical Analysis of Bias, Discretion & Governance Gaps",
+            ratio: 0.20,
+            guidance: "Dissect underlying structural flaws, opacity, and regulatory blind spots.",
+            keyPoints: ["Algorithmic opacity", "Due process concerns", "Enforcement deficits"],
+          },
+        ],
+      },
+      {
+        title: "Regulatory Solutions & Policy Horizon",
+        notes: "Propose actionable governance mechanisms and synthesize implications.",
+        subheadings: [
+          {
+            title: "Evaluation of Governance & Policy Alternatives",
+            ratio: 0.18,
+            guidance: "Critique existing legislative approaches and proposed multilateral standards.",
+            keyPoints: ["Statutory proposals", "Compliance trade-offs", "Institutional mechanisms"],
+          },
+          {
+            title: "Synthesis & Long-Term Trajectory",
+            ratio: 0.12,
+            guidance: "Synthesize findings into coherent academic conclusions and future trajectories.",
+            keyPoints: ["Overarching conclusions", "Unresolved challenges", "Future research agenda"],
+          },
+        ],
+      },
+    ];
+  } else if (isCaseStudyOrBusiness) {
+    specs = [
+      {
+        title: "Diagnostic Context & Strategic Problem Definition",
+        notes: "Diagnose root organizational dilemma and external landscape.",
+        subheadings: [
+          {
+            title: "Organizational Background & Market Dynamics",
+            ratio: 0.12,
+            guidance: "Contextualize the organization, industry environment, and operating conditions.",
+            keyPoints: ["Industry overview", "Organizational positioning", "Initial market indicators"],
+          },
+          {
+            title: "Root-Cause Problem Diagnosis",
+            ratio: 0.18,
+            guidance: "Distinguish superficial symptoms from underlying systemic drivers of failure or challenge.",
+            keyPoints: ["Operational bottlenecks", "Leadership & culture", "Systemic diagnostic"],
+          },
+        ],
+      },
+      {
+        title: "Critical Evaluation of Strategic Alternatives",
+        notes: "Rigorously test 2-3 mutually exclusive strategic options.",
+        subheadings: [
+          {
+            title: "Evaluation of Strategic Option A",
+            ratio: 0.20,
+            guidance: "Analyze feasibility, market viability, resource demands, and risks of primary option.",
+            keyPoints: ["Strategic alignment", "Financial feasibility", "Execution risks"],
+          },
+          {
+            title: "Evaluation of Strategic Option B & Comparative Matrix",
+            ratio: 0.20,
+            guidance: "Analyze counter-alternative and construct a standardized decision evaluation matrix.",
+            keyPoints: ["Alternative alignment", "Comparative trade-offs", "Decision criteria"],
+          },
+        ],
+      },
+      {
+        title: "Recommended Solution & Actionable Implementation",
+        notes: "Defend chosen pathway and provide phased roadmap with KPIs.",
+        subheadings: [
+          {
+            title: "Strategic Justification of Chosen Solution",
+            ratio: 0.16,
+            guidance: "Defend why the selected option delivers optimal outcomes while mitigating critical vulnerabilities.",
+            keyPoints: ["Competitive advantage", "Strategic fit", "Risk containment"],
+          },
+          {
+            title: "Implementation Roadmap, Risk Mitigation & Governance",
+            ratio: 0.14,
+            guidance: "Detail phased milestones, resource allocations, contingency plans, and success metrics.",
+            keyPoints: ["Phased roadmap", "Risk mitigation", "KPIs & monitoring"],
+          },
+        ],
+      },
+    ];
+  } else if (isLitReview) {
+    specs = [
+      {
+        title: "Theoretical Paradigms & Foundational Literature",
+        notes: "Review seminal works and established intellectual foundations.",
+        subheadings: [
+          {
+            title: "Scope, Search Parameters & Methodological Criteria",
+            ratio: 0.12,
+            guidance: "Establish inclusion/exclusion boundaries, database query parameters, and thematic taxonomy.",
+            keyPoints: ["Search methodology", "Selection criteria", "Thematic boundaries"],
+          },
+          {
+            title: "Seminal Theories & Foundational Frameworks",
+            ratio: 0.22,
+            guidance: "Synthesize the landmark publications that established the discipline's prevailing models.",
+            keyPoints: ["Foundational literature", "Seminal models", "Established consensus"],
+          },
+        ],
+      },
+      {
+        title: "Methodological Critique & Conflicting Evidence",
+        notes: "Contrast research designs, datasets, and contested empirical findings.",
+        subheadings: [
+          {
+            title: "Empirical Methodologies & Comparative Findings",
+            ratio: 0.24,
+            guidance: "Contrast qualitative vs quantitative findings across contemporary peer-reviewed studies.",
+            keyPoints: ["Methodological rigor", "Empirical variance", "Data validity"],
+          },
+          {
+            title: "Critical Debates, Tensions & Contradictions",
+            ratio: 0.24,
+            guidance: "Examine unresolved debates and conflicting evidentiary interpretations in the scholarship.",
+            keyPoints: ["Theoretical tensions", "Methodological disputes", "Interpretive clashes"],
+          },
+        ],
+      },
+      {
+        title: "Synthesis of Research Gaps & Future Trajectory",
+        notes: "Identify unexplored avenues and synthesize conclusions.",
+        subheadings: [
+          {
+            title: "Unaddressed Gaps in Current Scholarship",
+            ratio: 0.10,
+            guidance: "Highlight critical blind spots, underrepresented populations, or unverified assumptions.",
+            keyPoints: ["Identified blind spots", "Emerging questions", "Under-researched areas"],
+          },
+          {
+            title: "Conclusion & Future Scholarly Agenda",
+            ratio: 0.08,
+            guidance: "Synthesize the overarching state of knowledge and chart highest-priority future investigations.",
+            keyPoints: ["State of knowledge", "Theoretical contribution", "Future research agenda"],
+          },
+        ],
+      },
+    ];
+  } else {
+    // Default Analytical Academic Essay structure (responsive to question themes)
+    const promptKeywords = question
+      .replace(/[^\w\s]/g, "")
+      .split(/\s+/)
+      .filter((w) => w.length > 3)
+      .slice(0, 3)
+      .join(" ");
+
+    const contextTheme = promptKeywords ? `Focus: ${promptKeywords}` : "Contextual Investigation";
+
+    specs = [
+      {
+        title: "Conceptual and Theoretical Foundations",
+        notes: "Establish conceptual boundaries and theoretical framework for the essay.",
+        subheadings: [
+          {
+            title: "Conceptual Scope and Key Definitions",
+            ratio: 0.12,
+            guidance: "Define core terminology with academic precision and delineate scope of inquiry.",
+            keyPoints: ["Core definitions", "Analytical scope", "Disciplinary grounding"],
+          },
+          {
+            title: "Theoretical Frameworks & Academic Lenses",
+            ratio: 0.18,
+            guidance: "Articulate the theoretical perspectives through which the central question is analyzed.",
+            keyPoints: ["Primary theoretical lens", "Underlying assumptions", "Explanatory mechanism"],
+          },
+        ],
+      },
+      {
+        title: "Empirical Analysis & Thematic Evidence",
+        notes: "Substantive evidentiary analysis addressing primary claims.",
+        subheadings: [
+          {
+            title: "Primary Argument & Supporting Evidence",
+            ratio: 0.22,
+            guidance: "Develop primary affirmative analytical line substantiated with peer-reviewed scholarship.",
+            keyPoints: ["Primary thesis argument", "Empirical evidence synthesis", "Analytical significance"],
+          },
+          {
+            title: "Contextual Investigation & Case Application",
+            ratio: 0.20,
+            guidance: `Apply theoretical framework to concrete evidence and contemporary examples (${contextTheme}).`,
+            keyPoints: ["Case application", "Comparative evidence", "Contextual nuance"],
+          },
+        ],
+      },
+      {
+        title: "Critical Synthesis & Counter-Perspectives",
+        notes: "Weigh competing arguments, address limitations, and reach justified conclusion.",
+        subheadings: [
+          {
+            title: "Critical Counter-Perspectives & Dialectical Evaluation",
+            ratio: 0.16,
+            guidance: "Evaluate the strongest scholarly counterarguments or alternative interpretations.",
+            keyPoints: ["Counter-arguments", "Critique of assumptions", "Nuanced defence"],
+          },
+          {
+            title: "Scholarly Synthesis & Academic Implications",
+            ratio: 0.12,
+            guidance: "Synthesize the tension between viewpoints and articulate broader implications of the findings.",
+            keyPoints: ["Synthesis of findings", "Broader academic implications", "Concluding evaluation"],
+          },
+        ],
+      },
+    ];
+  }
+
+  // Calculate word allocations per subheading
+  const allSubheadings = specs.flatMap((h) => h.subheadings);
+  let allocatedSoFar = 0;
+
+  const headings: AssignmentMainHeading[] = specs.map((spec, hIdx) => {
+    const headingId = `heading-${hIdx + 1}`;
+    const headingNumber = hIdx + 1;
+
+    const subheadings: AssignmentSubheading[] = spec.subheadings.map((sub, sIdx) => {
+      const isLast = hIdx === specs.length - 1 && sIdx === spec.subheadings.length - 1;
+      let words = Math.round(total * sub.ratio);
+      if (isLast) {
+        words = Math.max(50, total - allocatedSoFar);
+      } else {
+        allocatedSoFar += words;
+      }
+
+      return {
+        id: `sub-${headingNumber}-${sIdx + 1}`,
+        headingId,
+        numberStr: `${headingNumber}.${sIdx + 1}`,
+        title: sub.title,
+        targetWordCount: words,
+        currentWordCount: 0,
+        notes: "",
+        guidance: sub.guidance,
+        keyPoints: sub.keyPoints,
+        researchStatus: "not_researched" as const,
+        sourcesCount: 0,
+        boundSourceIds: [],
+        draftContent: "",
+        draftStatus: "not_started" as const,
+      };
+    });
+
+    const headingTotal = subheadings.reduce((sum, s) => sum + s.targetWordCount, 0);
+
+    return {
+      id: headingId,
+      number: headingNumber,
+      title: spec.title,
+      notes: spec.notes || "",
+      targetWordCount: headingTotal,
+      subheadings,
+    };
+  });
+
+  const totalAllocated = headings.reduce((sum, h) => sum + h.targetWordCount, 0);
+
+  return {
+    version: currentStructure ? (currentStructure.version || 1) + 1 : 1,
+    isConfirmed: false,
+    targetWordCount: total,
+    totalAllocated,
+    headings,
+    rationale: `AI-proposed academic structure tailored to '${question.slice(0, 100)}' at ${academicLevel} level.`,
+  };
+}
+
+/**
+ * Auto-balance all subheading word counts proportionally to match targetWordCount.
+ */
+export function autoBalanceStructure(
+  structure: AssignmentStructure,
+  targetWordCount: number
+): AssignmentStructure {
+  const total = Math.max(200, Number(targetWordCount) || 2000);
+  const allSubs = structure.headings.flatMap((h) => h.subheadings);
+  if (allSubs.length === 0) return structure;
+
+  const currentSum = allSubs.reduce((sum, s) => sum + (Number(s.targetWordCount) || 0), 0) || 1;
+  let distributed = 0;
+
+  const updatedHeadings = structure.headings.map((h, hIdx) => {
+    const updatedSubs = h.subheadings.map((s, sIdx) => {
+      const isLastGlobal =
+        hIdx === structure.headings.length - 1 && sIdx === h.subheadings.length - 1;
+      let words: number;
+      if (isLastGlobal) {
+        words = Math.max(50, total - distributed);
+      } else {
+        words = Math.max(50, Math.round((s.targetWordCount / currentSum) * total));
+        distributed += words;
+      }
+      return { ...s, targetWordCount: words };
+    });
+
+    const hTotal = updatedSubs.reduce((sum, s) => sum + s.targetWordCount, 0);
+    return { ...h, targetWordCount: hTotal, subheadings: updatedSubs };
+  });
+
+  return {
+    ...structure,
+    version: structure.version + 1,
+    targetWordCount: total,
+    totalAllocated: total,
+    headings: updatedHeadings,
+  };
+}
+
+/**
+ * Distribute unallocated remaining words evenly across all subheadings.
+ */
+export function distributeRemainingWords(
+  structure: AssignmentStructure,
+  targetWordCount?: number
+): AssignmentStructure {
+  const total = Math.max(200, Number(targetWordCount ?? structure.targetWordCount) || 2000);
+  const allSubs = structure.headings.flatMap((h) => h.subheadings);
+  if (allSubs.length === 0) return structure;
+
+  const currentAllocated = allSubs.reduce((sum, s) => sum + (Number(s.targetWordCount) || 0), 0);
+  const difference = total - currentAllocated;
+  if (difference === 0) return structure;
+
+  const perSub = Math.floor(difference / allSubs.length);
+  let remainder = difference - perSub * allSubs.length;
+
+  const updatedHeadings = structure.headings.map((h) => {
+    const updatedSubs = h.subheadings.map((s) => {
+      const extra = perSub + (remainder !== 0 ? (remainder > 0 ? 1 : -1) : 0);
+      if (remainder !== 0) remainder += remainder > 0 ? -1 : 1;
+      const nextWordCount = Math.max(50, s.targetWordCount + extra);
+      return { ...s, targetWordCount: nextWordCount };
+    });
+    const hTotal = updatedSubs.reduce((sum, s) => sum + s.targetWordCount, 0);
+    return { ...h, targetWordCount: hTotal, subheadings: updatedSubs };
+  });
+
+  const nextAllocated = updatedHeadings.reduce((sum, h) => sum + h.targetWordCount, 0);
+
+  return {
+    ...structure,
+    version: structure.version + 1,
+    targetWordCount: total,
+    totalAllocated: nextAllocated,
+    headings: updatedHeadings,
+  };
+}
+
+/**
+ * Adjust an individual subheading's word count (+50, -50, or direct number input).
+ */
+export function adjustSubheadingWordCount(
+  structure: AssignmentStructure,
+  subheadingId: string,
+  deltaOrExact: number | { exact: number } | { delta: number }
+): AssignmentStructure {
+  const updatedHeadings = structure.headings.map((h) => {
+    let touched = false;
+    const updatedSubs = h.subheadings.map((s) => {
+      if (s.id !== subheadingId) return s;
+      touched = true;
+      let nextWords: number;
+      if (typeof deltaOrExact === "object" && "exact" in deltaOrExact) {
+        nextWords = Math.max(0, Math.round(deltaOrExact.exact));
+      } else if (typeof deltaOrExact === "object" && "delta" in deltaOrExact) {
+        nextWords = Math.max(0, s.targetWordCount + deltaOrExact.delta);
+      } else if (typeof deltaOrExact === "number") {
+        if (deltaOrExact === 50 || deltaOrExact === -50 || deltaOrExact === 25 || deltaOrExact === -25 || deltaOrExact < 0) {
+          nextWords = Math.max(0, s.targetWordCount + deltaOrExact);
+        } else if (deltaOrExact >= 100) {
+          nextWords = Math.max(0, Math.round(deltaOrExact));
+        } else {
+          nextWords = Math.max(0, s.targetWordCount + deltaOrExact);
+        }
+      } else {
+        nextWords = s.targetWordCount;
+      }
+      return { ...s, targetWordCount: nextWords };
+    });
+
+    if (!touched) return h;
+    const hTotal = updatedSubs.reduce((sum, s) => sum + s.targetWordCount, 0);
+    return { ...h, targetWordCount: hTotal, subheadings: updatedSubs };
+  });
+
+  const nextAllocated = updatedHeadings.reduce((sum, h) => sum + h.targetWordCount, 0);
+
+  return {
+    ...structure,
+    version: structure.version + 1,
+    totalAllocated: nextAllocated,
+    headings: updatedHeadings,
+  };
+}
+
+/**
+ * Add a new main heading to the structure.
+ */
+export function addMainHeading(
+  structure: AssignmentStructure,
+  title?: string
+): AssignmentStructure {
+  const nextNumber = structure.headings.length + 1;
+  const headingId = `heading-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+  const defaultTitle = title?.trim() || `Analytical Component ${nextNumber}`;
+
+  const defaultSub1: AssignmentSubheading = {
+    id: `sub-${nextNumber}-1`,
+    headingId,
+    numberStr: `${nextNumber}.1`,
+    title: `${defaultTitle}: Core Scope & Theoretical Grounding`,
+    targetWordCount: 200,
+    currentWordCount: 0,
+    notes: "",
+    guidance: `Foundational scope and theoretical grounding for ${defaultTitle}.`,
+    keyPoints: ["Core definitions", "Analytical scope"],
+    researchStatus: "not_researched",
+    sourcesCount: 0,
+    boundSourceIds: [],
+    draftContent: "",
+    draftStatus: "not_started",
+  };
+
+  const defaultSub2: AssignmentSubheading = {
+    id: `sub-${nextNumber}-2`,
+    headingId,
+    numberStr: `${nextNumber}.2`,
+    title: `${defaultTitle}: Empirical Analysis & Critical Evidence`,
+    targetWordCount: 250,
+    currentWordCount: 0,
+    notes: "",
+    guidance: `Empirical evaluation and evidence synthesis for ${defaultTitle}.`,
+    keyPoints: ["Empirical findings", "Critical assessment"],
+    researchStatus: "not_researched",
+    sourcesCount: 0,
+    boundSourceIds: [],
+    draftContent: "",
+    draftStatus: "not_started",
+  };
+
+  const newHeading: AssignmentMainHeading = {
+    id: headingId,
+    number: nextNumber,
+    title: defaultTitle,
+    notes: "",
+    targetWordCount: 450,
+    subheadings: [defaultSub1, defaultSub2],
+  };
+
+  const updatedHeadings = [...structure.headings, newHeading];
+  const nextAllocated = updatedHeadings.reduce((sum, h) => sum + h.targetWordCount, 0);
+
+  return {
+    ...structure,
+    version: structure.version + 1,
+    totalAllocated: nextAllocated,
+    headings: updatedHeadings,
+  };
+}
+
+/**
+ * Add a new subheading to an existing main heading.
+ */
+export function addSubheading(
+  structure: AssignmentStructure,
+  headingId: string,
+  title?: string
+): AssignmentStructure {
+  const updatedHeadings = structure.headings.map((h) => {
+    if (h.id !== headingId) return h;
+    const subIdx = h.subheadings.length + 1;
+    const subId = `sub-${h.number}-${subIdx}-${Date.now().toString(36).slice(-3)}`;
+    const subTitle = title?.trim() || `Analytical Subsection ${h.number}.${subIdx}`;
+
+    const newSub: AssignmentSubheading = {
+      id: subId,
+      headingId: h.id,
+      numberStr: `${h.number}.${subIdx}`,
+      title: subTitle,
+      targetWordCount: 250,
+      currentWordCount: 0,
+      notes: "",
+      guidance: `Develop reasoned analysis and evidence synthesis for ${subTitle}.`,
+      keyPoints: ["Contextual evidence", "Critical analysis", "Synthesis"],
+      researchStatus: "not_researched",
+      sourcesCount: 0,
+      boundSourceIds: [],
+      draftContent: "",
+      draftStatus: "not_started",
+    };
+
+    const nextSubs = [...h.subheadings, newSub];
+    const hTotal = nextSubs.reduce((sum, s) => sum + s.targetWordCount, 0);
+    return { ...h, targetWordCount: hTotal, subheadings: nextSubs };
+  });
+
+  const nextAllocated = updatedHeadings.reduce((sum, h) => sum + h.targetWordCount, 0);
+
+  return {
+    ...structure,
+    version: structure.version + 1,
+    totalAllocated: nextAllocated,
+    headings: updatedHeadings,
+  };
+}
+
+/**
+ * Remove a subheading and renumber remaining subheadings in that heading.
+ */
+export function removeSubheading(
+  structure: AssignmentStructure,
+  subheadingId: string
+): AssignmentStructure {
+  const updatedHeadings = structure.headings.map((h) => {
+    const remaining = h.subheadings.filter((s) => s.id !== subheadingId);
+    if (remaining.length === h.subheadings.length) return h;
+
+    const renumbered = remaining.map((s, idx) => ({
+      ...s,
+      numberStr: `${h.number}.${idx + 1}`,
+    }));
+    const hTotal = renumbered.reduce((sum, s) => sum + s.targetWordCount, 0);
+    return { ...h, targetWordCount: hTotal, subheadings: renumbered };
+  });
+
+  const nextAllocated = updatedHeadings.reduce((sum, h) => sum + h.targetWordCount, 0);
+
+  return {
+    ...structure,
+    version: structure.version + 1,
+    totalAllocated: nextAllocated,
+    headings: updatedHeadings,
+  };
+}
+
+/**
+ * Remove a main heading and renumber remaining headings.
+ */
+export function removeMainHeading(
+  structure: AssignmentStructure,
+  headingId: string
+): AssignmentStructure {
+  const remaining = structure.headings.filter((h) => h.id !== headingId);
+  const renumbered = remaining.map((h, hIdx) => {
+    const nextNum = hIdx + 1;
+    const updatedSubs = h.subheadings.map((s, sIdx) => ({
+      ...s,
+      numberStr: `${nextNum}.${sIdx + 1}`,
+    }));
+    return {
+      ...h,
+      number: nextNum,
+      subheadings: updatedSubs,
+    };
+  });
+
+  const nextAllocated = renumbered.reduce((sum, h) => sum + h.targetWordCount, 0);
+
+  return {
+    ...structure,
+    version: structure.version + 1,
+    totalAllocated: nextAllocated,
+    headings: renumbered,
+  };
+}
+
+/**
+ * Reorder main headings (e.g., drag-and-drop or move up/down).
+ */
+export function reorderHeadings(
+  structure: AssignmentStructure,
+  sourceIdx: number,
+  targetIdx: number
+): AssignmentStructure {
+  if (
+    sourceIdx < 0 ||
+    sourceIdx >= structure.headings.length ||
+    targetIdx < 0 ||
+    targetIdx >= structure.headings.length ||
+    sourceIdx === targetIdx
+  ) {
+    return structure;
+  }
+
+  const list = [...structure.headings];
+  const [moved] = list.splice(sourceIdx, 1);
+  list.splice(targetIdx, 0, moved);
+
+  const renumbered = list.map((h, hIdx) => {
+    const nextNum = hIdx + 1;
+    const updatedSubs = h.subheadings.map((s, sIdx) => ({
+      ...s,
+      numberStr: `${nextNum}.${sIdx + 1}`,
+    }));
+    return {
+      ...h,
+      number: nextNum,
+      subheadings: updatedSubs,
+    };
+  });
+
+  return {
+    ...structure,
+    version: structure.version + 1,
+    headings: renumbered,
+  };
+}
+
+/**
+ * Reorder subheadings within a main heading.
+ */
+export function reorderSubheadings(
+  structure: AssignmentStructure,
+  headingId: string,
+  sourceIdx: number,
+  targetIdx: number
+): AssignmentStructure {
+  const updatedHeadings = structure.headings.map((h) => {
+    if (h.id !== headingId) return h;
+    if (
+      sourceIdx < 0 ||
+      sourceIdx >= h.subheadings.length ||
+      targetIdx < 0 ||
+      targetIdx >= h.subheadings.length ||
+      sourceIdx === targetIdx
+    ) {
+      return h;
+    }
+
+    const list = [...h.subheadings];
+    const [moved] = list.splice(sourceIdx, 1);
+    list.splice(targetIdx, 0, moved);
+
+    const renumbered = list.map((s, sIdx) => ({
+      ...s,
+      numberStr: `${h.number}.${sIdx + 1}`,
+    }));
+
+    return { ...h, subheadings: renumbered };
+  });
+
+  return {
+    ...structure,
+    version: structure.version + 1,
+    headings: updatedHeadings,
+  };
+}
+
+/**
+ * Update user instructions or research notes for a specific subheading.
+ */
+export function updateSubheadingNotes(
+  structure: AssignmentStructure,
+  subheadingId: string,
+  notes: string
+): AssignmentStructure {
+  const updatedHeadings = structure.headings.map((h) => {
+    const updatedSubs = h.subheadings.map((s) => (s.id === subheadingId ? { ...s, notes } : s));
+    return { ...h, subheadings: updatedSubs };
+  });
+
+  return {
+    ...structure,
+    version: structure.version + 1,
+    headings: updatedHeadings,
+  };
+}
+
+/**
+ * Update main heading title.
+ */
+export function updateMainHeadingTitle(
+  structure: AssignmentStructure,
+  headingId: string,
+  title: string
+): AssignmentStructure {
+  const updatedHeadings = structure.headings.map((h) => (h.id === headingId ? { ...h, title } : h));
+  return {
+    ...structure,
+    version: structure.version + 1,
+    headings: updatedHeadings,
+  };
+}
+
+/**
+ * Update subheading title.
+ */
+export function updateSubheadingTitle(
+  structure: AssignmentStructure,
+  subheadingId: string,
+  title: string
+): AssignmentStructure {
+  const updatedHeadings = structure.headings.map((h) => {
+    const updatedSubs = h.subheadings.map((s) => (s.id === subheadingId ? { ...s, title } : s));
+    return { ...h, subheadings: updatedSubs };
+  });
+
+  return {
+    ...structure,
+    version: structure.version + 1,
+    headings: updatedHeadings,
+  };
 }

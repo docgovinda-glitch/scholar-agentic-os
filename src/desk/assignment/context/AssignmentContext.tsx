@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo, useRef } from "react";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../../types";
 import {
   getDocument,
@@ -38,6 +38,7 @@ import type {
   WritingTonePreset,
   WritingStyleConfig,
   WritingStylePreset,
+  AssignmentStructure,
 } from "../types";
 import {
   ASSIGNMENT_PHASES,
@@ -47,7 +48,10 @@ import {
   normalizeProjectAnswers,
   normalizeAssignmentPhase,
   AssignmentDraftingSection,
+  structureToInternalSections,
+  structureToSectionBudgets,
 } from "../types";
+import { generateDynamicAssignmentStructure } from "../services/outlineService";
 import {
   decomposeWordBudget,
   tuneSectionsToQuestion,
@@ -92,6 +96,8 @@ export interface AssignmentContextValue {
   setWritingStyle: (style: WritingStyleConfig) => Promise<void>;
   writingTone: WritingToneConfig;
   setWritingTone: (tone: WritingToneConfig) => Promise<void>;
+  structure: AssignmentStructure;
+  setStructure: (structure: AssignmentStructure) => Promise<void>;
   sectionBudgets: SectionBudgetItem[];
   addCustomSection: (title: string, targetWordCount: number) => Promise<void>;
   updateSectionBudget: (id: string, updates: Partial<{ title: string; targetWordCount: number }>) => Promise<void>;
@@ -196,6 +202,10 @@ export function AssignmentProvider({
 }) {
   const [activeProjectId, setActiveProjectId] = useState(projectId);
   const [project, setProject] = useState<ProjectView | null>(null);
+  const projectRef = useRef<ProjectView | null>(null);
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
   const [document, setDocument] = useState<CanonicalDocument | null>(null);
   const [rubric, setRubric] = useState<RubricReport | null>(null);
   const [outputType, setOutputType] = useState<OutputTypeSpec | null>(null);
@@ -377,11 +387,22 @@ export function AssignmentProvider({
         }
       }
 
-      const merged = { ...project.answers, ...standardized };
-      setProject((prev) => (prev ? { ...prev, answers: merged, title: standardized.title || prev.title } : null));
+      const baseAnswers = projectRef.current?.answers || project?.answers || {};
+      const mergedAnswers = { ...baseAnswers, ...standardized };
+      if (projectRef.current) {
+        projectRef.current = {
+          ...projectRef.current,
+          answers: mergedAnswers,
+          title: standardized.title || projectRef.current.title,
+        };
+      }
+      setProject((prev) => {
+        if (!prev) return null;
+        return { ...prev, answers: mergedAnswers, title: standardized.title || prev.title };
+      });
 
       try {
-        await saveIntakeAnswers(activeProjectId, merged);
+        await saveIntakeAnswers(activeProjectId, mergedAnswers);
       } catch (err) {
         console.error("Failed to persist assignment answers:", err);
       }
@@ -537,17 +558,62 @@ export function AssignmentProvider({
     [setWritingStyle]
   );
 
+  const question = extractStandardizedInstructions(answers);
+  const assignmentBriefText =
+    cleanAnswerString(answers["assignment_brief_text"]) ||
+    cleanAnswerString(answers["briefText"]) ||
+    cleanAnswerString(answers["brief"]) ||
+    question;
+
+  const structure: AssignmentStructure = useMemo(() => {
+    const raw = answers["assignment_structure"] || answers["structure"];
+    if (raw) {
+      try {
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (parsed?.headings && Array.isArray(parsed.headings) && parsed.headings.length > 0) {
+          return parsed;
+        }
+      } catch {}
+    }
+    return generateDynamicAssignmentStructure({
+      question: cleanAnswerString(question),
+      assignmentType,
+      academicLevel,
+      targetWordCount: targetWordCount > 0 ? targetWordCount : 2000,
+    });
+  }, [answers, question, assignmentType, academicLevel, targetWordCount]);
+
+  const setStructure = useCallback(
+    async (newStructure: AssignmentStructure) => {
+      const internalSecs = structureToInternalSections(newStructure);
+      const budgets = structureToSectionBudgets(newStructure);
+      await saveAnswers({
+        assignment_structure: newStructure,
+        structure: newStructure,
+        sectionBudgets: budgets,
+        section_budgets: budgets,
+        assignment_internal_sections: internalSecs,
+        assignment_outline: internalSecs,
+      });
+    },
+    [saveAnswers]
+  );
+
   const rawBudgets = answers["sectionBudgets"] || answers["section_budgets"];
   const rawBudgetsKey =
     typeof rawBudgets === "object" ? JSON.stringify(rawBudgets) : String(rawBudgets ?? "");
   const sectionBudgets: SectionBudgetItem[] = useMemo(() => {
+    if (structure?.headings && structure.headings.length > 0) {
+      const converted = structureToSectionBudgets(structure);
+      if (converted.length > 0) return converted;
+    }
     if (rawBudgets) {
       try {
         const parsed = typeof rawBudgets === "string" ? JSON.parse(rawBudgets) : rawBudgets;
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch {}
     }
-    // Baseline allocation: Introduction (~10%), Body (~80%), Conclusion (~10%)
+    // Baseline allocation
     const total = targetWordCount > 0 ? targetWordCount : 2000;
     const intro = Math.round(total * 0.10);
     const conclusion = Math.round(total * 0.10);
@@ -557,7 +623,7 @@ export function AssignmentProvider({
       { id: "body", title: "Body Paragraphs", targetWordCount: body, isCustom: false },
       { id: "conclusion", title: "Conclusion", targetWordCount: conclusion, isCustom: false },
     ];
-  }, [rawBudgetsKey, targetWordCount]);
+  }, [rawBudgetsKey, rawBudgets, structure, targetWordCount]);
 
   const addCustomSection = useCallback(
     async (title: string, targetWordCountVal: number) => {
@@ -618,13 +684,6 @@ export function AssignmentProvider({
     },
     [targetWordCount, saveAnswers]
   );
-
-  const question = extractStandardizedInstructions(answers);
-  const assignmentBriefText =
-    cleanAnswerString(answers["assignment_brief_text"]) ||
-    cleanAnswerString(answers["briefText"]) ||
-    cleanAnswerString(answers["brief"]) ||
-    question;
 
   // Structured entities
   const analysis: AssignmentAnalysis | null = answers["assignment_analysis"]
@@ -987,6 +1046,18 @@ export function AssignmentProvider({
   );
 
   const initializeDraftingPlan = useCallback((): AssignmentDraftingSection[] => {
+    if (structure?.headings && structure.headings.length > 0) {
+      const generated = structureToInternalSections(structure);
+      saveAnswers({
+        assignment_internal_sections: generated,
+        assignment_outline: generated,
+      });
+      if (generated.length > 0) {
+        setActiveSectionId((prev) => prev || generated[0].id);
+      }
+      return generated;
+    }
+
     const topicToUse = question || project?.title || "Academic Essay";
     const generated = decomposeWordBudget({
       targetWordCount,
@@ -1009,7 +1080,7 @@ export function AssignmentProvider({
       setActiveSectionId((prev) => prev || generated[0].id);
     }
     return generated;
-  }, [targetWordCount, sections, approvedSourceIds, question, project?.title, academicLevel, saveAnswers]);
+  }, [structure, targetWordCount, sections, approvedSourceIds, question, project?.title, academicLevel, saveAnswers]);
 
   const updateSectionContent = useCallback(
     async (sectionId: string, content: string) => {
@@ -1530,6 +1601,8 @@ export function AssignmentProvider({
         setWritingStyle,
         writingTone,
         setWritingTone,
+        structure,
+        setStructure,
         sectionBudgets,
         addCustomSection,
         updateSectionBudget,

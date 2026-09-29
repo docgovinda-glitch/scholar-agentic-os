@@ -16,6 +16,7 @@ import type {
   EvidenceItem,
   SourceAcademicType,
 } from "../types";
+import { flattenStructureSubheadings } from "../types";
 import {
   Library,
   ArrowRight,
@@ -40,6 +41,9 @@ import {
   Trash2,
   Check,
   FileUp,
+  Tag,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 
 export function formatHarvardCitation(source: Partial<DiscoveredSource>): string {
@@ -147,6 +151,7 @@ export default function AssignmentSourcesStage({
     projectId,
     question,
     citationStyle,
+    structure,
     sources,
     setSources,
     approvedSourceIds,
@@ -160,6 +165,28 @@ export default function AssignmentSourcesStage({
     advancePhase,
     setPhase,
   } = useAssignmentWorkspace();
+
+
+  // Outline subheadings & view mode
+  const subheadings = useMemo(() => flattenStructureSubheadings(structure), [structure]);
+  const [selectedSubheadingId, setSelectedSubheadingId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"bar" | "card">("bar");
+
+  const getSubheadingSources = useCallback(
+    (subId: string, sourceList: DiscoveredSource[]) => {
+      return sourceList.filter((s) => {
+        if (s.mappedSubheadingIds && s.mappedSubheadingIds.length > 0) {
+          return s.mappedSubheadingIds.includes(subId);
+        }
+        const sub = subheadings.find((item) => item.id === subId);
+        if (!sub) return false;
+        const words = sub.title.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+        const combined = `${s.title} ${s.suggestedUse || ""} ${s.mainFinding || ""}`.toLowerCase();
+        return words.some((w) => combined.includes(w));
+      });
+    },
+    [subheadings]
+  );
 
   // Filter & Search states
   const [activeTab, setActiveTab] = useState<"all" | "curated" | "uploaded" | "approved" | "bookmarked" | "excluded">("all");
@@ -591,6 +618,11 @@ export default function AssignmentSourcesStage({
   const displayedSources = useMemo(() => {
     let list = allMasterSources;
 
+    // 0. Subheading filter
+    if (selectedSubheadingId) {
+      list = getSubheadingSources(selectedSubheadingId, list);
+    }
+
     // 1. Tab status filtering
     if (activeTab === "approved") {
       list = list.filter((s) => approvedSourceIds.includes(s.id));
@@ -706,6 +738,8 @@ export default function AssignmentSourcesStage({
     minRelevance,
     openAccessOnly,
     sortBy,
+    selectedSubheadingId,
+    getSubheadingSources,
   ]);
 
   const activeFilterCount =
@@ -900,12 +934,44 @@ export default function AssignmentSourcesStage({
                   <Library className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
                   <span>Curated Scholarly Literature</span>
                   <span className="text-xs font-mono font-medium text-neutral-400">
-                    ({allMasterSources.length} identified)
+                    ({allMasterSources.length} identified{selectedSubheadingId ? " · filtered" : ""})
                   </span>
                 </h2>
                 <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
                   Peer-reviewed journal articles, seminal academic books, and user-uploaded course grounding materials.
                 </p>
+              </div>
+
+              {/* View Mode Switcher */}
+              <div className="flex items-center gap-1 bg-neutral-100 dark:bg-white/5 p-1 rounded-xl self-start md:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("bar")}
+                  title="Compact Bar View"
+                  aria-label="Compact Bar View"
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    viewMode === "bar"
+                      ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                      : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  }`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Compact Bars</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("card")}
+                  title="Detailed Cards"
+                  aria-label="Detailed Cards"
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    viewMode === "card"
+                      ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                      : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  }`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Detailed Cards</span>
+                </button>
               </div>
             </div>
 
@@ -1445,19 +1511,39 @@ export default function AssignmentSourcesStage({
                 className="flex flex-col gap-1.5"
                 data-testid="curated-sources-grid"
               >
-                {displayedSources.map((source) => (
-                  <ReferenceBarItem
-                    key={source.id}
-                    source={source}
-                    isApproved={approvedSourceIds.includes(source.id)}
-                    isBookmarked={bookmarkedIds.includes(source.id)}
-                    onToggleApproval={toggleSourceApproval}
-                    onDismiss={handleDismissSource}
-                    onToggleBookmark={handleToggleBookmark}
-                    onSaveEdit={handleSaveSourceUpdates}
-                    showDismiss={true}
-                  />
-                ))}
+                {displayedSources.map((source) =>
+                  viewMode === "card" ? (
+                    <CuratedSourceCard
+                      key={source.id}
+                      source={source}
+                      isApproved={approvedSourceIds.includes(source.id)}
+                      isBookmarked={bookmarkedIds.includes(source.id)}
+                      onToggleApproval={toggleSourceApproval}
+                      onDismiss={handleDismissSource}
+                      onToggleBookmark={handleToggleBookmark}
+                      onSaveEdit={handleSaveSourceUpdates}
+                      availableSubheadings={subheadings}
+                      onUpdateSubheadingMapping={(sId, mapping) =>
+                        handleSaveSourceUpdates(sId, { mappedSubheadingIds: mapping })
+                      }
+                      onUpdateUserNotes={(sId, notes) =>
+                        handleSaveSourceUpdates(sId, { userNotes: notes })
+                      }
+                    />
+                  ) : (
+                    <ReferenceBarItem
+                      key={source.id}
+                      source={source}
+                      isApproved={approvedSourceIds.includes(source.id)}
+                      isBookmarked={bookmarkedIds.includes(source.id)}
+                      onToggleApproval={toggleSourceApproval}
+                      onDismiss={handleDismissSource}
+                      onToggleBookmark={handleToggleBookmark}
+                      onSaveEdit={handleSaveSourceUpdates}
+                      showDismiss={true}
+                    />
+                  )
+                )}
               </div>
             ) : (
               <div className="p-10 text-center rounded-2xl border border-dashed border-neutral-200 dark:border-white/10 space-y-3">

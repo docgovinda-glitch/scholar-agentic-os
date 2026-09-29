@@ -1,16 +1,19 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { authedJsonFetch, authedFetch } from "../../api";
 import {
   type AcademicLevel,
   type AssignmentType,
   type AssignmentAnalysis,
+  type AssignmentStructure,
   type SectionBudgetItem,
   type WritingToneConfig,
   type WritingStyleConfig,
   type WritingStylePreset,
   ASSIGNMENT_TYPE_LABELS,
   cleanAnswerString,
+  structureToInternalSections,
+  structureToSectionBudgets,
 } from "../types";
 import { deriveHeuristicTitle } from "../../projectNaming";
 import {
@@ -25,10 +28,14 @@ import {
   Plus,
   Trash2,
   Edit2,
+  Layers,
+  RotateCcw,
+  BookOpen,
 } from "lucide-react";
 import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
-import SectionBudgetPlanner from "../components/SectionBudgetPlanner";
+import DynamicStructurePlanner from "../components/DynamicStructurePlanner";
 import WritingStyleSelector, { TONE_SUGGESTION_CHIPS } from "../components/WritingStyleSelector";
+import { generateDynamicAssignmentStructure } from "../services/outlineService";
 import { useSubscriptionLimits } from "../../../hooks/useSubscriptionLimits";
 import { UpgradeModal } from "../../../components/modals/UpgradeModal";
 import { isDeepEqual, stripCircularReferences } from "../../../utils/briefExtractor";
@@ -88,13 +95,13 @@ export default function AssignmentUnderstandStage() {
     assignmentType,
     targetWordCount,
     citationStyle,
-    sections,
     assignmentBriefText,
     writingStyle,
     setWritingStyle,
     writingTone,
     setWritingTone,
-    sectionBudgets,
+    structure,
+    setStructure,
     saveAnswers,
     analysis,
     setAnalysis,
@@ -134,24 +141,22 @@ export default function AssignmentUnderstandStage() {
   const [localLevel, setLocalLevel] = useState<AcademicLevel>(academicLevel || "undergraduate");
   const [localType, setLocalType] = useState<AssignmentType>(assignmentType || "essay");
   const [localWordCount, setLocalWordCount] = useState<number>(targetWordCount || 2000);
-  const [localSections, setLocalSections] = useState<SectionBreakdown | undefined>(sections);
   const [localCitation, setLocalCitation] = useState<string>(citationStyle || "apa7");
   const [localBrief, setLocalBrief] = useState(
     cleanAnswerString(assignmentBriefText) || cleanAnswerString(question)
   );
 
-  // Dynamic Section Budgets state (defaults: 10% Intro / 80% Body / 10% Conclusion)
-  const [localSectionBudgets, setLocalSectionBudgets] = useState<SectionBudgetItem[]>(() => {
-    if (sectionBudgets && sectionBudgets.length > 0) return sectionBudgets;
-    const total = targetWordCount > 0 ? targetWordCount : 2000;
-    const intro = Math.round(total * 0.10);
-    const conclusion = Math.round(total * 0.10);
-    const body = Math.max(0, total - intro - conclusion);
-    return [
-      { id: "intro", title: "Introduction", targetWordCount: intro, isCustom: false },
-      { id: "body", title: "Body Paragraphs", targetWordCount: body, isCustom: false },
-      { id: "conclusion", title: "Conclusion", targetWordCount: conclusion, isCustom: false },
-    ];
+  // Dynamic Structure state (replaces hardcoded Intro/Body/Conclusion)
+  const [localStructure, setLocalStructure] = useState<AssignmentStructure>(() => {
+    if (structure && structure.headings && structure.headings.length > 0) {
+      return structure;
+    }
+    return generateDynamicAssignmentStructure({
+      question: cleanAnswerString(question),
+      assignmentType: localType,
+      academicLevel: localLevel,
+      targetWordCount: localWordCount,
+    });
   });
 
   // Academic Writing Style state
@@ -331,8 +336,9 @@ export default function AssignmentUnderstandStage() {
     const otherSections = sectionItems.filter(
       (s) => s !== introItem && s !== conclusionItem
     );
+    const hasExplicitSections = Boolean(introItem && conclusionItem);
     const body =
-      otherSections.length > 0
+      hasExplicitSections && otherSections.length > 0
         ? otherSections.reduce((sum, s) => sum + s.targetWordCount, 0)
         : Math.max(0, total - intro - conclusion);
 
@@ -351,7 +357,6 @@ export default function AssignmentUnderstandStage() {
       conclusion: { targetWords: budget.conclusion, guidelines: "" },
     };
   };
-
   // Hydrate local state whenever project.answers changes / finishes loading
   useEffect(() => {
     if (isLoading) return;
@@ -367,15 +372,15 @@ export default function AssignmentUnderstandStage() {
     if (assignmentType) setLocalType((prev) => (prev !== assignmentType ? assignmentType : prev));
     if (targetWordCount > 0) setLocalWordCount((prev) => (prev !== targetWordCount ? targetWordCount : prev));
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
-    if (sections) setLocalSections((prev) => (isDeepEqual(prev, sections) ? prev : sections));
     if (writingStyle) {
       setLocalStyle((prev) => (isDeepEqual(prev, writingStyle) ? prev : writingStyle));
     } else if (writingTone) {
       setLocalStyle((prev) => (isDeepEqual(prev, writingTone) ? prev : (writingTone as WritingStyleConfig)));
     }
-    if (sectionBudgets && sectionBudgets.length > 0) {
-      setLocalSectionBudgets((prev) => (isDeepEqual(prev, sectionBudgets) ? prev : sectionBudgets));
+    if (structure && structure.headings && structure.headings.length > 0) {
+      setLocalStructure(structure);
     }
+
     const cleanedBrief = cleanAnswerString(assignmentBriefText);
     if (cleanedBrief) {
       setLocalBrief((prev) => (prev !== cleanedBrief ? cleanedBrief : prev));
@@ -393,10 +398,9 @@ export default function AssignmentUnderstandStage() {
     assignmentType,
     targetWordCount,
     citationStyle,
-    sections,
     writingStyle,
     writingTone,
-    sectionBudgets,
+    structure,
     assignmentBriefText,
     courseName,
     institutionName,
@@ -422,7 +426,7 @@ export default function AssignmentUnderstandStage() {
     });
   };
 
-  // Autosave / onBlur debouncing to commit changes directly to PostgreSQL / JSONB storage
+  // Autosave question & title onBlur
   const handleQuestionBlur = () => {
     const trimmed = cleanAnswerString(localQuestion);
     if (trimmed) {
@@ -437,8 +441,8 @@ export default function AssignmentUnderstandStage() {
         currentTitle.toLowerCase() === "academic assignment" ||
         currentTitle.toLowerCase() === "synthesized research project";
 
-      const budget = computeWordBudgetFromSections(localWordCount, localSectionBudgets);
-      const legacyBreakdown = computeSectionBreakdown(localWordCount, localSectionBudgets);
+      const internalSecs = structureToInternalSections(localStructure);
+      const budgets = structureToSectionBudgets(localStructure);
 
       const updates: Record<string, any> = {
         rawPrompt: trimmed,
@@ -448,11 +452,15 @@ export default function AssignmentUnderstandStage() {
         assignment_brief_text: trimmed,
         research_topic: trimmed,
         assignment_brief: trimmed,
-        wordBudget: budget,
-        word_budget: budget,
-        sectionBudgets: localSectionBudgets,
-        section_budgets: localSectionBudgets,
-        sections: legacyBreakdown,
+        wordBudget: computeWordBudgetFromSections(localWordCount, budgets),
+        word_budget: computeWordBudgetFromSections(localWordCount, budgets),
+        assignment_structure: localStructure,
+        structure: localStructure,
+        sectionBudgets: budgets,
+        section_budgets: budgets,
+        assignment_internal_sections: internalSecs,
+        assignment_outline: internalSecs,
+        sections: computeSectionBreakdown(localWordCount, budgets),
         writingStyle: localStyle,
         writing_style: localStyle,
         writingTone: localStyle,
@@ -473,50 +481,21 @@ export default function AssignmentUnderstandStage() {
 
   const handleTargetWordCountChange = (newCount: number) => {
     setLocalWordCount(newCount);
-    // If not customized, adjust standard sections proportionally (10/80/10)
-    const hasCustom = localSectionBudgets.some((s) => s.isCustom);
-    let updatedSections = localSectionBudgets;
-    if (!hasCustom) {
-      const intro = Math.round(newCount * 0.10);
-      const conclusion = Math.round(newCount * 0.10);
-      const body = Math.max(0, newCount - intro - conclusion);
-      updatedSections = [
-        { id: "intro", title: "Introduction", targetWordCount: intro, isCustom: false },
-        { id: "body", title: "Body Paragraphs", targetWordCount: body, isCustom: false },
-        { id: "conclusion", title: "Conclusion", targetWordCount: conclusion, isCustom: false },
-      ];
-      setLocalSectionBudgets(updatedSections);
-    }
-    const budget = computeWordBudgetFromSections(newCount, updatedSections);
-    const legacyBreakdown = computeSectionBreakdown(newCount, updatedSections);
-    setLocalSections(legacyBreakdown);
-
-    saveAnswers({
+    // Proportionally adjust local structure word count
+    const updated = generateDynamicAssignmentStructure({
+      question: localQuestion,
+      assignmentType: localType,
+      academicLevel: localLevel,
       targetWordCount: newCount,
-      target_word_count: newCount,
-      word_count: newCount,
-      word_limit: newCount,
-      sectionBudgets: updatedSections,
-      section_budgets: updatedSections,
-      sections: legacyBreakdown,
-      wordBudget: budget,
-      word_budget: budget,
+      currentStructure: localStructure,
     });
+    setLocalStructure(updated);
+    setStructure(updated);
   };
 
-  const handleSectionBudgetsChange = (newSections: SectionBudgetItem[]) => {
-    setLocalSectionBudgets(newSections);
-    const budget = computeWordBudgetFromSections(localWordCount, newSections);
-    const legacyBreakdown = computeSectionBreakdown(localWordCount, newSections);
-    setLocalSections(legacyBreakdown);
-
-    saveAnswers({
-      sectionBudgets: newSections,
-      section_budgets: newSections,
-      sections: legacyBreakdown,
-      wordBudget: budget,
-      word_budget: budget,
-    });
+  const handleStructureChange = (newStructure: AssignmentStructure) => {
+    setLocalStructure(newStructure);
+    setStructure(newStructure);
   };
 
   const handleStyleChange = (newStyle: WritingStyleConfig) => {
@@ -571,9 +550,22 @@ export default function AssignmentUnderstandStage() {
   const handleProceedToSources = async () => {
     if (!canProceedToSources) return;
     const trimmed = cleanAnswerString(localQuestion);
-    const budget = computeWordBudgetFromSections(localWordCount, localSectionBudgets);
-    const legacyBreakdown = computeSectionBreakdown(localWordCount, localSectionBudgets);
-    const parsedCriteria = parseRubricCriteria(rubricText);
+    const parsedCriteria = parseRubricCriteria(rubricText || markingRubricText);
+    const defaultIntro = Math.round(localWordCount * 0.1);
+    const defaultConclusion = Math.round(localWordCount * 0.1);
+    const defaultBody = Math.max(0, localWordCount - defaultIntro - defaultConclusion);
+    const budget = { intro: defaultIntro, body: defaultBody, conclusion: defaultConclusion };
+
+    // Lock and confirm structure
+    const confirmedStructure: AssignmentStructure = {
+      ...localStructure,
+      isConfirmed: true,
+      confirmedAt: new Date().toISOString(),
+    };
+    setLocalStructure(confirmedStructure);
+
+    const internalSecs = structureToInternalSections(confirmedStructure);
+    const budgets = structureToSectionBudgets(confirmedStructure);
 
     await saveAnswers({
       rawPrompt: trimmed,
@@ -591,11 +583,15 @@ export default function AssignmentUnderstandStage() {
       word_limit: localWordCount,
       targetWordCount: localWordCount,
       target_word_count: localWordCount,
-      wordBudget: budget,
-      word_budget: budget,
-      sectionBudgets: localSectionBudgets,
-      section_budgets: localSectionBudgets,
-      sections: legacyBreakdown,
+      wordBudget: computeWordBudgetFromSections(localWordCount, budgets),
+      word_budget: computeWordBudgetFromSections(localWordCount, budgets),
+      assignment_structure: confirmedStructure,
+      structure: confirmedStructure,
+      sectionBudgets: budgets,
+      section_budgets: budgets,
+      assignment_internal_sections: internalSecs,
+      assignment_outline: internalSecs,
+      sections: computeSectionBreakdown(localWordCount, budgets),
       writingStyle: localStyle,
       writing_style: localStyle,
       writingTone: localStyle,
@@ -604,8 +600,8 @@ export default function AssignmentUnderstandStage() {
       citationStyle: localCitation,
       rubricCriteria: parsedCriteria,
       rubric_criteria: parsedCriteria,
-      marking_rubric: rubricText,
-      rubric: rubricText,
+      marking_rubric: rubricText || markingRubricText,
+      rubric: rubricText || markingRubricText,
       course_name: course,
       institution,
       deadline,
@@ -632,8 +628,20 @@ export default function AssignmentUnderstandStage() {
     setIsAnalyzing(true);
     setAnalysisError(null);
 
-    const budget = computeWordBudgetFromSections(localWordCount, localSectionBudgets);
-    const legacyBreakdown = computeSectionBreakdown(localWordCount, localSectionBudgets);
+    // Generate dynamic structure directly from question
+    const proposedStructure = generateDynamicAssignmentStructure({
+      question: localQuestion,
+      assignmentType: localType,
+      academicLevel: localLevel,
+      targetWordCount: localWordCount,
+      currentStructure: localStructure,
+    });
+    setLocalStructure(proposedStructure);
+
+    const internalSecs = structureToInternalSections(proposedStructure);
+    const budgets = structureToSectionBudgets(proposedStructure);
+    const budget = computeWordBudgetFromSections(localWordCount, budgets);
+    const legacyBreakdown = computeSectionBreakdown(localWordCount, budgets);
 
     // Save intake details first
     await saveAnswers({
@@ -651,8 +659,12 @@ export default function AssignmentUnderstandStage() {
       target_word_count: localWordCount,
       citation_style: localCitation,
       citationStyle: localCitation,
-      sectionBudgets: localSectionBudgets,
-      section_budgets: localSectionBudgets,
+      assignment_structure: proposedStructure,
+      structure: proposedStructure,
+      sectionBudgets: budgets,
+      section_budgets: budgets,
+      assignment_internal_sections: internalSecs,
+      assignment_outline: internalSecs,
       wordBudget: budget,
       word_budget: budget,
       sections: legacyBreakdown,
@@ -701,16 +713,39 @@ export default function AssignmentUnderstandStage() {
 
       if (response && response.ok) {
         const data = await response.json();
-        if (data.analysis) {
-          await setAnalysis(data.analysis);
-          return;
-        }
-        await setAnalysis(data);
+        const incomingAnalysis: AssignmentAnalysis = data.analysis || data;
+        const struct = (data.structure?.headings?.length > 0)
+          ? data.structure
+          : generateDynamicAssignmentStructure({
+              question: localQuestion,
+              targetWordCount: localWordCount,
+              assignmentType: localType,
+              academicLevel: localLevel,
+            });
+
+        setLocalStructure(struct);
+        const internalSecs = structureToInternalSections(struct);
+        const budgets = structureToSectionBudgets(struct);
+
+        await saveAnswers({
+          assignment_analysis: typeof incomingAnalysis === "string" ? incomingAnalysis : JSON.stringify(incomingAnalysis),
+          assignment_structure: struct,
+          structure: struct,
+          sectionBudgets: budgets,
+          section_budgets: budgets,
+          assignment_internal_sections: internalSecs,
+          assignment_outline: internalSecs,
+        });
         return;
       }
-      throw new Error("Server analysis unavailable");
     } catch (err: any) {
-      console.warn("Using resilient brief analyzer:", err);
+      console.warn("Using resilient client brief analyzer and structure generator:", err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+
+    // Client-side fallback analysis
+    if (!analysis) {
       const qLower = localQuestion.toLowerCase();
       const detectedVerbs = [];
       const verbKeywords: Record<string, { def: string; act: string }> = {
@@ -801,8 +836,6 @@ export default function AssignmentUnderstandStage() {
       };
 
       await setAnalysis(fallbackAnalysis);
-    } finally {
-      setIsAnalyzing(false);
     }
   };
 
@@ -862,7 +895,6 @@ export default function AssignmentUnderstandStage() {
 
       const data = await res.json();
       const extractedText = data.text || "";
-
       if (!extractedText || extractedText.trim().length === 0) {
         throw new Error("Could not parse this document. Please verify the file format or paste the brief text manually.");
       }
@@ -871,37 +903,35 @@ export default function AssignmentUnderstandStage() {
       setLocalQuestion(cleanPrompt);
       setLocalBrief(cleanPrompt);
 
-      // Determine updated target word count and synchronized section budgets atomically
       const newWordCount =
         data.detectedWordCount && data.detectedWordCount >= 200
           ? data.detectedWordCount
           : localWordCount;
-      const intro = Math.round(newWordCount * 0.10);
-      const conclusion = Math.round(newWordCount * 0.10);
-      const body = Math.max(0, newWordCount - intro - conclusion);
-      const updatedSections: SectionBudgetItem[] = [
-        { id: "intro", title: "Introduction", targetWordCount: intro, isCustom: false },
-        { id: "body", title: "Body Paragraphs", targetWordCount: body, isCustom: false },
-        { id: "conclusion", title: "Conclusion", targetWordCount: conclusion, isCustom: false },
-      ];
-      const budget = computeWordBudgetFromSections(newWordCount, updatedSections);
-      const legacyBreakdown = computeSectionBreakdown(newWordCount, updatedSections);
+      const nextLevel = data.detectedLevel || localLevel;
+      const nextCitation = data.detectedCitation || localCitation;
 
       if (data.detectedWordCount && data.detectedWordCount >= 200) {
         setLocalWordCount(newWordCount);
-        setLocalSectionBudgets(updatedSections);
-        setLocalSections(legacyBreakdown);
       }
-
-      const nextLevel = data.detectedLevel || localLevel;
       if (data.detectedLevel) {
         setLocalLevel(data.detectedLevel);
       }
-
-      const nextCitation = data.detectedCitation || localCitation;
       if (data.detectedCitation) {
         setLocalCitation(data.detectedCitation);
       }
+
+      const dynamicStruct = generateDynamicAssignmentStructure({
+        question: cleanPrompt,
+        assignmentType: localType,
+        academicLevel: nextLevel,
+        targetWordCount: newWordCount,
+      });
+      setLocalStructure(dynamicStruct);
+
+      const budgets = structureToSectionBudgets(dynamicStruct);
+      const internalSecs = structureToInternalSections(dynamicStruct);
+      const budget = computeWordBudgetFromSections(newWordCount, budgets);
+      const legacyBreakdown = computeSectionBreakdown(newWordCount, budgets);
 
       const updates: Record<string, any> = {
         instructions: cleanPrompt,
@@ -914,8 +944,12 @@ export default function AssignmentUnderstandStage() {
         target_word_count: newWordCount,
         word_count: newWordCount,
         word_limit: newWordCount,
-        sectionBudgets: updatedSections,
-        section_budgets: updatedSections,
+        assignment_structure: dynamicStruct,
+        structure: dynamicStruct,
+        sectionBudgets: budgets,
+        section_budgets: budgets,
+        assignment_internal_sections: internalSecs,
+        assignment_outline: internalSecs,
         sections: legacyBreakdown,
         wordBudget: budget,
         word_budget: budget,
@@ -969,36 +1003,39 @@ export default function AssignmentUnderstandStage() {
     }
   };
 
+  const promptWordCount = useMemo(() => {
+    return localQuestion.trim() ? localQuestion.trim().split(/\s+/).filter(Boolean).length : 0;
+  }, [localQuestion]);
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 space-y-8 text-neutral-900 dark:text-neutral-100 font-sans">
+    <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 space-y-6 text-neutral-900 dark:text-neutral-100 font-sans">
       {/* Clean Decluttered Header */}
       <div>
-        <div className="flex items-center gap-2 mb-2">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200">
-            Phase 1 • Understand
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200">
+            Phase 1: Understand the Assignment Brief
           </span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-          <span className="sr-only">Phase 1: Understand the Assignment</span>
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
           Understand Your Brief
         </h1>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1.5 leading-relaxed">
+        <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
           Define the assignment question, target word allocation, academic writing tone, and rubric criteria.
         </p>
       </div>
 
       {/* Main Intake Canvas Card */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/70 dark:border-white/10 p-6 sm:p-8 shadow-xs space-y-7">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-6">
         {/* Streamlined Assessment Brief Intake: Dual-Tab Card */}
-        <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div className="space-y-2.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="inline-flex p-1 rounded-xl bg-neutral-100 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 w-fit">
               <button
                 type="button"
                 onClick={() => setIntakeTab("paste")}
-                className={`py-1.5 px-3.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   intakeTab === "paste"
-                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
+                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
               >
@@ -1007,9 +1044,9 @@ export default function AssignmentUnderstandStage() {
               <button
                 type="button"
                 onClick={() => setIntakeTab("upload")}
-                className={`py-1.5 px-3.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                   intakeTab === "upload"
-                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
+                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
               >
@@ -1018,12 +1055,19 @@ export default function AssignmentUnderstandStage() {
               </button>
             </div>
 
-            {uploadedFileName && (
-              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                <FileText className="w-3.5 h-3.5" />
-                <span>Loaded: {uploadedFileName}</span>
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {promptWordCount > 0 && (
+                <span className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500">
+                  {promptWordCount} words entered
+                </span>
+              )}
+              {uploadedFileName && (
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>{uploadedFileName}</span>
+                </span>
+              )}
+            </div>
           </div>
 
           {intakeTab === "paste" ? (
@@ -1031,9 +1075,9 @@ export default function AssignmentUnderstandStage() {
               value={localQuestion}
               onChange={(e) => setLocalQuestion(e.target.value)}
               onBlur={handleQuestionBlur}
-              rows={5}
+              rows={4}
               placeholder="Paste your assignment prompt, essay title, or question here..."
-              className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-4 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-white/15 focus:border-neutral-400 dark:focus:border-white/20 transition-all leading-relaxed resize-y"
+              className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-3.5 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all leading-relaxed resize-y"
             />
           ) : (
             <DropzoneErrorBoundary onError={() => setParseNotice("Could not parse this document. Please verify the file format or paste the brief text manually.")}>
@@ -1159,18 +1203,18 @@ export default function AssignmentUnderstandStage() {
         </div>
 
         {/* Compact Single Row: Academic Level, Assignment Type & Citation Style */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl bg-neutral-50/60 dark:bg-white/[0.02] border border-neutral-200/70 dark:border-white/10">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 p-3.5 sm:p-4 rounded-xl bg-neutral-50/60 dark:bg-white/[0.02] border border-neutral-200/70 dark:border-white/10">
           {/* Academic Level */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
               <span>Academic Level</span>
               <span className="text-rose-500 text-xs">*</span>
             </label>
-            <div className="flex p-0.5 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10">
+            <div className="flex p-0.5 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 h-8">
               <button
                 type="button"
                 onClick={() => handleLevelChange("undergraduate")}
-                className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer text-center ${
+                className={`flex-1 py-1 px-2 rounded-md text-xs font-medium transition-all cursor-pointer text-center flex items-center justify-center ${
                   localLevel === "undergraduate"
                     ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
@@ -1181,7 +1225,7 @@ export default function AssignmentUnderstandStage() {
               <button
                 type="button"
                 onClick={() => handleLevelChange("postgraduate")}
-                className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer text-center ${
+                className={`flex-1 py-1 px-2 rounded-md text-xs font-medium transition-all cursor-pointer text-center flex items-center justify-center ${
                   localLevel === "postgraduate"
                     ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
@@ -1193,7 +1237,7 @@ export default function AssignmentUnderstandStage() {
           </div>
 
           {/* Assignment Type */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
               <span>Assignment Type</span>
               <span className="text-rose-500 text-xs">*</span>
@@ -1202,7 +1246,7 @@ export default function AssignmentUnderstandStage() {
               <select
                 value={localType}
                 onChange={(e) => handleTypeChange(e.target.value as AssignmentType)}
-                className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium"
+                className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
               >
                 {Object.entries(ASSIGNMENT_TYPE_LABELS).map(([key, label]) => (
                   <option key={key} value={key}>
@@ -1217,7 +1261,7 @@ export default function AssignmentUnderstandStage() {
           </div>
 
           {/* Citation Style */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <label className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
               <span>Citation Style</span>
               <span className="text-rose-500 text-xs">*</span>
@@ -1226,7 +1270,7 @@ export default function AssignmentUnderstandStage() {
               <select
                 value={localCitation}
                 onChange={(e) => handleCitationChange(e.target.value)}
-                className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium"
+                className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
               >
                 {CITATION_STYLES.map((st) => (
                   <option key={st.id} value={st.id}>
@@ -1241,13 +1285,17 @@ export default function AssignmentUnderstandStage() {
           </div>
         </div>
 
-        {/* Word Budget with Custom Sections Adder */}
+        {/* Dynamic Assignment Structure & Word Allocation Planner */}
         <div className="pt-1">
-          <SectionBudgetPlanner
+          <DynamicStructurePlanner
+            structure={localStructure}
             targetWordCount={localWordCount}
+            onStructureChange={handleStructureChange}
             onTargetWordCountChange={handleTargetWordCountChange}
-            sections={localSectionBudgets}
-            onSectionsChange={handleSectionBudgetsChange}
+            question={localQuestion}
+            assignmentType={localType}
+            academicLevel={localLevel}
+            isConfirmed={localStructure.isConfirmed}
           />
         </div>
 
@@ -1278,8 +1326,8 @@ export default function AssignmentUnderstandStage() {
           </button>
 
           {showAdditional && (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 p-5 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] animate-in fade-in duration-150">
-              <div className="space-y-1.5">
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3.5 p-4 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] animate-in fade-in duration-150">
+              <div className="space-y-1">
                 <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Course / Module Code</label>
                 <input
                   type="text"
@@ -1287,31 +1335,31 @@ export default function AssignmentUnderstandStage() {
                   onChange={(e) => setCourse(e.target.value)}
                   onBlur={handleCourseDetailsBlur}
                   placeholder="e.g. POLI3002 International Security"
-                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3.5 py-2 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
+                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
                 />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">University / Institution</label>
                 <input
                   type="text"
                   value={institution}
                   onChange={(e) => setInstitution(e.target.value)}
                   onBlur={handleCourseDetailsBlur}
-                  placeholder="e.g. University of Edinburgh"
-                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3.5 py-2 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
+                  placeholder="e.g. University of Oxford"
+                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
                 />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Deadline</label>
                 <input
                   type="date"
                   value={deadline}
                   onChange={(e) => setDeadline(e.target.value)}
                   onBlur={handleCourseDetailsBlur}
-                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3.5 py-2 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
+                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
                 />
               </div>
-              <div className="md:col-span-3 space-y-1.5 pt-1">
+              <div className="md:col-span-3 space-y-1 pt-1">
                 <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Marking Rubric / Assessment Criteria</label>
                 <textarea
                   value={rubricText}
@@ -1319,7 +1367,7 @@ export default function AssignmentUnderstandStage() {
                   onBlur={handleCourseDetailsBlur}
                   rows={3}
                   placeholder="Paste marking criteria or grade band descriptions to index..."
-                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg p-3 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 leading-relaxed"
+                  className="w-full bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg p-2.5 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20 leading-relaxed"
                 />
               </div>
             </div>
@@ -1327,28 +1375,40 @@ export default function AssignmentUnderstandStage() {
         </div>
 
         {/* Primary Action Button Bar */}
-        <div className="pt-4 border-t border-neutral-100 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-          {!canProceedToSources ? (
-            <p className="text-xs text-rose-500 dark:text-rose-400 font-medium">
-              Please provide the assignment question, word count, and citation style to continue.
-            </p>
-          ) : <div />}
+        <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="text-xs">
+            {!canProceedToSources ? (
+              <p className="text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>Please provide the assignment question, word count, and citation style to continue.</span>
+              </p>
+            ) : localStructure.totalAllocated !== localWordCount ? (
+              <p className="text-amber-600 dark:text-amber-400 font-medium">
+                Note: {Math.abs(localWordCount - localStructure.totalAllocated)} words {localStructure.totalAllocated > localWordCount ? "over target" : "unallocated"}. You can auto-balance or proceed.
+              </p>
+            ) : (
+              <p className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5" />
+                <span>Structure calibrated and word count balanced.</span>
+              </p>
+            )}
+          </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
             <button
               type="button"
               disabled={!canAnalyze || isAnalyzing}
               onClick={handleAnalyze}
-              className="w-full sm:w-auto px-6 py-2.5 rounded-full border border-neutral-300 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-semibold text-neutral-800 dark:text-neutral-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-4 py-2 rounded-xl border border-neutral-300 dark:border-white/15 hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-semibold text-neutral-800 dark:text-neutral-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
             >
               {isAnalyzing ? (
                 <>
                   <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  <span>Analyzing Assignment Brief…</span>
+                  <span>Analyzing Brief…</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-3.5 h-3.5 text-neutral-500" />
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                   <span>{analysis ? "Re-Analyze Assignment Brief" : "Analyze Assignment Brief"}</span>
                 </>
               )}
@@ -1358,16 +1418,16 @@ export default function AssignmentUnderstandStage() {
               type="button"
               disabled={!canProceedToSources || isAnalyzing}
               onClick={handleProceedToSources}
-              className="w-full sm:w-auto px-7 py-2.5 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto px-5 py-2 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <span>Proceed to Sources</span>
+              <span>Confirm Structure & Proceed to Sources</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {analysisError && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
+          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{analysisError}</span>
           </div>
@@ -1379,7 +1439,7 @@ export default function AssignmentUnderstandStage() {
         <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/70 dark:border-white/10 p-6 sm:p-8 shadow-xs space-y-6 animate-in fade-in duration-200">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 dark:border-white/5 pb-4">
             <div>
-              <h2 className="text-lg font-semibold text-neutral-900 dark:text-white tracking-tight">
+              <h2 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-white tracking-tight">
                 Assignment Analysis Breakdown
               </h2>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
@@ -1390,6 +1450,33 @@ export default function AssignmentUnderstandStage() {
               ✓ Analysis Ready{analysis.briefLedger && analysis.briefLedger.length > 0 ? ` · ${analysis.briefLedger.length} Rules Indexed` : ""}
             </span>
           </div>
+
+          {/* Command Verbs & Examiner Demands */}
+          {analysis.commandVerbs && analysis.commandVerbs.length > 0 && (
+            <div className="space-y-2.5">
+              <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                Command Verbs & Examiner Demands
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {analysis.commandVerbs.map((cv, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] space-y-1"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-full bg-neutral-200/80 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold text-xs">
+                        {cv.verb}
+                      </span>
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400 italic">{cv.meaning}</span>
+                    </div>
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed pt-0.5">
+                      <span className="font-semibold text-neutral-900 dark:text-neutral-100">Requirement:</span> {cv.academicExpectation}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Detected Critical Penalty Alerts (only genuine assessment penalties, e.g. late submission deductions - never raw rubric grade tiers like [L070] (70% - 100%)) */}
           {(() => {
@@ -1431,6 +1518,41 @@ export default function AssignmentUnderstandStage() {
               </div>
             );
           })()}
+
+          {/* Summary & Core Specifications */}
+          {analysis.summary && (
+            <div className="p-4 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] space-y-2.5">
+              <div>
+                <span className="text-[11px] uppercase font-semibold text-neutral-500 dark:text-neutral-400 block tracking-wider">
+                  Summary & Expected Response
+                </span>
+                <p className="text-xs text-neutral-800 dark:text-neutral-200 mt-1 leading-relaxed">
+                  {analysis.summary}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2.5 border-t border-neutral-200/60 dark:border-white/5">
+                {analysis.evidenceRequirements && (
+                  <div>
+                    <span className="text-[10px] uppercase font-semibold text-neutral-400 block tracking-wider">Evidence Requirements</span>
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300 mt-0.5">{analysis.evidenceRequirements}</p>
+                  </div>
+                )}
+                {analysis.wordCountImplications && (
+                  <div>
+                    <span className="text-[10px] uppercase font-semibold text-neutral-400 block tracking-wider">Word Budget Guidance</span>
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300 mt-0.5">{analysis.wordCountImplications}</p>
+                  </div>
+                )}
+                {analysis.citationGuidance && (
+                  <div>
+                    <span className="text-[10px] uppercase font-semibold text-neutral-400 block tracking-wider">Referencing Style</span>
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300 mt-0.5">{analysis.citationGuidance}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Interactive Editable Scope Boundaries: Included (Green) vs Excluded (Amber) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1710,21 +1832,22 @@ export default function AssignmentUnderstandStage() {
           </div>
 
           {/* Student Approval & Confirmation Banner */}
-          <div className="pt-4 border-t border-neutral-100 dark:border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
-                Is this research scope correct?
+              <h3 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white">
+                Ready to begin researching sources?
               </h3>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                Lock this research scope to proceed to curated literature discovery.
+                Lock this research scope and structure to proceed to Phase 2: Sources.
               </p>
             </div>
             <button
               type="button"
               onClick={handleApproveAnalysis}
-              className="w-full sm:w-auto px-7 py-3 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] text-xs font-semibold transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] text-xs font-semibold transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center gap-1.5"
             >
-              ✓ Approve & Continue to Sources →
+              <span>Approve & Continue to Sources</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>

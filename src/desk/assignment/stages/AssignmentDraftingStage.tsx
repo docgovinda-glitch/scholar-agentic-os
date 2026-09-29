@@ -38,6 +38,7 @@ export function AssignmentDraftingStage({
     academicLevel,
     citationStyle,
     sources,
+    approvedSourceIds,
     internalSections,
     activeSectionId,
     setActiveSectionId,
@@ -103,8 +104,8 @@ export function AssignmentDraftingStage({
 
   // Filter approved sources
   const approvedSources = useMemo(() => {
-    return sources.filter((s) => s.status === "kept");
-  }, [sources]);
+    return sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id)));
+  }, [sources, approvedSourceIds]);
 
   // Stream single section (or revision)
   const handleStreamSection = useCallback(
@@ -117,11 +118,20 @@ export function AssignmentDraftingStage({
       setGeneratingSection(sec.id, true);
       setStreamingChunk(sec.draftContent || "");
 
+      const mappedIds = approvedSources
+        .filter((s) => s.mappedSubheadingIds?.includes(sec.id))
+        .map((s) => s.id);
+
       const planSection: InternalSectionPlan = {
         ...sec,
         sectionType: sec.sectionType || (sec.id.includes("intro") ? "intro" : sec.id.includes("conclusion") ? "conclusion" : "body"),
         academicFunction: sec.academicFunction || sec.title,
-        boundSourceIds: sec.boundSourceIds || [],
+        boundSourceIds:
+          sec.boundSourceIds && sec.boundSourceIds.length > 0
+            ? sec.boundSourceIds
+            : mappedIds.length > 0
+            ? mappedIds
+            : approvedSources.map((s) => s.id),
       };
 
       try {

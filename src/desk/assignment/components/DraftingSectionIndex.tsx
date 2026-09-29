@@ -73,10 +73,10 @@ export function DraftingSectionIndex({
             </div>
             <div>
               <h2 className="text-sm font-semibold text-neutral-900 dark:text-white tracking-tight">
-                Section Outline
+                Section Outline & Structure
               </h2>
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                Invisible PEEL decomposition
+                Drafting subsection-by-subsection
               </p>
             </div>
           </div>
@@ -138,17 +138,17 @@ export function DraftingSectionIndex({
           {isGenerating ? (
             <>
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              <span>Streaming Section...</span>
+              <span>Streaming Subsection...</span>
             </>
           ) : hasPending ? (
             <>
               <Sparkles className="w-3.5 h-3.5 text-amber-300 dark:text-amber-500" />
-              <span>Generate Next Section</span>
+              <span>Draft Next Subsection</span>
             </>
           ) : (
             <>
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>All Sections Drafted</span>
+              <span>All Subsections Drafted</span>
             </>
           )}
         </button>
@@ -160,7 +160,7 @@ export function DraftingSectionIndex({
             disabled={isGenerating}
             className="w-full py-1.5 px-3 rounded-xl text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 disabled:opacity-40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <span>Draft all remaining sections</span>
+            <span>Draft all remaining subsections</span>
             <ArrowRight className="w-3 h-3" />
           </button>
         )}
@@ -207,12 +207,14 @@ export function DraftingSectionIndex({
           const innerCardContent = (
             <>
               <div className="flex items-start justify-between gap-2 mb-1">
-                <span className="text-[10px] font-mono font-medium text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
+                <span className="text-[10px] font-mono font-medium text-neutral-400 dark:text-neutral-500 uppercase tracking-wider truncate max-w-[130px]">
                   {section.sectionType === "intro"
                     ? "Introduction"
                     : section.sectionType === "conclusion"
                     ? "Conclusion"
-                    : `Theme ${idx}`}
+                    : (section.academicFunction && section.academicFunction !== section.title
+                        ? section.academicFunction
+                        : `Section ${idx + 1}`)}
                 </span>
 
                 {/* Status Indicator */}
@@ -327,7 +329,7 @@ export function DraftingSectionIndex({
 
                 {boundSourcesCount > 0 && (
                   <div
-                    title={`${boundSourcesCount} approved sources assigned to this claim`}
+                    title={`${boundSourcesCount} approved sources assigned to this subsection`}
                     className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 font-medium"
                   >
                     <BookOpen className="w-2.5 h-2.5 text-neutral-400" />

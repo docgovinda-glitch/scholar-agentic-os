@@ -25,7 +25,9 @@ import {
   extractStandardizedInstructions,
   normalizeProjectAnswers,
   getSectionPromptGuidelines,
+  structureToInternalSections,
 } from "../../../src/desk/assignment/types.ts";
+import { generateDynamicAssignmentStructure } from "../../../src/desk/assignment/services/outlineService.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(rejectClientCredentials);
@@ -1136,10 +1138,14 @@ CRITICAL: You MUST divide the target word counts across the sections to strictly
 
   try {
     const prompt = `You are the Scholar Core Outline & Word Count Planning Agent.
-Create an adaptive, university-standard section outline tailored strictly to the assignment format.
+Create an academic structure tailored strictly to the assignment question and format.
+Do NOT use a generic or hardcoded Introduction / Body Paragraphs / Conclusion structure.
+Each main heading must represent a major analytical component required to answer the assignment.
+Under each main heading, generate 2-3 relevant analytical subheadings with allocated word counts.
+The sum of all subheading targetWordCounts MUST equal approximately ${targetWordCount}.
 
 Question: "${question}"
-Assignment Type: ${assignmentType} (Do NOT force a generic IMRaD format on essays, reflections, or case studies!)
+Assignment Type: ${assignmentType}
 Level: ${academicLevel}
 Target Word Count: ${targetWordCount} words
 Central Thesis: "${thesis}"
@@ -1148,21 +1154,51 @@ ${customAllocationPrompt}
 
 Return ONLY valid JSON matching:
 {
+  "structure": {
+    "version": 1,
+    "isConfirmed": false,
+    "targetWordCount": ${targetWordCount},
+    "totalAllocated": ${targetWordCount},
+    "rationale": "Why this structure addresses the question",
+    "headings": [
+      {
+        "id": "heading-1",
+        "number": 1,
+        "title": "Conceptual and Theoretical Framework",
+        "notes": "",
+        "targetWordCount": 700,
+        "subheadings": [
+          {
+            "id": "sub-1-1",
+            "headingId": "heading-1",
+            "numberStr": "1.1",
+            "title": "Definition and Analytical Scope",
+            "targetWordCount": 300,
+            "currentWordCount": 0,
+            "notes": "",
+            "guidance": "Detailed analytical guidance",
+            "keyPoints": ["Key point 1", "Key point 2"],
+            "researchStatus": "not_researched"
+          }
+        ]
+      }
+    ]
+  },
   "outline": [
     {
-      "id": "sec-1",
-      "title": "Introduction & Thesis Statement",
-      "targetWordCount": 200,
+      "id": "sub-1-1",
+      "title": "1.1 Definition and Analytical Scope",
+      "targetWordCount": 300,
       "currentWordCount": 0,
-      "guidance": "Hook the reader, contextualize the question, state thesis, and outline structure.",
-      "keyPoints": ["Background context", "Core thesis", "Scope of paper"],
+      "guidance": "Detailed analytical guidance",
+      "keyPoints": ["Key point 1"],
       "linkedEvidenceIds": [],
       "status": "not_started"
     }
   ]
 }`;
 
-    const data = await callOpenRouterJSON(
+    const data: any = await callOpenRouterJSON(
       req,
       res,
       "You are the Scholar Core Outline & Word Count Planning Agent.",
@@ -1171,12 +1207,61 @@ Return ONLY valid JSON matching:
       "planning"
     );
     if (!data) return;
-    res.json(data);
+
+    if (data.structure && data.outline) {
+      return res.json(data);
+    }
+
+    if (data.structure && !data.outline) {
+      data.outline = structureToInternalSections(data.structure);
+      return res.json(data);
+    }
+
+    if (data.outline && !data.structure) {
+      const fallbackStructure = generateDynamicAssignmentStructure({
+        question,
+        assignmentType,
+        academicLevel,
+        targetWordCount: Number(targetWordCount) || 2000,
+      });
+      return res.json({ structure: fallbackStructure, outline: data.outline });
+    }
+
+    const fallbackStructure = generateDynamicAssignmentStructure({
+      question,
+      assignmentType,
+      academicLevel,
+      targetWordCount: Number(targetWordCount) || 2000,
+    });
+    return res.json({
+      structure: fallbackStructure,
+      outline: structureToInternalSections(fallbackStructure),
+    });
   } catch (err: any) {
-    if (err?.message === "RequireFrontendLLMException") return;
+    if (err?.message === "RequireFrontendLLMException") {
+      const fallbackStructure = generateDynamicAssignmentStructure({
+        question,
+        assignmentType,
+        academicLevel,
+        targetWordCount: Number(targetWordCount) || 2000,
+      });
+      return res.json({
+        structure: fallbackStructure,
+        outline: structureToInternalSections(fallbackStructure),
+      });
+    }
     console.error("Structure generation error:", err);
     if (!res.headersSent) {
-      res.status(500).json({ error: err.message || "Failed to generate outline structure" });
+      const fallbackStructure = generateDynamicAssignmentStructure({
+        question,
+        assignmentType,
+        academicLevel,
+        targetWordCount: Number(targetWordCount) || 2000,
+      });
+      res.json({
+        structure: fallbackStructure,
+        outline: structureToInternalSections(fallbackStructure),
+      });
     }
   }
 });

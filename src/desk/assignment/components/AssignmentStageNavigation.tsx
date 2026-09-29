@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   FileText,
   Library,
@@ -29,12 +29,30 @@ export default function AssignmentStageNavigation({
     currentWordCount,
     targetWordCount,
     wordCountPercentage,
+    structure,
+    question,
+    approvedSourceIds = [],
+    submissionReport,
   } = useAssignmentWorkspace();
 
   const isOverLimit = currentWordCount > targetWordCount * 1.1;
   const isOptimal =
     currentWordCount >= targetWordCount * 0.9 &&
     currentWordCount <= targetWordCount * 1.1;
+
+  // Global Progress Percentages for each phase
+  const phasePercentages = useMemo(() => {
+    const p1 = structure?.isConfirmed ? 100 : question && question.trim().length > 10 ? 60 : 25;
+    const p2 = Math.min(100, Math.round((approvedSourceIds.length / 4) * 100));
+    const p3 = Math.min(100, wordCountPercentage || 0);
+    const p4 = submissionReport ? 100 : 0;
+    return {
+      understand: p1,
+      sources: p2,
+      drafting: p3,
+      submission: p4,
+    };
+  }, [structure, question, approvedSourceIds.length, wordCountPercentage, submissionReport]);
 
   const renderIcon = (iconKey: string, isActive: boolean) => {
     const iconProps = { className: "w-3.5 h-3.5 shrink-0" };
@@ -62,8 +80,9 @@ export default function AssignmentStageNavigation({
         {ASSIGNMENT_PHASES.map((phase, idx) => {
           const isActive = currentPhase === phase.id;
           const status = phaseStatuses?.[phase.id] || (isActive ? "active" : "upcoming");
-          const isCompleted = status === "completed";
+          const isCompleted = status === "completed" || phasePercentages[phase.id] === 100;
           const formattedNumber = `0${phase.number}`;
+          const progressPct = phasePercentages[phase.id];
 
           return (
             <React.Fragment key={phase.id}>
@@ -115,10 +134,15 @@ export default function AssignmentStageNavigation({
                   {renderIcon(phase.iconKey, isActive)}
                 </span>
 
-                {/* Title */}
-                <span className="truncate max-w-[120px] sm:max-w-none">
-                  {phase.shortLabel}
-                </span>
+                {/* Title & Percentage */}
+                <div className="flex items-center gap-1.5 truncate max-w-[130px] sm:max-w-none">
+                  <span className="truncate">{phase.shortLabel}</span>
+                  <span className={`text-[10px] font-mono tabular-nums ${
+                    isActive ? "opacity-90" : "opacity-60"
+                  }`}>
+                    {progressPct}%
+                  </span>
+                </div>
 
                 {/* Active Pulse Dot */}
                 {isActive && (

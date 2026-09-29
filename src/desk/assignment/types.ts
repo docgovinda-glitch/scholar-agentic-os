@@ -337,6 +337,12 @@ export interface DiscoveredSource {
     supportsPart?: string;
     evidenceType?: string;
   };
+
+  // Subheading Mapping, Explanation, Origin & Research Notes
+  mappedSubheadingIds?: string[];
+  whyThisSource?: string;
+  sourceOrigin?: "system_found" | "user_uploaded" | "user_added" | "web_source" | "academic" | "primary" | "secondary" | string;
+  userNotes?: string;
 }
 
 export interface EvidenceItem {
@@ -620,6 +626,8 @@ export interface AssignmentProjectAnswers {
   assignment_analysis?: AssignmentAnalysis;
   brief_ledger?: DocumentRequirement[];
   assignment_plan?: ResearchPlan;
+  structure?: AssignmentStructure;
+  assignment_structure?: AssignmentStructure;
   // Legacy / interoperability aliases
   assignment_question?: string;
   assignment_brief_text?: string;
@@ -716,9 +724,7 @@ export interface SectionBudgetItem {
   title: string;
   targetWordCount: number;
   isCustom?: boolean;
-}
-
-export type WritingStylePreset =
+}export type WritingStylePreset =
   | "analytical"
   | "argumentative"
   | "critical"
@@ -731,6 +737,124 @@ export interface WritingStyleConfig {
   customSampleText?: string;
   customFileName?: string;
   description?: string;
+}
+
+export type SubheadingResearchStatus =
+  | "not_researched"
+  | "researching"
+  | "limited"
+  | "sufficient"
+  | "gap";
+
+export interface AssignmentSubheading {
+  id: string;
+  headingId: string;
+  numberStr: string; // e.g. "1.1", "1.2", "2.1"
+  title: string;
+  targetWordCount: number;
+  currentWordCount?: number;
+  notes?: string; // User instructions or notes for this specific subsection
+  guidance?: string; // AI guidance on what this subsection should analyze
+  keyPoints?: string[];
+  researchStatus?: SubheadingResearchStatus;
+  evidenceGapDescription?: string;
+  sourcesCount?: number;
+  boundSourceIds?: string[];
+  draftContent?: string;
+  draftStatus?: "not_started" | "drafting" | "reviewed" | "completed";
+}
+
+export interface AssignmentMainHeading {
+  id: string;
+  number: number; // 1, 2, 3...
+  title: string;
+  notes?: string;
+  targetWordCount: number; // Sum of subheadings
+  subheadings: AssignmentSubheading[];
+}
+
+export interface AssignmentStructure {
+  version: number;
+  isConfirmed: boolean;
+  confirmedAt?: string;
+  targetWordCount: number;
+  totalAllocated: number;
+  headings: AssignmentMainHeading[];
+  rationale?: string;
+}
+
+export function flattenStructureSubheadings(structure?: AssignmentStructure | null): AssignmentSubheading[] {
+  if (!structure?.headings) return [];
+  return structure.headings.flatMap((h) => h.subheadings || []);
+}
+
+export function calculateStructureAllocatedWords(structure?: AssignmentStructure | null): number {
+  if (!structure?.headings) return 0;
+  return structure.headings.reduce(
+    (sum, h) =>
+      sum +
+      (h.subheadings && h.subheadings.length > 0
+        ? h.subheadings.reduce((subSum, s) => subSum + (Number(s.targetWordCount) || 0), 0)
+        : Number(h.targetWordCount) || 0),
+    0
+  );
+}
+
+export function structureToSectionBudgets(structure?: AssignmentStructure | null): SectionBudgetItem[] {
+  if (!structure?.headings || structure.headings.length === 0) return [];
+  const subs = flattenStructureSubheadings(structure);
+  if (subs.length > 0) {
+    return subs.map((s) => ({
+      id: s.id,
+      title: `${s.numberStr} ${s.title}`,
+      targetWordCount: s.targetWordCount,
+      isCustom: true,
+    }));
+  }
+  return structure.headings.map((h) => ({
+    id: h.id,
+    title: `${h.number}.0 ${h.title}`,
+    targetWordCount: h.targetWordCount,
+    isCustom: true,
+  }));
+}
+
+export function structureToInternalSections(structure?: AssignmentStructure | null): AssignmentDraftingSection[] {
+  if (!structure?.headings || structure.headings.length === 0) return [];
+  const sections: AssignmentDraftingSection[] = [];
+  structure.headings.forEach((h, hIdx) => {
+    if (h.subheadings && h.subheadings.length > 0) {
+      h.subheadings.forEach((s) => {
+        sections.push({
+          id: s.id,
+          title: `${s.numberStr} ${s.title}`,
+          targetWordCount: s.targetWordCount,
+          currentWordCount: s.currentWordCount || 0,
+          guidance: s.guidance || `Analytical depth for ${s.title}. Notes: ${s.notes || ""}`,
+          draftContent: s.draftContent || "",
+          status: s.draftStatus || (s.draftContent && s.draftContent.trim().length > 0 ? "completed" : "not_started"),
+          keyPoints: s.keyPoints || [],
+          linkedEvidenceIds: [],
+          boundSourceIds: s.boundSourceIds || [],
+          academicFunction: h.title,
+        });
+      });
+    } else {
+      sections.push({
+        id: h.id,
+        title: `${h.number}.0 ${h.title}`,
+        targetWordCount: h.targetWordCount,
+        currentWordCount: 0,
+        guidance: h.notes || `Analysis for ${h.title}`,
+        draftContent: "",
+        status: "not_started",
+        keyPoints: [],
+        linkedEvidenceIds: [],
+        academicFunction: h.title,
+      });
+    }
+  });
+  return sections;
 }
 
 export type WritingTonePreset =
@@ -762,6 +886,7 @@ export interface AssignmentBriefState {
   wordBudget?: AssignmentWordBudget;
   sectionBudgets?: SectionBudgetItem[];
   writingStyle?: WritingStyleConfig;
+  structure?: AssignmentStructure;
   writingTone?: WritingToneConfig;
   minWordCount?: number;
   maxWordCount?: number;

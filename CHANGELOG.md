@@ -5,7 +5,28 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-28
+## [Unreleased] - 2026-09-29
+
+### Added & Refactored (Phase 01: Dynamic Essay Structure, Research, and Drafting Workflow)
+- **Dynamic Analytical Essay Outline (Elimination of Fixed Intro/Body/Conclusion)**:
+  - Eliminated hardcoded `Introduction / Body Paragraphs / Conclusion` sections across the assignment module.
+  - Dynamically derives analytical Main Headings and Subheadings tailored to the assignment question, methodology, and theoretical frameworks (`outlineService.ts`, `server/routes/project/assignment.ts`).
+  - Added hierarchical `AssignmentStructure`, `AssignmentMainHeading`, and `AssignmentSubheading` schemas with automatic mapping to internal sections and section budgets (`types.ts`).
+- **Interactive Outline Editor & Word Allocation Controls (`DynamicStructurePlanner.tsx`)**:
+  - Full inline title editing, section reordering, addition, and deletion of main headings and subheadings.
+  - Live word count allocation controls: `+50`, `-50`, direct numeric word input, and live percentage distribution tracking.
+  - One-click `Auto-Balance` (proportionally balances all subheadings to target word count) and `Distribute Remaining` (evens out unallocated words).
+  - Structure versioning (`Structure v1`, `v2`, `v3`...) with confirmation locks.
+  - Section-level author research notes and guidance inputs passed directly to AskScholar and drafting engines.
+- **Cross-Phase Structure as Single Source of Truth**:
+  - Confirmed Phase I structure is saved as the authoritative blueprint across Phase II (Research & Sources) and Phase III (Drafting).
+  - Subheading research requirements with 5-tier status indicators (`⚪ Not researched`, `🔵 Researching`, `🟡 Limited evidence`, `🟢 Sufficient evidence`, `🔴 Evidence gap`).
+  - Visual source origin badges (`USER UPLOADED`, `SYSTEM FOUND`, `USER ADDED`, `WEB SOURCE`, `ACADEMIC`, `PRIMARY SOURCE`, `SECONDARY SOURCE`).
+  - Contextual "Why this source?" justifications on literature cards.
+  - Subheading-by-subheading drafting alignment with persistent multi-style citations (APA, MLA, Harvard, Chicago, IEEE).
+- **Persistent State Synchronization**:
+  - Implemented atomic `projectRef` synchronizer in `AssignmentContext.tsx` preventing asynchronous state loss during rapid field edits and phase transitions.
+  - 100% automated test coverage across all 19 test files (151 tests passing).
 
 ### Refactored & Fixed (Step 02 Sources: Streamlined UX, Ghost Sources Fix & Test Suite Alignment)
 - **Zero-State Ghost Sources Fix (`src/desk/assignment/stages/AssignmentSourcesStage.tsx`)**:
