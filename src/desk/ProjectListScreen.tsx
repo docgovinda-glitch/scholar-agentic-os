@@ -1380,6 +1380,8 @@ export default function ProjectListScreen({
   });
   const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([]);
   const [isGuideThinking, setIsGuideThinking] = useState(false);
+  const isLandingPage = activeView === "projects" && !choosing;
+  const hasStartedChatting = guideMessages.some((m) => m.sender === "user") || isGuideThinking;
   const [expandedPlanIds, setExpandedPlanIds] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const guideInputRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
@@ -2335,7 +2337,11 @@ export default function ProjectListScreen({
       </aside>
 
       {/* Main Content Area (Center Pane) */}
-      <main className="flex-1 flex flex-col h-screen w-full bg-[#F8F9FA] dark:bg-[#171717] overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out">
+      <main className={`${
+        isLandingPage && isAiSidebarOpen
+          ? "hidden"
+          : "flex-1 flex flex-col h-screen w-full bg-[#F8F9FA] dark:bg-[#171717] overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out"
+      }`}>
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
         <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-[#F8F9FA]/85 dark:bg-[#171717]/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
           <div className="flex items-center gap-3">
@@ -2492,83 +2498,110 @@ export default function ProjectListScreen({
                   </div>
                 )}
 
-                {/* Subtle Welcome / Workspace Heading */}
-                <div className="text-center mb-2">
-                  <h1 className="text-2xl font-semibold text-neutral-900 dark:text-white tracking-tight">
-                    Where will your research begin?
-                  </h1>
-                  <p className="text-[13px] text-neutral-500 mt-1">
-                    Select an academic deliverable or paste your assignment guidelines below.
-                  </p>
-                </div>
+                {/* Subtle Welcome / Workspace Heading & 4-Card Template Grid (completely hidden once chatting begins) */}
+                {!isAiSidebarOpen && !hasStartedChatting ? (
+                  <>
+                    <div className="text-center mb-2">
+                      <h1 className="text-2xl font-semibold text-neutral-900 dark:text-white tracking-tight">
+                        Where will your research begin?
+                      </h1>
+                      <p className="text-[13px] text-neutral-500 mt-1">
+                        Select an academic deliverable or paste your assignment guidelines below.
+                      </p>
+                    </div>
 
-                {/* 4-Card Template Grid (Resting gracefully above the bottom input) */}
-                <div className="w-full">
-                  <div className={`grid w-full gap-4 transition-all duration-300 ${
-                    isAiSidebarOpen
-                      ? "grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4"
-                      : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
-                  }`}>
-                    {FORMAT_TILES.map((tile) => {
-                      const isBootingThis = creatingFormatId === tile.id;
-                      const isOtherBooting = creating && !isBootingThis;
-                      const tileTheme = getFormatTileTheme(tile.id);
-                      return (
-                        <button
-                          key={tile.id}
-                          type="button"
-                          onClick={() => {
-                            if (creating) return;
-                            if (!userEmail) {
-                              openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
-                              return;
-                            }
-                            handleCreate(tile.id);
-                          }}
-                          disabled={isOtherBooting}
-                          className={`group bg-white dark:bg-[#1C1C1E] border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
-                            isOtherBooting
-                              ? "opacity-50 cursor-not-allowed"
-                              : isBootingThis
-                              ? "ring-2 ring-neutral-400 dark:ring-white/20 cursor-wait"
-                              : ""
-                          }`}
-                        >
-                          {/* Top Row: Clean Category Icon Container */}
-                          <div className="flex items-center justify-between w-full">
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
-                              {isBootingThis ? (
-                                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <FormatIcon id={tile.id} className="w-4 h-4" />
-                              )}
-                            </div>
-                          </div>
+                    <div className="w-full">
+                      <div className="grid w-full gap-4 transition-all duration-300 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                        {FORMAT_TILES.map((tile) => {
+                          const isBootingThis = creatingFormatId === tile.id;
+                          const isOtherBooting = creating && !isBootingThis;
+                          const tileTheme = getFormatTileTheme(tile.id);
+                          return (
+                            <button
+                              key={tile.id}
+                              type="button"
+                              onClick={() => {
+                                if (creating) return;
+                                if (!userEmail) {
+                                  openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
+                                  return;
+                                }
+                                handleCreate(tile.id);
+                              }}
+                              disabled={isOtherBooting}
+                              className={`group bg-white dark:bg-[#1C1C1E] border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
+                                isOtherBooting
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : isBootingThis
+                                  ? "ring-2 ring-neutral-400 dark:ring-white/20 cursor-wait"
+                                  : ""
+                              }`}
+                            >
+                              {/* Top Row: Clean Category Icon Container */}
+                              <div className="flex items-center justify-between w-full">
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
+                                  {isBootingThis ? (
+                                    <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <FormatIcon id={tile.id} className="w-4 h-4" />
+                                  )}
+                                </div>
+                              </div>
 
-                          {/* Middle Content: Title & Actionable Workflow Guidance */}
-                          <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-start">
-                            <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-white group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
-                              {tile.label}
-                            </h3>
-                            <p className="text-[12px] leading-relaxed font-normal text-neutral-600 dark:text-neutral-400 mt-2 line-clamp-3">
-                              {tile.guidance}
-                            </p>
-                          </div>
+                              {/* Middle Content: Title & Actionable Workflow Guidance */}
+                              <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-start">
+                                <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-white group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
+                                  {tile.label}
+                                </h3>
+                                <p className="text-[12px] leading-relaxed font-normal text-neutral-600 dark:text-neutral-400 mt-2 line-clamp-3">
+                                  {tile.guidance}
+                                </p>
+                              </div>
 
-                          {/* Bottom Row: Divider & Actionable Deliverables Spec */}
-                          <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-500 font-sans leading-tight">
-                            {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
-                              <React.Fragment key={idx}>
-                                {idx > 0 && <span className="text-neutral-400 dark:text-neutral-500 opacity-60 font-bold">·</span>}
-                                <span className="font-medium whitespace-nowrap">{part}</span>
-                              </React.Fragment>
-                            ))}
-                          </div>
-                        </button>
-                      );
-                    })}
+                              {/* Bottom Row: Divider & Actionable Deliverables Spec */}
+                              <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-500 font-sans leading-tight">
+                                {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
+                                  <React.Fragment key={idx}>
+                                    {idx > 0 && <span className="text-neutral-400 dark:text-neutral-500 opacity-60 font-bold">·</span>}
+                                    <span className="font-medium whitespace-nowrap">{part}</span>
+                                  </React.Fragment>
+                                ))}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8 flex flex-col items-center gap-3 animate-in fade-in duration-200">
+                    <div className="w-10 h-10 rounded-2xl bg-sky-500/10 text-sky-500 flex items-center justify-center">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-semibold text-neutral-900 dark:text-white">Ask Scholar Copilot Active</h2>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                        Your research inquiry is active in full screen.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsAiSidebarOpen(true)}
+                        className="px-3.5 py-1.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-medium hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors shadow-xs cursor-pointer"
+                      >
+                        Open Full-Screen Chat
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGuideMessages([])}
+                        className="px-3.5 py-1.5 rounded-xl bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 text-xs font-medium hover:bg-neutral-200 dark:hover:bg-white/15 transition-colors cursor-pointer"
+                      >
+                        Show Deliverables
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -2733,30 +2766,36 @@ export default function ProjectListScreen({
         )}
       </main>
 
-      {/* Secondary View (Right Panel): Module 3.2 AI Assistant Sidebar (Elevated UI/UX & Resizable Split-Pane) */}
+      {/* Secondary View (Right Panel / Full-Screen Landing Chat): Module 3.2 AI Assistant */}
       <aside
         style={
-          isAiSidebarOpen
+          isAiSidebarOpen && !isLandingPage
             ? { width: `min(${aiSidebarWidth}px, 100vw)` }
             : undefined
         }
-        className={`h-full bg-white dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 flex flex-col shrink-0 z-30 relative ${
-          isResizingAiSidebar ? "transition-none select-none" : "transition-all duration-300 ease-in-out"
+        className={`h-full bg-white dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 flex flex-col relative transition-all duration-300 ease-in-out ${
+          isLandingPage
+            ? "flex-1 w-full min-w-0 border-none shadow-none z-20"
+            : "shrink-0 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 z-30"
+        } ${
+          isResizingAiSidebar ? "transition-none select-none" : ""
         } ${
           isAiSidebarOpen
-            ? "w-full max-w-[calc(100vw-1rem)] translate-x-0"
-            : "w-0 translate-x-full overflow-hidden border-none"
+            ? isLandingPage
+              ? "w-full translate-x-0"
+              : "w-full max-w-[calc(100vw-1rem)] translate-x-0"
+            : "w-0 translate-x-full overflow-hidden border-none pointer-events-none"
         }`}
         aria-hidden={!isAiSidebarOpen}
       >
-        {/* Resizable Split-Pane Drag Divider on Left Edge */}
+        {/* Resizable Split-Pane Drag Divider on Left Edge (hidden on full-screen landing page) */}
         {isAiSidebarOpen && (
           <div
             onMouseDown={(e) => {
               e.preventDefault();
               setIsResizingAiSidebar(true);
             }}
-            className="hidden sm:flex absolute left-0 top-0 bottom-0 w-2.5 -ml-1 cursor-col-resize hover:bg-sky-500/30 active:bg-sky-500/50 transition-colors z-40 items-center justify-center select-none group"
+            className={`${isLandingPage ? "hidden" : "hidden sm:flex"} absolute left-0 top-0 bottom-0 w-2.5 -ml-1 cursor-col-resize hover:bg-sky-500/30 active:bg-sky-500/50 transition-colors z-40 items-center justify-center select-none group`}
             title="Drag to resize panel (360px - 750px)"
           >
             <div className="w-0.5 h-8 bg-neutral-300 dark:bg-white/20 rounded-full group-hover:bg-sky-500 transition-colors" />
@@ -2768,6 +2807,36 @@ export default function ProjectListScreen({
             {/* Sidebar Header with glassmorphism & elevated badge */}
             <header className="px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/95 dark:bg-[#18181B]/95 backdrop-blur-md sticky top-0 z-20">
               <div className="flex items-center gap-3">
+                {isLandingPage && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setMobileMenuOpen(true)}
+                      className="md:hidden p-1.5 rounded-lg border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer"
+                      aria-label="Open navigation"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                      </svg>
+                    </button>
+                    {!isSidebarOpen && (
+                      <button
+                        type="button"
+                        onClick={() => setIsSidebarOpen(true)}
+                        className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-lg border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 text-xs font-medium cursor-pointer transition-all"
+                        title="Expand sidebar"
+                        aria-label="Expand sidebar"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                          <rect x="3" y="3" width="18" height="18" rx="2" strokeWidth="1.5" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v18" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 15l3-3-3-3" />
+                        </svg>
+                        <span>Open Sidebar</span>
+                      </button>
+                    )}
+                  </>
+                )}
                 <div className="relative flex items-center justify-center">
                   <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500/10 via-indigo-500/10 to-purple-500/10 dark:from-sky-500/20 dark:via-indigo-500/20 dark:to-purple-500/20 border border-sky-500/20 dark:border-white/10 flex items-center justify-center shadow-2xs">
                     <ScholarCoreLogo size="sm" withText={false} className="scale-85" />
@@ -2790,6 +2859,21 @@ export default function ProjectListScreen({
               </div>
 
               <div className="flex items-center gap-2">
+                {hasStartedChatting && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGuideMessages([]);
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/[0.06] hover:bg-neutral-200 dark:hover:bg-white/10 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer"
+                    title="Start a new chat and show deliverable workspaces"
+                    aria-label="New Chat"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">New Chat</span>
+                  </button>
+                )}
+
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/10 text-xs">
                   <BookOpen className="w-3.5 h-3.5 text-sky-500 shrink-0" />
                   <label htmlFor="ask-scholar-header-citation-style" className="sr-only">
@@ -2833,7 +2917,7 @@ export default function ProjectListScreen({
 
             {/* Horizontally Scrolling Suggested Questions (Module 3.3) */}
             <div className="relative border-b border-neutral-200/80 dark:border-white/10 shrink-0 bg-neutral-50/70 dark:bg-[#151518]/70">
-              <div className="overflow-x-auto scrollbar-hide flex items-center gap-2 px-4 py-2.5">
+              <div className={`overflow-x-auto scrollbar-hide flex items-center gap-2 px-4 py-2.5 ${isLandingPage ? "max-w-4xl mx-auto" : ""}`}>
                 {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
                   <button
                     key={idx}
@@ -2850,7 +2934,106 @@ export default function ProjectListScreen({
 
             {/* Chat Canvas (flex-1 overflow-y-auto) */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm scholar-scrollbar">
-              {guideMessages.map((msg) => (
+              {/* On Landing page before chatting begins: render the 4 deliverable cards in full glory */}
+              {isLandingPage && !hasStartedChatting && (
+                <div className="w-full max-w-5xl mx-auto my-auto py-6 flex flex-col items-center justify-center animate-in fade-in duration-200">
+                  {/* Any assistant greeting messages (e.g. from Reset Chat) */}
+                  {guideMessages.map((msg) => (
+                    <div key={msg.id} className="w-full max-w-2xl mx-auto mb-6">
+                      <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-neutral-500">
+                        <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
+                          <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
+                        </div>
+                        <span className="font-semibold text-neutral-700 dark:text-neutral-300">Scholar Core</span>
+                        <span>•</span>
+                        <span>{msg.timestamp}</span>
+                      </div>
+                      <div className="rounded-2xl px-4 py-3 bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 rounded-tl-xs shadow-2xs text-[13px] leading-relaxed">
+                        {renderFormattedGuideText(msg.text, msg.citations, askCitationStyle)}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Heading */}
+                  <div className="text-center mb-6">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-white tracking-tight">
+                      Where will your research begin?
+                    </h1>
+                    <p className="text-[13px] sm:text-sm text-neutral-500 dark:text-neutral-400 mt-2 max-w-lg mx-auto leading-relaxed">
+                      Select an academic deliverable or paste your assignment guidelines below.
+                    </p>
+                  </div>
+
+                  {/* 4 Cards Grid - Responsive full 4-column layout */}
+                  <div className="w-full">
+                    <div className="grid w-full gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                      {FORMAT_TILES.map((tile) => {
+                        const isBootingThis = creatingFormatId === tile.id;
+                        const isOtherBooting = creating && !isBootingThis;
+                        const tileTheme = getFormatTileTheme(tile.id);
+                        return (
+                          <button
+                            key={tile.id}
+                            type="button"
+                            onClick={() => {
+                              if (creating) return;
+                              if (!userEmail) {
+                                openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
+                                return;
+                              }
+                              handleCreate(tile.id);
+                            }}
+                            disabled={isOtherBooting}
+                            className={`group bg-white dark:bg-[#1C1C1E] border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
+                              isOtherBooting
+                                ? "opacity-50 cursor-not-allowed"
+                                : isBootingThis
+                                ? "ring-2 ring-neutral-400 dark:ring-white/20 cursor-wait"
+                                : ""
+                            }`}
+                          >
+                            {/* Top Row: Clean Category Icon Container */}
+                            <div className="flex items-center justify-between w-full">
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
+                                {isBootingThis ? (
+                                  <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <FormatIcon id={tile.id} className="w-4 h-4" />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Middle Content: Title & Actionable Workflow Guidance */}
+                            <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-start">
+                              <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-white group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
+                                {tile.label}
+                              </h3>
+                              <p className="text-[12px] leading-relaxed font-normal text-neutral-600 dark:text-neutral-400 mt-2 line-clamp-3">
+                                {tile.guidance}
+                              </p>
+                            </div>
+
+                            {/* Bottom Row: Divider & Actionable Deliverables Spec */}
+                            <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-500 font-sans leading-tight">
+                              {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
+                                <React.Fragment key={idx}>
+                                  {idx > 0 && <span className="text-neutral-400 dark:text-neutral-500 opacity-60 font-bold">·</span>}
+                                  <span className="font-medium whitespace-nowrap">{part}</span>
+                                </React.Fragment>
+                              ))}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Chat Canvas (when hasStartedChatting or in non-landing view): 4 cards are COMPLETELY HIDDEN! */}
+              {(!isLandingPage || hasStartedChatting) && (
+                <div className={isLandingPage ? "w-full max-w-4xl mx-auto space-y-4 py-2" : "space-y-4"}>
+                  {guideMessages.map((msg) => (
                 <div
                   key={msg.id}
                   className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
@@ -3284,10 +3467,14 @@ export default function ProjectListScreen({
                   </div>
                 </div>
               )}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
             </div>
 
             {/* Pinned Floating Input Component (Module 3.4) */}
             <div className="p-3.5 bg-white/95 dark:bg-[#18181B]/95 backdrop-blur-md border-t border-neutral-200/80 dark:border-white/10 shrink-0">
+              <div className={isLandingPage ? "w-full max-w-4xl mx-auto" : "w-full"}>
               {/* Status & Reset Bar */}
               <div className="flex items-center justify-between px-1 mb-2">
                 <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
@@ -3473,6 +3660,7 @@ export default function ProjectListScreen({
                   </div>
                 </div>
               </form>
+              </div>
             </div>
           </div>
         )}

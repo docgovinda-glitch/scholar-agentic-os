@@ -172,4 +172,47 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
       expect(onOpen).toHaveBeenCalledWith("proj-booted-404");
     });
   });
+
+  it("renders Ask Scholar as full-screen chat box on landing page and completely hides the four cards once user starts chatting", async () => {
+    executeAgenticLLM.mockResolvedValueOnce(
+      "Comprehensive research synthesis on molecular dynamics."
+    );
+
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    // 1. Open Ask Scholar from navigation
+    const askScholarBtn = screen.getByRole("button", { name: /^Ask Scholar$/i });
+    fireEvent.click(askScholarBtn);
+    await screen.findByRole("heading", { name: "Ask Scholar" });
+
+    // 2. Before user starts chatting: the 4 deliverable cards and heading are visible
+    expect(screen.getByText("Where will your research begin?")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Coursework & Essays" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Slides & Keynotes" })).toBeInTheDocument();
+
+    // 3. User starts chatting by sending a research question
+    const input = screen.getByPlaceholderText("Ask anything, search projects, or type a command...");
+    fireEvent.change(input, { target: { value: "Perform molecular dynamics synthesis" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send question" }));
+
+    // 4. Once chatting starts, the four cards and heading are COMPLETELY HIDDEN
+    expect(screen.queryByText("Where will your research begin?")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Coursework & Essays" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Journal Article" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Research Proposal" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Slides & Keynotes" })).not.toBeInTheDocument();
+
+    // Verify chat response renders in full screen
+    expect(await screen.findByText(/Comprehensive research synthesis on molecular dynamics/i)).toBeInTheDocument();
+
+    // 5. Clicking 'New Chat' clears the conversation and restores the four cards
+    const newChatBtn = screen.getByRole("button", { name: "New Chat" });
+    fireEvent.click(newChatBtn);
+
+    expect(await screen.findByText("Where will your research begin?")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Coursework & Essays" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
+  });
 });
