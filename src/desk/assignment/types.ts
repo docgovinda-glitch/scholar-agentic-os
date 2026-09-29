@@ -154,13 +154,14 @@ export type AssignmentStage =
   | AssignmentPhaseId
   | LegacyAssignmentStage;
 
-export type AcademicLevel = "undergraduate" | "postgraduate";
+export type AcademicLevel = "high_school" | "undergraduate" | "postgraduate" | "doctoral";
 
 export type AssignmentType =
   | "essay"
   | "analytical_essay"
   | "critical_essay"
   | "argumentative_essay"
+  | "research_paper"
   | "report"
   | "case_study"
   | "literature_review"
@@ -540,6 +541,7 @@ export const ASSIGNMENT_TYPE_LABELS: Record<AssignmentType, string> = {
   report: "Formal Academic / Technical Report",
   case_study: "Case Study Analysis",
   literature_review: "Literature Review / Synthesis",
+  research_paper: "Academic Research Paper",
   annotated_bibliography: "Annotated Bibliography",
   reflection: "Critical Reflection / Reflective Essay",
   article_critique: "Article Critique / Evaluation",
@@ -725,9 +727,13 @@ export interface SectionBudgetItem {
   targetWordCount: number;
   isCustom?: boolean;
 }export type WritingStylePreset =
+  | "formal_academic"
   | "analytical"
-  | "argumentative"
+  | "persuasive"
+  | "objective"
   | "critical"
+  | "conversational_academic"
+  | "argumentative"
   | "expository"
   | "natural"
   | "custom";
@@ -780,6 +786,8 @@ export interface AssignmentStructure {
   targetWordCount: number;
   totalAllocated: number;
   headings: AssignmentMainHeading[];
+  thesisStatement?: string;
+  writingTone?: string;
   rationale?: string;
 }
 

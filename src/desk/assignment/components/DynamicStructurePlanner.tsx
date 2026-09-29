@@ -14,6 +14,7 @@ import {
   ArrowDown,
   Layers,
   StickyNote,
+  X,
 } from "lucide-react";
 import type {
   AssignmentStructure,
@@ -34,6 +35,10 @@ import {
   updateMainHeadingTitle,
   updateSubheadingTitle,
   generateDynamicAssignmentStructure,
+  updateThesisStatement,
+  addKeyPoint,
+  removeKeyPoint,
+  updateKeyPoint,
 } from "../services/outlineService";
 
 export interface DynamicStructurePlannerProps {
@@ -42,10 +47,13 @@ export interface DynamicStructurePlannerProps {
   onStructureChange?: (structure: AssignmentStructure) => void;
   onChange?: (structure: AssignmentStructure) => void;
   onTargetWordCountChange?: (target: number) => void;
+  onRegenerateOutline?: () => void;
   question?: string;
   assignmentQuestion?: string;
   assignmentType?: string;
   academicLevel?: string;
+  writingTone?: string;
+  citationStyle?: string;
   isConfirmed?: boolean;
   onConfirmStructure?: () => void;
   className?: string;
@@ -57,10 +65,13 @@ export function DynamicStructurePlanner({
   onStructureChange,
   onChange,
   onTargetWordCountChange,
+  onRegenerateOutline,
   question = "",
   assignmentQuestion = "",
   assignmentType = "essay",
   academicLevel = "undergraduate",
+  writingTone,
+  citationStyle,
   isConfirmed = false,
   onConfirmStructure,
   className = "",
@@ -113,6 +124,8 @@ export function DynamicStructurePlanner({
       assignmentType: assignmentType as any,
       academicLevel: academicLevel as any,
       targetWordCount,
+      writingTone,
+      citationStyle,
       currentStructure: structure,
     });
     notifyChange(fresh);
@@ -255,6 +268,19 @@ export function DynamicStructurePlanner({
               <span>Distribute Remaining</span>
             </button>
 
+            {onRegenerateOutline && (
+              <button
+                type="button"
+                onClick={onRegenerateOutline}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-white dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 hover:border-neutral-300 transition-colors cursor-pointer shadow-2xs"
+                title="Regenerate outline from current brief"
+                aria-label="Regenerate Outline"
+              >
+                <RotateCcw className="w-3 h-3 text-purple-500" />
+                <span>Regenerate Outline</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleResetToAI}
@@ -266,6 +292,40 @@ export function DynamicStructurePlanner({
               <span>Reset AI Suggestions</span>
             </button>
           </div>
+        </div>
+
+        {/* Introduction & Core Working Thesis (tailored to writing tone) */}
+        <div className="p-3.5 sm:px-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E20] shadow-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-md bg-purple-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                T
+              </span>
+              <div>
+                <h4 className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+                  <span>Introduction &amp; Core Working Thesis</span>
+                  {writingTone && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 capitalize">
+                      {writingTone.replace(/_/g, " ")} tone
+                    </span>
+                  )}
+                </h4>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  Tone-calibrated problem statement and working thesis to anchor analysis and evidence synthesis.
+                </p>
+              </div>
+            </div>
+          </div>
+          <textarea
+            value={structure.thesisStatement || ""}
+            onChange={(e) => {
+              const updated = updateThesisStatement(structure, e.target.value);
+              notifyChange(updated);
+            }}
+            placeholder="Core thesis statement or problem formulation tailored to your selected tone..."
+            rows={2}
+            className="w-full text-xs p-2.5 rounded-lg bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/90 dark:border-white/10 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-purple-500 resize-y font-normal leading-relaxed"
+          />
         </div>
 
         {/* Dynamic Main Headings & Subheadings List */}
@@ -482,6 +542,66 @@ export function DynamicStructurePlanner({
                                 <Trash2 className="w-3 h-3" />
                               </button>
                             )}
+                          </div>
+                        </div>
+
+                        {/* H3 Arguments, Evidence & Focus Areas */}
+                        <div className="pt-2 border-t border-neutral-200/50 dark:border-white/5 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] uppercase font-semibold text-neutral-500 dark:text-neutral-400 tracking-wider flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                              <span>H3 Specific Arguments &amp; Evidence Points ({(sub.keyPoints || []).length})</span>
+                            </span>
+                          </div>
+
+                          {sub.keyPoints && sub.keyPoints.length > 0 && (
+                            <div className="space-y-1 pl-2 border-l-2 border-blue-500/20">
+                              {sub.keyPoints.map((point, pIdx) => (
+                                <div key={pIdx} className="flex items-center gap-2 group/h3">
+                                  <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono shrink-0">
+                                    {sub.numberStr}.{pIdx + 1}
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={point}
+                                    onChange={(e) => {
+                                      const updated = updateKeyPoint(structure, sub.id, pIdx, e.target.value);
+                                      notifyChange(updated);
+                                    }}
+                                    placeholder="H3 argument or focus point..."
+                                    className="flex-1 text-xs py-0.5 px-1.5 rounded bg-transparent border border-transparent hover:border-neutral-200 dark:hover:border-white/10 focus:border-neutral-400 dark:focus:border-white/20 focus:bg-white dark:focus:bg-[#2C2C2E] text-neutral-800 dark:text-neutral-200 transition-colors"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = removeKeyPoint(structure, sub.id, pIdx);
+                                      notifyChange(updated);
+                                    }}
+                                    className="opacity-0 group-hover/h3:opacity-100 p-0.5 text-neutral-400 hover:text-rose-500 transition-opacity cursor-pointer"
+                                    title="Remove H3 focus point"
+                                    aria-label={`Remove H3 focus point ${point}`}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Add H3 focus point input */}
+                          <div className="flex items-center gap-1.5 pl-2 pt-0.5">
+                            <input
+                              type="text"
+                              placeholder="+ Add H3 specific argument or evidence focus (Press Enter)..."
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && e.currentTarget.value.trim()) {
+                                  const updated = addKeyPoint(structure, sub.id, e.currentTarget.value.trim());
+                                  notifyChange(updated);
+                                  e.currentTarget.value = "";
+                                }
+                              }}
+                              className="text-[11px] py-1 px-2.5 rounded-md bg-white/70 dark:bg-white/5 border border-dashed border-neutral-300 dark:border-white/15 text-neutral-800 dark:text-neutral-200 placeholder-neutral-400 focus:outline-none focus:border-blue-500 w-full"
+                            />
                           </div>
                         </div>
 
