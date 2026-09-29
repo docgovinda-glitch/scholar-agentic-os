@@ -10,7 +10,7 @@ Rather than generic forms, each academic format in Scholar Core operates through
 
 1. **📝 Coursework & Essay Engine (`OT-01`)**:
    - **4-Phase Lifecycle**:
-     - **Phase 1 · Understand & Structure**: Unified assignment setup box (prompt input, academic level, assignment type, and citation style in a clean single-component workspace), question-specific analytical structure generator (`Generate Structure`) without generic templates, dynamic word count allocator & editor (`DynamicStructurePlanner.tsx`), and authentic academic voice selection (`WritingStyleSelector.tsx`) across 6 styles.
+     - **Phase 1 · Understand & Structure**: Unified assignment setup box (prompt input, academic level, assignment type, and citation style in a clean single-component workspace), question-specific analytical structure generator (`outlineService.ts`) decomposing prompts into relational entities without generic templates, calibrated thesis statement generation, dynamic word count allocator & editor (`DynamicStructurePlanner.tsx`), and authentic academic voice selection (`WritingStyleSelector.tsx`) across 6 styles.
      - **Phase 2 · Sources & Discovery**: Question-led literature discovery engine (`scholarlyDiscoveryService.ts`), connecting directly to Phase 1 subheadings with research status indicators, explicit assignment roles (*Empirical evidence*, *Theoretical framework*, *Core theory*), relevance categorization, contextual justifications, 2024-2026 recency prioritization with seminal core theory anchors, and a lecture/slide upload dropzone (`LectureUploadDropzone.tsx`).
      - **Phase 3 · Drafting**: Subheading-by-subheading drafting alignment matching the confirmed structure (`DraftingSectionIndex.tsx`), live target vs. actual word counters, TipTap WYSIWYG editor, and pre-formatted in-text citation insertion.
      - **Phase 4 · Submission**: 10-point rubric compliance evaluator, citation reconciliation auditor (100% in-text citations checked against the bibliography), and one-click `.docx` and PDF export with running headers and formatted references.
@@ -33,6 +33,10 @@ Rather than generic forms, each academic format in Scholar Core operates through
 
 5. **🎓 Thesis & Dissertation Workspace (`OT-09` / `OT-07`)**:
    - Multi-chapter milestone tracker, literature synthesis matrix, and 15-question Viva Voce oral defense simulator.
+
+6. **💬 Full-Screen Conversational Ask Scholar (`/projects`)**:
+   - Immersive dashboard research chat that collapses template starter cards upon interaction, creating an expansive full-screen canvas with citation grounding and direct project initiation.
+
 
 ---
 

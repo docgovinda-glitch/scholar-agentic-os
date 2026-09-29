@@ -83,6 +83,14 @@ The design system avoids arbitrary hex codes in component styles, relying instea
 - Inputs: Project Title, Target Word Count, Academic Level, Citation Style.
 - Primary Action: `Create Project` navigates immediately to `/projects/:projectId`.
 
+### 3.4 Conversational Ask Scholar & Dynamic Canvas Mode
+- **Zero-Friction Inquiry**: Prominently featured on the main dashboard with contextual suggested inquiry chips.
+- **Full-Screen Conversational Expansion**:
+  - In resting state, displays starter deliverable cards alongside the inquiry input.
+  - When the user sends their first message or begins active dialogue, starter cards smoothly collapse, transitioning Ask Scholar into an expansive, full-width/full-height conversational canvas.
+  - Features real-time streaming, bibliographic citations, and one-click "Create Project from Chat" workflow.
+  - Includes a clear `✕ Reset` button allowing instant return to template cards and resting state.
+
 ---
 
 ## 4. Coursework & Essay Workspace (`OT-01`)

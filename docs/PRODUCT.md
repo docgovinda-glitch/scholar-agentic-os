@@ -106,3 +106,8 @@ Scholar Core provides purpose-built workspaces tailored to specific deliverable 
 ### 4.4 Admin Infrastructure Panel (`/admin`)
 - **Purpose**: Operational dashboard for monitoring system AI infrastructure.
 - **Features**: Real-time provider connectivity tests, latency meters, error logs, and BYOK credential status checks.
+
+### 4.5 Conversational Ask Scholar & Dynamic Canvas (`/projects`)
+- **Purpose**: Rapid academic inquiry, source-grounded brainstorming, and natural language project initiation on the dashboard.
+- **Full-Screen Conversational Experience**: Interacting with Ask Scholar smoothly collapses deliverable starter cards, transitioning the dashboard into an expansive, full-screen academic dialogue canvas with streaming answers, citation grounding, and one-click project creation directly from chat context.
+

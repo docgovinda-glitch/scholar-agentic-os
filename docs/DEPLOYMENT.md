@@ -33,7 +33,7 @@ The application includes an optimized multi-stage `Dockerfile`:
 - **Stage 1: Build Stage (`node:20-alpine`)**:
   - Installs npm dependencies.
   - Compiles client application via `vite build`.
-  - Compiles server bundle via `esbuild server.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/server.cjs`.
+  - Compiles server bundle via `esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --define:import.meta.env=process.env --define:import.meta={} --outfile=dist/server.cjs`. Ensures `import.meta.env` mappings safely resolve to `process.env` in Node.js CJS runtime.
 - **Stage 2: Production Runner (`node:20-alpine`)**:
   - Sets `NODE_ENV=production`.
   - Copies minimal production `node_modules` and compiled `dist/` directory.
@@ -114,8 +114,8 @@ To apply all migrations to a remote Supabase project:
 # Link local CLI to remote Supabase project
 npx supabase link --project-ref <your-project-ref>
 
-# Apply all pending SQL migrations
-npx supabase db push
+# Apply all pending SQL migrations using personal access token
+SUPABASE_ACCESS_TOKEN=<your-supabase-access-token> npx supabase db push
 ```
 
 ### 5.2 Storage Bucket Configuration

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-29
 
+### Added & Fixed (Full-Screen Ask Scholar, Tailored Outline Generation, Server Bundle Fix & DB Sync)
+- **Full-Screen Conversational Ask Scholar (`src/desk/ProjectListScreen.tsx`)**:
+  - Transformed Ask Scholar on the landing page into an immersive full-screen chat experience.
+  - Automatically collapses and hides the 4 starter project template cards when active dialogue begins, maximizing vertical and horizontal space for research inquiry.
+  - Added clean `✕ Reset` button allowing instant return to template cards and resting state.
+- **Tailored Question-Deconstructing Academic Outline Engine (`src/desk/assignment/services/outlineService.ts`)**:
+  - Implemented semantic deconstruction of assignment prompts into relational entities, analytical H2 main headings, descriptive H3 subheadings, and 3 concrete empirical/theoretical argument focus points per subheading.
+  - Calibrated working thesis statement generation directly responding to the prompt's core question.
+  - Decoupled `outlineService.ts` from browser client APIs (`src/desk/api.ts`) to keep it a pure TypeScript utility.
+- **Production Server Startup Crash Fix (`dist/server.cjs`)**:
+  - Resolved `TypeError: Cannot read properties of undefined (reading 'VITE_SUPABASE_URL')` in Node.js CJS runtime.
+  - Configured esbuild in `package.json` with `--define:import.meta.env=process.env --define:import.meta={}` to safely map client environment variables in Node runtime.
+  - Added defensive environment fallbacks across `supabaseClient.ts`, `captchaService.ts`, `supabaseAuthService.ts`, and `GoogleIdentityButton.tsx`.
+- **Remote Supabase Database Synchronization**:
+  - Synchronized and verified all 27 database migrations to the remote Supabase PostgreSQL database using personal access token authentication.
+
 ### Added & Refactored (Phase 01: Dynamic Essay Structure, Research, and Drafting Workflow)
 - **Dynamic Analytical Essay Outline (Elimination of Fixed Intro/Body/Conclusion)**:
   - Eliminated hardcoded `Introduction / Body Paragraphs / Conclusion` sections across the assignment module.
