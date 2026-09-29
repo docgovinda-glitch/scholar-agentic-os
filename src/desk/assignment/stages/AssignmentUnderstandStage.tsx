@@ -1391,20 +1391,46 @@ export default function AssignmentUnderstandStage() {
             </span>
           </div>
 
-          {/* Detected Critical Penalty Alerts (if any present in markingCriteriaInsights) */}
-          {analysis.markingCriteriaInsights && analysis.markingCriteriaInsights.length > 0 && (
-            <div className="space-y-2">
-              {analysis.markingCriteriaInsights.map((insight, idx) => (
-                <div
-                  key={idx}
-                  className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2.5"
-                >
-                  <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <span>{insight}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Detected Critical Penalty Alerts (only genuine assessment penalties, e.g. late submission deductions - never raw rubric grade tiers like [L070] (70% - 100%)) */}
+          {(() => {
+            const genuinePenaltyAlerts = (analysis.markingCriteriaInsights || []).filter((insight) => {
+              const lower = insight.toLowerCase();
+              const isRawRubricBand =
+                lower.includes("first class") ||
+                lower.includes("upper second") ||
+                lower.includes("lower second") ||
+                lower.includes("third class") ||
+                lower.includes("grading matrix") ||
+                lower.includes("criteria & weight") ||
+                lower.includes("standard assessment rubric") ||
+                /^\s*(\[L\d+(?:-L\d+)?\]\s*)?\(?\d+%\s*[-–]\s*\d+%\)?/i.test(insight) ||
+                /^\s*\[L\d+(?:-L\d+)?\]\s*PART\s+\d+/i.test(insight);
+
+              if (isRawRubricBand) return false;
+              return (
+                lower.includes("penalty") ||
+                lower.includes("deduction") ||
+                lower.includes("late submission") ||
+                insight.includes("🚨")
+              );
+            });
+
+            if (genuinePenaltyAlerts.length === 0) return null;
+
+            return (
+              <div className="space-y-2">
+                {genuinePenaltyAlerts.map((insight, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-xs leading-relaxed flex items-start gap-2.5"
+                  >
+                    <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <span>{insight}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Interactive Editable Scope Boundaries: Included (Green) vs Excluded (Amber) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

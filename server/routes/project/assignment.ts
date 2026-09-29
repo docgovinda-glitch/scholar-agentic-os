@@ -510,8 +510,17 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     const penaltyItems = ledger.filter((item) => item.category === "penalty");
     const markingCriteriaInsights: string[] = [];
 
-    if (rubricItems.length > 0) {
-      markingCriteriaInsights.push(...rubricItems.map((r) => `${r.lineRange} ${r.verbatimText}`).slice(0, 6));
+    const substantiveRubricItems = rubricItems.filter((r) => {
+      const text = r.verbatimText.trim();
+      if (text.length < 15) return false;
+      if (/^\(?\d+%\s*[-–]\s*\d+%\)?$/i.test(text)) return false;
+      if (/^part\s+\d+/i.test(text)) return false;
+      if (/^criteria\s*&\s*weight/i.test(text)) return false;
+      return true;
+    });
+
+    if (substantiveRubricItems.length > 0) {
+      markingCriteriaInsights.push(...substantiveRubricItems.map((r) => `${r.lineRange} ${r.verbatimText}`).slice(0, 6));
     } else {
       markingCriteriaInsights.push(
         "First Class (70%+): Demands independent critical stance, rigorous theoretical synthesis, and counterargument refutation.",
