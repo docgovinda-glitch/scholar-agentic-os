@@ -50,11 +50,12 @@ export function formatHarvardCitation(source: Partial<DiscoveredSource>): string
   if (source.citation && source.citation.trim()) {
     return source.citation.trim();
   }
+  const rawAuthors = (source as any).authors;
   const authorsStr =
-    Array.isArray(source.authors) && source.authors.length > 0
-      ? source.authors.join(", ")
-      : typeof source.authors === "string" && source.authors.trim()
-      ? source.authors.trim()
+    Array.isArray(rawAuthors) && rawAuthors.length > 0
+      ? rawAuthors.join(", ")
+      : typeof rawAuthors === "string" && rawAuthors.trim()
+      ? rawAuthors.trim()
       : "Author, A.";
   const yearStr = source.year || "2024";
   const titleStr = source.title ? `'${source.title}'` : "Untitled";
