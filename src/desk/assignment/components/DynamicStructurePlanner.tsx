@@ -16,9 +16,7 @@ import {
   StickyNote,
   X,
   Edit2,
-  Compass,
   BookOpen,
-  ShieldCheck,
   CheckCircle2,
   BookmarkCheck,
   ExternalLink,
@@ -91,7 +89,6 @@ export function DynamicStructurePlanner({
   className = "",
 }: DynamicStructurePlannerProps) {
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
-  const [isBlueprintOverviewOpen, setIsBlueprintOverviewOpen] = useState(true);
   const [expandedBlueprintHeadings, setExpandedBlueprintHeadings] = useState<Record<string, boolean>>({});
   const [expandedBlueprintSubheadings, setExpandedBlueprintSubheadings] = useState<Record<string, boolean>>({});
   const [newHeadingTitle, setNewHeadingTitle] = useState("");
@@ -394,157 +391,7 @@ export function DynamicStructurePlanner({
           />
         </div>
 
-        {/* Ask Scholar Research Architecture & Question Mapping Banner */}
-        {structure.researchBlueprintOverview && (
-          <div className="rounded-xl border border-indigo-500/30 dark:border-indigo-500/20 bg-gradient-to-r from-indigo-500/[0.06] via-blue-500/[0.04] to-purple-500/[0.06] p-4 shadow-xs space-y-3.5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <span className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                  <Compass className="w-4 h-4" />
-                </span>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
-                      <span>Ask Scholar Research Architecture &amp; Question Mapping</span>
-                    </h3>
-                    {structure.researchBlueprintOverview.inquiryType && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 uppercase tracking-wider">
-                        {structure.researchBlueprintOverview.inquiryType.replace(/_/g, " ")}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-                    Assignment-specific research blueprint: each section directly maps to assignment questions, backed by peer-reviewed literature and dialectical debates.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsBlueprintOverviewOpen((prev) => !prev)}
-                className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                title={isBlueprintOverviewOpen ? "Collapse Blueprint Overview" : "Expand Blueprint Overview"}
-                aria-label="Toggle Blueprint Overview"
-              >
-                {isBlueprintOverviewOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
-            </div>
-
-            {isBlueprintOverviewOpen && (
-              <div className="space-y-3 pt-1 border-t border-indigo-500/15 dark:border-indigo-500/10">
-                {/* Central Problem & Expected Outcomes */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
-                  <div className="p-2.5 rounded-lg bg-white/80 dark:bg-[#1E1E20]/80 border border-indigo-500/15">
-                    <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400 tracking-wider block mb-1">
-                      Central Intellectual Problem
-                    </span>
-                    <p className="text-neutral-800 dark:text-neutral-200 text-[11px] leading-relaxed">
-                      {structure.researchBlueprintOverview.centralProblem}
-                    </p>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-white/80 dark:bg-[#1E1E20]/80 border border-indigo-500/15">
-                    <span className="text-[10px] uppercase font-bold text-purple-600 dark:text-purple-400 tracking-wider block mb-1">
-                      Expected Analytical Contribution
-                    </span>
-                    <p className="text-neutral-800 dark:text-neutral-200 text-[11px] leading-relaxed">
-                      {structure.researchBlueprintOverview.expectedOutcomes}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Question-to-Section Mapping Matrix */}
-                {structure.questionMappingMatrix && structure.questionMappingMatrix.length > 0 && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-bold text-neutral-500 dark:text-neutral-400 tracking-wider flex items-center gap-1.5">
-                        <BookOpen className="w-3 h-3 text-blue-500" />
-                        <span>Assignment Question → Analytical Objective → Section Mapping</span>
-                      </span>
-                      <span className="text-[10px] text-neutral-400">
-                        {structure.questionMappingMatrix.length} questions mapped
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-2">
-                      {structure.questionMappingMatrix.map((item, qIdx) => (
-                        <div
-                          key={qIdx}
-                          className="p-2.5 rounded-lg bg-white dark:bg-[#1E1E20] border border-neutral-200/80 dark:border-white/10 shadow-2xs space-y-1.5"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-1.5">
-                              <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold flex items-center justify-center shrink-0">
-                                Q{qIdx + 1}
-                              </span>
-                              <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
-                                {item.assignmentQuestion}
-                              </span>
-                            </div>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-white/10 shrink-0">
-                              Section {item.proposedSectionNumber || qIdx + 1}
-                            </span>
-                          </div>
-
-                          <div className="text-[11px] grid grid-cols-1 md:grid-cols-2 gap-2 text-neutral-600 dark:text-neutral-300 pl-6">
-                            <div>
-                              <strong className="text-neutral-800 dark:text-neutral-200 font-medium">Analytical Objective: </strong>
-                              {item.analyticalObjective}
-                            </div>
-                            <div>
-                              <strong className="text-neutral-800 dark:text-neutral-200 font-medium">Scholarly Literature Needed: </strong>
-                              {item.researchNeeded}
-                            </div>
-                          </div>
-
-                          {item.relevantSources && item.relevantSources.length > 0 && (
-                            <div className="flex flex-wrap items-center gap-1 pl-6 pt-0.5">
-                              <span className="text-[10px] text-neutral-400 font-medium">Grounding Sources:</span>
-                              {item.relevantSources.map((src, sIdx) => (
-                                <span
-                                  key={sIdx}
-                                  className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40"
-                                >
-                                  {src}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Self-Reflexive Quality Control Checklist */}
-                {structure.researchBlueprintOverview.qualityControlChecklist && (
-                  <div className="pt-1.5 flex flex-wrap items-center gap-2 text-[10px]">
-                    <span className="font-semibold text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                      <span>Quality Control:</span>
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                      <Check className="w-2.5 h-2.5" /> 100% Inquiries Covered
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                      <Check className="w-2.5 h-2.5" /> Peer-Reviewed Grounded
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                      <Check className="w-2.5 h-2.5" /> Zero Generic Fluff
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                      <Check className="w-2.5 h-2.5" /> Recency &amp; Seminal Balanced
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                      <Check className="w-2.5 h-2.5" /> Dialectical Debates Included
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Target Theoretical Frameworks & Analytical Models */}
+        {/* Theoretical Frameworks & Analytical Models */}
         {(() => {
           const frameworksList = Array.isArray(structure.targetFrameworks)
             ? structure.targetFrameworks
@@ -553,28 +400,25 @@ export function DynamicStructurePlanner({
               : [];
 
           return (
-            <div className="p-3.5 sm:px-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E20] shadow-xs space-y-2">
+            <div className="p-3.5 sm:px-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E20] shadow-xs space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-md bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                  <span className="w-6 h-6 rounded-md bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-[11px] font-bold flex items-center justify-center shrink-0">
                     <Layers className="w-3.5 h-3.5" />
                   </span>
-                  <div>
-                    <h4 className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-                      <span>Target Theoretical Frameworks &amp; Models</span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                        {frameworksList.length} active
-                      </span>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
+                      Target Theoretical Frameworks &amp; Models
                     </h4>
-                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                      Theoretical lenses and analytical models grounding your inquiry, problem decomposition, and evidence synthesis.
-                    </p>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
+                      {frameworksList.length} active
+                    </span>
                   </div>
                 </div>
               </div>
 
               {/* Frameworks Chip List */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                 {frameworksList.map((framework, fIdx) => (
                   <span
                     key={fIdx}
@@ -605,8 +449,8 @@ export function DynamicStructurePlanner({
                       handleAddFramework(newFramework);
                     }
                   }}
-                  placeholder="+ Add theoretical framework or model (Press Enter)..."
-                  className="text-xs px-2.5 py-1 rounded-lg bg-neutral-50/80 dark:bg-white/[0.02] border border-dashed border-neutral-300 dark:border-white/15 text-neutral-800 dark:text-neutral-200 placeholder-neutral-400 focus:outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-[#2C2C2E] transition-colors min-w-[240px]"
+                  placeholder="+ Add framework or model (Press Enter)..."
+                  className="text-xs px-2.5 py-1 rounded-lg bg-neutral-50/80 dark:bg-white/[0.02] border border-dashed border-neutral-300 dark:border-white/15 text-neutral-800 dark:text-neutral-200 placeholder-neutral-400 focus:outline-none focus:border-neutral-500 focus:bg-white dark:focus:bg-[#2C2C2E] transition-colors min-w-[200px]"
                   aria-label="Add theoretical framework"
                 />
               </div>
@@ -720,22 +564,23 @@ export function DynamicStructurePlanner({
                     </div>
 
                     {/* Research Blueprint Toggle */}
+                    {/* Research Basis & Sources Toggle */}
                     <button
                       type="button"
                       onClick={() => toggleHeadingBlueprint(heading.id)}
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
                         expandedBlueprintHeadings[heading.id]
-                          ? "bg-indigo-600 text-white dark:bg-indigo-500"
-                          : "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200/60 dark:border-indigo-800/40"
+                          ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-2xs"
+                          : "bg-neutral-100 hover:bg-neutral-200 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 border border-neutral-200/70 dark:border-white/10"
                       }`}
-                      title="Toggle Research Blueprint & Ask Scholar Grounding"
-                      aria-label={`Research Blueprint for section ${heading.number}`}
+                      title="View research basis and supporting scholarly sources"
+                      aria-label={`Research basis for section ${heading.number}`}
                     >
-                      <Compass className="w-3 h-3" />
-                      <span className="hidden sm:inline">Blueprint</span>
+                      <BookOpen className="w-3 h-3 text-indigo-500 dark:text-indigo-400" />
+                      <span className="hidden sm:inline">Research basis</span>
                       {(heading.scholarlySources || []).length > 0 && (
-                        <span className="ml-0.5 px-1 rounded-full text-[9px] font-bold bg-white/20">
-                          {heading.scholarlySources?.length}
+                        <span className="text-[10px] opacity-75 font-mono">
+                          · {heading.scholarlySources?.length}
                         </span>
                       )}
                     </button>
@@ -767,17 +612,17 @@ export function DynamicStructurePlanner({
                   </div>
                 </div>
 
-                {/* Main Heading Research Blueprint Drawer */}
+                {/* Main Heading Research Basis Drawer */}
                 {expandedBlueprintHeadings[heading.id] && (
-                  <div className="p-3.5 sm:p-4 bg-indigo-500/[0.03] dark:bg-indigo-500/[0.05] border-b border-neutral-200/60 dark:border-white/5 space-y-3 animate-in fade-in duration-150">
+                  <div className="p-3.5 sm:p-4 bg-neutral-50/70 dark:bg-white/[0.02] border-b border-neutral-200/60 dark:border-white/5 space-y-3 animate-in fade-in duration-150">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400 tracking-wider flex items-center gap-1.5">
-                        <Compass className="w-3 h-3" />
-                        <span>Section {heading.number} Research Blueprint &amp; Inquiry Grounding</span>
+                      <span className="text-[11px] font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>Section {heading.number} Research Basis</span>
                       </span>
                       {heading.assignmentQuestionAddressed && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 truncate max-w-sm">
-                          Answers: {heading.assignmentQuestionAddressed}
+                        <span className="px-2 py-0.5 rounded text-[10px] text-neutral-600 dark:text-neutral-300 bg-neutral-200/50 dark:bg-white/5 truncate max-w-sm">
+                          Directly answers: {heading.assignmentQuestionAddressed}
                         </span>
                       )}
                     </div>
@@ -797,13 +642,13 @@ export function DynamicStructurePlanner({
                       )}
                       {heading.counterarguments && heading.counterarguments.length > 0 && (
                         <div className="p-2.5 rounded-lg bg-white dark:bg-[#2C2C2E] border border-neutral-200/70 dark:border-white/10 space-y-0.5">
-                          <strong className="text-[10px] uppercase text-amber-600 dark:text-amber-400 font-bold block">Counterarguments &amp; Debates</strong>
+                          <strong className="text-[10px] uppercase text-neutral-500 font-bold block">Competing Perspectives &amp; Debates</strong>
                           <p className="text-[11px] text-neutral-800 dark:text-neutral-200">{heading.counterarguments.join(" | ")}</p>
                         </div>
                       )}
                       {heading.expectedContribution && (
                         <div className="p-2.5 rounded-lg bg-white dark:bg-[#2C2C2E] border border-neutral-200/70 dark:border-white/10 space-y-0.5">
-                          <strong className="text-[10px] uppercase text-purple-600 dark:text-purple-400 font-bold block">Contribution to Thesis</strong>
+                          <strong className="text-[10px] uppercase text-neutral-500 font-bold block">Contribution to Thesis</strong>
                           <p className="text-[11px] text-neutral-800 dark:text-neutral-200">{heading.expectedContribution}</p>
                         </div>
                       )}
@@ -813,21 +658,21 @@ export function DynamicStructurePlanner({
                     {heading.scholarlySources && heading.scholarlySources.length > 0 && (
                       <div className="space-y-1.5 pt-1">
                         <span className="text-[10px] uppercase font-bold text-neutral-500 dark:text-neutral-400 tracking-wider flex items-center gap-1">
-                          <BookOpen className="w-3 h-3 text-indigo-500" />
-                          <span>Ask Scholar Supporting Literature ({heading.scholarlySources.length})</span>
+                          <BookmarkCheck className="w-3 h-3 text-indigo-500" />
+                          <span>Supporting Scholarly Sources ({heading.scholarlySources.length})</span>
                         </span>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {heading.scholarlySources.map((src, sIdx) => (
                             <div
                               key={sIdx}
-                              className="p-2 rounded-lg bg-white dark:bg-[#2C2C2E] border border-indigo-500/20 dark:border-indigo-500/15 shadow-2xs space-y-1"
+                              className="p-2 rounded-lg bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 shadow-2xs space-y-1"
                             >
                               <div className="flex items-start justify-between gap-1.5">
                                 <span className="text-xs font-semibold text-neutral-900 dark:text-white line-clamp-1">
                                   {src.title}
                                 </span>
                                 {src.role && (
-                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 shrink-0">
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 shrink-0">
                                     {src.role}
                                   </span>
                                 )}
@@ -971,7 +816,7 @@ export function DynamicStructurePlanner({
                                 </button>
                               </div>
 
-                              {/* Blueprint toggle button */}
+                              {/* Research Basis toggle button */}
                               <button
                                 type="button"
                                 onClick={() => toggleSubheadingBlueprint(sub.id)}
@@ -980,10 +825,10 @@ export function DynamicStructurePlanner({
                                     ? "text-indigo-600 dark:text-indigo-400 bg-indigo-500/10"
                                     : "text-neutral-400 hover:text-indigo-600 dark:hover:text-indigo-400"
                                 }`}
-                                title="Research Blueprint & Ask Scholar Sources"
-                                aria-label="Toggle Subheading Blueprint"
+                                title="Research basis & supporting sources"
+                                aria-label="Toggle Subheading Research Basis"
                               >
-                                <Compass className="w-3.5 h-3.5" />
+                                <BookOpen className="w-3.5 h-3.5" />
                               </button>
 
                               {/* Notes toggle button */}
@@ -1098,17 +943,17 @@ export function DynamicStructurePlanner({
                           </div>
                         )}
 
-                        {/* Subheading Research Blueprint Panel */}
+                        {/* Subheading Research Basis Panel */}
                         {expandedBlueprintSubheadings[sub.id] && (
                           <div className="pt-2 border-t border-indigo-500/20 dark:border-indigo-500/10 space-y-2 animate-in fade-in duration-100 bg-indigo-500/[0.02] p-2.5 rounded-lg">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400 tracking-wider flex items-center gap-1">
-                                <Compass className="w-3 h-3" />
-                                <span>{sub.numberStr} Analytical Blueprint</span>
+                                <BookOpen className="w-3 h-3" />
+                                <span>{sub.numberStr} Research Basis</span>
                               </span>
                               {sub.assignmentQuestionAddressed && (
                                 <span className="text-[10px] text-neutral-500 dark:text-neutral-400 truncate max-w-xs">
-                                  Answers: {sub.assignmentQuestionAddressed}
+                                  Addresses: {sub.assignmentQuestionAddressed}
                                 </span>
                               )}
                             </div>
@@ -1128,7 +973,7 @@ export function DynamicStructurePlanner({
                             {sub.scholarlySources && sub.scholarlySources.length > 0 && (
                               <div className="space-y-1 pt-1">
                                 <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider block">
-                                  Supporting Ask Scholar Literature:
+                                  Supporting Scholarly Sources:
                                 </span>
                                 <div className="space-y-1">
                                   {sub.scholarlySources.map((src, sIdx) => (

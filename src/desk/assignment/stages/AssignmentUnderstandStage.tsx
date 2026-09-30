@@ -114,6 +114,15 @@ export const WRITING_TONE_OPTIONS: { id: string; label: string }[] = [
   { id: "conversational_academic", label: "Conversational Academic" },
 ];
 
+export const AGENTIC_THINKING_STAGES = [
+  "Understanding your assignment",
+  "Identifying the core questions",
+  "Researching relevant scholarship",
+  "Connecting evidence to the questions",
+  "Building your research structure",
+  "Preparing your outline",
+];
+
 export default function AssignmentUnderstandStage() {
   const {
     projectId,
@@ -216,6 +225,7 @@ export default function AssignmentUnderstandStage() {
     return false;
   });
   const [isGeneratingStructure, setIsGeneratingStructure] = useState(false);
+  const [agenticStageIndex, setAgenticStageIndex] = useState(0);
   const [structureError, setStructureError] = useState<string | null>(null);
 
   // Academic Writing Style state
@@ -784,6 +794,13 @@ export default function AssignmentUnderstandStage() {
     setIsAnalyzing(true);
     setStructureError(null);
     setAnalysisError(null);
+    setAgenticStageIndex(0);
+
+    const stageInterval = setInterval(() => {
+      setAgenticStageIndex((prev) =>
+        prev < AGENTIC_THINKING_STAGES.length - 1 ? prev + 1 : prev
+      );
+    }, 600);
 
     // Generate dynamic structure directly from question & parameters
     let proposedStructure = generateDynamicAssignmentStructure({
@@ -998,6 +1015,7 @@ export default function AssignmentUnderstandStage() {
     } catch (saveErr) {
       console.warn("Could not save answers during structure generation:", saveErr);
     } finally {
+      clearInterval(stageInterval);
       setIsGeneratingStructure(false);
       setIsAnalyzing(false);
     }
@@ -1635,19 +1653,21 @@ export default function AssignmentUnderstandStage() {
             )}
           </div>
 
-          {/* Dynamic Loading State while generating brief-specific outline */}
+          {/* Minimal Agentic Thinking Indicator */}
           {isGeneratingStructure && (
-            <div className="p-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.04] dark:bg-indigo-500/[0.08] shadow-xs flex flex-col items-center justify-center text-center space-y-3 animate-in fade-in duration-300">
-              <div className="w-9 h-9 rounded-full border-3 border-indigo-500/30 border-t-indigo-600 dark:border-t-indigo-400 animate-spin" />
-              <div>
-                <h4 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center justify-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
-                  <span>Ask Scholar Research Architect: Generating Research Blueprint…</span>
-                </h4>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-lg">
-                  Deconstructing assignment inquiries, synthesizing peer-reviewed literature &amp; debates, and constructing a research-grounded blueprint.
+            <div className="py-3 px-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/70 dark:bg-white/[0.02] flex items-center justify-between gap-3 animate-in fade-in duration-200">
+              <div className="flex items-center gap-2.5">
+                <div className="relative flex items-center justify-center w-2.5 h-2.5 shrink-0">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping absolute opacity-75" />
+                  <span className="w-2 h-2 rounded-full bg-blue-600 relative" />
+                </div>
+                <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200">
+                  {AGENTIC_THINKING_STAGES[agenticStageIndex] || "Thinking through your assignment"}…
                 </p>
               </div>
+              <span className="text-[11px] font-mono text-neutral-400">
+                Step {agenticStageIndex + 1} of {AGENTIC_THINKING_STAGES.length}
+              </span>
             </div>
           )}
 
@@ -1678,7 +1698,7 @@ export default function AssignmentUnderstandStage() {
                 {isGeneratingStructure ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    <span>Generating outline…</span>
+                    <span>Thinking through assignment…</span>
                   </>
                 ) : (
                   <>

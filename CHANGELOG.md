@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-30
 
+### Refined & Streamlined (Phase I Minimal Agentic UI/UX & Invisible Intelligence Outline Experience)
+- **Invisible Research Intelligence & Background Architecture**:
+  - Completely eliminated the internal `"Ask Scholar Research Architecture & Question Mapping"` box and technical workflow terminology from the user interface.
+  - Research mapping, question decomposition, literature retrieval, recency balancing, and dialectical synthesis continue to run autonomously in the AI layer without exposing internal AI jargon.
+- **Subtle, Elegant Affordances (`DynamicStructurePlanner.tsx`)**:
+  - Replaced technical "Blueprint" labels with subtle, academic-native affordances: `"Research basis"`, `"Supporting Scholarly Sources"`, and `"Contribution to Thesis"`.
+  - Section drawers provide on-demand access to analytical focus, empirical evidence required, competing debates, and peer-reviewed sources without visual clutter.
+  - Streamlined "Target Theoretical Frameworks & Models" chip list into a clean, minimal card with inline quick-add input.
+- **Minimalist Agentic Transition (`AssignmentUnderstandStage.tsx`)**:
+  - Redesigned the transition between assignment input and outline generation from a mechanical loading screen to an elegant, subtle agentic indicator.
+  - Progresses smoothly through academic research milestones:
+    1. *Understanding your assignment*
+    2. *Identifying the core questions*
+    3. *Researching relevant scholarship*
+    4. *Connecting evidence to the questions*
+    5. *Building your research structure*
+    6. *Preparing your outline*
+  - Replaced technical loading headers with an understated animated status line (`Step X of 6`) and action button label `"Thinking through assignment…"`.
+- **Preserved Functional Completeness & Test Verification**:
+  - Fully maintained all prompt analysis, dynamic word count budgeting (+50/-50/direct input), source discovery, citation styles, and outline customization features.
+  - Updated integration test suite in `AskScholarResearchDrivenOutline.test.tsx` verifying clean removal of internal architecture boxes and presence of subtle research basis affordances.
+  - All 28 test suites in `src/desk/assignment` (205 tests) and `npm run build` passing with zero errors.
+
 ### Redesigned & Elevated (Ask Scholar Research-Driven Outline Architecture & AI Research Blueprint)
 - **Deep Ask Scholar Research Engine & Inquiry Deconstruction (`scholarlyDiscoveryService.ts`)**:
   - Implemented `conductAskScholarResearchForOutline` which acts as an AI Research Supervisor/Architect.

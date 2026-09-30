@@ -176,8 +176,8 @@ describe("Ask Scholar Research-Driven Outline Architecture", () => {
     });
   });
 
-  describe("5. DynamicStructurePlanner UI: Research Blueprint & Mapping Banner", () => {
-    it("renders the Ask Scholar Research Blueprint Overview and question mapping in the planner UI", () => {
+  describe("5. DynamicStructurePlanner UI: Subtle Research Basis Affordances", () => {
+    it("renders the outline without internal architecture boxes and exposes subtle research basis affordances", () => {
       const structure = generateDynamicAssignmentStructure({
         question: "Does Globalization Reduce State Sovereignty?",
         academicLevel: "undergraduate",
@@ -193,25 +193,22 @@ describe("Ask Scholar Research-Driven Outline Architecture", () => {
         />
       );
 
-      // Verify Blueprint Overview Banner is displayed
-      expect(screen.getByText("Ask Scholar Research Architecture & Question Mapping")).toBeDefined();
-      expect(screen.getByText("Central Intellectual Problem")).toBeDefined();
-      expect(screen.getByText("Assignment Question → Analytical Objective → Section Mapping")).toBeDefined();
-      expect(screen.getByText("100% Inquiries Covered")).toBeDefined();
-      expect(screen.getByText("Peer-Reviewed Grounded")).toBeDefined();
+      // Verify internal architecture banner is NOT present in the user-facing UI
+      expect(screen.queryByText(/Ask Scholar Research Architecture & Question Mapping/i)).toBeNull();
+      expect(screen.queryByText(/Assignment Question → Analytical Objective → Section Mapping/i)).toBeNull();
 
-      // Check that blueprint buttons exist on headings
-      const blueprintButtons = screen.getAllByRole("button", { name: /Research Blueprint for section/i });
-      expect(blueprintButtons.length).toBeGreaterThanOrEqual(1);
+      // Check that subtle "Research basis" buttons exist on headings
+      const researchBasisButtons = screen.getAllByRole("button", { name: /Research basis for section/i });
+      expect(researchBasisButtons.length).toBeGreaterThanOrEqual(1);
 
-      // Click blueprint toggle on section 1
-      fireEvent.click(blueprintButtons[0]);
+      // Click "Research basis" toggle on section 1
+      fireEvent.click(researchBasisButtons[0]);
 
-      // Should display section 1 research blueprint drawer
-      expect(screen.getByText(/Section 1 Research Blueprint & Inquiry Grounding/i)).toBeDefined();
+      // Should display section 1 subtle research basis drawer with analytical purpose and supporting literature
+      expect(screen.getByText(/Section 1 Research Basis/i)).toBeDefined();
       expect(screen.getByText("Purpose & Objective")).toBeDefined();
       expect(screen.getByText("Empirical Evidence Required")).toBeDefined();
-      expect(screen.getByText(/Ask Scholar Supporting Literature/i)).toBeDefined();
+      expect(screen.getByText(/Supporting Scholarly Sources/i)).toBeDefined();
     });
   });
 });
