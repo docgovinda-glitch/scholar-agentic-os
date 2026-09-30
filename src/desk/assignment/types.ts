@@ -344,6 +344,7 @@ export interface DiscoveredSource {
   mappedSubheadingIds?: string[];
   whyThisSource?: string;
   sourceOrigin?: "system_found" | "user_uploaded" | "user_added" | "web_source" | "academic" | "primary" | "secondary" | string;
+  originTag?: "user" | "ask-scholar" | "ai-research" | string;
   userNotes?: string;
 }
 
@@ -632,6 +633,9 @@ export interface AssignmentProjectAnswers {
   assignment_plan?: ResearchPlan;
   structure?: AssignmentStructure;
   assignment_structure?: AssignmentStructure;
+  analyticalSyntheses?: SectionAnalyticalSynthesis[];
+  analytical_syntheses?: SectionAnalyticalSynthesis[];
+  activeSourceView?: "vault" | "analysis";
   // Legacy / interoperability aliases
   assignment_question?: string;
   assignment_brief_text?: string;
@@ -1076,12 +1080,37 @@ export interface UploadedSourceDocument {
   };
 }
 
+export interface SectionAnalyticalSynthesis {
+  id: string;
+  sectionId: string;
+  sectionTitle: string;
+  sectionNumberStr?: string;
+  claim: string;
+  evidence: string;
+  sourceId?: string;
+  sourceTitle?: string;
+  sourceAuthors?: string[];
+  sourceYear?: string;
+  sourceJournal?: string;
+  evidenceExcerpt?: string;
+  evidenceLocation?: string;
+  citation: string;
+  inTextCitation?: string;
+  canonicalReference?: CanonicalReference;
+  interpretation: string;
+  counterargument: string;
+  analyticalLink: string;
+  isUserEdited?: boolean;
+  userNotes?: string;
+}
+
 export interface AssignmentSourcesState {
   curated: DiscoveredSource[];
   userUploaded: UploadedSourceDocument[];
   approvedSourceIds: string[];
   evidenceLedger?: EvidenceLedger | null;
   evidenceItems?: EvidenceItem[];
+  analyticalSyntheses?: SectionAnalyticalSynthesis[];
 }
 
 export interface AssignmentDraftingSection {

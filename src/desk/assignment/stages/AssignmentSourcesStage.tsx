@@ -10,11 +10,13 @@ import {
   fetchMoreLiteratureSources,
   areSourcesRelevantToQuestion,
 } from "../services/scholarlyDiscoveryService";
+import { SectionAnalysisWorkspace } from "../components/SectionAnalysisWorkspace";
 import type {
   DiscoveredSource,
   UploadedSourceDocument,
   EvidenceItem,
   SourceAcademicType,
+  SectionAnalyticalSynthesis,
 } from "../types";
 import { flattenStructureSubheadings } from "../types";
 import {
@@ -152,6 +154,8 @@ export default function AssignmentSourcesStage({
 }: AssignmentSourcesStageProps) {
   const {
     projectId,
+    project,
+    saveAnswers,
     question,
     citationStyle,
     structure,
@@ -169,6 +173,19 @@ export default function AssignmentSourcesStage({
     setPhase,
   } = useAssignmentWorkspace();
 
+  // Active Main View: Unified Evidence Vault vs AI Analysis Workspace
+  const [activeMainView, setActiveMainView] = useState<"vault" | "analysis">("vault");
+  const projectAnswers = project?.answers || {};
+  const savedSyntheses = (projectAnswers.analyticalSyntheses || projectAnswers.analytical_syntheses || []) as SectionAnalyticalSynthesis[];
+
+  const handleSaveSyntheses = async (newSyntheses: SectionAnalyticalSynthesis[]) => {
+    if (saveAnswers) {
+      await saveAnswers({
+        analyticalSyntheses: newSyntheses,
+        analytical_syntheses: newSyntheses,
+      });
+    }
+  };
 
   // Outline subheadings & view mode
   const subheadings = useMemo(() => flattenStructureSubheadings(structure), [structure]);
@@ -192,7 +209,7 @@ export default function AssignmentSourcesStage({
   );
 
   // Filter & Search states
-  const [activeTab, setActiveTab] = useState<"all" | "curated" | "uploaded" | "approved" | "bookmarked" | "excluded">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "curated" | "ask_scholar" | "ai_research" | "uploaded" | "approved" | "bookmarked" | "excluded">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedRole, setSelectedRole] = useState<string>("all");
@@ -525,12 +542,6 @@ export default function AssignmentSourcesStage({
     await removeUserUploadedSource(docId);
   };
 
-  // Approved count calculation
-  const approvedCount = approvedSourceIds.length;
-  const isExitGateUnlocked = approvedCount >= 4;
-  const minimumRequired = 4;
-  const progressPercent = Math.min(100, Math.round((approvedCount / minimumRequired) * 100));
-
   const handleContinue = () => {
     if (onProceed) {
       onProceed();
@@ -556,13 +567,17 @@ export default function AssignmentSourcesStage({
     if (!hasTopic && !hasUploadedDocs) {
       return [];
     }
-    if (sources && sources.length > 0) {
-      return sources;
-    }
-    if (hasTopic || hasUploadedDocs) {
-      return generateCuratedLiteratureSources(question, citationStyle);
-    }
-    return [];
+    const raw = (sources && sources.length > 0)
+      ? sources
+      : (hasTopic || hasUploadedDocs)
+      ? generateCuratedLiteratureSources(question, citationStyle)
+      : [];
+
+    return raw.map((s, idx) => ({
+      ...s,
+      sourceOrigin: s.sourceOrigin || (idx < 15 ? "ask_scholar" : "ai_research"),
+      status: s.status || "kept",
+    }));
   }, [sources, question, citationStyle, hasTopic, hasUploadedDocs]);
 
   // Map user-uploaded documents to DiscoveredSource objects to unify into literature collection
@@ -604,8 +619,9 @@ export default function AssignmentSourcesStage({
         isOpenAccess: true,
         isVerifiedAcademic: true,
         sourceCredibility: "verified-academic",
-        status: "unreviewed",
+        status: "kept",
         isUserUploaded: true,
+        sourceOrigin: "user",
         userDocumentId: doc.id,
         sourceFormatBadge: formatBadge,
         extractedEvidences: doc.extractedEvidences || [],
@@ -636,9 +652,13 @@ export default function AssignmentSourcesStage({
     if (activeTab === "approved") {
       list = list.filter((s) => approvedSourceIds.includes(s.id));
     } else if (activeTab === "uploaded") {
-      list = list.filter((s) => s.isUserUploaded);
+      list = list.filter((s) => s.isUserUploaded || s.sourceOrigin === "user");
+    } else if (activeTab === "ask_scholar") {
+      list = list.filter((s) => s.sourceOrigin === "ask_scholar" && !excludedIds.includes(s.id) && !s.isExcluded && s.status !== "removed");
+    } else if (activeTab === "ai_research") {
+      list = list.filter((s) => s.sourceOrigin === "ai_research" && !excludedIds.includes(s.id) && !s.isExcluded && s.status !== "removed");
     } else if (activeTab === "curated") {
-      list = list.filter((s) => !s.isUserUploaded && !excludedIds.includes(s.id) && !s.isExcluded && s.status !== "removed");
+      list = list.filter((s) => !s.isUserUploaded && s.sourceOrigin !== "user" && !excludedIds.includes(s.id) && !s.isExcluded && s.status !== "removed");
     } else if (activeTab === "bookmarked") {
       list = list.filter((s) => bookmarkedIds.includes(s.id) || s.isBookmarked);
     } else if (activeTab === "excluded") {
@@ -779,6 +799,19 @@ export default function AssignmentSourcesStage({
     (s) => !excludedIds.includes(s.id) && !s.isExcluded && s.status !== "removed"
   ).length;
 
+  const askScholarCount = allMasterSources.filter(
+    (s) => s.sourceOrigin === "ask_scholar" && !excludedIds.includes(s.id) && !s.isExcluded && s.status !== "removed"
+  ).length;
+
+  const aiResearchCount = allMasterSources.filter(
+    (s) => s.sourceOrigin === "ai_research" && !excludedIds.includes(s.id) && !s.isExcluded && s.status !== "removed"
+  ).length;
+
+  const approvedCount = approvedSourceIds.length > 0 ? approvedSourceIds.length : totalActiveSources;
+  const isExitGateUnlocked = true; // Always unlocked per requirement 5
+  const minimumRequired = 4;
+  const progressPercent = Math.min(100, Math.round((Math.max(approvedCount, totalActiveSources) / minimumRequired) * 100));
+
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 space-y-7 animate-in fade-in duration-200">
       {/* Stage Header */}
@@ -807,32 +840,46 @@ export default function AssignmentSourcesStage({
           )}
         </div>
 
-        {/* Exit Gate Widget (Top Header View) - Only displayed when sources exist */}
+        {/* View Switcher & Evidence Base Counter (Top Header View) */}
         {allMasterSources.length > 0 && (
-          <div className="flex flex-col items-end gap-1.5 shrink-0">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
-                Approved Sources:
-              </span>
-              <span
-                data-testid="evidence-counter"
-                className={`px-3 py-1 rounded-full text-xs font-bold font-mono ${
-                  isExitGateUnlocked
-                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
-                    : "bg-neutral-100 text-neutral-700 dark:bg-white/10 dark:text-neutral-300"
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 shrink-0">
+            {/* View Switcher: Evidence Vault vs AI Analysis */}
+            <div className="flex items-center gap-1 bg-neutral-100 dark:bg-white/5 p-1 rounded-2xl border border-neutral-200/60 dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => setActiveMainView("vault")}
+                data-testid="view-evidence-vault-btn"
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeMainView === "vault"
+                    ? "bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white shadow-xs"
+                    : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
               >
-                {approvedCount} / {minimumRequired} recommended
-              </span>
+                <Library className="w-3.5 h-3.5" />
+                <span>Evidence Vault ({allMasterSources.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveMainView("analysis")}
+                data-testid="view-ai-analysis-btn"
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeMainView === "analysis"
+                    ? "bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white shadow-xs"
+                    : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>AI Analysis</span>
+              </button>
             </div>
 
-            <div className="w-36 h-1.5 bg-neutral-200/80 dark:bg-white/10 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-300 ${
-                  isExitGateUnlocked ? "bg-emerald-500" : "bg-neutral-900 dark:bg-white"
-                }`}
-                style={{ width: `${progressPercent}%` }}
-              />
+            <div className="flex items-center gap-2">
+              <span
+                data-testid="evidence-counter"
+                className="px-3 py-1 rounded-full text-xs font-bold font-mono bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
+              >
+                {approvedSourceIds.length} / 4 recommended · {allMasterSources.length} in Vault
+              </span>
             </div>
           </div>
         )}
@@ -887,6 +934,22 @@ export default function AssignmentSourcesStage({
             </div>
           </div>
         </div>
+      ) : activeMainView === "analysis" ? (
+        <SectionAnalysisWorkspace
+          structure={structure}
+          sources={allMasterSources}
+          question={question}
+          citationStyle={citationStyle}
+          onCitationStyleChange={(newStyle) => {
+            if (saveAnswers) {
+              saveAnswers({ citationStyle: newStyle, citation_style: newStyle });
+            }
+          }}
+          onProceedToDrafting={handleContinue}
+          onBackToVault={() => setActiveMainView("vault")}
+          savedSyntheses={savedSyntheses}
+          onSaveSyntheses={handleSaveSyntheses}
+        />
       ) : (
         <>
           {/* Section 1: Course Materials & Syllabus Upload (Sleek Collapsible Card) */}
@@ -1019,6 +1082,38 @@ export default function AssignmentSourcesStage({
                   }`}
                 >
                   All Sources ({totalActiveSources})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("ask_scholar")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                    activeTab === "ask_scholar"
+                      ? "bg-purple-600 text-white shadow-xs dark:shadow-none"
+                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Ask Scholar</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
+                    {askScholarCount}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("ai_research")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                    activeTab === "ai_research"
+                      ? "bg-indigo-600 text-white shadow-xs dark:shadow-none"
+                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>AI Research</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/15 text-current">
+                    {aiResearchCount}
+                  </span>
                 </button>
 
                 <button
@@ -1647,6 +1742,15 @@ export default function AssignmentSourcesStage({
             className="px-5 py-2.5 rounded-full text-xs font-semibold border border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
           >
             Skip to Drafting
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveMainView("analysis")}
+            className="px-5 py-2.5 rounded-full text-xs font-semibold border border-neutral-200 dark:border-white/10 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-center gap-1.5"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Move to AI Analysis</span>
           </button>
 
           <button

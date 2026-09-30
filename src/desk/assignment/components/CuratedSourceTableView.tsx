@@ -106,6 +106,7 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                 <ArrowUpDown className="w-2.5 h-2.5" />
               </div>
             </th>
+            <th className="py-3 px-2 w-24">Origin</th>
             <th className="py-3 px-2 w-20 cursor-pointer hover:text-neutral-900 dark:hover:text-white" onClick={() => handleSort("year")}>
               <div className="flex items-center gap-1">
                 <span>Year</span>
@@ -132,7 +133,7 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                 <ArrowUpDown className="w-2.5 h-2.5" />
               </div>
             </th>
-            <th className="py-3 px-3 w-20 text-center">Actions</th>
+            <th className="py-3 px-3 w-28 text-center">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-100 dark:divide-white/5">
@@ -205,6 +206,23 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                           : "Unknown"}
                       </p>
                     </div>
+                  </td>
+
+                  {/* Origin */}
+                  <td className="py-3 px-2 align-top">
+                    {source.isUserUploaded ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/50">
+                        User
+                      </span>
+                    ) : source.originTag === "ask-scholar" || source.type === "journal" || source.type === "paper" || source.isVerifiedAcademic !== false ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-200/50">
+                        Ask Scholar
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200/50">
+                        AI Research
+                      </span>
+                    )}
                   </td>
 
                   {/* Year */}
@@ -305,10 +323,12 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                       <button
                         type="button"
                         onClick={() => onDismiss(source.id)}
-                        title="Dismiss"
-                        className="p-1 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 cursor-pointer"
+                        title="Remove source"
+                        aria-label="Remove source"
+                        className="px-2 py-1 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 cursor-pointer flex items-center gap-1 text-[11px] transition-colors"
                       >
                         <X className="w-3.5 h-3.5" />
+                        <span>Remove</span>
                       </button>
                     </div>
                   </td>
@@ -317,7 +337,7 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                 {/* Expanded Details Row */}
                 {isExpanded && (
                   <tr className="bg-neutral-50/80 dark:bg-white/[0.02]">
-                    <td colSpan={9} className="py-3 px-4 sm:px-6">
+                    <td colSpan={10} className="py-3 px-4 sm:px-6">
                       <div className="space-y-2 text-xs">
                         {/* Question-Driven Role & Alignment */}
                         <div className="bg-white dark:bg-[#1C1C1E] p-3 rounded-xl border border-neutral-200/60 dark:border-white/5 space-y-1.5">

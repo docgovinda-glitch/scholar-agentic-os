@@ -3972,7 +3972,7 @@ export function conductAskScholarResearchForOutline(
   const expectedOutcomes = `A rigorous, research-blueprint-grounded ${assignmentType.replace(/_/g, " ")} delivering an original, evidence-backed answer to each assignment inquiry without generic filler.`;
 
   // 4. Retrieve & Synthesize Ask Scholar Literature
-  const curatedDiscoveredSources = generateCuratedLiteratureSources(combinedText || question, 10);
+  const curatedDiscoveredSources = generateCuratedLiteratureSources(combinedText || question, "apa7");
   const sources: ResearchSourceReference[] = curatedDiscoveredSources.map((s) => ({
     id: s.id,
     title: s.title,

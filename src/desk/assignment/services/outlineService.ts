@@ -36,6 +36,7 @@ export function generateAdaptiveDefaultOutline(
   sections?: SectionBreakdown
 ): OutlineSection[] {
   const total = Math.max(100, Number(targetWordCount) || 2000);
+  let templates: Array<{ title: string; ratio: number; guidance: string; keyPoints: string[] }> = [];
 
   // If question or brief is available, generate a unique, brief-specific outline
   if (question && question.trim().length >= 5) {
@@ -50,6 +51,9 @@ export function generateAdaptiveDefaultOutline(
         id: s.id,
         title: s.title,
         targetWordCount: s.targetWordCount,
+        currentWordCount: (s as any).currentWordCount || 0,
+        linkedEvidenceIds: (s as any).linkedEvidenceIds || [],
+        status: (s as any).status || "not_started",
         guidance: s.guidance,
         keyPoints: s.keyPoints || [],
       }));

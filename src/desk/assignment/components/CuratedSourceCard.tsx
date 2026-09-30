@@ -121,17 +121,27 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Origin Badge */}
-            {source.sourceOrigin === "user_uploaded" || source.isUserUploaded ? (
+            {source.sourceOrigin === "user_uploaded" || source.isUserUploaded || source.sourceOrigin === "user" ? (
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 flex items-center gap-1">
                 <FileUp className="w-2.5 h-2.5" />
                 <span>USER UPLOADED</span>
               </span>
             ) : source.sourceOrigin === "system_found" ? (
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 flex items-center gap-1">
-                <Sparkles className="w-2.5 h-2.5" />
+                <BookOpen className="w-2.5 h-2.5" />
                 <span>SYSTEM FOUND</span>
               </span>
-            ) : null}
+            ) : source.sourceOrigin === "ai_research" || source.originTag === "ai-research" ? (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 flex items-center gap-1">
+                <Sparkles className="w-2.5 h-2.5" />
+                <span>AI RESEARCH</span>
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 flex items-center gap-1">
+                <BookOpen className="w-2.5 h-2.5" />
+                <span>ASK SCHOLAR</span>
+              </span>
+            )}
 
             {/* Academic Credibility Badge */}
             {source.isVerifiedAcademic && (

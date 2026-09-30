@@ -59,6 +59,9 @@ import {
   createEphemeralProject,
   updateEphemeralProject,
   deleteEphemeralProject,
+  recordDraftMigration,
+  getMigratedDraftRealId,
+  recoverDraftProject,
 } from "./ephemeralProjectStore";
 
 import {
@@ -72,6 +75,9 @@ export {
   createEphemeralProject,
   updateEphemeralProject,
   deleteEphemeralProject,
+  recordDraftMigration,
+  getMigratedDraftRealId,
+  recoverDraftProject,
 };
 
 
@@ -115,7 +121,8 @@ export async function commitProjectToDatabase(projectId: string): Promise<Projec
       }
     }
 
-    // 3. Remove from local memory
+    // 3. Record draft migration so draftId resolves to realProjectId everywhere
+    recordDraftMigration(projectId, created.projectId, finalProject);
     deleteEphemeralProject(projectId);
 
     // 4. Update browser URL history if on the draft page
@@ -156,9 +163,12 @@ async function authHeaders(): Promise<Record<string, string>> {
 export async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
   // If endpoint targets an uncommitted ephemeral project, commit it first before hitting server
   const draftMatch = typeof input === "string" ? input.match(/\/api\/projects\/(draft-[^/]+)(\/.*)?/) : null;
-  if (draftMatch && isEphemeralProject(draftMatch[1])) {
+  if (draftMatch) {
     const draftId = draftMatch[1];
-    if (!committingProjects.has(draftId)) {
+    const migratedId = getMigratedDraftRealId(draftId);
+    if (migratedId) {
+      input = input.replace(draftId, migratedId);
+    } else if (isEphemeralProject(draftId) && !committingProjects.has(draftId)) {
       try {
         const committed = await commitProjectToDatabase(draftId);
         input = input.replace(draftId, committed.projectId);
@@ -750,11 +760,12 @@ export function saveIntakeAnswers(
   projectId: string,
   answers: Record<string, any>
 ): Promise<ProjectView> {
-  if (isEphemeralProject(projectId)) {
-    const updated = updateEphemeralProject(projectId, answers);
+  const effectiveId = getMigratedDraftRealId(projectId) || projectId;
+  if (isEphemeralProject(effectiveId)) {
+    const updated = updateEphemeralProject(effectiveId, answers);
     if (updated) return Promise.resolve(updated);
   }
-  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/intake`, "PATCH", { answers }).then((r) =>
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(effectiveId)}/intake`, "PATCH", { answers }).then((r) =>
     json(r)
   );
 }
@@ -860,10 +871,22 @@ export function waiveFinding(projectId: string, ruleId: string, reason: string):
 }
 
 export function getProject(projectId: string): Promise<ProjectView> {
+  const migratedId = getMigratedDraftRealId(projectId);
+  if (migratedId && migratedId !== projectId) {
+    return getProject(migratedId);
+  }
+
   if (isEphemeralProject(projectId)) {
     const draft = getEphemeralProject(projectId);
     if (draft) return Promise.resolve(draft);
-    return Promise.reject(new Error(`Draft project ${projectId} not found in ephemeral memory`));
+
+    const recovered = recoverDraftProject(projectId);
+    if (recovered) return Promise.resolve(recovered);
+
+    // Resilient fallback: Query backend in case project was persisted on server
+    return authedFetch(`/api/projects/${encodeURIComponent(projectId)}`)
+      .then((r) => json<ProjectView>(r))
+      .catch(() => Promise.reject(new Error(`Draft project ${projectId} not found in ephemeral memory`)));
   }
   return authedFetch(`/api/projects/${encodeURIComponent(projectId)}`).then((r) => json(r));
 }

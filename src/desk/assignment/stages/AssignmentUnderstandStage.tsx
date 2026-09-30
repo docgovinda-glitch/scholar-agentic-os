@@ -770,6 +770,12 @@ export default function AssignmentUnderstandStage() {
       deadline,
     });
 
+    try {
+      await ensurePersisted();
+    } catch (persistErr) {
+      console.warn("Auto-persist before advancing to Phase II:", persistErr);
+    }
+
     if (advancePhase) {
       advancePhase("sources");
     } else if (setPhase) {

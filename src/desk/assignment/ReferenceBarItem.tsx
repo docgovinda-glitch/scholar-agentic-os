@@ -14,6 +14,7 @@ import {
   Quote,
   ChevronUp,
   ChevronDown,
+  Sparkles,
 } from "lucide-react";
 
 export interface ReferenceBarItemProps {
@@ -202,15 +203,21 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
     >
       {/* Left Section: Badges & Single-Line Metadata */}
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        {/* Type / Upload Badge */}
+        {/* Origin / Type Badge */}
         {source.isUserUploaded ? (
           <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 shrink-0 flex items-center gap-1">
             <FileUp className="w-2.5 h-2.5" />
             <span>Uploaded: {source.sourceFormatBadge || "DOCUMENT"}</span>
           </span>
+        ) : source.sourceOrigin === "ai_research" ? (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 shrink-0 flex items-center gap-1">
+            <Sparkles className="w-2.5 h-2.5" />
+            <span>AI Research</span>
+          </span>
         ) : (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300 shrink-0">
-            {source.type || "JOURNAL"}
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 shrink-0 flex items-center gap-1">
+            <BookOpen className="w-2.5 h-2.5" />
+            <span>Ask Scholar</span>
           </span>
         )}
 

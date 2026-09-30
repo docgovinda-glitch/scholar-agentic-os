@@ -160,36 +160,44 @@ Captures assignment parameters in a single unified workspace, decomposes the que
 
 ---
 
-### 4.3 Phase 2 · Sources & Literature Discovery (`AssignmentSourcesStage.tsx`)
+### 4.3 Phase 2 · Evidence, Sources & AI Analysis (`AssignmentSourcesStage.tsx` & `SectionAnalysisWorkspace.tsx`)
 
 #### Purpose
-Discovers, evaluates, organizes, and approves scholarly literature and course materials aligned directly with the confirmed Phase 1 subheadings.
+Builds the unified evidence base for the assignment and synthesizes research-grounded analytical argumentation mapped directly to Phase 1 outline subheadings.
 
-#### Layout
-1. **Breadcrumb & Topic Summary**:
-   - Lightweight banner displaying the deconstructed research question and key conceptual entities.
-2. **Lecture & Course Materials Dropzone (`LectureUploadDropzone.tsx`)**:
-   - Minimalist click-or-drop container for course slides, lecture notes, syllabus PDFs.
-   - Files are parsed, chunked, and displayed with badge `USER UPLOADED` for direct citation.
-3. **Scholarly Literature Grid**:
-   - 2-column minimalist card grid (`CuratedSourceCard.tsx`).
-   - Cards display:
-     - Title, Authors, Publication Year, Venue.
-     - Source Type Pill (`Journal`, `Book`, `Conference`, `Report`, `Institutional`).
-     - Role Badge: `Empirical evidence` | `Theoretical framework` | `Comparative evidence` | `Core theory` | `Methodological framework`.
-     - Relevance Category Pill: `Very High` | `High` | `Moderate`.
-     - Contextual "Why this source?" justification explaining relevance to the specific prompt.
-     - Primary Action: `+ Add Source` / `✓ Added to Evidence`.
-4. **Interactive Matrix Table View (`CuratedSourceTableView.tsx`)**:
-   - Toggleable tabular view sorting sources by Author, Year, Role, Key Findings, and Subheading mapping.
-5. **Approved Evidence Shelf (`ApprovedReferencesShelf.tsx`)**:
-   - Sticky bottom drawer or side panel listing approved sources grouped by Phase 1 subheadings.
-   - Shows research status per subheading (`⚪ Not researched`, `🔵 Researching`, `🟢 Sufficient evidence`, `🔴 Evidence gap`).
+#### Architecture & Layout
+1. **Unified Source Vault**:
+   - Merges user-provided documents (PDFs, docs, spreadsheets, links) and AI-discovered literature into a single evidence collection.
+   - Origin badges distinguish provenance without fragmenting the UI: `User`, `Ask Scholar`, and `AI Research`.
+   - Filter tabs: `All`, `Ask Scholar`, `AI Research`, `Uploaded`, `Bookmarked`.
+   - Table view with sortable columns: Status (`Included`), Source, Origin, Year, Relevance, Role in Assignment, Venue, Citations, and Actions.
+2. **Unblocked Research Workflow**:
+   - No mandatory approval bottleneck: sources accumulate automatically into the vault.
+   - Direct, single-click source removal (`Source → Remove`) on every card and table row.
+   - Advance to Analysis or Drafting at any time without manual approval requirements.
+3. **AI Analysis Workspace (`SectionAnalysisWorkspace.tsx`)**:
+   - Seamless top view switching between `[ Evidence Vault (N) ]` and `[ AI Analysis ]`.
+   - **Left Rail**: Outline section navigator displaying claim counts per subheading.
+   - **Main Panel**: 6-part analytical argument cards for each outline subheading:
+     - **1. Core Claim**: Central academic thesis answering the section inquiry.
+     - **2. Evidence & In-Text Citation**: Empirical/theoretical excerpt linked to live Citation Engine.
+     - **3. Critical Interpretation**: Analytical explanation of the evidence's significance.
+     - **4. Counterargument & Dissenting Debate**: Opposing theoretical perspectives and boundary conditions.
+     - **5. Analytical Link**: Direct connection explaining how this answers the assignment brief.
+4. **Citation Engine Bridge & Style Recalculation**:
+   - Integrated with Citation Compliance Engine across APA 7, MLA 9, Harvard, Chicago, IEEE, and Vancouver.
+   - Changing citation style updates citations across all analytical arguments in real time while strictly preserving custom user claim edits.
+5. **Source-to-Citation Traceability**:
+   - Clickable citation badge opens an interactive provenance popover displaying:
+     `Claim → In-Text Citation → Source Details → Relevant Evidence Excerpt & Locator`.
 
 #### User Actions
-- `Run Scholarly Discovery`: Deconstructs prompt and discovers recent peer-reviewed sources (2024-2026) alongside seminal classics.
-- `Add Custom Source / DOI`: Ingests specific papers by DOI.
-- `Proceed to Phase 3 Drafting`: Confirms evidence readiness and advances to drafting.
+- `View Switcher`: Toggle between Evidence Vault and AI Analysis Workspace.
+- `Edit Analysis`: Inline editing of claims, interpretations, counterarguments, and analytical links.
+- `Strengthen Claim / Deepen Counterargument`: AI-assisted refinement of academic rigor.
+- `Change Citation Style`: Instant recalculation across all generated citations.
+- `Remove Source`: Single-click removal of unwanted sources.
+- `Proceed to Phase 3 Drafting`: Advances to drafting with fully cited analytical arguments pre-grounded.
 
 ---
 

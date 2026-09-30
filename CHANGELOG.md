@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-30
 
+### Rebuilt & Enhanced (Phase II Evidence & Analysis Engine, Ephemeral State Recovery & Dynamic Citation Traceability)
+- **Root-Cause Resolution of Ephemeral Memory Loss (`ephemeralProjectStore.ts`, `api.ts`, `DeskApp.tsx`)**:
+  - Identified and eliminated the root cause of `Draft project draft-* not found in ephemeral memory` during Phase I → Phase II transitions.
+  - Implemented dual-tier persistence syncing in-memory maps to both `sessionStorage` and `localStorage`, ensuring draft states survive page reloads, tab navigation, and memory garbage collection.
+  - Created persistent draft-to-permanent project ID migration tracking (`recordDraftMigration`, `getMigratedDraftRealId`, `recoverDraftProject`).
+  - Added pre-navigation persistence guarantees in `AssignmentUnderstandStage.tsx` (`await ensurePersisted()`) before phase advancement.
+  - Implemented an intelligent route fallback and graceful recovery UI in `DeskApp.tsx` with clear recovery actions (`[Start New Assignment]`, `[Saved Projects]`).
+- **Unified Source Vault (`AssignmentSourcesStage.tsx`, `CuratedSourceCard.tsx`, `CuratedSourceTableView.tsx`)**:
+  - Merged user-provided research materials (PDFs, Word documents, spreadsheets, links) and AI-discovered literature into a unified vault.
+  - Attached explicit origin tags to all sources: `User`, `Ask Scholar`, and `AI Research`.
+  - Added origin filter tabs (`All`, `Ask Scholar`, `AI Research`, `Uploaded`, `Bookmarked`) and an Origin column in the matrix table view.
+  - Eliminated the mandatory 4-source approval gate (`isExitGateUnlocked = true`): sources accumulate automatically into the vault without requiring manual approval clicks.
+  - Provided direct, single-click source removal (`Source → Remove`) across both grid cards and table rows without destructive overhead.
+- **Section Analytical Synthesis Engine (`sectionAnalysisService.ts`, `types.ts`)**:
+  - Developed deep section synthesis mapping collected sources directly to Phase I outline subheadings.
+  - Generates structured 6-part academic arguments for each outline section:
+    1. **Claim**: Clear academic proposition answering the section focus.
+    2. **Evidence**: Verifiable empirical/theoretical excerpt extracted from vault sources with exact locators.
+    3. **Source Citation**: Live, standard in-text citation connected to the Citation Compliance Engine.
+    4. **Critical Interpretation**: Analytical explanation of the evidence's significance and mechanism.
+    5. **Counterargument & Dissenting Debate**: Opposing theoretical perspectives and boundary conditions.
+    6. **Analytical Link**: Explicit connection to the central research brief and thesis statement.
+  - Added AI argument refinement utilities: `strengthenSynthesisClaim` and `deepenCounterargument`.
+- **Citation Engine Bridge & Dynamic Recalculation (`citationFormatService.ts`)**:
+  - Connected Phase II sources with `CitationFormatterFactory` to format in-text citations and bibliographies across APA 7, MLA 9, Harvard, Chicago, IEEE, and Vancouver.
+  - Implemented `recalculateAllSynthesesCitations` allowing instant citation style switching with real-time recalculation across all analytical arguments while strictly preserving custom user claim edits.
+- **Minimalist Academic Analysis Workspace (`SectionAnalysisWorkspace.tsx`)**:
+  - Designed an uncluttered research environment with top view switching between `[ Evidence Vault (N) ]` and `[ AI Analysis ]`.
+  - Left rail: Outline section navigator displaying claim counts per subheading.
+  - Main panel: 6-part analytical argument cards with inline editing, custom claim creation, and AI regeneration with subtle agentic progression messages (*Reviewing relevant sources…* → *Extracting supporting evidence…* → *Connecting evidence to your argument…* → *Preparing cited analysis…*).
+- **Source-to-Citation Traceability**:
+  - Interactive in-text citation badge opens a dedicated provenance modal showing: **Claim → Citation → Source Details → Relevant Evidence Excerpt & Locator**.
+- **Automated Test Coverage**:
+  - Added `src/desk/assignment/__tests__/Phase2EvidenceAnalysisAndCitationTraceability.test.tsx` (16 unit & integration tests covering ephemeral recovery, multi-style citation formatting, 6-part argument synthesis, dynamic style recalculation, and citation traceability).
+  - All 29 assignment test suites (221 tests) and TypeScript type check (`tsc --noEmit`) passing with 100% success rate.
+
 ### Refined & Streamlined (Phase I Minimal Agentic UI/UX & Invisible Intelligence Outline Experience)
 - **Invisible Research Intelligence & Background Architecture**:
   - Completely eliminated the internal `"Ask Scholar Research Architecture & Question Mapping"` box and technical workflow terminology from the user interface.

@@ -15,7 +15,7 @@ import {
 import type { DeskShellView } from "./DeskShell";
 import type { ResearchStage } from "./workspace/types";
 import { STAGE_MAP } from "./workspace/types";
-import { getProject, UnauthenticatedError } from "./api";
+import { getProject, UnauthenticatedError, getMigratedDraftRealId, createEphemeralProject } from "./api";
 import { useAiSetupStatus } from "./setup/useAiSetupStatus";
 import { useVaultSetupStatus } from "./setup/useVaultSetupStatus";
 import { useDeskSession } from "./useDeskSession";
@@ -174,20 +174,43 @@ function ProjectRoute() {
   const navigate = useNavigate();
   const location = useLocation();
   const device = useDeviceClass();
-  const { projectId, view } = useParams<{ projectId: string; view?: string }>();
+  const { projectId: urlProjectId, view } = useParams<{ projectId: string; view?: string }>();
   const [outputTypeId, setOutputTypeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Auto-resolve migrated draft IDs to permanent database IDs
+  const effectiveProjectId = (urlProjectId && getMigratedDraftRealId(urlProjectId)) || urlProjectId || "";
+
+  // Synchronize route when project is committed to database
   useEffect(() => {
-    if (projectId === "new") {
+    if (urlProjectId && effectiveProjectId && effectiveProjectId !== urlProjectId) {
+      navigate(`/projects/${effectiveProjectId}/${view || ""}`, { replace: true });
+    }
+  }, [urlProjectId, effectiveProjectId, view, navigate]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handlePersisted = (e: Event) => {
+      const custom = e as CustomEvent<{ draftId: string; realId: string; project: any }>;
+      if (custom.detail && (custom.detail.draftId === urlProjectId || custom.detail.draftId === effectiveProjectId)) {
+        navigate(`/projects/${custom.detail.realId}/${view || ""}`, { replace: true });
+      }
+    };
+    window.addEventListener("scholar:project-persisted", handlePersisted);
+    return () => window.removeEventListener("scholar:project-persisted", handlePersisted);
+  }, [urlProjectId, effectiveProjectId, view, navigate]);
+
+  useEffect(() => {
+    if (urlProjectId === "new") {
       const search = new URLSearchParams(location.search);
       const format = search.get("format") || "OT-01";
       navigate(`/projects?newFormat=${format}`, { replace: true });
       return;
     }
     let active = true;
-    if (projectId) {
-      getProject(projectId)
+    const targetId = effectiveProjectId || urlProjectId;
+    if (targetId) {
+      getProject(targetId)
         .then((p) => {
           if (active) setOutputTypeId(p.outputTypeId);
         })
@@ -204,51 +227,77 @@ function ProjectRoute() {
     return () => {
       active = false;
     };
-  }, [projectId, location.search, navigate]);
+  }, [effectiveProjectId, urlProjectId, location.search, navigate]);
 
   const onDeskShellViewChange = useCallback(
     (next: DeskShellView, options?: { replace?: boolean }) => {
-      navigate(`/projects/${projectId}/${next}`, options);
+      const targetId = getMigratedDraftRealId(effectiveProjectId) || effectiveProjectId;
+      navigate(`/projects/${targetId}/${next}`, options);
     },
-    [navigate, projectId]
+    [navigate, effectiveProjectId]
   );
 
   const onResearchStageChange = useCallback(
     (next: ResearchStage, options?: { replace?: boolean }) => {
-      navigate(`/projects/${projectId}/${next}`, options);
+      const targetId = getMigratedDraftRealId(effectiveProjectId) || effectiveProjectId;
+      navigate(`/projects/${targetId}/${next}`, options);
     },
-    [navigate, projectId]
+    [navigate, effectiveProjectId]
   );
 
   const onAssignmentStageChange = useCallback(
     (next: AssignmentStage, options?: { replace?: boolean }) => {
-      navigate(`/projects/${projectId}/${next}`, options);
+      const targetId = getMigratedDraftRealId(effectiveProjectId) || effectiveProjectId;
+      navigate(`/projects/${targetId}/${next}`, options);
     },
-    [navigate, projectId]
+    [navigate, effectiveProjectId]
   );
 
   // Guaranteed by the route pattern (":projectId" only matches with a value)
-  // — this is TypeScript narrowing, not a real fallback path.
-  if (!projectId) return <Navigate to="/projects" replace />;
+  if (!urlProjectId && !effectiveProjectId) return <Navigate to="/projects" replace />;
 
   if (error) {
+    const isEphemeralMissing = error.includes("ephemeral memory") || error.includes("Draft project");
+
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[color:var(--surface-canvas)]">
-        <div className="flex flex-col items-center gap-6 max-w-md text-center p-8">
-          <div className="w-16 h-16 rounded-full bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] flex items-center justify-center">
-            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="min-h-screen flex items-center justify-center bg-[color:var(--surface-canvas)] p-6">
+        <div className="flex flex-col items-center gap-5 max-w-md text-center p-8 bg-white dark:bg-[#1E1E20] border border-neutral-200 dark:border-white/10 rounded-2xl shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <p className="text-lg text-[color:var(--text-primary)] font-medium">
-            {error}
-          </p>
-          <button
-            onClick={() => navigate("/projects")}
-            className="rounded-full bg-[color:var(--accent)] px-6 py-3 font-bold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-colors"
-          >
-            Back to your work
-          </button>
+          <div>
+            <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
+              {isEphemeralMissing ? "Draft Session Expired" : "Unable to Open Project"}
+            </h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1.5 leading-relaxed">
+              {isEphemeralMissing
+                ? "This draft session could not be located in temporary memory. You can start a fresh research assignment or review your saved projects."
+                : error}
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full pt-1">
+            {isEphemeralMissing && (
+              <button
+                type="button"
+                onClick={() => {
+                  const newDraft = createEphemeralProject("OT-01", "New Academic Assignment");
+                  navigate(`/projects/${newDraft.projectId}/understand`, { replace: true });
+                }}
+                className="w-full sm:flex-1 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 px-4 py-2.5 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                Start New Assignment
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate("/projects")}
+              className="w-full sm:flex-1 rounded-xl border border-neutral-200 dark:border-white/10 px-4 py-2.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              Saved Projects
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -265,10 +314,12 @@ function ProjectRoute() {
     );
   }
 
+  const targetProjectId = effectiveProjectId || urlProjectId || "";
+
   if (outputTypeId === "OT-01") {
     return (
       <AssignmentWorkspace
-        projectId={projectId}
+        projectId={targetProjectId}
         initialStage={isAssignmentStage(view) ? view : null}
         onStageChange={onAssignmentStageChange}
         onClose={() => navigate("/projects")}
@@ -282,7 +333,7 @@ function ProjectRoute() {
   if (outputTypeId === "OT-09" || outputTypeId === "OT-07") {
     return (
       <ThesisWorkspace
-        projectId={projectId}
+        projectId={targetProjectId}
         onClose={() => navigate("/projects")}
         onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
         onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
@@ -294,7 +345,7 @@ function ProjectRoute() {
   if (outputTypeId === "OT-19") {
     return (
       <ProposalWorkspace
-        projectId={projectId}
+        projectId={targetProjectId}
         onClose={() => navigate("/projects")}
         onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
         onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
@@ -306,7 +357,7 @@ function ProjectRoute() {
   if (outputTypeId === "OT-22") {
     return (
       <PresentationWorkspace
-        projectId={projectId}
+        projectId={targetProjectId}
         onClose={() => navigate("/projects")}
         onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
         onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
@@ -318,7 +369,7 @@ function ProjectRoute() {
   if (outputTypeId === "OT-10") {
     return (
       <ResearchWorkspace
-        projectId={projectId}
+        projectId={targetProjectId}
         initialStage={isResearchStage(view) ? view : null}
         onStageChange={onResearchStageChange}
         onClose={() => navigate("/projects")}
@@ -331,7 +382,7 @@ function ProjectRoute() {
 
   return (
     <DeskShell
-      projectId={projectId}
+      projectId={targetProjectId}
       view={isDeskShellView(view) ? view : null}
       onViewChange={onDeskShellViewChange}
       onClose={() => navigate("/projects")}
