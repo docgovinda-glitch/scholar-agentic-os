@@ -3934,9 +3934,9 @@ export function conductAskScholarResearchForOutline(
       case "dialectical_argument":
       default:
         subQuestions = [
-          `What foundational theoretical and conceptual parameters establish the primary thesis regarding ${primaryConcept}?`,
-          `What substantive empirical evidence, counter-arguments, and dissenting schools of thought contest this thesis?`,
-          `How does critical refutation and dialectical synthesis reconcile competing evidentiary claims into a nuanced conclusion?`,
+          `What foundational theoretical concepts, analytical frameworks, and scope conditions govern ${primaryConcept}?`,
+          `What substantive empirical evidence, comparative findings, and competing scholarly interpretations evaluate ${primaryConcept}?`,
+          `How do evidentiary findings and critical analysis synthesize into an authoritative answer regarding ${primaryConcept}?`,
         ];
         break;
     }
@@ -3953,14 +3953,14 @@ export function conductAskScholarResearchForOutline(
   } else if (inquiryType === "policy_diagnostic") {
     centralProblem = `Diagnosing systemic, operational, and institutional root causes of ${primaryConcept} and formulating validated strategic interventions.`;
   } else {
-    centralProblem = `Deconstructing the contentious academic question: "${(question || combinedText).slice(0, 120)}" through dialectical argument and empirical synthesis.`;
+    centralProblem = `Analyzing the core intellectual problem: "${(question || combinedText).slice(0, 120)}" through rigorous evidentiary evaluation and theoretical synthesis.`;
   }
 
   const analyticalComponents = [
     `Conceptual & Theoretical Parameterization: Defining ${primaryConcept} through ${primaryTheory}.`,
     `Empirical & Case Scrutiny: Evaluating observational datasets and case manifestations in ${geoOrCase}.`,
-    `Dialectical Evaluation: Weighing counter-arguments, rival theories (${secondaryTheory}), and empirical anomalies.`,
-    `Actionable Synthesis: Reconciling theoretical and empirical tensions into a defensible academic thesis.`,
+    `Critical Evaluation: Weighing rival perspectives, counter-evidence, and methodological constraints.`,
+    `Analytical Synthesis: Synthesizing findings into a defensible, evidence-grounded academic thesis.`,
   ];
 
   const coreDebates = [
@@ -4051,19 +4051,19 @@ export function conductAskScholarResearchForOutline(
         sectionTitle = `Strategic Interventions, Implementation Roadmap & Risk Mitigation`;
       }
     } else {
-      // dialectical / causal / theory-case
+      // General thematic / causal / theoretical / inquiry
       if (idx === 0) {
         obj = `Establish theoretical foundations, analytical definitions, and core hypotheses answering the prompt.`;
         researchNeed = `Core theoretical frameworks and foundational literature defining ${primaryConcept}.`;
-        sectionTitle = `Theoretical Foundations and Conceptual Architecture of ${primaryConcept}`;
+        sectionTitle = `Theoretical Foundations and Analytical Framing of ${primaryConcept}`;
       } else if (idx === 1) {
-        obj = `Scrutinize substantive empirical evidence, unpack rival arguments, and evaluate systemic anomalies.`;
-        researchNeed = `Recent empirical observations (2024–2026) and dissenting scholarly critiques.`;
-        sectionTitle = `Substantive Empirical Evidence and Operational Realities: ${primaryConcept}`;
+        obj = `Scrutinize substantive empirical evidence, unpack competing explanations, and evaluate evidentiary patterns.`;
+        researchNeed = `Recent empirical observations (2024–2026) and critical scholarly analyses.`;
+        sectionTitle = `Substantive Evidence and Comparative Evaluation: ${primaryConcept}`;
       } else {
-        obj = `Critically refute counter-claims, reconcile dialectical tensions, and substantiate an evidence-based conclusion.`;
-        researchNeed = `Dialectical syntheses and contemporary peer-reviewed evaluations.`;
-        sectionTitle = `Critical Counter-Perspectives, Dialectical Synthesis & Future Horizons`;
+        obj = `Critically evaluate competing perspectives, weigh methodological limitations, and substantiate an evidence-based conclusion.`;
+        researchNeed = `Analytical syntheses and contemporary peer-reviewed evaluations.`;
+        sectionTitle = `Analytical Synthesis, Critical Evaluation & Scholarly Horizons`;
       }
     }
 

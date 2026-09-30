@@ -1213,7 +1213,7 @@ CORE ARCHITECTURAL RULES:
    ${
      isCourseworkWorkspace
        ? `COURSEWORK WORKSPACE: Align with rubric criteria, module learning outcomes, diagnostic problem decomposition, applied analytical frameworks, empirical evaluation, and actionable strategic recommendations.`
-       : `ESSAY WORKSPACE: Enforce a rigorous dialectical argument progression (foundational conceptual parameters, substantive empirical evidence & antithesis, dialectical synthesis & critical refutation).`
+       : `ESSAY WORKSPACE: Formulate an original intellectual architecture specifically tailored to this assignment inquiry (whether comparative, causal, theoretical, policy, or case-driven). Ground every section title directly in the substantive problem and core concepts.`
    }
 5. WORD ALLOCATIONS:
    The sum of all subheading targetWordCounts MUST equal approximately ${targetWordCount}.

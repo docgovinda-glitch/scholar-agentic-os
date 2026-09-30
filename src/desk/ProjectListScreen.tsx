@@ -2870,35 +2870,6 @@ export default function ProjectListScreen({
                   </button>
                 )}
 
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/10 text-xs">
-                  <BookOpen className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-                  <label htmlFor="ask-scholar-header-citation-style" className="sr-only">
-                    Referencing Style
-                  </label>
-                  <select
-                    id="ask-scholar-header-citation-style"
-                    aria-label="Preferred Referencing Style"
-                    value={askCitationStyle}
-                    onChange={(e) => {
-                      const newStyle = e.target.value as AskCitationStyleId;
-                      setAskCitationStyle(newStyle);
-                      try {
-                        localStorage.setItem("scholar_ask_citation_style", newStyle);
-                      } catch {
-                        // ignore
-                      }
-                    }}
-                    className="bg-transparent text-[11px] font-medium text-neutral-700 dark:text-neutral-300 focus:outline-none cursor-pointer pr-1"
-                    title="Select referencing style (APA, MLA, Chicago, Harvard, IEEE, Vancouver)"
-                  >
-                    {ASK_SCHOLAR_CITATION_STYLES.map((s) => (
-                      <option key={s.id} value={s.id} className="bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100">
-                        {s.shortLabel}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 <button
                   type="button"
                   onClick={() => setIsAiSidebarOpen(false)}
@@ -3498,36 +3469,6 @@ export default function ProjectListScreen({
                     <span className="text-neutral-400 text-[10px] animate-pulse">• Checking AI...</span>
                   )}
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/10 text-[11px] text-neutral-600 dark:text-neutral-400">
-                    <BookOpen className="w-3 h-3 text-sky-500 shrink-0" />
-                    <label htmlFor="ask-scholar-bar-citation-style" className="sr-only">
-                      Referencing Style
-                    </label>
-                    <select
-                      id="ask-scholar-bar-citation-style"
-                      aria-label="Prompt Bar Referencing Style"
-                      value={askCitationStyle}
-                      onChange={(e) => {
-                        const newStyle = e.target.value as AskCitationStyleId;
-                        setAskCitationStyle(newStyle);
-                        try {
-                          localStorage.setItem("scholar_ask_citation_style", newStyle);
-                        } catch {
-                          // ignore
-                        }
-                      }}
-                      className="bg-transparent text-[10px] font-semibold text-neutral-700 dark:text-neutral-300 focus:outline-none cursor-pointer"
-                      title="Citation Style: APA, MLA, Chicago, Harvard, IEEE, Vancouver"
-                    >
-                      {ASK_SCHOLAR_CITATION_STYLES.map((s) => (
-                        <option key={s.id} value={s.id} className="bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100">
-                          {s.shortLabel}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
 
                   <button
                     type="button"

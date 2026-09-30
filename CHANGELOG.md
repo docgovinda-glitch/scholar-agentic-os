@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-30
 
+### UI & UX Refinements (Phase I & II)
+- **Removed Hardcoded Outline Terminology (`outlineService.ts`, `assignment.ts`)**:
+  - Eliminated rigid fallback headings such as "Conceptual Parameters", "Dialectical Counter-Perspective", and "Thesis-Antithesis-Synthesis".
+  - Removed negative constraints that inadvertently forced the LLM to generate forbidden terms, ensuring outlines adapt dynamically to the provided topic and question.
+- **UI Space Optimization for Uploaded Sources (`CuratedSourceCompactView.tsx`)**:
+  - Replaced large visual components for uploaded sources with a more condensed view to minimize vertical space usage and improve usability.
+- **Ask Scholar Sidebar UX Improvements (`api.ts`, `ProjectListScreen.tsx`)**:
+  - Removed explicit AI provider information (e.g., "Google Gemini") from the user interface, abstracting backend routing and simplifying the status to "Ask Scholar is ready".
+  - Removed redundant citation style dropdowns from the Ask Scholar sidebar, as citation styles are managed centrally within vault settings.
+
 ### Rebuilt & Enhanced (Phase II Evidence & Analysis Engine, Ephemeral State Recovery & Dynamic Citation Traceability)
 - **Root-Cause Resolution of Ephemeral Memory Loss (`ephemeralProjectStore.ts`, `api.ts`, `DeskApp.tsx`)**:
   - Identified and eliminated the root cause of `Draft project draft-* not found in ephemeral memory` during Phase I → Phase II transitions.

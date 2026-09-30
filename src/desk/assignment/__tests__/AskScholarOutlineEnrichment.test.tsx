@@ -118,7 +118,7 @@ describe("AskScholar Pattern Outline Enrichment", () => {
   });
 
   describe("3. Workspace Adaptations: Essay vs Coursework", () => {
-    it("generates dialectical argument progression for Essay workspace", () => {
+    it("generates substantive analytical argument progression for Essay workspace", () => {
       const structure = generateDynamicAssignmentStructure({
         question: "Does Globalization Reduce State Sovereignty?",
         assignmentType: "essay",
@@ -128,17 +128,17 @@ describe("AskScholar Pattern Outline Enrichment", () => {
 
       expect(structure.headings).toHaveLength(3);
       // H1: Theoretical & Conceptual Foundations
-      expect(structure.headings[0].title).toContain("Foundations");
+      expect(structure.headings[0].title).toContain("Theoretical Framing");
       expect(structure.headings[0].subheadings[0].title).toContain("Conceptual Parameters");
 
-      // H2: Antithesis & Contested Evidence
+      // H2: Substantive Evidence & Competing Explanations
       expect(structure.headings[1].title).toContain("Substantive Evidence");
-      expect(structure.headings[1].subheadings[0].title).toContain("Antithesis");
+      expect(structure.headings[1].subheadings[0].title).toContain("Competing Explanations");
 
-      // H3: Dialectical Synthesis & Resolution
-      expect(structure.headings[2].title).toContain("Critical Counter-Perspectives");
-      expect(structure.headings[2].subheadings[0].title).toContain("Critical Refutation");
-      expect(structure.headings[2].subheadings[1].title).toContain("Scholarly Synthesis");
+      // H3: Analytical Synthesis & Evidentiary Resolution
+      expect(structure.headings[2].title).toContain("Analytical Synthesis");
+      expect(structure.headings[2].subheadings[0].title).toContain("Evidentiary Synthesis");
+      expect(structure.headings[2].subheadings[1].title).toContain("Scholarly Contributions");
 
       // Structure depth: each subheading has concrete H3 key points
       expect(structure.headings[0].subheadings[0].keyPoints.length).toBeGreaterThanOrEqual(3);

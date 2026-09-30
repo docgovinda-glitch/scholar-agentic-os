@@ -1344,9 +1344,7 @@ export async function getAiOperationalStatus(): Promise<AiOperationalStatus> {
 
       return {
         connected,
-        statusText: connected
-          ? (activeProvider ? `AI Ready (${activeProvider})` : "AI Ready")
-          : "AI Disconnected",
+        statusText: connected ? "Ask Scholar is ready" : "AI Disconnected",
         provider: activeProvider,
         model: activeModel,
         capabilities: {
@@ -1365,7 +1363,7 @@ export async function getAiOperationalStatus(): Promise<AiOperationalStatus> {
 
   return {
     connected: hasClientByok,
-    statusText: hasClientByok ? `AI Ready (${byokProviders[0]})` : "AI Disconnected",
+    statusText: hasClientByok ? "Ask Scholar is ready" : "AI Disconnected",
     provider: hasClientByok ? byokProviders[0] : undefined,
     capabilities: {
       text: hasClientByok,

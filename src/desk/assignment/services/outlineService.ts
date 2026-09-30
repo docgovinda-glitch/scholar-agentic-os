@@ -294,7 +294,7 @@ export function generateAdaptiveDefaultOutline(
         {
           title: "4. Critical Debates, Tensions & Contradictions",
           ratio: 0.20,
-          guidance: "Identify major dialectical debates, theoretical tensions, and unresolved controversies in the literature.",
+          guidance: "Identify major debates, theoretical tensions, and unresolved controversies in the literature.",
           keyPoints: ["Key scholarly arguments", "Conceptual clashes", "Unresolved empirical disputes"],
         },
         {
@@ -433,13 +433,13 @@ export function generateAdaptiveDefaultOutline(
           keyPoints: ["Primary argument thesis", "Supporting empirical evidence", "Critical analysis of significance"],
         },
         {
-          title: "4. Dialectical Counter-Perspective & Critical Evaluation",
+          title: "4. Alternative Perspectives & Critical Evaluation",
           ratio: 0.25,
           guidance: "Fairly present the strongest scholarly counterargument or alternative interpretation, then critically refute or nuance it.",
           keyPoints: ["Opposing school of thought", "Critique of counter-evidence", "Nuanced defence of thesis"],
         },
         {
-          title: "5. Synthesis: Complex Nuance & Interdisciplinary Implications",
+          title: "5. Conclusion & Interdisciplinary Implications",
           ratio: 0.10,
           guidance: "Synthesize the tension between viewpoints, demonstrating high-level critical thinking and evaluating broader implications.",
           keyPoints: ["Resolution of debate", "Contextual qualifications", "Academic implications"],
@@ -807,9 +807,9 @@ export function extractTargetFrameworks(
       addIfNotPresent(frameworks, "Resource-Based View (RBV) & VRIO");
       addIfNotPresent(frameworks, "Strategic Alignment & Stakeholder Salience Theory");
     } else {
-      addIfNotPresent(frameworks, "Dialectical Thesis-Antithesis-Synthesis Progression");
       addIfNotPresent(frameworks, "Comparative Institutional Analysis");
       addIfNotPresent(frameworks, "Critical Epistemic & Methodological Deconstruction");
+      addIfNotPresent(frameworks, "Empirical Causal Inference & Evidence Synthesis");
     }
   }
 
@@ -865,11 +865,11 @@ export function sanitizeOutlineHeadings(
       } else if (hIdx === 1) {
         sanitizedH1Title = isCoursework
           ? `Applied Empirical Investigation & Diagnostic Analysis: ${topicB || topicA}`
-          : `Antithesis, Competing Paradigms & Contested Evidence in ${topicB || topicA}`;
+          : `Analytical Evaluation & Evidentiary Findings: ${topicB || topicA}`;
       } else {
         sanitizedH1Title = isCoursework
           ? `Strategic Recommendations, Interventions & Academic Reflection`
-          : `Dialectical Synthesis, Critical Refutation & Resolution`;
+          : `Analytical Synthesis, Critical Evaluation & Scholarly Horizons: ${topicA}`;
       }
     }
 
@@ -1394,13 +1394,13 @@ export function buildBriefSpecificSpecs(
       taskSpecs.push({
         title: isCoursework
           ? `3.0 Strategic Interventions, Implementation Roadmap & Governance Framework`
-          : `3.0 Dialectical Synthesis, Critical Refutation & Scholarly Horizons`,
+          : `3.0 Analytical Synthesis, Critical Evaluation & Scholarly Horizons`,
         notes: `Synthesize findings across preceding tasks into actionable recommendations and critical reflection.`,
         subheadings: [
           {
             title: isCoursework
               ? `Prioritized Evidence-Based Recommendations for ${primaryTopic}`
-              : `Critical Refutation of Rival Counter-Claims: ${primaryTopic}`,
+              : `Critical Evaluation and Evidentiary Rebuttal: ${primaryTopic}`,
             ratio: 0.16,
             guidance: `Synthesize insights into prioritized interventions or evidence-based rebuttal.`,
             keyPoints: [
@@ -1524,15 +1524,208 @@ export function buildBriefSpecificSpecs(
     ];
   }
 
-  // Essay: Dialectical progression incorporating brief concepts
+  // Detect intellectual inquiry architecture dynamically from prompt semantics
+  const qLower = (question || "").toLowerCase();
+  const isComparative =
+    qLower.includes("compare") ||
+    qLower.includes("contrast") ||
+    qLower.includes("versus") ||
+    qLower.includes(" vs ") ||
+    qLower.includes("similarities and differences") ||
+    qLower.includes("comparative");
+
+  const isCausal =
+    qLower.includes("why did") ||
+    qLower.includes("why do") ||
+    qLower.includes("causes of") ||
+    qLower.includes("factors that led") ||
+    qLower.includes("explain why") ||
+    qLower.includes("reasons for") ||
+    qLower.includes("causal mechanism") ||
+    qLower.includes("reduce") ||
+    qLower.includes("impact of");
+
+  if (isComparative) {
+    return [
+      {
+        title: `Theoretical Foundations & Comparative Parameters: ${primaryTopic}${secondaryTopic ? ` and ${secondaryTopic}` : ""}`,
+        notes: `Establish foundational definitions, comparative benchmarks, and theoretical models (${primaryFramework}) governing ${primaryTopic}.`,
+        subheadings: [
+          {
+            title: `Theoretical Foundations of ${c1}`,
+            ratio: 0.15,
+            guidance: `Define primary concepts, analytical frameworks, and scope conditions governing ${c1}.`,
+            keyPoints: [
+              `Foundational taxonomy and conceptual framing of ${c1}`,
+              `Core theoretical assumptions of ${primaryFramework}`,
+              `Analytical criteria and comparative evaluation metrics`,
+            ],
+          },
+          {
+            title: secondaryTopic
+              ? `Comparative Analytical Dimensions: Divergence and Commonalities in ${secondaryTopic}`
+              : `Comparative Analytical Dimensions: Divergence and Commonalities in ${c2}`,
+            ratio: 0.18,
+            guidance: `Analyze key structural and institutional dimensions that differentiate ${c1} and ${secondaryTopic || c2}.`,
+            keyPoints: [
+              `Direct comparative metrics and institutional mechanisms`,
+              `Structural similarities, distinctions, and divergence`,
+              `Scope conditions and contextual mediating factors`,
+            ],
+          },
+        ],
+      },
+      {
+        title: `Comparative Empirical Investigation & Case Scrutiny: ${c2}`,
+        notes: `Evaluate empirical case studies, observational datasets, and comparative evidence.`,
+        subheadings: [
+          {
+            title: `Empirical Evidence and Observational Findings in ${c1}`,
+            ratio: 0.20,
+            guidance: `Scrutinize primary empirical findings and real-world case observations examining ${c1}.`,
+            keyPoints: [
+              `Empirical case observations and field evidence`,
+              `Comparative institutional performance and variations`,
+              `Methodological reliability and data consistency`,
+            ],
+          },
+          {
+            title: `Critical Evaluation of Explanatory Power and Anomalies: ${c3}`,
+            ratio: 0.18,
+            guidance: `Critique competing explanations, empirical anomalies, and boundary conditions in ${c3}.`,
+            keyPoints: [
+              `Assessment of competing theoretical models`,
+              `Empirical anomalies and explanatory limitations in ${c3}`,
+              `Contextual heterogeneity and comparative trade-offs`,
+            ],
+          },
+        ],
+      },
+      {
+        title: `Comparative Synthesis, Implications & Scholarly Horizons: ${c4}`,
+        notes: `Synthesize comparative insights into a rigorous conclusion with theoretical and policy implications.`,
+        subheadings: [
+          {
+            title: `Synthesis of Comparative Evidence and Critical Evaluation: ${c1}`,
+            ratio: 0.15,
+            guidance: `Synthesize findings across comparative dimensions to resolve core analytical tensions.`,
+            keyPoints: [
+              `Synthesis of comparative evidence and thesis defense for ${primaryTopic}`,
+              `Reconciliation of empirical disparities and scope conditions`,
+              `Overarching explanatory verdict on ${c1}`,
+            ],
+          },
+          {
+            title: `Theoretical Implications, Policy Realities, and Future Research Agenda`,
+            ratio: 0.14,
+            guidance: `Detail wider implications for scholarship, institutional practice, and future inquiry.`,
+            keyPoints: [
+              `Contributions to scholarly literature and theoretical models`,
+              `Substantive policy or practice implications in ${c3}`,
+              `Emerging analytical horizons and future research priorities`,
+            ],
+          },
+        ],
+      },
+    ];
+  }
+
+  if (isCausal) {
+    return [
+      {
+        title: `Theoretical Framing and Causal Architecture of ${primaryTopic}${secondaryTopic ? ` in ${secondaryTopic}` : ""}`,
+        notes: `Establish foundational concepts, causal hypotheses, and explanatory models (${primaryFramework}) governing ${primaryTopic}.`,
+        subheadings: [
+          {
+            title: `Causal Foundations of ${c1}`,
+            ratio: 0.15,
+            guidance: `Define core concepts, transmission channels, and theoretical propositions governing ${c1}.`,
+            keyPoints: [
+              `Foundational concepts and causal hypotheses regarding ${c1}`,
+              `Theoretical mechanisms posited by ${primaryFramework}`,
+              `Scope conditions and analytical boundaries`,
+            ],
+          },
+          {
+            title: secondaryTopic
+              ? `Structural Drivers and Transmission Mechanisms in ${secondaryTopic}`
+              : `Structural Drivers and Transmission Mechanisms in ${c2}`,
+            ratio: 0.18,
+            guidance: `Analyze dominant transmission mechanisms and structural factors driving ${c1}.`,
+            keyPoints: [
+              `Primary causal mechanisms and operational pathways`,
+              `Intermediary variables and structural dynamics in ${c2}`,
+              `Institutional and environmental mediating influences`,
+            ],
+          },
+        ],
+      },
+      {
+        title: `Substantive Evidence and Competing Explanations: ${c1}${secondaryTopic ? ` in ${secondaryTopic}` : ""}`,
+        notes: `Investigate observational data, case evidence, and rival explanations.`,
+        subheadings: [
+          {
+            title: secondaryTopic
+              ? `Critical Evaluation of Competing Explanations in ${secondaryTopic}`
+              : `Critical Evaluation of Competing Explanations and Evidence on ${c1}`,
+            ratio: 0.20,
+            guidance: `Critically unpack rival explanations, empirical counter-evidence, and dissenting schools of thought on ${c1}.`,
+            keyPoints: [
+              `Rival explanations and dissenting interpretations of ${c1}`,
+              `Empirical counter-evidence and anomalies in ${c2}`,
+              `Contextual divergence and comparative evidence`,
+            ],
+          },
+          {
+            title: `Methodological Scrutiny, Endogeneity, and Boundary Conditions: ${c3}`,
+            ratio: 0.17,
+            guidance: `Scrutinize causal inference challenges, potential confounding factors, and empirical boundary conditions in ${c3}.`,
+            keyPoints: [
+              `Causal identification challenges and confounding variables in ${c3}`,
+              `Measurement limitations and methodological constraints`,
+              `Structural scope limits and contextual caveats`,
+            ],
+          },
+        ],
+      },
+      {
+        title: `Analytical Synthesis, Evidentiary Resolution & Future Horizons: ${c4}`,
+        notes: `Reconcile evidence, defend the central thesis, and articulate wider scholarly implications.`,
+        subheadings: [
+          {
+            title: `Evidentiary Synthesis and Resolution of Competing Claims: ${c1}`,
+            ratio: 0.16,
+            guidance: `Weigh evidence across rival explanations to substantiate an authoritative, nuanced conclusion on ${c1}.`,
+            keyPoints: [
+              `Evidence-based resolution of competing explanations on ${c1}`,
+              `Vindication of the primary causal argument in ${c2}`,
+              `Nuanced reconciliation of empirical trade-offs`,
+            ],
+          },
+          {
+            title: `Scholarly Contributions, Policy Implications, and Emerging Horizons`,
+            ratio: 0.14,
+            guidance: `Synthesize overarching conclusions into actionable policy insights and forward-looking research horizons.`,
+            keyPoints: [
+              `Overarching contribution to academic debate on ${primaryTopic}`,
+              `Policy and governance implications in ${c3}`,
+              `Prospective research questions and methodological frontiers`,
+            ],
+          },
+        ],
+      },
+    ];
+  }
+
+  // General Analytical Inquiry: Question-Grounded Academic Architecture
   return [
     {
-      title: `Theoretical Foundations and Conceptual Architecture of ${primaryTopic}${secondaryTopic ? ` in ${secondaryTopic}` : ""}`,
+      title: `Theoretical Foundations and Analytical Framing of ${primaryTopic}${secondaryTopic ? ` in ${secondaryTopic}` : ""}`,
       notes: `Establish foundational definitions, theoretical models (${primaryFramework}), and analytical scope governing ${primaryTopic}.`,
       subheadings: [
         {
-          title: `Conceptual Parameters and Intellectual Tensions Surrounding ${c1}`,
-          ratio: 0.14,
+          title: `Theoretical Foundations of ${c1}`,
+          ratio: 0.15,
           guidance: `Define primary concepts, taxonomical frameworks, and analytical boundaries addressing ${c1}.`,
           keyPoints: [
             `Foundational taxonomy and theoretical stakes of ${c1}`,
@@ -1542,8 +1735,8 @@ export function buildBriefSpecificSpecs(
         },
         {
           title: secondaryTopic
-            ? `Theoretical Paradigms: ${primaryFramework} Governing ${secondaryTopic}`
-            : `Dominant Theoretical Paradigms: ${primaryFramework} and Explanatory Mechanisms`,
+            ? `Analytical Frameworks: ${primaryFramework} Governing ${secondaryTopic}`
+            : `Analytical Frameworks: ${primaryFramework} and Explanatory Mechanisms`,
           ratio: 0.18,
           guidance: secondaryTopic
             ? `Synthesize primary theoretical mechanisms linking ${c1} directly to ${secondaryTopic} using ${primaryFramework}.`
@@ -1557,13 +1750,13 @@ export function buildBriefSpecificSpecs(
       ],
     },
     {
-      title: `Substantive Evidence and Operational Realities: ${c1}${secondaryTopic ? ` in ${secondaryTopic}` : ""}`,
+      title: `Substantive Evidence and Comparative Evaluation: ${c1}${secondaryTopic ? ` in ${secondaryTopic}` : ""}`,
       notes: `Investigate primary empirical findings, real-world case evidence, and operational dynamics.`,
       subheadings: [
         {
           title: secondaryTopic
-            ? `Antithesis: Counter-Arguments and Dissenting Perspectives in ${secondaryTopic}`
-            : `Antithesis: Counter-Arguments and Dissenting Perspectives on ${c1}`,
+            ? `Critical Evaluation and Competing Perspectives in ${secondaryTopic}`
+            : `Critical Evaluation and Competing Perspectives on ${c1}`,
           ratio: 0.20,
           guidance: `Critically unpack rival perspectives, empirical anomalies, and counter-arguments challenging prevailing assumptions regarding ${c1}.`,
           keyPoints: [
@@ -1574,7 +1767,7 @@ export function buildBriefSpecificSpecs(
         },
         {
           title: `Structural Vulnerabilities, Boundary Conditions, and Methodological Contestation: ${c3}`,
-          ratio: 0.18,
+          ratio: 0.17,
           guidance: `Scrutinize systemic friction points, boundary conditions, and methodological contestation in the scholarship surrounding ${c3}.`,
           keyPoints: [
             `Measurement limitations and methodological vulnerabilities in ${c3}`,
@@ -1585,17 +1778,17 @@ export function buildBriefSpecificSpecs(
       ],
     },
     {
-      title: `Critical Counter-Perspectives, Dialectical Synthesis & Future Horizons: ${c4}`,
-      notes: `Rigorously weigh counterarguments, address methodological limitations, and reach an evidence-based dialectical resolution.`,
+      title: `Analytical Synthesis, Critical Evaluation & Future Horizons: ${c4}`,
+      notes: `Rigorously weigh counterarguments, address methodological limitations, and reach an evidence-based resolution.`,
       subheadings: [
         {
-          title: `Critical Refutation of Counter-Claims and Reconciliation of Dialectical Tensions: ${c1}`,
+          title: `Analytical Synthesis and Resolution of Competing Arguments: ${c1}`,
           ratio: 0.16,
-          guidance: `Weigh conflicting perspectives, refute flawed objections, and synthesize a nuanced reconciliation of ${c1}.`,
+          guidance: `Weigh conflicting perspectives, evaluate evidentiary robustness, and synthesize a nuanced resolution of ${c1}.`,
           keyPoints: [
-            `Evidence-based rebuttal of competing objections on ${c1}`,
-            `Reconciliation of dialectical thesis-antithesis tensions in ${c2}`,
-            `Refined causal framework and analytical resolution`,
+            `Evidence-based evaluation of competing perspectives on ${c1}`,
+            `Reconciliation of empirical and theoretical tensions in ${c2}`,
+            `Refined explanatory framework and analytical resolution`,
           ],
         },
         {
@@ -2513,8 +2706,13 @@ CRITICAL RULES:
 2. Create EXACTLY 3 Main Headings that directly reflect the substantive analytical topics of the question.
 3. Under each Main Heading, provide EXACTLY 2 Subheadings with descriptive, intellectually rigorous titles.
 4. Under each Subheading, provide EXACTLY 3 specific H3 argument/evidence focus points (concrete academic concepts, models, empirical metrics, or theoretical debates).
-5. For Essays: enforce a dialectical progression (thesis, antithesis, synthesis, refutation).
-6. For Coursework: enforce problem decomposition, applied analytical frameworks, diagnostic evaluation, and actionable recommendations.
+5. Structuring Architecture: Derive the outline structure organically from what the question is asking:
+   - For comparative questions: enforce comparative analytical frameworks and cross-case evaluation.
+   - For causal questions: structure around competing causal mechanisms, empirical verification, and structural drivers.
+   - For policy/practice/coursework questions: enforce diagnostic problem formulation, applied models, evidence-based interventions, and risk roadmaps.
+   - For theoretical/conceptual questions: structure around conceptual architecture, empirical scope conditions, and critical theoretical debate.
+   - NEVER force generic academic template terminology unless the assignment specifically instructs it.
+6. Ground every section heading and subheading directly in the substantive domain topics and keywords of the prompt.
 7. Identify 2-4 target academic theoretical frameworks or models.
 8. Provide a definitive, tone-calibrated Working Thesis Statement answering the prompt.
 9. Allocate realistic target percentage ratios across the 6 subheadings summing to 1.0 (e.g. 0.12, 0.18, 0.20, 0.20, 0.16, 0.14).
