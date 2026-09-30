@@ -25,6 +25,8 @@ import type {
   AskScholarOutlineResponse,
 } from "../types";
 
+import { structureToInternalSections } from "../types";
+
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
   question: string,
@@ -32,16 +34,26 @@ export function generateAdaptiveDefaultOutline(
   thesis?: string,
   sections?: SectionBreakdown
 ): OutlineSection[] {
-  const total = Math.max(200, targetWordCount || 2000);
+  const total = Math.max(100, Number(targetWordCount) || 2000);
 
-  type TemplateItem = {
-    title: string;
-    ratio: number;
-    guidance: string;
-    keyPoints: string[];
-  };
-
-  let templates: TemplateItem[] = [];
+  // If question or brief is available, generate a unique, brief-specific outline
+  if (question && question.trim().length >= 5) {
+    const dyn = generateDynamicAssignmentStructure({
+      question,
+      assignmentType: type,
+      targetWordCount: total,
+    });
+    const internalSecs = structureToInternalSections(dyn);
+    if (internalSecs && internalSecs.length > 0) {
+      return internalSecs.map((s) => ({
+        id: s.id,
+        title: s.title,
+        targetWordCount: s.targetWordCount,
+        guidance: s.guidance,
+        keyPoints: s.keyPoints || [],
+      }));
+    }
+  }
 
   switch (type) {
     case "case_study":
@@ -486,7 +498,10 @@ const ACADEMIC_ACRONYMS = new Set([
   "EU", "UN", "US", "UK", "WTO", "IMF", "WHO", "NATO", "ASEAN", "BRICS",
   "GDP", "FDI", "ESG", "CSR", "HRM", "KPI", "KPIS", "ROI",
   "DNA", "RNA", "CRISPR", "CAR-T", "MHC", "FDA", "EMA", "NHS",
-  "BQP", "QEC", "NISQ", "BB84", "FIPS", "IPE", "IR", "BRI"
+  "BQP", "QEC", "NISQ", "BB84", "FIPS", "IPE", "IR", "BRI",
+  "CBAM", "GATT", "OECD", "SWIFT", "CBDC", "D2C", "ERM", "ZNE", "PEC", "CDR",
+  "ICANS", "CRS", "RBV", "VRIO", "PESTLE", "SWOT", "IMRAD", "SSPS", "IPCC",
+  "NDC", "NDCS", "FHIR", "HL7", "HIPAA", "SAMD", "EV", "EVS"
 ]);
 
 /** Format an extracted phrase into clean, academic title case while respecting acronyms */
@@ -516,6 +531,110 @@ export function formatAcademicTopicTitle(raw: string): string {
   });
 
   return formatted.join(" ");
+}
+
+export interface ExtractedBriefInquiries {
+  subQuestions: string[];
+  keyConcepts: string[];
+  extractedTasks: string[];
+  coreThemes: string[];
+}
+
+/**
+ * Extract key research inquiries, sub-questions, and domain terminology from the assignment brief.
+ */
+export function extractBriefInquiriesAndConcepts(
+  question: string,
+  briefText?: string
+): ExtractedBriefInquiries {
+  const combined = `${question}\n\n${briefText || ""}`.trim();
+  const lines = combined.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  const subQuestions: string[] = [];
+  const extractedTasks: string[] = [];
+  const keyConcepts: string[] = [];
+  const seenItems = new Set<string>();
+
+  // 1. Identify explicitly numbered/bulleted directives, tasks, or sub-questions
+  const taskNumberRegex = /^(?:(?:\d+|[a-zA-Z])[\.\):\-]|part\s*[\da-zA-Z]+[:\-\s]|task\s*[\da-zA-Z]+[:\-\s]|question\s*[\da-zA-Z]+[:\-\s])\s*(.+)/i;
+  const bulletRegex = /^[-*•]\s*(.+)/;
+
+  let inTaskBlock = false;
+  for (const line of lines) {
+    const cleanLine = line.trim();
+    if (!cleanLine) continue;
+
+    // Detect directive trigger headers
+    if (/(?:in your answer|address the following|ensure you address|tasks?|questions?|sub-questions?|key requirements?|topics? to cover)[:]/i.test(cleanLine)) {
+      inTaskBlock = true;
+      continue;
+    }
+
+    const taskMatch = cleanLine.match(taskNumberRegex);
+    if (taskMatch) {
+      const text = taskMatch[1].replace(/[?.!]+$/, "").trim();
+      if (text.length >= 8 && !seenItems.has(text.toLowerCase()) && !/^\d+%\s*[-–]\s*\d+%/.test(text)) {
+        seenItems.add(text.toLowerCase());
+        extractedTasks.push(text);
+      }
+      continue;
+    }
+
+    if (inTaskBlock && bulletRegex.test(cleanLine)) {
+      const text = cleanLine.replace(bulletRegex, "$1").replace(/[?.!]+$/, "").trim();
+      if (text.length >= 8 && !seenItems.has(text.toLowerCase())) {
+        seenItems.add(text.toLowerCase());
+        extractedTasks.push(text);
+      }
+      continue;
+    }
+
+    // Sentence question ending in ?
+    if (cleanLine.endsWith("?") && cleanLine.length >= 15) {
+      const text = cleanLine.replace(/\?+$/, "").trim();
+      if (!seenItems.has(text.toLowerCase())) {
+        seenItems.add(text.toLowerCase());
+        subQuestions.push(text);
+      }
+    }
+  }
+
+  // 2. Extract technical terms, acronyms, and proper noun clusters
+  const phraseRegex = /\b(?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+|[A-Z]{2,}(?:-[A-Z0-9]+)?)\b/g;
+  const matches = combined.match(phraseRegex) || [];
+  const stopTerms = new Set([
+    "assignment brief", "module handbook", "target word", "word count", "academic year",
+    "marking rubric", "course details", "assessment criteria", "first class", "upper second",
+    "scholar os", "student id", "due date", "united kingdom", "united states", "course code",
+    "executive summary", "table of contents", "learning outcomes", "reference list", "grading scale"
+  ]);
+
+  for (const m of matches) {
+    const clean = m.trim();
+    if (clean.length > 2 && !stopTerms.has(clean.toLowerCase()) && !keyConcepts.includes(clean)) {
+      keyConcepts.push(clean);
+    }
+  }
+
+  // 3. Extract core thematic nouns from question/brief
+  const coreThemes: string[] = [];
+  const words = question
+    .replace(/[^\w\s-]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 3 && !/^(this|that|with|from|have|been|which|their|about|what|when|where|examine|evaluate|assess|analyze|analyse|critically|discuss|investigate|explore)$/i.test(w));
+  for (let i = 0; i < words.length - 1; i += 2) {
+    const pair = `${words[i]} ${words[i + 1]}`;
+    if (!coreThemes.includes(pair)) {
+      coreThemes.push(formatAcademicTopicTitle(pair));
+    }
+  }
+
+  return {
+    subQuestions,
+    keyConcepts: keyConcepts.slice(0, 10),
+    extractedTasks: extractedTasks.slice(0, 6),
+    coreThemes: coreThemes.slice(0, 6),
+  };
 }
 
 /** Helper to add a framework if not already in array */
@@ -1149,6 +1268,299 @@ export function generateThesisStatement(
 }
 
 /**
+ * Construct truly brief-specific, non-generic heading specifications directly mirroring
+ * extracted inquiries, explicit brief sub-tasks, questions, and domain concepts.
+ */
+export function buildBriefSpecificSpecs(
+  question: string,
+  briefText: string | undefined,
+  assignmentType: string,
+  targetFrameworks: string[]
+): HeadingSpec[] {
+  const inquiries = extractBriefInquiriesAndConcepts(question, briefText);
+  const directTasks = [...inquiries.extractedTasks, ...inquiries.subQuestions];
+  const semantics = deconstructQuestionSemantics(question);
+  const primaryTopic = semantics.topicA || inquiries.coreThemes[0] || "Primary Analytical Focus";
+  const secondaryTopic = semantics.topicB || inquiries.coreThemes[1] || "";
+  const concepts = inquiries.keyConcepts;
+  const isCoursework =
+    assignmentType === "coursework" ||
+    assignmentType === "business_assignment" ||
+    assignmentType === "report" ||
+    assignmentType === "case_study";
+
+  const primaryFramework = targetFrameworks[0] || (isCoursework ? "Applied Analytical Model" : "Theoretical Explanatory Framework");
+
+  // If the brief provided 2 or more explicit tasks or questions, mirror them directly!
+  if (directTasks.length >= 2) {
+    const taskSpecs: HeadingSpec[] = directTasks.slice(0, 4).map((task, tIdx) => {
+      const cleanTaskTitle = formatAcademicTopicTitle(
+        task
+          .replace(/^(?:critically\s+evaluate|evaluate|critically\s+analyze|analyze|critically\s+assess|assess|examine|investigate|discuss|explore|propose|detail)\s+/i, "")
+          .replace(/[?:.]+$/, "")
+          .trim()
+      );
+
+      const taskConcept = concepts[tIdx] || primaryTopic;
+      const relatedConcept = concepts[(tIdx + 1) % (concepts.length || 1)] || secondaryTopic || "Operational Dynamics";
+
+      const sub1Title = `${cleanTaskTitle}: Theoretical Baselines and ${taskConcept}`;
+      const sub2Title = `${cleanTaskTitle}: Empirical Evaluation and ${relatedConcept}`;
+
+      return {
+        title: `${tIdx + 1}.0 ${cleanTaskTitle}`,
+        notes: `Directly address and substantiate: "${task}".`,
+        subheadings: [
+          {
+            title: sub1Title,
+            ratio: tIdx === 0 ? 0.16 : 0.18,
+            guidance: `Deconstruct theoretical assumptions, diagnostic baseline, and core analytical parameters for: "${task}".`,
+            keyPoints: [
+              `Direct answer to directive: ${task.slice(0, 80)}`,
+              `Analytical parameters and theoretical grounding (${primaryFramework})`,
+              `Core conceptual mechanisms concerning ${taskConcept}`,
+            ],
+          },
+          {
+            title: sub2Title,
+            ratio: tIdx === 0 ? 0.18 : 0.16,
+            guidance: `Examine empirical case evidence, diagnostic indicators, and critical contestation regarding: "${task}".`,
+            keyPoints: [
+              `Empirical data and case evidence addressing ${relatedConcept}`,
+              `Critical friction points, vulnerabilities, and counterarguments`,
+              `Substantiated conclusions and analytical synthesis`,
+            ],
+          },
+        ],
+      };
+    });
+
+    if (taskSpecs.length === 2) {
+      taskSpecs.push({
+        title: isCoursework
+          ? `3.0 Strategic Interventions, Implementation Roadmap & Governance Framework`
+          : `3.0 Dialectical Synthesis, Critical Refutation & Scholarly Horizons`,
+        notes: `Synthesize findings across preceding tasks into actionable recommendations and critical reflection.`,
+        subheadings: [
+          {
+            title: isCoursework
+              ? `Prioritized Evidence-Based Recommendations for ${primaryTopic}`
+              : `Critical Refutation of Rival Counter-Claims: ${primaryTopic}`,
+            ratio: 0.16,
+            guidance: `Synthesize insights into prioritized interventions or evidence-based rebuttal.`,
+            keyPoints: [
+              `Actionable interventions substantiated by preceding analysis`,
+              `Mitigation of structural and operational risks`,
+              `Measurable indicators and governance criteria`,
+            ],
+          },
+          {
+            title: isCoursework
+              ? `Implementation Roadmap, Risk Mitigation & Academic Reflection`
+              : `Scholarly Synthesis, Policy Implications & Future Research Horizons`,
+            ratio: 0.16,
+            guidance: `Detail rollout timeline, stakeholder engagement, and critical reflection.`,
+            keyPoints: [
+              `Phased implementation timeline and contingency buffers`,
+              `Stakeholder implications and strategic trade-offs`,
+              `Future outlook and prospective developments`,
+            ],
+          },
+        ],
+      });
+    }
+
+    const totalRatio = taskSpecs.flatMap((h) => h.subheadings).reduce((s, sub) => s + sub.ratio, 0);
+    taskSpecs.forEach((h) => {
+      h.subheadings.forEach((sub) => {
+        sub.ratio = sub.ratio / totalRatio;
+      });
+    });
+
+    return taskSpecs;
+  }
+
+  // Universal concept-driven deconstruction (non-generic, brief-specific)
+  const c1 = concepts[0] || primaryTopic;
+  const c2 = concepts[1] || secondaryTopic || (primaryTopic !== concepts[0] ? primaryTopic : "Empirical Dynamics");
+  const c3 = concepts[2] || "Comparative Realities";
+  const c4 = concepts[3] || "Strategic Horizons";
+
+  if (isCoursework) {
+    return [
+      {
+        title: `Problem Formulation, Operational Scope & Baseline: ${primaryTopic}${secondaryTopic ? ` in ${secondaryTopic}` : ""}`,
+        notes: `Deconstruct the assignment problem statement against module benchmarks and ${primaryFramework} criteria.`,
+        subheadings: [
+          {
+            title: `Diagnostic Baseline and Scope Boundaries: ${c1}`,
+            ratio: 0.15,
+            guidance: `Deconstruct core assignment brief directives for ${c1}, establish operational baseline, and define diagnostic compliance parameters.`,
+            keyPoints: [
+              `Deconstruction of core brief criteria for ${c1}`,
+              `Contextual baseline and diagnostic problem parameters`,
+              `Compliance benchmarks and performance indicators`,
+            ],
+          },
+          {
+            title: `Applied Analytical Framework & Methodological Protocol: ${primaryFramework}`,
+            ratio: 0.17,
+            guidance: `Detail and justify analytical models (${targetFrameworks.slice(0, 2).join(", ") || primaryFramework}), secondary data sources, and investigative procedures.`,
+            keyPoints: [
+              `Methodological justification for ${primaryFramework}`,
+              `Empirical data gathering and evidence protocol`,
+              `Analytical validity, reliability, and scope constraints`,
+            ],
+          },
+        ],
+      },
+      {
+        title: `Applied Empirical Investigation, Diagnostic Evaluation & Comparative Dynamics: ${c2}`,
+        notes: `Execute rigorous applied evaluation using ${primaryFramework} against real-world evidence or organizational scenarios.`,
+        subheadings: [
+          {
+            title: `Diagnostic Application to Empirical Evidence: ${c2}`,
+            ratio: 0.22,
+            guidance: `Apply diagnostic models directly to primary evidence in ${c2} to evaluate systemic performance and operational friction.`,
+            keyPoints: [
+              `Diagnostic application of ${primaryFramework} to evidence in ${c2}`,
+              `Identification of systemic friction and performance deficits`,
+              `Comparative benchmarking against industry and scholarly standards`,
+            ],
+          },
+          {
+            title: `Critical Evaluation of Institutional Constraints & Risk Factors: ${c3}`,
+            ratio: 0.18,
+            guidance: `Scrutinize operational vulnerabilities, institutional resistance, compliance risks, and feasibility barriers addressing ${c3}.`,
+            keyPoints: [
+              `Institutional bottlenecks and operational constraints in ${c3}`,
+              `Resource deficits and structural feasibility barriers`,
+              `Multi-variable risk assessment and trade-offs`,
+            ],
+          },
+        ],
+      },
+      {
+        title: `Strategic Interventions, Implementation Roadmap & Critical Reflection: ${c4}`,
+        notes: `Synthesize diagnostic findings into actionable SMART interventions, risk mitigation, and module self-evaluation.`,
+        subheadings: [
+          {
+            title: `Prioritized Evidence-Based Recommendations & Strategic Interventions for ${c1}`,
+            ratio: 0.16,
+            guidance: `Formulate concrete, prioritized SMART recommendations for ${c1} justified by diagnostic evidence and ${primaryFramework}.`,
+            keyPoints: [
+              `Actionable SMART intervention measures for ${c1}`,
+              `Resource allocation, budget priorities, and phased timeline`,
+              `Measurable KPIs and governance monitoring mechanisms`,
+            ],
+          },
+          {
+            title: `Implementation Roadmap, Risk Mitigation Matrix & Critical Academic Reflection`,
+            ratio: 0.12,
+            guidance: `Construct a phased rollout plan with contingency buffers, stakeholder management protocols, and critical evaluation of module learnings.`,
+            keyPoints: [
+              `Contingency planning for operational and strategic risks in ${c2}`,
+              `Stakeholder engagement and change management protocols`,
+              `Critical self-reflection on analytical limits and learning outcomes`,
+            ],
+          },
+        ],
+      },
+    ];
+  }
+
+  // Essay: Dialectical progression incorporating brief concepts
+  return [
+    {
+      title: `Theoretical Foundations and Conceptual Architecture of ${primaryTopic}${secondaryTopic ? ` in ${secondaryTopic}` : ""}`,
+      notes: `Establish foundational definitions, theoretical models (${primaryFramework}), and analytical scope governing ${primaryTopic}.`,
+      subheadings: [
+        {
+          title: `Conceptual Parameters and Intellectual Tensions Surrounding ${c1}`,
+          ratio: 0.14,
+          guidance: `Define primary concepts, taxonomical frameworks, and analytical boundaries addressing ${c1}.`,
+          keyPoints: [
+            `Foundational taxonomy and theoretical stakes of ${c1}`,
+            `Epistemological definitions and scope boundaries`,
+            `Primary causal mechanisms and analytical criteria`,
+          ],
+        },
+        {
+          title: secondaryTopic
+            ? `Theoretical Paradigms: ${primaryFramework} Governing ${secondaryTopic}`
+            : `Dominant Theoretical Paradigms: ${primaryFramework} and Explanatory Mechanisms`,
+          ratio: 0.18,
+          guidance: secondaryTopic
+            ? `Synthesize primary theoretical mechanisms linking ${c1} directly to ${secondaryTopic} using ${primaryFramework}.`
+            : `Analyze dominant theoretical perspectives explaining causal and functional dynamics of ${c1}.`,
+          keyPoints: [
+            `Core theoretical assumptions of ${primaryFramework}`,
+            `Explanatory causal claims and transmission channels in ${c2}`,
+            `Scope conditions, structural assumptions, and mediating variables`,
+          ],
+        },
+      ],
+    },
+    {
+      title: secondaryTopic
+        ? `Substantive Empirical Evidence and Operational Realities: ${c1} and ${secondaryTopic}`
+        : `Empirical Evidence, Operational Realities, and Case Analysis: ${c2}`,
+      notes: `Investigate primary empirical findings, real-world case evidence, and operational dynamics.`,
+      subheadings: [
+        {
+          title: secondaryTopic
+            ? `Antithesis: Counter-Arguments and Dissenting Perspectives in ${secondaryTopic}`
+            : `Antithesis: Counter-Arguments and Dissenting Perspectives on ${c1}`,
+          ratio: 0.20,
+          guidance: `Critically unpack rival perspectives, empirical anomalies, and counter-arguments challenging prevailing assumptions regarding ${c1}.`,
+          keyPoints: [
+            `Primary counter-arguments and dissenting schools of thought on ${c1}`,
+            `Empirical counter-evidence and systemic anomalies in ${c2}`,
+            `Contextual heterogeneity and comparative divergence`,
+          ],
+        },
+        {
+          title: `Structural Vulnerabilities, Boundary Conditions, and Methodological Contestation: ${c3}`,
+          ratio: 0.18,
+          guidance: `Scrutinize systemic friction points, boundary conditions, and methodological contestation in the scholarship surrounding ${c3}.`,
+          keyPoints: [
+            `Measurement limitations and methodological vulnerabilities in ${c3}`,
+            `Confounding variables and endogeneity concerns`,
+            `Structural boundary conditions and contextual disparities`,
+          ],
+        },
+      ],
+    },
+    {
+      title: `Critical Counter-Perspectives, Dialectical Synthesis & Future Horizons: ${c4}`,
+      notes: `Rigorously weigh counterarguments, address methodological limitations, and reach an evidence-based dialectical resolution.`,
+      subheadings: [
+        {
+          title: `Critical Refutation of Counter-Claims and Reconciliation of Dialectical Tensions: ${c1}`,
+          ratio: 0.16,
+          guidance: `Weigh conflicting perspectives, refute flawed objections, and synthesize a nuanced reconciliation of ${c1}.`,
+          keyPoints: [
+            `Evidence-based rebuttal of competing objections on ${c1}`,
+            `Reconciliation of dialectical thesis-antithesis tensions in ${c2}`,
+            `Refined causal framework and analytical resolution`,
+          ],
+        },
+        {
+          title: `Scholarly Synthesis, Strategic Policy Implications, and Future Research Horizons`,
+          ratio: 0.14,
+          guidance: `Synthesize analytical conclusions into coherent academic arguments and forward-looking strategic recommendations.`,
+          keyPoints: [
+            `Overarching scholarly contribution and thesis vindication for ${primaryTopic}`,
+            `Evidence-based policy, practice, or theoretical implications in ${c3}`,
+            `Prospective research agenda and emerging analytical horizons`,
+          ],
+        },
+      ],
+    },
+  ];
+}
+
+/**
  * Generate a dynamic, question-led academic structure tailored to the user's prompt.
  * Strictly avoids hardcoded "Introduction / Body Paragraphs / Conclusion" labels.
  * Produces analytical Main Headings and Subheadings tailored to the assignment task.
@@ -1174,6 +1586,8 @@ export function generateDynamicAssignmentStructure(
   const total = Math.max(300, Number(targetWordCount) || 2000);
   const qLower = question.toLowerCase();
 
+  const briefInquiries = extractBriefInquiriesAndConcepts(question, briefText);
+
   let specs: HeadingSpec[] = [];
 
   const isEconomicInterdependence =
@@ -1195,6 +1609,13 @@ export function generateDynamicAssignmentStructure(
         qLower.includes("immunotherapy") ||
         qLower.includes("oncology") ||
         qLower.includes("tumor")));
+
+  const hasExplicitBriefDirectives =
+    Boolean(briefText && briefText.trim().length > 20) &&
+    (briefInquiries.extractedTasks.length >= 2 || briefInquiries.subQuestions.length >= 2) &&
+    !isEconomicInterdependence &&
+    !isNepalIndia &&
+    !isCellTherapyCancer;
 
   const isChinaOrGeopolitics =
     !isNepalIndia &&
@@ -1273,7 +1694,9 @@ export function generateDynamicAssignmentStructure(
     assignmentType === "annotated_bibliography" ||
     qLower.includes("literature review");
 
-  if (isEconomicInterdependence) {
+  if (hasExplicitBriefDirectives) {
+    specs = buildBriefSpecificSpecs(question, briefText, assignmentType, targetFrameworks);
+  } else if (isEconomicInterdependence) {
     specs = [
       {
         title: "Theoretical Foundations of Economic Interdependence and Interstate Conflict",
@@ -1883,186 +2306,8 @@ export function generateDynamicAssignmentStructure(
       },
     ];
   } else {
-    // Dynamic universal semantic question deconstruction
-    const semantics = deconstructQuestionSemantics(question);
-    const titleA = semantics.topicA;
-    const titleB = semantics.topicB;
-
-    if (isCoursework) {
-      // Coursework: Rubric compliance, applied problem decomposition & strategic interventions
-      specs = [
-        {
-          title: `Problem Formulation, Learning Objective Alignment & Methodological Scope: ${titleA}${titleB ? ` in ${titleB}` : ""}`,
-          notes: `Deconstruct the assignment problem statement against module learning objectives, diagnostic benchmarks, and methodological protocol.`,
-          subheadings: [
-            {
-              title: `Diagnostic Problem Decomposition and Scope Boundaries: ${titleA}`,
-              ratio: 0.15,
-              guidance: `Decompose core assignment brief directives, establish the operational baseline, and define diagnostic compliance parameters.`,
-              keyPoints: [
-                `Deconstruction of primary assignment brief criteria for ${titleA}`,
-                "Contextual baseline and diagnostic problem parameters",
-                "Compliance benchmarks and performance indicators",
-              ],
-            },
-            {
-              title: `Applied Analytical Framework and Methodological Protocol: ${targetFrameworks[0] || "Target Analytical Model"}`,
-              ratio: 0.17,
-              guidance: `Detail and justify the analytical models (${targetFrameworks.join(", ") || "Selected Frameworks"}), secondary data sources, and investigative procedures.`,
-              keyPoints: [
-                `Methodological justification for ${targetFrameworks[0] || "primary analytical framework"}`,
-                "Empirical data gathering and evidence protocol",
-                "Analytical validity, reliability, and scope constraints",
-              ],
-            },
-          ],
-        },
-        {
-          title: `Applied Empirical Investigation, Diagnostic Evaluation & Scenario Analysis: ${titleA}${titleB ? ` and ${titleB}` : ""}`,
-          notes: `Execute rigorous applied evaluation using selected models against real-world evidence, organizational scenarios, or empirical datasets.`,
-          subheadings: [
-            {
-              title: titleB
-                ? `In-Depth Diagnostic Model Application to Empirical Evidence in ${titleB}`
-                : `In-Depth Diagnostic Model Application to Empirical Evidence`,
-              ratio: 0.22,
-              guidance: `Apply diagnostic frameworks directly to primary evidence and case dynamics to evaluate operational and systemic performance.`,
-              keyPoints: [
-                "Diagnostic application of models to empirical data",
-                "Identification of core operational friction and performance deficits",
-                "Comparative benchmarking against industry standards",
-              ],
-            },
-            {
-              title: `Critical Evaluation of Institutional Constraints, Systemic Bottlenecks, and Risk Factors`,
-              ratio: 0.18,
-              guidance: `Scrutinize operational vulnerabilities, institutional resistance, compliance risks, and feasibility barriers.`,
-              keyPoints: [
-                "Institutional bottlenecks and operational constraints",
-                "Resource deficits and structural feasibility barriers",
-                "Multi-variable risk assessment and trade-offs",
-              ],
-            },
-          ],
-        },
-        {
-          title: `Strategic Interventions, Implementation Roadmap & Critical Reflection`,
-          notes: `Synthesize diagnostic findings into actionable SMART interventions, risk-mitigated rollout plans, and academic self-evaluation.`,
-          subheadings: [
-            {
-              title: `Prioritized Evidence-Based Recommendations and Strategic Interventions`,
-              ratio: 0.16,
-              guidance: `Formulate concrete, prioritized SMART recommendations justified by diagnostic evidence and theoretical models.`,
-              keyPoints: [
-                "Actionable SMART intervention measures",
-                "Resource allocation, budget priorities, and phased timeline",
-                "Measurable KPIs and governance monitoring mechanisms",
-              ],
-            },
-            {
-              title: `Implementation Roadmap, Risk Mitigation Matrix, and Critical Self-Evaluation`,
-              ratio: 0.12,
-              guidance: `Construct a phased rollout plan with contingency buffers, stakeholder management protocols, and critical evaluation of module learnings.`,
-              keyPoints: [
-                "Contingency planning for strategic and operational risks",
-                "Stakeholder engagement and change management protocols",
-                "Critical self-reflection on analytical limits and learning outcomes",
-              ],
-            },
-          ],
-        },
-      ];
-    } else {
-      // Essay: Dialectical argument progression (thesis, antithesis, synthesis, refutation)
-      specs = [
-        {
-          title: `Theoretical and Conceptual Foundations of ${titleA}${titleB ? ` in ${titleB}` : ""}`,
-          notes: `Establish foundational definitions, theoretical models, and analytical scope governing ${titleA}.`,
-          subheadings: [
-            {
-              title: `Conceptual Parameters and Intellectual Tensions Surrounding ${titleA}`,
-              ratio: 0.14,
-              guidance: `Define primary concepts, taxonomical frameworks, and analytical boundaries addressing ${titleA}.`,
-              keyPoints: [
-                `Foundational taxonomy and theoretical stakes of ${titleA}`,
-                "Epistemological definitions and scope boundaries",
-                "Primary causal mechanisms and analytical criteria",
-              ],
-            },
-            {
-              title: titleB
-                ? `Theoretical Paradigms Governing the Relationship with ${titleB}`
-                : `Dominant Theoretical Frameworks and Explanatory Mechanisms`,
-              ratio: 0.18,
-              guidance: titleB
-                ? `Synthesize the primary theoretical mechanisms linking ${titleA} directly to ${titleB}.`
-                : `Analyze the dominant theoretical perspectives explaining causal and functional dynamics.`,
-              keyPoints: [
-                `Core orthodox theoretical models (${targetFrameworks[0] || "prevailing paradigms"})`,
-                "Explanatory causal claims and structural assumptions",
-                "Scope conditions, transmission channels, and mediating variables",
-              ],
-            },
-          ],
-        },
-        {
-          title: titleB
-            ? `Substantive Evidence and Operational Dynamics: ${titleA} and ${titleB}`
-            : `Empirical Evidence, Operational Realities, and Case Analysis`,
-          notes: `Investigate primary empirical findings, real-world case evidence, and operational dynamics.`,
-          subheadings: [
-            {
-              title: titleB
-                ? `Antithesis: Counter-Arguments and Dissenting Perspectives in ${titleB}`
-                : `Antithesis: Counter-Arguments and Dissenting Perspectives on ${titleA}`,
-              ratio: 0.20,
-              guidance: `Critically unpack rival perspectives, empirical anomalies, and counter-arguments challenging prevailing assumptions.`,
-              keyPoints: [
-                "Primary counter-arguments and dissenting schools of thought",
-                "Empirical counter-evidence and systemic anomalies",
-                "Contextual heterogeneity and comparative divergence",
-              ],
-            },
-            {
-              title: `Structural Vulnerabilities, Boundary Conditions, and Methodological Contestation`,
-              ratio: 0.18,
-              guidance: `Scrutinize systemic friction points, boundary conditions, and methodological contestation in the scholarship.`,
-              keyPoints: [
-                "Measurement limitations and methodological vulnerabilities",
-                "Confounding variables and endogeneity concerns",
-                "Structural boundary conditions and contextual disparities",
-              ],
-            },
-          ],
-        },
-        {
-          title: `Critical Counter-Perspectives, Policy Synthesis, and Future Horizons`,
-          notes: `Rigorously weigh counterarguments, address methodological limitations, and reach an evidence-based dialectical resolution.`,
-          subheadings: [
-            {
-              title: `Critical Refutation of Counter-Claims and Reconciliation of Dialectical Tensions`,
-              ratio: 0.16,
-              guidance: `Weigh conflicting perspectives, refute flawed objections, and synthesize a nuanced reconciliation of the core debate.`,
-              keyPoints: [
-                "Evidence-based rebuttal of competing objections",
-                "Reconciliation of dialectical thesis-antithesis tensions",
-                "Refined causal framework and analytical resolution",
-              ],
-            },
-            {
-              title: `Scholarly Synthesis, Strategic Interventions, and Future Horizons`,
-              ratio: 0.14,
-              guidance: `Synthesize analytical conclusions into coherent academic arguments and forward-looking strategic recommendations.`,
-              keyPoints: [
-                "Overarching scholarly contribution and thesis vindication",
-                "Evidence-based policy, practice, or theoretical implications",
-                "Prospective research agenda and emerging analytical horizons",
-              ],
-            },
-          ],
-        },
-      ];
-    }
+    // Dynamic universal brief-specific question deconstruction
+    specs = buildBriefSpecificSpecs(question, briefText, assignmentType, targetFrameworks);
   }
 
   // Calculate word allocations per subheading
@@ -2538,6 +2783,66 @@ export function adjustSubheadingWordCount(
 
   const nextAllocated = updatedHeadings.reduce((sum, h) => sum + h.targetWordCount, 0);
 
+  return {
+    ...structure,
+    version: structure.version + 1,
+    totalAllocated: nextAllocated,
+    headings: updatedHeadings,
+  };
+}
+
+/**
+ * Adjust an individual heading's word count (+50, -50, or direct number input)
+ * and proportionally distribute the new budget across its subheadings.
+ */
+export function adjustHeadingWordCount(
+  structure: AssignmentStructure,
+  headingId: string,
+  deltaOrExact: number | { exact: number } | { delta: number }
+): AssignmentStructure {
+  const updatedHeadings = structure.headings.map((h) => {
+    if (h.id !== headingId) return h;
+    let newHeadingTotal: number;
+    if (typeof deltaOrExact === "object" && "exact" in deltaOrExact) {
+      newHeadingTotal = Math.max(0, Math.round(deltaOrExact.exact));
+    } else if (typeof deltaOrExact === "object" && "delta" in deltaOrExact) {
+      newHeadingTotal = Math.max(0, h.targetWordCount + deltaOrExact.delta);
+    } else if (typeof deltaOrExact === "number") {
+      if (deltaOrExact === 50 || deltaOrExact === -50 || deltaOrExact === 100 || deltaOrExact === -100 || deltaOrExact < 0) {
+        newHeadingTotal = Math.max(0, h.targetWordCount + deltaOrExact);
+      } else if (deltaOrExact >= 50) {
+        newHeadingTotal = Math.max(0, Math.round(deltaOrExact));
+      } else {
+        newHeadingTotal = Math.max(0, h.targetWordCount + deltaOrExact);
+      }
+    } else {
+      newHeadingTotal = h.targetWordCount;
+    }
+
+    if (h.subheadings.length === 0) {
+      return { ...h, targetWordCount: newHeadingTotal };
+    }
+
+    const currentTotal = h.subheadings.reduce((sum, s) => sum + s.targetWordCount, 0);
+    let allocatedSoFar = 0;
+    const updatedSubs = h.subheadings.map((s, idx) => {
+      const isLast = idx === h.subheadings.length - 1;
+      const ratio = currentTotal > 0 ? s.targetWordCount / currentTotal : 1 / h.subheadings.length;
+      let subWords: number;
+      if (isLast) {
+        subWords = Math.max(0, newHeadingTotal - allocatedSoFar);
+      } else {
+        subWords = Math.max(0, Math.round(newHeadingTotal * ratio));
+        allocatedSoFar += subWords;
+      }
+      return { ...s, targetWordCount: subWords };
+    });
+
+    const finalHeadingTotal = updatedSubs.reduce((sum, s) => sum + s.targetWordCount, 0);
+    return { ...h, targetWordCount: finalHeadingTotal, subheadings: updatedSubs };
+  });
+
+  const nextAllocated = updatedHeadings.reduce((sum, h) => sum + h.targetWordCount, 0);
   return {
     ...structure,
     version: structure.version + 1,

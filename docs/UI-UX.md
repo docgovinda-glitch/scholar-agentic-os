@@ -127,22 +127,24 @@ Captures assignment parameters in a single unified workspace, decomposes the que
 1. **Unified Assignment Setup Workspace**:
    - Single cohesive card containing all initial inputs in a clean, logical sequence:
      - **Header Tab Switcher**: Minimal toggles for `[ Paste Prompt ]` and `[ Upload Brief Document (.pdf, .docx) ]` with live entered word count.
-     - **Assignment Question**: Prominent, auto-expanding text area for the complete assignment prompt or question.
-     - **Compact Parameters Row**: 3-column inline controls for **Academic Level** (`Undergraduate` | `Postgraduate / Masters`), **Assignment Type** (`General Academic Essay` | `Critical Review` | `Report` | `Case Study` | `Policy Brief` | `Literature Review`), and **Citation Style** (`APA 7th` | `Harvard` | `Chicago` | `IEEE` | `MLA 9th` | `OSCOLA`).
-     - **Single Primary CTA**: Prominent `[ Generate Structure ]` trigger button with concise loading state (`Generating structure…`) and retry handling.
+     - **Assignment Question & Brief**: Prominent, auto-expanding text area for prompt, assignment brief, and questions.
+     - **Interactive Target Word Count Stepper**: Stepper controls (`−` and `+` by 250 words) alongside direct numeric input (`e.g. 1500, 2500, 3000`), removing fixed default constraints and dynamically driving downstream section budgets and drafting compliance gates.
+     - **Compact Parameters Row**: Inline controls for **Academic Level** (`Undergraduate` | `Postgraduate / Masters`), **Assignment Type** (`General Academic Essay` | `Coursework` | `Critical Review` | `Report` | `Case Study` | `Policy Brief` | `Literature Review`), **Citation Style** (`APA 7th` | `Harvard` | `Chicago` | `IEEE` | `MLA 9th` | `OSCOLA`), and **Writing Tone**.
+     - **Single Primary CTA**: Prominent `[ Save & Build ]` trigger button with animated loading state (*"Analyzing Brief & Generating Tailored Assignment Structure..."*).
 2. **Dynamic Analytical Structure Planner (`DynamicStructurePlanner.tsx`)**:
    - Transitions directly inside the unified workspace once generated.
-   - **Question-Specific Generation**: Produces substantive, analytical Main Headings and Subheadings tailored specifically to the assignment question (no hardcoded Introduction/Body/Conclusion outlines).
+   - **Brief-Specific Dynamic Generation**: Deconstructs explicit brief sub-tasks, questions ending with `?`, and domain terminology into tailored, substantive Main Headings and Subheadings (no generic or hardcoded templates).
    - **Dynamic Word Allocation Status Bar**: Real-time allocation metrics displaying `Target: X words · Allocated: Y words · Remaining: Z words` (or `Over: W words` / `Balanced`).
-   - **Controls & Interactivity**:
-     - Inline editable main headings and subheadings.
-     - Add and delete headings and subheadings.
+   - **Outline Tree Customization (CRUD) & Word Allocation**:
+     - Full inline editing with visual edit affordances for all main headings and nested subheadings.
+     - Unconstrained addition and deletion of main headings and subheadings (with empty state handling and 1-click `+ Add Subheading`).
      - Reorder sections with Up/Down buttons.
-     - Live word allocation per subheading: `+50` / `-50` buttons and direct numeric input.
-     - `Auto-Balance`: Proportionally distributes total target words across all subheadings to achieve a balanced allocation.
+     - Section-level word count adjustments (`-50`, direct numeric input, `+50`) on main headings that proportionally scale nested subheadings.
+     - Subheading-level word budget adjustments (`-50`, direct numeric input, `+50`).
+     - `Auto-Balance`: 1-click proportional auto-balancing across all sections to align with the total target word count.
      - `Distribute Remaining`: Automatically assigns unallocated budget words across all subheadings.
      - Section Author Notes: Expandable text box for subheading-level research notes and writing guidance.
-     - Stable Internal Identifiers: Generates and preserves stable internal IDs (`headingId`, `subheadingId`) across renames for Phase 2 source attachment and Phase 3 drafting.
+     - Stable Internal Identifiers: Preserves stable internal IDs (`headingId`, `subheadingId`) across renames for Phase 2 source attachment and Phase 3 drafting.
 3. **Academic Writing Tone & Style Selector (`WritingStyleSelector.tsx`)**:
    - 6 distinct academic voice profiles:
      - *Analytical*: Objective, measured, hypothesis-driven.
@@ -153,8 +155,8 @@ Captures assignment parameters in a single unified workspace, decomposes the que
      - *Match My Writing (Custom Voice)*: Paste a sample past essay to mirror syntactic complexity and transition patterns.
 
 #### User Actions
-- `Generate Structure`: Primary Phase 1 action; triggers question-specific structural decomposition.
-- `Confirm Structure & Proceed to Sources`: Validates the structure, commits canonical structure keys (`assignment_structure`, `structure`, `sectionBudgets`, `assignment_internal_sections`), and advances to Phase 2.
+- `Save & Build`: Primary Phase 1 action; triggers question- and brief-specific structural decomposition with animated loading.
+- `Proceed`: Replaces legacy approval labels; validates the balanced structure, commits canonical structure keys (`assignment_structure`, `structure`, `sectionBudgets`, `assignment_internal_sections`), and advances to Phase 2.
 
 ---
 

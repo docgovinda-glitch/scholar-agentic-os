@@ -35,7 +35,7 @@ import {
 import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
 import DynamicStructurePlanner from "../components/DynamicStructurePlanner";
 import WritingStyleSelector, { TONE_SUGGESTION_CHIPS } from "../components/WritingStyleSelector";
-import { generateDynamicAssignmentStructure } from "../services/outlineService";
+import { generateDynamicAssignmentStructure, autoBalanceStructure } from "../services/outlineService";
 import { useSubscriptionLimits } from "../../../hooks/useSubscriptionLimits";
 import { UpgradeModal } from "../../../components/modals/UpgradeModal";
 import { isDeepEqual, stripCircularReferences, safeFormatLabel } from "../../../utils/briefExtractor";
@@ -547,19 +547,49 @@ export default function AssignmentUnderstandStage() {
   };
 
   const handleTargetWordCountChange = (newCount: number) => {
-    setLocalWordCount(newCount);
-    // Proportionally adjust local structure word count
-    const updated = generateDynamicAssignmentStructure({
-      question: localQuestion,
-      assignmentType: localType,
-      academicLevel: localLevel,
-      targetWordCount: newCount,
-      writingTone: localTone,
-      citationStyle: localCitation,
-      currentStructure: localStructure,
-    });
+    const validCount = Math.max(0, newCount);
+    setLocalWordCount(validCount);
+
+    if (validCount <= 0) return;
+
+    let updated: AssignmentStructure;
+    if (localStructure && localStructure.headings && localStructure.headings.length > 0) {
+      updated = autoBalanceStructure(localStructure, validCount);
+    } else {
+      updated = generateDynamicAssignmentStructure({
+        question: localQuestion,
+        assignmentType: localType,
+        academicLevel: localLevel,
+        targetWordCount: validCount,
+        writingTone: localTone,
+        citationStyle: localCitation,
+        currentStructure: localStructure,
+        briefText: localBrief,
+      });
+    }
     setLocalStructure(updated);
-    setStructure(updated);
+    if (setStructure) {
+      setStructure(updated);
+    }
+
+    const budgets = structureToSectionBudgets(updated);
+    const internalSecs = structureToInternalSections(updated);
+
+    saveAnswers({
+      targetWordCount: validCount,
+      target_word_count: validCount,
+      word_count: validCount,
+      word_limit: validCount,
+      assignment_structure: updated,
+      structure: updated,
+      sectionBudgets: budgets,
+      section_budgets: budgets,
+      assignment_internal_sections: internalSecs,
+      assignment_outline: internalSecs,
+      wordBudget: computeWordBudgetFromSections(validCount, budgets),
+      word_budget: computeWordBudgetFromSections(validCount, budgets),
+      sections: computeSectionBreakdown(validCount, budgets),
+    }).catch(console.warn);
   };
 
   const handleWordCountChange = (newCount: number) => {
@@ -568,7 +598,22 @@ export default function AssignmentUnderstandStage() {
 
   const handleStructureChange = (newStructure: AssignmentStructure) => {
     setLocalStructure(newStructure);
-    setStructure(newStructure);
+    if (setStructure) {
+      setStructure(newStructure);
+    }
+    const budgets = structureToSectionBudgets(newStructure);
+    const internalSecs = structureToInternalSections(newStructure);
+    saveAnswers({
+      assignment_structure: newStructure,
+      structure: newStructure,
+      sectionBudgets: budgets,
+      section_budgets: budgets,
+      assignment_internal_sections: internalSecs,
+      assignment_outline: internalSecs,
+      wordBudget: computeWordBudgetFromSections(localWordCount, budgets),
+      word_budget: computeWordBudgetFromSections(localWordCount, budgets),
+      sections: computeSectionBreakdown(localWordCount, budgets),
+    }).catch(console.warn);
   };
 
   const handleToneChange = (newTone: string) => {
@@ -650,9 +695,16 @@ export default function AssignmentUnderstandStage() {
     const defaultBody = Math.max(0, localWordCount - defaultIntro - defaultConclusion);
     const budget = { intro: defaultIntro, body: defaultBody, conclusion: defaultConclusion };
 
+    // Auto-balance structure if allocated word count differs from target word count
+    let structureToConfirm = localStructure;
+    if (structureToConfirm && structureToConfirm.totalAllocated !== localWordCount && localWordCount > 0) {
+      structureToConfirm = autoBalanceStructure(structureToConfirm, localWordCount);
+      setLocalStructure(structureToConfirm);
+    }
+
     // Lock and confirm structure
     const confirmedStructure: AssignmentStructure = {
-      ...localStructure,
+      ...structureToConfirm,
       isConfirmed: true,
       confirmedAt: new Date().toISOString(),
     };
@@ -1452,28 +1504,58 @@ export default function AssignmentUnderstandStage() {
               </div>
             </div>
 
-            {/* Target Words */}
+            {/* Target Words Stepper / Input */}
             <div className="space-y-1">
-              <label htmlFor="target_word_count" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-                <span>Target Word Count</span>
-                <span className="text-rose-500 text-xs">*</span>
-              </label>
-              <div className="relative flex items-center">
-                <input
-                  id="target_word_count"
-                  name="target_word_count"
-                  type="number"
-                  min={100}
-                  step={50}
-                  value={localWordCount || ""}
-                  onChange={(e) => handleWordCountChange(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  aria-label="Target Word Count"
-                  placeholder="2000"
-                  className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all font-medium shadow-2xs text-right pr-12 tabular-nums"
-                />
-                <span className="pointer-events-none absolute right-3 text-[11px] text-neutral-400">
-                  words
+              <label htmlFor="target_word_count" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <span>Target Word Count</span>
+                  <span className="text-rose-500 text-xs">*</span>
                 </span>
+                {localWordCount > 0 && (
+                  <span className="text-[10px] text-neutral-400 font-normal">
+                    {localWordCount.toLocaleString()} words
+                  </span>
+                )}
+              </label>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleTargetWordCountChange(Math.max(100, (localWordCount || 2000) - 250))}
+                  aria-label="Decrease target word count"
+                  className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+                  title="Decrease by 250 words"
+                >
+                  −
+                </button>
+                <div className="relative flex-1 flex items-center">
+                  <input
+                    id="target_word_count"
+                    name="target_word_count"
+                    type="number"
+                    min={100}
+                    step={50}
+                    value={localWordCount > 0 ? localWordCount : ""}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      handleWordCountChange(isNaN(val) ? 0 : Math.max(0, val));
+                    }}
+                    aria-label="Target Word Count"
+                    placeholder="e.g. 1500, 2500, 3000"
+                    className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all font-medium shadow-2xs text-right pr-12 tabular-nums"
+                  />
+                  <span className="pointer-events-none absolute right-3 text-[11px] text-neutral-400">
+                    words
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleTargetWordCountChange((localWordCount || 0) + 250)}
+                  aria-label="Increase target word count"
+                  className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+                  title="Increase by 250 words"
+                >
+                  +
+                </button>
               </div>
             </div>
           </div>
@@ -1553,6 +1635,22 @@ export default function AssignmentUnderstandStage() {
             )}
           </div>
 
+          {/* Dynamic Loading State while generating brief-specific outline */}
+          {isGeneratingStructure && (
+            <div className="p-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.04] dark:bg-indigo-500/[0.08] shadow-xs flex flex-col items-center justify-center text-center space-y-3 animate-in fade-in duration-300">
+              <div className="w-9 h-9 rounded-full border-3 border-indigo-500/30 border-t-indigo-600 dark:border-t-indigo-400 animate-spin" />
+              <div>
+                <h4 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center justify-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+                  <span>Analyzing Assignment Brief &amp; Generating Custom Outline…</span>
+                </h4>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-md">
+                  Extracting core concepts, questions, and domain terminology to synthesize an assignment-specific structure.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Primary Action Button Bar Before Structure Generation */}
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-neutral-100 dark:border-white/5">
             <div className="text-xs">
@@ -1574,7 +1672,7 @@ export default function AssignmentUnderstandStage() {
                 id="save_and_build_outline_btn"
                 disabled={!canGenerate || isGeneratingStructure}
                 onClick={handleGenerateStructure}
-                aria-label="Save & Build Outline (Generate Outline / Generate Structure / Analyze Assignment Brief)"
+                aria-label="Save & Build Outline (Save & Build / Generate Structure / Analyze Assignment Brief)"
                 className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isGeneratingStructure ? (
@@ -1585,7 +1683,7 @@ export default function AssignmentUnderstandStage() {
                 ) : (
                   <>
                     <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Save &amp; Build Outline</span>
+                    <span>Save &amp; Build</span>
                   </>
                 )}
               </button>
@@ -1740,10 +1838,10 @@ export default function AssignmentUnderstandStage() {
                   type="button"
                   disabled={!canProceedToSources || isGeneratingStructure}
                   onClick={handleProceedToSources}
-                  aria-label="Approve Outline & Proceed (Confirm Structure & Proceed to Sources)"
+                  aria-label="Proceed (Approve Outline & Proceed / Confirm Structure & Proceed to Sources)"
                   className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <span>Approve Outline &amp; Proceed</span>
+                  <span>Proceed</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>

@@ -15,6 +15,7 @@ import {
   Layers,
   StickyNote,
   X,
+  Edit2,
 } from "lucide-react";
 import type {
   AssignmentStructure,
@@ -25,6 +26,7 @@ import {
   autoBalanceStructure,
   distributeRemainingWords,
   adjustSubheadingWordCount,
+  adjustHeadingWordCount,
   addMainHeading,
   addSubheading,
   removeSubheading,
@@ -124,6 +126,16 @@ export function DynamicStructurePlanner({
     notifyChange(updated);
   };
 
+  const handleAdjustHeadingWords = (headingId: string, delta: number) => {
+    const updated = adjustHeadingWordCount(structure, headingId, delta);
+    notifyChange(updated);
+  };
+
+  const handleExactHeadingWords = (headingId: string, words: number) => {
+    const updated = adjustHeadingWordCount(structure, headingId, { exact: words });
+    notifyChange(updated);
+  };
+
   const handleAutoBalance = () => {
     const updated = autoBalanceStructure(structure, targetWordCount);
     notifyChange(updated);
@@ -205,8 +217,17 @@ export function DynamicStructurePlanner({
           </p>
         </div>
 
-        {/* Global Target Word Count Input */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Global Target Word Count Input & Stepper */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => onTargetWordCountChange?.(Math.max(100, targetWordCount - 250))}
+            aria-label="Decrease target word count"
+            className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+            title="Decrease by 250 words"
+          >
+            −
+          </button>
           <div className="relative flex items-center">
             <input
               type="number"
@@ -216,12 +237,21 @@ export function DynamicStructurePlanner({
               onChange={(e) => onTargetWordCountChange?.(Math.max(0, parseInt(e.target.value, 10) || 0))}
               aria-label="Target Word Count"
               className="w-32 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-xl px-3 py-1.5 text-right text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums pr-12 shadow-2xs"
-              placeholder="2000"
+              placeholder="e.g. 2000"
             />
             <span className="pointer-events-none absolute right-3 text-xs font-medium text-neutral-400">
               words
             </span>
           </div>
+          <button
+            type="button"
+            onClick={() => onTargetWordCountChange?.(targetWordCount + 250)}
+            aria-label="Increase target word count"
+            className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+            title="Increase by 250 words"
+          >
+            +
+          </button>
         </div>
       </div>
 
@@ -418,32 +448,74 @@ export function DynamicStructurePlanner({
                 className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E20] shadow-xs overflow-hidden transition-all group/heading"
               >
                 {/* Main Heading Header */}
-                <div className="p-3.5 sm:px-4 bg-neutral-100/60 dark:bg-white/[0.04] border-b border-neutral-200/60 dark:border-white/5 flex items-center justify-between gap-3">
+                <div className="p-3.5 sm:px-4 bg-neutral-100/60 dark:bg-white/[0.04] border-b border-neutral-200/60 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex-1 min-w-0 flex items-center gap-2.5">
                     <span className="w-6 h-6 rounded-md bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-[11px] font-bold flex items-center justify-center shrink-0">
                       {heading.number}
                     </span>
                     <span className="sr-only">{heading.title}</span>
-                    <input
-                      type="text"
-                      value={heading.title}
-                      onChange={(e) => {
-                        const updated = updateMainHeadingTitle(structure, heading.id, e.target.value);
-                        notifyChange(updated);
-                      }}
-                      placeholder="Main Heading Title"
-                      className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-neutral-100 bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-neutral-500 focus:outline-none py-0.5 truncate flex-1 min-w-0"
-                    />
+                    <div className="relative flex-1 min-w-0 flex items-center">
+                      <input
+                        type="text"
+                        value={heading.title}
+                        onChange={(e) => {
+                          const updated = updateMainHeadingTitle(structure, heading.id, e.target.value);
+                          notifyChange(updated);
+                        }}
+                        placeholder="Main Heading Title"
+                        aria-label={`Heading ${heading.number}: ${heading.title}`}
+                        className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-neutral-100 bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-neutral-500 focus:outline-none py-0.5 truncate w-full pr-6"
+                      />
+                      <Edit2 className="w-3 h-3 text-neutral-400 absolute right-1 pointer-events-none opacity-40 group-hover/heading:opacity-100 transition-opacity" />
+                    </div>
                   </div>
 
                   {/* Heading Word Budget & Controls */}
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
                     <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 tabular-nums">
                       {heading.targetWordCount.toLocaleString()} words
                     </span>
                     <span className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500 tabular-nums hidden sm:inline">
                       (~{headingPercentage}%)
                     </span>
+
+                    {/* Section Word Count Stepper & Input */}
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleAdjustHeadingWords(heading.id, -50)}
+                        className="px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded bg-neutral-200/60 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
+                        title="Decrease section word budget by 50 words"
+                        aria-label={`Decrease section ${heading.number} word count by 50`}
+                      >
+                        -50
+                      </button>
+                      <div className="relative flex items-center">
+                        <input
+                          type="number"
+                          min={0}
+                          step={25}
+                          value={heading.targetWordCount || ""}
+                          onChange={(e) =>
+                            handleExactHeadingWords(heading.id, parseInt(e.target.value, 10) || 0)
+                          }
+                          aria-label={`Word count for section ${heading.title}`}
+                          className="w-16 bg-white dark:bg-[#2C2C2E] border border-neutral-200/90 dark:border-white/10 rounded px-1.5 py-0.5 text-right text-[11px] font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white pr-5 tabular-nums"
+                        />
+                        <span className="pointer-events-none absolute right-1 text-[9px] text-neutral-400">
+                          w
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAdjustHeadingWords(heading.id, 50)}
+                        className="px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded bg-neutral-200/60 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
+                        title="Increase section word budget by 50 words"
+                        aria-label={`Increase section ${heading.number} word count by 50`}
+                      >
+                        +50
+                      </button>
+                    </div>
 
                     {/* Reorder Buttons */}
                     <div className="flex items-center gap-0.5 text-neutral-400">
@@ -473,6 +545,7 @@ export function DynamicStructurePlanner({
                       onClick={() => handleCreateSubheading(heading.id)}
                       className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-neutral-200/70 hover:bg-neutral-300 dark:bg-white/10 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
                       title="Add a subheading to this section"
+                      aria-label={`Add subheading to section ${heading.number}`}
                     >
                       <Plus className="w-3 h-3" />
                       <span className="hidden sm:inline">Subheading</span>
@@ -485,6 +558,7 @@ export function DynamicStructurePlanner({
                         onClick={() => handleDeleteHeading(heading.id)}
                         className="p-1 text-neutral-400 hover:text-rose-500 hover:bg-rose-500/10 rounded transition-colors cursor-pointer"
                         title="Delete main heading"
+                        aria-label={`Delete heading ${heading.title}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -494,132 +568,150 @@ export function DynamicStructurePlanner({
 
                 {/* Subheadings Container */}
                 <div className="p-3 sm:p-4 space-y-2.5">
-                  {heading.subheadings.map((sub, sIdx) => {
-                    const subPercent =
-                      targetWordCount > 0
-                        ? Math.round((sub.targetWordCount / targetWordCount) * 100)
-                        : 0;
-                    const isNotesOpen = expandedNotes[sub.id];
-
-                    return (
-                      <div
-                        key={sub.id}
-                        className="p-2.5 sm:p-3 rounded-lg border border-neutral-200/70 dark:border-white/5 bg-neutral-50/70 dark:bg-white/[0.02] hover:border-neutral-300 dark:hover:border-white/15 transition-all space-y-2 group/sub"
+                  {heading.subheadings.length === 0 ? (
+                    <div className="py-4 px-3 text-center rounded-lg border border-dashed border-neutral-200 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.01]">
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-2">
+                        No subheadings in this section yet.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleCreateSubheading(heading.id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer"
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                          {/* Subheading Title & Number */}
-                          <div className="flex-1 min-w-0 flex items-center gap-2">
-                            <span className="text-[11px] font-mono font-bold text-neutral-500 dark:text-neutral-400 shrink-0 w-7">
-                              {sub.numberStr}
-                            </span>
-                            <span className="sr-only">{sub.title}</span>
-                            <input
-                              type="text"
-                              value={sub.title}
-                              onChange={(e) => {
-                                const updated = updateSubheadingTitle(structure, sub.id, e.target.value);
-                                notifyChange(updated);
-                              }}
-                              placeholder="Subheading Title"
-                              className="text-xs font-medium text-neutral-900 dark:text-neutral-100 bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-neutral-500 focus:outline-none py-0.5 truncate flex-1 min-w-0"
-                            />
-                          </div>
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Subheading</span>
+                      </button>
+                    </div>
+                  ) : (
+                    heading.subheadings.map((sub, sIdx) => {
+                      const subPercent =
+                        targetWordCount > 0
+                          ? Math.round((sub.targetWordCount / targetWordCount) * 100)
+                          : 0;
+                      const isNotesOpen = expandedNotes[sub.id];
 
-                          {/* Word Count Adjustment Controls */}
-                          <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
-                            <span className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500 tabular-nums hidden md:inline mr-1">
-                              ~{subPercent}%
-                            </span>
-
-                            {/* -50 Words */}
-                            <button
-                              type="button"
-                              onClick={() => handleAdjustWords(sub.id, -50)}
-                              className="px-1.5 py-1 text-[11px] font-mono font-semibold rounded bg-neutral-200/60 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
-                              title="Decrease by 50 words"
-                              aria-label="-50"
-                            >
-                              -50
-                            </button>
-
-                            {/* Direct Word Input */}
-                            <div className="relative flex items-center">
-                              <input
-                                type="number"
-                                min={0}
-                                step={25}
-                                value={sub.targetWordCount || ""}
-                                onChange={(e) =>
-                                  handleExactWords(sub.id, parseInt(e.target.value, 10) || 0)
-                                }
-                                aria-label={`Word count for ${sub.title}`}
-                                className="w-20 bg-white dark:bg-[#2C2C2E] border border-neutral-200/90 dark:border-white/10 rounded-md px-2 py-1 text-right text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white pr-6 tabular-nums"
-                              />
-                              <span className="pointer-events-none absolute right-1.5 text-[10px] text-neutral-400">
-                                w
+                      return (
+                        <div
+                          key={sub.id}
+                          className="p-2.5 sm:p-3 rounded-lg border border-neutral-200/70 dark:border-white/5 bg-neutral-50/70 dark:bg-white/[0.02] hover:border-neutral-300 dark:hover:border-white/15 transition-all space-y-2 group/sub"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                            {/* Subheading Title & Number */}
+                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                              <span className="text-[11px] font-mono font-bold text-neutral-500 dark:text-neutral-400 shrink-0 w-7">
+                                {sub.numberStr}
                               </span>
+                              <span className="sr-only">{sub.title}</span>
+                              <div className="relative flex-1 min-w-0 flex items-center">
+                                <input
+                                  type="text"
+                                  value={sub.title}
+                                  onChange={(e) => {
+                                    const updated = updateSubheadingTitle(structure, sub.id, e.target.value);
+                                    notifyChange(updated);
+                                  }}
+                                  placeholder="Subheading Title"
+                                  aria-label={`Subheading ${sub.numberStr}: ${sub.title}`}
+                                  className="text-xs font-medium text-neutral-900 dark:text-neutral-100 bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-neutral-500 focus:outline-none py-0.5 truncate w-full pr-5"
+                                />
+                                <Edit2 className="w-2.5 h-2.5 text-neutral-400 absolute right-1 pointer-events-none opacity-30 group-hover/sub:opacity-100 transition-opacity" />
+                              </div>
                             </div>
 
-                            {/* +50 Words */}
-                            <button
-                              type="button"
-                              onClick={() => handleAdjustWords(sub.id, 50)}
-                              className="px-1.5 py-1 text-[11px] font-mono font-semibold rounded bg-neutral-200/60 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
-                              title="Increase by 50 words"
-                              aria-label="+50"
-                            >
-                              +50
-                            </button>
+                            {/* Word Count Adjustment Controls */}
+                            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                              <span className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500 tabular-nums hidden md:inline mr-1">
+                                ~{subPercent}%
+                              </span>
 
-                            {/* Reorder Subheading Buttons */}
-                            <div className="flex items-center text-neutral-400 pl-1">
+                              {/* -50 Words */}
                               <button
                                 type="button"
-                                onClick={() => handleMoveSubheading(heading.id, sIdx, sIdx - 1)}
-                                disabled={sIdx === 0}
-                                title="Move subheading up"
-                                className="p-1 rounded hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                                onClick={() => handleAdjustWords(sub.id, -50)}
+                                className="px-1.5 py-1 text-[11px] font-mono font-semibold rounded bg-neutral-200/60 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
+                                title="Decrease by 50 words"
+                                aria-label="-50"
                               >
-                                <ArrowUp className="w-2.5 h-2.5" />
+                                -50
                               </button>
+
+                              {/* Direct Word Input */}
+                              <div className="relative flex items-center">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={25}
+                                  value={sub.targetWordCount || ""}
+                                  onChange={(e) =>
+                                    handleExactWords(sub.id, parseInt(e.target.value, 10) || 0)
+                                  }
+                                  aria-label={`Word count for ${sub.title}`}
+                                  className="w-20 bg-white dark:bg-[#2C2C2E] border border-neutral-200/90 dark:border-white/10 rounded-md px-2 py-1 text-right text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white pr-6 tabular-nums"
+                                />
+                                <span className="pointer-events-none absolute right-1.5 text-[10px] text-neutral-400">
+                                  w
+                                </span>
+                              </div>
+
+                              {/* +50 Words */}
                               <button
                                 type="button"
-                                onClick={() => handleMoveSubheading(heading.id, sIdx, sIdx + 1)}
-                                disabled={sIdx === heading.subheadings.length - 1}
-                                title="Move subheading down"
-                                className="p-1 rounded hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                                onClick={() => handleAdjustWords(sub.id, 50)}
+                                className="px-1.5 py-1 text-[11px] font-mono font-semibold rounded bg-neutral-200/60 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
+                                title="Increase by 50 words"
+                                aria-label="+50"
                               >
-                                <ArrowDown className="w-2.5 h-2.5" />
+                                +50
                               </button>
-                            </div>
 
-                            {/* Notes toggle button */}
-                            <button
-                              type="button"
-                              onClick={() => toggleNotes(sub.id)}
-                              className={`p-1 rounded text-xs transition-colors cursor-pointer ml-0.5 ${
-                                sub.notes || isNotesOpen
-                                  ? "text-blue-600 dark:text-blue-400 bg-blue-500/10"
-                                  : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-                              }`}
-                              title={sub.notes ? "Edit section notes" : "Add section notes"}
-                            >
-                              <StickyNote className="w-3.5 h-3.5" />
-                            </button>
+                              {/* Reorder Subheading Buttons */}
+                              <div className="flex items-center text-neutral-400 pl-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveSubheading(heading.id, sIdx, sIdx - 1)}
+                                  disabled={sIdx === 0}
+                                  title="Move subheading up"
+                                  className="p-1 rounded hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                                >
+                                  <ArrowUp className="w-2.5 h-2.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveSubheading(heading.id, sIdx, sIdx + 1)}
+                                  disabled={sIdx === heading.subheadings.length - 1}
+                                  title="Move subheading down"
+                                  className="p-1 rounded hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                                >
+                                  <ArrowDown className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
 
-                            {/* Delete Subheading */}
-                            {heading.subheadings.length > 1 && (
+                              {/* Notes toggle button */}
+                              <button
+                                type="button"
+                                onClick={() => toggleNotes(sub.id)}
+                                className={`p-1 rounded text-xs transition-colors cursor-pointer ml-0.5 ${
+                                  sub.notes || isNotesOpen
+                                    ? "text-blue-600 dark:text-blue-400 bg-blue-500/10"
+                                    : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                                }`}
+                                title={sub.notes ? "Edit section notes" : "Add section notes"}
+                              >
+                                <StickyNote className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Delete Subheading */}
                               <button
                                 type="button"
                                 onClick={() => handleDeleteSubheading(sub.id)}
                                 className="p-1 text-neutral-400 hover:text-rose-500 hover:bg-rose-500/10 rounded transition-colors cursor-pointer"
                                 title="Delete subheading"
+                                aria-label={`Delete subheading ${sub.title}`}
                               >
                                 <Trash2 className="w-3 h-3" />
                               </button>
-                            )}
+                            </div>
                           </div>
-                        </div>
 
                         {/* H3 Arguments, Evidence & Focus Areas */}
                         <div className="pt-2 border-t border-neutral-200/50 dark:border-white/5 space-y-1.5">
@@ -707,7 +799,7 @@ export function DynamicStructurePlanner({
                         )}
                       </div>
                     );
-                  })}
+                  }))}
                 </div>
               </div>
             );

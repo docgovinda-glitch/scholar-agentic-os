@@ -94,20 +94,20 @@ Phase 4: Submission & Verification Audit
 ### 3.1 Phase 1: Understand & Structure
  
 1. **Unified Setup & Question Input**:
-   - **User Action**: Pastes the assignment question/prompt (or uploads brief document `.pdf`, `.docx`), and selects Academic Level, Assignment Type, and Citation Style within the unified setup box.
-   - **Result**: Context parameters and prompt are staged cleanly in a single workspace component without distracting helper text or cards.
-2. **Question-Specific Structure Generation**:
-   - **User Action**: Clicks `Generate Structure`.
-   - **System Processing**: Server and client outline services analyze the substantive assignment requirements, command verbs, and academic level. The AI generates substantive, question-specific Main Headings, Subheadings, and target word counts (without generic Introduction/Body/Conclusion templates or conversational AI commentary).
-   - **Result**: The generated structure displays immediately in the unified workspace via `DynamicStructurePlanner`.
-3. **Structure Customization & Word Count Allocation**:
-   - **User Action**: User edits heading/subheading titles, adds/deletes sections, reorders headings/subheadings, and calibrates word allocations using `+50` / `-50` buttons, direct numeric inputs, or `Auto-Balance`.
-   - **Dynamic Word Status**: Live status bar tracks `Target: X words · Allocated: Y words · Remaining: Z words (or Over: W words / Balanced)`.
+   - **User Action**: Pastes the assignment question/prompt (or uploads brief document `.pdf`, `.docx`), sets target word count via interactive stepper (`−`/`+`) or numeric input, and selects Academic Level, Assignment Type, Citation Style, and Writing Tone within the unified setup box.
+   - **Result**: Context parameters and prompt are staged cleanly in a single workspace component without rigid 2000-word limits, dynamically driving downstream section budgets and drafting compliance gates.
+2. **Brief-Specific Structure Generation**:
+   - **User Action**: Clicks `Save & Build`.
+   - **System Processing**: Client and server outline services display an animated loading state (*"Analyzing Brief & Generating Tailored Assignment Structure..."*). The engine extracts inquiry directives, sentence questions ending in `?`, domain acronyms, and technical terms directly from the brief text (`extractBriefInquiriesAndConcepts`, `buildBriefSpecificSpecs`). Bespoke H1/H2/H3 structures are generated that substantively mirror the assignment brief's requirements without generic Introduction/Body/Conclusion placeholders.
+   - **Result**: The tailored structure displays immediately in the unified workspace via `DynamicStructurePlanner`.
+3. **Structure Customization & Word Count Allocation (CRUD)**:
+   - **User Action**: User edits heading/subheading titles inline with visual edit affordances, adds/deletes headings and nested subheadings without restrictive length barriers, reorders sections with Up/Down buttons, and calibrates word allocations using section-level (`-50`/`+50`), subheading-level (`-50`/`+50`), or direct numeric inputs.
+   - **Dynamic Word Status & Auto-Balancing**: Live status bar tracks `Target: X words · Allocated: Y words · Remaining: Z words (or Over: W words / Balanced)`. 1-click `Auto-Balance` proportionally synchronizes all section allocations to match the user's target word count.
 4. **Voice & Tone Selection**:
    - **User Action**: Selects an academic style (e.g. *Analytical*, *Argumentative*, *Critical*, *Natural & Engaging*, or *Match My Writing*).
 5. **Phase Progression & Canonical Persistence**:
-   - **User Action**: Clicks `Confirm Structure & Proceed to Sources`.
-   - **System Processing**: The confirmed structure with stable internal IDs is saved into canonical project keys (`assignment_structure`, `structure`, `sectionBudgets`, `assignment_internal_sections`).
+   - **User Action**: Clicks `Proceed` (formerly "Confirm Structure & Proceed to Sources").
+   - **System Processing**: The confirmed structure with stable internal IDs is saved into canonical project keys (`assignment_structure`, `structure`, `sectionBudgets`, `assignment_internal_sections`, `targetWordCount`, `word_count`, `word_limit`).
    - **Result**: Phase 1 is completed; Phase 2 unlocks using the exact confirmed structure.
 
 ---
