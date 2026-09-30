@@ -754,6 +754,27 @@ export type SubheadingResearchStatus =
   | "sufficient"
   | "gap";
 
+export interface ResearchSourceReference {
+  id: string;
+  title: string;
+  authors: string[];
+  year: string;
+  journalOrPublisher?: string;
+  citation: string;
+  role?:
+    | "Empirical evidence"
+    | "Theoretical framework"
+    | "Comparative evidence"
+    | "Core theory"
+    | "Methodological framework"
+    | "Contextual evidence"
+    | string;
+  relevance?: string;
+  doi?: string;
+  url?: string;
+  keyFinding?: string;
+}
+
 export interface AssignmentSubheading {
   id: string;
   headingId: string;
@@ -770,6 +791,17 @@ export interface AssignmentSubheading {
   boundSourceIds?: string[];
   draftContent?: string;
   draftStatus?: "not_started" | "drafting" | "reviewed" | "completed";
+
+  // Research Blueprint fields (Ask Scholar grounded)
+  purpose?: string;
+  assignmentQuestionAddressed?: string;
+  analyticalObjective?: string;
+  keyTheories?: string[];
+  keyArguments?: string[];
+  evidenceRequired?: string;
+  counterarguments?: string[];
+  expectedContribution?: string;
+  scholarlySources?: ResearchSourceReference[];
 }
 
 export interface AssignmentMainHeading {
@@ -779,6 +811,51 @@ export interface AssignmentMainHeading {
   notes?: string;
   targetWordCount: number; // Sum of subheadings
   subheadings: AssignmentSubheading[];
+
+  // Research Blueprint fields (Ask Scholar grounded)
+  purpose?: string;
+  assignmentQuestionAddressed?: string;
+  analyticalObjective?: string;
+  keyTheories?: string[];
+  keyArguments?: string[];
+  evidenceRequired?: string;
+  counterarguments?: string[];
+  expectedContribution?: string;
+  scholarlySources?: ResearchSourceReference[];
+}
+
+export interface QuestionMappingMatrixItem {
+  assignmentQuestion: string;
+  analyticalObjective: string;
+  researchNeeded: string;
+  keyArguments: string[];
+  relevantSources: string[];
+  proposedSectionTitle: string;
+  proposedSectionNumber: number;
+}
+
+export interface ResearchBlueprintOverview {
+  centralProblem: string;
+  analyticalComponents: string[];
+  inquiryType:
+    | "comparative_analysis"
+    | "causal_inquiry"
+    | "theory_case_evaluation"
+    | "policy_diagnostic"
+    | "dialectical_argument"
+    | "empirical_investigation";
+  coreDebates: string[];
+  expectedOutcomes: string;
+  qualityControlChecklist: {
+    allQuestionsCovered: boolean;
+    logicallyConnected: boolean;
+    freeOfGenericFluff: boolean;
+    literatureGrounded: boolean;
+    debatesIncluded: boolean;
+    recencyBalanced: boolean;
+    clearProgression: boolean;
+    reviewNotes: string;
+  };
 }
 
 export interface AssignmentStructure {
@@ -792,6 +869,10 @@ export interface AssignmentStructure {
   writingTone?: string;
   rationale?: string;
   targetFrameworks?: string[];
+
+  // Research Blueprint Architecture & Question Mapping
+  researchBlueprintOverview?: ResearchBlueprintOverview;
+  questionMappingMatrix?: QuestionMappingMatrixItem[];
 }
 
 export interface OutlineTreeSection {
@@ -866,6 +947,16 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
           linkedEvidenceIds: [],
           boundSourceIds: s.boundSourceIds || [],
           academicFunction: h.title,
+          // Propagate Research Blueprint fields to drafting phase
+          purpose: s.purpose || h.purpose,
+          assignmentQuestionAddressed: s.assignmentQuestionAddressed || h.assignmentQuestionAddressed,
+          analyticalObjective: s.analyticalObjective || h.analyticalObjective,
+          keyTheories: s.keyTheories || h.keyTheories || [],
+          keyArguments: s.keyArguments || h.keyArguments || [],
+          evidenceRequired: s.evidenceRequired || h.evidenceRequired,
+          counterarguments: s.counterarguments || h.counterarguments || [],
+          expectedContribution: s.expectedContribution || h.expectedContribution,
+          scholarlySources: s.scholarlySources || h.scholarlySources || [],
         });
       });
     } else {
@@ -880,6 +971,15 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
         keyPoints: [],
         linkedEvidenceIds: [],
         academicFunction: h.title,
+        purpose: h.purpose,
+        assignmentQuestionAddressed: h.assignmentQuestionAddressed,
+        analyticalObjective: h.analyticalObjective,
+        keyTheories: h.keyTheories || [],
+        keyArguments: h.keyArguments || [],
+        evidenceRequired: h.evidenceRequired,
+        counterarguments: h.counterarguments || [],
+        expectedContribution: h.expectedContribution,
+        scholarlySources: h.scholarlySources || [],
       });
     }
   });
@@ -997,6 +1097,17 @@ export interface AssignmentDraftingSection {
   boundSourceIds?: string[];
   academicFunction?: string;
   sectionType?: "intro" | "body" | "conclusion";
+
+  // Research Blueprint fields (Ask Scholar grounded)
+  purpose?: string;
+  assignmentQuestionAddressed?: string;
+  analyticalObjective?: string;
+  keyTheories?: string[];
+  keyArguments?: string[];
+  evidenceRequired?: string;
+  counterarguments?: string[];
+  expectedContribution?: string;
+  scholarlySources?: ResearchSourceReference[];
 }
 
 export interface AssignmentDraftingState {

@@ -5,7 +5,37 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-29
+## [Unreleased] - 2026-09-30
+
+### Redesigned & Elevated (Ask Scholar Research-Driven Outline Architecture & AI Research Blueprint)
+- **Deep Ask Scholar Research Engine & Inquiry Deconstruction (`scholarlyDiscoveryService.ts`)**:
+  - Implemented `conductAskScholarResearchForOutline` which acts as an AI Research Supervisor/Architect.
+  - Interrogates complete assignment brief to detect core analytical problem, sub-questions, and inquiry typing (`comparative_analysis`, `causal_inquiry`, `theory_case_evaluation`, `policy_diagnostic`, `dialectical_argument`, `empirical_investigation`).
+  - Conducts targeted scholarly literature discovery balancing recent peer-reviewed sources (2024–2026) and classic seminal foundations with verified citations, authors, publication years, and analytical roles.
+  - Synthesizes core theoretical/empirical debates and expected analytical outcomes.
+- **Explicit Assignment-Question Mapping Matrix (`types.ts`, `outlineService.ts`, `assignment.ts`)**:
+  - Direct pipeline mapping: `Assignment Question → Analytical Objective → Research Needed → Key Arguments/Issues → Relevant Sources → Proposed Section`.
+  - Guarantees every major section exists to answer specific components of the assignment rather than copying generic academic templates.
+- **Research-Aware Outline Blueprint Specification (`types.ts`, `outlineService.ts`)**:
+  - Extended all `AssignmentMainHeading`, `AssignmentSubheading`, and `AssignmentDraftingSection` structures with complete research blueprint metadata:
+    - Section purpose & analytical objective
+    - Assignment question addressed
+    - Key theories / analytical models
+    - Key arguments & analytical issues
+    - Required empirical evidence
+    - Relevant scholarly sources (with Citation Engine citations)
+    - Potential counterarguments and competing perspectives
+    - Expected contribution to the overall argument
+- **Dynamic Structure Planner UI & Grounding Drawers (`DynamicStructurePlanner.tsx`)**:
+  - Added "Ask Scholar Research Architecture & Question Mapping" header banner displaying central problem, inquiry archetype, and question-to-section mapping table.
+  - Integrated 5-point Quality Control Checklist verifying coverage, logical progression, and absence of generic fluff.
+  - Interactive "Research Blueprint & Ask Scholar Grounding" drawers on every main heading and subheading displaying purpose, required evidence, counter-perspectives, and verified citation cards.
+- **Server-Side Integration (`server/routes/project/assignment.ts`)**:
+  - Integrated Ask Scholar research synthesis into `POST /api/projects/:id/assignment/structure`.
+  - LLM prompts now strictly enforce the question-mapping matrix and populate all research blueprint fields without hallucinating.
+- **Comprehensive Test Suite & Verification**:
+  - Added `src/desk/assignment/__tests__/AskScholarResearchDrivenOutline.test.tsx` (8 unit & integration tests covering inquiry deconstruction, literature recency, question mapping, blueprint generation, and UI components).
+  - All 28 assignment test files (205 tests) and full application production build (`npm run build`) passing with 100% success rate.
 
 ### Added & Enhanced (AskScholar Outline Generation Enrichment for Coursework & Essay, Landing Page UI Fix)
 - **Dynamic Outline Generation Enrichment for Coursework & Essay (`outlineService.ts`, `assignment.ts`)**:

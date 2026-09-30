@@ -1642,10 +1642,10 @@ export default function AssignmentUnderstandStage() {
               <div>
                 <h4 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center justify-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
-                  <span>Analyzing Assignment Brief &amp; Generating Custom Outline…</span>
+                  <span>Ask Scholar Research Architect: Generating Research Blueprint…</span>
                 </h4>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-md">
-                  Extracting core concepts, questions, and domain terminology to synthesize an assignment-specific structure.
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-lg">
+                  Deconstructing assignment inquiries, synthesizing peer-reviewed literature &amp; debates, and constructing a research-grounded blueprint.
                 </p>
               </div>
             </div>

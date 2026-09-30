@@ -34,6 +34,7 @@ import {
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,
 } from "../../../src/desk/assignment/services/outlineService.ts";
+import { conductAskScholarResearchForOutline } from "../../../src/desk/assignment/services/scholarlyDiscoveryService.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(rejectClientCredentials);
@@ -1168,49 +1169,93 @@ CRITICAL: You MUST divide the target word counts across the sections to strictly
       assignmentType === "case_study" ||
       question.toLowerCase().includes("coursework");
 
-    const prompt = `You are the Scholar Core AskScholar Outline & Analytical Planning Agent.
-Create a deeply synthesized, context-specific academic structure rooted directly in the assignment question, academic rigor, and domain nuance.
+    // 1. Conduct deep Ask Scholar literature and inquiry research
+    const askScholarResearch = conductAskScholarResearchForOutline({
+      question,
+      briefText,
+      assignmentType,
+      academicLevel,
+      targetWordCount: Number(targetWordCount) || 2000,
+    });
 
-CRITICAL INSTRUCTIONS:
-1. STRICT BAN ON GENERIC PLACEHOLDERS: NEVER generate generic titles like "Section 1: Introduction", "Body Paragraph 1", "Main Argument", "Analysis", "Discussion", "Overview", or "Conclusion". All headings must be content-rich and domain-specific.
-2. EXTRACTION OF CORE INQUIRY DIMENSIONS: Deconstruct the brief into primary thesis/debates, counter-arguments, and domain theoretical frameworks.
-3. STRUCTURE DEPTH:
-   - H1 (Main Headings): Core thematic/analytical dimensions required to answer the assignment.
-   - H2 (Subheadings): Sub-argument or case focus.
-   - H3 (Evidence/Mechanism Descriptors): 3 concrete evidence points, models, empirical metrics, or counter-perspectives per subheading under keyPoints.
+    const sourcesSummary = askScholarResearch.sources
+      .slice(0, 6)
+      .map(
+        (s) =>
+          `  - ${s.citation}: "${s.title}" (${s.journalOrPublisher || "Academic Press"}, ${s.year}) [Role: ${s.role}] -> ${s.relevance || s.keyFinding || ""}`
+      )
+      .join("\n");
+
+    const inquiriesSummary = askScholarResearch.subQuestions
+      .map((sq, idx) => `  Inquiry ${idx + 1}: "${sq}"`)
+      .join("\n");
+
+    const prompt = `You are the Scholar Core AskScholar Research Architect & Thesis Supervisor.
+Your role is to think through the assignment instructions, interrogate the core analytical questions, conduct targeted scholarly research, and build an assignment-specific RESEARCH BLUEPRINT.
+
+CORE ARCHITECTURAL RULES:
+1. STRICT BAN ON GENERIC ACADEMIC TEMPLATES: Do NOT generate generic templates like "Introduction -> Literature Review -> Methodology -> Analysis -> Conclusion". Headings must emerge directly from the intellectual problem of the assignment (${askScholarResearch.inquiryType}).
+2. EXPLICIT ASSIGNMENT-QUESTION MAPPING: Every major section MUST exist because it is directly required to answer a specific assignment inquiry:
+   Assignment Question -> Analytical Objective -> Research Needed -> Key Arguments/Issues -> Relevant Sources -> Proposed Section
+3. RESEARCH BLUEPRINT DEPTH:
+   For every main section and subsection, provide:
+   - title: substantive, content-driven domain title
+   - purpose: exact purpose and what this section demonstrates
+   - assignmentQuestionAddressed: which specific assignment inquiry it answers
+   - analyticalObjective: analytical goal (explain, compare, evaluate, analyse, or argue)
+   - keyTheories: analytical models or frameworks applied
+   - keyArguments: 3 concrete analytical issues or arguments (also put in keyPoints)
+   - evidenceRequired: specific empirical data, observational cases, or literature needed
+   - counterarguments: rival schools of thought or competing interpretations
+   - expectedContribution: how this section drives towards defending the central thesis
+   - scholarlySources: citations from the verified Ask Scholar literature pool below
 4. WORKSPACE ADAPTATION:
    ${
      isCourseworkWorkspace
-       ? `COURSEWORK WORKSPACE: Align with rubric compliance, module learning objectives, diagnostic problem decomposition, applied analytical methodology/frameworks, empirical evaluation, and actionable policy/managerial recommendations.`
-       : `ESSAY WORKSPACE: Enforce a rigorous dialectical argument progression (thesis formulation, antithesis/counter-arguments & contested evidence, dialectical synthesis & critical refutation).`
+       ? `COURSEWORK WORKSPACE: Align with rubric criteria, module learning outcomes, diagnostic problem decomposition, applied analytical frameworks, empirical evaluation, and actionable strategic recommendations.`
+       : `ESSAY WORKSPACE: Enforce a rigorous dialectical argument progression (foundational conceptual parameters, substantive empirical evidence & antithesis, dialectical synthesis & critical refutation).`
    }
-5. ALLOCATIONS:
+5. WORD ALLOCATIONS:
    The sum of all subheading targetWordCounts MUST equal approximately ${targetWordCount}.
 
-Question: "${question}"
-Assignment Type: ${assignmentType}
-Level: ${academicLevel}
-Target Word Count: ${targetWordCount} words
-Central Thesis: "${thesis}"
-Brief Context: "${briefText.slice(0, 1000)}"
+ASSIGNMENT INTAKE:
+- Question: "${question}"
+- Assignment Type: ${assignmentType}
+- Academic Level: ${academicLevel}
+- Target Word Count: ${targetWordCount} words
+- Central Thesis: "${thesis || askScholarResearch.centralProblem}"
+- Central Intellectual Problem: "${askScholarResearch.centralProblem}"
+- Core Analytical Inquiries:
+${inquiriesSummary}
+- Discovered Ask Scholar Literature (Grounding Citations):
+${sourcesSummary}
+- Core Scholarly Debates: ${askScholarResearch.coreDebates.join(" | ")}
 
 ${customAllocationPrompt}
 
 Return ONLY valid JSON matching:
 {
   "thesis_statement": "Working thesis answering the prompt",
-  "target_frameworks": ["Framework/Model 1", "Framework/Model 2"],
+  "target_frameworks": ["Framework 1", "Framework 2"],
   "structure": {
     "version": 1,
     "isConfirmed": false,
     "targetWordCount": ${targetWordCount},
     "totalAllocated": ${targetWordCount},
-    "rationale": "Why this structure addresses the question",
+    "rationale": "Why this research blueprint addresses the assignment inquiries",
     "headings": [
       {
         "id": "heading-1",
         "number": 1,
         "title": "Substantive Domain H1 Title",
+        "purpose": "Purpose of section answering assignment question",
+        "assignmentQuestionAddressed": "Assignment inquiry addressed",
+        "analyticalObjective": "Analytical objective",
+        "keyTheories": ["Theory A"],
+        "keyArguments": ["Argument 1", "Argument 2", "Argument 3"],
+        "evidenceRequired": "Evidence required",
+        "counterarguments": ["Rival perspective"],
+        "expectedContribution": "Contribution to thesis",
         "notes": "Guidance notes",
         "targetWordCount": 700,
         "subheadings": [
@@ -1219,12 +1264,20 @@ Return ONLY valid JSON matching:
             "headingId": "heading-1",
             "numberStr": "1.1",
             "title": "Substantive Analytical H2 Title",
+            "purpose": "Purpose of subsection",
+            "assignmentQuestionAddressed": "Assignment inquiry addressed",
+            "analyticalObjective": "Analytical objective",
+            "keyTheories": ["Theory A"],
+            "keyArguments": ["Argument 1", "Argument 2", "Argument 3"],
+            "evidenceRequired": "Evidence required",
+            "counterarguments": ["Rival perspective"],
+            "expectedContribution": "Contribution to thesis",
             "targetWordCount": 350,
             "currentWordCount": 0,
             "notes": "",
             "guidance": "Detailed analytical guidance",
-            "keyPoints": ["H3 Evidence/Model Descriptor 1", "H3 Descriptor 2", "H3 Descriptor 3"],
-            "researchStatus": "not_researched"
+            "keyPoints": ["Argument 1", "Argument 2", "Argument 3"],
+            "researchStatus": "sufficient"
           }
         ]
       }
@@ -1241,9 +1294,9 @@ Return ONLY valid JSON matching:
           "title": "Substantive Analytical H2 Title",
           "guidance": "Detailed analytical guidance",
           "children": [
-            { "level": "h3", "title": "H3 Evidence/Model Descriptor 1" },
-            { "level": "h3", "title": "H3 Descriptor 2" },
-            { "level": "h3", "title": "H3 Descriptor 3" }
+            { "level": "h3", "title": "Evidence Descriptor 1" },
+            { "level": "h3", "title": "Evidence Descriptor 2" },
+            { "level": "h3", "title": "Evidence Descriptor 3" }
           ]
         }
       ]
@@ -1254,7 +1307,7 @@ Return ONLY valid JSON matching:
     const data: any = await callOpenRouterJSON(
       req,
       res,
-      "You are the Scholar Core AskScholar Outline & Analytical Planning Agent.",
+      "You are the Scholar Core AskScholar Research Architect & Thesis Supervisor.",
       prompt,
       "openrouter/auto",
       "planning"
@@ -1290,6 +1343,59 @@ Return ONLY valid JSON matching:
         finalStructure.thesisStatement ||
         thesis;
 
+      // Backfill Ask Scholar Research Blueprint fields if missing
+      finalStructure.researchBlueprintOverview = {
+        centralProblem: askScholarResearch.centralProblem,
+        analyticalComponents: askScholarResearch.analyticalComponents,
+        inquiryType: askScholarResearch.inquiryType,
+        coreDebates: askScholarResearch.coreDebates,
+        expectedOutcomes: askScholarResearch.expectedOutcomes,
+        qualityControlChecklist: askScholarResearch.qualityControlChecklist,
+      };
+      finalStructure.questionMappingMatrix = askScholarResearch.questionMappingMatrix;
+
+      finalStructure.headings.forEach((h: any, hIdx: number) => {
+        const mappingItem =
+          askScholarResearch.questionMappingMatrix[hIdx] ||
+          askScholarResearch.questionMappingMatrix[hIdx % Math.max(1, askScholarResearch.questionMappingMatrix.length)];
+        const headingSources = askScholarResearch.sources.slice(hIdx * 2, hIdx * 2 + 3);
+
+        if (!h.purpose) h.purpose = `Investigate and substantiate ${h.title} to answer: "${mappingItem.assignmentQuestion}".`;
+        if (!h.assignmentQuestionAddressed) h.assignmentQuestionAddressed = mappingItem.assignmentQuestion;
+        if (!h.analyticalObjective) h.analyticalObjective = mappingItem.analyticalObjective;
+        if (!h.keyTheories || h.keyTheories.length === 0) h.keyTheories = finalStructure.targetFrameworks;
+        if (!h.evidenceRequired) h.evidenceRequired = mappingItem.researchNeeded;
+        if (!h.keyArguments || h.keyArguments.length === 0) h.keyArguments = mappingItem.keyArguments;
+        if (!h.counterarguments || h.counterarguments.length === 0) {
+          h.counterarguments = [askScholarResearch.coreDebates[hIdx % askScholarResearch.coreDebates.length] || "Alternative interpretations"];
+        }
+        if (!h.expectedContribution) h.expectedContribution = `Directly answers inquiry dimension ${hIdx + 1} and substantiates the thesis.`;
+        if (!h.scholarlySources || h.scholarlySources.length === 0) h.scholarlySources = headingSources;
+
+        if (h.subheadings && Array.isArray(h.subheadings)) {
+          h.subheadings.forEach((s: any, sIdx: number) => {
+            const subSources = headingSources.slice(sIdx, sIdx + 2);
+            if (!s.purpose) s.purpose = s.guidance || `Detailed analysis of ${s.title}.`;
+            if (!s.assignmentQuestionAddressed) s.assignmentQuestionAddressed = h.assignmentQuestionAddressed;
+            if (!s.analyticalObjective) s.analyticalObjective = h.analyticalObjective;
+            if (!s.keyTheories || s.keyTheories.length === 0) s.keyTheories = h.keyTheories;
+            if (!s.evidenceRequired) s.evidenceRequired = h.evidenceRequired;
+            if (!s.keyArguments || s.keyArguments.length === 0) s.keyArguments = s.keyPoints || h.keyArguments;
+            if (!s.counterarguments || s.counterarguments.length === 0) s.counterarguments = h.counterarguments;
+            if (!s.expectedContribution) s.expectedContribution = `Contributes focused analysis of ${s.title} towards defending the thesis.`;
+            if (!s.scholarlySources || s.scholarlySources.length === 0) s.scholarlySources = subSources;
+            s.boundSourceIds = s.scholarlySources.map((src: any) => src.id);
+            s.sourcesCount = s.scholarlySources.length;
+            s.researchStatus = s.sourcesCount > 0 ? "sufficient" : "not_researched";
+          });
+        }
+      });
+
+      // Persist in project answers
+      project.answers.assignment_structure = JSON.stringify(finalStructure);
+      project.answers.structure = JSON.stringify(finalStructure);
+      await getProjectStore().save(project);
+
       const tree = assignmentStructureToOutlineTree(finalStructure);
       return res.json({
         structure: finalStructure,
@@ -1297,6 +1403,8 @@ Return ONLY valid JSON matching:
         sections: tree.sections,
         target_frameworks: finalStructure.targetFrameworks,
         thesis_statement: finalStructure.thesisStatement,
+        research_blueprint: finalStructure.researchBlueprintOverview,
+        question_mapping: finalStructure.questionMappingMatrix,
       });
     }
 
@@ -1307,6 +1415,10 @@ Return ONLY valid JSON matching:
       targetWordCount: Number(targetWordCount) || 2000,
       briefText,
     });
+    project.answers.assignment_structure = JSON.stringify(fallbackStructure);
+    project.answers.structure = JSON.stringify(fallbackStructure);
+    await getProjectStore().save(project);
+
     const fallbackTree = assignmentStructureToOutlineTree(fallbackStructure);
     return res.json({
       structure: fallbackStructure,
@@ -1314,6 +1426,8 @@ Return ONLY valid JSON matching:
       sections: fallbackTree.sections,
       target_frameworks: fallbackStructure.targetFrameworks || [],
       thesis_statement: fallbackStructure.thesisStatement,
+      research_blueprint: fallbackStructure.researchBlueprintOverview,
+      question_mapping: fallbackStructure.questionMappingMatrix,
     });
   } catch (err: any) {
     const briefText = cleanAnswerString(project.answers["assignment_brief_text"]) || question;

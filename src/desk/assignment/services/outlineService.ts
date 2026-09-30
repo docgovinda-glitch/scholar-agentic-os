@@ -26,6 +26,7 @@ import type {
 } from "../types";
 
 import { structureToInternalSections } from "../types";
+import { conductAskScholarResearchForOutline } from "./scholarlyDiscoveryService";
 
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
@@ -45,13 +46,63 @@ export function generateAdaptiveDefaultOutline(
     });
     const internalSecs = structureToInternalSections(dyn);
     if (internalSecs && internalSecs.length > 0) {
-      return internalSecs.map((s) => ({
+      let sectionsResult: OutlineSection[] = internalSecs.map((s) => ({
         id: s.id,
         title: s.title,
         targetWordCount: s.targetWordCount,
         guidance: s.guidance,
         keyPoints: s.keyPoints || [],
       }));
+
+      // If custom sections provided (or customized section splits requested)
+      if (
+        sections &&
+        (sections.isCustomized ||
+          (sections.intro?.targetWords && sections.body?.targetWords && sections.conclusion?.targetWords))
+      ) {
+        const introWords = sections.intro.targetWords;
+        const conclWords = sections.conclusion.targetWords;
+        const bodyWords = sections.body.targetWords;
+
+        if (sectionsResult.length >= 2) {
+          // First section is intro
+          sectionsResult[0].targetWordCount = introWords;
+          if (sections.intro.guidelines) {
+            sectionsResult[0].guidance = sectionsResult[0].guidance
+              ? `${sectionsResult[0].guidance} ${sections.intro.guidelines}`
+              : sections.intro.guidelines;
+          }
+
+          // Last section is conclusion
+          const lastIdx = sectionsResult.length - 1;
+          sectionsResult[lastIdx].targetWordCount = conclWords;
+          if (sections.conclusion.guidelines) {
+            sectionsResult[lastIdx].guidance = sectionsResult[lastIdx].guidance
+              ? `${sectionsResult[lastIdx].guidance} ${sections.conclusion.guidelines}`
+              : sections.conclusion.guidelines;
+          }
+
+          // In-between sections are body
+          const bodySecs = sectionsResult.slice(1, lastIdx);
+          if (bodySecs.length > 0) {
+            let allocatedBody = 0;
+            bodySecs.forEach((bSec, bIdx) => {
+              const isLastBody = bIdx === bodySecs.length - 1;
+              const ratio = 1 / bodySecs.length;
+              const w = isLastBody ? Math.max(50, bodyWords - allocatedBody) : Math.round(bodyWords * ratio);
+              allocatedBody += w;
+              bSec.targetWordCount = w;
+              if (sections.body.guidelines) {
+                bSec.guidance = bSec.guidance
+                  ? `${bSec.guidance} ${sections.body.guidelines}`
+                  : sections.body.guidelines;
+              }
+            });
+          }
+        }
+      }
+
+      return sectionsResult;
     }
   }
 
@@ -974,7 +1025,7 @@ export function addTargetFramework(
 ): AssignmentStructure {
   const trimmed = framework.trim();
   if (!trimmed) return structure;
-  const current = structure.targetFrameworks || [];
+  const current = Array.isArray(structure.targetFrameworks) ? structure.targetFrameworks : [];
   if (current.includes(trimmed)) return structure;
   return {
     ...structure,
@@ -987,7 +1038,7 @@ export function removeTargetFramework(
   structure: AssignmentStructure,
   frameworkIndex: number
 ): AssignmentStructure {
-  const current = structure.targetFrameworks || [];
+  const current = Array.isArray(structure.targetFrameworks) ? structure.targetFrameworks : [];
   return {
     ...structure,
     targetFrameworks: current.filter((_, idx) => idx !== frameworkIndex),
@@ -1393,7 +1444,7 @@ export function buildBriefSpecificSpecs(
         notes: `Deconstruct the assignment problem statement against module benchmarks and ${primaryFramework} criteria.`,
         subheadings: [
           {
-            title: `Diagnostic Baseline and Scope Boundaries: ${c1}`,
+            title: `Diagnostic Problem Decomposition and Scope Boundaries: ${c1}`,
             ratio: 0.15,
             guidance: `Deconstruct core assignment brief directives for ${c1}, establish operational baseline, and define diagnostic compliance parameters.`,
             keyPoints: [
@@ -1419,7 +1470,7 @@ export function buildBriefSpecificSpecs(
         notes: `Execute rigorous applied evaluation using ${primaryFramework} against real-world evidence or organizational scenarios.`,
         subheadings: [
           {
-            title: `Diagnostic Application to Empirical Evidence: ${c2}`,
+            title: `In-Depth Diagnostic Model Application to Empirical Evidence: ${c2}`,
             ratio: 0.22,
             guidance: `Apply diagnostic models directly to primary evidence in ${c2} to evaluate systemic performance and operational friction.`,
             keyPoints: [
@@ -1502,9 +1553,7 @@ export function buildBriefSpecificSpecs(
       ],
     },
     {
-      title: secondaryTopic
-        ? `Substantive Empirical Evidence and Operational Realities: ${c1} and ${secondaryTopic}`
-        : `Empirical Evidence, Operational Realities, and Case Analysis: ${c2}`,
+      title: `Substantive Evidence and Operational Realities: ${c1}${secondaryTopic ? ` in ${secondaryTopic}` : ""}`,
       notes: `Investigate primary empirical findings, real-world case evidence, and operational dynamics.`,
       subheadings: [
         {
@@ -2310,6 +2359,15 @@ export function generateDynamicAssignmentStructure(
     specs = buildBriefSpecificSpecs(question, briefText, assignmentType, targetFrameworks);
   }
 
+  // Perform deep Ask Scholar research for this assignment
+  const askScholarResearch = conductAskScholarResearchForOutline({
+    question,
+    briefText,
+    assignmentType,
+    academicLevel,
+    targetWordCount: total,
+  });
+
   // Calculate word allocations per subheading
   const allSubheadings = specs.flatMap((h) => h.subheadings);
   let allocatedSoFar = 0;
@@ -2317,6 +2375,27 @@ export function generateDynamicAssignmentStructure(
   const rawHeadings: AssignmentMainHeading[] = specs.map((spec, hIdx) => {
     const headingId = `heading-${hIdx + 1}`;
     const headingNumber = hIdx + 1;
+
+    const mappingItem =
+      askScholarResearch.questionMappingMatrix[hIdx] ||
+      askScholarResearch.questionMappingMatrix[hIdx % Math.max(1, askScholarResearch.questionMappingMatrix.length)] || {
+        assignmentQuestion: `Core inquiry ${headingNumber} for ${question.slice(0, 60)}`,
+        analyticalObjective: `Critically evaluate and substantiate ${spec.title}`,
+        researchNeeded: `Empirical evidence and theoretical frameworks supporting ${spec.title}`,
+        keyArguments: [`Analytical evaluation of ${spec.title}`, `Empirical evidence synthesis`, `Counterargument refutation`],
+        relevantSources: askScholarResearch.sources.slice(0, 2).map((s) => s.citation),
+        proposedSectionTitle: spec.title,
+        proposedSectionNumber: headingNumber,
+      };
+
+    const headingSources = askScholarResearch.sources.slice(hIdx * 2, hIdx * 2 + 3);
+    const headingTheories =
+      targetFrameworks && targetFrameworks.length > 0
+        ? targetFrameworks
+        : [askScholarResearch.deconstruction.theories[0] || "Structural Analytical Framework"];
+    const headingDebate =
+      askScholarResearch.coreDebates[hIdx % Math.max(1, askScholarResearch.coreDebates.length)] ||
+      "Counter-perspectives, rival interpretations, and empirical anomalies in existing scholarship";
 
     const subheadings: AssignmentSubheading[] = spec.subheadings.map((sub, sIdx) => {
       const isLast = hIdx === specs.length - 1 && sIdx === spec.subheadings.length - 1;
@@ -2326,6 +2405,8 @@ export function generateDynamicAssignmentStructure(
       } else {
         allocatedSoFar += words;
       }
+
+      const subSources = headingSources.slice(sIdx, sIdx + 2);
 
       return {
         id: `sub-${headingNumber}-${sIdx + 1}`,
@@ -2337,11 +2418,22 @@ export function generateDynamicAssignmentStructure(
         notes: "",
         guidance: sub.guidance,
         keyPoints: sub.keyPoints,
-        researchStatus: "not_researched" as const,
-        sourcesCount: 0,
-        boundSourceIds: [],
+        researchStatus: subSources.length > 0 ? ("sufficient" as const) : ("not_researched" as const),
+        sourcesCount: subSources.length,
+        boundSourceIds: subSources.map((s) => s.id),
         draftContent: "",
         draftStatus: "not_started" as const,
+
+        // Research Blueprint grounding
+        purpose: sub.guidance || `Detailed analytical evaluation of ${sub.title}.`,
+        assignmentQuestionAddressed: mappingItem.assignmentQuestion,
+        analyticalObjective: mappingItem.analyticalObjective,
+        keyTheories: headingTheories,
+        keyArguments: sub.keyPoints && sub.keyPoints.length > 0 ? sub.keyPoints : mappingItem.keyArguments,
+        evidenceRequired: mappingItem.researchNeeded,
+        counterarguments: [headingDebate],
+        expectedContribution: `Contributes focused analysis of ${sub.title} towards defending the thesis.`,
+        scholarlySources: subSources,
       };
     });
 
@@ -2354,6 +2446,17 @@ export function generateDynamicAssignmentStructure(
       notes: spec.notes || "",
       targetWordCount: headingTotal,
       subheadings,
+
+      // Research Blueprint grounding
+      purpose: `Investigate and analytically substantiate ${spec.title} to answer: "${mappingItem.assignmentQuestion}".`,
+      assignmentQuestionAddressed: mappingItem.assignmentQuestion,
+      analyticalObjective: mappingItem.analyticalObjective,
+      keyTheories: headingTheories,
+      keyArguments: mappingItem.keyArguments,
+      evidenceRequired: mappingItem.researchNeeded,
+      counterarguments: [headingDebate],
+      expectedContribution: `Directly answers inquiry dimension ${headingNumber} and builds towards the working thesis.`,
+      scholarlySources: headingSources,
     };
   });
 
@@ -2371,6 +2474,15 @@ export function generateDynamicAssignmentStructure(
     targetFrameworks,
     writingTone: typeof options.writingTone === "string" ? options.writingTone : (options.writingTone as any)?.preset || "formal_academic",
     rationale: `AI-proposed academic structure tailored to '${question.slice(0, 100)}' at ${academicLevel} level.`,
+    researchBlueprintOverview: {
+      centralProblem: askScholarResearch.centralProblem,
+      analyticalComponents: askScholarResearch.analyticalComponents,
+      inquiryType: askScholarResearch.inquiryType,
+      coreDebates: askScholarResearch.coreDebates,
+      expectedOutcomes: askScholarResearch.expectedOutcomes,
+      qualityControlChecklist: askScholarResearch.qualityControlChecklist,
+    },
+    questionMappingMatrix: askScholarResearch.questionMappingMatrix,
   };
 }
 
