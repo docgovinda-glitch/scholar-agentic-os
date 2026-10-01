@@ -292,6 +292,8 @@ export type CitationImpactLevel =
 
 export type LiteratureViewMode = "card" | "list" | "table" | "compact";
 
+export type SourceVerificationStatus = "verified" | "unverified" | "metadata_incomplete" | "doi_invalid";
+
 export interface DiscoveredSource {
   id: string;
   title: string;
@@ -308,6 +310,17 @@ export interface DiscoveredSource {
   canonicalReference?: CanonicalReference;
   status: "unreviewed" | "kept" | "removed";
   fromVault?: boolean;
+
+  // Canonical Source Registry Fields (Production Spec §3.3)
+  verificationStatus?: SourceVerificationStatus;
+  isActive?: boolean;               // true = eligible for retrieval; false = excluded
+  retrievalSource?: string;         // e.g. "openalex", "crossref", "doaj", "arxiv", "datacite", "user_upload"
+  retrievedAt?: string;             // ISO timestamp of discovery
+  peerReviewed?: boolean | null;    // null = unknown
+  volume?: string;
+  issue?: string;
+  pages?: string;
+  publicationStatus?: string;       // e.g. "published", "preprint", "in_press"
 
   // Academic quality, depth, and research metadata
   abstract?: string;
@@ -346,6 +359,10 @@ export interface DiscoveredSource {
   sourceOrigin?: "system_found" | "user_uploaded" | "user_added" | "web_source" | "academic" | "primary" | "secondary" | string;
   originTag?: "user" | "ask-scholar" | "ai-research" | string;
   userNotes?: string;
+
+  // Citation Anchoring (Production Spec §5.3)
+  // Tracks which sections cite this source, for bidirectional sync
+  citedInSections?: string[];
 }
 
 export interface EvidenceItem {

@@ -58,6 +58,8 @@ import {
   type InternalSectionPlan,
 } from "../services/invisibleChunkerService";
 import { auditCitations, evaluateRubricCompliance } from "../services/submissionAuditService";
+import { getCitationCoverage } from "../services/citationAnchoringService";
+import { generateReferenceListBlock } from "../services/referenceListGenerator";
 import { stripCircularReferences } from "../../../utils/briefExtractor";
 
 export interface AssignmentContextValue {
@@ -1546,11 +1548,16 @@ export function AssignmentProvider({
       );
       setCitationAuditResult(citAudit);
 
+      // 1b. Citation Coverage
+      const approvedSources = sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id)));
+      const citationCoverage = getCitationCoverage(activeSecs as any, approvedSources);
+
       // 2. Rubric Compliance Evaluation
       const rubricReport = evaluateRubricCompliance(
         fullMarkdown,
         projectState.brief,
-        citAudit
+        citAudit,
+        citationCoverage
       );
 
       await saveAnswers({

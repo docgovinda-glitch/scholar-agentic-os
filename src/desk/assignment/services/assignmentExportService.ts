@@ -30,6 +30,12 @@ import type {
   AssignmentDraftingSection,
   DiscoveredSource,
 } from "../types";
+import {
+  formatReference,
+  generateReferenceList,
+  generateReferenceListBlock,
+  getReferenceListHeading,
+} from "./referenceListGenerator";
 
 export interface AssignmentExportParams {
   title: string;
@@ -45,53 +51,18 @@ export interface AssignmentExportParams {
 
 /**
  * Formats a single source into an academic bibliography entry based on citation style.
+ * Now delegates to the comprehensive referenceListGenerator.
  */
 export function formatBibliographyEntry(source: DiscoveredSource, style: string, index?: number): string {
-  if (source.citation && source.citation.trim().length > 10) {
-    return source.citation.trim();
-  }
-
-  const authors = Array.isArray(source.authors) && source.authors.length > 0
-    ? source.authors.join(", ")
-    : "Anonymous";
-  const year = source.year ? String(source.year).trim() : "n.d.";
-  const title = source.title ? source.title.trim() : "Untitled Work";
-  const venue = source.journal || "Academic Repository";
-  const doi = source.doi ? `https://doi.org/${source.doi.replace(/^https?:\/\/doi\.org\//, "")}` : source.url || "";
-
-  const normStyle = (style || "harvard").toLowerCase().replace(/[^a-z0-9]/g, "");
-
-  if (normStyle.includes("apa") || normStyle.includes("apa7")) {
-    return `${authors} (${year}). ${title}. ${venue}.${doi ? ` ${doi}` : ""}`;
-  } else if (normStyle.includes("ieee")) {
-    const num = index !== undefined ? `[${index + 1}] ` : "";
-    return `${num}${authors}, "${title}," ${venue}, ${year}.${doi ? ` ${doi}` : ""}`;
-  } else if (normStyle.includes("mhra")) {
-    return `${authors}, '${title}', ${venue} (${year})${doi ? `, <${doi}>` : ""}.`;
-  } else {
-    // Default Harvard format
-    return `${authors} (${year}) '${title}', ${venue}.${doi ? ` Available at: ${doi}` : ""}`;
-  }
+  return formatReference(source, style, index ?? 0);
 }
 
 /**
- * Builds the complete list of formatted bibliography references
+ * Builds the complete list of formatted bibliography references.
+ * Now delegates to the comprehensive referenceListGenerator.
  */
 export function buildFormattedBibliography(sources: DiscoveredSource[], style: string): string[] {
-  const normStyle = (style || "harvard").toLowerCase();
-  const isNumbered = normStyle.includes("ieee") || normStyle.includes("vancouver");
-
-  const keptSources = sources.filter((s) => s.status !== "removed");
-  const pool = keptSources.length > 0 ? keptSources : sources;
-
-  const formatted = pool.map((s, idx) => formatBibliographyEntry(s, style, idx));
-
-  if (!isNumbered) {
-    // Alphabetical sort by author surname
-    formatted.sort((a, b) => a.localeCompare(b));
-  }
-
-  return formatted;
+  return generateReferenceList(sources, style);
 }
 
 /**
@@ -396,7 +367,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
       spacing: { before: 240, after: 240 },
       children: [
         new TextRun({
-          text: "References",
+          text: getReferenceListHeading(brief.citationStyle || "harvard"),
           font: "Times New Roman",
           size: 28, // 14pt
           bold: true,
@@ -659,7 +630,7 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
   </main>
 
   <div class="bib-section">
-    <h2>References</h2>
+    <h2>${getReferenceListHeading(brief.citationStyle || "harvard")}</h2>
     ${bibliographyHtml}
   </div>
 
@@ -689,7 +660,7 @@ export async function copyAssignmentMarkdown(
   brief: AssignmentBriefState,
   title: string
 ): Promise<boolean> {
-  const bibliography = buildFormattedBibliography(sources, brief.citationStyle || "harvard");
+  const referenceBlock = generateReferenceListBlock(sources, brief.citationStyle || "harvard");
 
   const fullMarkdown = [
     `# ${title}`,
@@ -698,9 +669,7 @@ export async function copyAssignmentMarkdown(
     "",
     ...sections.map((s) => `## ${s.title}\n\n${(s.draftContent || "").trim()}`),
     "",
-    "## References",
-    "",
-    ...bibliography.map((b) => `- ${b}`),
+    referenceBlock,
   ].join("\n");
 
   try {

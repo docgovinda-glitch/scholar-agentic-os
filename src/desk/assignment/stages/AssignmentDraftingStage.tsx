@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { DraftingSectionIndex } from "../components/DraftingSectionIndex";
 import { DraftingActiveEditor } from "../components/DraftingActiveEditor";
@@ -6,6 +6,9 @@ import {
   streamSectionGeneration,
   type InternalSectionPlan,
 } from "../services/invisibleChunkerService";
+import { buildEvidencePack, serializeEvidencePackForPrompt } from "../services/evidencePackService";
+import { buildContextContinuity, updateContextContinuityAfterSection } from "../services/contextContinuityService";
+import type { ContextContinuityState } from "../services/evidencePackService";
 import type { AssignmentDraftingSection } from "../types";
 import {
   PenTool,
@@ -30,6 +33,7 @@ export function AssignmentDraftingStage({
 }: AssignmentDraftingStageProps) {
   const {
     projectId,
+    project,
     setPhase,
     targetWordCount,
     currentWordCount,
@@ -39,6 +43,7 @@ export function AssignmentDraftingStage({
     citationStyle,
     sources,
     approvedSourceIds,
+    userUploadedSources,
     internalSections,
     activeSectionId,
     setActiveSectionId,
@@ -54,6 +59,9 @@ export function AssignmentDraftingStage({
   const [activeStreamingSectionId, setActiveStreamingSectionId] = useState<string | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isTuning, setIsTuning] = useState(false);
+
+  // Context continuity state — tracks claims, cited sources, and themes across sections
+  const contextContinuityRef = useRef<ContextContinuityState | null>(null);
 
   // Auto-initialize drafting decomposition plan if empty
   useEffect(() => {
@@ -118,6 +126,27 @@ export function AssignmentDraftingStage({
       setGeneratingSection(sec.id, true);
       setStreamingChunk(sec.draftContent || "");
 
+      // ── Evidence Pack Construction (Production Spec §4.1–4.3) ──
+      // Build context continuity from completed sections
+      const sectionIndex = internalSections.findIndex((s) => s.id === sec.id);
+      const continuity = buildContextContinuity(internalSections, sectionIndex);
+
+      // Get analytical syntheses from project answers
+      const projectAnswers = project?.answers || {};
+      const syntheses = (projectAnswers.analyticalSyntheses || projectAnswers.analytical_syntheses || []) as any[];
+
+      // Build evidence pack for this section
+      const evidencePack = buildEvidencePack(
+        sec,
+        approvedSources,
+        userUploadedSources || [],
+        syntheses,
+        continuity
+      );
+
+      // Serialize evidence pack for prompt injection
+      const evidencePackPrompt = serializeEvidencePackForPrompt(evidencePack);
+
       const mappedIds = approvedSources
         .filter((s) => s.mappedSubheadingIds?.includes(sec.id))
         .map((s) => s.id);
@@ -143,11 +172,17 @@ export function AssignmentDraftingStage({
           citationStyle,
           approvedSources,
           revisionPrompt,
+          evidencePackPrompt, // Injected into the LLM prompt
           onChunk: (_chunk, aggregated) => {
             setStreamingChunk(aggregated);
           },
           onComplete: async (fullText) => {
             await updateSectionContent(sec.id, fullText);
+            // Update context continuity state after section completion
+            contextContinuityRef.current = updateContextContinuityAfterSection(
+              contextContinuityRef.current,
+              { ...sec, draftContent: fullText }
+            );
             setStreamingChunk("");
             setActiveStreamingSectionId(null);
             setGeneratingSection(sec.id, false);
@@ -167,10 +202,13 @@ export function AssignmentDraftingStage({
     [
       activeSection,
       projectId,
+      project,
       question,
       academicLevel,
       citationStyle,
       approvedSources,
+      userUploadedSources,
+      internalSections,
       setActiveSectionId,
       setGeneratingSection,
       updateSectionContent,

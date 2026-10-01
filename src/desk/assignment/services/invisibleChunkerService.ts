@@ -748,6 +748,8 @@ export interface StreamSectionOptions {
   approvedSources?: DiscoveredSource[];
   thesis?: string;
   revisionPrompt?: "deepen" | "expand" | "condense" | string;
+  /** Serialized evidence pack prompt block (Production Spec §4.1–4.3) */
+  evidencePackPrompt?: string;
   onChunk: (chunk: string, aggregatedText: string) => void;
   onComplete: (fullText: string) => void;
   onError?: (err: Error) => void;
@@ -763,6 +765,7 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
     approvedSources = [],
     thesis = "",
     revisionPrompt,
+    evidencePackPrompt,
     onChunk,
     onComplete,
     onError,
@@ -790,6 +793,7 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
         boundSources: relevantSources,
         revisionPrompt,
         existingContent: section.draftContent,
+        evidencePackPrompt,
       }),
     });
 

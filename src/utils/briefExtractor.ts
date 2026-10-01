@@ -59,22 +59,26 @@ export function stripCircularReferences<T>(input: T): T {
     }
     seen.add(val);
 
+    let result: any;
     if (Array.isArray(val)) {
-      return val.map((item) => sanitize(item, depth + 1)).filter((item) => item !== undefined);
+      result = val.map((item) => sanitize(item, depth + 1)).filter((item) => item !== undefined);
+    } else {
+      const cleanObj: Record<string, any> = {};
+      for (const [key, item] of Object.entries(val)) {
+        // Omit DOM/React internal attributes like _reactFiber, _reactEvents
+        if (key.startsWith("_react") || key === "nativeEvent") {
+          continue;
+        }
+        const cleaned = sanitize(item, depth + 1);
+        if (cleaned !== undefined) {
+          cleanObj[key] = cleaned;
+        }
+      }
+      result = cleanObj;
     }
 
-    const cleanObj: Record<string, any> = {};
-    for (const [key, item] of Object.entries(val)) {
-      // Omit DOM/React internal attributes like _reactFiber, _reactEvents
-      if (key.startsWith("_react") || key === "nativeEvent") {
-        continue;
-      }
-      const cleaned = sanitize(item, depth + 1);
-      if (cleaned !== undefined) {
-        cleanObj[key] = cleaned;
-      }
-    }
-    return cleanObj;
+    seen.delete(val);
+    return result;
   }
 
   return sanitize(input, 0);

@@ -214,6 +214,10 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/50">
                         User
                       </span>
+                    ) : source.retrievalSource ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border border-teal-200/50">
+                        {source.retrievalSource === "openalex" ? "OpenAlex" : source.retrievalSource === "crossref" ? "CrossRef" : source.retrievalSource === "doaj" ? "DOAJ" : source.retrievalSource === "datacite" ? "DataCite" : source.retrievalSource === "arxiv" ? "arXiv" : source.retrievalSource}
+                      </span>
                     ) : source.originTag === "ask-scholar" || source.type === "journal" || source.type === "paper" || source.isVerifiedAcademic !== false ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-200/50">
                         Ask Scholar

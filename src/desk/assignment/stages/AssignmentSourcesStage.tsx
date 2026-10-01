@@ -10,6 +10,10 @@ import {
   fetchMoreLiteratureSources,
   areSourcesRelevantToQuestion,
 } from "../services/scholarlyDiscoveryService";
+import {
+  discoverRealScholarlySourcesFromServer,
+  fetchMoreRealSources,
+} from "../services/realScholarlyDiscoveryService";
 import { SectionAnalysisWorkspace } from "../components/SectionAnalysisWorkspace";
 import type {
   DiscoveredSource,
@@ -222,6 +226,7 @@ export default function AssignmentSourcesStage({
 
   // Progressive discovery state
   const [isFindingMore, setIsFindingMore] = useState(false);
+  const [isDiscoveringInitial, setIsDiscoveringInitial] = useState(false);
   const [discoverySuccessMsg, setDiscoverySuccessMsg] = useState<string | null>(null);
   const [altPoolIndex, setAltPoolIndex] = useState(0);
 
@@ -422,15 +427,37 @@ export default function AssignmentSourcesStage({
     }
 
     const currentNormalizedTopic = (question || "").trim();
-    if (sources.length === 0) {
-      lastAutoCuratedQuestionRef.current = currentNormalizedTopic;
-      const generated = generateCuratedLiteratureSources(question, citationStyle);
-      setSources(generated);
-    } else if (isMismatched && lastAutoCuratedQuestionRef.current !== currentNormalizedTopic) {
-      lastAutoCuratedQuestionRef.current = currentNormalizedTopic;
-      const generated = generateCuratedLiteratureSources(question, citationStyle);
-      setSources(generated);
-    }
+    const shouldDiscover = sources.length === 0 || (isMismatched && lastAutoCuratedQuestionRef.current !== currentNormalizedTopic);
+    
+    if (!shouldDiscover) return;
+    
+    lastAutoCuratedQuestionRef.current = currentNormalizedTopic;
+
+    // Try real multi-portal scholarly discovery (OpenAlex, CrossRef, DOAJ, DataCite, arXiv)
+    // Falls back to mock catalog if server is unavailable
+    let cancelled = false;
+    setIsDiscoveringInitial(true);
+    discoverRealScholarlySourcesFromServer(question, citationStyle)
+      .then((discovered) => {
+        if (!cancelled) {
+          setSources(discovered);
+          setIsDiscoveringInitial(false);
+          if (discovered.length > 0 && discovered[0].retrievalSource) {
+            setDiscoverySuccessMsg(`Discovered ${discovered.length} scholarly sources from academic databases.`);
+            setTimeout(() => setDiscoverySuccessMsg(null), 5000);
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          // Fallback to mock catalog
+          const generated = generateCuratedLiteratureSources(question, citationStyle);
+          setSources(generated);
+          setIsDiscoveringInitial(false);
+        }
+      });
+    
+    return () => { cancelled = true; };
   }, [sources.length, isMismatched, question, citationStyle, setSources, hasTopic, hasUploadedDocs]);
 
   // Sync bookmarks & exclusions when sources change
@@ -445,27 +472,48 @@ export default function AssignmentSourcesStage({
     }
   }, [sources]);
 
-  // Re-curate literature for active assignment prompt
+  // Re-curate literature for active assignment prompt (uses real API with fallback)
   const handleReCurateForPrompt = async () => {
     setIsFindingMore(true);
-    const generated = generateCuratedLiteratureSources(question, citationStyle);
-    await setSources(generated);
+    try {
+      const discovered = await discoverRealScholarlySourcesFromServer(question, citationStyle);
+      await setSources(discovered);
+      const isReal = discovered.length > 0 && discovered[0].retrievalSource;
+      setDiscoverySuccessMsg(
+        isReal
+          ? `Discovered ${discovered.length} scholarly sources from OpenAlex, CrossRef, DOAJ, DataCite & arXiv.`
+          : `Curated ${discovered.length} literature sources matching your assignment prompt.`
+      );
+    } catch {
+      const generated = generateCuratedLiteratureSources(question, citationStyle);
+      await setSources(generated);
+      setDiscoverySuccessMsg(`Curated ${generated.length} literature sources matching your assignment prompt.`);
+    }
     setIsFindingMore(false);
-    setDiscoverySuccessMsg(`Curated ${generated.length} literature sources matching your assignment prompt.`);
-    setTimeout(() => setDiscoverySuccessMsg(null), 4000);
+    setTimeout(() => setDiscoverySuccessMsg(null), 5000);
   };
 
-  // Progressive Discovery: Find More Literature
+  // Progressive Discovery: Find More Literature (uses real API with fallback)
   const handleFindMoreLiterature = async () => {
     setIsFindingMore(true);
-    setTimeout(async () => {
+    try {
+      const moreBatch = await fetchMoreRealSources(sources, question, 10);
+      const nextSources = [...sources, ...moreBatch];
+      await setSources(nextSources);
+      const isReal = moreBatch.length > 0 && moreBatch[0].retrievalSource;
+      setDiscoverySuccessMsg(
+        isReal
+          ? `Retrieved ${moreBatch.length} additional scholarly sources from academic databases.`
+          : `Retrieved ${moreBatch.length} additional literature sources.`
+      );
+    } catch {
       const moreBatch = fetchMoreLiteratureSources(sources, question, 10);
       const nextSources = [...sources, ...moreBatch];
       await setSources(nextSources);
-      setIsFindingMore(false);
-      setDiscoverySuccessMsg(`Retrieved ${moreBatch.length} additional authentic literature sources.`);
-      setTimeout(() => setDiscoverySuccessMsg(null), 4000);
-    }, 450);
+      setDiscoverySuccessMsg(`Retrieved ${moreBatch.length} additional literature sources.`);
+    }
+    setIsFindingMore(false);
+    setTimeout(() => setDiscoverySuccessMsg(null), 5000);
   };
 
   // Toggle Bookmark
@@ -482,7 +530,7 @@ export default function AssignmentSourcesStage({
     await setSources(nextSources);
   };
 
-  // Dismiss / Replace source with item from replacement pool or dynamic pool matching question
+  // Dismiss / Replace source with real discovery replacement when possible
   const handleDismissSource = async (sourceId: string) => {
     const isUserDoc = userUploadedSources.some((doc) => doc.id === sourceId);
     if (isUserDoc) {
@@ -490,16 +538,12 @@ export default function AssignmentSourcesStage({
       return;
     }
     let nextReplacement: DiscoveredSource | undefined;
-    if (
-      question &&
-      (question.toLowerCase().includes("china") ||
-        question.toLowerCase().includes("geopolitic") ||
-        question.toLowerCase().includes("united nations") ||
-        question.toLowerCase().includes("peace"))
-    ) {
-      const freshBatch = fetchMoreLiteratureSources(sources, question, 1);
+    try {
+      // Try to get a real replacement from the server
+      const freshBatch = await fetchMoreRealSources(sources, question, 1);
       nextReplacement = freshBatch[0];
-    } else {
+    } catch {
+      // Fallback to mock replacement pool
       nextReplacement = REPLACEMENT_POOL[altPoolIndex % REPLACEMENT_POOL.length];
       setAltPoolIndex((prev) => prev + 1);
     }
@@ -567,10 +611,9 @@ export default function AssignmentSourcesStage({
     if (!hasTopic && !hasUploadedDocs) {
       return [];
     }
+    // Use whatever sources are in state; the useEffect handles async discovery
     const raw = (sources && sources.length > 0)
       ? sources
-      : (hasTopic || hasUploadedDocs)
-      ? generateCuratedLiteratureSources(question, citationStyle)
       : [];
 
     return raw.map((s, idx) => ({
@@ -885,7 +928,25 @@ export default function AssignmentSourcesStage({
         )}
       </div>
 
-      {allMasterSources.length === 0 ? (
+      {isDiscoveringInitial && allMasterSources.length === 0 ? (
+        <div
+          data-testid="sources-discovering-state"
+          className="bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-2xl p-8 sm:p-12 shadow-xs dark:shadow-none"
+        >
+          <div className="flex flex-col items-center justify-center space-y-4 py-8">
+            <div className="relative">
+              <div className="w-12 h-12 rounded-full border-2 border-emerald-500/30 border-t-emerald-500 animate-spin" />
+              <Search className="w-5 h-5 text-emerald-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+            </div>
+            <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
+              Discovering Scholarly Sources
+            </h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 text-center max-w-md">
+              Searching OpenAlex, CrossRef, DOAJ, DataCite & arXiv for peer-reviewed literature matching your assignment prompt…
+            </p>
+          </div>
+        </div>
+      ) : allMasterSources.length === 0 ? (
         <div
           data-testid="sources-empty-state"
           className="bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-2xl p-8 sm:p-12 shadow-xs dark:shadow-none space-y-6"

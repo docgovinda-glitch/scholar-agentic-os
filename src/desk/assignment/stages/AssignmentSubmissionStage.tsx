@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { RubricComplianceCard } from "../components/RubricComplianceCard";
 import { CitationReconciliationCard } from "../components/CitationReconciliationCard";
@@ -7,6 +7,7 @@ import {
   exportAssignmentToPdf,
   copyAssignmentMarkdown,
 } from "../services/assignmentExportService";
+import { getCitationCoverage } from "../services/citationAnchoringService";
 import {
   FileText,
   Printer,
@@ -17,6 +18,8 @@ import {
   Sparkles,
   ShieldCheck,
   AlertTriangle,
+  BookOpen,
+  LinkIcon,
 } from "lucide-react";
 
 export interface AssignmentSubmissionStageProps {
@@ -34,6 +37,7 @@ export function AssignmentSubmissionStage({
     internalSections,
     outline,
     sources,
+    approvedSourceIds,
     citationStyle,
     academicLevel,
     question,
@@ -126,6 +130,16 @@ export function AssignmentSubmissionStage({
       setTimeout(() => setCopiedMarkdown(false), 2200);
     }
   };
+
+  // Citation Coverage Statistics (Production Spec §5)
+  const approvedSources = useMemo(
+    () => sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id))),
+    [sources, approvedSourceIds]
+  );
+  const citationCoverage = useMemo(
+    () => getCitationCoverage(activeSections as any, approvedSources),
+    [activeSections, approvedSources]
+  );
 
   // Word Budget Deviation
   const wordDiff = currentWordCount - targetWordCount;
@@ -243,6 +257,59 @@ export function AssignmentSubmissionStage({
           onReRunAudit={runSubmissionAudit}
         />
       </div>
+
+      {/* Citation Coverage Statistics Card (Production Spec §5) */}
+      {approvedSources.length > 0 && (
+        <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <LinkIcon className="w-4 h-4 text-teal-500" />
+              <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
+                Citation Anchor Coverage
+              </h3>
+            </div>
+            <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
+              citationCoverage.orphanedSources === 0
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            }`}>
+              {citationCoverage.sourcesWithCitations}/{approvedSources.length} sources cited
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5">
+              <div className="text-lg font-bold text-neutral-900 dark:text-white tabular-nums">{citationCoverage.totalAnchors}</div>
+              <div className="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Total Anchors</div>
+            </div>
+            <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5">
+              <div className="text-lg font-bold text-neutral-900 dark:text-white tabular-nums">{citationCoverage.sourcesWithCitations}</div>
+              <div className="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Sources Cited</div>
+            </div>
+            <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5">
+              <div className={`text-lg font-bold tabular-nums ${citationCoverage.orphanedSources > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                {citationCoverage.orphanedSources}
+              </div>
+              <div className="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Orphaned</div>
+            </div>
+            <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5">
+              <div className="text-lg font-bold text-neutral-900 dark:text-white tabular-nums">
+                {citationCoverage.sectionCoverage.filter((s) => s.anchorCount > 0).length}/{citationCoverage.sectionCoverage.length}
+              </div>
+              <div className="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Sections w/ Cites</div>
+            </div>
+          </div>
+
+          {citationCoverage.orphanedSources > 0 && (
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-500/5 border border-amber-200/50 dark:border-amber-500/10">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                <span className="font-semibold">{citationCoverage.orphanedSources} approved source{citationCoverage.orphanedSources > 1 ? "s are" : " is"} not cited</span> in any section. Consider integrating them or removing them from approved sources.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Export Bar & Final Action Controls */}
       <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4">

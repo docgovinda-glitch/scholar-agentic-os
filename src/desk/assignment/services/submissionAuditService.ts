@@ -232,7 +232,14 @@ export function auditCitations(
 export function evaluateRubricCompliance(
   fullDraftText: string,
   brief: AssignmentBriefState,
-  citationAudit?: CitationAuditResult
+  citationAudit?: CitationAuditResult,
+  citationCoverage?: {
+    totalAnchors: number;
+    sourcesWithCitations: number;
+    orphanedSources: number;
+    sectionCoverage: { sectionId: string; sectionTitle: string; anchorCount: number }[];
+    mostCitedSources: { sourceId: string; sourceTitle: string; count: number }[];
+  }
 ): RubricScoreReport {
   const text = (fullDraftText || "").trim();
   const wordCount = text.length > 0 ? text.split(/\s+/).filter(Boolean).length : 0;
@@ -255,6 +262,13 @@ export function evaluateRubricCompliance(
   if (citationAudit && !citationAudit.isReconciled && citationAudit.unresolvedCitations.length > 0) {
     missingRequirements.push(
       `${citationAudit.unresolvedCitations.length} in-text citation(s) are missing from the verified bibliography reference list.`
+    );
+  }
+
+  // 2b. Check orphaned sources from citation coverage
+  if (citationCoverage && citationCoverage.orphanedSources > 0) {
+    missingRequirements.push(
+      `${citationCoverage.orphanedSources} approved source(s) are orphaned (not cited in the draft).`
     );
   }
 
@@ -353,18 +367,34 @@ export function evaluateRubricCompliance(
         ? "Exemplary critical depth; arguments move beyond description to evaluate theoretical trade-offs and counter-positions."
         : "Sound conceptual discussion; deepen critical scrutiny by challenging theoretical assumptions and exploring contrasting viewpoints.";
     } else if (normName.includes("evidence") || normName.includes("grounding") || normName.includes("citation") || normName.includes("source")) {
-      if (citationAudit?.isReconciled && citationDensity >= 3) {
-        score = 86;
-        criteriaFeedback[crit.name] = "Outstanding evidence density; claims are substantiated with verified peer-reviewed citations matching the reference list.";
-      } else if (citationAudit && citationAudit.unresolvedCitations.length > 0) {
-        score = 64;
-        criteriaFeedback[crit.name] = `Citation audit identified ${citationAudit.unresolvedCitations.length} unresolved citation(s). Reconcile all in-text references before submission.`;
-      } else if (citationDensity > 0) {
-        score = 75;
-        criteriaFeedback[crit.name] = "Good source integration. Consider expanding evidence coverage across all analytical body paragraphs.";
+      if (citationCoverage) {
+        if (citationCoverage.orphanedSources === 0 && citationCoverage.sourcesWithCitations >= 3) {
+          score = 86;
+          criteriaFeedback[crit.name] = "Outstanding evidence density; claims are substantiated with verified peer-reviewed citations matching the reference list, with no orphaned sources.";
+        } else if (citationCoverage.orphanedSources > 0) {
+          score = 64;
+          criteriaFeedback[crit.name] = `Citation audit identified ${citationCoverage.orphanedSources} orphaned source(s). Integrate them into the text or remove them from the approved list.`;
+        } else if (citationCoverage.totalAnchors > 0) {
+          score = 75;
+          criteriaFeedback[crit.name] = "Good source integration. Consider expanding evidence coverage across all analytical body paragraphs.";
+        } else {
+          score = 55;
+          criteriaFeedback[crit.name] = "Limited empirical citations detected. Ground key assertions in approved scholarly literature.";
+        }
       } else {
-        score = 55;
-        criteriaFeedback[crit.name] = "Limited empirical citations detected. Ground key assertions in approved scholarly literature.";
+        if (citationAudit?.isReconciled && citationDensity >= 3) {
+          score = 86;
+          criteriaFeedback[crit.name] = "Outstanding evidence density; claims are substantiated with verified peer-reviewed citations matching the reference list.";
+        } else if (citationAudit && citationAudit.unresolvedCitations.length > 0) {
+          score = 64;
+          criteriaFeedback[crit.name] = `Citation audit identified ${citationAudit.unresolvedCitations.length} unresolved citation(s). Reconcile all in-text references before submission.`;
+        } else if (citationDensity > 0) {
+          score = 75;
+          criteriaFeedback[crit.name] = "Good source integration. Consider expanding evidence coverage across all analytical body paragraphs.";
+        } else {
+          score = 55;
+          criteriaFeedback[crit.name] = "Limited empirical citations detected. Ground key assertions in approved scholarly literature.";
+        }
       }
     } else if (normName.includes("structure") || normName.includes("coherence") || normName.includes("organization")) {
       score = hasIntro && hasConclusion && isWordCountCompliant ? 85 : hasIntro || hasConclusion ? 76 : 65;
@@ -434,6 +464,9 @@ export function evaluateRubricCompliance(
   }
   if (citationAudit && !citationAudit.isReconciled) {
     readiness = Math.max(25, readiness - 15);
+  }
+  if (citationCoverage && citationCoverage.orphanedSources > 0) {
+    readiness = Math.max(25, readiness - 10);
   }
   if (!isWordCountCompliant) {
     readiness = Math.max(30, readiness - 10);

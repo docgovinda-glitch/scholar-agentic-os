@@ -1575,6 +1575,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     boundSources = [],
     revisionPrompt,
     existingContent = "",
+    evidencePackPrompt,
   } = req.body || {};
 
   res.setHeader("Content-Type", "text/event-stream");
@@ -1583,9 +1584,13 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
   res.flushHeaders?.();
 
   try {
-    const evidenceList = (boundSources || [])
-      .map((s: any, i: number) => `[${i + 1}] Title: ${s.title} | Author(s): ${(s.authors || []).join(", ")} (${s.year || "n.d."}) | Venue: ${s.journal || s.type} | Rationale: ${s.suggestedUse || s.mainFinding || ""}`)
-      .join("\n");
+    // Use structured evidence pack if provided (Production Spec §4.1–4.3),
+    // otherwise fall back to the basic flat evidence list
+    const evidenceBlock = evidencePackPrompt
+      ? evidencePackPrompt
+      : (boundSources || [])
+        .map((s: any, i: number) => `[${i + 1}] Title: ${s.title} | Author(s): ${(s.authors || []).join(", ")} (${s.year || "n.d."}) | Venue: ${s.journal || s.type} | Rationale: ${s.suggestedUse || s.mainFinding || ""}`)
+        .join("\n");
 
     const revisionInstruction = revisionPrompt === "deepen"
       ? "REVISION FOCUS: Deepen analytical critique. Minimize passive descriptive text and amplify dialectical interrogation of theoretical assumptions (target 70% analysis / 30% description)."
@@ -1606,8 +1611,7 @@ Assignment Topic: "${assignmentTopic}"
 
 ${revisionInstruction}
 
-BOUND EVIDENCE (Use these sources for in-text citations; do NOT fabricate external sources):
-${evidenceList || "Use standard scholarly reasoning."}
+${evidencePackPrompt ? evidenceBlock : `BOUND EVIDENCE (Use these sources for in-text citations; do NOT fabricate external sources):\n${evidenceBlock || "Use standard scholarly reasoning."}`}
 
 MANDATORY PEEL PARAGRAPH FRAMEWORK:
 - Point: Distinct topic sentence advancing the central thesis.
