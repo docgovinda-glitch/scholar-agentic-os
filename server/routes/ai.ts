@@ -241,7 +241,7 @@ export function registerAIRoutes(
     try {
       const {
         prompt,
-        systemPrompt = "You are Scholar Core Socratic Assistant, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers with clear citations.",
+        systemPrompt = "You are Scholar Core Socratic Assistant, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers with clear citations. Where appropriate, use structured data formats like Markdown tables to compare or organize information. Prioritize the most recent and highly relevant empirical data, incorporating analytical depth.",
         history = [],
         files = [],
         images = [],

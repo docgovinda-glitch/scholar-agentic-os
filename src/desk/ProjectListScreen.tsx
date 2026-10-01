@@ -583,6 +583,7 @@ export function renderFormattedGuideText(
     | { type: "ordered"; num: string; content: string }
     | { type: "blockquote"; content: string }
     | { type: "code_block"; lang: string; code: string }
+    | { type: "table"; header: string[]; rows: string[][] }
     | { type: "paragraph"; content: string };
 
   const blocks: Block[] = [];
@@ -615,6 +616,23 @@ export function renderFormattedGuideText(
 
     if (!trimmed) {
       blocks.push({ type: "empty" });
+      continue;
+    }
+
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      const cells = trimmed.split("|").slice(1, -1).map(c => c.trim());
+      const isSeparator = cells.length > 0 && cells.every(c => /^[:\-]+$/.test(c.replace(/\s/g, '')));
+      
+      const lastBlock = blocks[blocks.length - 1];
+      if (lastBlock?.type === "table") {
+        if (!isSeparator) {
+          lastBlock.rows.push(cells);
+        }
+      } else {
+        if (!isSeparator) {
+          blocks.push({ type: "table", header: cells, rows: [] });
+        }
+      }
       continue;
     }
 
@@ -764,6 +782,35 @@ export function renderFormattedGuideText(
 
         if (block.type === "code_block") {
           return <CodeBlockWithCopy key={idx} lang={block.lang} code={block.code} />;
+        }
+
+        if (block.type === "table") {
+          return (
+            <div key={idx} className="overflow-x-auto my-2 rounded-md border border-neutral-200 dark:border-white/10 shadow-sm scrollbar-hide">
+              <table className="w-full text-left text-sm text-neutral-600 dark:text-neutral-300">
+                <thead className="bg-neutral-50 dark:bg-white/5 border-b border-neutral-200 dark:border-white/10">
+                  <tr>
+                    {block.header.map((h, i) => (
+                      <th key={i} className="px-3 py-2 font-semibold text-neutral-900 dark:text-neutral-100 uppercase text-xs tracking-wider">
+                        {parseInline(h)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-200 dark:divide-white/5">
+                  {block.rows.map((row, rIdx) => (
+                    <tr key={rIdx} className="hover:bg-neutral-50/50 dark:hover:bg-white/[0.02] transition-colors">
+                      {row.map((cell, cIdx) => (
+                        <td key={cIdx} className="px-3 py-2 leading-relaxed">
+                          {parseInline(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
         }
 
         const isHeaderLike = block.content.endsWith(":") || block.content.startsWith("👉");
@@ -2855,6 +2902,35 @@ export default function ProjectListScreen({
               </div>
 
               <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/10 text-xs">
+                  <BookOpen className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                  <label htmlFor="ask-scholar-header-citation-style" className="sr-only">
+                    Referencing Style
+                  </label>
+                  <select
+                    id="ask-scholar-header-citation-style"
+                    aria-label="Preferred Referencing Style"
+                    value={askCitationStyle}
+                    onChange={(e) => {
+                      const newStyle = e.target.value as AskCitationStyleId;
+                      setAskCitationStyle(newStyle);
+                      try {
+                        localStorage.setItem("scholar_ask_citation_style", newStyle);
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    className="bg-transparent text-[11px] font-medium text-neutral-700 dark:text-neutral-300 focus:outline-none cursor-pointer pr-1"
+                    title="Select referencing style (APA, MLA, Chicago, Harvard, IEEE, Vancouver)"
+                  >
+                    {ASK_SCHOLAR_CITATION_STYLES.map((s) => (
+                      <option key={s.id} value={s.id} className="bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100">
+                        {s.shortLabel}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {hasStartedChatting && (
                   <button
                     type="button"
