@@ -43,7 +43,7 @@ describe("Journal Article — User-Specific Author Persistence Integration", () 
     creditRoles: ["Conceptualization", "Methodology"],
   };
 
-  const project: ProjectView = {
+  const project: any = {
     projectId: "proj-ja-01",
     outputTypeId: "OT-06",
     title: "Clinical Efficacy of Prime Editing in In Vivo Models",

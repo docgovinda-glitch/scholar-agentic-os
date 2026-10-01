@@ -3470,6 +3470,7 @@ export default function ProjectListScreen({
                   )}
                 </div>
 
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     aria-label="Reset Chat"

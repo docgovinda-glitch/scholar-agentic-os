@@ -180,9 +180,9 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
       // Verify each source has questionAlignment populated
       sources.forEach((source) => {
         expect(source.questionAlignment).toBeDefined();
-        expect(source.questionAlignment.directScore).toBeGreaterThanOrEqual(70);
-        expect(source.questionAlignment.supportsPart).toBeTruthy();
-        expect(source.questionAlignment.evidenceType).toBeTruthy();
+        expect(source.questionAlignment!.directScore).toBeGreaterThanOrEqual(70);
+        expect(source.questionAlignment!.supportsPart).toBeTruthy();
+        expect(source.questionAlignment!.evidenceType).toBeTruthy();
       });
     });
   });

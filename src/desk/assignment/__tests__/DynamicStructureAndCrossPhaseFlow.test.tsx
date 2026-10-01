@@ -132,7 +132,7 @@ describe("Phase I Dynamic Structure & Cross-Phase Workflow", () => {
       expect(newHeading.subheadings.length).toBe(2);
 
       // Add custom subheading
-      structure = addSubheading(structure, newHeading.id, "ASEAN Diplomatic Responses", 250);
+      structure = addSubheading(structure, newHeading.id, "ASEAN Diplomatic Responses");
       const updatedHeading = structure.headings.find((h) => h.id === newHeading.id);
       expect(updatedHeading?.subheadings.length).toBe(3);
 
@@ -184,7 +184,7 @@ describe("Phase I Dynamic Structure & Cross-Phase Workflow", () => {
       const mockUpdateMapping = vi.fn();
       const mockUpdateNotes = vi.fn();
 
-      const source = {
+      const source: any = {
         id: "src-101",
         title: "Maritime Strategy in the Indo-Pacific",
         authors: ["Till, G."],
