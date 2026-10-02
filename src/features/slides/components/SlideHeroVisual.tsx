@@ -26,6 +26,118 @@ export default function SlideHeroVisual({
 }: SlideHeroVisualProps) {
   const accent = theme?.accent || '#2563EB';
 
+  // Specific theme-tailored hero illustrations (Kimi & Gamma official cards)
+  if (theme?.id === 'travel-green-handbook') {
+    return (
+      <div
+        className={`w-full h-full rounded-xl border flex flex-col justify-between p-3 relative overflow-hidden bg-emerald-950/10 ${theme?.metricBorder || 'border-emerald-500/30'} ${className}`}
+      >
+        <div className="flex items-center justify-between text-[9px] font-mono opacity-80" style={{ color: accent }}>
+          <span>FOUR-SEASON RETURNS</span>
+          <span>EXPEDITION</span>
+        </div>
+
+        <div className="my-auto flex items-center justify-center py-1">
+          <svg viewBox="0 0 140 50" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-28 h-10">
+            <path d="M 10 45 L 45 15 L 75 45 Z" fill={accent} fillOpacity="0.3" stroke={accent} strokeWidth="1" />
+            <path d="M 50 45 L 85 10 L 125 45 Z" fill={accent} fillOpacity="0.5" stroke={accent} strokeWidth="1.2" />
+            <path d="M 25 45 L 35 28 L 45 45 Z" fill={accent} />
+            <path d="M 65 45 L 75 25 L 85 45 Z" fill={accent} />
+            <circle cx="115" cy="12" r="5" fill="#F59E0B" fillOpacity="0.8" />
+          </svg>
+        </div>
+
+        <div className="flex items-center justify-between text-[8px] font-mono opacity-70">
+          <span>FIELD AUDIT: 180d</span>
+          <span className="text-emerald-600 dark:text-emerald-400 font-bold">100% ECO</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (theme?.id === 'blue-flame-brand') {
+    return (
+      <div
+        className={`w-full h-full rounded-xl border flex flex-col justify-between p-3 relative overflow-hidden bg-blue-950/30 ${theme?.metricBorder || 'border-blue-500/30'} ${className}`}
+      >
+        <div className="flex items-center justify-between text-[9px] font-mono opacity-80" style={{ color: accent }}>
+          <span className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+            HIGHWAY FLEET
+          </span>
+          <span>31ms LIDAR</span>
+        </div>
+
+        <div className="my-auto flex items-center justify-center py-1">
+          <svg viewBox="0 0 140 50" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-28 h-10">
+            <rect x="25" y="14" width="70" height="26" rx="4" fill="#0B132B" stroke={accent} strokeWidth="1.2" />
+            <path d="M 75 14 L 95 24 L 95 40 L 75 40 Z" fill="#0B132B" stroke={accent} strokeWidth="1.2" />
+            <polygon points="95,28 135,20 135,42 95,36" fill={accent} fillOpacity="0.25" />
+            <circle cx="45" cy="40" r="5" fill="#040814" stroke={accent} strokeWidth="1.5" />
+            <circle cx="85" cy="40" r="5" fill="#040814" stroke={accent} strokeWidth="1.5" />
+          </svg>
+        </div>
+
+        <div className="flex items-center justify-between text-[8px] font-mono opacity-70">
+          <span>5.1M TOTAL MILES</span>
+          <span className="text-cyan-400 font-bold">Q4 TARGET MET</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (theme?.id === 'pacific-teal') {
+    return (
+      <div
+        className={`w-full h-full rounded-xl border flex flex-col justify-between p-3 relative overflow-hidden bg-teal-500/10 ${theme?.metricBorder || 'border-teal-500/30'} ${className}`}
+      >
+        <div className="flex items-center justify-between text-[9px] font-mono opacity-80" style={{ color: accent }}>
+          <span>AS THE CITY'S LIFELINES</span>
+          <span>WETLANDS</span>
+        </div>
+
+        <div className="my-auto flex items-center justify-center py-1">
+          <svg viewBox="0 0 140 45" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-28 h-9">
+            <path d="M 5 15 Q 35 5, 70 15 T 135 15" stroke={accent} strokeWidth="1.8" fill="none" />
+            <path d="M 5 25 Q 35 15, 70 25 T 135 25" stroke={accent} strokeWidth="1.4" strokeOpacity="0.7" fill="none" />
+            <path d="M 5 35 Q 35 25, 70 35 T 135 35" stroke={accent} strokeWidth="1.0" strokeOpacity="0.4" fill="none" />
+          </svg>
+        </div>
+
+        <div className="flex items-center justify-between text-[8px] font-mono opacity-70">
+          <span>186,000+ RESIDENTS</span>
+          <span className="text-teal-600 dark:text-teal-400 font-bold">PROTECTED</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (theme?.id === 'beyond-2027') {
+    return (
+      <div
+        className={`w-full h-full rounded-xl border flex flex-col justify-between p-3 relative overflow-hidden bg-zinc-900/50 ${theme?.metricBorder || 'border-zinc-700/40'} ${className}`}
+      >
+        <div className="flex items-center justify-between text-[9px] font-mono opacity-80" style={{ color: accent }}>
+          <span>BEYOND 2027</span>
+          <span>ASSET ALLOCATION</span>
+        </div>
+
+        <div className="my-auto flex items-center justify-center py-1">
+          <svg viewBox="0 0 140 50" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-28 h-10">
+            <polygon points="30,45 60,5 90,5 60,45" fill="#27272A" stroke={accent} strokeWidth="1.2" />
+            <polygon points="60,5 90,5 120,45 90,45" fill="#3F3F46" fillOpacity="0.5" stroke={accent} strokeWidth="1.2" />
+            <line x1="10" y1="45" x2="130" y2="45" stroke={accent} strokeWidth="1.5" />
+          </svg>
+        </div>
+
+        <div className="flex items-center justify-between text-[8px] font-mono opacity-70">
+          <span>$4.2B AUM</span>
+          <span className="text-zinc-200 font-bold">+22.4% ALPHA</span>
+        </div>
+      </div>
+    );
+  }
+
   switch (motif) {
     case 'blueprint-grid': {
       // Pastel Derivation: Mathematical formula & fluidic sorting diagram (p0 -> p1)

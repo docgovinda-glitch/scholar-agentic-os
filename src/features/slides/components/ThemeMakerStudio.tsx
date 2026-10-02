@@ -11,6 +11,7 @@ import {
   FileCode,
   AlertCircle,
   Eye,
+  Dices,
 } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import type { SlideTheme, VisualMotif, LayoutArchetype, TypographyPairing, SurfaceTreatment } from '../types/themes';
@@ -20,6 +21,7 @@ import SlideHeroVisual from './SlideHeroVisual';
 import {
   extractThemeFromImage,
   generateThemeFromPrompt,
+  generateFreestyleTheme,
   compileSlideTheme,
   saveCustomThemeToStorage,
   type ExtractedThemeResult,
@@ -242,7 +244,7 @@ export default function ThemeMakerStudio({
         <button
           type="button"
           onClick={() => setCreationMode('customize')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
             creationMode === 'customize'
               ? 'bg-purple-600 text-white shadow-xs'
               : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/5'
@@ -250,6 +252,20 @@ export default function ThemeMakerStudio({
         >
           <Palette className="w-3.5 h-3.5" />
           <span>🎛️ Manual Customizer</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            const res = generateFreestyleTheme();
+            applyExtractedResult(res);
+            setCreationMode('customize');
+          }}
+          className="px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-purple-500/15 hover:from-amber-500/25 hover:to-purple-500/25 text-neutral-800 dark:text-neutral-100 border border-amber-500/30"
+          title="Roll a random inspiring theme like Kimi Freestyle"
+        >
+          <Dices className="w-3.5 h-3.5 text-amber-500" />
+          <span>🎲 Freestyle Roll (Surprise Me)</span>
         </button>
       </div>
 
