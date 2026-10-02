@@ -22,8 +22,9 @@ Scholar OS **Presentation Studio** is a web-native, academic-grade slide authori
 
 ### Step 01: Scaffolding & Decomposition (`Step01Scaffolding.tsx`)
 - **Intake Modes**:
-  - **Academic Topic Prompt**: Generates complete 5-beat academic presentation decks from freeform topic titles (e.g., *"Quantum Computing & Fault-Tolerant Cryptographic Verification"*, *"Corporate Restructuring Under High Rates"*, *"Biomedical Ethics in Autonomous Clinical Trials"*).
-  - **Raw Coursework / Draft Markdown**: Ingests draft sections, decomposing headings and text into single-idea slides.
+  - **📁 Upload Brief or Paper (.pdf, .docx, .txt, .md)**: Coursework intake bridge featuring drag-and-drop file upload (up to 50MB), word count detection, excerpt preview, auto-detected academic thesis title, and automatic 5-beat narrative deconstruction.
+  - **🎯 Academic Topic Prompt**: Generates complete 5-beat academic presentation decks from freeform topic titles (e.g., *"Quantum Computing & Fault-Tolerant Cryptographic Verification"*, *"Corporate Restructuring Under High Rates"*, *"Biomedical Ethics in Autonomous Clinical Trials"*).
+  - **📄 Raw Coursework / Draft Markdown**: Ingests draft sections, decomposing headings and text into single-idea slides.
 - **Cognitive Frameworks**:
   - `Universal-5Beat` (Default)
   - `SCR` (Situation · Complication · Resolution)
@@ -130,3 +131,4 @@ CREATE INDEX IF NOT EXISTS idx_presentation_decks_topic ON presentation_decks(to
 - `PUT /api/presentations/:id`: Debounced autosave (500ms) for slides, themes, and metadata.
 - `DELETE /api/presentations/:id`: Remove deck.
 - `POST /api/presentations/:id/copilot`: Natural language in-slide transformation endpoint.
+- `POST /api/presentations/parse-document`: Multipart document parsing for PDF, DOCX, TXT, and Markdown briefs with automatic word count detection and heuristic topic title extraction.

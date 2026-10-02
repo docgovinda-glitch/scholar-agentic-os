@@ -361,8 +361,8 @@ export function generateReferenceList(
   const norm = normalizeCitationStyle(style);
   const isNumbered = norm.includes("ieee") || norm.includes("vancouver");
 
-  // Filter to cited sources if anchor data is available
-  let pool = sources.filter((s) => s.status !== "dismissed" && s.status !== "excluded");
+  // Filter to active, non-removed sources
+  let pool = sources.filter((s) => s.status !== "removed" && (s as any).status !== "dismissed" && (s as any).status !== "excluded" && s.isActive !== false);
   if (citedSourceIds && citedSourceIds.size > 0) {
     pool = pool.filter((s) => citedSourceIds.has(s.id));
   }

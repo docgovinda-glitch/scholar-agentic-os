@@ -312,29 +312,41 @@ export default function PresentationWorkspace({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
-          {/* Legacy Tool Dropdown / Stage Shortcuts */}
-          <div className="flex items-center gap-1">
+          {/* Rehearsal & Defense Tools Dropdown */}
+          <div className="relative group">
             <button
               type="button"
-              onClick={() => setLegacyStage('timing')}
-              className="hidden lg:inline-block px-2.5 py-1 text-[11px] font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-white rounded-lg"
+              className="px-2.5 py-1 text-[11px] font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-white rounded-lg flex items-center gap-1 border border-transparent hover:border-neutral-200 dark:hover:border-white/10 transition-colors cursor-pointer"
             >
-              1. Timing & Constraints
+              <span>🎙️ Defense Tools</span>
+              <span className="text-[9px]">▾</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setLegacyStage('script')}
-              className="hidden lg:inline-block px-2.5 py-1 text-[11px] font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-white rounded-lg"
-            >
-              4. Speaker Script & Notes
-            </button>
-            <button
-              type="button"
-              onClick={() => setLegacyStage('qa')}
-              className="hidden lg:inline-block px-2.5 py-1 text-[11px] font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-white rounded-lg"
-            >
-              6. Q&A & Defense Simulator
-            </button>
+            <div className="absolute right-0 top-full mt-1 w-52 py-1 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+              <button
+                type="button"
+                onClick={() => setLegacyStage('timing')}
+                className="w-full text-left px-3 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 flex items-center gap-2 cursor-pointer"
+              >
+                <span>⏱️</span>
+                <span>Timing & Constraints</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLegacyStage('script')}
+                className="w-full text-left px-3 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 flex items-center gap-2 cursor-pointer"
+              >
+                <span>📝</span>
+                <span>Speaker Script & Notes</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLegacyStage('qa')}
+                className="w-full text-left px-3 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 flex items-center gap-2 cursor-pointer"
+              >
+                <span>🛡️</span>
+                <span>Q&A & Defense Simulator</span>
+              </button>
+            </div>
           </div>
 
           <button

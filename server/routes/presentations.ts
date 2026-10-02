@@ -7,7 +7,33 @@
 
 import express, { Router, Request, Response } from "express";
 import { randomUUID } from "node:crypto";
+import multer from "multer";
+import * as pdfParseModule from "pdf-parse";
+import mammoth from "mammoth";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+});
+
+async function extractTextFromPdf(buffer: Buffer): Promise<{ text: string }> {
+  try {
+    if (typeof (pdfParseModule as any).PDFParse === "function") {
+      const parser = new (pdfParseModule as any).PDFParse({ data: buffer });
+      const res = await parser.getText();
+      return { text: res.text || "" };
+    }
+    const fn = (pdfParseModule as any).default || pdfParseModule;
+    if (typeof fn === "function") {
+      const res = await fn(buffer);
+      return { text: res.text || "" };
+    }
+  } catch (err) {
+    console.warn("[presentations.ts] PDF parse fallback error:", err);
+  }
+  return { text: "" };
+}
 
 export interface PresentationDeckRow extends Record<string, unknown> {
   id: string;
@@ -81,6 +107,80 @@ router.get("/:id", async (req: Request, res: Response) => {
     res.status(404).json({ error: `Presentation deck ${id} not found` });
   } catch (err: any) {
     res.status(500).json({ error: `Failed to get presentation: ${err.message}` });
+  }
+});
+
+/**
+ * POST /api/presentations/parse-document
+ * Ingests a brief, coursework draft, or research paper (.pdf, .docx, .txt, .md)
+ * and extracts raw text, word count, and detected thesis/topic title.
+ */
+router.post("/parse-document", upload.single("file"), async (req: Request, res: Response) => {
+  const file = (req as any).file;
+  if (!file) {
+    return res.status(400).json({ error: "No document file provided." });
+  }
+
+  try {
+    let text = "";
+    const lowerName = file.originalname.toLowerCase();
+
+    if (file.mimetype === "application/pdf" || lowerName.endsWith(".pdf")) {
+      const data = await extractTextFromPdf(file.buffer);
+      text = data.text;
+    } else if (
+      file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      lowerName.endsWith(".docx") ||
+      lowerName.endsWith(".doc")
+    ) {
+      const result = await mammoth.extractRawText({ buffer: file.buffer });
+      text = result.value || "";
+    } else {
+      text = file.buffer.toString("utf-8");
+    }
+
+    text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    if (!text) {
+      return res.status(422).json({ error: "Could not extract readable text from document. Please verify file content." });
+    }
+
+    // Heuristically extract title/topic from first few non-trivial lines
+    const lines = text.split("\n").map(l => l.trim().replace(/^#+\s*/, "")).filter(Boolean);
+    let detectedTitle = "";
+    for (let i = 0; i < Math.min(lines.length, 6); i++) {
+      const candidate = lines[i].replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
+      if (
+        candidate.length >= 8 &&
+        candidate.length <= 120 &&
+        !/^(assignment brief|essay prompt|module handbook|table of contents|contents|abstract|overview|introduction)$/i.test(candidate)
+      ) {
+        detectedTitle = candidate;
+        break;
+      }
+    }
+
+    if (!detectedTitle) {
+      detectedTitle = file.originalname
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[-_]/g, " ")
+        .replace(/\b\w/g, (c: string) => c.toUpperCase())
+        .trim();
+    }
+
+    const words = text.split(/\s+/).filter(Boolean);
+    const wordCount = words.length;
+
+    res.json({
+      success: true,
+      text,
+      detectedTitle,
+      wordCount,
+      fileName: file.originalname,
+      fileSize: file.size,
+    });
+  } catch (err: any) {
+    console.error("[presentations.ts] Document parsing error:", err);
+    res.status(500).json({ error: `Failed to parse document: ${err.message}` });
   }
 });
 
