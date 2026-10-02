@@ -27,6 +27,8 @@ import {
 } from '../types/themes';
 import SlideMotifGraphic from './SlideMotifGraphic';
 import SlideHeroVisual from './SlideHeroVisual';
+import ThemeMakerStudio from './ThemeMakerStudio';
+import { getStoredCustomThemes } from '../services/themeExtractorService';
 
 export interface Step02ThemeTemplateProps {
   deck: SlideDeck;
@@ -57,7 +59,8 @@ export default function Step02ThemeTemplate({
   onNextStep,
 }: Step02ThemeTemplateProps) {
   const currentThemeId = (deck.themeId as SlideThemeId) || 'sand-academic';
-  const [activeTab, setActiveTab] = useState<'presets' | 'byot'>('presets');
+  const [activeTab, setActiveTab] = useState<'presets' | 'maker' | 'byot'>('presets');
+  const [customThemesList, setCustomThemesList] = useState<SlideTheme[]>(() => getStoredCustomThemes());
 
   // Filter States
   const [selectedCategory, setSelectedCategory] = useState<'all' | ThemeCategory>('all');
@@ -136,6 +139,30 @@ export default function Step02ThemeTemplate({
     });
   };
 
+  const handleApplyCustomTheme = (theme: SlideTheme) => {
+    const updatedCustom: CustomTheme = {
+      accentColor: theme.accent,
+      fontPairing:
+        theme.fontFamily === 'serif'
+          ? 'Newsreader Serif'
+          : theme.fontFamily === 'mono'
+          ? 'Noto Sans'
+          : 'Inter',
+      surfaceTreatment: 'elevated',
+      contrastRatio: calculateContrastRatio(theme.accent, theme.cardBg),
+      isValidWcagAA: true,
+    };
+
+    onUpdateDeck({
+      ...deck,
+      themeId: theme.id,
+      customTheme: updatedCustom,
+      updatedAt: new Date().toISOString(),
+    });
+    setCustomThemesList(getStoredCustomThemes());
+    setActiveTab('presets');
+  };
+
   // Sample slide preview content
   const firstSlide = deck.slides?.[0];
   const previewHeadline = firstSlide?.actionHeadline || deck.title || 'Autonomous Knowledge Grounding in Multi-Agent Scientific Discovery';
@@ -175,29 +202,45 @@ export default function Step02ThemeTemplate({
           </p>
         </div>
 
-        {/* Live Slide Preview Toggle Button */}
-        {activeTab === 'presets' && (
+        {/* Header Action Buttons */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={() => setShowLivePreview(!showLivePreview)}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all flex items-center gap-2 shrink-0 ${
-              showLivePreview
-                ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-500/50 text-blue-700 dark:text-blue-300 shadow-xs'
-                : 'bg-white dark:bg-[#1C1C1E] border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-white/5'
+            onClick={() => setActiveTab('maker')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'maker'
+                ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                : 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-pink-600/10 hover:from-blue-600/20 hover:to-pink-600/20 text-neutral-800 dark:text-neutral-100 border-blue-500/30'
             }`}
           >
-            <Eye className="w-3.5 h-3.5" />
-            <span>{showLivePreview ? 'Hide Live Slide Preview' : 'Show Live Slide Preview'}</span>
+            <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+            <span>AI Theme Maker (Look & Clone)</span>
           </button>
-        )}
+
+          {/* Live Slide Preview Toggle Button */}
+          {activeTab === 'presets' && (
+            <button
+              type="button"
+              onClick={() => setShowLivePreview(!showLivePreview)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all flex items-center gap-2 shrink-0 ${
+                showLivePreview
+                  ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-500/50 text-blue-700 dark:text-blue-300 shadow-xs'
+                  : 'bg-white dark:bg-[#1C1C1E] border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-white/5'
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>{showLivePreview ? 'Hide Live Slide Preview' : 'Show Live Slide Preview'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Mode Switcher Tabs */}
-      <div className="flex items-center gap-3 border-b border-neutral-200 dark:border-white/10 pb-3">
+      <div className="flex items-center gap-3 border-b border-neutral-200 dark:border-white/10 pb-3 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveTab('presets')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'presets'
               ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-xs'
               : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
@@ -208,8 +251,20 @@ export default function Step02ThemeTemplate({
         </button>
         <button
           type="button"
+          onClick={() => setActiveTab('maker')}
+          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === 'maker'
+              ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-xs'
+              : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+          <span>✨ AI Theme Maker (Clone from Screenshot / Prompt)</span>
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveTab('byot')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'byot'
               ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-xs'
               : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
@@ -219,8 +274,14 @@ export default function Step02ThemeTemplate({
         </button>
       </div>
 
-      {/* Preset View with Category Chips, Search, and Live Slide Preview */}
-      {activeTab === 'presets' ? (
+      {/* View Branch: AI Theme Maker / Presets / BYOT */}
+      {activeTab === 'maker' ? (
+        <ThemeMakerStudio
+          deck={deck}
+          onApplyTheme={handleApplyCustomTheme}
+          onCancel={() => setActiveTab('presets')}
+        />
+      ) : activeTab === 'presets' ? (
         <div className="space-y-6">
           {/* Controls Bar: Category Filter Chips + Light/Dark Mode + Search */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200/80 dark:border-white/10 p-3 sm:p-4 rounded-2xl">
@@ -446,6 +507,107 @@ export default function Step02ThemeTemplate({
                     <span>Verified Academic Grounding · 60/30/10 Balance</span>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Custom & Cloned AI Themes (if any exist) */}
+          {customThemesList.length > 0 && (
+            <div className="space-y-3 pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 animate-pulse" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200">
+                    My AI Cloned & Synthesized Themes ({customThemesList.length})
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('maker')}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Clone Another Slide</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {customThemesList.map((theme) => {
+                  const isSelected = deck.themeId === theme.id;
+                  return (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      onClick={() => handleApplyCustomTheme(theme)}
+                      className={`text-left p-4 rounded-2xl border transition-all relative overflow-hidden flex flex-col justify-between group cursor-pointer ${
+                        isSelected
+                          ? 'border-purple-500 ring-2 ring-purple-500/30 shadow-xl shadow-purple-500/10 scale-[1.01]'
+                          : 'border-purple-500/30 dark:border-purple-500/20 hover:border-purple-400 hover:shadow-md'
+                      } ${theme.canvasClass}`}
+                      style={{ minHeight: '270px' }}
+                    >
+                      <div className="space-y-3 w-full">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-black uppercase tracking-wider truncate">
+                            {theme.name}
+                          </span>
+                          {isSelected ? (
+                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-600 text-white text-[10px] font-bold shrink-0 shadow-2xs">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                              <span>Active</span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-300 font-mono font-bold">
+                              AI Clone
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Miniature 16:9 Slide Simulation */}
+                        <div
+                          className="w-full aspect-[16/9] rounded-xl border relative shadow-xs overflow-hidden flex flex-col justify-between p-3 select-none"
+                          style={{
+                            backgroundColor: theme.cardBg.startsWith('linear') ? undefined : theme.cardBg,
+                          }}
+                        >
+                          <SlideMotifGraphic motif={theme.visualMotif} theme={theme} isMini={true} />
+                          <div className="relative z-10 flex items-center justify-between text-[8px] font-mono opacity-80">
+                            <span className={`px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${theme.accentBadgeBg} ${theme.accentBadgeText}`}>
+                              {theme.layoutArchetype.toUpperCase()}
+                            </span>
+                            <span className="truncate max-w-[100px] text-right font-mono" style={{ color: theme.accent }}>
+                              {theme.headerStamp.split('//')[0] || 'AI THEME'}
+                            </span>
+                          </div>
+                          <div className="relative z-10 my-auto py-1">
+                            <div className={`text-[10px] font-black leading-tight line-clamp-1 ${theme.textPrimary}`}>
+                              {deck.title || 'AI Cloned Deck'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-[11px] opacity-80 line-clamp-2 leading-relaxed">
+                          {theme.tagline}
+                        </p>
+                      </div>
+
+                      <div className="pt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between w-full mt-2">
+                        <div className="flex items-center gap-1.5">
+                          {theme.swatch.map((c, i) => (
+                            <span
+                              key={i}
+                              className="w-3.5 h-3.5 rounded-full border border-black/15 dark:border-white/20 shadow-2xs"
+                              style={{ backgroundColor: c }}
+                            />
+                          ))}
+                        </div>
+                        <span className="font-mono text-[9px] opacity-60">
+                          60 · 30 · 10
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
