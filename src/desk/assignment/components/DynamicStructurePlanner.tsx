@@ -238,7 +238,7 @@ export function DynamicStructurePlanner({
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
-            onClick={() => onTargetWordCountChange?.(Math.max(100, targetWordCount - 250))}
+            onClick={() => onTargetWordCountChange?.(Math.max(100, (Number(targetWordCount) || 2000) - 250))}
             aria-label="Decrease target word count"
             className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
             title="Decrease by 250 words"
@@ -249,11 +249,15 @@ export function DynamicStructurePlanner({
             <input
               type="number"
               min={100}
+              max={50000}
               step={50}
               value={targetWordCount || ""}
-              onChange={(e) => onTargetWordCountChange?.(Math.max(0, parseInt(e.target.value, 10) || 0))}
+              onChange={(e) => {
+                const val = parseInt(e.target.value.replace(/[^0-9]/g, ""), 10);
+                onTargetWordCountChange?.(isNaN(val) ? 0 : Math.min(50000, Math.max(0, val)));
+              }}
               aria-label="Target Word Count"
-              className="w-32 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-xl px-3 py-1.5 text-right text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums pr-12 shadow-2xs"
+              className="w-32 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-xl px-3 py-1.5 text-right text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums pr-12 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               placeholder="e.g. 2000"
             />
             <span className="pointer-events-none absolute right-3 text-xs font-medium text-neutral-400">
@@ -262,7 +266,7 @@ export function DynamicStructurePlanner({
           </div>
           <button
             type="button"
-            onClick={() => onTargetWordCountChange?.(targetWordCount + 250)}
+            onClick={() => onTargetWordCountChange?.(Math.min(50000, (Number(targetWordCount) || 2000) + 250))}
             aria-label="Increase target word count"
             className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
             title="Increase by 250 words"
@@ -524,7 +528,7 @@ export function DynamicStructurePlanner({
                             handleExactHeadingWords(heading.id, parseInt(e.target.value, 10) || 0)
                           }
                           aria-label={`Word count for section ${heading.title}`}
-                          className="w-16 bg-white dark:bg-[#2C2C2E] border border-neutral-200/90 dark:border-white/10 rounded px-1.5 py-0.5 text-right text-[11px] font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white pr-5 tabular-nums"
+                          className="w-16 bg-white dark:bg-[#2C2C2E] border border-neutral-200/90 dark:border-white/10 rounded px-1.5 py-0.5 text-right text-[11px] font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white pr-5 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                         <span className="pointer-events-none absolute right-1 text-[9px] text-neutral-400">
                           w
@@ -776,7 +780,7 @@ export function DynamicStructurePlanner({
                                     handleExactWords(sub.id, parseInt(e.target.value, 10) || 0)
                                   }
                                   aria-label={`Word count for ${sub.title}`}
-                                  className="w-20 bg-white dark:bg-[#2C2C2E] border border-neutral-200/90 dark:border-white/10 rounded-md px-2 py-1 text-right text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white pr-6 tabular-nums"
+                                  className="w-20 bg-white dark:bg-[#2C2C2E] border border-neutral-200/90 dark:border-white/10 rounded-md px-2 py-1 text-right text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white pr-6 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                                 <span className="pointer-events-none absolute right-1.5 text-[10px] text-neutral-400">
                                   w

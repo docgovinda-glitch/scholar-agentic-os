@@ -177,7 +177,12 @@ export default function AssignmentUnderstandStage() {
   const [localQuestion, setLocalQuestion] = useState(cleanAnswerString(question));
   const [localLevel, setLocalLevel] = useState<AcademicLevel>(academicLevel || "undergraduate");
   const [localType, setLocalType] = useState<AssignmentType>(assignmentType || "essay");
-  const [localWordCount, setLocalWordCount] = useState<number>(targetWordCount || 2000);
+  const [localWordCount, setLocalWordCount] = useState<number>(() => {
+    const raw = Number(targetWordCount);
+    if (isNaN(raw) || raw <= 0) return 2000;
+    if (raw > 50000) return 2000; // Auto-heal accidental concatenations like 2000150
+    return Math.max(100, Math.min(50000, Math.round(raw)));
+  });
   const [localCitation, setLocalCitation] = useState<string>(citationStyle || "apa7");
   const [localBrief, setLocalBrief] = useState(
     cleanAnswerString(assignmentBriefText) || cleanAnswerString(question)
@@ -439,7 +444,11 @@ export default function AssignmentUnderstandStage() {
     });
     if (academicLevel) setLocalLevel((prev) => (prev !== academicLevel ? academicLevel : prev));
     if (assignmentType) setLocalType((prev) => (prev !== assignmentType ? assignmentType : prev));
-    if (targetWordCount > 0) setLocalWordCount((prev) => (prev !== targetWordCount ? targetWordCount : prev));
+    if (targetWordCount > 0) {
+      const sanitized =
+        targetWordCount > 50000 ? 2000 : Math.max(100, Math.min(50000, Number(targetWordCount) || 2000));
+      setLocalWordCount((prev) => (prev !== sanitized ? sanitized : prev));
+    }
     if (citationStyle) setLocalCitation((prev) => (prev !== citationStyle ? citationStyle : prev));
     if (writingStyle) {
       setLocalStyle((prev) => (isDeepEqual(prev, writingStyle) ? prev : writingStyle));
@@ -557,7 +566,8 @@ export default function AssignmentUnderstandStage() {
   };
 
   const handleTargetWordCountChange = (newCount: number) => {
-    const validCount = Math.max(0, newCount);
+    const rawNum = Number(newCount);
+    const validCount = isNaN(rawNum) || rawNum <= 0 ? 2000 : Math.min(50000, Math.max(100, Math.round(rawNum)));
     setLocalWordCount(validCount);
 
     if (validCount <= 0) return;
@@ -1093,14 +1103,15 @@ export default function AssignmentUnderstandStage() {
       setLocalQuestion(cleanPrompt);
       setLocalBrief(cleanPrompt);
 
+      const rawDetectedCount = Number(data.detectedWordCount);
       const newWordCount =
-        data.detectedWordCount && data.detectedWordCount >= 200
-          ? data.detectedWordCount
+        !isNaN(rawDetectedCount) && rawDetectedCount >= 100 && rawDetectedCount <= 50000
+          ? Math.round(rawDetectedCount)
           : localWordCount;
       const nextLevel = data.detectedLevel || localLevel;
       const nextCitation = data.detectedCitation || localCitation;
 
-      if (data.detectedWordCount && data.detectedWordCount >= 200) {
+      if (!isNaN(rawDetectedCount) && rawDetectedCount >= 100 && rawDetectedCount <= 50000) {
         setLocalWordCount(newWordCount);
       }
       if (data.detectedLevel) {
@@ -1544,36 +1555,60 @@ export default function AssignmentUnderstandStage() {
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => handleTargetWordCountChange(Math.max(100, (localWordCount || 2000) - 250))}
+                  onClick={() => {
+                    const current = Number(localWordCount) || 2000;
+                    handleTargetWordCountChange(Math.max(100, current - 250));
+                  }}
                   aria-label="Decrease target word count"
                   className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
                   title="Decrease by 250 words"
                 >
                   −
                 </button>
-                <div className="relative flex-1 flex items-center">
+                <div className="relative flex-1 flex items-center min-w-0">
                   <input
                     id="target_word_count"
                     name="target_word_count"
                     type="number"
                     min={100}
+                    max={50000}
                     step={50}
                     value={localWordCount > 0 ? localWordCount : ""}
                     onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      handleWordCountChange(isNaN(val) ? 0 : Math.max(0, val));
+                      const raw = e.target.value.replace(/[^0-9]/g, "");
+                      if (!raw) {
+                        setLocalWordCount(0);
+                        return;
+                      }
+                      const val = parseInt(raw, 10);
+                      if (!isNaN(val)) {
+                        const clamped = Math.min(50000, Math.max(0, val));
+                        setLocalWordCount(clamped);
+                        handleWordCountChange(clamped);
+                      }
+                    }}
+                    onBlur={() => {
+                      const cur = Number(localWordCount);
+                      if (!cur || isNaN(cur) || cur < 100) {
+                        handleTargetWordCountChange(2000);
+                      } else if (cur > 50000) {
+                        handleTargetWordCountChange(50000);
+                      }
                     }}
                     aria-label="Target Word Count"
-                    placeholder="e.g. 1500, 2500, 3000"
-                    className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all font-medium shadow-2xs text-right pr-12 tabular-nums"
+                    placeholder="2000"
+                    className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg pl-2 pr-7 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all font-semibold shadow-2xs text-right tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="pointer-events-none absolute right-3 text-[11px] text-neutral-400">
+                  <span className="pointer-events-none absolute right-2 text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
                     words
                   </span>
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleTargetWordCountChange((localWordCount || 0) + 250)}
+                  onClick={() => {
+                    const current = Number(localWordCount) || 2000;
+                    handleTargetWordCountChange(Math.min(50000, current + 250));
+                  }}
                   aria-label="Increase target word count"
                   className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
                   title="Increase by 250 words"

@@ -491,10 +491,17 @@ export function AssignmentProvider({
       : answers["word_count"] !== undefined
       ? answers["word_count"]
       : answers["word_limit"];
-  const targetWordCount =
+  let parsedTarget =
     rawTarget !== undefined && rawTarget !== null && rawTarget !== ""
       ? Number(rawTarget)
       : 2000;
+  if (isNaN(parsedTarget) || parsedTarget <= 0) {
+    parsedTarget = 2000;
+  } else if (parsedTarget > 50000) {
+    // Auto-heal runaway or concatenated values e.g. 2000150 -> 2000
+    parsedTarget = 2000;
+  }
+  const targetWordCount = parsedTarget;
 
   const rawCitation =
     answers["citationStyle"] !== undefined

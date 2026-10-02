@@ -135,10 +135,14 @@ export default function SectionBudgetPlanner({
             <input
               type="number"
               min={100}
+              max={50000}
               step={50}
               value={targetWordCount || ""}
-              onChange={(e) => onTargetWordCountChange(Math.max(0, parseInt(e.target.value, 10) || 0))}
-              className="w-28 sm:w-32 bg-neutral-50 dark:bg-white/5 border border-neutral-200 dark:border-white/10 rounded-xl px-3 py-1.5 text-right text-sm font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-white/15 tabular-nums pr-12"
+              onChange={(e) => {
+                const val = parseInt(e.target.value.replace(/[^0-9]/g, ""), 10);
+                onTargetWordCountChange(isNaN(val) ? 0 : Math.min(50000, Math.max(0, val)));
+              }}
+              className="w-28 sm:w-32 bg-neutral-50 dark:bg-white/5 border border-neutral-200 dark:border-white/10 rounded-xl px-3 py-1.5 text-right text-sm font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-white/15 tabular-nums pr-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               placeholder="2000"
             />
             <span className="pointer-events-none absolute right-3 text-xs font-medium text-neutral-400">
@@ -256,7 +260,7 @@ export default function SectionBudgetPlanner({
                       onChange={(e) =>
                         handleWordChange(section.id, parseInt(e.target.value, 10) || 0)
                       }
-                      className="w-20 sm:w-24 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200/90 dark:border-white/10 rounded-lg px-2.5 py-1 text-right text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white pr-7 tabular-nums"
+                      className="w-20 sm:w-24 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200/90 dark:border-white/10 rounded-lg px-2.5 py-1 text-right text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white pr-7 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <span className="pointer-events-none absolute right-2 text-[11px] text-neutral-400">
                       w

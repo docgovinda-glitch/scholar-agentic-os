@@ -231,6 +231,50 @@ describe("Phase 1: Dynamic Target Word Count & Brief-Specific Outline Generation
         expect(wordCountInput.value).toBe("3200");
       });
     });
+
+    it("auto-heals runaway word count values like 2,000,150 and prevents string concatenation", async () => {
+      getProject.mockResolvedValue({
+        projectId: "proj-corrupt-wordcount",
+        outputTypeId: "OT-01",
+        title: "Academic Assignment",
+        hasDocument: false,
+        answers: {
+          assignment_question: "Assess renewable energy policy",
+          word_count: "2000150",
+          target_word_count: "2000150",
+          citation_style: "apa7",
+          academic_level: "undergraduate",
+          assignment_type: "coursework",
+        },
+        gates: [],
+      });
+
+      render(<AssignmentWorkspace projectId="proj-corrupt-wordcount" initialStage="understand" />);
+
+      expect(await screen.findByText(/Phase 1: Understand the Assignment Brief/i)).toBeInTheDocument();
+
+      const wordCountInput = screen.getByRole("spinbutton", { name: /^Target Word Count$/i }) as HTMLInputElement;
+      expect(wordCountInput).toBeInTheDocument();
+      // Auto-healed from 2000150 back to 2000
+      expect(wordCountInput.value).toBe("2000");
+
+      // Verify browser native spin buttons are hidden
+      expect(wordCountInput.className).toContain("[appearance:textfield]");
+
+      // Clicking "+" increases by 250 numerically to 2250, NOT string "2000250"
+      const plusBtn = screen.getByRole("button", { name: /Increase target word count/i });
+      fireEvent.click(plusBtn);
+
+      await waitFor(() => {
+        expect(wordCountInput.value).toBe("2250");
+      });
+
+      // Typing runaway value clamps to max 50000
+      fireEvent.change(wordCountInput, { target: { value: "999999" } });
+      await waitFor(() => {
+        expect(wordCountInput.value).toBe("50000");
+      });
+    });
   });
 
   describe("3. Dynamic Outline Generation & Bottom Button Renaming", () => {
