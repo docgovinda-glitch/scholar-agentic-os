@@ -2,6 +2,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import type { SlideDeck, SlideViewMode } from '../types/slides';
 import type { SlideTheme } from '../types/themes';
 import SlideCardBlock from './SlideCardBlock';
+import SlideMotifGraphic from './SlideMotifGraphic';
+import SlideHeroVisual from './SlideHeroVisual';
 import KeynoteController from './KeynoteController';
 import { useKeynoteShortcuts } from '../hooks/useKeynoteShortcuts';
 
@@ -188,8 +190,11 @@ export default function SlideCanvas({
           style={theme ? { background: theme.cardBg } : undefined}
           data-testid="slide-card-active"
         >
+          {/* Authentic Vector Motif Background Graphic */}
+          {theme && <SlideMotifGraphic motif={theme.visualMotif} theme={theme} />}
+
           {/* Card Top: Framework Phase & Slide Index */}
-          <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-white/5 text-xs">
+          <div className="relative z-10 flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-white/5 text-xs">
             <div className="flex items-center gap-2">
               <span className={`font-bold text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
                 theme
@@ -198,6 +203,11 @@ export default function SlideCanvas({
               }`}>
                 {activeSlide.framework} · {activeSlide.frameworkPhase || 'SYNTHESIS'}
               </span>
+              {theme?.headerStamp && (
+                <span className="hidden md:inline font-mono text-[9px] uppercase tracking-widest opacity-60 ml-1.5" style={{ color: theme.accent }}>
+                  // {theme.headerStamp}
+                </span>
+              )}
             </div>
 
             <div className={`font-mono text-xs font-semibold ${theme ? theme.textMuted : 'text-neutral-400 dark:text-neutral-500'}`}>
@@ -205,11 +215,24 @@ export default function SlideCanvas({
             </div>
           </div>
 
-          {/* Card Body: Dynamic Semantic Blocks */}
-          <div className="my-auto py-4 overflow-y-auto max-h-[440px] pr-1">
-            {activeSlide.blocks.map((block, idx) => (
-              <SlideCardBlock key={idx} block={block} viewMode={activeViewMode} theme={theme} />
-            ))}
+          {/* Card Body: Dynamic Semantic Blocks with Archetype Layout */}
+          <div className="relative z-10 my-auto py-4 overflow-y-auto max-h-[440px] pr-1">
+            {theme?.layoutArchetype === 'split-hero' ? (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                <div className="lg:col-span-8">
+                  {activeSlide.blocks.map((block, idx) => (
+                    <SlideCardBlock key={idx} block={block} viewMode={activeViewMode} theme={theme} />
+                  ))}
+                </div>
+                <div className="lg:col-span-4 h-48 sm:h-64">
+                  <SlideHeroVisual motif={theme.visualMotif} theme={theme} />
+                </div>
+              </div>
+            ) : (
+              activeSlide.blocks.map((block, idx) => (
+                <SlideCardBlock key={idx} block={block} viewMode={activeViewMode} theme={theme} />
+              ))
+            )}
           </div>
 
           {/* Card Footer: Dual-Mode Adaptive Footer */}

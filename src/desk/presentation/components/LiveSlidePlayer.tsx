@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import type { PresentationProjectData, PresentationSlide } from "../types";
 import type { SlideTheme } from "../../../features/slides";
+import SlideMotifGraphic from "../../../features/slides/components/SlideMotifGraphic";
 import SpeakerRehearsalTimer from "./SpeakerRehearsalTimer";
 
 export interface LiveSlidePlayerProps {
@@ -181,16 +182,26 @@ export default function LiveSlidePlayer({
             style={theme ? { background: theme.cardBg } : undefined}
             data-testid="audience-slide-canvas"
           >
-            <div className="flex items-center justify-between text-xs text-[#9B9B9B]">
-              <span className="font-bold text-[#ECECEC] uppercase tracking-wider">
-                {deckData.title}
-              </span>
+            {/* Authentic Vector Motif Background Layer */}
+            {theme && <SlideMotifGraphic motif={theme.visualMotif} theme={theme} />}
+
+            <div className="relative z-10 flex items-center justify-between text-xs text-[#9B9B9B]">
+              <div className="flex items-center gap-3">
+                <span className="font-bold text-[#ECECEC] uppercase tracking-wider">
+                  {deckData.title}
+                </span>
+                {theme?.headerStamp && (
+                  <span className="font-mono text-[10px] uppercase tracking-widest opacity-70" style={{ color: theme.accent }}>
+                    // {theme.headerStamp}
+                  </span>
+                )}
+              </div>
               <span>
                 Slide {currentSlide.slideNumber} / {slides.length}
               </span>
             </div>
 
-            <div className="my-auto space-y-4">
+            <div className="relative z-10 my-auto space-y-4">
               <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight leading-snug">
                 {currentSlide.title}
               </h1>
@@ -210,7 +221,7 @@ export default function LiveSlidePlayer({
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs text-[#9B9B9B] pt-4 border-t border-[#262626]">
+            <div className="relative z-10 flex items-center justify-between text-xs text-[#9B9B9B] pt-4 border-t border-[#262626]">
               <span className="truncate max-w-md">{deckData.targetAudience}</span>
               <span className="text-[#ECECEC] font-medium">{currentSlide.visualFocus}</span>
             </div>

@@ -11,6 +11,8 @@ import type {
 } from '../types/slides';
 import { SLIDE_THEMES, type SlideThemeId } from '../types/themes';
 import { condenseToSixWords } from '../services/semanticSlideExtractor';
+import SlideMotifGraphic from './SlideMotifGraphic';
+import SlideHeroVisual from './SlideHeroVisual';
 
 export interface Step03StudioCanvasProps {
   deck: SlideDeck;
@@ -466,26 +468,36 @@ export default function Step03StudioCanvas({
         <div className="lg:col-span-9 space-y-4">
           {/* Slide Card Container */}
           <div
-            className={`w-full min-h-[460px] p-6 sm:p-10 rounded-3xl border transition-all relative flex flex-col justify-between ${
+            className={`w-full min-h-[460px] p-6 sm:p-10 rounded-3xl border transition-all relative flex flex-col justify-between overflow-hidden ${
               deck.customTheme?.surfaceTreatment === 'hairline'
                 ? 'border-neutral-200/80 dark:border-white/10'
                 : 'shadow-2xl shadow-neutral-900/5'
             } ${activeTheme.cardClass}`}
             data-testid="wysiwyg-slide-card"
           >
-            <div className="space-y-6">
-              {/* Category Tag (Click to Edit) */}
+            {/* Background Graphic Motif */}
+            <SlideMotifGraphic motif={activeTheme.visualMotif} theme={activeTheme} />
+
+            <div className="space-y-6 relative z-10">
+              {/* Category Tag (Click to Edit) + Header Stamp */}
               <div className="flex items-center justify-between">
-                <input
-                  type="text"
-                  value={
-                    (activeSlide.blocks.find((b) => b.type === 'action-header') as ActionHeaderBlock)
-                      ?.category || 'ACADEMIC SYNTHESIS'
-                  }
-                  onChange={(e) => handleCategoryChange(e.target.value)}
-                  className={`text-xs md:text-sm font-extrabold uppercase tracking-wider bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-blue-500 focus:outline-none ${activeTheme.accentBadgeText}`}
-                  placeholder="CATEGORY / BEAT"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={
+                      (activeSlide.blocks.find((b) => b.type === 'action-header') as ActionHeaderBlock)
+                        ?.category || 'ACADEMIC SYNTHESIS'
+                    }
+                    onChange={(e) => handleCategoryChange(e.target.value)}
+                    className={`text-xs md:text-sm font-extrabold uppercase tracking-wider bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-blue-500 focus:outline-none ${activeTheme.accentBadgeText}`}
+                    placeholder="CATEGORY / BEAT"
+                  />
+                  {activeTheme.headerStamp && (
+                    <span className="hidden sm:inline font-mono text-[9px] uppercase tracking-widest opacity-60 ml-2" style={{ color: activeTheme.accent }}>
+                      // {activeTheme.headerStamp}
+                    </span>
+                  )}
+                </div>
                 <span className="text-[11px] font-mono text-neutral-400">
                   Click text to edit inline
                 </span>

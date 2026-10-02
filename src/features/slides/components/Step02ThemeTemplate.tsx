@@ -25,6 +25,8 @@ import {
   calculateContrastRatio,
   isWcagAA,
 } from '../types/themes';
+import SlideMotifGraphic from './SlideMotifGraphic';
+import SlideHeroVisual from './SlideHeroVisual';
 
 export interface Step02ThemeTemplateProps {
   deck: SlideDeck;
@@ -335,43 +337,113 @@ export default function Step02ThemeTemplate({
                 </span>
               </div>
 
-              {/* Full Width Live Slide Card */}
-              <div className={`p-8 rounded-2xl border shadow-xl transition-all ${activePreset.cardClass}`}>
-                <div className="space-y-4 max-w-4xl">
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${activePreset.accentBadgeBg} ${activePreset.accentBadgeText} border ${activePreset.accentBadgeBorder}`}>
-                      Topic 01 · Analytical Foundation
-                    </span>
-                    <span className="text-xs font-mono opacity-60">
-                      Beat 1 of 5
-                    </span>
+              {/* Full Width Live Slide Card with Motif and Archetype */}
+              <div className={`p-8 rounded-2xl border shadow-xl transition-all relative overflow-hidden ${activePreset.cardClass}`}>
+                {/* Visual Motif Vector Layer */}
+                <SlideMotifGraphic motif={activePreset.visualMotif} theme={activePreset} />
+
+                <div className="space-y-5 max-w-5xl relative z-10">
+                  {/* Top Metadata Header Bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${activePreset.accentBadgeBg} ${activePreset.accentBadgeText} border ${activePreset.accentBadgeBorder}`}>
+                        Topic 01 · Analytical Foundation
+                      </span>
+                      <span className="text-xs font-mono opacity-60">
+                        Beat 1 of 5
+                      </span>
+                    </div>
+                    {activePreset.headerStamp && (
+                      <span className="font-mono text-[10px] uppercase tracking-widest opacity-70" style={{ color: activePreset.accent }}>
+                        {activePreset.headerStamp}
+                      </span>
+                    )}
                   </div>
 
-                  <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug ${activePreset.textPrimary}`}>
-                    {previewHeadline}
-                  </h2>
-
-                  <p className={`text-sm italic opacity-85 ${activePreset.textSecondary}`}>
-                    {previewTag}
-                  </p>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
-                    {previewBullets.map((bullet, idx) => (
-                      <div
-                        key={idx}
-                        className={`p-3.5 rounded-xl border flex items-start gap-2.5 ${activePreset.metricBg} ${activePreset.metricBorder}`}
-                      >
-                        <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${activePreset.bulletColor}`} />
-                        <span className={`text-xs leading-relaxed ${activePreset.textSecondary}`}>
-                          {bullet}
-                        </span>
+                  {/* Body: Render according to layout archetype */}
+                  {activePreset.layoutArchetype === 'split-hero' ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                      <div className="lg:col-span-7 space-y-3">
+                        <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug ${activePreset.textPrimary}`}>
+                          {previewHeadline}
+                        </h2>
+                        <p className={`text-sm italic opacity-85 ${activePreset.textSecondary}`}>
+                          {previewTag}
+                        </p>
+                        <div className="space-y-2 pt-1">
+                          {previewBullets.map((bullet, idx) => (
+                            <div key={idx} className="flex items-start gap-2.5 text-xs">
+                              <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${activePreset.bulletColor}`} />
+                              <span className={activePreset.textSecondary}>{bullet}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                      <div className="lg:col-span-5 h-44 sm:h-52">
+                        <SlideHeroVisual motif={activePreset.visualMotif} theme={activePreset} />
+                      </div>
+                    </div>
+                  ) : activePreset.layoutArchetype === 'data-ledger' ? (
+                    <div className="space-y-4">
+                      <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug ${activePreset.textPrimary}`}>
+                        {previewHeadline}
+                      </h2>
+                      <p className={`text-sm italic opacity-85 ${activePreset.textSecondary}`}>
+                        {previewTag}
+                      </p>
+                      {/* Metric Ledger Row */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                        {(activePreset.previewKpis || [
+                          { value: '142.0', label: 'Primary Index', sub: 'Baseline' },
+                          { value: '118', label: 'Sample Cohort', sub: 'Verified' },
+                          { value: '+18.0%', label: 'Empirical Lift', sub: 'Significant' },
+                        ]).map((kpi, kIdx) => (
+                          <div
+                            key={kIdx}
+                            className={`p-4 rounded-xl border flex flex-col justify-between ${activePreset.metricBg} ${activePreset.metricBorder}`}
+                          >
+                            <div className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${activePreset.metricColor}`}>
+                              {kpi.value}
+                            </div>
+                            <div className={`text-xs font-semibold mt-1 ${activePreset.textPrimary}`}>
+                              {kpi.label}
+                            </div>
+                            {kpi.sub && (
+                              <div className={`text-[10px] font-mono opacity-60 mt-0.5 ${activePreset.textMuted}`}>
+                                {kpi.sub}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug ${activePreset.textPrimary}`}>
+                        {previewHeadline}
+                      </h2>
+                      <p className={`text-sm italic opacity-85 ${activePreset.textSecondary}`}>
+                        {previewTag}
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                        {previewBullets.map((bullet, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-3.5 rounded-xl border flex items-start gap-2.5 ${activePreset.metricBg} ${activePreset.metricBorder}`}
+                          >
+                            <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${activePreset.bulletColor}`} />
+                            <span className={`text-xs leading-relaxed ${activePreset.textSecondary}`}>
+                              {bullet}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="pt-2 flex items-center justify-between border-t border-black/5 dark:border-white/5 text-[11px] font-mono opacity-60">
-                    <span>Scholar OS Cognitive Engine</span>
-                    <span>Verified Academic Grounding · 60/30/10</span>
+                    <span>Scholar OS Cognitive Engine · {activePreset.name}</span>
+                    <span>Verified Academic Grounding · 60/30/10 Balance</span>
                   </div>
                 </div>
               </div>
@@ -425,50 +497,116 @@ export default function Step02ThemeTemplate({
                       )}
                     </div>
 
-                    {/* Miniature Slide Canvas Simulation (Kimi & Gamma Visual Card) */}
+                    {/* Miniature 16:9 Slide Canvas Simulation (Kimi & Gamma Visual Card) */}
                     <div
-                      className="p-3 rounded-xl border relative shadow-xs transition-transform duration-200 group-hover:scale-[1.02]"
+                      className="w-full aspect-[16/9] rounded-xl border relative shadow-xs transition-transform duration-200 group-hover:scale-[1.02] overflow-hidden flex flex-col justify-between p-3 select-none"
                       style={{
                         backgroundColor: theme.cardBg.startsWith('linear') ? undefined : theme.cardBg,
                         borderColor: theme.cardBorder.includes('#') ? undefined : undefined,
                       }}
                     >
-                      <div className="space-y-2">
-                        {/* Mini Badge */}
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${theme.accentBadgeBg} ${theme.accentBadgeText}`}
-                          >
-                            Topic 01
-                          </span>
-                          <span
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ backgroundColor: theme.accent }}
-                          />
-                        </div>
+                      {/* Authentic Visual Motif Vector Layer */}
+                      <SlideMotifGraphic motif={theme.visualMotif} theme={theme} isMini={true} />
 
-                        {/* Slide Title Simulation */}
-                        <div className={`text-[11px] font-bold leading-tight line-clamp-2 ${theme.textPrimary}`}>
-                          {deck.title || 'Autonomous Knowledge Grounding'}
-                        </div>
+                      {/* Mini Top Header Bar */}
+                      <div className="relative z-10 flex items-center justify-between text-[8px] font-mono opacity-80">
+                        <span className={`px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${theme.accentBadgeBg} ${theme.accentBadgeText}`}>
+                          {theme.layoutArchetype === 'split-hero'
+                            ? 'SPLIT MEDIA'
+                            : theme.layoutArchetype === 'data-ledger'
+                            ? 'DATA LEDGER'
+                            : theme.layoutArchetype === 'derivation-schematic'
+                            ? 'BLUEPRINT'
+                            : 'COGNITIVE'}
+                        </span>
+                        <span className="truncate max-w-[110px] text-right font-mono" style={{ color: theme.accent }}>
+                          {theme.headerStamp.split('//')[0] || 'SCHOLAR OS'}
+                        </span>
+                      </div>
 
-                        {/* Mini Key Stat or Bullet Item */}
-                        <div
-                          className={`p-1.5 rounded-lg border text-[9px] flex items-center justify-between gap-1 ${theme.metricBg} ${theme.metricBorder}`}
-                        >
-                          <span className={`font-mono font-bold ${theme.metricColor}`}>
-                            87.4%
-                          </span>
-                          <span className={`truncate text-[8px] opacity-75 ${theme.textSecondary}`}>
-                            Confidence Score
-                          </span>
-                        </div>
+                      {/* Mini Body Content depending on Archetype */}
+                      <div className="relative z-10 my-auto py-1">
+                        {theme.layoutArchetype === 'split-hero' ? (
+                          <div className="grid grid-cols-12 gap-1.5 items-center">
+                            <div className="col-span-7 space-y-1">
+                              <div className={`text-[10px] font-black leading-tight line-clamp-2 ${theme.textPrimary}`}>
+                                {deck.title || 'Autonomous Grounding'}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className={`w-1 h-1 rounded-full shrink-0 ${theme.bulletColor}`} />
+                                <div className={`h-1 rounded w-3/4 bg-current opacity-30 ${theme.textSecondary}`} />
+                              </div>
+                            </div>
+                            <div className="col-span-5 h-12">
+                              <SlideHeroVisual motif={theme.visualMotif} theme={theme} isMini={true} />
+                            </div>
+                          </div>
+                        ) : theme.layoutArchetype === 'data-ledger' ? (
+                          <div className="space-y-1">
+                            <div className={`text-[10px] font-black leading-tight line-clamp-1 ${theme.textPrimary}`}>
+                              {deck.title || 'Executive Monitoring Report'}
+                            </div>
+                            {/* Metric Pill Row */}
+                            <div className="grid grid-cols-3 gap-1 pt-0.5">
+                              {(theme.previewKpis || [
+                                { value: '142.0', label: 'Score' },
+                                { value: '118', label: 'Deals' },
+                                { value: '+18%', label: 'QoQ' },
+                              ]).map((kpi, kIdx) => (
+                                <div
+                                  key={kIdx}
+                                  className={`p-1 rounded border text-center ${theme.metricBg} ${theme.metricBorder}`}
+                                >
+                                  <div className={`text-[9px] font-bold font-mono leading-none ${theme.metricColor}`}>
+                                    {kpi.value}
+                                  </div>
+                                  <div className={`text-[7px] truncate opacity-70 ${theme.textSecondary}`}>
+                                    {kpi.label}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : theme.layoutArchetype === 'derivation-schematic' ? (
+                          <div className="space-y-1">
+                            <div className={`text-[10px] font-black leading-tight line-clamp-1 ${theme.textPrimary}`}>
+                              {deck.title || 'Continuous Generative Modeling'}
+                            </div>
+                            <div className={`p-1.5 rounded border flex items-center justify-between text-[8px] font-mono ${theme.metricBg} ${theme.metricBorder}`}>
+                              <span className="font-bold" style={{ color: theme.accent }}>p⁰ ──► p¹</span>
+                              <span className="opacity-75">99.4% YIELD</span>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Standard Card Archetype with Topographic / Waves / Grid */
+                          <div className="space-y-1.5">
+                            <div className={`text-[10px] font-black leading-tight line-clamp-2 ${theme.textPrimary}`}>
+                              {deck.title || 'Autonomous Knowledge Grounding'}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${theme.bulletColor}`} />
+                              <div className={`h-1.5 rounded w-4/5 bg-current opacity-30 ${theme.textSecondary}`} />
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${theme.bulletColor}`} />
+                              <div className={`h-1.5 rounded w-3/5 bg-current opacity-20 ${theme.textSecondary}`} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
-                        {/* Mini bullet line */}
-                        <div className="flex items-center gap-1.5 pt-0.5">
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${theme.bulletColor}`} />
-                          <div className={`h-1.5 rounded-full w-4/5 bg-current opacity-30 ${theme.textSecondary}`} />
-                        </div>
+                      {/* Mini Card Footer */}
+                      <div className="relative z-10 flex items-center justify-between text-[7px] font-mono opacity-60 pt-1 border-t border-black/5 dark:border-white/5">
+                        <span>60 · 30 · 10</span>
+                        <span className="capitalize">{theme.visualMotif.replace('-', ' ')}</span>
+                      </div>
+
+                      {/* Hover Action Pill Overlay */}
+                      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-20">
+                        <span className="px-3 py-1 rounded-full bg-white text-black font-bold text-[10px] shadow-lg flex items-center gap-1">
+                          <Check className="w-3 h-3" />
+                          <span>Use Template</span>
+                        </span>
                       </div>
                     </div>
 

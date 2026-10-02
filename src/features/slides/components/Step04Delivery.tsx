@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { SlideDeck, SlideViewMode } from '../types/slides';
 import { SLIDE_THEMES, type SlideThemeId } from '../types/themes';
 import SlideCardBlock from './SlideCardBlock';
+import SlideMotifGraphic from './SlideMotifGraphic';
 import { usePresentationShortcuts } from '../hooks/usePresentationShortcuts';
 
 export interface Step04DeliveryProps {
@@ -202,14 +203,25 @@ export default function Step04Delivery({ deck, onPrevStep, onClose }: Step04Deli
       <main className="flex-1 flex items-center justify-center p-4 sm:p-8 max-w-5xl mx-auto w-full">
         {activeSlide ? (
           <div
-            className={`w-full p-8 sm:p-14 rounded-3xl border transition-all relative flex flex-col justify-between min-h-[480px] ${
+            className={`w-full p-8 sm:p-14 rounded-3xl border transition-all relative flex flex-col justify-between min-h-[480px] overflow-hidden ${
               deck.customTheme?.surfaceTreatment === 'hairline'
                 ? 'border-neutral-200/80 dark:border-white/10'
                 : 'shadow-2xl shadow-neutral-900/10'
             } ${activeTheme.cardClass}`}
             data-testid="delivery-slide-card"
           >
-            <div>
+            {/* Visual Motif Vector Layer */}
+            <SlideMotifGraphic motif={activeTheme.visualMotif} theme={activeTheme} />
+
+            <div className="relative z-10">
+              {activeTheme.headerStamp && (
+                <div className="pb-3 mb-4 border-b border-black/5 dark:border-white/5 flex items-center justify-between text-[10px] font-mono opacity-70">
+                  <span className="uppercase tracking-widest" style={{ color: activeTheme.accent }}>
+                    {activeTheme.headerStamp}
+                  </span>
+                  <span>{String(currentSlideIndex + 1).padStart(2, '0')} / {String(totalSlides).padStart(2, '0')}</span>
+                </div>
+              )}
               {activeSlide.blocks.map((block, idx) => (
                 <SlideCardBlock
                   key={idx}
