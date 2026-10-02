@@ -24,7 +24,8 @@ export type SlideThemeId =
   | 'travel-green-handbook'
   | 'blue-flame-brand'
   | 'moon-white-imagery'
-  | 'beyond-2027';
+  | 'beyond-2027'
+  | 'swiss-editorial';
 
 export type ThemeCategory = 'academic' | 'minimal' | 'dark' | 'vibrant';
 export type ThemeSector = 'Work' | 'Finance' | 'Promotion' | 'Academic' | 'Consulting';
@@ -43,7 +44,8 @@ export type VisualMotif =
   | 'mesh-aura'
   | 'swiss-cut'
   | 'editorial-split'
-  | 'minimal-frame';
+  | 'minimal-frame'
+  | 'retro-poster-cut';
 
 export type LayoutArchetype =
   | 'split-hero'
@@ -51,7 +53,8 @@ export type LayoutArchetype =
   | 'derivation-schematic'
   | 'magazine-highlight'
   | 'executive-memo'
-  | 'standard-card';
+  | 'standard-card'
+  | 'swiss-editorial';
 
 export interface SlideKpiMetric {
   value: string;
@@ -99,6 +102,8 @@ export interface SlideTheme {
   fontFamily: 'sans' | 'serif' | 'mono';
   bulletColor: string;
   quoteBorder: string;
+  secondaryAccent?: string;
+  bottomSummaryBar?: boolean;
 }
 
 /**
@@ -1003,5 +1008,44 @@ export const SLIDE_THEMES: Record<SlideThemeId, SlideTheme> = {
     fontFamily: 'serif',
     bulletColor: 'bg-zinc-200',
     quoteBorder: 'border-zinc-300',
+  },
+  'swiss-editorial': {
+    id: 'swiss-editorial',
+    name: 'Swiss Retro-Poster (Editorial)',
+    tagline: 'Warm cream canvas with sharp geometric tomato-red, cobalt blue, angled banners, and dark bottom summary bar',
+    category: 'minimal',
+    sector: 'Work',
+    mode: 'light',
+    visualMotif: 'retro-poster-cut',
+    layoutArchetype: 'swiss-editorial',
+    headerStamp: 'QINGDAO NATURE SOCIETY // WETLAND CONSERVATION PARK',
+    highlightKeyword: 'MIGRATORY BIRD SEASON',
+    heroGraphicTag: 'MIGRATORY BIRDS ARRIVE, AND THE CITY MAKES ROOM',
+    bottomSummaryBar: true,
+    secondaryAccent: '#2563EB',
+    previewKpis: [
+      { value: '120k', label: 'Migratory Birds', sub: 'Seasonal Census' },
+      { value: '66', label: 'Sessions', sub: 'Observation' },
+      { value: '18k', label: 'Spots', sub: 'Public Engagement' },
+    ],
+    swatch: ['#F7F5F0', '#18181B', '#EB4424'],
+    canvasBg: '#F7F5F0',
+    canvasClass: 'bg-[#F7F5F0] text-neutral-900',
+    cardBg: '#FFFFFF',
+    cardClass: 'bg-white border-neutral-300/80 text-neutral-900 shadow-xl shadow-neutral-900/5',
+    cardBorder: 'border-neutral-300/80',
+    accent: '#EB4424',
+    accentBadgeBg: 'bg-[#EB4424]/10',
+    accentBadgeText: 'text-[#EB4424] font-black',
+    accentBadgeBorder: 'border-[#EB4424]/30',
+    metricColor: 'text-[#EB4424]',
+    metricBg: 'bg-[#EB4424]/10',
+    metricBorder: 'border-[#EB4424]/20',
+    textPrimary: 'text-neutral-900',
+    textSecondary: 'text-neutral-700',
+    textMuted: 'text-neutral-500',
+    fontFamily: 'serif',
+    bulletColor: 'bg-[#EB4424]',
+    quoteBorder: 'border-[#2563EB]',
   },
 };

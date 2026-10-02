@@ -17,7 +17,10 @@ export type SlideLayoutType =
   | 'bullets'
   | 'metric-focus'
   | 'two-column'
-  | 'quote-evidence';
+  | 'quote-evidence'
+  | 'cover'
+  | 'metrics'
+  | 'categories';
 
 export interface ActionHeaderBlock {
   type: 'action-header';
@@ -80,6 +83,24 @@ export type Universal5BeatPhase =
   | 'beat-4-empirical-proof'
   | 'beat-5-strategic-horizon';
 
+export interface RatioComparisonData {
+  labelA: string;
+  percentA: number;
+  labelB: string;
+  percentB: number;
+  ratio?: string;
+  insight?: string;
+}
+
+export interface ColorBlockedPillar {
+  id: string;
+  title: string;
+  tag?: string;
+  points: string[];
+  accentColor?: 'red' | 'blue' | 'black' | 'slate';
+  stat?: string;
+}
+
 export interface SlideCard {
   id: string;
   order: number;
@@ -95,6 +116,16 @@ export interface SlideCard {
   citations?: string[];
   footnote?: string;
   targetDurationSeconds?: number;
+
+  // Swiss Hard-Edge Retro-Poster Editorial Extensions
+  subheadline?: string;
+  angledBanner?: string;
+  headerTag?: string;
+  dateBadge?: string;
+  calloutRibbon?: string;
+  summaryBar?: string;
+  ratioComparison?: RatioComparisonData;
+  pillars?: ColorBlockedPillar[];
 }
 
 export interface SlideDeck {

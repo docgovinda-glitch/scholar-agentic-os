@@ -6,6 +6,11 @@ import SlideMotifGraphic from './SlideMotifGraphic';
 import SlideHeroVisual from './SlideHeroVisual';
 import KeynoteController from './KeynoteController';
 import { useKeynoteShortcuts } from '../hooks/useKeynoteShortcuts';
+import {
+  EditorialCoverSlide,
+  EditorialMetricsSlide,
+  EditorialCategoriesSlide,
+} from './SwissEditorialTemplates';
 
 export interface SlideCanvasProps {
   deck?: SlideDeck | null;
@@ -17,6 +22,7 @@ export interface SlideCanvasProps {
   onViewModeChange?: (mode: SlideViewMode) => void;
   onSlideChange?: (index: number) => void;
   onClose?: () => void;
+  onExportPdf?: () => void;
 }
 
 /**
@@ -38,6 +44,7 @@ export default function SlideCanvas({
   onViewModeChange,
   onSlideChange,
   onClose,
+  onExportPdf,
 }: SlideCanvasProps) {
   const [slideIndex, setSlideIndex] = useState(initialSlideIndex);
   const currentSlideIndex = controlledSlideIndex !== undefined ? controlledSlideIndex : slideIndex;
@@ -179,6 +186,42 @@ export default function SlideCanvas({
             Ingest or paste academic markdown to synthesize structured, action-oriented presentation cards.
           </p>
         </div>
+      ) : activeSlide.layoutType === 'cover' || (theme?.layoutArchetype === 'swiss-editorial' && currentSlideIndex === 0) ? (
+        <main
+          className="max-w-5xl w-full aspect-[16/9] min-h-[520px] transition-all duration-300 relative overflow-hidden"
+          data-testid="slide-card-active"
+        >
+          <EditorialCoverSlide
+            slide={activeSlide}
+            slideIndex={currentSlideIndex}
+            totalSlides={totalSlides}
+            theme={theme}
+          />
+        </main>
+      ) : activeSlide.layoutType === 'metrics' || (theme?.layoutArchetype === 'swiss-editorial' && currentSlideIndex === 1) ? (
+        <main
+          className="max-w-5xl w-full aspect-[16/9] min-h-[520px] transition-all duration-300 relative overflow-hidden"
+          data-testid="slide-card-active"
+        >
+          <EditorialMetricsSlide
+            slide={activeSlide}
+            slideIndex={currentSlideIndex}
+            totalSlides={totalSlides}
+            theme={theme}
+          />
+        </main>
+      ) : activeSlide.layoutType === 'categories' || (theme?.layoutArchetype === 'swiss-editorial' && currentSlideIndex === 2) ? (
+        <main
+          className="max-w-5xl w-full aspect-[16/9] min-h-[520px] transition-all duration-300 relative overflow-hidden"
+          data-testid="slide-card-active"
+        >
+          <EditorialCategoriesSlide
+            slide={activeSlide}
+            slideIndex={currentSlideIndex}
+            totalSlides={totalSlides}
+            theme={theme}
+          />
+        </main>
       ) : (
         // Active Slide Card
         <main
@@ -235,8 +278,26 @@ export default function SlideCanvas({
             )}
           </div>
 
+          {/* Persistent Dark Summary Bar for Swiss Editorial or Specified Summary */}
+          {(theme?.bottomSummaryBar || activeSlide.summaryBar) && (
+            <div
+              className="relative z-10 w-full bg-neutral-900 text-white px-4 py-2 rounded-xl flex items-center justify-between text-xs font-sans shadow-md mb-2"
+              data-testid="persistent-dark-summary-bar"
+            >
+              <div className="flex items-center gap-2 truncate pr-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#EB4424] shrink-0" />
+                <span className="font-semibold text-neutral-300 truncate">
+                  {activeSlide.summaryBar || 'Strategic Mandate: Verified knowledge grounding with zero ghost citations.'}
+                </span>
+              </div>
+              <span className="font-mono text-[9px] uppercase tracking-widest text-neutral-400 shrink-0 hidden sm:block">
+                SCHOLAR OS
+              </span>
+            </div>
+          )}
+
           {/* Card Footer: Dual-Mode Adaptive Footer */}
-          <footer className="pt-4 border-t border-neutral-100 dark:border-white/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 text-xs">
+          <footer className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 text-xs">
             {activeViewMode === 'stage' ? (
               // Minimal stage footer: Billboard clarity
               <>
@@ -296,6 +357,7 @@ export default function SlideCanvas({
           onToggleFullscreen={toggleFullscreen}
           isPresenterOpen={isPresenterOpen}
           onTogglePresenter={handleTogglePresenter}
+          onExportPdf={onExportPdf}
         />
       )}
     </div>

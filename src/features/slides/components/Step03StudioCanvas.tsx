@@ -22,8 +22,11 @@ export interface Step03StudioCanvasProps {
 }
 
 const LAYOUT_OPTIONS: Array<{ id: SlideLayoutType; label: string; icon: string }> = [
+  { id: 'cover', label: 'Swiss Cover (Angled Banner)', icon: '🚩' },
+  { id: 'metrics', label: 'High-Contrast Metrics & Ratio', icon: '📊' },
+  { id: 'categories', label: 'Color-Blocked Pillars (3-4)', icon: '🏛️' },
   { id: 'bullets', label: 'Header & 6x6 Bullets', icon: '📝' },
-  { id: 'metric-focus', label: 'Big Metric Focus', icon: '📊' },
+  { id: 'metric-focus', label: 'Big Metric Focus', icon: '📈' },
   { id: 'two-column', label: '2-Column Comparative', icon: '⚖️' },
   { id: 'quote-evidence', label: 'Quote / Evidence', icon: '💬' },
 ];
@@ -237,6 +240,102 @@ export default function Step03StudioCanvas({
           attribution: 'Journal of Agentic Computing (2026)',
           citation: 'doi:10.1016/j.jac.2026.04.012',
         });
+      } else if (newLayout === 'cover') {
+        return {
+          ...slide,
+          layoutType: 'cover',
+          angledBanner: slide.angledBanner || 'MIGRATORY BIRD SEASON',
+          subheadline:
+            slide.subheadline ||
+            'This winter, join the week when the city draws closest to 120,000 passing migratory birds. Walk the tidal flats for seven days and meet the neighbors who share our coast.',
+          headerTag: slide.headerTag || 'Qingdao Nature Society | Qingdao Coastal Wetland Park',
+          dateBadge: slide.dateBadge || '11.07—11.13',
+          calloutRibbon: slide.calloutRibbon || 'Migratory birds arrive, and the city makes room.',
+          summaryBar:
+            slide.summaryBar ||
+            'Strategic Mandate: 120,000 migratory birds protected via 66 certified observation corridors.',
+          blocks: [
+            headerBlock,
+            {
+              type: 'metric-callout',
+              metric: '120,000',
+              label: 'migratory birds',
+              context: 'Seasonal census tracking across coastal wetland reserve',
+            },
+          ],
+        };
+      } else if (newLayout === 'metrics') {
+        return {
+          ...slide,
+          layoutType: 'metrics',
+          summaryBar:
+            slide.summaryBar ||
+            'Takeaway: 74.2% habitat concentration confirms tidal mudflats as irreplaceable ecological nodes.',
+          ratioComparison: slide.ratioComparison || {
+            labelA: 'Core Protected Tidal Habitat',
+            percentA: 74.2,
+            labelB: 'Urban Coastal Buffer Zone',
+            percentB: 25.8,
+            ratio: '2.88 : 1',
+            insight: 'Overwintering shorebirds concentrate heavily along the seaward tidal margins.',
+          },
+          blocks: [
+            headerBlock,
+            {
+              type: 'metric-callout',
+              metric: '120,000',
+              label: 'ANNUAL CENSUS',
+              context: '+18.4% YoY surge across all observation stations',
+            },
+          ],
+        };
+      } else if (newLayout === 'categories') {
+        return {
+          ...slide,
+          layoutType: 'categories',
+          summaryBar:
+            slide.summaryBar ||
+            'Strategic Alignment: Tri-pillar architecture guarantees zero ecological disruption through 2030.',
+          pillars: slide.pillars || [
+            {
+              id: 'p1',
+              title: 'HABITAT SANCTUARY',
+              tag: '// PILLAR 01',
+              accentColor: 'red',
+              points: [
+                '14.8 km² tidal mudflat protection',
+                'Zero-construction perimeter',
+                'Seasonal access quotas',
+              ],
+              stat: '14,800 Hectares',
+            },
+            {
+              id: 'p2',
+              title: 'AUTONOMOUS SENSING',
+              tag: '// PILLAR 02',
+              accentColor: 'blue',
+              points: [
+                'Acoustic bird tracking stations',
+                'LiDAR drone telemetry',
+                'Salinity and flux monitors',
+              ],
+              stat: '99.4% Uptime',
+            },
+            {
+              id: 'p3',
+              title: 'COMMUNITY GUARDIANS',
+              tag: '// PILLAR 03',
+              accentColor: 'black',
+              points: [
+                '66 certified ranger patrol paths',
+                'Public scientific workshops',
+                'Rapid wildlife response unit',
+              ],
+              stat: '66 Patrol Paths',
+            },
+          ],
+          blocks: [headerBlock],
+        };
       }
 
       return {
@@ -514,6 +613,258 @@ export default function Step03StudioCanvas({
                 />
               </div>
 
+              {/* Swiss Retro-Poster Cover Dedicated Inline Editor */}
+              {activeSlide.layoutType === 'cover' && (
+                <div className="space-y-4 pt-1 border-t border-neutral-200/60 dark:border-white/10 mt-3" data-testid="cover-inline-editor">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <input
+                      type="text"
+                      value={activeSlide.headerTag || 'Qingdao Nature Society | Qingdao Coastal Wetland Park'}
+                      onChange={(e) => updateActiveSlide((s) => ({ ...s, headerTag: e.target.value }))}
+                      placeholder="Header Tag"
+                      className="text-xs font-semibold px-2 py-1 rounded bg-black/5 dark:bg-white/5 border border-transparent focus:border-blue-500 focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={activeSlide.dateBadge || '11.07—11.13'}
+                      onChange={(e) => updateActiveSlide((s) => ({ ...s, dateBadge: e.target.value }))}
+                      placeholder="Date Badge"
+                      className="text-xs font-mono font-bold px-2 py-1 rounded bg-[#BEF264] text-[#365314] border border-transparent focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] font-mono uppercase text-neutral-400 block mb-1">
+                      Angled Banner (-3° Tomato Red):
+                    </span>
+                    <div className="inline-block transform -rotate-3 origin-left shadow-lg bg-[#EB4424] px-4 py-1.5 rounded-xs">
+                      <input
+                        type="text"
+                        value={activeSlide.angledBanner || 'MIGRATORY BIRD SEASON'}
+                        onChange={(e) => updateActiveSlide((s) => ({ ...s, angledBanner: e.target.value }))}
+                        className="font-sans font-black text-xl sm:text-2xl tracking-tight text-neutral-950 uppercase bg-transparent border-none focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] font-mono uppercase text-neutral-400 block mb-1">
+                      Subheadline Narrative:
+                    </span>
+                    <textarea
+                      rows={2}
+                      value={activeSlide.subheadline || ''}
+                      onChange={(e) => updateActiveSlide((s) => ({ ...s, subheadline: e.target.value }))}
+                      placeholder="Narrative subheadline..."
+                      className="w-full text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed bg-black/5 dark:bg-white/5 p-2.5 rounded-xl border border-transparent hover:border-neutral-300 focus:border-blue-500 focus:outline-none resize-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-mono uppercase text-neutral-400">Callout Ribbon:</span>
+                    <input
+                      type="text"
+                      value={activeSlide.calloutRibbon || 'Migratory birds arrive, and the city makes room.'}
+                      onChange={(e) => updateActiveSlide((s) => ({ ...s, calloutRibbon: e.target.value }))}
+                      className="flex-1 text-xs font-bold text-white bg-[#2563EB] px-3 py-1.5 rounded shadow-sm focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Swiss Retro-Poster Metrics Dedicated Inline Editor */}
+              {activeSlide.layoutType === 'metrics' && (
+                <div className="space-y-4 pt-1 border-t border-neutral-200/60 dark:border-white/10 mt-3" data-testid="metrics-inline-editor">
+                  <div className="p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-neutral-300/80 dark:border-white/10 space-y-3">
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span>High-Contrast Ratio Comparison Bar</span>
+                      <span className="font-mono text-[10px] text-neutral-400">Ratio Segment Visual</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-neutral-400 uppercase">Segment A (Tomato Red %):</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={activeSlide.ratioComparison?.labelA || 'Core Protected Tidal Habitat'}
+                            onChange={(e) =>
+                              updateActiveSlide((s) => ({
+                                ...s,
+                                ratioComparison: {
+                                  ...(s.ratioComparison || { percentA: 74.2, labelB: 'Buffer', percentB: 25.8 }),
+                                  labelA: e.target.value,
+                                },
+                              }))
+                            }
+                            className="flex-1 px-2.5 py-1 text-xs rounded bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10"
+                            placeholder="Label A"
+                          />
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={activeSlide.ratioComparison?.percentA ?? 74.2}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              updateActiveSlide((s) => ({
+                                ...s,
+                                ratioComparison: {
+                                  ...(s.ratioComparison || { labelA: 'Core', labelB: 'Buffer', percentB: 25.8 }),
+                                  percentA: val,
+                                  percentB: Math.round((100 - val) * 10) / 10,
+                                },
+                              }));
+                            }}
+                            className="w-16 px-2 py-1 text-xs font-bold font-mono rounded bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-neutral-400 uppercase">Segment B (Cobalt Blue %):</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={activeSlide.ratioComparison?.labelB || 'Urban Coastal Buffer Zone'}
+                            onChange={(e) =>
+                              updateActiveSlide((s) => ({
+                                ...s,
+                                ratioComparison: {
+                                  ...(s.ratioComparison || { percentA: 74.2, labelA: 'Core', percentB: 25.8 }),
+                                  labelB: e.target.value,
+                                },
+                              }))
+                            }
+                            className="flex-1 px-2.5 py-1 text-xs rounded bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10"
+                            placeholder="Label B"
+                          />
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={activeSlide.ratioComparison?.percentB ?? 25.8}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              updateActiveSlide((s) => ({
+                                ...s,
+                                ratioComparison: {
+                                  ...(s.ratioComparison || { labelA: 'Core', labelB: 'Buffer', percentA: 74.2 }),
+                                  percentB: val,
+                                  percentA: Math.round((100 - val) * 10) / 10,
+                                },
+                              }));
+                            }}
+                            className="w-16 px-2 py-1 text-xs font-bold font-mono rounded bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-mono text-neutral-400 uppercase">Ratio Insight Text:</label>
+                      <input
+                        type="text"
+                        value={
+                          activeSlide.ratioComparison?.insight ||
+                          'Overwintering shorebirds concentrate heavily along the seaward tidal margins.'
+                        }
+                        onChange={(e) =>
+                          updateActiveSlide((s) => ({
+                            ...s,
+                            ratioComparison: {
+                              ...(s.ratioComparison || { labelA: 'Core', percentA: 74.2, labelB: 'Buffer', percentB: 25.8 }),
+                              insight: e.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full mt-1 px-2.5 py-1.5 text-xs rounded bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Swiss Retro-Poster Categories Dedicated Inline Editor */}
+              {activeSlide.layoutType === 'categories' && (
+                <div className="space-y-3 pt-1 border-t border-neutral-200/60 dark:border-white/10 mt-3" data-testid="categories-inline-editor">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold uppercase tracking-wider text-neutral-500">
+                      Color-Blocked Pillars (3-4 Columns)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pillars = activeSlide.pillars || [];
+                        if (pillars.length < 4) {
+                          const newPillar = {
+                            id: `p${pillars.length + 1}`,
+                            title: `NEW PILLAR 0${pillars.length + 1}`,
+                            tag: `// PILLAR 0${pillars.length + 1}`,
+                            accentColor: pillars.length === 3 ? ('slate' as const) : ('black' as const),
+                            points: ['Action point one', 'Action point two'],
+                            stat: 'Benchmark Target',
+                          };
+                          updateActiveSlide((s) => ({ ...s, pillars: [...(s.pillars || []), newPillar] }));
+                        }
+                      }}
+                      className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      + Add Column
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {(
+                      activeSlide.pillars || [
+                        { id: 'p1', title: 'HABITAT SANCTUARY', tag: '// PILLAR 01', accentColor: 'red' as const, points: ['14.8 km² tidal mudflat', 'Zero-construction'], stat: '14,800 Ha' },
+                        { id: 'p2', title: 'AUTONOMOUS SENSING', tag: '// PILLAR 02', accentColor: 'blue' as const, points: ['Acoustic stations', 'LiDAR drones'], stat: '99.4% Uptime' },
+                        { id: 'p3', title: 'COMMUNITY GUARDIANS', tag: '// PILLAR 03', accentColor: 'black' as const, points: ['66 ranger paths', 'Public workshops'], stat: '66 Paths' },
+                      ]
+                    ).map((p, pIdx) => (
+                      <div
+                        key={p.id || pIdx}
+                        className={`p-3.5 rounded-xl border space-y-2 ${
+                          p.accentColor === 'red'
+                            ? 'bg-[#EB4424] text-white'
+                            : p.accentColor === 'blue'
+                            ? 'bg-[#2563EB] text-white'
+                            : 'bg-[#18181B] text-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-[10px] font-mono opacity-80">
+                          <span>{p.tag}</span>
+                          <span className="uppercase">{p.accentColor}</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={p.title}
+                          onChange={(e) => {
+                            const updatedPillars = [...(activeSlide.pillars || [])];
+                            if (updatedPillars[pIdx]) {
+                              updatedPillars[pIdx] = { ...updatedPillars[pIdx], title: e.target.value };
+                              updateActiveSlide((s) => ({ ...s, pillars: updatedPillars }));
+                            }
+                          }}
+                          className="w-full font-bold uppercase text-xs bg-transparent border-b border-white/20 focus:outline-none"
+                        />
+                        <input
+                          type="text"
+                          value={p.stat || ''}
+                          onChange={(e) => {
+                            const updatedPillars = [...(activeSlide.pillars || [])];
+                            if (updatedPillars[pIdx]) {
+                              updatedPillars[pIdx] = { ...updatedPillars[pIdx], stat: e.target.value };
+                              updateActiveSlide((s) => ({ ...s, pillars: updatedPillars }));
+                            }
+                          }}
+                          placeholder="Stat Benchmark"
+                          className="w-full text-[11px] font-mono bg-transparent border-b border-white/20 focus:outline-none opacity-90"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Dynamic Block-level Content Renderer with Direct Editing */}
               {activeSlide.blocks.map((block, bIdx) => {
                 if (block.type === 'bullet-list') {
@@ -699,6 +1050,29 @@ export default function Step03StudioCanvas({
 
                 return null;
               })}
+
+              {/* Persistent Dark Bottom Summary Bar Editor (Swiss Hard-Edge Retro-Poster Anchor) */}
+              {(activeSlide.summaryBar || activeTheme.bottomSummaryBar || ['cover', 'metrics', 'categories'].includes(activeSlide.layoutType || '')) && (
+                <div
+                  className="w-full bg-neutral-900 text-white px-4 py-2.5 rounded-xl flex items-center justify-between gap-3 text-xs shadow-md mt-4"
+                  data-testid="studio-summary-bar-editor"
+                >
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-[#EB4424] shrink-0" />
+                    <span className="text-[10px] font-mono uppercase text-neutral-400 shrink-0">Summary Bar:</span>
+                    <input
+                      type="text"
+                      value={activeSlide.summaryBar || 'Strategic Mandate: 120,000 migratory birds protected via 66 certified observation corridors.'}
+                      onChange={(e) => updateActiveSlide((s) => ({ ...s, summaryBar: e.target.value }))}
+                      className="w-full text-xs font-semibold text-neutral-100 bg-transparent border-b border-white/20 focus:border-red-400 focus:outline-none truncate"
+                      placeholder="Persistent dark bottom summary bar text..."
+                    />
+                  </div>
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-neutral-400 shrink-0 hidden sm:block">
+                    SWISS ANCHOR
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Slide Footnote */}

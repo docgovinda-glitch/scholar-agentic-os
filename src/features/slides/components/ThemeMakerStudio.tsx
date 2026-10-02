@@ -44,11 +44,13 @@ const VISUAL_MOTIFS: Array<{ id: VisualMotif; label: string; icon: string }> = [
   { id: 'swiss-cut', label: 'Swiss Modernist Cut', icon: '🇨🇭' },
   { id: 'editorial-split', label: 'Editorial Split Media', icon: '🏛️' },
   { id: 'minimal-frame', label: 'Archival Minimal Frame', icon: '🖼️' },
+  { id: 'retro-poster-cut', label: 'Swiss Retro-Poster Cut', icon: '🚩' },
 ];
 
 const LAYOUT_ARCHETYPES: Array<{ id: LayoutArchetype; label: string; desc: string }> = [
   { id: 'standard-card', label: 'Standard 60/30/10 Card', desc: 'Universal cognitive card with background vector motif' },
   { id: 'split-hero', label: 'Split Hero (Media Panel)', desc: 'Editorial headline & bullets on left, illustration on right' },
+  { id: 'swiss-editorial', label: 'Swiss Hard-Edge Retro-Poster', desc: 'Angled banner (-3°), diagonal split image window, warm cream ground & dark summary bar' },
   { id: 'data-ledger', label: 'Data & KPI Metric Ledger', desc: 'Prominent 3-box metric ledger row with comparison deltas' },
   { id: 'derivation-schematic', label: 'Derivation Schematic', desc: 'Mathematical formula (p0 -> p1) and process flow nodes' },
   { id: 'magazine-highlight', label: 'Magazine Highlight', desc: 'Bold display statement with highlighter accent box' },
@@ -641,7 +643,63 @@ export default function ThemeMakerStudio({
 
             {/* Body Content based on Layout Archetype */}
             <div className="relative z-10 my-auto py-2">
-              {layoutArchetype === 'split-hero' ? (
+              {layoutArchetype === 'swiss-editorial' ? (
+                <div className="grid grid-cols-12 gap-5 items-center">
+                  <div className="col-span-7 space-y-2.5">
+                    {/* Header Tag with Lime Date Pill */}
+                    <div className="flex items-center gap-2 text-[10px] font-sans">
+                      <span className="font-semibold text-neutral-800">Qingdao Nature Society | Coastal Wetland Park</span>
+                      <span className="bg-[#BEF264] text-[#365314] font-mono font-bold text-[9px] px-2 py-0.5 rounded-xs select-none">
+                        11.07—11.13
+                      </span>
+                    </div>
+                    <div className="w-16 h-0.5 bg-[#2563EB]" />
+
+                    {/* Headline */}
+                    <h2
+                      className={`text-2xl sm:text-3xl font-black leading-none tracking-tight ${
+                        fontFamily === 'serif' ? 'font-serif' : 'font-sans'
+                      }`}
+                      style={{ color: mode === 'dark' ? '#FFFFFF' : '#0F172A' }}
+                    >
+                      {previewHeadline === 'Autonomous Knowledge Grounding in Multi-Agent Scientific Discovery' ? 'Qing Plover' : previewHeadline}
+                    </h2>
+
+                    {/* Angled Red Banner */}
+                    <div>
+                      <div className="inline-block transform -rotate-3 origin-left bg-[#EB4424] px-4 py-1.5 rounded-xs shadow-md select-none">
+                        <span className="font-sans font-black text-base sm:text-lg tracking-tight text-neutral-950 uppercase block">
+                          MIGRATORY BIRD SEASON
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Subheadline Narrative */}
+                    <p className="text-[11px] sm:text-xs text-neutral-700 leading-relaxed max-w-sm">
+                      This winter, join the week when the city draws closest to 120,000 passing migratory birds. Walk the tidal flats for seven days and meet the neighbors who share our coast.
+                    </p>
+
+                    {/* Stat Callouts with Red Dash */}
+                    <div className="pt-1">
+                      <div className="w-8 h-0.5 bg-[#EB4424] mb-1" />
+                      <div className="flex items-baseline gap-2 text-[10px] font-sans text-neutral-600">
+                        <span className="text-[#EB4424] font-black text-xs">120,000</span>
+                        <span>birds</span>
+                        <span>|</span>
+                        <span className="text-[#EB4424] font-black text-xs">66</span>
+                        <span>sessions</span>
+                        <span>|</span>
+                        <span className="text-[#EB4424] font-black text-xs">18,000</span>
+                        <span>spots</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-span-5 h-44 sm:h-52">
+                    <SlideHeroVisual motif="retro-poster-cut" theme={activeThemeObject} />
+                  </div>
+                </div>
+              ) : layoutArchetype === 'split-hero' ? (
                 <div className="grid grid-cols-12 gap-4 items-center">
                   <div className="col-span-7 space-y-2">
                     <h2
@@ -769,10 +827,24 @@ export default function ThemeMakerStudio({
             </div>
 
             {/* Bottom Footer */}
-            <div className="relative z-10 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 text-[10px] font-mono opacity-60">
-              <span>Scholar OS Cognitive Engine</span>
-              <span>60% Ground · 30% Card · 10% Signal</span>
-            </div>
+            {layoutArchetype === 'swiss-editorial' ? (
+              <div className="relative z-10 w-full bg-neutral-900 text-white px-4 py-2 rounded-xl flex items-center justify-between text-[11px] font-sans shadow-md">
+                <div className="flex items-center gap-2 truncate">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#EB4424] shrink-0" />
+                  <span className="font-semibold text-neutral-300 truncate">
+                    Strategic Mandate: 120,000 migratory birds protected via 66 certified observation corridors.
+                  </span>
+                </div>
+                <span className="font-mono text-[9px] uppercase tracking-widest text-neutral-400 shrink-0 hidden sm:block">
+                  SCHOLAR OS // EDITORIAL POSTER
+                </span>
+              </div>
+            ) : (
+              <div className="relative z-10 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 text-[10px] font-mono opacity-60">
+                <span>Scholar OS Cognitive Engine</span>
+                <span>60% Ground · 30% Card · 10% Signal</span>
+              </div>
+            )}
           </div>
 
           {/* Action Row */}

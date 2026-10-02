@@ -227,10 +227,10 @@ export async function extractThemeFromImage(fileOrDataUrl: File | string): Promi
             name = 'Cloned Paper Courseware (Kimi Style)';
             headerStamp = 'ACADEMIC COURSEWARE // MODULE 02 METHODOLOGY';
           } else if (isRedOrange) {
-            motif = 'editorial-split';
-            archetype = 'split-hero';
-            name = 'Cloned Apricot Brief (Kimi Style)';
-            headerStamp = 'M&A DUE DILIGENCE // INVESTMENT COMMITTEE';
+            motif = 'retro-poster-cut';
+            archetype = 'swiss-editorial';
+            name = 'Swiss Retro-Poster (Editorial)';
+            headerStamp = 'QINGDAO NATURE SOCIETY // WETLAND CONSERVATION PARK';
           } else if (isCyanViolet || ab > ar) {
             motif = 'blueprint-grid';
             archetype = 'derivation-schematic';
@@ -246,7 +246,7 @@ export async function extractThemeFromImage(fileOrDataUrl: File | string): Promi
 
         // Determine typography & text colors
         const fontFamily: 'sans' | 'serif' | 'mono' =
-          motif === 'golden-waves' || motif === 'editorial-split' ? 'serif' : motif === 'cyber-hud' ? 'mono' : 'sans';
+          motif === 'golden-waves' || motif === 'retro-poster-cut' ? 'serif' : motif === 'cyber-hud' ? 'mono' : 'sans';
 
         const textPrimary = isDark ? '#FFFFFF' : '#0F172A';
         const textSecondary = isDark ? '#D4D4D8' : '#334155';
@@ -304,6 +304,39 @@ export async function extractThemeFromImage(fileOrDataUrl: File | string): Promi
  */
 export function generateThemeFromPrompt(prompt: string): ExtractedThemeResult {
   const p = prompt.toLowerCase();
+
+  if (
+    p.includes('swiss') ||
+    p.includes('poster') ||
+    p.includes('retro') ||
+    p.includes('bird') ||
+    p.includes('plover') ||
+    p.includes('migratory') ||
+    p.includes('hard-edge') ||
+    (p.includes('editorial') && (p.includes('poster') || p.includes('retro') || p.includes('swiss')))
+  ) {
+    return {
+      name: 'Swiss Retro-Poster (AI Generated)',
+      tagline: 'Warm cream canvas with sharp geometric tomato-red, cobalt blue, angled banners, and dark bottom summary bar',
+      category: 'minimal',
+      mode: 'light',
+      visualMotif: 'retro-poster-cut',
+      layoutArchetype: 'swiss-editorial',
+      headerStamp: 'QINGDAO NATURE SOCIETY // WETLAND CONSERVATION PARK',
+      canvasBg: '#F7F5F0',
+      cardBg: '#FFFFFF',
+      accent: '#EB4424',
+      textPrimary: '#18181B',
+      textSecondary: '#3F3F46',
+      textMuted: '#71717A',
+      fontFamily: 'serif',
+      previewKpis: [
+        { value: '120k', label: 'Migratory Birds', sub: 'Seasonal Census' },
+        { value: '66', label: 'Sessions', sub: 'Field Observation' },
+        { value: '18k', label: 'Spots', sub: 'Public Engagement' },
+      ],
+    };
+  }
 
   if (p.includes('black gold') || p.includes('gold') || p.includes('ledger') || p.includes('luxury')) {
     return {
@@ -604,5 +637,7 @@ export function compileSlideTheme(result: ExtractedThemeResult, id?: string): Sl
     fontFamily: result.fontFamily,
     bulletColor: result.accent,
     quoteBorder: result.accent,
+    bottomSummaryBar: result.layoutArchetype === 'swiss-editorial',
+    secondaryAccent: result.layoutArchetype === 'swiss-editorial' ? '#2563EB' : undefined,
   };
 }

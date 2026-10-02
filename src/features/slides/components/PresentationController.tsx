@@ -15,6 +15,7 @@ export interface PresentationControllerProps {
   onToggleFullscreen: () => void;
   isPresenterOpen: boolean;
   onTogglePresenter: () => void;
+  onExportPdf?: () => void;
 }
 
 /**
@@ -45,6 +46,7 @@ export default function PresentationController({
   onToggleFullscreen,
   isPresenterOpen,
   onTogglePresenter,
+  onExportPdf,
 }: PresentationControllerProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(true);
@@ -229,6 +231,18 @@ export default function PresentationController({
             aria-label="Toggle speaker notes"
           >
             🎙️
+          </button>
+
+          {/* PDF Export Button */}
+          <button
+            type="button"
+            onClick={onExportPdf || (() => window.print())}
+            className="p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 cursor-pointer transition-colors flex items-center gap-1 font-semibold text-[11px]"
+            title="Export Presentation to PDF (P)"
+            aria-label="Export to PDF"
+          >
+            <span>📄</span>
+            <span className="hidden sm:inline">PDF</span>
           </button>
 
           {/* Fullscreen Toggle */}

@@ -2,6 +2,7 @@ import express from "express";
 import multer from "multer";
 import * as pdfParseModule from "pdf-parse";
 import mammoth from "mammoth";
+import JSZip from "jszip";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
 import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy } from "../../utils/llm.ts";
 import { completeWithFailover } from "../../../src/platform/gateway/gateway.ts";
@@ -35,6 +36,9 @@ import {
   outlineTreeToAssignmentStructure,
 } from "../../../src/desk/assignment/services/outlineService.ts";
 import { conductAskScholarResearchForOutline } from "../../../src/desk/assignment/services/scholarlyDiscoveryService.ts";
+import { sanitizeBrief } from "../../../src/features/understand/services/briefSanitizer.ts";
+import { classifyScopeBoundaries, stripLineTags } from "../../../src/features/understand/services/scopeClassifier.ts";
+import { generateSectionDraft } from "../../../src/features/drafting/services/sectionDraftingEngine.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(rejectClientCredentials);
@@ -267,6 +271,37 @@ async function extractTextFromPdf(buffer: Buffer): Promise<{ text: string }> {
   return { text: "" };
 }
 
+async function extractTextFromPptx(buffer: Buffer): Promise<string> {
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    const slideFiles = Object.keys(zip.files).filter((name) =>
+      /^ppt\/slides\/slide\d+\.xml$/.test(name)
+    );
+    slideFiles.sort((a, b) => {
+      const numA = parseInt(a.match(/slide(\d+)\.xml/)?.[1] || "0", 10);
+      const numB = parseInt(b.match(/slide(\d+)\.xml/)?.[1] || "0", 10);
+      return numA - numB;
+    });
+
+    const slideTexts: string[] = [];
+    for (const slidePath of slideFiles) {
+      const xml = await zip.files[slidePath].async("text");
+      const matches = xml.match(/<a:t[^>]*>([^<]+)<\/a:t>/g) || [];
+      const extracted = matches
+        .map((m) => m.replace(/<[^>]+>/g, "").trim())
+        .filter(Boolean)
+        .join(" ");
+      if (extracted) {
+        slideTexts.push(extracted);
+      }
+    }
+    return slideTexts.join("\n\n");
+  } catch (err) {
+    console.warn("PPTX parser error in assignment router:", err);
+    return buffer.toString("utf-8").replace(/[^\x20-\x7E\n]/g, " ").trim();
+  }
+}
+
 async function getProjectSafe(req: express.Request<any>, res: express.Response) {
   const projectId = req.params.id;
   if (!projectId) {
@@ -293,13 +328,21 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
 
   let text = "";
   try {
-    if (file.mimetype === "application/pdf" || file.originalname.toLowerCase().endsWith(".pdf")) {
+    const lowerName = file.originalname.toLowerCase();
+    if (file.mimetype === "application/pdf" || lowerName.endsWith(".pdf")) {
       const data = await extractTextFromPdf(file.buffer);
       text = data.text;
     } else if (
+      file.mimetype === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+      file.mimetype === "application/vnd.ms-powerpoint" ||
+      lowerName.endsWith(".pptx") ||
+      lowerName.endsWith(".ppt")
+    ) {
+      text = await extractTextFromPptx(file.buffer);
+    } else if (
       file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      file.originalname.toLowerCase().endsWith(".docx") ||
-      file.originalname.toLowerCase().endsWith(".doc")
+      lowerName.endsWith(".docx") ||
+      lowerName.endsWith(".doc")
     ) {
       const result = await mammoth.extractRawText({ buffer: file.buffer });
       text = result.value || "";
@@ -310,8 +353,13 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
     // Clean whitespace and normalize line breaks
     text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
 
+    // Sanitize brief: repair hyphenated line breaks, soft breaks, and purge classroom/pedagogical noise
+    const sanitizedResult = sanitizeBrief(text);
+    const cleanedText = sanitizedResult.cleanedText;
+    const extractedQuestions = sanitizedResult.extractedQuestions;
+
     // Detect metadata within first 50,000 characters to eliminate regex backtracking on multi-MB documents
-    const searchSlice = text.slice(0, 50000);
+    const searchSlice = cleanedText.slice(0, 50000);
     let detectedWordCount: number | undefined;
     const wordMatch =
       searchSlice.match(/(?:word\s*count|target|limit|length)\s*(?:is|of|:)?\s*([1-9]\d{2,4})/i) ||
@@ -338,17 +386,21 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
     else if (/\bchicago\b/i.test(searchSlice)) detectedCitation = "chicago";
     else if (/\boscola\b/i.test(searchSlice)) detectedCitation = "oscola";
 
-    const lines = text.split("\n").filter((l) => l.trim().length > 0);
+    const lines = cleanedText.split("\n").filter((l) => l.trim().length > 0);
 
     // Guaranteed persistence: commit extracted brief directly into project answers
     if (!project.answers) {
       project.answers = {};
     }
-    project.answers["instructions"] = text;
-    project.answers["assignment_question"] = text;
-    project.answers["assignment_brief_text"] = text;
-    project.answers["research_topic"] = text;
-    project.answers["assignment_brief"] = text;
+    project.answers["instructions"] = cleanedText;
+    project.answers["assignment_question"] =
+      extractedQuestions.length > 0 ? extractedQuestions.join("\n\n") : cleanedText;
+    project.answers["assignment_brief_text"] = cleanedText;
+    project.answers["research_topic"] = cleanedText;
+    project.answers["assignment_brief"] = cleanedText;
+    if (extractedQuestions.length > 0) {
+      project.answers["extracted_questions"] = JSON.stringify(extractedQuestions);
+    }
     if (detectedWordCount) {
       project.answers["targetWordCount"] = String(detectedWordCount);
       project.answers["target_word_count"] = String(detectedWordCount);
@@ -365,12 +417,15 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
     }
     await getProjectStore().save(project);
 
-    const derivedTitle = await deriveSemanticAcademicTitle(text, req);
+    const derivedTitle = await deriveSemanticAcademicTitle(cleanedText, req);
     const updatedTitle = await autoUpdateProjectTitleIfUntitled(project, derivedTitle);
 
     return res.json({
       success: true,
-      text,
+      text: cleanedText,
+      extractedQuestions,
+      omittedPedagogicalNoise: sanitizedResult.omittedPedagogicalNoise,
+      repairedLineWrapsCount: sanitizedResult.repairedLineWrapsCount,
       lineCount: lines.length,
       detectedWordCount,
       detectedLevel,
@@ -473,46 +528,11 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       );
     }
 
-    // 2. Key Conceptual Scope & Boundaries (mapped from category === 'constraint': mustInclude vs excluded)
-    const constraintItems = ledger.filter((item) => item.category === "constraint");
-    const included: string[] = [];
-    const excluded: string[] = [];
-
-    for (const item of constraintItems) {
-      if (/(?:do not|must not|avoid|exclude|excluded|out of scope|not acceptable|will not be credited|shall not|never)/i.test(item.verbatimText)) {
-        excluded.push(`${item.lineRange} ${item.verbatimText}`);
-      } else {
-        included.push(`${item.lineRange} ${item.verbatimText}`);
-      }
-    }
-
-    // Also include prompt requirements if specified
-    for (const p of promptItems) {
-      if (/^(?:\d+[\.\)]|[a-e][\.\)]|\?)/.test(p.verbatimText) || p.verbatimText.length > 20) {
-        const itemTag = `${p.lineRange} ${p.verbatimText}`;
-        if (!included.includes(itemTag)) {
-          included.push(itemTag);
-        }
-      }
-    }
-
-    if (included.length === 0) {
-      included.push(
-        `Direct deconstruction and systematic investigation of: "${question.slice(0, 100)}"`,
-        `Application of authoritative theoretical frameworks appropriate to ${academicLevel} study`,
-        `Substantiation of claims using peer-reviewed scholarly literature formatted in ${citationStyle.toUpperCase()}`,
-        "Dialectical evaluation of counterarguments, competing evidence, and disciplinary controversies"
-      );
-    }
-
-    if (excluded.length === 0) {
-      excluded.push(
-        "Purely descriptive narrative storytelling or textbook summaries lacking critical evaluation",
-        "Unsubstantiated personal opinion pieces or non-academic blogs/wikis",
-        "Irrelevant biographical or historical context that does not answer the core question",
-        `Content exceeding the target word count (${targetWordCount} words) by more than standard tolerance`
-      );
-    }
+    // 2. Key Conceptual Scope & Boundaries (Green: What to Focus On vs Orange: What to Avoid)
+    const rawQuestions = promptItems.map((p) => p.verbatimText);
+    const scope = classifyScopeBoundaries(combinedContent, rawQuestions);
+    const included: string[] = [...scope.included];
+    const excluded: string[] = [...scope.excluded];
 
     // 3. Rubric Rules & Grade Bands (mapped from category === 'rubric_band' and category === 'penalty')
     const rubricItems = ledger.filter((item) => item.category === "rubric_band");
@@ -1547,8 +1567,25 @@ CRITICAL RULES:
       "openrouter/auto",
       "drafting"
     );
-    if (!draft) return;
-    res.json({ draft });
+
+    const effectiveDraft = draft?.trim()
+      ? draft.trim()
+      : generateSectionDraft({
+          sectionTitle,
+          assignmentQuestion: project.answers["assignment_question"] || "",
+          academicFunction: sectionGuidance,
+          targetWordCount,
+          academicLevel,
+          citationStyle,
+          thesis,
+          keyPoints,
+          boundSources: approvedEvidence.map((e: any) => ({
+            title: e.claim,
+            citation: e.citation,
+          })),
+        });
+
+    res.json({ draft: effectiveDraft });
   } catch (err: any) {
     if (err?.message === "RequireFrontendLLMException") return;
     console.error("Section drafting error:", err);
@@ -1630,19 +1667,28 @@ Output ONLY the section text in clean academic Markdown prose.`;
       "drafting"
     );
 
-    if (draft) {
-      const words = draft.split(" ");
-      for (let i = 0; i < words.length; i += 5) {
-        const chunk = (i === 0 ? "" : " ") + words.slice(i, i + 5).join(" ");
-        res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
-      }
-      res.write(`data: ${JSON.stringify({ fullText: draft })}\n\n`);
-      res.write("data: [DONE]\n\n");
-      res.end();
-    } else {
-      res.write("data: [DONE]\n\n");
-      res.end();
+    const effectiveDraft = draft?.trim()
+      ? draft.trim()
+      : generateSectionDraft({
+          sectionTitle,
+          assignmentQuestion: assignmentTopic,
+          academicFunction,
+          targetWordCount,
+          academicLevel,
+          citationStyle,
+          thesis,
+          boundSources,
+          revisionPrompt: revisionPrompt as any,
+        });
+
+    const words = effectiveDraft.split(" ");
+    for (let i = 0; i < words.length; i += 5) {
+      const chunk = (i === 0 ? "" : " ") + words.slice(i, i + 5).join(" ");
+      res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
     }
+    res.write(`data: ${JSON.stringify({ fullText: effectiveDraft })}\n\n`);
+    res.write("data: [DONE]\n\n");
+    res.end();
   } catch (err: any) {
     console.error("Stream section error:", err);
     res.write(`data: ${JSON.stringify({ error: err.message || "Failed to stream section" })}\n\n`);

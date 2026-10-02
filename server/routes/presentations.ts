@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import multer from "multer";
 import * as pdfParseModule from "pdf-parse";
 import mammoth from "mammoth";
+import JSZip from "jszip";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 
 const upload = multer({
@@ -33,6 +34,37 @@ async function extractTextFromPdf(buffer: Buffer): Promise<{ text: string }> {
     console.warn("[presentations.ts] PDF parse fallback error:", err);
   }
   return { text: "" };
+}
+
+async function extractTextFromPptx(buffer: Buffer): Promise<string> {
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    const slideFiles = Object.keys(zip.files).filter((name) =>
+      /^ppt\/slides\/slide\d+\.xml$/.test(name)
+    );
+    slideFiles.sort((a, b) => {
+      const numA = parseInt(a.match(/slide(\d+)\.xml/)?.[1] || "0", 10);
+      const numB = parseInt(b.match(/slide(\d+)\.xml/)?.[1] || "0", 10);
+      return numA - numB;
+    });
+
+    const slideTexts: string[] = [];
+    for (const slidePath of slideFiles) {
+      const xml = await zip.files[slidePath].async("text");
+      const matches = xml.match(/<a:t[^>]*>([^<]+)<\/a:t>/g) || [];
+      const extracted = matches
+        .map((m) => m.replace(/<[^>]+>/g, "").trim())
+        .filter(Boolean)
+        .join(" ");
+      if (extracted) {
+        slideTexts.push(extracted);
+      }
+    }
+    return slideTexts.join("\n\n");
+  } catch (err) {
+    console.warn("[presentations.ts] PPTX parse fallback error:", err);
+    return buffer.toString("utf-8").replace(/[^\x20-\x7E\n]/g, " ").trim();
+  }
 }
 
 export interface PresentationDeckRow extends Record<string, unknown> {
@@ -128,6 +160,13 @@ router.post("/parse-document", upload.single("file"), async (req: Request, res: 
     if (file.mimetype === "application/pdf" || lowerName.endsWith(".pdf")) {
       const data = await extractTextFromPdf(file.buffer);
       text = data.text;
+    } else if (
+      file.mimetype === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+      file.mimetype === "application/vnd.ms-powerpoint" ||
+      lowerName.endsWith(".pptx") ||
+      lowerName.endsWith(".ppt")
+    ) {
+      text = await extractTextFromPptx(file.buffer);
     } else if (
       file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       lowerName.endsWith(".docx") ||

@@ -138,6 +138,58 @@ export default function SlideHeroVisual({
     );
   }
 
+  if (theme?.id === 'swiss-editorial' || motif === 'retro-poster-cut') {
+    return (
+      <div
+        className={`w-full h-full rounded-2xl border flex flex-col justify-between p-3 relative overflow-hidden bg-[#E2E8F0]/40 border-neutral-300 shadow-md ${className}`}
+      >
+        <div className="flex items-center justify-between text-[9px] font-mono opacity-80 text-neutral-600">
+          <span>QINGDAO WETLAND PARK</span>
+          <span className="text-[#EB4424] font-bold">11.07—11.13</span>
+        </div>
+
+        {/* Flock of Birds across Coastal Horizon Illustration */}
+        <div className="my-auto flex flex-col items-center justify-center relative w-full h-28 py-1 overflow-hidden">
+          <svg viewBox="0 0 160 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+            {/* Distant Mountain Ridge */}
+            <path d="M 0 65 Q 40 45, 90 60 T 160 55 L 160 80 L 0 80 Z" fill="#94A3B8" fillOpacity="0.3" />
+            <path d="M 20 68 Q 70 52, 120 62 T 160 65 L 160 80 L 0 80 Z" fill="#64748B" fillOpacity="0.4" />
+            
+            {/* Coastal Water & Mudflat */}
+            <rect x="0" y="70" width="160" height="10" fill="#CBD5E1" fillOpacity="0.6" />
+            
+            {/* Wave / Tidal Lines */}
+            <path d="M 0 74 Q 40 71, 80 74 T 160 74" stroke="#0284C7" strokeWidth="0.8" strokeOpacity="0.6" fill="none" />
+            <path d="M 0 77 Q 40 75, 80 77 T 160 77" stroke="#0284C7" strokeWidth="0.5" strokeOpacity="0.4" fill="none" />
+
+            {/* Flying Migratory Birds V-Formation */}
+            <path d="M 30 25 Q 33 22, 36 25 Q 39 22, 42 25" stroke="#1E293B" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+            <path d="M 45 18 Q 48 15, 51 18 Q 54 15, 57 18" stroke="#1E293B" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+            <path d="M 60 12 Q 63 9, 66 12 Q 69 9, 72 12" stroke="#1E293B" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+            <path d="M 75 16 Q 78 13, 81 16 Q 84 13, 87 16" stroke="#1E293B" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+            <path d="M 90 22 Q 93 19, 96 22 Q 99 19, 102 22" stroke="#1E293B" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+            <path d="M 105 28 Q 108 25, 111 28 Q 114 25, 117 28" stroke="#1E293B" strokeWidth="1.0" fill="none" strokeLinecap="round" />
+            
+            {/* Distant Flock */}
+            <path d="M 95 38 Q 97 36, 99 38 Q 101 36, 103 38" stroke="#475569" strokeWidth="0.8" fill="none" />
+            <path d="M 108 34 Q 110 32, 112 34 Q 114 32, 116 34" stroke="#475569" strokeWidth="0.8" fill="none" />
+            <path d="M 120 37 Q 122 35, 124 37 Q 126 35, 128 37" stroke="#475569" strokeWidth="0.8" fill="none" />
+          </svg>
+
+          {/* Overlaid Slanted Cobalt Blue Callout Bar */}
+          <div className="absolute bottom-1 right-1 bg-[#2563EB] text-white px-2.5 py-1 rounded-sm text-[8px] font-sans font-bold shadow-md transform -skew-x-6 tracking-wide">
+            Migratory birds arrive, and the city makes room.
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between text-[8px] font-mono opacity-80 text-neutral-600">
+          <span>120,000 BIRDS</span>
+          <span className="text-[#2563EB] font-bold">100% SECURE HABITAT</span>
+        </div>
+      </div>
+    );
+  }
+
   switch (motif) {
     case 'blueprint-grid': {
       // Pastel Derivation: Mathematical formula & fluidic sorting diagram (p0 -> p1)

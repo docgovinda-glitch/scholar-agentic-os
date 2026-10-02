@@ -1,7 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, CheckCircle2, AlertCircle, Trash2, Sparkles, FileCode } from 'lucide-react';
 import type { SlideDeck, NarrativeFramework } from '../types/slides';
-import { decomposeToUniversal5Beat } from '../services/universalDecomposer';
+import {
+  decomposeToUniversal5Beat,
+  decomposeToSwissEditorial,
+} from '../services/universalDecomposer';
 
 export interface Step01ScaffoldingProps {
   deck: SlideDeck;
@@ -10,6 +13,7 @@ export interface Step01ScaffoldingProps {
 }
 
 const SAMPLE_TOPICS = [
+  'Qing Plover: Migratory Bird Season (Swiss Editorial)',
   'Quantum Computing & Cryptographic Verification',
   'Autonomous Knowledge Grounding in Multi-Agent Synthesis',
   'Corporate Restructuring & Capital Allocation Under High Rates',
@@ -47,16 +51,29 @@ export default function Step01Scaffolding({
       const textToUse = overrideText !== undefined ? overrideText : (inputMode === 'markdown' ? rawTextInput : rawTextInput || undefined);
       const topicToUse = overrideTopic !== undefined ? overrideTopic : topicInput;
 
-      const generatedDeck = decomposeToUniversal5Beat({
-        topic: topicToUse,
-        text: textToUse,
-        framework: selectedFramework,
-      });
+      const isSwiss =
+        topicToUse.toLowerCase().includes('bird') ||
+        topicToUse.toLowerCase().includes('plover') ||
+        topicToUse.toLowerCase().includes('swiss') ||
+        topicToUse.toLowerCase().includes('editorial') ||
+        deck.themeId === 'swiss-editorial';
+
+      const generatedDeck = isSwiss
+        ? decomposeToSwissEditorial({
+            topic: topicToUse,
+            text: textToUse,
+            framework: selectedFramework,
+          })
+        : decomposeToUniversal5Beat({
+            topic: topicToUse,
+            text: textToUse,
+            framework: selectedFramework,
+          });
 
       onUpdateDeck({
         ...generatedDeck,
         id: deck.id || generatedDeck.id,
-        themeId: deck.themeId || 'sand-academic',
+        themeId: isSwiss ? 'swiss-editorial' : (deck.themeId || 'sand-academic'),
         customTheme: deck.customTheme,
       });
     } finally {
@@ -201,7 +218,7 @@ export default function Step01Scaffolding({
             }`}
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>Upload Document (.pdf, .docx, .txt, .md)</span>
+            <span>Upload Document (.pdf, .docx, .ppt, .pptx, .txt, .md)</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold ml-1">
               Coursework Bridge
             </span>
@@ -407,7 +424,7 @@ export default function Step01Scaffolding({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.docx,.doc,.txt,.md,.markdown"
+          accept=".pdf,.docx,.doc,.ppt,.pptx,.txt,.md,.markdown"
           onChange={handleFileChange}
           disabled={isParsingFile}
           className="hidden"
@@ -438,7 +455,7 @@ export default function Step01Scaffolding({
             <div className="p-3 rounded-xl border border-blue-200/80 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20 flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
                 <Upload className="w-4 h-4 shrink-0" />
-                <span>Working from coursework? Upload your brief document (.pdf, .docx, .txt, .md)</span>
+                <span>Working from brief or PPT? Upload your document (.pdf, .docx, .ppt, .pptx, .txt, .md)</span>
               </div>
               <button
                 type="button"
