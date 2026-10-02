@@ -84,6 +84,27 @@ describe("PresentationWorkspace", () => {
     expect(screen.getByText(/WCAG AA Pass/i)).toBeInTheDocument();
   });
 
+  it("Step 02: displays 22 Kimi and Gamma themes with category filtering and search", () => {
+    render(<PresentationWorkspace projectId="proj-pres-1" />);
+
+    // Go to themes
+    fireEvent.click(screen.getByRole("button", { name: /02 Themes & Templates/i }));
+
+    expect(screen.getByText(/22 Curated Presets/i)).toBeInTheDocument();
+    expect(screen.getByText(/Dark & Cyber · Kimi/i)).toBeInTheDocument();
+    expect(screen.getByText(/Vibrant & Modern · Gamma/i)).toBeInTheDocument();
+
+    // Filter by Kimi Cyber themes
+    fireEvent.click(screen.getByRole("button", { name: /Dark & Cyber · Kimi/i }));
+    expect(screen.getByText(/Obsidian Aurora/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cyber Quantum/i)).toBeInTheDocument();
+    expect(screen.getByText(/Midnight Onyx/i)).toBeInTheDocument();
+
+    // Select Obsidian Aurora
+    fireEvent.click(screen.getByRole("button", { name: /Obsidian Aurora/i }));
+    expect(screen.getByText(/Open Canvas Studio \(Obsidian Aurora\)/i)).toBeInTheDocument();
+  });
+
   it("Step 03: supports WYSIWYG text editing, 6x6 bullet alerts, and layout switching", () => {
     render(<PresentationWorkspace projectId="proj-pres-1" />);
 
