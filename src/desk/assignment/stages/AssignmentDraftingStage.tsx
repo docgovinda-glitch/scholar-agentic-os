@@ -21,15 +21,20 @@ import {
   FileCheck,
   RotateCcw,
 } from "lucide-react";
+import { SlideCanvas, extractSlidesFromAcademicText, type SlideDeck } from "../../../features/slides";
 
 export interface AssignmentDraftingStageProps {
   onProceed?: () => void;
   onBack?: () => void;
+  onPresentPresentation?: (markdown: string) => void;
+  onPresentKeynote?: (markdown: string) => void;
 }
 
 export function AssignmentDraftingStage({
   onProceed,
   onBack,
+  onPresentPresentation,
+  onPresentKeynote,
 }: AssignmentDraftingStageProps) {
   const {
     projectId,
@@ -59,6 +64,16 @@ export function AssignmentDraftingStage({
   const [activeStreamingSectionId, setActiveStreamingSectionId] = useState<string | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isTuning, setIsTuning] = useState(false);
+  const [showPresentation, setShowPresentation] = useState(false);
+  const [showKeynote, setShowKeynote] = useState(false);
+  const [presentationDeck, setPresentationDeck] = useState<SlideDeck | null>(null);
+  const [keynoteDeck, setKeynoteDeck] = useState<SlideDeck | null>(null);
+
+  const draftMarkdown = useMemo(() => {
+    return internalSections
+      .map((sec) => `## ${sec.title}\n\n${sec.draftContent || ""}`)
+      .join("\n\n");
+  }, [internalSections]);
 
   // Context continuity state — tracks claims, cited sources, and themes across sections
   const contextContinuityRef = useRef<ContextContinuityState | null>(null);
@@ -296,8 +311,27 @@ export function AssignmentDraftingStage({
             </p>
           </div>
 
-          {/* Quick Exit Gate Preview Badge */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Quick Exit Gate & Presentation Action Pills */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                const handler = onPresentPresentation || onPresentKeynote;
+                if (handler) {
+                  handler(draftMarkdown);
+                } else {
+                  const deck = extractSlidesFromAcademicText(draftMarkdown, "SCR");
+                  setPresentationDeck(deck);
+                  setShowPresentation(true);
+                }
+              }}
+              aria-label="Present Presentation"
+              className="rounded-full px-4 py-1.5 text-sm font-medium border border-neutral-200/80 bg-white hover:bg-neutral-50 text-neutral-900 dark:border-white/10 dark:bg-[#1C1C1E] dark:hover:bg-neutral-800 dark:text-neutral-100 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <span>📽️</span>
+              <span>Present Presentation</span>
+            </button>
+
             <button
               type="button"
               onClick={handleProceed}
@@ -450,6 +484,22 @@ export function AssignmentDraftingStage({
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </footer>
+
+      {/* Fullscreen Presentation Overlay */}
+      {(showPresentation || showKeynote) && (presentationDeck || keynoteDeck) && (
+        <div
+          className="fixed inset-0 z-50 bg-[#F7F5F0] dark:bg-[#171717] overflow-auto flex flex-col justify-center animate-in fade-in duration-200"
+          data-testid="drafting-keynote-overlay"
+        >
+          <SlideCanvas
+            deck={presentationDeck || keynoteDeck}
+            onClose={() => {
+              setShowPresentation(false);
+              setShowKeynote(false);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

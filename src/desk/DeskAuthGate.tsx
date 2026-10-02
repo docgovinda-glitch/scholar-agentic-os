@@ -74,7 +74,14 @@ export function RequireAuth() {
   if (session.status === "loading") return <SessionBoundaryFallback status="loading" />;
   if (session.status === "unconfigured") return <SessionBoundaryFallback status="unconfigured" />;
   if (session.status === "signed-out") {
-    if (location.pathname === "/projects" || location.pathname === "/" || !location.pathname || location.pathname === "/signin" || location.pathname === "/signup") {
+    if (
+      location.pathname === "/projects" ||
+      location.pathname === "/" ||
+      !location.pathname ||
+      location.pathname === "/signin" ||
+      location.pathname === "/signup" ||
+      location.pathname.startsWith("/projects/draft-")
+    ) {
       return <Outlet />;
     }
     const redirect = encodeURIComponent(location.pathname + location.search);

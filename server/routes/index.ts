@@ -8,4 +8,5 @@ export { registerProjectRoutes } from "./project.ts";
 export { registerAiAccessRoutes } from "./aiAccess.ts";
 export { registerSearchRoutes } from "./search.ts";
 export { registerVaultRoutes } from "./vault.ts";
+export { registerPresentationRoutes } from "./presentations.ts";
 export { registerSupabaseProxy, registerSupabaseWsProxy, getRemoteSupabaseUrl } from "./supabaseProxy.ts";

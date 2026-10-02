@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useCallback } from "react";
 import type { PresentationProjectData, PresentationSlide } from "../types";
+import type { SlideTheme } from "../../../features/slides";
 import SpeakerRehearsalTimer from "./SpeakerRehearsalTimer";
 
 export interface LiveSlidePlayerProps {
   deckData: PresentationProjectData;
   initialSlideIndex?: number;
+  theme?: SlideTheme;
   onClose: () => void;
 }
 
 export default function LiveSlidePlayer({
   deckData,
   initialSlideIndex = 0,
+  theme,
   onClose,
 }: LiveSlidePlayerProps) {
   const [slideIndex, setSlideIndex] = useState(initialSlideIndex);
@@ -170,7 +173,12 @@ export default function LiveSlidePlayer({
         ) : (
           /* Audience Mode: Clean Full 16:9 Slide Canvas */
           <div
-            className="w-full max-w-6xl aspect-video rounded-2xl bg-[#171717] p-10 md:p-14 flex flex-col justify-between border border-[#262626] shadow-2xl relative overflow-hidden"
+            className={`w-full max-w-6xl aspect-video rounded-2xl p-10 md:p-14 flex flex-col justify-between border shadow-2xl relative overflow-hidden transition-all duration-300 ${
+              theme
+                ? `${theme.cardClass} ${theme.cardBorder}`
+                : "bg-[#171717] border-[#262626]"
+            }`}
+            style={theme ? { background: theme.cardBg } : undefined}
             data-testid="audience-slide-canvas"
           >
             <div className="flex items-center justify-between text-xs text-[#9B9B9B]">

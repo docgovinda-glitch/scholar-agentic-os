@@ -155,11 +155,15 @@ function ProjectsIndexRoute() {
   const justFinishedOnboarding = outletCtx?.justFinishedOnboarding ?? false;
   const clearJustFinishedOnboarding = outletCtx?.clearJustFinishedOnboarding ?? (() => {});
 
+  const isLocalhost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const effectiveUserId = session.status === "signed-in" ? session.userId : (isLocalhost ? "localhost-dev" : null);
+  const effectiveUserEmail = session.status === "signed-in" ? session.email : (isLocalhost ? "localhost@scholar.internal" : null);
+
   return (
     <ProjectListScreen
       initialView="projects"
-      userId={session.status === "signed-in" ? session.userId : null}
-      userEmail={session.status === "signed-in" ? session.email : null}
+      userId={effectiveUserId}
+      userEmail={effectiveUserEmail}
       onOpen={(id) => navigate(`/projects/${id}`)}
       onOpenAccountSettings={() => navigate("/settings", { state: { from: "/projects" } })}
       onOpenVault={() => navigate("/vault", { state: { from: "/projects" } })}
@@ -410,12 +414,15 @@ function VaultRoute() {
   const navigate = useNavigate();
   const location = useLocation();
   const session = useDeskSession();
-  if (session.status !== "signed-in") return null;
+  const isLocalhost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  if (session.status !== "signed-in" && !isLocalhost) return null;
+  const userId = session.status === "signed-in" ? session.userId : "localhost-dev";
+  const userEmail = session.status === "signed-in" ? session.email : "localhost@scholar.internal";
   return (
     <ProjectListScreen
       initialView="vault"
-      userId={session.userId}
-      userEmail={session.email}
+      userId={userId}
+      userEmail={userEmail}
       onOpen={(id) => navigate(`/projects/${id}`)}
       onOpenAccountSettings={() => navigate("/settings", { state: { from: "/vault" } })}
       onOpenVault={() => {}}
@@ -433,11 +440,14 @@ function AiAccessRoute() {
   const session = useDeskSession();
   const { section } = useParams<{ section?: string }>();
   const activeSection = normalizeSectionId(section);
+  const isLocalhost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const userId = session.status === "signed-in" ? session.userId : (isLocalhost ? "localhost-dev" : null);
+  const userEmail = session.status === "signed-in" ? session.email : (isLocalhost ? "localhost@scholar.internal" : null);
   return (
     <ProjectListScreen
       initialView="ai-access"
-      userId={session.status === "signed-in" ? session.userId : null}
-      userEmail={session.status === "signed-in" ? session.email : null}
+      userId={userId}
+      userEmail={userEmail}
       aiAccessSection={activeSection}
       onAiAccessSectionChange={(next) => navigate(next === "overview" ? "/ai-access" : `/ai-access/${next}`)}
       onOpen={(id) => navigate(`/projects/${id}`)}
@@ -472,10 +482,32 @@ export default function DeskApp() {
               }
             />
             <Route path="/verify-email" element={<VerifyEmailRoute />} />
+            <Route
+              path="/presentation"
+              element={
+                <PresentationWorkspace
+                  projectId="demo-presentation"
+                  onClose={() => {
+                    if (typeof window !== "undefined") window.location.href = "/projects";
+                  }}
+                />
+              }
+            />
             <Route path="/*" element={<RequireAuth />}>
               <Route path="onboarding" element={<OnboardingRoute />} />
               <Route element={<RequireOnboarding />}>
                 <Route element={<OnboardingGate />}>
+                  <Route
+                    path="presentation"
+                    element={
+                      <PresentationWorkspace
+                        projectId="demo-presentation"
+                        onClose={() => {
+                          if (typeof window !== "undefined") window.location.href = "/projects";
+                        }}
+                      />
+                    }
+                  />
                   <Route path="projects" element={<ProjectsIndexRoute />} />
                   <Route path="projects/:projectId" element={<ProjectRoute />} />
                   <Route path="projects/:projectId/:view" element={<ProjectRoute />} />

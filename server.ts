@@ -33,7 +33,7 @@ import {
 } from "./src/config/providerCatalog.ts";
 import http from "node:http";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
-import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerSupabaseProxy, registerSupabaseWsProxy } from "./server/routes/index.ts";
+import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerPresentationRoutes, registerSupabaseProxy, registerSupabaseWsProxy } from "./server/routes/index.ts";
 
 dotenv.config();
 
@@ -326,6 +326,7 @@ registerProjectRoutes(app, projectLimit);
 registerAiAccessRoutes(app);
 registerSearchRoutes(app);
 registerVaultRoutes(app);
+registerPresentationRoutes(app);
 
 // Global Error Handler (must be registered after all routes)
 app.use(errorHandler);

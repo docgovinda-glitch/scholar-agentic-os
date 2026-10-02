@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import type { PresentationSlide } from "../types";
+import type { SlideCard } from "../../../features/slides";
 
 export interface SpeakerRehearsalTimerProps {
-  currentSlide: PresentationSlide;
+  currentSlide: PresentationSlide | SlideCard;
   slideIndex: number;
   totalSlides: number;
   onNextSlide?: () => void;

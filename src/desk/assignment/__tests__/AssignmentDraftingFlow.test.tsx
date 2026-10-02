@@ -443,5 +443,27 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
 
       expect(onUpdateTitle).toHaveBeenCalledWith("Superconducting Transmon Qubits vs Trapped Ions");
     });
+
+    it("renders Present Presentation action pill in drafting header and launches presentation overlay", async () => {
+      const onPresentPresentation = vi.fn();
+      render(
+        <AssignmentProvider
+          projectId="proj-draft-keynote"
+          initialStage="drafting"
+          onStageChangeCallback={vi.fn()}
+        >
+          <AssignmentDraftingStage onPresentPresentation={onPresentPresentation} />
+        </AssignmentProvider>
+      );
+
+      const presBtn = screen.getByRole("button", { name: /Present Presentation/i });
+      expect(presBtn).toBeInTheDocument();
+      expect(presBtn.className).toContain("rounded-full");
+      expect(presBtn.className).toContain("px-4");
+      expect(presBtn.className).toContain("py-1.5");
+
+      fireEvent.click(presBtn);
+      expect(onPresentPresentation).toHaveBeenCalled();
+    });
   });
 });

@@ -14,6 +14,7 @@ import {
   removeSavedAccount,
   type StoredAccountProfile,
 } from "../../services/auth/multiAccountService";
+import { createEphemeralProject } from "../ephemeralProjectStore";
 
 export interface EmbeddedAuthModalProps {
   isOpen: boolean;
@@ -135,11 +136,34 @@ export default function EmbeddedAuthModal({
 
           {/* Contextual Notice (e.g. from clicking a format card) */}
           {initialMessage && (
-            <div className="mb-5 p-3 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2.5">
+            <div className="mb-4 p-3 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2.5">
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
               <span className="font-medium">{initialMessage}</span>
             </div>
           )}
+
+          {/* Guest Quick-Access for testing without compulsory login */}
+          <div className="mb-5 p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-400/10 border border-amber-500/30 flex items-center justify-between gap-3 shadow-xs">
+            <div className="flex flex-col text-left">
+              <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                <span>⚡</span> Testing locally? Sign-in is optional
+              </span>
+              <span className="text-[11px] text-slate-600 dark:text-neutral-400 mt-0.5">
+                Open {selectedFormatId === "OT-22" ? "Presentation Studio" : "workspace"} immediately as guest
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const draft = createEphemeralProject(selectedFormatId || "OT-22", "Academic Presentation Deck");
+                onClose();
+                navigate(`/projects/${draft.projectId}`);
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold text-xs transition-all shadow-sm shrink-0 cursor-pointer"
+            >
+              Try as Guest →
+            </button>
+          </div>
 
           {/* Embedded Auth Screens */}
           {screen === "signin" && (
