@@ -102,4 +102,36 @@ describe('SlideCardBlock', () => {
     expect(screen.getByText(/Dr\. Evelyn Reed/)).toBeInTheDocument();
     expect(screen.getByText(/\[Reed et al\., 2026\]/)).toBeInTheDocument();
   });
+
+  it('renders ImageBlock with image-hero layout and caption', () => {
+    const block = {
+      type: 'image' as const,
+      imageUrl: 'https://example.com/figure1.png',
+      caption: 'Figure 1: Empirical verification latency comparison',
+      layout: 'hero' as const,
+    };
+
+    render(<SlideCardBlock block={block} />);
+
+    expect(screen.getByTestId('slide-block-image-hero')).toBeInTheDocument();
+    const img = screen.getByRole('img');
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute('src', 'https://example.com/figure1.png');
+    expect(screen.getByText('Figure 1: Empirical verification latency comparison')).toBeInTheDocument();
+  });
+
+  it('renders ImageBlock with image-split layout', () => {
+    const block = {
+      type: 'image' as const,
+      imageUrl: 'https://example.com/diagram.png',
+      layout: 'split' as const,
+    };
+
+    render(<SlideCardBlock block={block} />);
+
+    expect(screen.getByTestId('slide-block-image-split')).toBeInTheDocument();
+    const img = screen.getByRole('img');
+    expect(img).toHaveAttribute('src', 'https://example.com/diagram.png');
+  });
 });
+

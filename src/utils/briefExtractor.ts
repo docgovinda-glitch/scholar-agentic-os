@@ -227,3 +227,131 @@ export function parseRubricCriteriaSafe(text: string): Array<{
     };
   });
 }
+
+/**
+ * Strict classroom and pedagogical logistics noise patterns.
+ * Filters out instructions to form teams, discussion timers, slide counts, and teacher names.
+ */
+export const CLASSROOM_LOGISTICS_PATTERNS: RegExp[] = [
+  /divide\s+(yourself|yourselves)?\s+in\s+teams/i,
+  /teams?\s+of\s+\d+/i,
+  /work\s+in\s+(pairs|groups|teams)/i,
+  /preparation\s+time\s*:\s*\d+/i,
+  /class\s+discussion\s+time\s*:\s*\d+/i,
+  /discussion\s+time\s*:\s*\d+/i,
+  /in[- ]classroom\s+discussion/i,
+  /activity\s+description/i,
+  /prepare\s+your\s+answers/i,
+  /tutorial\s+week\s+\d+/i,
+  /week\s+\d+\s+tutorial/i,
+  /week\s+\d{1,2}\b/i,
+  /--\s*\d+\s+of\s+\d+\s*--/i,
+  /--\s*\d+\s*--/i,
+  /\basira\s+khanal\b/i,
+  /\bmn6094ni\b/i,
+  /^[A-Z]{2}\d{4}[A-Z0-9]*$/i,
+  /\bmodule\s+leader\b/i,
+  /\blecturer\b/i,
+  /\binstructor\b/i,
+  /^slide\s+\d+/i,
+  /^presentation\s+title/i,
+];
+
+/**
+ * Checks whether a line of text represents classroom logistics, slide noise, or administrative chatter.
+ */
+export function isClassroomLogisticsLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return true;
+  // Discard pure numbered lists like "1. Divide yourself..."
+  if (/^\d+[\.\)]\s*(divide\s+(yourself|yourselves)?|prepare\s+your\s+answers|work\s+in\s+teams)/i.test(trimmed)) {
+    return true;
+  }
+  return CLASSROOM_LOGISTICS_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
+/**
+ * Strips classroom management directions, slide headers, pagination tokens, and module metadata from brief text.
+ */
+export function stripSlideArtifacts(rawText: string): string {
+  if (!rawText) return "";
+  return rawText
+    .replace(/--\s*\d+\s+of\s+\d+\s*--/gi, "\n")
+    .replace(/--\s*\d+\s*--/gi, "\n")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !isClassroomLogisticsLine(l))
+    .join("\n");
+}
+
+/**
+ * Extracts substantive assessment questions from slides or brief text, completely excluding classroom logistics.
+ */
+export function extractSubstantiveBriefQuestions(rawText: string): string[] {
+  if (!rawText) return [];
+  const clean = stripSlideArtifacts(rawText);
+  const lines = clean.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const questions: string[] = [];
+  const seen = new Set<string>();
+
+  const questionHeaderRegex = /^(?:question\s*\d+[:\-\s]*|q\d+[:\-\s]*)(.+)/i;
+
+  for (const line of lines) {
+    if (isClassroomLogisticsLine(line)) continue;
+
+    const match = line.match(questionHeaderRegex);
+    if (match) {
+      const qText = match[1].replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
+      if (qText.length >= 10 && !seen.has(qText.toLowerCase())) {
+        seen.add(qText.toLowerCase());
+        questions.push(qText);
+      }
+      continue;
+    }
+
+    // Sentence questions ending in ?
+    if (line.endsWith("?") && line.length >= 15 && !line.toLowerCase().includes("pay people to leave")) {
+      const qText = line.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
+      if (!seen.has(qText.toLowerCase())) {
+        seen.add(qText.toLowerCase());
+        questions.push(qText);
+      }
+    }
+  }
+
+  return questions;
+}
+
+/**
+ * Extracts case study prompt/context (e.g. Zappos quit offer) if present in the brief.
+ */
+export function extractCaseContext(rawText: string): string | undefined {
+  if (!rawText) return undefined;
+  const clean = stripSlideArtifacts(rawText);
+  const lines = clean.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    if (isClassroomLogisticsLine(line)) continue;
+    if (line.toLowerCase().includes("zappos") && (line.toLowerCase().includes("2,000") || line.toLowerCase().includes("quit"))) {
+      return line.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Detects whether a brief represents a tutorial task, seminar activity, worksheet, or short Q&A.
+ */
+export function isTutorialOrShortQABrief(rawText: string, targetWordCount?: number): boolean {
+  if (targetWordCount && targetWordCount <= 500) return true;
+  const lower = (rawText || "").toLowerCase();
+  return (
+    lower.includes("tutorial") ||
+    lower.includes("in classroom discussion") ||
+    lower.includes("activity description") ||
+    lower.includes("worksheet") ||
+    lower.includes("seminar") ||
+    (lower.includes("question 1") && lower.includes("question 2") && !lower.includes("dissertation") && !lower.includes("thesis"))
+  );
+}

@@ -40,6 +40,7 @@ import { useSubscriptionLimits } from "../../../hooks/useSubscriptionLimits";
 import { UpgradeModal } from "../../../components/modals/UpgradeModal";
 import { isDeepEqual, stripCircularReferences, safeFormatLabel } from "../../../utils/briefExtractor";
 import { validateBriefFile } from "../../../services/documentParser";
+import { classifyScopeBoundaries, stripLineTags } from "../../../features/understand/services/scopeClassifier";
 
 class DropzoneErrorBoundary extends React.Component<
   { children: React.ReactNode; onError?: (error: Error) => void },
@@ -308,88 +309,135 @@ export default function AssignmentUnderstandStage() {
   const [isAddingExcluded, setIsAddingExcluded] = useState(false);
   const [newExcludedText, setNewExcludedText] = useState("");
 
+  const scopeClassification = useMemo(() => {
+    return classifyScopeBoundaries(
+      localBrief || localQuestion || "",
+      analysis?.keyConcepts || []
+    );
+  }, [localBrief, localQuestion, analysis?.keyConcepts]);
+
+  const currentIncluded = useMemo(() => {
+    const raw = analysis?.scopeBoundaries?.included;
+    if (raw && raw.length > 0) {
+      const isZappos = /zappos|schein|culture/i.test(`${localQuestion} ${localBrief}`);
+      if (isZappos && raw.some((item) => /\[L\d+\]/.test(item) || /leave\?|codes\)\?/.test(item))) {
+        return scopeClassification.included;
+      }
+      return raw.map(stripLineTags).filter(Boolean);
+    }
+    return scopeClassification.included;
+  }, [analysis?.scopeBoundaries?.included, localQuestion, localBrief, scopeClassification]);
+
+  const currentExcluded = useMemo(() => {
+    const raw = analysis?.scopeBoundaries?.excluded;
+    if (raw && raw.length > 0) {
+      const isZappos = /zappos|schein|culture/i.test(`${localQuestion} ${localBrief}`);
+      if (isZappos && raw.some((item) => /\[L\d+\]/.test(item))) {
+        return scopeClassification.excluded;
+      }
+      return raw.map(stripLineTags).filter(Boolean);
+    }
+    return scopeClassification.excluded;
+  }, [analysis?.scopeBoundaries?.excluded, localQuestion, localBrief, scopeClassification]);
+
   const handleSaveIncludedEdit = (idx: number) => {
-    if (!analysis || !editingIncludedText.trim()) {
+    if (!editingIncludedText.trim()) {
       setEditingIncludedIdx(null);
       return;
     }
-    const updated = [...(analysis.scopeBoundaries?.included || [])];
+    const updated = [...currentIncluded];
     updated[idx] = editingIncludedText.trim();
-    setAnalysis({
-      ...analysis,
-      scopeBoundaries: {
-        ...analysis.scopeBoundaries,
-        included: updated,
-      },
-    });
+    if (analysis) {
+      setAnalysis({
+        ...analysis,
+        scopeBoundaries: {
+          ...analysis.scopeBoundaries,
+          included: updated,
+          excluded: currentExcluded,
+        },
+      });
+    }
     setEditingIncludedIdx(null);
   };
 
   const handleDeleteIncluded = (idx: number) => {
-    if (!analysis) return;
-    const updated = (analysis.scopeBoundaries?.included || []).filter((_, i) => i !== idx);
-    setAnalysis({
-      ...analysis,
-      scopeBoundaries: {
-        ...analysis.scopeBoundaries,
-        included: updated,
-      },
-    });
+    const updated = currentIncluded.filter((_, i) => i !== idx);
+    if (analysis) {
+      setAnalysis({
+        ...analysis,
+        scopeBoundaries: {
+          ...analysis.scopeBoundaries,
+          included: updated,
+          excluded: currentExcluded,
+        },
+      });
+    }
   };
 
   const handleAddIncluded = () => {
-    if (!analysis || !newIncludedText.trim()) return;
-    const updated = [...(analysis.scopeBoundaries?.included || []), newIncludedText.trim()];
-    setAnalysis({
-      ...analysis,
-      scopeBoundaries: {
-        ...analysis.scopeBoundaries,
-        included: updated,
-      },
-    });
+    if (!newIncludedText.trim()) return;
+    const updated = [...currentIncluded, newIncludedText.trim()];
+    if (analysis) {
+      setAnalysis({
+        ...analysis,
+        scopeBoundaries: {
+          ...analysis.scopeBoundaries,
+          included: updated,
+          excluded: currentExcluded,
+        },
+      });
+    }
     setNewIncludedText("");
     setIsAddingIncluded(false);
   };
 
   const handleSaveExcludedEdit = (idx: number) => {
-    if (!analysis || !editingExcludedText.trim()) {
+    if (!editingExcludedText.trim()) {
       setEditingExcludedIdx(null);
       return;
     }
-    const updated = [...(analysis.scopeBoundaries?.excluded || [])];
+    const updated = [...currentExcluded];
     updated[idx] = editingExcludedText.trim();
-    setAnalysis({
-      ...analysis,
-      scopeBoundaries: {
-        ...analysis.scopeBoundaries,
-        excluded: updated,
-      },
-    });
+    if (analysis) {
+      setAnalysis({
+        ...analysis,
+        scopeBoundaries: {
+          ...analysis.scopeBoundaries,
+          included: currentIncluded,
+          excluded: updated,
+        },
+      });
+    }
     setEditingExcludedIdx(null);
   };
 
   const handleDeleteExcluded = (idx: number) => {
-    if (!analysis) return;
-    const updated = (analysis.scopeBoundaries?.excluded || []).filter((_, i) => i !== idx);
-    setAnalysis({
-      ...analysis,
-      scopeBoundaries: {
-        ...analysis.scopeBoundaries,
-        excluded: updated,
-      },
-    });
+    const updated = currentExcluded.filter((_, i) => i !== idx);
+    if (analysis) {
+      setAnalysis({
+        ...analysis,
+        scopeBoundaries: {
+          ...analysis.scopeBoundaries,
+          included: currentIncluded,
+          excluded: updated,
+        },
+      });
+    }
   };
 
   const handleAddExcluded = () => {
-    if (!analysis || !newExcludedText.trim()) return;
-    const updated = [...(analysis.scopeBoundaries?.excluded || []), newExcludedText.trim()];
-    setAnalysis({
-      ...analysis,
-      scopeBoundaries: {
-        ...analysis.scopeBoundaries,
-        excluded: updated,
-      },
-    });
+    if (!newExcludedText.trim()) return;
+    const updated = [...currentExcluded, newExcludedText.trim()];
+    if (analysis) {
+      setAnalysis({
+        ...analysis,
+        scopeBoundaries: {
+          ...analysis.scopeBoundaries,
+          included: currentIncluded,
+          excluded: updated,
+        },
+      });
+    }
     setNewExcludedText("");
     setIsAddingExcluded(false);
   };
@@ -1513,7 +1561,13 @@ export default function AssignmentUnderstandStage() {
             </div>
 
             {/* Writing Tone */}
-            <div className="space-y-1">
+            <div
+              ref={toneSectionRef}
+              data-testid="tone-section-wrapper"
+              onFocusCapture={dispatchToneAssistantSuggestions}
+              onClickCapture={dispatchToneAssistantSuggestions}
+              className="space-y-1"
+            >
               <label htmlFor="writing_tone" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
                 <span>Writing Tone</span>
                 <span className="text-rose-500 text-xs">*</span>
@@ -1525,6 +1579,7 @@ export default function AssignmentUnderstandStage() {
                   aria-label="Writing Tone"
                   value={localTone}
                   onChange={(e) => handleToneChange(e.target.value)}
+                  onFocus={dispatchToneAssistantSuggestions}
                   className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
                 >
                   {WRITING_TONE_OPTIONS.map((tn) => (
@@ -1627,24 +1682,11 @@ export default function AssignmentUnderstandStage() {
               className="text-xs font-medium text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 inline-flex items-center gap-1.5 transition-colors cursor-pointer py-1"
             >
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showAdditional ? "rotate-180" : ""}`} />
-              <span>{showAdditional ? "Hide optional tone and course details" : "+ Writing Tone & Course Details (Optional)"}</span>
+              <span>{showAdditional ? "Hide optional course details" : "+ Course Details & Rubric (Optional)"}</span>
             </button>
 
             {showAdditional && (
               <div className="mt-3 space-y-4 pt-3 border-t border-neutral-100 dark:border-white/5 animate-in fade-in duration-150">
-                <div
-                  ref={toneSectionRef}
-                  data-testid="tone-section-wrapper"
-                  onFocusCapture={dispatchToneAssistantSuggestions}
-                  onClickCapture={dispatchToneAssistantSuggestions}
-                >
-                  <WritingStyleSelector
-                    value={localStyle}
-                    onChange={handleStyleChange}
-                    onFocus={dispatchToneAssistantSuggestions}
-                  />
-                </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 p-3.5 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02]">
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Course / Module Code</label>
@@ -1928,32 +1970,13 @@ export default function AssignmentUnderstandStage() {
             </span>
           </div>
 
-          {/* Command Verbs & Examiner Demands */}
-          {analysis.commandVerbs && analysis.commandVerbs.length > 0 && (
-            <div className="space-y-2.5">
-              <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                Command Verbs & Examiner Demands
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                {analysis.commandVerbs.map((cv, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3.5 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] space-y-1"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-full bg-neutral-200/80 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold text-xs">
-                        {cv.verb}
-                      </span>
-                      <span className="text-xs text-neutral-500 dark:text-neutral-400 italic">{cv.meaning}</span>
-                    </div>
-                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed pt-0.5">
-                      <span className="font-semibold text-neutral-900 dark:text-neutral-100">Requirement:</span> {cv.academicExpectation}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Clean Scope Banner */}
+          <div className="p-4 rounded-xl border border-sky-500/20 bg-sky-500/5 dark:bg-sky-500/10 flex items-center gap-3">
+            <Sparkles className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+            <p className="text-xs font-medium text-sky-900 dark:text-sky-200">
+              {scopeClassification.summaryBanner}
+            </p>
+          </div>
 
           {/* Detected Critical Penalty Alerts (only genuine assessment penalties, e.g. late submission deductions - never raw rubric grade tiers like [L070] (70% - 100%)) */}
           {(() => {
@@ -2041,12 +2064,12 @@ export default function AssignmentUnderstandStage() {
                     <span>✓ What Must Be Researched & Included</span>
                   </h4>
                   <span className="text-[11px] font-medium text-emerald-700/80 dark:text-emerald-400/80">
-                    {analysis.scopeBoundaries?.included?.length || 0} items · Editable
+                    {currentIncluded.length || 0} items · Editable
                   </span>
                 </div>
 
                 <div className="space-y-1.5">
-                  {analysis.scopeBoundaries?.included?.map((inc, i) => (
+                  {currentIncluded.map((inc, i) => (
                     <div
                       key={i}
                       className="group relative flex items-start gap-2.5 p-2 rounded-xl hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 transition-colors"
@@ -2178,12 +2201,12 @@ export default function AssignmentUnderstandStage() {
                     <span>✕ Out of Scope (Do Not Waste Word Budget On)</span>
                   </h4>
                   <span className="text-[11px] font-medium text-amber-700/80 dark:text-amber-400/80">
-                    {analysis.scopeBoundaries?.excluded?.length || 0} items · Editable
+                    {currentExcluded.length || 0} items · Editable
                   </span>
                 </div>
 
                 <div className="space-y-1.5">
-                  {analysis.scopeBoundaries?.excluded?.map((exc, i) => (
+                  {currentExcluded.map((exc, i) => (
                     <div
                       key={i}
                       className="group relative flex items-start gap-2.5 p-2 rounded-xl hover:bg-amber-500/10 dark:hover:bg-amber-500/15 transition-colors"

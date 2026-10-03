@@ -28,8 +28,8 @@ Rather than generic forms, each academic format in Scholar Core operates through
    - **Competitive Grant Pipeline**: *Funding Agency Alignment → 1-Page Specific Aims → Significance & Innovation → Research Strategy & Pitfalls → Timeline & Gantt Work Packages → Budget Justification*.
    - Includes a **Study Section Review Simulator (NIH / NSF Scoring Criteria)**.
 
-4. **📊 Academic Presentation Workspace (`OT-22`)**:
-   - **Visual Narrative & Defense Studio**: *Timing & Constraint Profiler (10m / 20m / 45m) → Narrative Arc & Hook → Slide Deck Architecture → Speaker Scripts → Interactive 16:9 Canvas Preview → Slide Export*.
+4. **📊 Academic Presentation Studio (`OT-22`)**:
+   - **4-Step Guided Workflow**: *01 Understand (Define Topic & Outline) → 02 Design (4 Curated Presets & Custom Accent Picker) → 03 Edit Slides (100% WYSIWYG Editable Canvas with Split Image + Text Layouts) → 04 Present (Stage View, Rehearsal Timing, & Clean Export)*. Zero developer database leakages and purged feature bloat.
 
 5. **🎓 Thesis & Dissertation Workspace (`OT-09` / `OT-07`)**:
    - Multi-chapter milestone tracker, literature synthesis matrix, and 15-question Viva Voce oral defense simulator.

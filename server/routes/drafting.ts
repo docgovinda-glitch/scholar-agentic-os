@@ -1,0 +1,154 @@
+import express from "express";
+import { callOpenRouterText } from "../utils/llm.ts";
+import { generateSectionDraft } from "../../src/features/drafting/services/sectionDraftingEngine.ts";
+import { getProjectStore } from "../../src/services/store/projectStore.ts";
+
+const router = express.Router();
+
+export interface DraftSectionRequest {
+  projectId?: string;
+  sectionTitle: string;
+  assignmentQuestion?: string;
+  sectionGuidance?: string;
+  academicFunction?: string;
+  targetWordCount?: number;
+  academicLevel?: string;
+  citationStyle?: string;
+  thesis?: string;
+  keyPoints?: string[];
+  boundSources?: any[];
+  revisionPrompt?: "deepen" | "expand" | "condense";
+  allDraftedSections?: any[];
+}
+
+/**
+ * POST /api/drafting/section
+ * Generates an academic section draft, ensuring the complete assignment question context
+ * is provided to the generation model along with PEEL structure guidelines.
+ */
+router.post("/section", async (req: express.Request, res: express.Response) => {
+  const {
+    projectId,
+    sectionTitle,
+    assignmentQuestion = "",
+    sectionGuidance = "",
+    academicFunction = "Analysis",
+    targetWordCount = 450,
+    academicLevel = "undergraduate",
+    citationStyle = "apa7",
+    thesis = "",
+    keyPoints = [],
+    boundSources = [],
+    revisionPrompt,
+    allDraftedSections = [],
+  }: DraftSectionRequest = req.body || {};
+
+  if (!sectionTitle) {
+    return res.status(400).json({ error: "sectionTitle is required." });
+  }
+
+  // Attempt to recover full assignment question from project answers if not passed directly
+  let effectiveQuestion = assignmentQuestion;
+  if (!effectiveQuestion && projectId) {
+    try {
+      const project = await getProjectStore().get(projectId);
+      if (project?.answers) {
+        effectiveQuestion =
+          project.answers["assignment_question"] ||
+          project.answers["research_topic"] ||
+          project.answers["instructions"] ||
+          "";
+      }
+    } catch {
+      // Continue with provided fields
+    }
+  }
+
+  const prompt = `You are the Scholar Core Grounded Academic Drafting Agent.
+
+Write a rigorous academic draft for section: "${sectionTitle}".
+PRIMARY ASSIGNMENT QUESTION: "${effectiveQuestion}"
+Academic Function: ${academicFunction}
+Section Guidance: ${sectionGuidance}
+Target Word Count: ~${targetWordCount} words
+Academic Level: ${academicLevel}
+Citation Style: ${citationStyle}
+Central Thesis: "${thesis}"
+Key Argument Points: ${keyPoints.join(", ")}
+
+${
+  boundSources && boundSources.length > 0
+    ? `BOUND EVIDENCE (Cite smoothly from these sources; do NOT fabricate other sources):\n` +
+      boundSources
+        .map(
+          (s: any, i: number) =>
+            `[${i + 1}] ${s.title} (${s.authors?.join(", ") || "n.d."}, ${s.year || "n.d."})`
+        )
+        .join("\n")
+    : "Ground argumentation in established scholarly frameworks."
+}
+
+MANDATORY PEEL PARAGRAPH FRAMEWORK:
+- Point: Distinct topic sentence advancing the argument.
+- Evidence: Grounded conceptual reasoning or empirical citation.
+- Explanation: 70% critical analysis & evaluation / 30% descriptive exposition.
+- Link: Clear concluding synthesis linking back to the primary assignment question.
+
+Output ONLY clean academic markdown prose.`;
+
+  try {
+    const draftText = await callOpenRouterText(
+      req,
+      res,
+      "You are the Scholar Core Grounded Academic Drafting Agent.",
+      prompt,
+      "openrouter/auto",
+      "drafting"
+    );
+
+    if (draftText && typeof draftText === "string" && draftText.trim().length > 50) {
+      return res.json({
+        success: true,
+        draft: draftText.trim(),
+        sectionTitle,
+        wordCount: draftText.trim().split(/\s+/).filter(Boolean).length,
+      });
+    }
+  } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") {
+      // Graceful fallback to deterministic topic-grounded generation
+    } else {
+      console.warn("Drafting route LLM fallback:", err?.message);
+    }
+  }
+
+  // Deterministic topic-grounded synthesis fallback
+  const fallbackDraft = generateSectionDraft({
+    sectionTitle,
+    assignmentQuestion: effectiveQuestion,
+    academicFunction,
+    targetWordCount,
+    academicLevel,
+    citationStyle,
+    thesis,
+    keyPoints,
+    boundSources,
+    revisionPrompt,
+    allDraftedSections,
+  });
+
+  return res.json({
+    success: true,
+    draft: fallbackDraft,
+    sectionTitle,
+    wordCount: fallbackDraft.split(/\s+/).filter(Boolean).length,
+    isFallback: true,
+  });
+});
+
+export function registerDraftingRoutes(app: express.Express): void {
+  app.use("/api/drafting", router);
+}
+
+export default router;
+export { router as draftingRouter };

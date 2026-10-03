@@ -5,6 +5,7 @@
  */
 
 import type { DiscoveredSource, AssignmentDraftingSection } from "../types";
+import { generateSectionDraft } from "../../../features/drafting/services/sectionDraftingEngine";
 
 export interface InternalSectionPlan extends AssignmentDraftingSection {
   sectionType: "intro" | "body" | "conclusion";
@@ -274,6 +275,79 @@ export function getThematicDecompositionForTopic(
           "Human-in-the-loop governance",
           "Institutional auditing standards",
           "Future research horizons",
+        ],
+      },
+    };
+  }
+
+  // 2b. Organizational Culture, Leadership & Organizational Behavior
+  const isOBOrLeadership =
+    lower.includes("schein") ||
+    lower.includes("zappos") ||
+    lower.includes("organizational culture") ||
+    lower.includes("leadership") ||
+    lower.includes("breakthrough leadership") ||
+    lower.includes("human resource");
+
+  if (isOBOrLeadership) {
+    const obBody: ThematicSectionTemplate[] = [
+      {
+        title: "Evaluating Culture Change: Why Changing Artifacts Alone Is Insufficient",
+        academicFunction: "Artifacts vs Assumptions",
+        guidance:
+          "Analyze why modifying physical artifacts alone fails to create durable cultural transformation without shifting underlying assumptions.",
+        keyPoints: [
+          "Surface compliance vs internalized behavioral alignment",
+          "Limits of cosmetic alterations (dress codes, office redesigns)",
+          "Why underlying assumptions resist superficial visual redesigns",
+        ],
+      },
+      {
+        title: "Leadership Interventions: Selecting the Most Effective Cultural Level to Target",
+        academicFunction: "Leadership Intervention Level",
+        guidance:
+          "Evaluate which level of Schein's model leaders should target first to successfully lead and sustain culture change.",
+        keyPoints: [
+          "Weighing intervention points: direct targeting of values vs behavioral habits",
+          "Executive role-modeling and resource allocation in unfreezing assumptions",
+          "Aligning reward systems to bridge espoused values and everyday practices",
+        ],
+      },
+      {
+        title: "Assessing Organizational Culture During the Job Interview Process",
+        academicFunction: "Interview Culture Assessment",
+        guidance:
+          "Formulate practical methods for candidates and evaluators to assess genuine organizational culture during job interviews using Schein's levels.",
+        keyPoints: [
+          "Observing physical artifacts and interaction patterns during visits",
+          "Asking probing behavioral questions that test stated values against real dilemmas",
+          "Identifying discrepancies between public marketing and internal unspoken assumptions",
+        ],
+      },
+    ];
+
+    return {
+      intro: {
+        title: "Introduction: Organizational Culture & Theoretical Framing",
+        academicFunction: "Introduction & Theoretical Framing",
+        guidance:
+          "Contextualize organizational culture as a strategic asset, setting up Schein's theoretical framework and the Zappos case study.",
+        keyPoints: [
+          "Significance of organizational culture",
+          "Schein's 3-level model as analytical scaffold",
+          "Central thesis on cultural alignment",
+        ],
+      },
+      body: obBody.slice(0, bodyCount),
+      conclusion: {
+        title: "Conclusion: Strategic Synthesis & Leadership Horizons",
+        academicFunction: "Conclusion & Strategic Synthesis",
+        guidance:
+          "Synthesize findings on leadership, cultural alignment, and strategic hiring into actionable takeaways.",
+        keyPoints: [
+          "Cultural coherence as sustainable advantage",
+          "Schein's framework applied to modern leadership",
+          "Recommendations for driving cultural evolution",
         ],
       },
     };
@@ -895,10 +969,31 @@ function generateAcademicPeelProse(params: {
   thesis: string;
   revisionPrompt?: string;
 }): string {
-  const { section, assignmentTopic, citationStyle, sources, thesis, revisionPrompt } = params;
+  const { section, assignmentTopic, academicLevel, citationStyle, sources, thesis, revisionPrompt } = params;
+
+  const isQuantumOrPhysics = /quantum|qubit|superconducting|trapped-ion|rydberg|bqp|shor|grover|surface code/i.test(assignmentTopic);
+
+  if (!isQuantumOrPhysics) {
+    return generateSectionDraft({
+      sectionTitle: section.title,
+      assignmentQuestion: assignmentTopic,
+      academicFunction: section.academicFunction,
+      targetWordCount: section.targetWordCount,
+      academicLevel,
+      citationStyle,
+      thesis,
+      keyPoints: section.guidance ? [section.guidance] : [],
+      boundSources: sources.map((s) => ({
+        title: s.title,
+        authors: s.authors,
+        year: s.year,
+        citation: s.citation,
+      })),
+      revisionPrompt: revisionPrompt as "deepen" | "expand" | "condense" | undefined,
+    });
+  }
 
   const displayTopic = cleanTopicTitle(assignmentTopic);
-  const isQuantumOrPhysics = /quantum|qubit|superconducting|trapped-ion|rydberg|bqp|shor|grover|surface code/i.test(assignmentTopic);
 
   // Format citations according to style
   const citations = sources.map((s) => {
@@ -911,43 +1006,25 @@ function generateAcademicPeelProse(params: {
       : `(${author}, ${year})`;
   });
 
-  const defaultCit1 = isQuantumOrPhysics ? "(Preskill, 2018)" : "(Pasquale, 2023)";
-  const defaultCit2 = isQuantumOrPhysics ? "(Nielsen & Chuang, 2010)" : "(Kearns & Roth, 2022)";
+  const defaultCit1 = "(Preskill, 2018)";
+  const defaultCit2 = "(Nielsen & Chuang, 2010)";
   const cit1 = citations[0] || defaultCit1;
   const cit2 = citations[1] || defaultCit2;
 
   if (section.sectionType === "intro") {
-    if (isQuantumOrPhysics) {
-      return (
-        `Contemporary scholarly scrutiny of ${displayTopic} centers on overcoming physical hardware constraints and formalizing computational bounds in the noisy intermediate-scale quantum (NISQ) era ${cit1}. ` +
-        `Rather than theoretical abstractions alone, these foundational architectures dictate physical scalability, gate fidelities, and fault-tolerant thresholds ${cit2}. ` +
-        `This assessment critically evaluates the core theoretical and engineering dimensions of the field, establishing that ${thesis || `practical quantum advantage requires navigating fundamental trade-offs between physical decoherence, connectivity graphs, and error-correction overheads`}. ` +
-        `To substantiate this evaluation, the following analysis systematically examines hardware modalities, algorithm complexity classes, topological error correction codes, and cross-branch applications.`
-      );
-    }
-
     return (
-      `Contemporary scholarly scrutiny of ${displayTopic} exposes fundamental tensions within modern theoretical frameworks. ` +
-      `Rather than operating as neutral procedural tools, these mechanisms actively configure systemic outcomes and analytical validity ${cit1}. ` +
-      `This analysis critically evaluates the core dimensions of the problem, arguing that ${thesis || `substantive empirical rigor cannot be achieved through procedural assumptions alone`}. ` +
-      `To substantiate this central thesis, the following analysis first reconstructs foundational theoretical paradigms, ` +
-      `subsequently interrogates empirical proofs and comparative case studies, and culminates in an analytical critique of practical trade-offs.`
+      `Contemporary scholarly scrutiny of ${displayTopic} centers on overcoming physical hardware constraints and formalizing computational bounds in the noisy intermediate-scale quantum (NISQ) era ${cit1}. ` +
+      `Rather than theoretical abstractions alone, these foundational architectures dictate physical scalability, gate fidelities, and fault-tolerant thresholds ${cit2}. ` +
+      `This assessment critically evaluates the core theoretical and engineering dimensions of the field, establishing that ${thesis || `practical quantum advantage requires navigating fundamental trade-offs between physical decoherence, connectivity graphs, and error-correction overheads`}. ` +
+      `To substantiate this evaluation, the following analysis systematically examines hardware modalities, algorithm complexity classes, topological error correction codes, and cross-branch applications.`
     );
   }
 
   if (section.sectionType === "conclusion") {
-    if (isQuantumOrPhysics) {
-      return (
-        `In conclusion, the rigorous examination of ${displayTopic} confirms that achieving scalable quantum computing demands co-design between physical hardware architectures and fault-tolerant error correction ${cit1}. ` +
-        `The comparative analyses demonstrate that while NISQ processors provide crucial empirical proof-of-concepts, physical-to-logical qubit overheads remain the critical bottleneck for practical cryptanalytic and simulation workloads ${cit2}. ` +
-        `By evaluating physical modalities against theoretical complexity thresholds, this investigation confirms that fault-tolerant topological protection and algorithmic optimizations are essential prerequisites for substantive computational utility.`
-      );
-    }
-
     return (
-      `In conclusion, the rigorous examination of ${displayTopic} confirms that theoretical paradigms must remain grounded in empirical validation ${cit1}. ` +
-      `The comparative proof analyzed across preceding sections demonstrates that procedural frameworks require verifiable operational benchmarks ${cit2}. ` +
-      `By critically evaluating competing claims, this investigation has proven that long-term efficacy demands structured, reproducible methodology.`
+      `In conclusion, the rigorous examination of ${displayTopic} confirms that achieving scalable quantum computing demands co-design between physical hardware architectures and fault-tolerant error correction ${cit1}. ` +
+      `The comparative analyses demonstrate that while NISQ processors provide crucial empirical proof-of-concepts, physical-to-logical qubit overheads remain the critical bottleneck for practical cryptanalytic and simulation workloads ${cit2}. ` +
+      `By evaluating physical modalities against theoretical complexity thresholds, this investigation confirms that fault-tolerant topological protection and algorithmic optimizations are essential prerequisites for substantive computational utility.`
     );
   }
 
@@ -1057,17 +1134,11 @@ function generateAcademicPeelProse(params: {
 
   let bodyContent =
     `### ${sectionTitleClean}\n\n` +
-    (isQuantumOrPhysics
-      ? `A critical point of departure for evaluating this dimension lies in how microscopic physical dynamics dictate macroscopic computational capabilities. ` +
-        `As demonstrated by seminal literature, physical qubit implementations inherently trade gate execution speed against environmental decoherence rates ${cit1}. ` +
-        `However, rigorous technical analysis reveals that raw coherence times alone do not determine performance; compilation overheads and connectivity graphs fundamentally govern circuit depth. ` +
-        `Specifically, seventy percent of execution errors in dense algorithms stem from non-local gate routing and cumulative phase drift rather than isolated single-qubit infidelities ${cit2}. ` +
-        `When evaluated against architectural thresholds, these constraints highlight why fault-tolerant topological schemes and optimized compiler mappings are indispensable prerequisites for scalable computation.`
-      : `A critical point of departure for evaluating this dimension lies in how structural mechanisms configure operational outcomes. ` +
-        `As demonstrated by authoritative empirical findings, the initial implementation of these systems often obscures underlying trade-offs under the guise of procedural objectivity ${cit1}. ` +
-        `However, a rigorous conceptual analysis reveals that this perceived neutrality is operational rather than absolute. ` +
-        `Specifically, seventy percent of the operational variability stems from embedded design assumptions that privilege computational expediency over structural robustness ${cit2}. ` +
-        `When contrasted against alternative benchmarks, the limitations of uncritical adoption become evident: efficiency gains are frequently offset by diminished transparency and heightened procedural vulnerability.`);
+    `A critical point of departure for evaluating this dimension lies in how microscopic physical dynamics dictate macroscopic computational capabilities. ` +
+    `As demonstrated by seminal literature, physical qubit implementations inherently trade gate execution speed against environmental decoherence rates ${cit1}. ` +
+    `However, rigorous technical analysis reveals that raw coherence times alone do not determine performance; compilation overheads and connectivity graphs fundamentally govern circuit depth. ` +
+    `Specifically, seventy percent of execution errors in dense algorithms stem from non-local gate routing and cumulative phase drift rather than isolated single-qubit infidelities ${cit2}. ` +
+    `When evaluated against architectural thresholds, these constraints highlight why fault-tolerant topological schemes and optimized compiler mappings are indispensable prerequisites for scalable computation.`;
 
   if (revisionPrompt === "deepen") {
     bodyContent +=

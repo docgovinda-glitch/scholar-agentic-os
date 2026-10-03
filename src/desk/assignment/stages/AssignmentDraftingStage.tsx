@@ -87,18 +87,22 @@ export function AssignmentDraftingStage({
 
   // Auto-tune generic placeholder titles to question if question is present
   useEffect(() => {
+    const briefText = (typeof project?.answers?.["assignment_brief_text"] === "string" ? project.answers["assignment_brief_text"] : "") || question;
     if (internalSections.length > 0 && question && question.trim().length > 0) {
-      const hasGenericTitles = internalSections.some(
+      const isNonML = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
+      const hasGenericOrLeakedTitles = internalSections.some(
         (s) =>
           s.title.includes("Core Concept & Foundational") ||
           s.title.includes("Empirical Evidence & Contemporary Contextual") ||
-          s.title.startsWith("Body Theme 1: Core Concept")
+          s.title.startsWith("Body Theme 1: Core Concept") ||
+          (isNonML && /Mathematical Formulations|Loss Optimization Landscapes|Algorithmic Architectures/i.test(s.title)) ||
+          /Divide Yourself in Teams|teams of 2|in classroom discussion/i.test(s.title)
       );
-      if (hasGenericTitles) {
+      if (hasGenericOrLeakedTitles) {
         tuneOutlineWithQuestion();
       }
     }
-  }, [internalSections, question, tuneOutlineWithQuestion]);
+  }, [internalSections, question, project?.answers, tuneOutlineWithQuestion]);
 
   const handleTuneOutline = useCallback(async () => {
     setIsTuning(true);

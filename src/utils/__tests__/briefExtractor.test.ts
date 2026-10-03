@@ -6,6 +6,10 @@ import {
   extractLevelFromText,
   extractCitationStyleFromText,
   parseRubricCriteriaSafe,
+  stripSlideArtifacts,
+  extractSubstantiveBriefQuestions,
+  extractCaseContext,
+  isTutorialOrShortQABrief,
 } from "../briefExtractor";
 
 describe("briefExtractor & Document Parsing Utilities", () => {
@@ -98,4 +102,53 @@ describe("briefExtractor & Document Parsing Utilities", () => {
       expect(criteria[0].weightPercentage).toBe(40);
     });
   });
+
+  describe("Classroom logistics & Tutorial slide filtering", () => {
+    const rawSlideText = `
+MN6094NI
+Developing Breakthrough Leadership
+Asira Khanal
+Tutorial
+Week 02
+-- 1 of 5 --
+Zappos offers new employees $2,000 to quit after their first week of training. Why would a company pay people to leave?
+-- 2 of 5 --
+Schein's Organizational Culture Model
+-- 3 of 5 --
+Activity Description- In Classroom Discussion
+1. Divide yourself in teams of 2 members.
+2. Prepare your answers to the following questions:
+Question 1: "Can culture be changed by changing artifacts alone (e.g., redesigning offices, changing dress codes)? Why or why not?"
+Question 2: "As a leader, which level would you start with to change organizational culture, and why?"
+Question 3: "How would you assess a company's culture during a job interview using Schein's model?"
+Preparation time: 10 minutes
+Class Discussion Time: 20 minutes
+    `;
+
+    it("filters classroom management noise (teams of 2, discussion timers, instructor names)", () => {
+      const stripped = stripSlideArtifacts(rawSlideText);
+      expect(stripped).not.toContain("Divide yourself in teams");
+      expect(stripped).not.toContain("Preparation time: 10 minutes");
+      expect(stripped).not.toContain("Class Discussion Time: 20 minutes");
+      expect(stripped).not.toContain("-- 1 of 5 --");
+      expect(stripped).not.toContain("Asira Khanal");
+    });
+
+    it("extracts strictly substantive questions and case context", () => {
+      const questions = extractSubstantiveBriefQuestions(rawSlideText);
+      expect(questions.length).toBe(3);
+      expect(questions[0]).toContain("Can culture be changed by changing artifacts alone");
+      expect(questions[1]).toContain("which level would you start with to change organizational culture");
+      expect(questions[2]).toContain("assess a company's culture during a job interview");
+
+      const caseCtx = extractCaseContext(rawSlideText);
+      expect(caseCtx).toContain("Zappos offers new employees $2,000 to quit");
+    });
+
+    it("detects tutorial / short Q&A mode", () => {
+      expect(isTutorialOrShortQABrief(rawSlideText, 300)).toBe(true);
+      expect(isTutorialOrShortQABrief("Doctoral Dissertation on International Law", 10000)).toBe(false);
+    });
+  });
 });
+

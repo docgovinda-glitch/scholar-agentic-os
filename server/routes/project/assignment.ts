@@ -39,9 +39,89 @@ import { conductAskScholarResearchForOutline } from "../../../src/desk/assignmen
 import { sanitizeBrief } from "../../../src/features/understand/services/briefSanitizer.ts";
 import { classifyScopeBoundaries, stripLineTags } from "../../../src/features/understand/services/scopeClassifier.ts";
 import { generateSectionDraft } from "../../../src/features/drafting/services/sectionDraftingEngine.ts";
+import {
+  isClassroomLogisticsLine,
+  isTutorialOrShortQABrief,
+  extractSubstantiveBriefQuestions,
+  stripSlideArtifacts,
+} from "../../../src/utils/briefExtractor.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(rejectClientCredentials);
+
+export function isCorruptedOutlineHeadings(headings: any[], topic: string): boolean {
+  if (!headings || !Array.isArray(headings) || headings.length === 0) return false;
+  const flatTitles: string[] = [];
+  headings.forEach((h: any) => {
+    if (h.title) flatTitles.push(h.title);
+    if (h.subheadings && Array.isArray(h.subheadings)) {
+      h.subheadings.forEach((s: any) => {
+        if (s.title) flatTitles.push(s.title);
+      });
+    }
+  });
+
+  const isAIML = /\b(machine learning|deep learning|neural network|reinforcement learning|gradient descent|transformer model|llm|computer science)\b/i.test(topic);
+  const hasOBOrLeadership = /\b(leadership|culture|schein|zappos|human resources|organizational behavior|management|mba|business strategy)\b/i.test(topic);
+
+  const hasLeakedML = (!isAIML || hasOBOrLeadership) && flatTitles.some((t) =>
+    /\b(mathematical formulations|loss optimization|optimization landscapes|erm|loss surfaces|gradient descent|empirical risk|convex optimization)\b/i.test(t)
+  );
+
+  const hasClassroomLogistics = flatTitles.some((t) =>
+    isClassroomLogisticsLine(t) ||
+    /\b(divide yourself|teams of \d+|breakout|discussion timer|class discussion|icebreaker)\b/i.test(t)
+  );
+
+  return hasLeakedML || hasClassroomLogistics;
+}
+
+export function healCorruptedProjectStructure(project: any): boolean {
+  if (!project || !project.answers) return false;
+  let changed = false;
+  const rawStructure = project.answers["assignment_structure"] || project.answers["structure"];
+  const topic = [
+    project.answers["assignment_question"],
+    project.answers["instructions"],
+    project.answers["assignment_brief_text"],
+    project.answers["research_topic"],
+    project.answers["title"],
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  if (rawStructure) {
+    try {
+      const parsed = typeof rawStructure === "string" ? JSON.parse(rawStructure) : rawStructure;
+      if (parsed?.headings && isCorruptedOutlineHeadings(parsed.headings, topic)) {
+        const briefText = cleanAnswerString(project.answers["assignment_brief_text"]) || topic;
+        const targetWords = Number(
+          project.answers["targetWordCount"] ||
+          project.answers["word_count"] ||
+          (isTutorialOrShortQABrief(briefText) ? 400 : 2000)
+        );
+        const repaired = generateDynamicAssignmentStructure({
+          question: project.answers["assignment_question"] || topic,
+          assignmentType: (project.answers["assignment_type"] || "essay") as any,
+          academicLevel: (project.answers["academic_level"] || "undergraduate") as any,
+          targetWordCount: targetWords,
+          citationStyle: project.answers["citation_style"] || "apa7",
+          briefText,
+        });
+        project.answers["assignment_structure"] = JSON.stringify(repaired);
+        project.answers["structure"] = JSON.stringify(repaired);
+        if (project.answers["assignment_internal_sections"]) {
+          delete project.answers["assignment_internal_sections"];
+        }
+        if (project.answers["assignment_outline"]) {
+          delete project.answers["assignment_outline"];
+        }
+        changed = true;
+      }
+    } catch {}
+  }
+  return changed;
+}
 
 function safeParseObject<T = any>(val: any): T | null {
   if (!val) return null;
@@ -125,6 +205,9 @@ export function deriveHeuristicTitle(rawText: string): string {
     if (/^(?:assignment\s*(?:brief|question|specification)?|coursework\s*(?:brief|specification)?|syllabus\s*brief|essay\s*prompt)$/i.test(line)) {
       continue;
     }
+    if (isClassroomLogisticsLine(line)) {
+      continue;
+    }
 
     // Pattern 1: Course code prefix e.g. "POLI3002: Security Analysis in the 21st Century" or "CS 7015 - Machine Learning"
     const courseCodeMatch = line.match(/^([A-Z]{2,5}\s*\d{3,5})[:\s\-–]+(.+)$/i);
@@ -150,6 +233,9 @@ export function deriveHeuristicTitle(rawText: string): string {
   for (let i = 0; i < Math.min(lines.length, 5); i++) {
     const line = lines[i];
     if (/^(?:assignment\s*(?:brief|question|specification)?|coursework\s*(?:brief|specification)?|syllabus\s*brief|essay\s*prompt)$/i.test(line)) {
+      continue;
+    }
+    if (isClassroomLogisticsLine(line)) {
       continue;
     }
     const cleaned = cleanTitleCandidate(line);
@@ -313,6 +399,9 @@ async function getProjectSafe(req: express.Request<any>, res: express.Response) 
     res.status(404).json({ error: "Project not found" });
     return null;
   }
+  if (healCorruptedProjectStructure(project)) {
+    await getProjectStore().save(project);
+  }
   return project;
 }
 
@@ -353,10 +442,17 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
     // Clean whitespace and normalize line breaks
     text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
 
+    // Strip slide artifacts and pedagogical noise
+    text = stripSlideArtifacts(text);
+
     // Sanitize brief: repair hyphenated line breaks, soft breaks, and purge classroom/pedagogical noise
     const sanitizedResult = sanitizeBrief(text);
     const cleanedText = sanitizedResult.cleanedText;
-    const extractedQuestions = sanitizedResult.extractedQuestions;
+    const rawQuestions =
+      sanitizedResult.extractedQuestions.length > 0
+        ? sanitizedResult.extractedQuestions
+        : extractSubstantiveBriefQuestions(cleanedText);
+    const extractedQuestions = rawQuestions.filter((q: string) => !isClassroomLogisticsLine(q));
 
     // Detect metadata within first 50,000 characters to eliminate regex backtracking on multi-MB documents
     const searchSlice = cleanedText.slice(0, 50000);
@@ -369,6 +465,8 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
       if (parsed >= 200 && parsed <= 50000) {
         detectedWordCount = parsed;
       }
+    } else if (isTutorialOrShortQABrief(cleanedText)) {
+      detectedWordCount = 350;
     }
 
     let detectedLevel: "undergraduate" | "postgraduate" | undefined;
@@ -457,22 +555,23 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     project.answers["academicLevel"] ||
     project.answers["academic_level"] ||
     "undergraduate";
+  const briefText =
+    cleanAnswerString(req.body?.briefText) ||
+    cleanAnswerString(project.answers["assignment_brief_text"]) ||
+    question;
+  const isTutorial = isTutorialOrShortQABrief(briefText) || isTutorialOrShortQABrief(question);
   const targetWordCount = Number(
     req.body?.targetWordCount ||
     project.answers["targetWordCount"] ||
     project.answers["word_count"] ||
     project.answers["word_limit"] ||
-    2000
+    (isTutorial ? 400 : 2000)
   );
   const citationStyle =
     cleanAnswerString(req.body?.citationStyle) ||
     cleanAnswerString(project.answers["citationStyle"]) ||
     cleanAnswerString(project.answers["citation_style"]) ||
     "apa7";
-  const briefText =
-    cleanAnswerString(req.body?.briefText) ||
-    cleanAnswerString(project.answers["assignment_brief_text"]) ||
-    question;
   const rubricText =
     cleanAnswerString(req.body?.rubricText) ||
     cleanAnswerString(project.answers["marking_rubric"]) ||
@@ -485,7 +584,7 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     const ledger: DocumentRequirement[] = await auditDocumentLineByLine(combinedContent);
 
     // 1. Command Verbs & Examiner Demands (mapped from category === 'prompt')
-    const promptItems = ledger.filter((item) => item.category === "prompt");
+    const promptItems = ledger.filter((item) => item.category === "prompt" && !isClassroomLogisticsLine(item.verbatimText));
     const commandVerbs: CommandVerbDetail[] = [];
     const verbSeen = new Set<string>();
 
@@ -566,7 +665,7 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     }
 
     // 4. Formatting & Word Budget (mapped from category === 'formatting')
-    const targetWords = Number(targetWordCount) || 2000;
+    const targetWords = Number(targetWordCount) || (isTutorial ? 400 : 2000);
     const introWords = parsedSections?.intro?.targetWords ?? Math.round(targetWords * 0.10);
     const conclWords = parsedSections?.conclusion?.targetWords ?? Math.round(targetWords * 0.15);
     const bodyWords = parsedSections?.body?.targetWords ?? Math.max(0, targetWords - introWords - conclWords);
@@ -693,6 +792,12 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     project.answers.assignment_structure = JSON.stringify(structure);
     project.answers.structure = JSON.stringify(structure);
     project.answers.target_frameworks = JSON.stringify(structure.targetFrameworks || []);
+    if (project.answers.assignment_internal_sections) {
+      delete project.answers.assignment_internal_sections;
+    }
+    if (project.answers.assignment_outline) {
+      delete project.answers.assignment_outline;
+    }
 
     await getProjectStore().save(project);
 
@@ -1351,6 +1456,14 @@ Return ONLY valid JSON matching:
     }
 
     if (finalStructure) {
+      const topicForCheck = [question, briefText].join(" ");
+      if (isCorruptedOutlineHeadings(finalStructure.headings, topicForCheck)) {
+        console.warn("[assignment.ts] Leaked or corrupted outline headings detected. Discarding and using dynamic assignment structure generator.");
+        finalStructure = null;
+      }
+    }
+
+    if (finalStructure) {
       finalStructure.headings = sanitizeOutlineHeadings(finalStructure.headings, question, assignmentType);
       finalStructure.targetFrameworks =
         data.target_frameworks ||
@@ -1414,6 +1527,12 @@ Return ONLY valid JSON matching:
       // Persist in project answers
       project.answers.assignment_structure = JSON.stringify(finalStructure);
       project.answers.structure = JSON.stringify(finalStructure);
+      if (project.answers.assignment_internal_sections) {
+        delete project.answers.assignment_internal_sections;
+      }
+      if (project.answers.assignment_outline) {
+        delete project.answers.assignment_outline;
+      }
       await getProjectStore().save(project);
 
       const tree = assignmentStructureToOutlineTree(finalStructure);
@@ -1428,15 +1547,23 @@ Return ONLY valid JSON matching:
       });
     }
 
+    const isTutorial = isTutorialOrShortQABrief(briefText) || isTutorialOrShortQABrief(question);
+    const computedTargetWords = Number(targetWordCount) || (isTutorial ? 400 : 2000);
     const fallbackStructure = generateDynamicAssignmentStructure({
       question,
       assignmentType,
       academicLevel,
-      targetWordCount: Number(targetWordCount) || 2000,
+      targetWordCount: computedTargetWords,
       briefText,
     });
     project.answers.assignment_structure = JSON.stringify(fallbackStructure);
     project.answers.structure = JSON.stringify(fallbackStructure);
+    if (project.answers.assignment_internal_sections) {
+      delete project.answers.assignment_internal_sections;
+    }
+    if (project.answers.assignment_outline) {
+      delete project.answers.assignment_outline;
+    }
     await getProjectStore().save(project);
 
     const fallbackTree = assignmentStructureToOutlineTree(fallbackStructure);
@@ -1451,11 +1578,13 @@ Return ONLY valid JSON matching:
     });
   } catch (err: any) {
     const briefText = cleanAnswerString(project.answers["assignment_brief_text"]) || question;
+    const isTutorial = isTutorialOrShortQABrief(briefText) || isTutorialOrShortQABrief(question);
+    const computedTargetWords = Number(targetWordCount) || (isTutorial ? 400 : 2000);
     const fallbackStructure = generateDynamicAssignmentStructure({
       question,
       assignmentType,
       academicLevel,
-      targetWordCount: Number(targetWordCount) || 2000,
+      targetWordCount: computedTargetWords,
       briefText,
     });
     const fallbackTree = assignmentStructureToOutlineTree(fallbackStructure);
@@ -1480,6 +1609,70 @@ Return ONLY valid JSON matching:
       });
     }
   }
+});
+
+// 5b. GET /api/projects/:id/assignment/structure
+router.get("/structure", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+
+  const topic = [
+    project.answers["assignment_question"],
+    project.answers["assignment_brief_text"],
+    project.answers["instructions"],
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const raw = project.answers?.["assignment_structure"] || project.answers?.["structure"];
+  if (raw) {
+    try {
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (parsed?.headings && !isCorruptedOutlineHeadings(parsed.headings, topic)) {
+        const tree = assignmentStructureToOutlineTree(parsed);
+        return res.json({
+          structure: parsed,
+          outline: structureToInternalSections(parsed),
+          sections: tree.sections,
+          target_frameworks: parsed.targetFrameworks || [],
+          thesis_statement: parsed.thesisStatement || "",
+          research_blueprint: parsed.researchBlueprintOverview,
+          question_mapping: parsed.questionMappingMatrix,
+        });
+      }
+    } catch {}
+  }
+
+  const briefText = cleanAnswerString(project.answers?.["assignment_brief_text"]) || project.answers?.["assignment_question"] || "";
+  const isTutorial = isTutorialOrShortQABrief(briefText) || isTutorialOrShortQABrief(project.answers?.["assignment_question"] || "");
+  const targetWords = Number(project.answers?.["targetWordCount"] || project.answers?.["word_count"] || (isTutorial ? 400 : 2000));
+  const fallback = generateDynamicAssignmentStructure({
+    question: project.answers?.["assignment_question"] || briefText,
+    assignmentType: (project.answers?.["assignment_type"] || "essay") as any,
+    academicLevel: (project.answers?.["academic_level"] || "undergraduate") as any,
+    targetWordCount: targetWords,
+    citationStyle: project.answers?.["citation_style"] || "apa7",
+    briefText,
+  });
+  project.answers["assignment_structure"] = JSON.stringify(fallback);
+  project.answers["structure"] = JSON.stringify(fallback);
+  if (project.answers["assignment_internal_sections"]) {
+    delete project.answers["assignment_internal_sections"];
+  }
+  if (project.answers["assignment_outline"]) {
+    delete project.answers["assignment_outline"];
+  }
+  await getProjectStore().save(project);
+  const fallbackTree = assignmentStructureToOutlineTree(fallback);
+  return res.json({
+    structure: fallback,
+    outline: structureToInternalSections(fallback),
+    sections: fallbackTree.sections,
+    target_frameworks: fallback.targetFrameworks || [],
+    thesis_statement: fallback.thesisStatement || "",
+    research_blueprint: fallback.researchBlueprintOverview,
+    question_mapping: fallback.questionMappingMatrix,
+  });
 });
 
 // 6. POST /api/projects/:id/assignment/draft-section
@@ -1536,6 +1729,28 @@ router.post("/draft-section", async (req: express.Request<{ id: string }>, res) 
         ? "Format: Policy analysis briefing paper. Frame policy options with criteria-based evaluation (feasibility, cost, equity) and concrete recommendations."
         : "Format: Academic essay. Maintain rigorous paragraph structure (Topic sentence → Evidence & Explanation → Critical Analysis → Transition).";
 
+    const briefRaw = [
+      project.answers["assignment_brief_text"],
+      project.answers["instructions"],
+      project.answers["assignment_question"],
+      project.answers["research_topic"],
+    ].filter(Boolean).join(" ");
+    const isShortQA = isTutorialOrShortQABrief(briefRaw, targetWordCount) || targetWordCount <= 200;
+
+    const tutorialOrPeelRules = isShortQA
+      ? `CRITICAL TUTORIAL Q&A GUIDELINES:
+1. Directly answer the question in concise, conversational, and analytically grounded prose (~100-150 words).
+2. Do NOT write generic dissertation introductions, conclusion filler, artificial section summaries, or meta-commentary.
+3. ONLY cite external sources if provided in the approved evidence; do NOT invent or force fake citations.
+4. Adhere strictly to any custom section guidance provided by the student above.
+5. Provide ONLY the section draft text.`
+      : `CRITICAL RULES:
+1. ONLY cite from the approved evidence provided above. Do NOT fabricate citations, authors, or statistics.
+2. Integrate in-text citations smoothly according to ${citationStyle}.
+3. Maintain rigorous paragraph structure and academic tone.
+4. Adhere strictly to any custom section guidance provided by the student above.
+5. Provide ONLY the section draft text.`;
+
     const prompt = `You are the Scholar Core Grounded Academic Drafting Agent.
 Write the draft for section: "${sectionTitle}".
 
@@ -1552,12 +1767,7 @@ Key Points to cover: ${keyPoints.join(", ")}
 
 ${evidenceContext}
 
-CRITICAL RULES:
-1. ONLY cite from the approved evidence provided above. Do NOT fabricate citations, authors, or statistics.
-2. Integrate in-text citations smoothly according to ${citationStyle}.
-3. Maintain rigorous paragraph structure and academic tone.
-4. Adhere strictly to any custom section guidance provided by the student above.
-5. Provide ONLY the section draft text.`;
+${tutorialOrPeelRules}`;
 
     const draft = await callOpenRouterText(
       req,
@@ -1637,6 +1847,25 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
       ? "REVISION FOCUS: Condense prose. Tighten argumentation and eliminate redundancies to fit the exact target word count."
       : "";
 
+    const briefRaw = [
+      project.answers["assignment_brief_text"],
+      project.answers["instructions"],
+      project.answers["assignment_question"],
+      assignmentTopic,
+    ].filter(Boolean).join(" ");
+    const isShortQA = isTutorialOrShortQABrief(briefRaw, targetWordCount) || targetWordCount <= 200;
+
+    const frameworkGuidelines = isShortQA
+      ? `TUTORIAL & CASE STUDY Q&A GUIDELINES:
+- Directly answer the question in concise, conversational, and analytically grounded prose (~100-150 words).
+- Do NOT generate generic dissertation introductions, conclusion filler, artificial section summaries, or meta-commentary.
+- ONLY cite sources if explicitly provided in the bound evidence above; do NOT invent or force fake citations.`
+      : `MANDATORY PEEL PARAGRAPH FRAMEWORK:
+- Point: Distinct topic sentence advancing the central thesis.
+- Evidence: Grounded empirical citations from the bound sources.
+- Explanation: 70% critical analysis & evaluation / 30% descriptive exposition.
+- Link: Clear concluding transition linking back to the primary assessment prompt.`;
+
     const prompt = `You are the Scholar Core Grounded Academic Drafting Agent.
 Write the section prose for: "${sectionTitle}".
 Academic Function: ${academicFunction}
@@ -1650,11 +1879,7 @@ ${revisionInstruction}
 
 ${evidencePackPrompt ? evidenceBlock : `BOUND EVIDENCE (Use these sources for in-text citations; do NOT fabricate external sources):\n${evidenceBlock || "Use standard scholarly reasoning."}`}
 
-MANDATORY PEEL PARAGRAPH FRAMEWORK:
-- Point: Distinct topic sentence advancing the central thesis.
-- Evidence: Grounded empirical citations from the bound sources.
-- Explanation: 70% critical analysis & evaluation / 30% descriptive exposition.
-- Link: Clear concluding transition linking back to the primary assessment prompt.
+${frameworkGuidelines}
 
 Output ONLY the section text in clean academic Markdown prose.`;
 

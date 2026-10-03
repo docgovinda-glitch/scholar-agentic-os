@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { Upload, Image as ImageIcon, Sparkles, Trash2 } from 'lucide-react';
 import type {
   SlideDeck,
   SlideCard,
@@ -8,6 +9,7 @@ import type {
   BulletListBlock,
   TwoColumnBlock,
   QuoteEvidenceBlock,
+  ImageBlock,
 } from '../types/slides';
 import { SLIDE_THEMES, type SlideThemeId } from '../types/themes';
 import { condenseToSixWords } from '../services/semanticSlideExtractor';
@@ -21,14 +23,15 @@ export interface Step03StudioCanvasProps {
   onNextStep: () => void;
 }
 
-const LAYOUT_OPTIONS: Array<{ id: SlideLayoutType; label: string; icon: string }> = [
-  { id: 'cover', label: 'Swiss Cover (Angled Banner)', icon: '🚩' },
-  { id: 'metrics', label: 'High-Contrast Metrics & Ratio', icon: '📊' },
-  { id: 'categories', label: 'Color-Blocked Pillars (3-4)', icon: '🏛️' },
-  { id: 'bullets', label: 'Header & 6x6 Bullets', icon: '📝' },
-  { id: 'metric-focus', label: 'Big Metric Focus', icon: '📈' },
-  { id: 'two-column', label: '2-Column Comparative', icon: '⚖️' },
-  { id: 'quote-evidence', label: 'Quote / Evidence', icon: '💬' },
+const LAYOUT_OPTIONS: Array<{ id: SlideLayoutType; label: string; icon: string; ariaLabel?: string }> = [
+  { id: 'bullets', label: 'Header & Bullets', icon: '📝', ariaLabel: 'Header & Bullets' },
+  { id: 'image-split', label: 'Split Image + Text', icon: '🖼️', ariaLabel: 'Split Image + Text' },
+  { id: 'metric-focus', label: 'Big Metric Focus', icon: '📈', ariaLabel: 'Big Metric Focus' },
+  { id: 'two-column', label: '2-Column Comparison', icon: '⚖️', ariaLabel: '2-Column Comparison (2-Column Comparative)' },
+  { id: 'quote-evidence', label: 'Quote / Highlight', icon: '💬', ariaLabel: 'Quote / Highlight (Quote / Evidence)' },
+  { id: 'cover', label: 'Swiss Cover', icon: '🚩', ariaLabel: 'Swiss Cover' },
+  { id: 'metrics', label: 'Ratio Metrics', icon: '📊', ariaLabel: 'Ratio Metrics' },
+  { id: 'categories', label: 'Pillars', icon: '🏛️', ariaLabel: 'Pillars' },
 ];
 
 export default function Step03StudioCanvas({
@@ -41,6 +44,7 @@ export default function Step03StudioCanvas({
   const [isCopilotLoading, setIsCopilotLoading] = useState(false);
   const [copilotPrompt, setCopilotPrompt] = useState('');
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
 
   const activeTheme = SLIDE_THEMES[deck.themeId as SlideThemeId] || SLIDE_THEMES['sand-academic'];
   const activeSlide = deck.slides[activeSlideIndex] || deck.slides[0];
@@ -215,6 +219,52 @@ export default function Step03StudioCanvas({
             'Cryptographic proof of reference provenance verified',
           ],
         });
+      } else if (newLayout === 'image-split') {
+        const defaultImg =
+          slide.imageUrl ||
+          'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80';
+        const defaultCaption =
+          slide.imageCaption || 'Empirical architecture data flow and verification graph';
+        newBlocks.push({
+          type: 'image',
+          imageUrl: defaultImg,
+          caption: defaultCaption,
+          layout: 'split',
+          aspectRatio: '16:9',
+        });
+        newBlocks.push({
+          type: 'bullet-list',
+          items: [
+            'Visual diagram grounds empirical test observations',
+            'Multi-agent consensus loop coordinates claims',
+            'Real-time citation graphs trace reference authenticity',
+          ],
+        });
+        return {
+          ...slide,
+          layoutType: 'image-split',
+          imageUrl: defaultImg,
+          imageCaption: defaultCaption,
+          blocks: newBlocks,
+        };
+      } else if (newLayout === 'image-hero') {
+        const defaultImg =
+          slide.imageUrl ||
+          'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80';
+        newBlocks.push({
+          type: 'image',
+          imageUrl: defaultImg,
+          caption: slide.imageCaption || 'High-resolution system telemetry and observation graph',
+          layout: 'hero',
+          aspectRatio: '16:9',
+        });
+        return {
+          ...slide,
+          layoutType: 'image-hero',
+          imageUrl: defaultImg,
+          imageCaption: slide.imageCaption || 'High-resolution system telemetry and observation graph',
+          blocks: newBlocks,
+        };
       } else if (newLayout === 'metric-focus') {
         newBlocks.push({
           type: 'metric-callout',
@@ -378,6 +428,8 @@ export default function Step03StudioCanvas({
       const lower = copilotPrompt.toLowerCase();
       if (lower.includes('2-column') || lower.includes('compare')) {
         handleLayoutSwitch('two-column');
+      } else if (lower.includes('image') || lower.includes('photo') || lower.includes('picture') || lower.includes('split')) {
+        handleLayoutSwitch('image-split');
       } else if (lower.includes('metric') || lower.includes('callout') || lower.includes('4.2x')) {
         handleLayoutSwitch('metric-focus');
       } else if (lower.includes('condense') || lower.includes('6-word')) {
@@ -394,6 +446,45 @@ export default function Step03StudioCanvas({
       setIsCopilotLoading(false);
       setCopilotPrompt('');
     }
+  };
+
+  const handleImageFileUpload = (file: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (dataUrl) {
+        updateActiveSlide((s) => {
+          const updatedBlocks = s.blocks.map((b) =>
+            b.type === 'image' ? { ...b, imageUrl: dataUrl } : b
+          );
+          if (!updatedBlocks.some((b) => b.type === 'image')) {
+            updatedBlocks.push({
+              type: 'image',
+              imageUrl: dataUrl,
+              caption: s.imageCaption || '',
+              layout: 'split',
+              aspectRatio: '16:9',
+            });
+          }
+          return {
+            ...s,
+            imageUrl: dataUrl,
+            blocks: updatedBlocks,
+          };
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    updateActiveSlide((s) => ({
+      ...s,
+      imageUrl: undefined,
+      imageCaption: undefined,
+      blocks: s.blocks.filter((b) => b.type !== 'image'),
+    }));
   };
 
   // Rail Actions
@@ -565,6 +656,22 @@ export default function Step03StudioCanvas({
 
         {/* Center WYSIWYG Editable Card (Right 9 Columns) */}
         <div className="lg:col-span-9 space-y-4">
+          {/* Hidden File Input for Image Upload */}
+          <input
+            ref={imageFileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            data-testid="slide-image-file-input"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                handleImageFileUpload(file);
+                e.target.value = '';
+              }
+            }}
+          />
+
           {/* Slide Card Container */}
           <div
             className={`w-full min-h-[460px] p-6 sm:p-10 rounded-3xl border transition-all relative flex flex-col justify-between overflow-hidden ${
@@ -865,8 +972,185 @@ export default function Step03StudioCanvas({
                 </div>
               )}
 
+              {/* Split Image + Text Dedicated Layout View */}
+              {activeSlide.layoutType === 'image-split' && (
+                <div
+                  className="grid grid-cols-1 md:grid-cols-2 gap-6 my-3 items-start"
+                  data-testid="split-image-text-container"
+                >
+                  {/* Left Column: 50% responsive image container with upload/replace button and caption */}
+                  <div className="space-y-2">
+                    <div className="relative group rounded-xl overflow-hidden border border-neutral-200/60 dark:border-white/10 bg-neutral-100 dark:bg-black/30 shadow-xs aspect-16/9 sm:aspect-4/3 flex items-center justify-center">
+                      {activeSlide.imageUrl ? (
+                        <>
+                          <img
+                            src={activeSlide.imageUrl}
+                            alt={activeSlide.imageCaption || activeSlide.actionHeadline}
+                            className="w-full h-full object-cover rounded-xl"
+                          />
+                          {/* Overlay Action Buttons on Hover */}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-3">
+                            <button
+                              type="button"
+                              onClick={() => imageFileInputRef.current?.click()}
+                              className="px-3 py-1.5 rounded-lg bg-white/95 text-neutral-900 text-xs font-bold shadow hover:bg-white transition-all flex items-center gap-1.5"
+                            >
+                              <span>📷 Replace</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleRemoveImage}
+                              className="px-3 py-1.5 rounded-lg bg-red-600/90 text-white text-xs font-bold shadow hover:bg-red-600 transition-all flex items-center gap-1.5"
+                            >
+                              <span>✕ Remove</span>
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div
+                          onClick={() => imageFileInputRef.current?.click()}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const file = e.dataTransfer.files?.[0];
+                            if (file) handleImageFileUpload(file);
+                          }}
+                          className="w-full h-full flex flex-col items-center justify-center p-6 text-center cursor-pointer hover:bg-neutral-200/50 dark:hover:bg-white/5 transition-colors border-2 border-dashed border-neutral-300 dark:border-white/20 rounded-xl"
+                        >
+                          <span className="text-3xl mb-1">🖼️</span>
+                          <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                            Click or drag image here
+                          </p>
+                          <p className="text-[10px] text-neutral-400 mt-0.5">
+                            Supports PNG, JPG, WebP
+                          </p>
+                          <button
+                            type="button"
+                            className="mt-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs"
+                          >
+                            Upload Local Image
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Image URL input & Caption */}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={activeSlide.imageUrl || ''}
+                          onChange={(e) => {
+                            const url = e.target.value;
+                            updateActiveSlide((s) => ({
+                              ...s,
+                              imageUrl: url,
+                              blocks: s.blocks.map((b) => (b.type === 'image' ? { ...b, imageUrl: url } : b)),
+                            }));
+                          }}
+                          placeholder="Or enter image URL (https://...)"
+                          className="flex-1 text-xs px-2.5 py-1.5 rounded-lg bg-black/5 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-800 dark:text-neutral-200 focus:outline-none focus:border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => imageFileInputRef.current?.click()}
+                          className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-neutral-200 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/20 text-neutral-800 dark:text-neutral-200"
+                        >
+                          Browse
+                        </button>
+                      </div>
+
+                      <input
+                        type="text"
+                        value={activeSlide.imageCaption || ''}
+                        onChange={(e) => {
+                          const cap = e.target.value;
+                          updateActiveSlide((s) => ({
+                            ...s,
+                            imageCaption: cap,
+                            blocks: s.blocks.map((b) => (b.type === 'image' ? { ...b, caption: cap } : b)),
+                          }));
+                        }}
+                        placeholder="Add an optional figure caption..."
+                        className="w-full text-[11px] italic text-neutral-500 dark:text-neutral-400 bg-transparent border-b border-transparent hover:border-neutral-200 dark:hover:border-white/10 focus:border-blue-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right Column: 3-4 bullet points */}
+                  <div className="space-y-3">
+                    {(() => {
+                      const bulletBlock = activeSlide.blocks.find((b) => b.type === 'bullet-list') as BulletListBlock | undefined;
+                      const items = bulletBlock?.items || [
+                        'Visual diagram grounds empirical test observations',
+                        'Multi-agent consensus loop coordinates claims',
+                        'Real-time citation graphs trace reference authenticity',
+                      ];
+
+                      return (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
+                              Key Points ({items.length}/6)
+                            </span>
+                            {items.length < 6 && (
+                              <button
+                                type="button"
+                                onClick={handleAddBullet}
+                                className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                              >
+                                + Add Point
+                              </button>
+                            )}
+                          </div>
+
+                          <ul className="space-y-2">
+                            {items.map((item, itemIdx) => {
+                              const wordCount = item.trim().split(/\s+/).filter(Boolean).length;
+                              const exceedsLimit = wordCount > 6;
+                              return (
+                                <li key={itemIdx} className="flex items-start gap-2.5">
+                                  <span
+                                    className={`w-2 h-2 rounded-full shrink-0 mt-2 ${activeTheme.bulletColor}`}
+                                  />
+                                  <div className="flex-1">
+                                    <input
+                                      type="text"
+                                      value={item}
+                                      onChange={(e) => handleBulletItemChange(itemIdx, e.target.value)}
+                                      className={`w-full text-sm md:text-base font-normal bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-blue-500 focus:outline-none ${activeTheme.textSecondary}`}
+                                    />
+                                  </div>
+                                  <span
+                                    className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full shrink-0 mt-1 ${
+                                      exceedsLimit
+                                        ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold border border-amber-500/30'
+                                        : 'bg-neutral-100 dark:bg-white/10 text-neutral-500'
+                                    }`}
+                                  >
+                                    {wordCount}w
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveBullet(itemIdx)}
+                                    className="text-xs text-neutral-400 hover:text-red-500 mt-1"
+                                    title="Remove Point"
+                                  >
+                                    ✕
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
               {/* Dynamic Block-level Content Renderer with Direct Editing */}
-              {activeSlide.blocks.map((block, bIdx) => {
+              {activeSlide.layoutType !== 'image-split' && activeSlide.blocks.map((block, bIdx) => {
                 if (block.type === 'bullet-list') {
                   return (
                     <div key={bIdx} className="space-y-3 pt-2">
@@ -1048,6 +1332,52 @@ export default function Step03StudioCanvas({
                   );
                 }
 
+                if (block.type === 'image') {
+                  return (
+                    <div key={bIdx} className="space-y-2 my-3">
+                      <div className="relative group rounded-xl overflow-hidden border border-neutral-200/60 dark:border-white/10 bg-neutral-100 dark:bg-black/30 aspect-16/9 max-h-[340px] flex items-center justify-center">
+                        {block.imageUrl ? (
+                          <>
+                            <img
+                              src={block.imageUrl}
+                              alt={block.caption || 'Slide visual'}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-3">
+                              <button
+                                type="button"
+                                onClick={() => imageFileInputRef.current?.click()}
+                                className="px-3 py-1.5 rounded-lg bg-white/95 text-neutral-900 text-xs font-bold shadow hover:bg-white transition-all flex items-center gap-1.5"
+                              >
+                                <span>📷 Replace</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleRemoveImage}
+                                className="px-3 py-1.5 rounded-lg bg-red-600/90 text-white text-xs font-bold shadow hover:bg-red-600 transition-all flex items-center gap-1.5"
+                              >
+                                <span>✕ Remove</span>
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <div
+                            onClick={() => imageFileInputRef.current?.click()}
+                            className="cursor-pointer p-6 text-center text-xs text-neutral-500"
+                          >
+                            📷 Click to upload image
+                          </div>
+                        )}
+                      </div>
+                      {block.caption && (
+                        <p className="text-[11px] italic text-neutral-500 dark:text-neutral-400">
+                          {block.caption}
+                        </p>
+                      )}
+                    </div>
+                  );
+                }
+
                 return null;
               })}
 
@@ -1083,7 +1413,7 @@ export default function Step03StudioCanvas({
           </div>
 
           {/* In-Slide AI Prompt Copilot Bar */}
-          <div className="bg-white dark:bg-[#1C1C1E] border border-blue-500/30 rounded-2xl p-4 shadow-sm space-y-2">
+          <div className="bg-white dark:bg-[#1C1C1E] border border-blue-500/30 rounded-2xl p-4 shadow-xs space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-extrabold uppercase tracking-wide text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
                 <span>✨ In-Slide AI Prompt Copilot</span>
@@ -1101,7 +1431,7 @@ export default function Step03StudioCanvas({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleExecuteCopilot();
                 }}
-                placeholder='e.g. "Convert bullets to a 4.2x metric callout" or "Make this a 2-column comparative case study"'
+                placeholder='e.g. "Add an image to this slide" or "Change to 2 columns"'
                 className="flex-1 px-4 py-2 text-xs rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-black/20 text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
               <button
@@ -1112,6 +1442,28 @@ export default function Step03StudioCanvas({
               >
                 {isCopilotLoading ? 'Mutating...' : 'Apply Mutation'}
               </button>
+            </div>
+
+            {/* Quick Copilot Suggestion Chips */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-[10px] font-medium text-neutral-400">Quick Actions:</span>
+              {[
+                'Add an image to this slide',
+                'Change to 2 columns',
+                'Focus on big metric',
+                'Shorten bullets',
+              ].map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => {
+                    setCopilotPrompt(chip);
+                  }}
+                  className="px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 dark:bg-white/5 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 border border-neutral-200/80 dark:border-white/10 transition-colors"
+                >
+                  + {chip}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -1151,17 +1503,19 @@ export default function Step03StudioCanvas({
         <button
           type="button"
           onClick={onPrevStep}
+          aria-label="Back to Design (Themes)"
           className="px-5 py-2.5 rounded-xl text-xs font-bold text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white border border-neutral-200 dark:border-white/10"
         >
-          ← Back to Themes
+          ← Back to Design
         </button>
 
         <button
           type="button"
           onClick={onNextStep}
+          aria-label="Proceed to Present (Delivery & Export)"
           className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition-all flex items-center gap-2"
         >
-          <span>Proceed to Delivery & Export</span>
+          <span>Proceed to Present</span>
           <span>→</span>
         </button>
       </div>

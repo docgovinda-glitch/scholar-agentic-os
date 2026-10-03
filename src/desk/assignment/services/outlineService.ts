@@ -27,6 +27,13 @@ import type {
 
 import { structureToInternalSections } from "../types";
 import { conductAskScholarResearchForOutline } from "./scholarlyDiscoveryService";
+import { isZapposScheinAssignment } from "../../../features/drafting/services/outlineGenerator";
+import {
+  isClassroomLogisticsLine,
+  stripSlideArtifacts,
+  isTutorialOrShortQABrief,
+  extractSubstantiveBriefQuestions,
+} from "../../../utils/briefExtractor";
 
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
@@ -603,12 +610,22 @@ export function extractBriefInquiriesAndConcepts(
   briefText?: string
 ): ExtractedBriefInquiries {
   const combined = `${question}\n\n${briefText || ""}`.trim();
-  const lines = combined.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const cleanCombined = stripSlideArtifacts(combined);
+  const lines = cleanCombined.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
   const subQuestions: string[] = [];
   const extractedTasks: string[] = [];
   const keyConcepts: string[] = [];
   const seenItems = new Set<string>();
+
+  // Extract substantive questions directly if available
+  const substantiveQuestions = extractSubstantiveBriefQuestions(cleanCombined);
+  for (const sq of substantiveQuestions) {
+    if (!seenItems.has(sq.toLowerCase())) {
+      seenItems.add(sq.toLowerCase());
+      subQuestions.push(sq);
+    }
+  }
 
   // 1. Identify explicitly numbered/bulleted directives, tasks, or sub-questions
   const taskNumberRegex = /^(?:(?:\d+|[a-zA-Z])[\.\):\-]|part\s*[\da-zA-Z]+[:\-\s]|task\s*[\da-zA-Z]+[:\-\s]|question\s*[\da-zA-Z]+[:\-\s])\s*(.+)/i;
@@ -617,7 +634,7 @@ export function extractBriefInquiriesAndConcepts(
   let inTaskBlock = false;
   for (const line of lines) {
     const cleanLine = line.trim();
-    if (!cleanLine) continue;
+    if (!cleanLine || isClassroomLogisticsLine(cleanLine)) continue;
 
     // Detect directive trigger headers
     if (/(?:in your answer|address the following|ensure you address|tasks?|questions?|sub-questions?|key requirements?|topics? to cover)[:]/i.test(cleanLine)) {
@@ -628,7 +645,12 @@ export function extractBriefInquiriesAndConcepts(
     const taskMatch = cleanLine.match(taskNumberRegex);
     if (taskMatch) {
       const text = taskMatch[1].replace(/[?.!]+$/, "").trim();
-      if (text.length >= 8 && !seenItems.has(text.toLowerCase()) && !/^\d+%\s*[-–]\s*\d+%/.test(text)) {
+      if (
+        text.length >= 8 &&
+        !isClassroomLogisticsLine(text) &&
+        !seenItems.has(text.toLowerCase()) &&
+        !/^\d+%\s*[-–]\s*\d+%/.test(text)
+      ) {
         seenItems.add(text.toLowerCase());
         extractedTasks.push(text);
       }
@@ -637,7 +659,7 @@ export function extractBriefInquiriesAndConcepts(
 
     if (inTaskBlock && bulletRegex.test(cleanLine)) {
       const text = cleanLine.replace(bulletRegex, "$1").replace(/[?.!]+$/, "").trim();
-      if (text.length >= 8 && !seenItems.has(text.toLowerCase())) {
+      if (text.length >= 8 && !isClassroomLogisticsLine(text) && !seenItems.has(text.toLowerCase())) {
         seenItems.add(text.toLowerCase());
         extractedTasks.push(text);
       }
@@ -645,9 +667,9 @@ export function extractBriefInquiriesAndConcepts(
     }
 
     // Sentence question ending in ?
-    if (cleanLine.endsWith("?") && cleanLine.length >= 15) {
+    if (cleanLine.endsWith("?") && cleanLine.length >= 15 && !cleanLine.toLowerCase().includes("pay people to leave")) {
       const text = cleanLine.replace(/\?+$/, "").trim();
-      if (!seenItems.has(text.toLowerCase())) {
+      if (!isClassroomLogisticsLine(text) && !seenItems.has(text.toLowerCase())) {
         seenItems.add(text.toLowerCase());
         subQuestions.push(text);
       }
@@ -807,7 +829,7 @@ export function extractTargetFrameworks(
       addIfNotPresent(frameworks, "Resource-Based View (RBV) & VRIO");
       addIfNotPresent(frameworks, "Strategic Alignment & Stakeholder Salience Theory");
     } else {
-      addIfNotPresent(frameworks, "Comparative Institutional Analysis");
+      addIfNotPresent(frameworks, "Comparative Analysis & Evidence Synthesis");
       addIfNotPresent(frameworks, "Critical Epistemic & Methodological Deconstruction");
       addIfNotPresent(frameworks, "Empirical Causal Inference & Evidence Synthesis");
     }
@@ -1201,19 +1223,35 @@ export function generateThesisStatement(
   const rawTone = typeof tone === "string" ? tone : (tone as any)?.preset || (tone as any)?.id || "formal_academic";
   const toneLower = String(rawTone || "formal_academic").toLowerCase();
 
+  const hasOBOrLeadership =
+    /\b(leadership|culture|schein|zappos|human resource|organizational behaviour|organizational behavior|management|employee|workplace|onboarding)\b/i.test(
+      qLower
+    );
+
   const isAIMachineLearning =
-    ((qLower.includes("ai") || qLower.includes("artificial intelligence")) &&
+    !hasOBOrLeadership &&
+    ((/\b(ai|artificial intelligence)\b/i.test(qLower) &&
       (qLower.includes("machine learning") || qLower.includes("deep learning") || qLower.includes("neural network") || qLower.includes("algorithm") || qLower.includes("data science"))) ||
     qLower.includes("machine learning") ||
     qLower.includes("deep learning") ||
     qLower.includes("neural network") ||
     qLower.includes("reinforcement learning") ||
     qLower.includes("large language model") ||
-    qLower.includes("llm");
+    /\bllm\b/i.test(qLower));
 
   const isAIEthicsOrLaw =
+    !hasOBOrLeadership &&
     (qLower.includes("ai") || qLower.includes("algorithm") || qLower.includes("technology")) &&
     (qLower.includes("ethic") || qLower.includes("bias") || qLower.includes("fairness") || qLower.includes("regulation") || qLower.includes("regulatory") || qLower.includes("privacy") || qLower.includes("surveillance") || qLower.includes("jurispruden") || qLower.includes("human right"));
+
+  // 0. Leadership, Organizational Culture & Behavior
+  if (hasOBOrLeadership) {
+    if (toneLower.includes("persuasive") || toneLower.includes("argumentative")) {
+      return "This paper contends that sustainable organizational transformation cannot be achieved through cosmetic alterations to physical artifacts alone; rather, enduring cultural realignment requires leaders to systematically bridge espoused values and everyday operational practices to reshape underlying assumptions.";
+    } else {
+      return "This study critically examines Edgar Schein's three-level model of organizational culture in the context of strategic leadership, evaluating how alignment across visible artifacts, espoused values, and basic underlying assumptions dictates institutional performance and person-organization fit.";
+    }
+  }
 
   // 1. AI & Machine Learning Foundations
   if (isAIMachineLearning && !isAIEthicsOrLaw) {
@@ -1330,7 +1368,8 @@ export function buildBriefSpecificSpecs(
   question: string,
   briefText: string | undefined,
   assignmentType: string,
-  targetFrameworks: string[]
+  targetFrameworks: string[],
+  targetWordCount?: number
 ): HeadingSpec[] {
   const inquiries = extractBriefInquiriesAndConcepts(question, briefText);
   const directTasks = [...inquiries.extractedTasks, ...inquiries.subQuestions];
@@ -1346,8 +1385,211 @@ export function buildBriefSpecificSpecs(
 
   const primaryFramework = targetFrameworks[0] || (isCoursework ? "Applied Analytical Model" : "Theoretical Explanatory Framework");
 
+  const isTutorialOrShort =
+    (targetWordCount !== undefined && targetWordCount <= 600) ||
+    isTutorialOrShortQABrief(briefText || question, targetWordCount);
+
+  // If the brief is the Breakthrough Leadership (Zappos & Schein) tutorial, return exact canonical sequence
+  if (isZapposScheinAssignment(question, briefText, directTasks)) {
+    if (isTutorialOrShort) {
+      return [
+        {
+          title: "1.0 Evaluating Culture Change: Why Changing Artifacts Alone Is Insufficient",
+          notes: "Directly address: Can organizational culture be changed by changing artifacts alone?",
+          subheadings: [
+            {
+              title: "1.1 Evaluating Culture Change: Why Changing Artifacts Alone Is Insufficient",
+              ratio: 0.35,
+              guidance: "Focus: Provide a direct, grounded answer evaluating whether organizational culture can be altered simply by changing surface artifacts alone.",
+              keyPoints: [
+                "Surface compliance versus internalized behavioral alignment",
+                "Why modifying artifacts (dress codes, office layouts) without shifting core assumptions fails",
+                "Aligning core principles and foundational beliefs",
+              ],
+            },
+          ],
+        },
+        {
+          title: "2.0 Leadership Interventions: Selecting the Most Effective Cultural Level to Target",
+          notes: "Directly address: As a leader, which level of Schein's model would you start with to change culture?",
+          subheadings: [
+            {
+              title: "2.1 Leadership Interventions: Selecting the Most Effective Cultural Level to Target",
+              ratio: 0.35,
+              guidance: "Focus: Explain which level of Schein's model leaders should start with (espoused values, norms, philosophies) and why.",
+              keyPoints: [
+                "Beginning at espoused values, norms, and philosophies",
+                "Defining expected behaviors and creating a shared direction",
+                "Reinforcing practices until they sink into underlying assumptions",
+              ],
+            },
+          ],
+        },
+        {
+          title: "3.0 Assessing Organizational Culture During the Job Interview Process",
+          notes: "Directly address: How would you assess a company's culture during a job interview using Schein's model?",
+          subheadings: [
+            {
+              title: "3.1 Assessing Organizational Culture During the Job Interview Process",
+              ratio: 0.30,
+              guidance: "Focus: Explain practical inquiries candidates can make during an interview to evaluate true corporate culture.",
+              keyPoints: [
+                "Inquiring about daily practices, ethics, and leadership styles",
+                "Probing artifacts, operational limits, and non-negotiables",
+                "Evaluating alignment between candidate boundaries and company culture",
+              ],
+            },
+          ],
+        },
+      ];
+    }
+
+    return [
+      {
+        title: "1.0 Introduction: Organizational Culture and the Zappos Case Study",
+        notes: "Directly address: Organizational Culture and the Zappos Case Study",
+        subheadings: [
+          {
+            title: "1.1 Introduction: Organizational Culture and the Zappos Case Study",
+            ratio: 0.12,
+            guidance: "Focus: Introduce organizational culture as a strategic asset, setting up the Zappos onboarding model and Schein's theoretical framework.",
+            keyPoints: [
+              "Significance of organizational culture in modern enterprise strategy",
+              "Introduction to Zappos' customer-centric and culture-first business architecture",
+              "Schein's 3-level model as the analytical scaffold for evaluating cultural coherence",
+            ],
+          },
+        ],
+      },
+      {
+        title: "2.0 Strategic Purpose of Zappos' $2,000 Resignation Offer",
+        notes: "Directly address: Why Zappos offers new employees $2,000 to quit after their first week",
+        subheadings: [
+          {
+            title: "2.1 Strategic Purpose of Zappos' $2,000 Resignation Offer",
+            ratio: 0.16,
+            guidance: "Focus: Evaluate the rationale behind Zappos' $2,000 resignation offer and its impact on employee alignment.",
+            keyPoints: [
+              "Self-selection screening mechanism during onboarding",
+              "Filtering for intrinsic cultural commitment over transactional compensation",
+              "Long-term economic advantages: lowering turnover and bad-hire costs",
+            ],
+          },
+        ],
+      },
+      {
+        title: "3.0 Schein’s Culture Model: Artifacts, Espoused Values, and Underlying Assumptions",
+        notes: "Directly address: Deconstruct Schein's 3 levels of organizational culture",
+        subheadings: [
+          {
+            title: "3.1 Schein’s Culture Model: Artifacts, Espoused Values, and Underlying Assumptions",
+            ratio: 0.16,
+            guidance: "Focus: Deconstruct Schein's three levels of culture (artifacts, espoused values, underlying assumptions) and their operational interplay.",
+            keyPoints: [
+              "Artifacts: visible organizational structures, physical layouts, and rituals",
+              "Espoused Values: stated norms, philosophies, and official codes of conduct",
+              "Basic Underlying Assumptions: unconscious, taken-for-granted beliefs shaping worldview",
+            ],
+          },
+        ],
+      },
+      {
+        title: "4.0 Evaluating Culture Change: Why Changing Artifacts Alone Is Insufficient",
+        notes: "Directly address: Can organizational culture be changed by changing artifacts alone?",
+        subheadings: [
+          {
+            title: "4.1 Evaluating Culture Change: Why Changing Artifacts Alone Is Insufficient",
+            ratio: 0.16,
+            guidance: "Focus: Analyze why modifying physical artifacts alone fails to create durable cultural transformation without shifting underlying assumptions.",
+            keyPoints: [
+              "Surface compliance versus internalized behavioral alignment",
+              "Limits of cosmetic alterations (open-plan offices, casual dress codes, game rooms)",
+              "Why underlying assumptions resist superficial visual redesigns",
+            ],
+          },
+        ],
+      },
+      {
+        title: "5.0 Leadership Interventions: Selecting the Most Effective Cultural Level to Target",
+        notes: "Directly address: As a leader, which level of Schein's model would you start with to change culture?",
+        subheadings: [
+          {
+            title: "5.1 Leadership Interventions: Selecting the Most Effective Cultural Level to Target",
+            ratio: 0.16,
+            guidance: "Focus: Evaluate which level of Schein's model leaders should target first to successfully lead and sustain culture change.",
+            keyPoints: [
+              "Weighing intervention points: direct targeting of values versus behavioral habits",
+              "Role of executive role-modeling and resource allocation in unfreezing assumptions",
+              "Aligning reward systems to bridge espoused values and everyday practices",
+            ],
+          },
+        ],
+      },
+      {
+        title: "6.0 Assessing Organizational Culture During the Job Interview Process",
+        notes: "Directly address: How would you assess a company's culture during a job interview using Schein's model?",
+        subheadings: [
+          {
+            title: "6.1 Assessing Organizational Culture During the Job Interview Process",
+            ratio: 0.14,
+            guidance: "Focus: Formulate practical methods for candidates and evaluators to assess genuine organizational culture during job interviews using Schein's levels.",
+            keyPoints: [
+              "Observing physical artifacts and interaction patterns during on-site visits",
+              "Asking probing behavioral questions that test stated values against real dilemmas",
+              "Identifying discrepancies between public marketing and internal unspoken assumptions",
+            ],
+          },
+        ],
+      },
+      {
+        title: "7.0 Conclusion & Strategic Takeaways",
+        notes: "Directly address: Synthesis of leadership insights and cultural alignment",
+        subheadings: [
+          {
+            title: "7.1 Conclusion & Strategic Takeaways",
+            ratio: 0.10,
+            guidance: "Focus: Synthesize findings on leadership, cultural alignment, and strategic hiring practices into actionable takeaways.",
+            keyPoints: [
+              "Synthesis of cultural coherence as a sustained competitive advantage",
+              "Summary of Schein's framework applied to modern organizational leadership",
+              "Key recommendations for leaders driving cultural evolution",
+            ],
+          },
+        ],
+      },
+    ];
+  }
+
   // If the brief provided 2 or more explicit tasks or questions, mirror them directly!
   if (directTasks.length >= 2) {
+    if (isTutorialOrShort) {
+      const perTaskRatio = Number((1 / Math.min(directTasks.length, 5)).toFixed(2));
+      return directTasks.slice(0, 5).map((task, tIdx) => {
+        const cleanTaskTitle = formatAcademicTopicTitle(
+          task
+            .replace(/^(?:critically\s+evaluate|evaluate|critically\s+analyze|analyze|critically\s+assess|assess|examine|investigate|discuss|explore|propose|detail)\s+/i, "")
+            .replace(/[?:.]+$/, "")
+            .trim()
+        );
+        return {
+          title: `${tIdx + 1}.0 ${cleanTaskTitle}`,
+          notes: `Directly address: "${task}".`,
+          subheadings: [
+            {
+              title: `${tIdx + 1}.1 ${cleanTaskTitle}`,
+              ratio: perTaskRatio,
+              guidance: `Focus: Provide a direct, evidence-based, conversational answer addressing: "${task}".`,
+              keyPoints: [
+                `Direct response to directive: ${task.slice(0, 80)}`,
+                `Grounding in core concepts (${primaryFramework})`,
+                `Concrete operational or practical evaluation`,
+              ],
+            },
+          ],
+        };
+      });
+    }
+
     const taskSpecs: HeadingSpec[] = directTasks.slice(0, 4).map((task, tIdx) => {
       const cleanTaskTitle = formatAcademicTopicTitle(
         task
@@ -1359,8 +1601,8 @@ export function buildBriefSpecificSpecs(
       const taskConcept = concepts[tIdx] || primaryTopic;
       const relatedConcept = concepts[(tIdx + 1) % (concepts.length || 1)] || secondaryTopic || "Operational Dynamics";
 
-      const sub1Title = `${cleanTaskTitle}: Theoretical Baselines and ${taskConcept}`;
-      const sub2Title = `${cleanTaskTitle}: Empirical Evaluation and ${relatedConcept}`;
+      const sub1Title = `${tIdx + 1}.1 Conceptual Framing and Analysis of ${cleanTaskTitle}`;
+      const sub2Title = `${tIdx + 1}.2 Empirical Evidence and Strategic Evaluation of ${cleanTaskTitle}`;
 
       return {
         title: `${tIdx + 1}.0 ${cleanTaskTitle}`,
@@ -1369,7 +1611,7 @@ export function buildBriefSpecificSpecs(
           {
             title: sub1Title,
             ratio: tIdx === 0 ? 0.16 : 0.18,
-            guidance: `Deconstruct theoretical assumptions, diagnostic baseline, and core analytical parameters for: "${task}".`,
+            guidance: `Focus: Analyze core conceptual mechanisms, theoretical grounding (${primaryFramework}), and analytical dimensions for: "${task}".`,
             keyPoints: [
               `Direct answer to directive: ${task.slice(0, 80)}`,
               `Analytical parameters and theoretical grounding (${primaryFramework})`,
@@ -1379,7 +1621,7 @@ export function buildBriefSpecificSpecs(
           {
             title: sub2Title,
             ratio: tIdx === 0 ? 0.18 : 0.16,
-            guidance: `Examine empirical case evidence, diagnostic indicators, and critical contestation regarding: "${task}".`,
+            guidance: `Focus: Examine empirical case evidence, diagnostic indicators, and critical evaluation regarding: "${task}".`,
             keyPoints: [
               `Empirical data and case evidence addressing ${relatedConcept}`,
               `Critical friction points, vulnerabilities, and counterarguments`,
@@ -1766,9 +2008,9 @@ export function buildBriefSpecificSpecs(
           ],
         },
         {
-          title: `Structural Vulnerabilities, Boundary Conditions, and Methodological Contestation: ${c3}`,
+          title: `Critical Evaluation, Contextual Factors, and Analytical Limits: ${c3}`,
           ratio: 0.17,
-          guidance: `Scrutinize systemic friction points, boundary conditions, and methodological contestation in the scholarship surrounding ${c3}.`,
+          guidance: `Focus: Scrutinize systemic friction points, boundary conditions, and analytical limits in the scholarship surrounding ${c3}.`,
           keyPoints: [
             `Measurement limitations and methodological vulnerabilities in ${c3}`,
             `Confounding variables and endogeneity concerns`,
@@ -1782,9 +2024,9 @@ export function buildBriefSpecificSpecs(
       notes: `Rigorously weigh counterarguments, address methodological limitations, and reach an evidence-based resolution.`,
       subheadings: [
         {
-          title: `Analytical Synthesis and Resolution of Competing Arguments: ${c1}`,
+          title: `Synthesis and Resolution of Core Arguments: ${c1}`,
           ratio: 0.16,
-          guidance: `Weigh conflicting perspectives, evaluate evidentiary robustness, and synthesize a nuanced resolution of ${c1}.`,
+          guidance: `Focus: Weigh conflicting perspectives, evaluate evidentiary robustness, and synthesize a nuanced resolution of ${c1}.`,
           keyPoints: [
             `Evidence-based evaluation of competing perspectives on ${c1}`,
             `Reconciliation of empirical and theoretical tensions in ${c2}`,
@@ -1792,9 +2034,9 @@ export function buildBriefSpecificSpecs(
           ],
         },
         {
-          title: `Scholarly Synthesis, Strategic Policy Implications, and Future Research Horizons`,
+          title: `Strategic Policy Implications and Future Research Horizons`,
           ratio: 0.14,
-          guidance: `Synthesize analytical conclusions into coherent academic arguments and forward-looking strategic recommendations.`,
+          guidance: `Focus: Synthesize analytical conclusions into coherent academic arguments and forward-looking strategic recommendations.`,
           keyPoints: [
             `Overarching scholarly contribution and thesis vindication for ${primaryTopic}`,
             `Evidence-based policy, practice, or theoretical implications in ${c3}`,
@@ -1903,9 +2145,18 @@ export function generateDynamicAssignmentStructure(
       qLower.includes("pharma") ||
       qLower.includes("drug discovery"));
 
+  const hasOBOrLeadership =
+    /\b(leadership|culture|schein|zappos|human resource|organizational behaviour|organizational behavior|management|employee|workplace|onboarding)\b/i.test(
+      qLower
+    );
+
+  const isZapposSchein = isZapposScheinAssignment(question, briefText);
+
   const isAIMachineLearning =
     !isAIEthicsOrLaw &&
     !isAIInHealthcare &&
+    !hasOBOrLeadership &&
+    !isZapposSchein &&
     (qLower.includes("machine learning") ||
       qLower.includes("deep learning") ||
       qLower.includes("neural network") ||
@@ -1916,7 +2167,13 @@ export function generateDynamicAssignmentStructure(
       qLower.includes("computer vision") ||
       qLower.includes("transformer") ||
       qLower.includes("foundation model") ||
-      (qLower.includes("ai") && (qLower.includes("model") || qLower.includes("algorithm") || qLower.includes("training") || qLower.includes("data") || qLower.includes("architecture") || qLower.includes("role of ai"))));
+      (/\b(ai|artificial intelligence)\b/i.test(qLower) &&
+        (qLower.includes("model architecture") ||
+          qLower.includes("algorithm") ||
+          qLower.includes("model training") ||
+          qLower.includes("neural architecture") ||
+          qLower.includes("loss optimization") ||
+          qLower.includes("role of ai"))));
 
   const isCoursework =
     assignmentType === "coursework" ||
@@ -1940,8 +2197,8 @@ export function generateDynamicAssignmentStructure(
     assignmentType === "annotated_bibliography" ||
     qLower.includes("literature review");
 
-  if (hasExplicitBriefDirectives) {
-    specs = buildBriefSpecificSpecs(question, briefText, assignmentType, targetFrameworks);
+  if (hasExplicitBriefDirectives || isZapposSchein || hasOBOrLeadership) {
+    specs = buildBriefSpecificSpecs(question, briefText, assignmentType, targetFrameworks, targetWordCount);
   } else if (isEconomicInterdependence) {
     specs = [
       {

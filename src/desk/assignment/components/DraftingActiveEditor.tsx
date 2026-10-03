@@ -281,13 +281,16 @@ export function DraftingActiveEditor({
       </header>
 
       {/* Section Guidance & Bound Citations Strip */}
-      <div className="px-5 py-3 border-b border-neutral-100 dark:border-white/5 bg-neutral-50/30 dark:bg-white/[0.01] flex flex-wrap items-center justify-between gap-3 text-xs">
-        <p className="text-neutral-600 dark:text-neutral-400 max-w-xl text-[12px] leading-relaxed line-clamp-2">
-          <strong className="font-medium text-neutral-800 dark:text-neutral-200">
-            Academic Lens:
-          </strong>{" "}
-          {section.guidance}
-        </p>
+      {(section.guidance || boundSources.length > 0) && (
+        <div className="px-5 py-3 border-b border-neutral-100 dark:border-white/5 bg-neutral-50/30 dark:bg-white/[0.01] flex flex-wrap items-center justify-between gap-3 text-xs">
+          {section.guidance && (
+            <p className="text-neutral-600 dark:text-neutral-400 max-w-xl text-[12px] leading-relaxed line-clamp-2">
+              <strong className="font-medium text-neutral-800 dark:text-neutral-200">
+                Focus:
+              </strong>{" "}
+              {section.guidance.replace(/^Academic\s+Lens:\s*/i, "").replace(/^Focus:\s*/i, "")}
+            </p>
+          )}
 
         {boundSources.length > 0 && (
           <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
@@ -306,6 +309,7 @@ export function DraftingActiveEditor({
           </div>
         )}
       </div>
+      )}
 
       {/* Inline Section Action Controls Toolbar */}
       <div className="px-5 py-2.5 border-b border-neutral-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-[#1C1C1E]">

@@ -207,14 +207,12 @@ export function DraftingSectionIndex({
           const innerCardContent = (
             <>
               <div className="flex items-start justify-between gap-2 mb-1">
-                <span className="text-[10px] font-mono font-medium text-neutral-400 dark:text-neutral-500 uppercase tracking-wider truncate max-w-[130px]">
+                <span className="text-[11px] font-mono font-medium text-neutral-400 dark:text-neutral-500">
                   {section.sectionType === "intro"
-                    ? "Introduction"
+                    ? "1.0 Introduction"
                     : section.sectionType === "conclusion"
-                    ? "Conclusion"
-                    : (section.academicFunction && section.academicFunction !== section.title
-                        ? section.academicFunction
-                        : `Section ${idx + 1}`)}
+                    ? `${sections.length}.0 Conclusion`
+                    : `Section ${idx + 1}`}
                 </span>
 
                 {/* Status Indicator */}

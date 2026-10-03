@@ -36,6 +36,7 @@ import {
   generateReferenceListBlock,
   getReferenceListHeading,
 } from "./referenceListGenerator";
+import { isTutorialOrShortQABrief } from "../../../utils/briefExtractor";
 
 export interface AssignmentExportParams {
   title: string;
@@ -140,6 +141,79 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
     left: 1440,
     right: 1440,
   };
+
+  const isTutorialOrShortQA =
+    computedWordCount <= 600 ||
+    (brief.targetWordCount !== undefined && brief.targetWordCount <= 600) ||
+    isTutorialOrShortQABrief(brief.rawPrompt || brief.instructions || title, computedWordCount);
+
+  if (isTutorialOrShortQA) {
+    const qnaChildren: Paragraph[] = [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 200, after: 400 },
+        children: [
+          new TextRun({
+            text: title,
+            font: "Times New Roman",
+            size: 32, // 16pt
+            bold: true,
+          }),
+        ],
+      }),
+    ];
+
+    sections.forEach((sec, idx) => {
+      qnaChildren.push(
+        new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: idx === 0 ? 100 : 300, after: 120 },
+          children: [
+            new TextRun({
+              text: sec.title,
+              font: "Times New Roman",
+              size: 26, // 13pt
+              bold: true,
+            }),
+          ],
+        })
+      );
+
+      const paragraphs = (sec.draftContent || "")
+        .split(/\n\s*\n/)
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
+
+      paragraphs.forEach((pText) => {
+        const cleanP = pText.replace(/^#+\s*/, "");
+        qnaChildren.push(
+          new Paragraph({
+            spacing: { line: 320, after: 140 },
+            children: [
+              new TextRun({
+                text: cleanP,
+                font: "Times New Roman",
+                size: 24, // 12pt
+              }),
+            ],
+          })
+        );
+      });
+    });
+
+    const doc = new Document({
+      sections: [
+        {
+          properties: {
+            page: { margin: academicMargins },
+          },
+          children: qnaChildren,
+        },
+      ],
+    });
+
+    return await Packer.toBlob(doc);
+  }
 
   // Section 1: University Title Page
   const titlePageChildren: (Paragraph | Table)[] = [
@@ -535,6 +609,11 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
     return;
   }
 
+  const isTutorialOrShortQA =
+    computedWordCount <= 600 ||
+    (brief.targetWordCount !== undefined && brief.targetWordCount <= 600) ||
+    isTutorialOrShortQABrief(brief.rawPrompt || brief.instructions || title, computedWordCount);
+
   const sectionsHtml = sections
     .map((s) => {
       const paras = (s.draftContent || "")
@@ -546,6 +625,56 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
       return `<section class="academic-section"><h2>${s.title}</h2>${paras || "<p><em>[Section complete]</em></p>"}</section>`;
     })
     .join("\n");
+
+  if (isTutorialOrShortQA) {
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${title}</title>
+  <style>
+    @page { size: A4; margin: 2.54cm; }
+    @media print { .no-print { display: none !important; } }
+    body {
+      font-family: "Times New Roman", Times, Georgia, serif;
+      font-size: 12pt;
+      line-height: 1.6;
+      color: #111;
+      margin: 0 auto;
+      max-width: 800px;
+      padding: 2.54cm;
+      background: #fff;
+    }
+    h1 { font-size: 20pt; font-weight: bold; margin-bottom: 2rem; text-align: center; }
+    h2 { font-size: 14pt; font-weight: bold; margin-top: 1.5rem; margin-bottom: 0.8rem; }
+    p { margin: 0 0 1.2rem; text-align: justify; }
+    .print-btn-bar { position: fixed; top: 16px; right: 16px; background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 8px 12px; }
+    .print-btn { background: #111; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="print-btn-bar no-print">
+    <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+  <h1>${title}</h1>
+  <main>
+    ${sectionsHtml}
+  </main>
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      setTimeout(() => { window.print(); }, 500);
+    });
+  </script>
+</body>
+</html>
+    `.trim();
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    return;
+  }
 
   const bibliographyHtml = bibliographyEntries.length > 0
     ? bibliographyEntries.map((ref) => `<p class="bib-entry">${ref}</p>`).join("\n")

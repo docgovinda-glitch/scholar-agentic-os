@@ -13,99 +13,86 @@ describe("PresentationWorkspace", () => {
     });
   });
 
-  it("renders 4-step guided studio workflow with 01 Scaffolding, 02 Themes, 03 Studio, and 04 Delivery", () => {
+  it("renders 4-step guided studio workflow with 01 Understand, 02 Design, 03 Edit Slides, and 04 Present with no PostgreSQL or Defense Tools", () => {
     render(<PresentationWorkspace projectId="proj-pres-1" />);
 
     expect(screen.getByText(/Presentation Studio/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /01 Scaffolding/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /02 Themes & Templates/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /03 Canvas Studio/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /04 Delivery & Export/i })).toBeInTheDocument();
-    expect(screen.getByText(/Saved to PostgreSQL/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /01 Understand/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /02 Design/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /03 Edit Slides/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /04 Present/i })).toBeInTheDocument();
+    expect(screen.getByText(/All changes saved|Saved/i)).toBeInTheDocument();
+    expect(screen.queryByText(/PostgreSQL/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Defense Tools/i)).not.toBeInTheDocument();
   });
 
-  it("navigates between steps via stepper buttons", async () => {
+  it("navigates between steps via clean stepper buttons", async () => {
     render(<PresentationWorkspace projectId="proj-pres-1" />);
 
-    // Switch to Step 01 Scaffolding
-    const step1Btn = screen.getByRole("button", { name: /01 Scaffolding/i });
+    // Switch to Step 01 Understand
+    const step1Btn = screen.getByRole("button", { name: /01 Understand/i });
     fireEvent.click(step1Btn);
     expect(screen.getByTestId("step-01-scaffolding")).toBeInTheDocument();
-    expect(screen.getByText(/Architect Your Presentation Narrative/i)).toBeInTheDocument();
+    expect(screen.getByText(/Understand Your Presentation/i)).toBeInTheDocument();
 
-    // Switch to Step 02 Themes
-    const step2Btn = screen.getByRole("button", { name: /02 Themes & Templates/i });
+    // Switch to Step 02 Design
+    const step2Btn = screen.getByRole("button", { name: /02 Design/i });
     fireEvent.click(step2Btn);
-    expect(screen.getByTestId("step-02-theme-template")).toBeInTheDocument();
-    expect(screen.getByText(/Select Design Theme or Bring Your Own Template/i)).toBeInTheDocument();
+    expect(screen.getByText("Choose Presentation Design")).toBeInTheDocument();
 
-    // Switch to Step 04 Delivery
-    const step4Btn = screen.getByRole("button", { name: /04 Delivery & Export/i });
+    // Switch to Step 04 Present
+    const step4Btn = screen.getByRole("button", { name: /04 Present/i });
     fireEvent.click(step4Btn);
     expect(screen.getByTestId("step-04-delivery")).toBeInTheDocument();
     expect(screen.getByText(/Step 04 · Delivery & Presentation/i)).toBeInTheDocument();
 
-    // Return to Step 03 Studio
-    const step3Btn = screen.getByRole("button", { name: /03 Canvas Studio/i });
+    // Return to Step 03 Edit Slides
+    const step3Btn = screen.getByRole("button", { name: /03 Edit Slides/i });
     fireEvent.click(step3Btn);
     expect(screen.getByTestId("step-03-studio-canvas")).toBeInTheDocument();
   });
 
-  it("Step 01: generates 5-beat architecture from topic prompt", () => {
+  it("Step 01: generates clean outline with human titles from topic prompt", () => {
     render(<PresentationWorkspace projectId="proj-pres-1" />);
 
-    // Go to scaffolding
-    fireEvent.click(screen.getByRole("button", { name: /01 Scaffolding/i }));
+    // Go to understand
+    fireEvent.click(screen.getByRole("button", { name: /01 Understand/i }));
 
-    const input = screen.getByPlaceholderText(/e\.g\. Quantum Computing/i);
+    const input = screen.getByPlaceholderText(/Why Zappos|Quantum Computing/i);
     fireEvent.change(input, {
-      target: { value: "Quantum Computing & Cryptographic Verification" },
+      target: { value: "Why Zappos Pays New Hires to Quit" },
     });
 
-    const genBtn = screen.getByRole("button", { name: /Generate 5-Beat Architecture/i });
+    const genBtn = screen.getByRole("button", { name: /Create Slides Outline/i });
     fireEvent.click(genBtn);
 
-    expect(screen.getByText(/Generated Narrative Architecture/i)).toBeInTheDocument();
-    expect(screen.getByText(/Beat 1/i)).toBeInTheDocument();
-    expect(screen.getByText(/Beat 5/i)).toBeInTheDocument();
+    expect(screen.getByText(/Generated (Slides|Presentation) Outline/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Why Zappos Pays New Hires to Quit/i).length).toBeGreaterThan(0);
   });
 
-  it("Step 02: supports preset theme selection and BYOT contrast validation", () => {
+  it("Step 02: displays exactly 4 curated theme cards and custom accent picker with zero cloner or 20+ filter chips", () => {
     render(<PresentationWorkspace projectId="proj-pres-1" />);
 
-    // Go to themes
-    fireEvent.click(screen.getByRole("button", { name: /02 Themes & Templates/i }));
+    // Go to design themes
+    fireEvent.click(screen.getByRole("button", { name: /02 Design/i }));
 
-    // Click BYOT tab
-    const byotTab = screen.getByRole("button", { name: /Bring Your Own Template/i });
-    fireEvent.click(byotTab);
+    // 4 Clean theme cards
+    expect(screen.getByTestId("theme-card-sand-academic")).toBeInTheDocument();
+    expect(screen.getByTestId("theme-card-minimal-clean")).toBeInTheDocument();
+    expect(screen.getByTestId("theme-card-editorial-warm")).toBeInTheDocument();
+    expect(screen.getByTestId("theme-card-deep-midnight")).toBeInTheDocument();
 
-    expect(screen.getByText(/10% Accent Signal Color/i)).toBeInTheDocument();
-    expect(screen.getByText(/WCAG AA Pass/i)).toBeInTheDocument();
+    // Custom accent color picker
+    expect(screen.getByTestId("custom-accent-picker")).toBeInTheDocument();
+    expect(screen.getByText(/WCAG AA/i)).toBeInTheDocument();
+
+    // Verify bloat is removed
+    expect(screen.queryByText(/22 Curated Presets/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/AI Theme Maker/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Freestyle \(Random\)/i)).not.toBeInTheDocument();
   });
 
-  it("Step 02: displays 22 Kimi and Gamma themes with category filtering and search", () => {
-    render(<PresentationWorkspace projectId="proj-pres-1" />);
-
-    // Go to themes
-    fireEvent.click(screen.getByRole("button", { name: /02 Themes & Templates/i }));
-
-    expect(screen.getByText(/22 Curated Presets/i)).toBeInTheDocument();
-    expect(screen.getByText(/Dark & Cyber · Kimi/i)).toBeInTheDocument();
-    expect(screen.getByText(/Vibrant & Modern · Gamma/i)).toBeInTheDocument();
-
-    // Filter by Kimi Cyber themes
-    fireEvent.click(screen.getByRole("button", { name: /Dark & Cyber · Kimi/i }));
-    expect(screen.getByText(/Obsidian Aurora/i)).toBeInTheDocument();
-    expect(screen.getByText(/Cyber Quantum/i)).toBeInTheDocument();
-    expect(screen.getByText(/Midnight Onyx/i)).toBeInTheDocument();
-
-    // Select Obsidian Aurora
-    fireEvent.click(screen.getByRole("button", { name: /Obsidian Aurora/i }));
-    expect(screen.getByText(/Open Canvas Studio \(Obsidian Aurora\)/i)).toBeInTheDocument();
-  });
-
-  it("Step 03: supports WYSIWYG text editing, 6x6 bullet alerts, and layout switching", () => {
+  it("Step 03: supports WYSIWYG text editing, 6x6 bullet alerts, layout switching, and Split Image + Text layout", () => {
     render(<PresentationWorkspace projectId="proj-pres-1" />);
 
     // Defaults to studio
@@ -115,13 +102,17 @@ describe("PresentationWorkspace", () => {
     // Switch layout to Big Metric Focus
     const metricLayoutBtn = screen.getByRole("button", { name: /Big Metric Focus/i });
     fireEvent.click(metricLayoutBtn);
-
     expect(screen.getByDisplayValue("4.2x")).toBeInTheDocument();
 
-    // Switch layout to 2-Column Comparative
-    const colLayoutBtn = screen.getByRole("button", { name: /2-Column Comparative/i });
-    fireEvent.click(colLayoutBtn);
+    // Switch layout to Split Image + Text
+    const splitLayoutBtn = screen.getByRole("button", { name: /Split Image \+ Text/i });
+    fireEvent.click(splitLayoutBtn);
+    expect(screen.getByTestId("split-image-text-container")).toBeInTheDocument();
+    expect(screen.getByText(/Key Points/i)).toBeInTheDocument();
 
+    // Switch layout to 2-Column Comparison
+    const colLayoutBtn = screen.getByRole("button", { name: /2-Column Comparison/i });
+    fireEvent.click(colLayoutBtn);
     expect(screen.getByDisplayValue(/Baseline Framework|Baseline Heuristic Model/i)).toBeInTheDocument();
   });
 
@@ -129,7 +120,7 @@ describe("PresentationWorkspace", () => {
     render(<PresentationWorkspace projectId="proj-pres-1" />);
 
     // Go to delivery
-    fireEvent.click(screen.getByRole("button", { name: /04 Delivery & Export/i }));
+    fireEvent.click(screen.getByRole("button", { name: /04 Present/i }));
 
     // Initial Stage View: minimal footer
     expect(screen.queryByTestId("leave-behind-footer")).not.toBeInTheDocument();
@@ -143,7 +134,7 @@ describe("PresentationWorkspace", () => {
     expect(screen.getByText(/Provenance:/i)).toBeInTheDocument();
   });
 
-  it("triggers 500ms debounced autosave to PostgreSQL REST API on slide mutation", async () => {
+  it("triggers 500ms debounced autosave with clean indicator and zero PostgreSQL leakage", async () => {
     vi.useFakeTimers();
 
     render(<PresentationWorkspace projectId="proj-pres-deb" />);
@@ -154,7 +145,8 @@ describe("PresentationWorkspace", () => {
       target: { value: "Empirical Proof: 99.8% Grounding Precision Achieved" },
     });
 
-    expect(screen.getByText(/Autosaving\.\.\./i)).toBeInTheDocument();
+    expect(screen.getByText(/Saving changes\.\.\./i)).toBeInTheDocument();
+    expect(screen.queryByText(/PostgreSQL/i)).not.toBeInTheDocument();
 
     // Advance timer by 500ms
     act(() => {

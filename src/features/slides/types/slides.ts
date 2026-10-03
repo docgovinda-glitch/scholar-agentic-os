@@ -11,10 +11,13 @@ export type SlideBlockType =
   | 'metric-callout'
   | 'bullet-list'
   | 'two-column'
-  | 'quote-evidence';
+  | 'quote-evidence'
+  | 'image';
 
 export type SlideLayoutType =
   | 'bullets'
+  | 'image-split'
+  | 'image-hero'
   | 'metric-focus'
   | 'two-column'
   | 'quote-evidence'
@@ -67,12 +70,22 @@ export interface QuoteEvidenceBlock {
   context?: string;
 }
 
+export interface ImageBlock {
+  type: 'image';
+  imageUrl: string;
+  caption?: string;
+  layout?: 'split' | 'hero' | 'card';
+  alt?: string;
+  aspectRatio?: '16:9' | '4:3';
+}
+
 export type SlideBlock =
   | ActionHeaderBlock
   | MetricCalloutBlock
   | BulletListBlock
   | TwoColumnBlock
-  | QuoteEvidenceBlock;
+  | QuoteEvidenceBlock
+  | ImageBlock;
 
 export type NarrativeFramework = 'Universal-5Beat' | 'SCR' | 'WhatIsCouldBe' | 'ABT';
 
@@ -126,6 +139,10 @@ export interface SlideCard {
   summaryBar?: string;
   ratioComparison?: RatioComparisonData;
   pillars?: ColorBlockedPillar[];
+
+  // Image Media Extensions
+  imageUrl?: string;
+  imageCaption?: string;
 }
 
 export interface SlideDeck {

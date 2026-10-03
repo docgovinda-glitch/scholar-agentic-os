@@ -2,69 +2,70 @@
 
 ## 1. Overview & Architecture
 
-Scholar OS **Presentation Studio** is a web-native, academic-grade slide authoring and delivery suite. It replaces dated legacy slide wizards with an intuitive **4-Step Guided Studio** modeled on the UX of Scholar OS Coursework and Essay drafting environments.
+Scholar OS **Presentation Studio** is a web-native, academic-grade slide authoring and delivery suite. It aligns with the design system and intuitive UX of Scholar OS Coursework and Essay drafting environments, purging academic jargon, developer database leakages, and feature bloat.
 
 ```
-01 Scaffolding ──▶ 02 Themes & Templates ──▶ 03 Canvas Studio ──▶ 04 Delivery & Export
+01 Understand ──▶ 02 Design ──▶ 03 Edit Slides ──▶ 04 Present
 ```
 
 ### Core Design Pillars
-1. **Universal 5-Beat Narrative Deconstruction**: Transforms complex academic theses into high-impact, single-idea slides.
-2. **Cognitive Presentation Guardrails**: Eliminates slide clutter via 1-idea constraints, Action Headlines (30–40pt scale), strict 6x6 bullet constraints, and the 3-Second Billboard Filter.
-3. **60/30/10 Visual Distribution & BYOT**: Enforces harmonious visual hierarchy (60% background canvas, 30% structural elevated card, 10% accent signal) with WCAG AA contrast ratio validation.
-4. **100% WYSIWYG Editable Card Canvas**: Direct inline editing with live word-count warning badges and an in-slide AI prompt copilot.
-5. **Dual-Mode Consumption**: Instant switching between minimal live **Stage View** and citation-rich **Leave-Behind View**.
-6. **PostgreSQL Persistence with Debounced Autosave**: Automatic 500ms debounced synchronization via `/api/presentations/:id`.
+1. **Coursework & Essay UX Alignment**: Replaces confusing jargon (*"Scaffolding"*, *"Decomposition"*, *"5-Beat Narrative"*) with clean English (*"Understand"*, *"Topic"*, *"Key Points"*).
+2. **Subtle & Private Auto-Save**: Replaces developer database strings (`"Saved to PostgreSQL"`) with a quiet, non-intrusive status indicator (`"All changes saved"` or `"Saving changes..."`) with a clean green/amber status dot.
+3. **Four Curated Design Themes & Custom Accent**: Replaces 20+ filter chips and AI cloners with 4 aesthetic presets (`Sand Academic`, `Minimal Clean`, `Editorial Warm`, `Deep Midnight`) plus an accessible custom accent color picker with live WCAG AA contrast calculation.
+4. **Native Image Upload & Split-Media Layouts**: First-class support for `Split Image + Text` (`image-split`) and hero layouts with drag-and-drop file upload (`.png`, `.jpg`, `.webp`), URL input, responsive `16:9`/`4:3` aspect ratios, and editable captions.
+5. **Human, Natural Slide Titles**: Concise headline generation (max 8–10 words) stating immediate conclusions rather than AI word salads.
+6. **Purged Feature Bloat**: Completely removed unnecessary extras such as `Defense Tools` dropdowns, 22 filter chips, and AI theme cloners.
 
 ---
 
 ## 2. The 4-Step Guided Workflow
 
-### Step 01: Scaffolding & Decomposition (`Step01Scaffolding.tsx`)
+### Step 01: Understand Your Presentation (`Step01Understand.tsx`)
 - **Intake Modes**:
-  - **📁 Upload Brief or Paper (.pdf, .docx, .txt, .md)**: Coursework intake bridge featuring drag-and-drop file upload (up to 50MB), word count detection, excerpt preview, auto-detected academic thesis title, and automatic 5-beat narrative deconstruction.
-  - **🎯 Academic Topic Prompt**: Generates complete 5-beat academic presentation decks from freeform topic titles (e.g., *"Quantum Computing & Fault-Tolerant Cryptographic Verification"*, *"Corporate Restructuring Under High Rates"*, *"Biomedical Ethics in Autonomous Clinical Trials"*).
-  - **📄 Raw Coursework / Draft Markdown**: Ingests draft sections, decomposing headings and text into single-idea slides.
-- **Cognitive Frameworks**:
-  - `Universal-5Beat` (Default)
-  - `SCR` (Situation · Complication · Resolution)
-  - `WhatIsCouldBe` ("What Is" vs. "What Could Be")
-  - `ABT` (And · But · Therefore)
-- **Live Preview Rail**: Displays thumbnail cards of the 5 beats with action headlines, layout types, and delivery notes.
+  - **📁 Upload Brief or Paper (.pdf, .docx, .txt, .md)**: Drag-and-drop document upload (up to 50MB) with automatic word count detection, excerpt preview, auto-detected title, and slide generation.
+  - **🎯 Presentation Topic or Question**: Generates clean slide outlines from natural topic inputs (e.g., *"Why Zappos Pays New Hires to Quit"*, *"Quantum Computing & Cryptographic Verification"*).
+  - **📄 Raw Notes / Draft Markdown**: Ingests draft sections and bullet points.
+- **Presentation Style Selector**:
+  - `Standard Story` (Context → Problem → Evidence → Solution → Takeaway)
+  - `Problem & Solution` (Executive briefing & immediate resolution)
+  - `Comparison` (Side-by-side analysis & evaluation)
+- **Outline Preview Cards**:
+  - Displays slide cards with natural takeaways and 1-idea-per-slide clarity, avoiding repetitive *"Key Insight 1: Grounded Analysis..."* boilerplate.
 
-### Step 02: Theme Studio & Bring Your Own Template (`Step02ThemeTemplate.tsx`)
-- **Preset Academic Themes (60/30/10 Rule)**:
-  - **Sand Academic** (`#F7F5F0` ground, `#FFFFFF` elevated card, `#0F172A` text, `#2563EB` signal).
-  - **Minimal Slate** (`#F1F5F9` ground, `#FFFFFF` elevated card, `#1E293B` text, `#0F172A` signal).
-  - **Deep Charcoal** (`#171717` ground, `#1C1C1E` elevated card, `#F8FAFC` text, `#60A5FA` signal).
-  - **Editorial Warm** (`#FAF8F5` ground, `#FFFDF9` elevated card, `#292524` text, `#C2410C` signal).
-- **Bring Your Own Template (BYOT)**:
-  - Custom color picker with real-time **WCAG AA contrast validation badge** (`≥ 4.5:1` ratio against elevated cards).
-  - Typography pairings: `Inter`, `Helvetica Neue`, `Noto Sans`, `Newsreader Serif`.
-  - Surface treatment toggle: **Subtle Elevation** (`shadow-xl`) or **Hairline Divider** (`border-neutral-200/80` light, `border-white/10` dark).
+### Step 02: Design Themes & Visual Direction (`Step02ThemeTemplate.tsx`)
+- **4 Curated Academic Presets**:
+  1. **Sand Academic** (`#F7F5F0` light canvas, `#FFFFFF` crisp card, slate text, `#2563EB` royal blue accent).
+  2. **Minimal Clean** (`#FFFFFF` background, `#FAFAFA` elevated card, sharp dark gray typography `#1E293B`, subtle hairline borders).
+  3. **Editorial Warm** (`#FAF8F5` canvas, `#FFFDF9` cream card, rich charcoal text `#292524`, `#C2410C` warm terracotta accent).
+  4. **Deep Midnight** (`#171717` dark canvas, `#1C1C1E` elevated card, light gray text `#F8FAFC`, `#38BDF8` sky blue accent).
+- **Custom Accent Picker**:
+  - Preset color swatches (Royal Blue, Terracotta, Emerald, Violet, Sky Blue, Tomato Red, Solid Black).
+  - Native HTML5 color picker.
+  - Real-time **WCAG AA contrast calculation** badge (`≥ 4.5:1` ratio against cards).
 
-### Step 03: 100% WYSIWYG Editable Studio & Copilot (`Step03StudioCanvas.tsx`)
-- **Direct Canvas Editing**:
-  - Action Headlines: Editable text area at 30pt–40pt typographic scale.
-  - Category Badges: Click-to-edit category tags.
-  - 6x6 Bullet Constraint: Inline list items with real-time word-count badges alerting when any bullet exceeds 6 words.
-  - Big Metric Callout: Editable metric value (`text-5xl md:text-7xl font-black`) and context description.
-  - 2-Column Comparative: Side-by-side editable headers and bullet arrays.
-  - Bottom Drawer: Rehearsal notes and word-for-word delivery cues.
+### Step 03: Edit Slides (`Step03StudioCanvas.tsx`)
+- **100% WYSIWYG Editable Card Canvas**:
+  - Click-to-edit Action Headlines at 30–40pt typographic scale.
+  - Click-to-edit Category Badges.
+  - 6x6 Bullet Constraint: Inline items with live word-count alert badges (`⚠️ >6 words`).
+  - Big Metric Focus: Editable metric stat and empirical context note.
+  - 2-Column Comparison: Side-by-side editable headers and bullet arrays.
+  - Quote / Highlight: Editable quote text and attribution.
+- **Split Image + Text Layout (`image-split`)**:
+  - Left: 50% responsive image container with `16:9` / `4:3` aspect ratio, rounded corners, hairline borders, and hover replace/remove controls.
+  - Right: Key bullet points with real-time word counting.
+  - Local image upload (`.png`, `.jpg`, `.webp`), image URL input, and editable figure caption.
 - **In-Slide AI Prompt Copilot**:
-  - Prompt bar embedded at the base of the active slide card.
-  - Natural language mutations dispatch immediately to local state and PostgreSQL (e.g., *"Convert bullets to a 4.2x metric callout"*, *"Make this slide a 2-column comparison"*, *"Condense into 6-word action bullets"*).
-- **Dynamic Layout Switcher**:
-  - Segmented control to toggle between `Header & 6x6 Bullets`, `Big Metric Focus`, `2-Column Comparative`, and `Quote / Evidence`.
-- **Slide Navigation Rail**:
-  - Add, reorder, duplicate, and delete slide cards.
+  - Clean input bar with one-click quick actions (*"Add an image to this slide"*, *"Change to 2 columns"*, *"Focus on big metric"*, *"Shorten bullets"*).
+- **Speaker Rehearsal Notes Drawer**:
+  - Expandable bottom drawer for word-for-word delivery cues and timing reminders.
 
-### Step 04: Delivery & Presentation Mode (`Step04Delivery.tsx`)
+### Step 04: Present (`Step04Delivery.tsx`)
 - **Presentation Engine**: Fullscreen slide projection with keyboard shortcut traversal.
 - **Rehearsal Timer**: Integrated elapsed timer in `MM:SS` with pause and reset controls.
-- **Speaker Delivery Script**: Floating drawer (`KeyP`) displaying word-for-word speech cues and target durations.
+- **Speaker Delivery Script**: Word-for-word speech cues and target durations.
 - **Dual Consumption Modes**:
-  - **Stage View**: Minimal visual soundtrack designed for live speaking without clutter.
+  - **Stage View**: Minimal visual soundtrack designed for live speaking.
   - **Leave-Behind View**: Displays methodology notes, citations, and research provenance.
 - **Export Formats**:
   - JSON deck export.
@@ -72,63 +73,20 @@ Scholar OS **Presentation Studio** is a web-native, academic-grade slide authori
 
 ---
 
-## 3. Universal 5-Beat Narrative Breakdown Engine
+## 3. Natural Slide Headline Generator (`slideTitleGenerator.ts`)
 
-| Beat | Narrative Role | Visual Layout Focus | Cognitive Requirement |
-| :--- | :--- | :--- | :--- |
-| **Beat 1: The Action Hook** | Establishes immediate empirical authority | Big Metric Focus (`4.2x`, `84%`, etc.) | Answers: *What is the singular high-impact conclusion?* |
-| **Beat 2: Tension & Context** | Unpacks current operational friction | Action Header & 6x6 Bullets | Establishes the cost of inaction before the solution |
-| **Beat 3: The Mechanical Principle** | Explains the underlying theory/mechanism | 2-Column Comparative Layout | Side-by-side contrast: Baseline vs. Grounded model |
-| **Beat 4: Empirical Proof & Case Studies** | Humanized real-world validation | Benchmark Metrics & Bullets | Verifiable trials avoiding raw data dumps |
-| **Beat 5: Strategic Horizon & Synthesis** | Actionable roadmap and next steps | Strategic Roadmap Bullets | Concrete research and deployment milestones |
-
-### Cognitive Guardrails
-- **Action Headlines**: Automatic transformation of passive topic labels (e.g., *"The Problem"*, *"Overview"*, *"Results"*) into pre-digested analytical assertions.
-- **6x6 Bullet Constraint**: Strictly enforced limit of 6 bullets per list, 6 words per bullet.
-- **3-Second Billboard Filter**: Explanatory paragraphs (> 2 lines) are routed into `speakerNotes` rather than the slide canvas.
+Replaces run-on academic jargon with punchy, human titles (max 8–10 words):
+- *"Autonomous Knowledge Grounding in Multi-Agent Scientific Synthesis Solves Fundamental"* ➔ **"How Multi-Agent Systems Verify Scientific Papers"**
+- Repetitive *"Key Insight 1: Grounded Analysis of MN6094NI"* ➔ **"Why Zappos Pays New Hires to Quit"**
 
 ---
 
 ## 4. Keyboard Shortcuts Reference
 
-| Key Combination | Action | Isolation Scope |
+| Key Combination | Action | Scope |
 | :--- | :--- | :--- |
-| `ArrowRight` / `Space` / `PageDown` | Advance to next slide | Disabled when typing in `<input>`, `<textarea>`, or contenteditable |
-| `ArrowLeft` / `PageUp` | Return to previous slide | Disabled when typing in `<input>`, `<textarea>`, or contenteditable |
-| `Home` | Jump to first slide | Disabled when typing in `<input>`, `<textarea>`, or contenteditable |
-| `End` | Jump to last slide | Disabled when typing in `<input>`, `<textarea>`, or contenteditable |
+| `ArrowRight` / `Space` / `PageDown` | Advance to next slide | Disabled when editing text |
+| `ArrowLeft` / `PageUp` | Return to previous slide | Disabled when editing text |
+| `Home` | Jump to first slide | Disabled when editing text |
+| `End` | Jump to last slide | Disabled when editing text |
 | `KeyF` / `f` | Toggle Fullscreen Mode | Global |
-| `KeyP` / `p` | Toggle Speaker Notes Drawer | Global |
-| `Escape` | Exit Fullscreen Mode | Global |
-
----
-
-## 5. PostgreSQL Database Schema & Persistence
-
-### Table: `presentation_decks`
-```sql
-CREATE TABLE IF NOT EXISTS presentation_decks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title VARCHAR(255) NOT NULL,
-  topic VARCHAR(255),
-  framework VARCHAR(50) DEFAULT 'Universal-5Beat',
-  theme_id VARCHAR(50) DEFAULT 'sand-academic',
-  custom_theme JSONB DEFAULT NULL,
-  slides JSONB NOT NULL DEFAULT '[]'::jsonb,
-  source_module VARCHAR(50),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_presentation_decks_created_at ON presentation_decks(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_presentation_decks_topic ON presentation_decks(topic);
-```
-
-### REST API Endpoints (`server/routes/presentations.ts`)
-- `GET /api/presentations`: List all decks ordered by `updated_at DESC`.
-- `GET /api/presentations/:id`: Retrieve single presentation deck.
-- `POST /api/presentations`: Create a new presentation deck.
-- `PUT /api/presentations/:id`: Debounced autosave (500ms) for slides, themes, and metadata.
-- `DELETE /api/presentations/:id`: Remove deck.
-- `POST /api/presentations/:id/copilot`: Natural language in-slide transformation endpoint.
-- `POST /api/presentations/parse-document`: Multipart document parsing for PDF, DOCX, TXT, and Markdown briefs with automatic word count detection and heuristic topic title extraction.

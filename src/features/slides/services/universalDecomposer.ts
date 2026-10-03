@@ -44,6 +44,8 @@ const PASSIVE_LABELS: Record<string, string> = {
   data: 'High-Fidelity Telemetry and Observed Metrics',
 };
 
+import { generateNaturalSlideTitle, cleanHumanTitle } from './slideTitleGenerator';
+
 /**
  * Transforms a passive label into an active analytical assertion.
  */
@@ -58,13 +60,20 @@ export function transformToActiveHeadline(raw: string, contextTopic?: string): s
   }
 
   // If already an assertion or long descriptive headline, clean and return
-  if (trimmed.length > 15 && !trimmed.toLowerCase().startsWith('slide')) {
-    return trimmed;
+  if (trimmed.length > 15 && !trimmed.toLowerCase().startsWith('slide') && !trimmed.toLowerCase().startsWith('key insight')) {
+    return cleanHumanTitle(trimmed);
   }
 
-  return contextTopic
-    ? `${trimmed || 'Core Synthesis'}: Grounded Analysis of ${contextTopic}`
-    : trimmed || 'Grounded Analytical Synthesis';
+  // Prevent repetitive robotic template "Key Insight X: Grounded Analysis of..."
+  if (/^key\s+insight/i.test(trimmed) || trimmed.toLowerCase().includes('grounded analysis')) {
+    return generateNaturalSlideTitle(trimmed, contextTopic);
+  }
+
+  if (contextTopic) {
+    return generateNaturalSlideTitle(trimmed, contextTopic);
+  }
+
+  return cleanHumanTitle(trimmed) || 'Key Analytical Synthesis';
 }
 
 /**

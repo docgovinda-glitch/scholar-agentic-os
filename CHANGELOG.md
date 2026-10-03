@@ -5,7 +5,24 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-30
+## [Unreleased] - 2026-10-03
+
+### Presentation Studio Redesign & Coursework UX Alignment
+- **Aligned 4-Step Guided Workflow (`PresentationWorkspace.tsx`)**:
+  - Renamed all steps to plain, human language: `01 Understand`, `02 Design`, `03 Edit Slides`, and `04 Present`.
+  - Replaced developer database indicators (`"Saved to PostgreSQL"`) with a subtle `"All changes saved"` / `"Saving changes..."` indicator and clean status dot.
+  - Completely purged the `🎙️ Defense Tools` dropdown button and legacy mock simulation dependencies.
+- **Understand Your Presentation (`Step01Understand.tsx`, `Step01Scaffolding.tsx`)**:
+  - Replaced academic framework jargon with clear prompts: *"Presentation Topic or Question"*, *"Presentation Style"* (`Standard Story`, `Problem & Solution`, `Comparison`), and a clean *"Create Slides Outline"* action.
+  - Eliminated repetitive *"Key Insight 1: Grounded Analysis..."* outline titles, replacing them with dynamic topic takeaways.
+- **4 Curated Theme Presets & Custom Accent (`Step02ThemeTemplate.tsx`)**:
+  - Purged 20+ filter chips, Kimi/Gamma tags, and AI theme cloner tools.
+  - Added 4 curated presets (`Sand Academic`, `Minimal Clean`, `Editorial Warm`, `Deep Midnight`) plus a custom color picker with live WCAG AA contrast calculation.
+- **Native Image Support & Split-Media Layouts (`Step03StudioCanvas.tsx`, `SlideCardBlock.tsx`, `slides.ts`)**:
+  - Added `Split Image + Text` (`image-split`) and hero layouts with drag-and-drop file upload (`.png`, `.jpg`, `.webp`), image URL input, `16:9`/`4:3` responsive containers, and editable figure captions.
+  - Added quick prompt chips to the in-slide AI copilot (*"Add an image to this slide"*, *"Change to 2 columns"*, *"Focus on big metric"*, *"Shorten bullets"*).
+- **Natural Slide Headline Generator (`slideTitleGenerator.ts`)**:
+  - Enforced concise, punchy headlines (max 8–10 words) that immediately communicate takeaways without AI word salads.
 
 ### UI & UX Refinements (Phase I & II)
 - **Removed Hardcoded Outline Terminology (`outlineService.ts`, `assignment.ts`)**:

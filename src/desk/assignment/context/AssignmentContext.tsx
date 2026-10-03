@@ -576,11 +576,12 @@ export function AssignmentProvider({
   );
 
   const question = extractStandardizedInstructions(answers);
-  const assignmentBriefText =
+  const briefText =
     cleanAnswerString(answers["assignment_brief_text"]) ||
     cleanAnswerString(answers["briefText"]) ||
     cleanAnswerString(answers["brief"]) ||
     question;
+  const assignmentBriefText = briefText;
 
   const structure: AssignmentStructure = useMemo(() => {
     const raw = answers["assignment_structure"] || answers["structure"];
@@ -588,7 +589,18 @@ export function AssignmentProvider({
       try {
         const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
         if (parsed?.headings && Array.isArray(parsed.headings) && parsed.headings.length > 0) {
-          return parsed;
+          const isNonMLTopic = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
+          const hasLeakedML = parsed.headings.some((h: any) =>
+            /Mathematical Formulations|Loss Optimization Landscapes|Algorithmic Architectures/i.test(h.title || "") ||
+            (h.subheadings || []).some((sub: any) => /Mathematical Formulations|Loss Optimization Landscapes|empirical risk minimization/i.test(sub.title || sub.guidance || ""))
+          );
+          const hasClassroomLogistics = parsed.headings.some((h: any) =>
+            /Divide Yourself in Teams|teams of 2|in classroom discussion/i.test(h.title || "")
+          );
+
+          if (!((isNonMLTopic && hasLeakedML) || hasClassroomLogistics)) {
+            return parsed;
+          }
         }
       } catch {}
     }
@@ -597,8 +609,9 @@ export function AssignmentProvider({
       assignmentType,
       academicLevel,
       targetWordCount: targetWordCount > 0 ? targetWordCount : 2000,
+      briefText: cleanAnswerString(briefText),
     });
-  }, [answers, question, assignmentType, academicLevel, targetWordCount]);
+  }, [answers, question, assignmentType, academicLevel, targetWordCount, briefText]);
 
   const setStructure = useCallback(
     async (newStructure: AssignmentStructure) => {
@@ -806,18 +819,25 @@ export function AssignmentProvider({
   }, [answers]);
 
   const internalSections: AssignmentDraftingSection[] = useMemo(() => {
+    const isNonML = !/\b(machine learning|deep learning|neural network|transformer|foundation model)\b/i.test(`${question} ${briefText}`);
+    const isCorrupted = (list: any[]) =>
+      list.some((sec: any) =>
+        (isNonML && /Mathematical Formulations|Loss Optimization Landscapes|Algorithmic Architectures/i.test(sec.title || "")) ||
+        /Divide Yourself in Teams|teams of 2|in classroom discussion/i.test(sec.title || "")
+      );
+
     const rawInternal = answers["assignment_internal_sections"];
     if (rawInternal) {
       try {
         const parsed = typeof rawInternal === "string" ? JSON.parse(rawInternal) : rawInternal;
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0 && !isCorrupted(parsed)) return parsed;
       } catch {}
     }
     const rawOutline = answers["assignment_outline"];
     if (rawOutline) {
       try {
         const parsed = typeof rawOutline === "string" ? JSON.parse(rawOutline) : rawOutline;
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed) && parsed.length > 0 && !isCorrupted(parsed)) {
           return parsed.map((sec: any) => ({
             id: sec.id,
             title: sec.title,
@@ -836,7 +856,7 @@ export function AssignmentProvider({
       } catch {}
     }
     return [];
-  }, [answers]);
+  }, [answers, question, briefText]);
 
   const submissionReport: RubricScoreReport | SubmissionCheckReport | null = answers["assignment_submission_report"]
     ? (typeof answers["assignment_submission_report"] === "string"

@@ -1,6 +1,11 @@
 import { StateGraph, Annotation, END, START } from "@langchain/langgraph";
 import { z } from "zod";
 import type { AssignmentAnalysis, CommandVerbDetail } from "../../src/desk/assignment/types.ts";
+import {
+  isClassroomNoise,
+  repairHyphenatedAndSoftLineBreaks,
+  filterPedagogicalNoise,
+} from "../../src/features/understand/services/briefSanitizer.ts";
 
 /**
  * Standard university command verb definitions and examiner expectations
@@ -76,11 +81,25 @@ export const COMMAND_VERB_MAP: Record<string, { meaning: string; expectation: st
  * Line Indexer: Formats raw text into line-numbered strings [L001], [L002]...
  */
 export function indexDocumentLines(rawText: string): string[] {
-  return rawText
+  const rawLines = rawText
     .split(/\r?\n/)
     .map((l) => l.trim())
-    .filter((l) => l.length > 0)
-    .map((line, idx) => `[L${String(idx + 1).padStart(3, "0")}] ${line}`);
+    .filter((l) => l.length > 0);
+
+  // If already tagged (e.g. from unit tests), preserve
+  if (rawLines.length > 0 && /^\[L\d{3}\]/.test(rawLines[0])) {
+    return rawLines;
+  }
+
+  // Strip classroom chatter if present
+  const cleanLines: string[] = [];
+  for (const line of rawLines) {
+    if (!isClassroomNoise(line)) {
+      cleanLines.push(line);
+    }
+  }
+
+  return cleanLines.map((line, idx) => `[L${String(idx + 1).padStart(3, "0")}] ${line}`);
 }
 
 /**
@@ -212,6 +231,17 @@ function scanBatch(state: ScannerState) {
         lineContent
       )
     ) {
+      if (isClassroomNoise(lineContent)) {
+        continue;
+      }
+      // Skip fragments that are too short to be meaningful questions
+      if (
+        lineContent.trim().length < 15 &&
+        !/(?:assess|evaluate|analyse|analyze|explain|justify)/i.test(lineContent)
+      ) {
+        continue;
+      }
+
       rawFindings.push({
         lineRange: lineTag,
         category: "prompt",
