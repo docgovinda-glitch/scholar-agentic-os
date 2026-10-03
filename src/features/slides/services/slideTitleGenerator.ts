@@ -22,10 +22,10 @@ const JARGON_REMOVAL_PATTERNS = [
 const BOTTLENECK_TOPICS: Record<string, string[]> = {
   zappos: [
     'Why Zappos Pays New Hires to Quit',
-    'The 3 Levels of Company Culture',
-    'Can Changing Office Perks Fix Culture?',
+    "Schein's Three Levels of Culture",
+    'Can Office Perks Change Culture?',
     'Assessing Culture in Job Interviews',
-    'What Leaders Must Learn from the Offer',
+    'What Leaders Learn from the Offer',
   ],
   culture: [
     'The Truth About Workplace Culture',

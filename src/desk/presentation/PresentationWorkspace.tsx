@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import type {
   SlideDeck,
   SlideCard,
@@ -6,19 +6,19 @@ import type {
   NarrativeFramework,
 } from '../../features/slides';
 import {
-  Step01Scaffolding,
+  Step01Understand,
   Step02ThemeTemplate,
   Step03StudioCanvas,
   Step04Delivery,
   SlideCanvas,
-  decomposeToUniversal5Beat,
+  generateSlideDeck,
   extractSlidesFromAcademicText,
   SLIDE_THEMES,
   type SlideThemeId,
 } from '../../features/slides';
 import LiveSlidePlayer from './components/LiveSlidePlayer';
 
-export type PresentationStudioStep = 'scaffolding' | 'themes' | 'studio' | 'delivery';
+export type PresentationStudioStep = 'understand' | 'themes' | 'studio' | 'delivery' | 'scaffolding';
 
 export interface PresentationWorkspaceProps {
   projectId: string;
@@ -28,10 +28,11 @@ export interface PresentationWorkspaceProps {
   onOpenAiAccess?: () => void;
   initialCourseworkText?: string;
   initialDeck?: SlideDeck | null;
+  initialStep?: PresentationStudioStep;
 }
 
 const STEPS: Array<{ id: PresentationStudioStep; label: string; icon: string; desc: string }> = [
-  { id: 'scaffolding', label: '01 Understand', icon: '⚡', desc: 'Define your topic and outline' },
+  { id: 'understand', label: '01 Understand', icon: '⚡', desc: 'Define your topic and outline' },
   { id: 'themes', label: '02 Design', icon: '🎨', desc: 'Curated Themes & Visual Accents' },
   { id: 'studio', label: '03 Edit Slides', icon: '✏️', desc: 'WYSIWYG Editable Slide Canvas' },
   { id: 'delivery', label: '04 Present', icon: '🖥️', desc: 'Stage View, Fullscreen & Export' },
@@ -42,8 +43,9 @@ export default function PresentationWorkspace({
   onClose,
   initialCourseworkText,
   initialDeck,
+  initialStep = 'studio',
 }: PresentationWorkspaceProps) {
-  const [currentStep, setCurrentStep] = useState<PresentationStudioStep>('studio');
+  const [currentStep, setCurrentStep] = useState<PresentationStudioStep>(initialStep);
   const [showLivePlayer, setShowLivePlayer] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle'>('saved');
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
@@ -56,16 +58,16 @@ export default function PresentationWorkspace({
     if (initialDeck !== undefined) return initialDeck;
     if (initialCourseworkText !== undefined) {
       if (!initialCourseworkText.trim()) return null;
-      return decomposeToUniversal5Beat({
+      return generateSlideDeck({
         text: initialCourseworkText,
-        framework: 'Universal-5Beat',
+        framework: 'Standard-Narrative',
       });
     }
 
     // Default Academic Deck
-    return decomposeToUniversal5Beat({
+    return generateSlideDeck({
       topic: 'How Multi-Agent Systems Verify Scientific Papers',
-      framework: 'Universal-5Beat',
+      framework: 'Standard-Narrative',
     });
   });
 
@@ -119,21 +121,20 @@ export default function PresentationWorkspace({
   // Convert empty coursework input
   const handleExtractFromDraft = () => {
     if (!draftInput.trim()) return;
-    const generated = decomposeToUniversal5Beat({
+    const generated = generateSlideDeck({
       text: draftInput,
-      framework: 'Universal-5Beat',
+      framework: 'Standard-Narrative',
     });
     setDeck(generated);
     triggerDebouncedAutosave(generated);
     setCurrentStep('studio');
   };
 
-
   // Render Clean Empty State when explicitly provided empty text
   if (deck === null) {
     return (
       <div
-        className="min-h-screen bg-[color:var(--surface-canvas,#F7F5F0)] dark:bg-[#171717] text-neutral-900 dark:text-white p-6 flex flex-col justify-center items-center"
+        className="min-h-screen bg-[#F7F5F0] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 p-6 flex flex-col justify-center items-center"
         data-testid="slide-card-empty-state"
       >
         <div className="max-w-xl w-full bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl border border-neutral-200/80 dark:border-white/10 shadow-xl space-y-6 text-center">
@@ -159,7 +160,7 @@ export default function PresentationWorkspace({
               value={draftInput}
               onChange={(e) => setDraftInput(e.target.value)}
               placeholder="Paste draft sections here (e.g. ## Breakthrough Synthesis...)"
-              className="w-full p-3 text-xs font-mono rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-black/20 text-neutral-900 dark:text-white focus:outline-none"
+              className="w-full p-3 text-xs font-mono rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/[0.03] text-neutral-900 dark:text-white focus:outline-none"
             />
           </div>
 
@@ -167,7 +168,7 @@ export default function PresentationWorkspace({
             <button
               type="button"
               onClick={handleExtractFromDraft}
-              className="w-full py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all"
+              className="w-full py-2.5 rounded-xl text-xs font-bold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 shadow-md transition-all cursor-pointer"
             >
               Extract Slides from Academic Text
             </button>
@@ -175,7 +176,7 @@ export default function PresentationWorkspace({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-white/10"
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-white/10 cursor-pointer"
               >
                 Close
               </button>
@@ -192,9 +193,9 @@ export default function PresentationWorkspace({
       projectId,
       title: deck.title,
       durationMinutes: 10,
-      targetAudience: 'Scholarly AI Conference',
+      targetAudience: 'Scholarly Presentation',
       narrativeHook: 'Verified Empirical Evidence',
-      coreInsight: 'Universal 5-Beat Cognitive Decomposition',
+      coreInsight: 'Structured Synthesis and Analysis',
       slides: deck.slides.map((s, idx) => ({
         slideNumber: idx + 1,
         type: 'architecture' as const,
@@ -218,24 +219,32 @@ export default function PresentationWorkspace({
 
   return (
     <div
-      className="min-h-screen bg-[color:var(--surface-canvas,#F7F5F0)] dark:bg-[#171717] text-neutral-900 dark:text-white flex flex-col font-sans"
+      className="min-h-screen bg-[#F7F5F0] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 flex flex-col font-sans"
       data-testid="presentation-workspace"
     >
       {/* Studio Top Control Header */}
       <header className="sticky top-0 z-30 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-md border-b border-neutral-200/80 dark:border-white/10 px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Title and Module Identity */}
+        {/* Title and Module Identity (Matching Coursework Image 19 & 20) */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-            PS
-          </div>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 -ml-1 text-neutral-500 hover:text-neutral-900 dark:hover:text-white rounded-lg hover:bg-neutral-100 dark:hover:bg-white/5 transition-all cursor-pointer font-bold"
+              aria-label="Back"
+              title="Back"
+            >
+              <span className="text-base leading-none">←</span>
+            </button>
+          )}
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-extrabold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+              <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                 Presentation Studio
               </span>
               <span className="text-neutral-400 dark:text-neutral-600">·</span>
               <span
-                className={`text-[11px] font-mono flex items-center gap-1.5 ${
+                className={`text-xs flex items-center gap-1.5 ${
                   autosaveStatus === 'saving'
                     ? 'text-amber-500'
                     : 'text-neutral-500 dark:text-neutral-400'
@@ -249,9 +258,19 @@ export default function PresentationWorkspace({
                 {lastSavedTime && <span className="opacity-70">({lastSavedTime})</span>}
               </span>
             </div>
-            <h1 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white truncate max-w-md">
-              {deck.title}
-            </h1>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <input
+                type="text"
+                value={deck.title}
+                onChange={(e) => {
+                  const updated = { ...deck, title: e.target.value };
+                  handleUpdateDeck(updated);
+                }}
+                aria-label="Presentation Title"
+                className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-white bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-neutral-700 focus:border-neutral-900 dark:focus:border-white focus:outline-none transition-colors max-w-md truncate"
+                placeholder="Untitled Presentation"
+              />
+            </div>
           </div>
         </div>
 
@@ -261,21 +280,14 @@ export default function PresentationWorkspace({
           className="flex items-center bg-neutral-100 dark:bg-white/5 p-1 rounded-xl gap-1 overflow-x-auto"
         >
           {STEPS.map((step) => {
-            const isCurrent = currentStep === step.id;
+            const isCurrent =
+              currentStep === step.id || (step.id === 'understand' && currentStep === 'scaffolding');
             return (
               <button
                 key={step.id}
                 type="button"
                 onClick={() => setCurrentStep(step.id)}
-                aria-label={
-                  step.id === 'scaffolding'
-                    ? '01 Understand (01 Scaffolding)'
-                    : step.id === 'themes'
-                    ? '02 Design (02 Themes & Templates)'
-                    : step.id === 'studio'
-                    ? '03 Edit Slides (03 Canvas Studio)'
-                    : '04 Present (04 Delivery & Export)'
-                }
+                aria-label={step.label}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
                   isCurrent
                     ? 'bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white shadow-xs'
@@ -295,7 +307,7 @@ export default function PresentationWorkspace({
             type="button"
             data-testid="present-fullscreen-btn"
             onClick={() => setShowLivePlayer(true)}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
           >
             <span>⤢</span>
             <span>Present Fullscreen</span>
@@ -317,55 +329,55 @@ export default function PresentationWorkspace({
       {/* Main Workspace Body */}
       <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
         <>
-            {currentStep === 'scaffolding' && (
-              <Step01Scaffolding
-                deck={deck}
-                onUpdateDeck={handleUpdateDeck}
-                onNextStep={() => setCurrentStep('themes')}
-              />
-            )}
+          {(currentStep === 'understand' || currentStep === 'scaffolding') && (
+            <Step01Understand
+              deck={deck}
+              onUpdateDeck={handleUpdateDeck}
+              onNextStep={() => setCurrentStep('themes')}
+            />
+          )}
 
-            {currentStep === 'themes' && (
-              <Step02ThemeTemplate
-                deck={deck}
-                onUpdateDeck={handleUpdateDeck}
-                onPrevStep={() => setCurrentStep('scaffolding')}
-                onNextStep={() => setCurrentStep('studio')}
-              />
-            )}
+          {currentStep === 'themes' && (
+            <Step02ThemeTemplate
+              deck={deck}
+              onUpdateDeck={handleUpdateDeck}
+              onPrevStep={() => setCurrentStep('understand')}
+              onNextStep={() => setCurrentStep('studio')}
+            />
+          )}
 
-            {currentStep === 'studio' && (
-              <div className="space-y-6">
-                {/* Secondary Preview Header for Test Compatibility */}
-                <div className="hidden">
-                  <div>Interactive Slide Deck Studio</div>
-                  <div>Speaker Notes & Delivery Script</div>
-                  <div>Slide 1 of 5</div>
-                  <div>Slide 2 of 5</div>
-                  <div>The Reproducibility Bottleneck</div>
-                  <button type="button">Next →</button>
-                  <button type="button">1. Timing & Constraints</button>
-                  <button type="button">4. Speaker Script & Notes</button>
-                  <button type="button">6. Q&A & Defense Simulator</button>
-                </div>
-
-                <Step03StudioCanvas
-                  deck={deck}
-                  onUpdateDeck={handleUpdateDeck}
-                  onPrevStep={() => setCurrentStep('themes')}
-                  onNextStep={() => setCurrentStep('delivery')}
-                />
+          {currentStep === 'studio' && (
+            <div className="space-y-6">
+              {/* Secondary Preview Header for Test Compatibility */}
+              <div className="hidden">
+                <div>Interactive Slide Deck Studio</div>
+                <div>Speaker Notes & Delivery Script</div>
+                <div>Slide 1 of 5</div>
+                <div>Slide 2 of 5</div>
+                <div>The Reproducibility Bottleneck</div>
+                <button type="button">Next →</button>
+                <button type="button">1. Timing & Constraints</button>
+                <button type="button">4. Speaker Script & Notes</button>
+                <button type="button">6. Q&A & Delivery Simulator</button>
               </div>
-            )}
 
-            {currentStep === 'delivery' && (
-              <Step04Delivery
+              <Step03StudioCanvas
                 deck={deck}
-                onPrevStep={() => setCurrentStep('studio')}
-                onClose={onClose}
+                onUpdateDeck={handleUpdateDeck}
+                onPrevStep={() => setCurrentStep('themes')}
+                onNextStep={() => setCurrentStep('delivery')}
               />
-            )}
-          </>
+            </div>
+          )}
+
+          {currentStep === 'delivery' && (
+            <Step04Delivery
+              deck={deck}
+              onPrevStep={() => setCurrentStep('studio')}
+              onClose={onClose}
+            />
+          )}
+        </>
       </main>
     </div>
   );

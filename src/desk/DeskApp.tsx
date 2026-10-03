@@ -487,6 +487,7 @@ export default function DeskApp() {
               element={
                 <PresentationWorkspace
                   projectId="demo-presentation"
+                  initialStep="understand"
                   onClose={() => {
                     if (typeof window !== "undefined") window.location.href = "/projects";
                   }}
@@ -502,6 +503,7 @@ export default function DeskApp() {
                     element={
                       <PresentationWorkspace
                         projectId="demo-presentation"
+                        initialStep="understand"
                         onClose={() => {
                           if (typeof window !== "undefined") window.location.href = "/projects";
                         }}

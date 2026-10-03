@@ -41,9 +41,9 @@ export const FOUR_CLEAN_PRESETS: PresetThemeDef[] = [
   {
     id: 'minimal-slate',
     name: 'Minimal Clean',
-    description: 'Clean white background, sharp dark gray typography, subtle hairline borders.',
-    canvasHex: '#FFFFFF',
-    cardHex: '#FAFAFA',
+    description: 'Crisp light slate canvas (#F8FAFC), white card (#FFFFFF), neutral dark text, charcoal accent.',
+    canvasHex: '#F8FAFC',
+    cardHex: '#FFFFFF',
     accentHex: '#0F172A',
     textColor: '#1E293B',
     mode: 'light',
@@ -61,10 +61,10 @@ export const FOUR_CLEAN_PRESETS: PresetThemeDef[] = [
   {
     id: 'obsidian-aurora',
     name: 'Deep Midnight',
-    description: 'Dark neutral canvas (#171717), elevated card (#1C1C1E), light gray text, sky blue accent.',
+    description: 'Dark neutral canvas (#171717), elevated card (#1C1C1E), light text (#F8FAFC), sky blue accent (#60A5FA).',
     canvasHex: '#171717',
     cardHex: '#1C1C1E',
-    accentHex: '#38BDF8',
+    accentHex: '#60A5FA',
     textColor: '#F8FAFC',
     mode: 'dark',
   },
@@ -362,7 +362,7 @@ export default function Step02ThemeTemplate({
           onClick={onNextStep}
           className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 shadow-md transition-all flex items-center gap-2 cursor-pointer"
         >
-          <span>Open Canvas Studio ({activePreset.name})</span>
+          <span>Proceed to Edit Slides ({activePreset.name})</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

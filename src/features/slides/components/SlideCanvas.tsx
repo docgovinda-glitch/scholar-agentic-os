@@ -4,8 +4,8 @@ import type { SlideTheme } from '../types/themes';
 import SlideCardBlock from './SlideCardBlock';
 import SlideMotifGraphic from './SlideMotifGraphic';
 import SlideHeroVisual from './SlideHeroVisual';
-import KeynoteController from './KeynoteController';
-import { useKeynoteShortcuts } from '../hooks/useKeynoteShortcuts';
+import PresentationController from './PresentationController';
+import { usePresentationShortcuts } from '../hooks/usePresentationShortcuts';
 import {
   EditorialCoverSlide,
   EditorialMetricsSlide,
@@ -104,7 +104,7 @@ export default function SlideCanvas({
     setIsPresenterOpen((prev) => !prev);
   }, []);
 
-  const { isFullscreen, toggleFullscreen } = useKeynoteShortcuts({
+  const { isFullscreen, toggleFullscreen } = usePresentationShortcuts({
     slideCount: totalSlides,
     activeSlideIndex: currentSlideIndex,
     onNextSlide: handleNext,
@@ -341,9 +341,9 @@ export default function SlideCanvas({
         </main>
       )}
 
-      {/* Floating Keynote Controller */}
+      {/* Floating Presentation Controller */}
       {totalSlides > 0 && (
-        <KeynoteController
+        <PresentationController
           currentSlideIndex={slideIndex}
           totalSlides={totalSlides}
           activeSlide={activeSlide}

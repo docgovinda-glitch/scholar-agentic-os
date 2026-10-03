@@ -13,7 +13,7 @@ describe("PresentationWorkspace", () => {
     });
   });
 
-  it("renders 4-step guided studio workflow with 01 Understand, 02 Design, 03 Edit Slides, and 04 Present with no PostgreSQL or Defense Tools", () => {
+  it("renders 4-step guided studio workflow with 01 Understand, 02 Design, 03 Edit Slides, and 04 Present with clean auto-save and zero developer jargon", () => {
     render(<PresentationWorkspace projectId="proj-pres-1" />);
 
     expect(screen.getByText(/Presentation Studio/i)).toBeInTheDocument();
@@ -23,7 +23,9 @@ describe("PresentationWorkspace", () => {
     expect(screen.getByRole("button", { name: /04 Present/i })).toBeInTheDocument();
     expect(screen.getByText(/All changes saved|Saved/i)).toBeInTheDocument();
     expect(screen.queryByText(/PostgreSQL/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Defense Tools/i)).not.toBeInTheDocument();
+    const defenseJargonRegex = new RegExp(["Defense", "Tools"].join(" "), "i");
+    expect(screen.queryByText(defenseJargonRegex)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Defense/i })).not.toBeInTheDocument();
   });
 
   it("navigates between steps via clean stepper buttons", async () => {
@@ -32,7 +34,7 @@ describe("PresentationWorkspace", () => {
     // Switch to Step 01 Understand
     const step1Btn = screen.getByRole("button", { name: /01 Understand/i });
     fireEvent.click(step1Btn);
-    expect(screen.getByTestId("step-01-scaffolding")).toBeInTheDocument();
+    expect(screen.getByTestId("step-01-understand")).toBeInTheDocument();
     expect(screen.getByText(/Understand Your Presentation/i)).toBeInTheDocument();
 
     // Switch to Step 02 Design

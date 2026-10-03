@@ -1,6 +1,6 @@
 /**
  * Core data structures for Scholar OS Presentation Studio.
- * Enforces 1-idea-per-slide, Universal 5-Beat cognitive breakdown,
+ * Enforces 1-idea-per-slide, structured presentation outline breakdown,
  * 6x6 bullet constraints, and dual-mode stage/leave-behind consumption.
  */
 
@@ -87,14 +87,21 @@ export type SlideBlock =
   | QuoteEvidenceBlock
   | ImageBlock;
 
-export type NarrativeFramework = 'Universal-5Beat' | 'SCR' | 'WhatIsCouldBe' | 'ABT';
+export type NarrativeFramework = 'Standard-Narrative' | 'SCR' | 'WhatIsCouldBe' | 'ABT' | (string & {});
 
-export type Universal5BeatPhase =
+export type SlideOutlinePhase =
+  | 'overview-action-hook'
+  | 'tension-context'
+  | 'mechanical-principle'
+  | 'empirical-proof'
+  | 'strategic-horizon'
   | 'beat-1-action-hook'
   | 'beat-2-tension-context'
   | 'beat-3-mechanical-principle'
   | 'beat-4-empirical-proof'
   | 'beat-5-strategic-horizon';
+
+export type Universal5BeatPhase = SlideOutlinePhase;
 
 export interface RatioComparisonData {
   labelA: string;
@@ -139,6 +146,7 @@ export interface SlideCard {
   summaryBar?: string;
   ratioComparison?: RatioComparisonData;
   pillars?: ColorBlockedPillar[];
+  swissCover?: Record<string, any>;
 
   // Image Media Extensions
   imageUrl?: string;

@@ -67,6 +67,7 @@ import {
   Info,
   BookOpen,
   BookmarkCheck,
+  Presentation,
 } from "lucide-react";
 import { getCloudProvider } from "../config/providerCatalog";
 import { loadUserAiSettings } from "../services/userAiSettings";
@@ -2154,6 +2155,21 @@ export default function ProjectListScreen({
             >
               <Sliders className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 flex-shrink-0" />
               <span>AI Access</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                if (typeof window !== "undefined") {
+                  window.location.href = "/presentation";
+                }
+              }}
+              aria-label="Presentation Studio"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+            >
+              <Presentation className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 flex-shrink-0" />
+              <span>Presentation Studio</span>
             </button>
 
             {/* Phase 1: Ask Scholar toggle button allowing opening and closing on click */}

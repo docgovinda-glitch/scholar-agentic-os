@@ -58,7 +58,7 @@ export default function Step03StudioCanvas({
           onClick={onPrevStep}
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs"
         >
-          ← Back to Scaffolding
+          ← Back to Understand
         </button>
       </div>
     );
@@ -494,7 +494,7 @@ export default function Step03StudioCanvas({
       order: deck.slides.length + 1,
       actionHeadline: 'New Grounded Analytical Assertion',
       layoutType: 'bullets',
-      framework: deck.framework || 'Universal-5Beat',
+      framework: deck.framework || 'Standard-Narrative',
       frameworkPhase: 'Synthesis',
       blocks: [
         {
@@ -549,7 +549,7 @@ export default function Step03StudioCanvas({
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400">
-              Step 03 · 100% WYSIWYG Canvas Studio
+              03 Edit Slides · Slide Canvas Studio
             </span>
             <span className="text-xs text-neutral-400 font-mono">
               Slide {activeSlideIndex + 1} of {deck.slides.length}
@@ -696,7 +696,7 @@ export default function Step03StudioCanvas({
                     }
                     onChange={(e) => handleCategoryChange(e.target.value)}
                     className={`text-xs md:text-sm font-extrabold uppercase tracking-wider bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-blue-500 focus:outline-none ${activeTheme.accentBadgeText}`}
-                    placeholder="CATEGORY / BEAT"
+                    placeholder="SLIDE THEME / CATEGORY"
                   />
                   {activeTheme.headerStamp && (
                     <span className="hidden sm:inline font-mono text-[9px] uppercase tracking-widest opacity-60 ml-2" style={{ color: activeTheme.accent }}>
@@ -1408,7 +1408,7 @@ export default function Step03StudioCanvas({
             {/* Slide Footnote */}
             <div className="pt-6 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between text-[11px] text-neutral-400 font-mono">
               <span>{activeSlide.footnote || 'Scholar OS Grounded Slide'}</span>
-              <span>Beat Phase: {activeSlide.frameworkPhase || 'Synthesis'}</span>
+              <span>Phase: {activeSlide.frameworkPhase || 'Synthesis'}</span>
             </div>
           </div>
 
