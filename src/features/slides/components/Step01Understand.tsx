@@ -13,27 +13,20 @@ export interface Step01UnderstandProps {
   onNextStep: () => void;
 }
 
-const SAMPLE_TOPICS = [
-  'Why Zappos Pays New Hires to Quit',
-  'Qing Plover: Migratory Bird Season',
-  'Quantum Computing & Cryptographic Verification',
-  'How Multi-Agent Systems Verify Scientific Papers',
-  'Corporate Restructuring & Capital Allocation Under High Rates',
-];
-
 export default function Step01Understand({
   deck,
   onUpdateDeck,
   onNextStep,
 }: Step01UnderstandProps) {
-  const [topicInput, setTopicInput] = useState(deck.topic || deck.title || '');
+  const [topicInput, setTopicInput] = useState(
+    deck.topic || (deck.title && deck.title !== 'Untitled Presentation' ? deck.title : '') || ''
+  );
   const [rawTextInput, setRawTextInput] = useState('');
-  const [inputMode, setInputMode] = useState<'topic' | 'upload' | 'markdown'>('topic');
+  const [inputMode, setInputMode] = useState<'topic' | 'upload'>('topic');
   const [selectedFramework, setSelectedFramework] = useState<NarrativeFramework>(
     deck.framework || 'Standard-Narrative'
   );
   const [slideCount, setSlideCount] = useState<'5' | '8' | '12'>('5');
-  const [audienceLevel, setAudienceLevel] = useState('undergraduate');
   const [isDecomposing, setIsDecomposing] = useState(false);
 
   // File Upload & Drag-and-Drop States
@@ -51,7 +44,7 @@ export default function Step01Understand({
   const handleDecompose = (overrideText?: string, overrideTopic?: string) => {
     setIsDecomposing(true);
     try {
-      const textToUse = overrideText !== undefined ? overrideText : (inputMode === 'markdown' ? rawTextInput : rawTextInput || undefined);
+      const textToUse = overrideText !== undefined ? overrideText : (rawTextInput || undefined);
       const topicToUse = overrideTopic !== undefined ? overrideTopic : topicInput;
 
       const isSwiss =
@@ -68,7 +61,7 @@ export default function Step01Understand({
             framework: selectedFramework,
             slideCount: Number(slideCount),
             presentationStyle: selectedFramework,
-            audienceLevel,
+            audienceLevel: 'general',
           })
         : generateSlideDeck({
             topic: topicToUse,
@@ -76,7 +69,7 @@ export default function Step01Understand({
             framework: selectedFramework,
             slideCount: Number(slideCount),
             presentationStyle: selectedFramework,
-            audienceLevel,
+            audienceLevel: 'general',
           });
 
       // Ensure slides have natural human headlines
@@ -207,20 +200,20 @@ export default function Step01Understand({
       <div>
         <div className="flex items-center gap-2 mb-1.5">
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200">
-            PHASE 1: UNDERSTAND YOUR TOPIC · Presentation Studio
+            PHASE 1: UNDERSTAND YOUR TOPIC · Slide Outline
           </span>
         </div>
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
           Understand Your Presentation
         </h1>
         <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
-          Define your topic, choose your presentation style, and generate a clear slide outline.
+          Type your topic or upload a document to create a clean, beautiful slide outline.
         </p>
       </div>
 
       {/* Unified Setup Card (Matching Coursework Box) */}
       <div className="bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-2xl p-5 sm:p-7 shadow-xs space-y-5">
-        {/* Segmented Mode Switcher */}
+        {/* Segmented Mode Switcher (2 Clean Modes) */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="inline-flex p-1 rounded-xl bg-neutral-100 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 w-fit">
             <button
@@ -248,19 +241,6 @@ export default function Step01Understand({
               <Upload className="w-3 h-3" />
               <span>Upload Document (.pdf, .docx)</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setInputMode('markdown')}
-              aria-label="Import from Coursework (Raw Coursework / Paste Text)"
-              className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                inputMode === 'markdown'
-                  ? 'bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold'
-                  : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
-              }`}
-            >
-              <FileText className="w-3 h-3" />
-              <span>Import from Coursework</span>
-            </button>
           </div>
 
           {inputMode !== 'upload' && uploadedFileName && (
@@ -287,31 +267,9 @@ export default function Step01Understand({
                 rows={3}
                 value={topicInput}
                 onChange={(e) => setTopicInput(e.target.value)}
-                placeholder="Enter your topic, key question, or paste lecture notes... (e.g. Why Zappos Pays New Hires to Quit, Quantum Computing)"
+                placeholder="Type your presentation topic or key question here... (e.g. Sustainable Urban Planning, Corporate Strategy under High Rates)"
                 className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-3.5 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all leading-relaxed resize-y"
               />
-            </div>
-
-            {/* Quick Sample Topics */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider">
-                Sample Topics:
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {SAMPLE_TOPICS.map((topic) => (
-                  <button
-                    key={topic}
-                    type="button"
-                    onClick={() => {
-                      setTopicInput(topic);
-                      handleDecompose(undefined, topic);
-                    }}
-                    className="px-2.5 py-1 text-xs rounded-lg border border-neutral-200/80 dark:border-white/10 bg-neutral-50 dark:bg-white/[0.02] text-neutral-600 dark:text-neutral-300 hover:border-neutral-400 dark:hover:border-white/30 transition-colors cursor-pointer"
-                  >
-                    {topic}
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
         )}
@@ -500,36 +458,9 @@ export default function Step01Understand({
           data-testid="presentation-file-input"
         />
 
-        {/* Mode 3: Raw Paste / Coursework Import */}
-        {inputMode === 'markdown' && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label
-                htmlFor="markdown-input-field"
-                className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1"
-              >
-                <span>Coursework Notes or Text</span>
-                <span className="text-rose-500 text-xs">*</span>
-              </label>
-              {rawTextInput && (
-                <span className="text-[11px] font-mono text-neutral-400">
-                  {rawTextInput.split(/\s+/).filter(Boolean).length} words
-                </span>
-              )}
-            </div>
-            <textarea
-              id="markdown-input-field"
-              rows={5}
-              value={rawTextInput}
-              onChange={(e) => setRawTextInput(e.target.value)}
-              placeholder="Paste draft notes, brief sections, or bullet points here..."
-              className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-3.5 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all leading-relaxed resize-y font-mono"
-            />
-          </div>
-        )}
 
-        {/* Parameter Grid: Slide Count, Style, Audience Level & Action Button */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-3 border-t border-neutral-100 dark:border-white/5 items-end">
+        {/* Parameter Grid: Slide Count, Style & Action Button (Clean 3-Column Layout) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-3 border-t border-neutral-100 dark:border-white/5 items-end">
           {/* Slide Count */}
           <div className="space-y-1">
             <label htmlFor="slide-count" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
@@ -571,30 +502,6 @@ export default function Step01Understand({
                 <option value="Standard-Narrative">Standard Narrative</option>
                 <option value="SCR">Problem &amp; Solution</option>
                 <option value="WhatIsCouldBe">Case Study Analysis</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
-                <ChevronDown className="w-3.5 h-3.5" />
-              </div>
-            </div>
-          </div>
-
-          {/* Audience Level */}
-          <div className="space-y-1">
-            <label htmlFor="audience-level" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-              <span>Audience Level</span>
-              <span className="text-rose-500 text-xs">*</span>
-            </label>
-            <div className="relative">
-              <select
-                id="audience-level"
-                value={audienceLevel}
-                onChange={(e) => setAudienceLevel(e.target.value)}
-                aria-label="Audience Level"
-                className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
-              >
-                <option value="undergraduate">Undergraduate</option>
-                <option value="executive">Executive / Professional</option>
-                <option value="general">General Audience</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
                 <ChevronDown className="w-3.5 h-3.5" />

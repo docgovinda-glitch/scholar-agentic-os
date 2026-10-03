@@ -193,14 +193,14 @@ export default function ThemeMakerStudio({
               <span>AI Theme Maker & Cloner</span>
             </span>
             <span className="text-xs text-neutral-400 font-mono">
-              Vision-to-Theme Engine
+              Vision Extraction
             </span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-neutral-900 dark:text-white">
-            Clone or Generate Any Design Theme from Kimi, Gamma, or Web
+          <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white">
+            Clone or Create Your Design Theme from Any Slide Screenshot
           </h2>
-          <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-3xl">
-            Drop or paste any screenshot of a slide or template. Our computer vision engine extracts the 60/30/10 color palette, typography pairing, vector motif, and layout archetype into an authentic presentation theme.
+          <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-3xl leading-relaxed">
+            Drop or paste any screenshot of a slide or template you love. We will instantly extract its color palette, typography pairing, and visual layout into your presentation.
           </p>
         </div>
 

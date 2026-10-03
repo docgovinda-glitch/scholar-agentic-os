@@ -29,7 +29,7 @@ describe("PresentationWorkspace", () => {
   });
 
   it("navigates between steps via clean stepper buttons", async () => {
-    render(<PresentationWorkspace projectId="proj-pres-1" />);
+    render(<PresentationWorkspace projectId="proj-pres-1" initialStep="studio" />);
 
     // Switch to Step 01 Understand
     const step1Btn = screen.getByRole("button", { name: /01 Understand/i });
@@ -54,13 +54,14 @@ describe("PresentationWorkspace", () => {
     expect(screen.getByTestId("step-03-studio-canvas")).toBeInTheDocument();
   });
 
-  it("Step 01: generates clean outline with human titles from topic prompt", () => {
+  it("Step 01: starts clean with zero mock slides and generates outline on demand", () => {
     render(<PresentationWorkspace projectId="proj-pres-1" />);
 
-    // Go to understand
-    fireEvent.click(screen.getByRole("button", { name: /01 Understand/i }));
+    // Starts on 01 Understand
+    expect(screen.getByTestId("step-01-understand")).toBeInTheDocument();
+    expect(screen.queryByTestId("generated-outline-section")).not.toBeInTheDocument();
 
-    const input = screen.getByPlaceholderText(/Why Zappos|Quantum Computing/i);
+    const input = screen.getByPlaceholderText(/presentation topic|key question/i);
     fireEvent.change(input, {
       target: { value: "Why Zappos Pays New Hires to Quit" },
     });
@@ -68,7 +69,7 @@ describe("PresentationWorkspace", () => {
     const genBtn = screen.getByRole("button", { name: /Create Slides Outline/i });
     fireEvent.click(genBtn);
 
-    expect(screen.getByText(/Generated (Slides|Presentation) Outline/i)).toBeInTheDocument();
+    expect(screen.getByText(/Generated Presentation Outline/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Why Zappos Pays New Hires to Quit/i).length).toBeGreaterThan(0);
   });
 
@@ -95,7 +96,7 @@ describe("PresentationWorkspace", () => {
   });
 
   it("Step 03: supports WYSIWYG text editing, 6x6 bullet alerts, layout switching, and Split Image + Text layout", () => {
-    render(<PresentationWorkspace projectId="proj-pres-1" />);
+    render(<PresentationWorkspace projectId="proj-pres-1" initialStep="studio" />);
 
     // Defaults to studio
     expect(screen.getByTestId("step-03-studio-canvas")).toBeInTheDocument();
@@ -119,7 +120,7 @@ describe("PresentationWorkspace", () => {
   });
 
   it("Step 04: toggles between Stage View and Leave-Behind View with methodology provenance", () => {
-    render(<PresentationWorkspace projectId="proj-pres-1" />);
+    render(<PresentationWorkspace projectId="proj-pres-1" initialStep="studio" />);
 
     // Go to delivery
     fireEvent.click(screen.getByRole("button", { name: /04 Present/i }));
@@ -139,7 +140,7 @@ describe("PresentationWorkspace", () => {
   it("triggers 500ms debounced autosave with clean indicator and zero PostgreSQL leakage", async () => {
     vi.useFakeTimers();
 
-    render(<PresentationWorkspace projectId="proj-pres-deb" />);
+    render(<PresentationWorkspace projectId="proj-pres-deb" initialStep="studio" />);
 
     // In Studio canvas, edit headline
     const headlineTextarea = screen.getByPlaceholderText(/Action Headline asserting singular conclusion/i);
@@ -164,7 +165,7 @@ describe("PresentationWorkspace", () => {
   });
 
   it("opens LiveSlidePlayer when Present Fullscreen is clicked and closes on Exit", async () => {
-    render(<PresentationWorkspace projectId="proj-pres-1" />);
+    render(<PresentationWorkspace projectId="proj-pres-1" initialStep="studio" />);
 
     const presentBtn = screen.getByTestId("present-fullscreen-btn");
     fireEvent.click(presentBtn);

@@ -51,14 +51,25 @@ export default function Step03StudioCanvas({
 
   if (!activeSlide) {
     return (
-      <div className="p-8 text-center" data-testid="step-03-studio-canvas-empty">
-        <p className="text-neutral-500">No slides loaded. Go to Step 01 to generate a deck.</p>
+      <div
+        className="max-w-md mx-auto my-16 p-8 text-center bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-3xl shadow-sm space-y-4"
+        data-testid="step-03-studio-canvas-empty"
+      >
+        <div className="w-12 h-12 mx-auto rounded-2xl bg-neutral-100 dark:bg-white/10 flex items-center justify-center text-neutral-700 dark:text-neutral-300">
+          <Sparkles className="w-6 h-6 text-amber-500" />
+        </div>
+        <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+          No Slides Created Yet
+        </h3>
+        <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-xs mx-auto leading-relaxed">
+          Enter your topic or upload a document in Step 01 to generate your presentation slides.
+        </p>
         <button
           type="button"
           onClick={onPrevStep}
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs"
+          className="mt-2 inline-flex items-center gap-2 px-4 py-2.5 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 rounded-xl text-xs font-semibold shadow-xs cursor-pointer hover:opacity-90 transition-all"
         >
-          ← Back to Understand
+          ← Go to Step 01: Understand
         </button>
       </div>
     );

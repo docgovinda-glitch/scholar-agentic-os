@@ -180,13 +180,13 @@ export function EditorialCoverSlide({
                 <path d="M 175 60 Q 181 53, 187 60 Q 193 53, 199 60" />
                 <path d="M 205 75 Q 211 68, 217 75 Q 223 68, 229 75" />
                 <path d="M 235 90 Q 241 83, 247 90 Q 253 83, 259 90" />
-                
+
                 {/* Secondary Flight Formation */}
                 <path d="M 180 110 Q 185 104, 190 110 Q 195 104, 200 110" strokeWidth="1.6" stroke="#1E293B" />
                 <path d="M 210 100 Q 215 94, 220 100 Q 225 94, 230 100" strokeWidth="1.6" stroke="#1E293B" />
                 <path d="M 240 105 Q 245 99, 250 105 Q 255 99, 260 105" strokeWidth="1.5" stroke="#1E293B" />
                 <path d="M 270 120 Q 275 114, 280 120 Q 285 114, 290 120" strokeWidth="1.4" stroke="#334155" />
-                
+
                 {/* Distant Horizon Flock */}
                 <path d="M 290 85 Q 293 81, 296 85 Q 299 81, 302 85" strokeWidth="1.2" stroke="#475569" />
                 <path d="M 315 92 Q 318 88, 321 92 Q 324 88, 327 92" strokeWidth="1.2" stroke="#475569" />
@@ -452,9 +452,8 @@ export function EditorialCategoriesSlide({
       {/* Body: 3–4 Solid Color-Blocked Columns */}
       <div className="my-auto py-4">
         <div
-          className={`grid grid-cols-1 ${
-            pillars.length === 4 ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'
-          } gap-4`}
+          className={`grid grid-cols-1 ${pillars.length === 4 ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'
+            } gap-4`}
         >
           {pillars.map((pillar, idx) => {
             const isRed = pillar.accentColor === 'red' || idx === 0;
@@ -464,10 +463,10 @@ export function EditorialCategoriesSlide({
             const bgClass = isRed
               ? 'bg-[#EB4424] text-white'
               : isBlue
-              ? 'bg-[#2563EB] text-white'
-              : isBlack
-              ? 'bg-[#18181B] text-white'
-              : 'bg-[#E2E8F0] text-neutral-900';
+                ? 'bg-[#2563EB] text-white'
+                : isBlack
+                  ? 'bg-[#18181B] text-white'
+                  : 'bg-[#E2E8F0] text-neutral-900';
 
             return (
               <div

@@ -43,9 +43,11 @@ export default function PresentationWorkspace({
   onClose,
   initialCourseworkText,
   initialDeck,
-  initialStep = 'studio',
+  initialStep,
 }: PresentationWorkspaceProps) {
-  const [currentStep, setCurrentStep] = useState<PresentationStudioStep>(initialStep);
+  const computedInitialStep =
+    initialStep ?? (initialDeck || (initialCourseworkText && initialCourseworkText.trim()) ? 'studio' : 'understand');
+  const [currentStep, setCurrentStep] = useState<PresentationStudioStep>(computedInitialStep);
   const [showLivePlayer, setShowLivePlayer] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle'>('saved');
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
@@ -64,11 +66,26 @@ export default function PresentationWorkspace({
       });
     }
 
-    // Default Academic Deck
-    return generateSlideDeck({
-      topic: 'How Multi-Agent Systems Verify Scientific Papers',
+    // If step was requested as studio, provide starter slides for editing canvas
+    if (computedInitialStep === 'studio') {
+      return generateSlideDeck({
+        topic: 'Research Synthesis & Presentation',
+        framework: 'Standard-Narrative',
+      });
+    }
+
+    // Default: Clean empty presentation with zero pre-filled mock slides
+    return {
+      id: `deck-${Date.now()}`,
+      title: 'Untitled Presentation',
+      topic: '',
+      sourceModule: 'presentation-studio',
       framework: 'Standard-Narrative',
-    });
+      slides: [],
+      activeSlideIndex: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
   });
 
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);

@@ -56,7 +56,7 @@ describe("Step01Scaffolding (Document Upload & Coursework Intake)", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the 3 intake modes: Upload Document, Topic Prompt, and Raw Markdown", () => {
+  it("renders the 2 clean intake modes: Enter Topic or Question and Upload Document", () => {
     render(
       <Step01Scaffolding
         deck={mockDeck}
@@ -65,9 +65,8 @@ describe("Step01Scaffolding (Document Upload & Coursework Intake)", () => {
       />
     );
 
+    expect(screen.getByRole("button", { name: /Enter Topic or Question/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Upload Document \(/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Academic Topic Prompt/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Raw Coursework/i })).toBeInTheDocument();
   });
 
   it("renders Coursework-style drag-and-drop dropzone when Upload Document tab is selected", () => {
