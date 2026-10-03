@@ -11,7 +11,7 @@ import type {
   QuoteEvidenceBlock,
   ImageBlock,
 } from '../types/slides';
-import { SLIDE_THEMES, type SlideThemeId } from '../types/themes';
+import { SLIDE_THEMES, type SlideThemeId, resolveSlideTheme } from '../types/themes';
 import { condenseToSixWords } from '../services/semanticSlideExtractor';
 import SlideMotifGraphic from './SlideMotifGraphic';
 import SlideHeroVisual from './SlideHeroVisual';
@@ -46,7 +46,7 @@ export default function Step03StudioCanvas({
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
 
-  const activeTheme = SLIDE_THEMES[deck.themeId as SlideThemeId] || SLIDE_THEMES['sand-academic'];
+  const activeTheme = resolveSlideTheme(deck.themeId, deck.customTheme);
   const activeSlide = deck.slides[activeSlideIndex] || deck.slides[0];
 
   if (!activeSlide) {

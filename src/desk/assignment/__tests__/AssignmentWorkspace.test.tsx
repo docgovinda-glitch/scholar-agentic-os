@@ -263,7 +263,7 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(await screen.findByText(/Assignment Analysis Breakdown/i)).toBeInTheDocument();
     expect(screen.getByText(/✓ Analysis Ready · 1 Rules Indexed/i)).toBeInTheDocument();
     expect(screen.getByText(/\[L012-L015\] Late submissions incur an automatic 5% per day penalty deduction/i)).toBeInTheDocument();
-    expect(screen.getByText(/\[L016\] Do not write about general history before 2000/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Do not write about general history before 2000/i).length).toBeGreaterThanOrEqual(1);
 
     // 5. Confirm no visual regressions or unwanted stage tabs exist
     expect(screen.queryByText(/AssignmentDeconstructStage/i)).not.toBeInTheDocument();

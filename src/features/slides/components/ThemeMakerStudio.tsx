@@ -34,26 +34,26 @@ export interface ThemeMakerStudioProps {
 }
 
 const VISUAL_MOTIFS: Array<{ id: VisualMotif; label: string; icon: string }> = [
-  { id: 'topographic', label: 'Topographic Contour', icon: '〰️' },
-  { id: 'golden-waves', label: 'Golden Waves / Aurora', icon: '✨' },
-  { id: 'blueprint-grid', label: 'Blueprint Drafting Grid', icon: '📐' },
-  { id: 'polar-compass', label: 'Polar Compass Rings', icon: '🧭' },
-  { id: 'cyber-hud', label: 'Cyber HUD Telemetry', icon: '💻' },
-  { id: 'radar-rings', label: 'Sonar Radar Waves', icon: '📡' },
-  { id: 'mesh-aura', label: 'Ambient Mesh Aura', icon: '🔮' },
-  { id: 'swiss-cut', label: 'Swiss Modernist Cut', icon: '🇨🇭' },
-  { id: 'editorial-split', label: 'Editorial Split Media', icon: '🏛️' },
-  { id: 'minimal-frame', label: 'Archival Minimal Frame', icon: '🖼️' },
-  { id: 'retro-poster-cut', label: 'Swiss Retro-Poster Cut', icon: '🚩' },
+  { id: 'topographic', label: 'Topographic Waves', icon: '〰️' },
+  { id: 'golden-waves', label: 'Golden Waves', icon: '✨' },
+  { id: 'blueprint-grid', label: 'Grid Lines', icon: '📐' },
+  { id: 'polar-compass', label: 'Compass Circles', icon: '🧭' },
+  { id: 'cyber-hud', label: 'Tech Brackets (Cyber HUD Telemetry)', icon: '💻' },
+  { id: 'radar-rings', label: 'Radar Waves', icon: '📡' },
+  { id: 'mesh-aura', label: 'Soft Glow Aura', icon: '🔮' },
+  { id: 'swiss-cut', label: 'Clean Cut', icon: '🇨🇭' },
+  { id: 'editorial-split', label: 'Split Frame', icon: '🏛️' },
+  { id: 'minimal-frame', label: 'Simple Border', icon: '🖼️' },
+  { id: 'retro-poster-cut', label: 'Bold Poster Cut', icon: '🚩' },
 ];
 
 const LAYOUT_ARCHETYPES: Array<{ id: LayoutArchetype; label: string; desc: string }> = [
-  { id: 'standard-card', label: 'Standard 60/30/10 Card', desc: 'Universal cognitive card with background vector motif' },
-  { id: 'split-hero', label: 'Split Hero (Media Panel)', desc: 'Editorial headline & bullets on left, illustration on right' },
-  { id: 'swiss-editorial', label: 'Swiss Hard-Edge Retro-Poster', desc: 'Angled banner (-3°), diagonal split image window, warm cream ground & dark summary bar' },
-  { id: 'data-ledger', label: 'Data & KPI Metric Ledger', desc: 'Prominent 3-box metric ledger row with comparison deltas' },
-  { id: 'derivation-schematic', label: 'Derivation Schematic', desc: 'Mathematical formula (p0 -> p1) and process flow nodes' },
-  { id: 'magazine-highlight', label: 'Magazine Highlight', desc: 'Bold display statement with highlighter accent box' },
+  { id: 'standard-card', label: 'Standard Card', desc: 'Centered card with a gentle background pattern' },
+  { id: 'split-hero', label: 'Side-by-Side (Text & Picture)', desc: 'Title and bullet points on left, photo on right' },
+  { id: 'swiss-editorial', label: 'Bold Poster', desc: 'Standout banner and photo that grabs attention immediately' },
+  { id: 'data-ledger', label: 'Numbers & Stats', desc: '3 big stat boxes side-by-side with comparison numbers' },
+  { id: 'derivation-schematic', label: 'Step-by-Step Flow', desc: 'Shows an idea or formula moving from start to finish' },
+  { id: 'magazine-highlight', label: 'Big Highlight Quote', desc: 'Large statement with a bright highlight color' },
 ];
 
 export default function ThemeMakerStudio({
@@ -61,7 +61,7 @@ export default function ThemeMakerStudio({
   onApplyTheme,
   onCancel,
 }: ThemeMakerStudioProps) {
-  const [creationMode, setCreationMode] = useState<'vision' | 'prompt' | 'customize'>('vision');
+  const [creationMode, setCreationMode] = useState<'vision' | 'prompt' | 'customize'>('customize');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [promptInput, setPromptInput] = useState('');
@@ -69,7 +69,7 @@ export default function ThemeMakerStudio({
 
   // Active Theme Editor State
   const [themeName, setThemeName] = useState('My Custom Theme');
-  const [headerStamp, setHeaderStamp] = useState('SCHOLAR OS // CUSTOM VISUAL ARCHETYPE');
+  const [headerStamp, setHeaderStamp] = useState('Presentation Style');
   const [canvasBg, setCanvasBg] = useState('#F7F5F0');
   const [cardBg, setCardBg] = useState('#FFFFFF');
   const [accent, setAccent] = useState('#2563EB');
@@ -179,8 +179,8 @@ export default function ThemeMakerStudio({
   };
 
   const firstSlide = deck.slides?.[0];
-  const previewHeadline = firstSlide?.actionHeadline || deck.title || 'Autonomous Knowledge Grounding in Multi-Agent Scientific Discovery';
-  const previewTag = firstSlide?.frameworkPhase || 'Executive Problem Statement & Cognitive Breakdown';
+  const previewHeadline = firstSlide?.actionHeadline || deck.title || 'Autonomous Knowledge Grounding in Multi-Agent Synthesis';
+  const previewTag = firstSlide?.frameworkPhase || 'Key Takeaways & Points';
 
   return (
     <div className="bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-3xl p-6 sm:p-8 shadow-xl space-y-8 animate-in fade-in duration-300">
@@ -190,17 +190,17 @@ export default function ThemeMakerStudio({
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 flex items-center gap-1">
               <Sparkles className="w-3 h-3" />
-              <span>AI Theme Maker & Cloner</span>
+              <span>AI Theme Maker &amp; Cloner</span>
             </span>
             <span className="text-xs text-neutral-400 font-mono">
-              Vision Extraction
+              Patterns, Colors &amp; Picture Matcher
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white">
-            Clone or Create Your Design Theme from Any Slide Screenshot
+            Design Your Slide Look &amp; Feel
           </h2>
           <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-3xl leading-relaxed">
-            Drop or paste any screenshot of a slide or template you love. We will instantly extract its color palette, typography pairing, and visual layout into your presentation.
+            Pick your favorite background patterns, choose balanced colors, or drop any slide picture to match its style automatically.
           </p>
         </div>
 
@@ -208,41 +208,15 @@ export default function ThemeMakerStudio({
           <button
             type="button"
             onClick={onCancel}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold border border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 self-start md:self-auto"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold border border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 self-start md:self-auto cursor-pointer"
           >
-            ← Back to Presets
+            ← Back to Ready Styles
           </button>
         )}
       </div>
 
       {/* Creation Mode Tabs */}
-      <div className="flex items-center gap-2 border-b border-neutral-200 dark:border-white/10 pb-3">
-        <button
-          type="button"
-          onClick={() => setCreationMode('vision')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
-            creationMode === 'vision'
-              ? 'bg-purple-600 text-white shadow-xs'
-              : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/5'
-          }`}
-        >
-          <Camera className="w-3.5 h-3.5" />
-          <span>📸 Look & Clone (Paste Screenshot)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setCreationMode('prompt')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
-            creationMode === 'prompt'
-              ? 'bg-purple-600 text-white shadow-xs'
-              : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/5'
-          }`}
-        >
-          <Wand2 className="w-3.5 h-3.5" />
-          <span>💬 Describe with Prompt</span>
-        </button>
-
+      <div className="flex items-center gap-2 border-b border-neutral-200 dark:border-white/10 pb-3 flex-wrap">
         <button
           type="button"
           onClick={() => setCreationMode('customize')}
@@ -253,7 +227,33 @@ export default function ThemeMakerStudio({
           }`}
         >
           <Palette className="w-3.5 h-3.5" />
-          <span>🎛️ Manual Customizer</span>
+          <span>🎛️ Manual Customizer &amp; Patterns</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCreationMode('vision')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
+            creationMode === 'vision'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/5'
+          }`}
+        >
+          <Camera className="w-3.5 h-3.5" />
+          <span>📸 Look &amp; Clone (Paste Screenshot)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCreationMode('prompt')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
+            creationMode === 'prompt'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/5'
+          }`}
+        >
+          <Wand2 className="w-3.5 h-3.5" />
+          <span>💬 Describe with Prompt</span>
         </button>
 
         <button
@@ -267,7 +267,7 @@ export default function ThemeMakerStudio({
           title="Roll a random inspiring theme like Kimi Freestyle"
         >
           <Dices className="w-3.5 h-3.5 text-amber-500" />
-          <span>🎲 Freestyle Roll (Surprise Me)</span>
+          <span>🎲 Surprise Me (Freestyle Roll)</span>
         </button>
       </div>
 
@@ -413,10 +413,10 @@ export default function ThemeMakerStudio({
           {/* Mode 3 / General Fine-Tuning Controls */}
           <div className="space-y-5 pt-2 border-t border-neutral-100 dark:border-white/5">
             <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-              Theme Details & Attributes
+              Theme Details & Colors
             </h3>
 
-            {/* Theme Name & Header Stamp */}
+            {/* Theme Name & Header Tag */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-300">
@@ -432,7 +432,7 @@ export default function ThemeMakerStudio({
 
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-300">
-                  Header Stamp
+                  Header Tag
                 </label>
                 <input
                   type="text"
@@ -443,15 +443,15 @@ export default function ThemeMakerStudio({
               </div>
             </div>
 
-            {/* 60 / 30 / 10 Colors */}
+            {/* 3-Color Balance */}
             <div className="space-y-2">
               <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-300">
-                60/30/10 Visual Palette
+                Slide Colors (Simple 3-Color Balance)
               </label>
               <div className="grid grid-cols-3 gap-2">
-                {/* 60% Ground Canvas */}
+                {/* Background (60%) */}
                 <div className="p-2.5 rounded-xl border border-neutral-200 dark:border-white/10 space-y-1">
-                  <span className="text-[9px] font-bold uppercase text-neutral-400 block">60% Ground</span>
+                  <span className="text-[9px] font-bold uppercase text-neutral-400 block">Background (60%)</span>
                   <div className="flex items-center gap-1.5">
                     <input
                       type="color"
@@ -463,9 +463,9 @@ export default function ThemeMakerStudio({
                   </div>
                 </div>
 
-                {/* 30% Elevated Card */}
+                {/* Slide Card (30%) */}
                 <div className="p-2.5 rounded-xl border border-neutral-200 dark:border-white/10 space-y-1">
-                  <span className="text-[9px] font-bold uppercase text-neutral-400 block">30% Card</span>
+                  <span className="text-[9px] font-bold uppercase text-neutral-400 block">Slide Card (30%)</span>
                   <div className="flex items-center gap-1.5">
                     <input
                       type="color"
@@ -477,9 +477,9 @@ export default function ThemeMakerStudio({
                   </div>
                 </div>
 
-                {/* 10% Signal Accent */}
+                {/* Accent Color (10%) */}
                 <div className="p-2.5 rounded-xl border border-neutral-200 dark:border-white/10 space-y-1">
-                  <span className="text-[9px] font-bold uppercase text-neutral-400 block">10% Signal</span>
+                  <span className="text-[9px] font-bold uppercase text-neutral-400 block">Accent Color (10%)</span>
                   <div className="flex items-center gap-1.5">
                     <input
                       type="color"
@@ -499,24 +499,24 @@ export default function ThemeMakerStudio({
                     passWcag ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
                   }`}
                 >
-                  {passWcag ? '✓ WCAG AA Compliant' : '⚠️ Low Contrast Warning'} ({contrastRatio}:1)
+                  {passWcag ? '✓ Easy to Read · WCAG AA Compliant' : '⚠️ Low Contrast Warning'} ({contrastRatio}:1)
                 </span>
                 <button
                   type="button"
                   onClick={() => setMode(mode === 'light' ? 'dark' : 'light')}
-                  className="px-2 py-0.5 rounded-md border text-[10px] font-mono"
+                  className="px-2 py-0.5 rounded-md border text-[10px] font-mono cursor-pointer"
                 >
                   Mode: {mode.toUpperCase()}
                 </button>
               </div>
             </div>
 
-            {/* Visual Motif Selector */}
+            {/* Visual Motif / Background Pattern Selector */}
             <div className="space-y-2">
               <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-300">
-                Visual Motif (Background Graphic Layer)
+                Background Pattern
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-40 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
                 {VISUAL_MOTIFS.map((m) => {
                   const isCurrent = visualMotif === m.id;
                   return (
@@ -524,24 +524,27 @@ export default function ThemeMakerStudio({
                       key={m.id}
                       type="button"
                       onClick={() => setVisualMotif(m.id)}
-                      className={`p-2 rounded-xl border text-left text-xs transition-all flex items-center gap-1.5 ${
+                      className={`p-2.5 rounded-xl border text-left text-xs transition-all flex items-center justify-between gap-2 cursor-pointer ${
                         isCurrent
-                          ? 'border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-300 font-bold'
+                          ? 'border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-300 font-bold shadow-2xs'
                           : 'border-neutral-200 dark:border-white/10 hover:border-neutral-300 text-neutral-600 dark:text-neutral-300'
                       }`}
                     >
-                      <span className="text-sm">{m.icon}</span>
-                      <span className="truncate text-[10px]">{m.label}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-base select-none shrink-0">{m.icon}</span>
+                        <span className="text-[11px] font-semibold leading-snug">{m.label}</span>
+                      </div>
+                      {isCurrent && <Check className="w-3.5 h-3.5 text-purple-600 shrink-0" />}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Layout Archetype Selector */}
+            {/* Slide Layout Selector */}
             <div className="space-y-2">
               <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-300">
-                Layout Archetype
+                Slide Layout
               </label>
               <div className="space-y-1.5">
                 {LAYOUT_ARCHETYPES.map((arch) => {
@@ -551,7 +554,7 @@ export default function ThemeMakerStudio({
                       key={arch.id}
                       type="button"
                       onClick={() => setLayoutArchetype(arch.id)}
-                      className={`w-full p-2.5 rounded-xl border text-left transition-all ${
+                      className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         isCurrent
                           ? 'border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-300 font-bold'
                           : 'border-neutral-200 dark:border-white/10 hover:border-neutral-300 text-neutral-600 dark:text-neutral-400'
@@ -565,22 +568,22 @@ export default function ThemeMakerStudio({
               </div>
             </div>
 
-            {/* Typography Pairing */}
+            {/* Font Style */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-300">
-                Typography Personality
+                Font Style
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { id: 'sans', label: 'Sans-Serif', family: 'Inter' },
-                  { id: 'serif', label: 'Editorial Serif', family: 'Newsreader' },
-                  { id: 'mono', label: 'Monospace', family: 'JetBrains' },
+                  { id: 'sans', label: 'Modern (Sans)', family: 'Inter' },
+                  { id: 'serif', label: 'Classic Book (Serif)', family: 'Newsreader' },
+                  { id: 'mono', label: 'Code & Numbers (Mono)', family: 'JetBrains' },
                 ].map((f) => (
                   <button
                     key={f.id}
                     type="button"
                     onClick={() => setFontFamily(f.id as any)}
-                    className={`p-2 rounded-xl border text-center text-xs transition-all ${
+                    className={`p-2 rounded-xl border text-center text-xs transition-all cursor-pointer ${
                       fontFamily === f.id
                         ? 'border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-300 font-bold'
                         : 'border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300'
@@ -600,11 +603,11 @@ export default function ThemeMakerStudio({
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-purple-600" />
               <span className="text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
-                Live 16:9 Slide Preview ({themeName})
+                Live Slide Preview ({themeName})
               </span>
             </div>
             <span className="text-[10px] font-mono opacity-70">
-              Archetype: {layoutArchetype.toUpperCase()}
+              Layout: {layoutArchetype.toUpperCase()}
             </span>
           </div>
 
@@ -718,8 +721,8 @@ export default function ThemeMakerStudio({
                     </p>
                     <div className="space-y-1.5 pt-1">
                       {[
-                        'Rigorous 60/30/10 visual balance prevents slide clutter',
-                        'Direct evidence grounding with verifiable scholarly citations',
+                        'Clean 3-color balance makes text easy to read',
+                        'Clear points and key takeaways anyone can follow',
                       ].map((item, idx) => (
                         <div key={idx} className="flex items-center gap-2 text-xs">
                           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: accent }} />
@@ -744,9 +747,9 @@ export default function ThemeMakerStudio({
                   </h2>
                   <div className="grid grid-cols-3 gap-2.5 pt-1">
                     {[
-                      { value: '142.0', label: 'Primary Index', sub: 'Baseline' },
-                      { value: '118', label: 'Active Cohort', sub: 'Verified' },
-                      { value: '+18.0%', label: 'Growth Lift', sub: 'Empirical' },
+                      { value: '142.0', label: 'Primary Stat', sub: 'Baseline' },
+                      { value: '118', label: 'Active Group', sub: 'Verified' },
+                      { value: '+18.0%', label: 'Growth Lift', sub: 'Proven' },
                     ].map((kpi, kIdx) => (
                       <div
                         key={kIdx}
@@ -789,7 +792,7 @@ export default function ThemeMakerStudio({
                       <span className="font-mono text-xs">────►</span>
                       <span>p¹</span>
                     </div>
-                    <span className="font-mono text-xs opacity-75">99.4% EMPIRICAL PURITY YIELD</span>
+                    <span className="font-mono text-xs opacity-75">Step 1 to Step 2 Process</span>
                   </div>
                 </div>
               ) : (
@@ -804,8 +807,8 @@ export default function ThemeMakerStudio({
                   </h2>
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     {[
-                      'Direct evidence grounding with verifiable scholarly citations',
-                      'Executive delivery ready for thesis defense and peer review',
+                      'Clear points and key takeaways anyone can follow',
+                      'Ready for presentations, classes, and meetings worldwide',
                     ].map((bullet, idx) => (
                       <div
                         key={idx}
@@ -832,17 +835,17 @@ export default function ThemeMakerStudio({
                 <div className="flex items-center gap-2 truncate">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#EB4424] shrink-0" />
                   <span className="font-semibold text-neutral-300 truncate">
-                    Strategic Mandate: 120,000 migratory birds protected via 66 certified observation corridors.
+                    Special Spotlight: Standout event poster banner with bold typography.
                   </span>
                 </div>
                 <span className="font-mono text-[9px] uppercase tracking-widest text-neutral-400 shrink-0 hidden sm:block">
-                  SCHOLAR OS // EDITORIAL POSTER
+                  POSTER SLIDE
                 </span>
               </div>
             ) : (
               <div className="relative z-10 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 text-[10px] font-mono opacity-60">
-                <span>Scholar OS Cognitive Engine</span>
-                <span>60% Ground · 30% Card · 10% Signal</span>
+                <span>Slide 1 of 5</span>
+                <span>Balanced Colors: Background · Card · Accent</span>
               </div>
             )}
           </div>

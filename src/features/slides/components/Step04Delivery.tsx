@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { SlideDeck, SlideViewMode } from '../types/slides';
-import { SLIDE_THEMES, type SlideThemeId } from '../types/themes';
+import { SLIDE_THEMES, type SlideThemeId, resolveSlideTheme } from '../types/themes';
 import SlideCardBlock from './SlideCardBlock';
 import SlideMotifGraphic from './SlideMotifGraphic';
 import { usePresentationShortcuts } from '../hooks/usePresentationShortcuts';
@@ -19,7 +19,7 @@ export default function Step04Delivery({ deck, onPrevStep, onClose }: Step04Deli
   const [isTimerRunning, setIsTimerRunning] = useState(true);
   const [showExportMenu, setShowExportMenu] = useState(false);
 
-  const activeTheme = SLIDE_THEMES[deck.themeId as SlideThemeId] || SLIDE_THEMES['sand-academic'];
+  const activeTheme = resolveSlideTheme(deck.themeId, deck.customTheme);
   const totalSlides = deck.slides.length;
   const activeSlide = deck.slides[currentSlideIndex] || deck.slides[0];
 

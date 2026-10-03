@@ -33,7 +33,7 @@ export interface PresentationWorkspaceProps {
 
 const STEPS: Array<{ id: PresentationStudioStep; label: string; icon: string; desc: string }> = [
   { id: 'understand', label: '01 Understand', icon: '⚡', desc: 'Define your topic and outline' },
-  { id: 'themes', label: '02 Design', icon: '🎨', desc: 'Curated Themes & Visual Accents' },
+  { id: 'themes', label: '02 Design', icon: '🎨', desc: 'Slide Styles & Themes' },
   { id: 'studio', label: '03 Edit Slides', icon: '✏️', desc: 'WYSIWYG Editable Slide Canvas' },
   { id: 'delivery', label: '04 Present', icon: '🖥️', desc: 'Stage View, Fullscreen & Export' },
 ];

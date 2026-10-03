@@ -2,7 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   generateSectionDraft,
   validateSectionUniqueness,
+  assembleDraftingPrompt,
 } from "../services/sectionDraftingEngine";
+import { evaluateWritingQuality } from "../services/writingQualityEvaluator";
+import type { AcademicTone } from "../types/drafting";
 
 describe("Section Drafting Engine", () => {
   it("generates grounded academic synthesis for Zappos $2,000 quit bonus", () => {
@@ -131,5 +134,100 @@ describe("Section Drafting Engine", () => {
     const passValidation = validateSectionUniqueness(uniqueSections);
     expect(passValidation.isUnique).toBe(true);
     expect(passValidation.maxSimilarity).toBeLessThanOrEqual(0.25);
+  });
+
+  describe("Collegiate Writing Quality & Tone Audits", () => {
+    const tones: AcademicTone[] = [
+      "formal_academic",
+      "analytical",
+      "critical",
+      "persuasive",
+      "conversational_academic",
+    ];
+
+    it("enforces >80% active voice and zero banned buzzwords on Zappos $2,000 resignation bonus", () => {
+      const draft = generateSectionDraft({
+        sectionTitle: "Why would Zappos offer new employees $2,000 to quit after their first week of training?",
+        assignmentQuestion: "Evaluate Zappos' hiring strategy using Schein's culture model",
+        academicLevel: "undergraduate",
+        tone: "analytical",
+      });
+
+      const evaluation = evaluateWritingQuality(draft, { tone: "analytical" });
+      expect(evaluation.meetsStandard).toBe(true);
+      expect(evaluation.metrics.activeVoiceRatio).toBeGreaterThanOrEqual(0.8);
+      expect(evaluation.metrics.passiveVoiceRatio).toBeLessThanOrEqual(0.2);
+      expect(evaluation.metrics.bannedPhraseCount).toBe(0);
+
+      // Verify absence of pseudo-intellectual filler
+      expect(draft).not.toContain("Primary Phenomenon");
+      expect(draft).not.toContain("computational expediency");
+      expect(draft).not.toContain("procedural objectivity");
+      expect(draft).not.toContain("Pasquale, 2023");
+    });
+
+    it("enforces collegiate clarity on Schein Artifacts vs Assumptions (office redesign / dress codes)", () => {
+      const draft = generateSectionDraft({
+        sectionTitle: "Can organizational culture be changed by changing artifacts alone (e.g., redesigning offices, changing dress codes)?",
+        assignmentQuestion: "Can organizational culture be changed by changing artifacts alone?",
+        academicLevel: "undergraduate",
+        tone: "analytical",
+      });
+
+      const evaluation = evaluateWritingQuality(draft, { tone: "analytical" });
+      expect(evaluation.meetsStandard).toBe(true);
+      expect(evaluation.metrics.activeVoiceRatio).toBeGreaterThanOrEqual(0.8);
+      expect(evaluation.metrics.bannedPhraseCount).toBe(0);
+
+      expect(draft).toContain("artifacts");
+      expect(draft).toContain("assumptions");
+      expect(draft).not.toContain("computational expediency");
+      expect(draft).not.toContain("Pasquale");
+    });
+
+    it("produces distinct, tailored drafts across all 5 collegiate tone profiles", () => {
+      const drafts = new Map<AcademicTone, string>();
+
+      for (const tone of tones) {
+        const draft = generateSectionDraft({
+          sectionTitle: "Can organizational culture be changed by changing artifacts alone?",
+          assignmentQuestion: "Schein's culture model and organizational change",
+          academicLevel: "undergraduate",
+          tone,
+        });
+
+        drafts.set(tone, draft);
+        expect(draft).toBeTruthy();
+        expect(draft).not.toContain("computational expediency");
+      }
+
+      // Check tone distinctiveness
+      const criticalDraft = drafts.get("critical")!;
+      const persuasiveDraft = drafts.get("persuasive")!;
+      const conversationalDraft = drafts.get("conversational_academic")!;
+
+      expect(criticalDraft).not.toBe(persuasiveDraft);
+      expect(criticalDraft).not.toBe(conversationalDraft);
+    });
+
+    it("assembles complete LLM drafting prompts with collegiate constraints and few-shot exemplars", () => {
+      const prompt = assembleDraftingPrompt({
+        sectionTitle: "Schein's Cultural Strata and Zappos HR Policy",
+        assignmentQuestion: "How does Zappos operationalize Schein's culture framework?",
+        academicLevel: "undergraduate",
+        tone: "critical",
+        keyPoints: ["Self-selection filtering", "Tacit assumptions"],
+        targetWordCount: 500,
+      });
+
+      expect(prompt.systemPrompt).toContain("Critical");
+      expect(prompt.systemPrompt).toContain("ACTIVE VOICE");
+      expect(prompt.systemPrompt).toContain("FEW-SHOT CONTRASTIVE");
+      expect(prompt.systemPrompt).toContain("canned buzzwords");
+
+      expect(prompt.userPrompt).toContain("SECTION TITLE: Schein's Cultural Strata and Zappos HR Policy");
+      expect(prompt.userPrompt).toContain("Self-selection filtering");
+      expect(prompt.userPrompt).toContain("Ensure active voice in at least 80% of sentences");
+    });
   });
 });

@@ -2,6 +2,8 @@ export * from "./types/drafting";
 export * from "./services/sectionDraftingEngine";
 export * from "./services/academicLensService";
 export * from "./services/outlineGenerator";
+export * from "./services/academicToneProfiles";
+export * from "./services/writingQualityEvaluator";
+export * from "./prompts/academicWritingPrompts";
 export * from "./components/SectionOutlineSidebar";
 export * from "./components/DraftingWorkspace";
-

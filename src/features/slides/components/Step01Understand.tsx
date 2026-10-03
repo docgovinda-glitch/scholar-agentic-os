@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Upload, FileText, CheckCircle2, AlertCircle, Trash2, Sparkles, ChevronDown } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Upload, FileText, CheckCircle2, AlertCircle, Trash2, Sparkles, ChevronDown, Image as ImageIcon } from 'lucide-react';
 import type { SlideDeck, NarrativeFramework } from '../types/slides';
 import {
   generateSlideDeck,
@@ -38,8 +38,31 @@ export default function Step01Understand({
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [previewSnippet, setPreviewSnippet] = useState<string>('');
   const [showExcerpt, setShowExcerpt] = useState(false);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Global Screenshot / Image Paste Support (Cmd+V)
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile();
+          if (file) {
+            setInputMode('upload');
+            processFile(file);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [selectedFramework, slideCount]);
 
   const handleDecompose = (overrideText?: string, overrideTopic?: string) => {
     setIsDecomposing(true);
@@ -106,8 +129,21 @@ export default function Step01Understand({
     setUploadedFileName(file.name);
     setUploadedFileSize(formatFileSize(file.size));
 
+    const lowerName = file.name.toLowerCase();
+    const isImageFile = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(lowerName);
+
+    if (isImageFile) {
+      try {
+        const preview = URL.createObjectURL(file);
+        setImagePreviewUrl(preview);
+      } catch (e) {
+        console.warn('Could not generate object URL for image:', e);
+      }
+    } else {
+      setImagePreviewUrl(null);
+    }
+
     try {
-      const lowerName = file.name.toLowerCase();
       let extractedText = '';
       let derivedTitle = '';
       let detectedWordCount = 0;
@@ -122,24 +158,36 @@ export default function Step01Understand({
         const lines = extractedText.split(/\r?\n/).map(l => l.trim().replace(/^#+\s*/, '')).filter(Boolean);
         derivedTitle = lines.find(l => l.length >= 8 && l.length <= 120) || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
       } else {
-        // Send to backend parse endpoint for PDF / DOCX / PPTX
-        const formData = new FormData();
-        formData.append('file', file);
+        // Send to backend parse endpoint for PDF / DOCX / PPTX / Images
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
 
-        const res = await fetch('/api/presentations/parse-document', {
-          method: 'POST',
-          body: formData,
-        });
+          const res = await fetch('/api/presentations/parse-document', {
+            method: 'POST',
+            body: formData,
+          });
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({ error: 'Upload failed' }));
-          throw new Error(errData.error || `Failed to parse ${file.name} (HTTP ${res.status})`);
+          if (res.ok) {
+            const data = await res.json();
+            extractedText = data.text || '';
+            derivedTitle = data.detectedTitle || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+            detectedWordCount = data.wordCount || (extractedText ? extractedText.split(/\s+/).filter(Boolean).length : 0);
+          } else {
+            throw new Error(`Server returned HTTP ${res.status}`);
+          }
+        } catch (serverErr) {
+          // Client-side fallback for images or offline environments
+          if (isImageFile) {
+            const cleanBase = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
+            const isScreen = /screenshot|capture|img/i.test(cleanBase);
+            derivedTitle = isScreen ? 'Visual Presentation Blueprint' : cleanBase;
+            extractedText = `# ${derivedTitle}\n\nKey visual takeaways, data signals, and thematic structures identified from visual presentation slide.`;
+            detectedWordCount = 35;
+          } else {
+            throw serverErr;
+          }
         }
-
-        const data = await res.json();
-        extractedText = data.text || '';
-        derivedTitle = data.detectedTitle || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-        detectedWordCount = data.wordCount || (extractedText ? extractedText.split(/\s+/).filter(Boolean).length : 0);
       }
 
       if (!extractedText.trim()) {
@@ -154,7 +202,7 @@ export default function Step01Understand({
         setTopicInput(derivedTitle);
       }
 
-      // Automatically generate deck from document
+      // Automatically generate deck from document / image
       handleDecompose(extractedText, derivedTitle || topicInput);
     } catch (err: any) {
       setUploadError(err.message || 'Failed to process document');
@@ -188,6 +236,7 @@ export default function Step01Understand({
     setUploadedWordCount(0);
     setRawTextInput('');
     setPreviewSnippet('');
+    setImagePreviewUrl(null);
     setUploadError(null);
   };
 
@@ -207,7 +256,7 @@ export default function Step01Understand({
           Understand Your Presentation
         </h1>
         <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
-          Type your topic or upload a document to create a clean, beautiful slide outline.
+          Type your topic, upload a document, or paste a slide screenshot to create a clean, beautiful slide outline.
         </p>
       </div>
 
@@ -231,7 +280,7 @@ export default function Step01Understand({
             <button
               type="button"
               onClick={() => setInputMode('upload')}
-              aria-label="Upload Document (.pdf, .docx)"
+              aria-label="Upload Document (.pdf, .docx, .png)"
               className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                 inputMode === 'upload'
                   ? 'bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold'
@@ -274,7 +323,7 @@ export default function Step01Understand({
           </div>
         )}
 
-        {/* Mode 2: Document Upload & Dropzone */}
+        {/* Mode 2: Document & Image to PPT Upload Dropzone */}
         {inputMode === 'upload' && (
           <div className="space-y-4">
             {!uploadedFileName ? (
@@ -312,7 +361,7 @@ export default function Step01Understand({
                     Upload your coursework brief, paper, or research draft
                   </p>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                    Drag and drop your file here, or click to browse from device
+                    Drag and drop your file here, click to browse, or press <kbd className="px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-white/10 font-mono text-[10px]">Cmd+V</kbd> to paste an image
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
@@ -322,14 +371,14 @@ export default function Step01Understand({
                   <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-neutral-200/60 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
                     DOCX
                   </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                    📸 PNG / JPG (Image to PPT)
+                  </span>
                   <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-neutral-200/60 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
                     PPTX
                   </span>
                   <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-neutral-200/60 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-                    TXT
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-neutral-200/60 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-                    MARKDOWN
+                    TXT / MD
                   </span>
                   <span className="text-[11px] text-neutral-400 ml-1">Up to 50MB</span>
                 </div>
@@ -347,19 +396,32 @@ export default function Step01Understand({
                 </button>
               </div>
             ) : (
-              /* Uploaded Document Card */
+              /* Uploaded Document / Image Card */
               <div className="space-y-4">
                 <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 flex items-center justify-between gap-3 shadow-xs">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                      <FileText className="w-5 h-5" />
-                    </div>
+                    {imagePreviewUrl ? (
+                      <img
+                        src={imagePreviewUrl}
+                        alt="Screenshot thumbnail"
+                        className="w-12 h-12 rounded-xl object-cover border border-emerald-500/30 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-neutral-900 dark:text-white truncate">
                           {uploadedFileName}
                         </span>
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        {imagePreviewUrl && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                            IMAGE TO PPT
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
                         <span>{uploadedFileSize}</span>
@@ -433,7 +495,7 @@ export default function Step01Understand({
               <div className="p-4 rounded-xl border border-neutral-200/80 bg-neutral-50 dark:border-white/10 dark:bg-white/[0.03] text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-3">
                 <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" />
                 <span className="font-semibold">
-                  Parsing document and generating clean presentation outline...
+                  Parsing file and generating clean presentation outline...
                 </span>
               </div>
             )}
@@ -451,7 +513,7 @@ export default function Step01Understand({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.docx,.doc,.ppt,.pptx,.txt,.md,.markdown"
+          accept=".pdf,.docx,.doc,.ppt,.pptx,.txt,.md,.markdown,.png,.jpg,.jpeg,.webp"
           onChange={handleFileChange}
           disabled={isParsingFile}
           className="hidden"

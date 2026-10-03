@@ -488,8 +488,8 @@ function AssignmentWorkspaceInner({
   if (isLoading || !project) {
     return (
       <div className="h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 overflow-hidden">
-        <header className="border-b border-neutral-200/80 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#171717] z-20 shrink-0">
-          <div className="flex items-center justify-between px-4 h-12 gap-4">
+        <header className="bg-white dark:bg-[#1C1C1E] z-20 shrink-0">
+          <div className="flex items-center justify-between px-4 sm:px-6 h-11 gap-4">
             <div className="flex items-center gap-2.5 min-w-0">
               <button
                 type="button"
@@ -556,8 +556,8 @@ function AssignmentWorkspaceInner({
   return (
     <div className="h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 overflow-hidden">
       {/* Minimalist Workspace Header */}
-      <header className="border-b border-neutral-200/80 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#171717] z-20 shrink-0">
-        <div className="flex items-center justify-between px-4 h-12 gap-4">
+      <header className="bg-white dark:bg-[#1C1C1E] z-20 shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 pt-2.5 pb-1 gap-4">
           <div className="flex items-center gap-2.5 min-w-0">
             {/* Apple/Notion-Style Clean Back Button */}
             <button

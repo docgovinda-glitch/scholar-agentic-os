@@ -68,6 +68,7 @@ export interface CustomTheme {
   surfaceTreatment: SurfaceTreatment;
   contrastRatio: number;
   isValidWcagAA: boolean;
+  visualMotif?: VisualMotif;
 }
 
 export interface SlideTheme {
@@ -146,6 +147,20 @@ export function validateWcagAA(contrastRatio: number, isLargeText = false): bool
 }
 
 export const isWcagAA = validateWcagAA;
+
+/**
+ * Resolves the active slide theme incorporating any custom accents or background motifs.
+ */
+export function resolveSlideTheme(themeId?: string, customTheme?: CustomTheme | null): SlideTheme {
+  const base = (themeId && SLIDE_THEMES[themeId as SlideThemeId]) || SLIDE_THEMES['sand-academic'];
+  if (!customTheme) return base;
+
+  return {
+    ...base,
+    accent: customTheme.accentColor || base.accent,
+    visualMotif: customTheme.visualMotif || base.visualMotif,
+  };
+}
 
 /**
  * Complete catalog of 22 presentation visual design templates inspired by Kimi (Moonshot) & Gamma.app.
