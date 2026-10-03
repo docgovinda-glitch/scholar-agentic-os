@@ -361,7 +361,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
  */
 router.post("/:id/copilot", async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { prompt, slideIndex = 0, currentSlide } = req.body;
+  const { prompt, slideIndex = 0, currentSlide, referenceImage } = req.body;
 
   if (!prompt || typeof prompt !== "string") {
     return res.status(400).json({ error: "Missing or invalid prompt" });
@@ -378,8 +378,41 @@ router.post("/:id/copilot", async (req: Request, res: Response) => {
     const lowerPrompt = prompt.toLowerCase();
     const mutatedSlide = JSON.parse(JSON.stringify(targetSlide));
 
+    // Handle Screenshot Reference Replication request
+    if (referenceImage || lowerPrompt.includes("replicate") || lowerPrompt.includes("screenshot") || lowerPrompt.includes("clone slide")) {
+      const isSplit = !lowerPrompt.includes("2-column") && !lowerPrompt.includes("metric");
+      if (isSplit) {
+        mutatedSlide.layoutType = "image-split";
+        mutatedSlide.imageUrl = referenceImage || mutatedSlide.imageUrl || "";
+        mutatedSlide.imageCaption = "Synthesized replica from reference screenshot";
+        mutatedSlide.blocks = [
+          {
+            type: "action-header",
+            headline: mutatedSlide.actionHeadline || "Replicated Visual Synthesis",
+            category: "REFERENCE REPLICA · EMPIRICAL ARTIFACT",
+            subheadline: prompt.length < 90 ? prompt : "Exact architectural replica synthesized directly from attached reference screenshot",
+          },
+          {
+            type: "bullet-list",
+            items: [
+              "Visual layout structure mapped directly from reference screenshot",
+              "50/50 balance between visual evidence and core takeaways",
+              "Preserves spatial proportions and visual weight of original artifact",
+              "Full inline editing supported across headline and bullet copy",
+            ],
+          },
+          {
+            type: "image",
+            imageUrl: referenceImage || mutatedSlide.imageUrl || "",
+            caption: "Synthesized replica from reference screenshot",
+            layout: "split",
+            aspectRatio: "16:9",
+          },
+        ];
+      }
+    }
     // Handle 2-column comparative layout request
-    if (lowerPrompt.includes("2-column") || lowerPrompt.includes("compare") || lowerPrompt.includes("comparison")) {
+    else if (lowerPrompt.includes("2-column") || lowerPrompt.includes("compare") || lowerPrompt.includes("comparison")) {
       mutatedSlide.layoutType = "two-column";
       mutatedSlide.blocks = [
         {

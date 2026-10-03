@@ -6,6 +6,7 @@ export {
 } from './services/semanticSlideExtractor';
 export * from './services/universalDecomposer';
 export * from './services/slideGenerator';
+export * from './services/slideReplicaService';
 export { default as SlideCanvas } from './components/SlideCanvas';
 export { default as SlideCardBlock } from './components/SlideCardBlock';
 export { default as PresentationController } from './components/PresentationController';

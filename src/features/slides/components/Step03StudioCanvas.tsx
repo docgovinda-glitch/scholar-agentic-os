@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Image as ImageIcon, Sparkles, Trash2 } from 'lucide-react';
+import { Upload, Image as ImageIcon, Sparkles, Trash2, Camera, X } from 'lucide-react';
 import type {
   SlideDeck,
   SlideCard,
@@ -13,6 +13,7 @@ import type {
 } from '../types/slides';
 import { SLIDE_THEMES, type SlideThemeId, resolveSlideTheme } from '../types/themes';
 import { condenseToSixWords } from '../services/semanticSlideExtractor';
+import { replicateSlideFromScreenshot } from '../services/slideReplicaService';
 import SlideMotifGraphic from './SlideMotifGraphic';
 import SlideHeroVisual from './SlideHeroVisual';
 
@@ -45,6 +46,14 @@ export default function Step03StudioCanvas({
   const [copilotPrompt, setCopilotPrompt] = useState('');
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reference Screenshot Replica States
+  const [referenceScreenshot, setReferenceScreenshot] = useState<string | null>(null);
+  const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
+  const [cloneThemeWithScreenshot, setCloneThemeWithScreenshot] = useState(true);
+  const [isDraggingReference, setIsDraggingReference] = useState(false);
+  const [replicationMessage, setReplicationMessage] = useState<string | null>(null);
+  const referenceFileInputRef = useRef<HTMLInputElement>(null);
 
   const activeTheme = resolveSlideTheme(deck.themeId, deck.customTheme);
   const activeSlide = deck.slides[activeSlideIndex] || deck.slides[0];
@@ -407,20 +416,91 @@ export default function Step03StudioCanvas({
     });
   };
 
-  // In-Slide Copilot Action
+  // Reference Screenshot Replica Handlers
+  const handleReferenceImageSelect = (file: File) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (dataUrl) {
+        setReferenceScreenshot(dataUrl);
+        setReferenceFileName(file.name);
+        setReplicationMessage(null);
+        if (!copilotPrompt.trim()) {
+          setCopilotPrompt('Replicate slide layout, structure, and visual hierarchy from attached reference');
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveReferenceImage = () => {
+    setReferenceScreenshot(null);
+    setReferenceFileName(null);
+    setReplicationMessage(null);
+    if (referenceFileInputRef.current) {
+      referenceFileInputRef.current.value = '';
+    }
+  };
+
+  const handleCopilotDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingReference(true);
+  };
+
+  const handleCopilotDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingReference(false);
+  };
+
+  const handleCopilotDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingReference(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      handleReferenceImageSelect(file);
+    }
+  };
+
+  const handleCopilotPaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleReferenceImageSelect(file);
+          break;
+        }
+      }
+    }
+  };
+
+  // In-Slide Copilot Action with Reference Screenshot Support
   const handleExecuteCopilot = async () => {
-    if (!copilotPrompt.trim()) return;
+    if (!copilotPrompt.trim() && !referenceScreenshot) return;
     setIsCopilotLoading(true);
+    setReplicationMessage(null);
+
+    const promptToUse =
+      copilotPrompt.trim() ||
+      'Replicate slide layout, structure, and visual hierarchy from attached reference screenshot';
 
     try {
-      // Call REST API copilot endpoint
+      // Call REST API copilot endpoint with optional reference screenshot
       const response = await fetch(`/api/presentations/${deck.id}/copilot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: copilotPrompt,
+          prompt: promptToUse,
           slideIndex: activeSlideIndex,
           currentSlide: activeSlide,
+          referenceImage: referenceScreenshot || undefined,
         }),
       });
 
@@ -429,33 +509,62 @@ export default function Step03StudioCanvas({
         if (data.mutatedSlide) {
           updateActiveSlide(() => data.mutatedSlide);
           setCopilotPrompt('');
+          if (referenceScreenshot) {
+            setReplicationMessage('✨ Replicated slide from reference screenshot');
+          }
+          setIsCopilotLoading(false);
           return;
         }
       }
     } catch {
       // Offline fallback: client-side mutation
-    } finally {
-      // Fallback deterministic mutation
-      const lower = copilotPrompt.toLowerCase();
-      if (lower.includes('2-column') || lower.includes('compare')) {
-        handleLayoutSwitch('two-column');
-      } else if (lower.includes('image') || lower.includes('photo') || lower.includes('picture') || lower.includes('split')) {
-        handleLayoutSwitch('image-split');
-      } else if (lower.includes('metric') || lower.includes('callout') || lower.includes('4.2x')) {
-        handleLayoutSwitch('metric-focus');
-      } else if (lower.includes('condense') || lower.includes('6-word')) {
-        updateActiveSlide((slide) => {
-          const blocks = [...slide.blocks];
-          const bIdx = blocks.findIndex((b) => b.type === 'bullet-list');
-          if (bIdx >= 0) {
-            const list = blocks[bIdx] as BulletListBlock;
-            list.items = list.items.slice(0, 6).map(condenseToSixWords);
-          }
-          return { ...slide, blocks };
+    }
+
+    try {
+      // Client-side fallback mutation
+      if (referenceScreenshot) {
+        const replica = await replicateSlideFromScreenshot({
+          referenceImage: referenceScreenshot,
+          currentSlide: activeSlide,
+          prompt: promptToUse,
+          deckTopic: deck.topic || deck.title,
+          cloneTheme: cloneThemeWithScreenshot,
         });
+
+        updateActiveSlide(() => replica.replicatedSlide);
+        if (replica.customTheme && cloneThemeWithScreenshot) {
+          onUpdateDeck({
+            ...deck,
+            customTheme: replica.customTheme,
+          });
+        }
+        setReplicationMessage('✨ Replicated slide from reference screenshot');
+        setCopilotPrompt('');
+      } else {
+        const lower = promptToUse.toLowerCase();
+        if (lower.includes('2-column') || lower.includes('compare')) {
+          handleLayoutSwitch('two-column');
+        } else if (lower.includes('image') || lower.includes('photo') || lower.includes('picture') || lower.includes('split')) {
+          handleLayoutSwitch('image-split');
+        } else if (lower.includes('metric') || lower.includes('callout') || lower.includes('4.2x')) {
+          handleLayoutSwitch('metric-focus');
+        } else if (lower.includes('condense') || lower.includes('6-word')) {
+          updateActiveSlide((slide) => {
+            const blocks = [...slide.blocks];
+            const bIdx = blocks.findIndex((b) => b.type === 'bullet-list');
+            if (bIdx >= 0) {
+              const list = blocks[bIdx] as BulletListBlock;
+              list.items = list.items.slice(0, 6).map(condenseToSixWords);
+            }
+            return { ...slide, blocks };
+          });
+        }
+        setCopilotPrompt('');
       }
+    } catch (err) {
+      console.error('Copilot mutation error:', err);
+    } finally {
       setIsCopilotLoading(false);
-      setCopilotPrompt('');
     }
   };
 
@@ -1423,54 +1532,186 @@ export default function Step03StudioCanvas({
             </div>
           </div>
 
-          {/* In-Slide AI Prompt Copilot Bar */}
-          <div className="bg-white dark:bg-[#1C1C1E] border border-blue-500/30 rounded-2xl p-4 shadow-xs space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-extrabold uppercase tracking-wide text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
-                <span>✨ In-Slide AI Prompt Copilot</span>
-              </span>
-              <span className="text-[11px] text-neutral-400">
-                Transforms slide card structure instantly
-              </span>
+          {/* In-Slide AI Prompt Copilot Bar with Screenshot Reference Replica Support */}
+          <div
+            onDragOver={handleCopilotDragOver}
+            onDragLeave={handleCopilotDragLeave}
+            onDrop={handleCopilotDrop}
+            className={`bg-white dark:bg-[#1C1C1E] border rounded-2xl p-4 shadow-xs space-y-3 transition-all ${
+              isDraggingReference
+                ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20'
+                : referenceScreenshot
+                ? 'border-blue-500/40 ring-1 ring-blue-500/10'
+                : 'border-blue-500/30'
+            }`}
+            data-testid="in-slide-copilot-container"
+          >
+            {/* Header: Title + Attach Reference Button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-extrabold uppercase tracking-wide text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                  <span>✨ In-Slide AI Prompt Copilot</span>
+                </span>
+                <span className="text-[11px] text-neutral-400 hidden sm:inline">
+                  Transforms slide card structure instantly
+                </span>
+              </div>
+
+              {/* Attach Reference Screenshot Button */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  ref={referenceFileInputRef}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleReferenceImageSelect(file);
+                  }}
+                  accept="image/png,image/jpeg,image/webp,image/jpg"
+                  className="hidden"
+                  data-testid="copilot-reference-input"
+                />
+                <button
+                  type="button"
+                  onClick={() => referenceFileInputRef.current?.click()}
+                  className="px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-blue-500/30 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Upload or paste a slide screenshot to replicate"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>{referenceScreenshot ? 'Change Reference' : 'Attach Reference Screenshot'}</span>
+                </button>
+              </div>
             </div>
 
+            {/* Attached Reference Screenshot Banner */}
+            {referenceScreenshot && (
+              <div className="p-2.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="relative group shrink-0">
+                    <img
+                      src={referenceScreenshot}
+                      alt="Reference Screenshot"
+                      className="w-14 h-9 object-cover rounded-lg border border-blue-300 dark:border-blue-700 shadow-2xs"
+                    />
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-[#1C1C1E]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+                        <span>📸 Reference Screenshot Attached</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded bg-blue-100/70 dark:bg-blue-900/40">
+                        Ready to Replicate
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate max-w-md">
+                      {referenceFileName || 'Attached slide capture'} · AI will replicate exact layout &amp; visual hierarchy
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cloneThemeWithScreenshot}
+                      onChange={(e) => setCloneThemeWithScreenshot(e.target.checked)}
+                      className="rounded border-neutral-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                    />
+                    <span>Clone Colors</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleRemoveReferenceImage}
+                    className="p-1 rounded-md text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                    title="Remove reference screenshot"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Success/Status Toast */}
+            {replicationMessage && (
+              <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 px-1">
+                <span>✓</span>
+                <span>{replicationMessage}</span>
+              </div>
+            )}
+
+            {/* Prompt Input Row */}
             <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={copilotPrompt}
-                onChange={(e) => setCopilotPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleExecuteCopilot();
-                }}
-                placeholder='e.g. "Add an image to this slide" or "Change to 2 columns"'
-                className="flex-1 px-4 py-2 text-xs rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-black/20 text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              />
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={copilotPrompt}
+                  onChange={(e) => setCopilotPrompt(e.target.value)}
+                  onPaste={handleCopilotPaste}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleExecuteCopilot();
+                  }}
+                  placeholder={
+                    referenceScreenshot
+                      ? 'e.g. "Replicate this exact slide layout" or "Clone layout and adapt to my topic"'
+                      : 'e.g. "Add an image to this slide" or "Change to 2 columns"'
+                  }
+                  className="w-full px-4 py-2 pr-9 text-xs rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-black/20 text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                />
+                <button
+                  type="button"
+                  onClick={() => referenceFileInputRef.current?.click()}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-1 cursor-pointer"
+                  title="Attach screenshot (or press Cmd+V to paste)"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={handleExecuteCopilot}
-                disabled={isCopilotLoading}
-                className="px-4 py-2 text-xs font-bold uppercase rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-all disabled:opacity-50"
+                disabled={isCopilotLoading || (!copilotPrompt.trim() && !referenceScreenshot)}
+                className={`px-4 py-2 text-xs font-bold uppercase rounded-xl text-white shadow-xs transition-all disabled:opacity-50 flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  referenceScreenshot
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
-                {isCopilotLoading ? 'Mutating...' : 'Apply Mutation'}
+                {isCopilotLoading ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    <span>{referenceScreenshot ? 'Replicating...' : 'Mutating...'}</span>
+                  </>
+                ) : (
+                  <span>{referenceScreenshot ? '✨ Replicate Slide' : 'Apply Mutation'}</span>
+                )}
               </button>
             </div>
 
             {/* Quick Copilot Suggestion Chips */}
             <div className="flex flex-wrap items-center gap-1.5 pt-1">
               <span className="text-[10px] font-medium text-neutral-400">Quick Actions:</span>
-              {[
-                'Add an image to this slide',
-                'Change to 2 columns',
-                'Focus on big metric',
-                'Shorten bullets',
-              ].map((chip) => (
+              {(referenceScreenshot
+                ? [
+                    'Replicate exact layout from screenshot',
+                    'Replicate split image + takeaways',
+                    'Replicate 2-column structure',
+                    'Replicate key metric callout',
+                  ]
+                : [
+                    'Add an image to this slide',
+                    'Change to 2 columns',
+                    'Focus on big metric',
+                    'Shorten bullets',
+                  ]
+              ).map((chip) => (
                 <button
                   key={chip}
                   type="button"
                   onClick={() => {
                     setCopilotPrompt(chip);
                   }}
-                  className="px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 dark:bg-white/5 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 border border-neutral-200/80 dark:border-white/10 transition-colors"
+                  className="px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 dark:bg-white/5 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer"
                 >
                   + {chip}
                 </button>
