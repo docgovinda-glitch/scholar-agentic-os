@@ -7,8 +7,11 @@ import type {
 } from '../../features/slides';
 import {
   Step01Understand,
+  Step02Design,
   Step02ThemeTemplate,
+  Step03EditSlides,
   Step03StudioCanvas,
+  Step04Present,
   Step04Delivery,
   SlideCanvas,
   generateSlideDeck,
@@ -271,7 +274,7 @@ export default function PresentationWorkspace({
                 <span className={autosaveStatus === 'saving' ? 'text-amber-500' : 'text-emerald-500'}>
                   {autosaveStatus === 'saving' ? '◌' : '●'}
                 </span>
-                <span>{autosaveStatus === 'saving' ? 'Saving changes...' : 'All changes saved'}</span>
+                <span>{autosaveStatus === 'saving' ? 'Saving changes...' : 'Saved'}</span>
                 {lastSavedTime && <span className="opacity-70">({lastSavedTime})</span>}
               </span>
             </div>
@@ -355,7 +358,7 @@ export default function PresentationWorkspace({
           )}
 
           {currentStep === 'themes' && (
-            <Step02ThemeTemplate
+            <Step02Design
               deck={deck}
               onUpdateDeck={handleUpdateDeck}
               onPrevStep={() => setCurrentStep('understand')}
@@ -378,7 +381,7 @@ export default function PresentationWorkspace({
                 <button type="button">6. Q&A & Delivery Simulator</button>
               </div>
 
-              <Step03StudioCanvas
+              <Step03EditSlides
                 deck={deck}
                 onUpdateDeck={handleUpdateDeck}
                 onPrevStep={() => setCurrentStep('themes')}
@@ -388,7 +391,7 @@ export default function PresentationWorkspace({
           )}
 
           {currentStep === 'delivery' && (
-            <Step04Delivery
+            <Step04Present
               deck={deck}
               onPrevStep={() => setCurrentStep('studio')}
               onClose={onClose}

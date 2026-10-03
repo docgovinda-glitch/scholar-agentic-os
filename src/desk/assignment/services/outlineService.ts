@@ -1191,7 +1191,7 @@ export function deconstructQuestionSemantics(question: string): DeconstructedQue
 
   // Fallback: extract nominal groups
   const words = cleanPrompt.split(/\s+/).filter((w) => w.length > 2 && !/^(the|and|for|with|from|that|this|these|those|into|about)$/i.test(w));
-  const subjectA = words.slice(0, 4).join(" ") || cleanPrompt || "Primary Phenomenon";
+  const subjectA = words.slice(0, 4).join(" ") || cleanPrompt || "Core Analytical Subject";
   const subjectB = words.length > 4 ? words.slice(4, 8).join(" ") : undefined;
   const fA = formatAcademicTopicTitle(subjectA);
   const fB = subjectB ? formatAcademicTopicTitle(subjectB) : "";

@@ -27,6 +27,7 @@ export default function Step01Understand({
     deck.framework || 'Standard-Narrative'
   );
   const [slideCount, setSlideCount] = useState<'5' | '8' | '12'>('5');
+  const [audienceLevel, setAudienceLevel] = useState<'general' | 'executive' | 'academic'>('general');
   const [isDecomposing, setIsDecomposing] = useState(false);
 
   // File Upload & Drag-and-Drop States
@@ -84,7 +85,7 @@ export default function Step01Understand({
             framework: selectedFramework,
             slideCount: Number(slideCount),
             presentationStyle: selectedFramework,
-            audienceLevel: 'general',
+            audienceLevel: audienceLevel,
           })
         : generateSlideDeck({
             topic: topicToUse,
@@ -92,7 +93,7 @@ export default function Step01Understand({
             framework: selectedFramework,
             slideCount: Number(slideCount),
             presentationStyle: selectedFramework,
-            audienceLevel: 'general',
+            audienceLevel: audienceLevel,
           });
 
       // Ensure slides have natural human headlines
@@ -521,8 +522,8 @@ export default function Step01Understand({
         />
 
 
-        {/* Parameter Grid: Slide Count, Style & Action Button (Clean 3-Column Layout) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-3 border-t border-neutral-100 dark:border-white/5 items-end">
+        {/* Parameter Grid: Slide Count, Style, Audience Level & Action Button */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-3 border-t border-neutral-100 dark:border-white/5 items-end">
           {/* Slide Count */}
           <div className="space-y-1">
             <label htmlFor="slide-count" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
@@ -537,9 +538,9 @@ export default function Step01Understand({
                 aria-label="Slide Count"
                 className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
               >
-                <option value="5">5 Slides (Brief)</option>
-                <option value="8">8 Slides (Standard)</option>
-                <option value="12">10–12 Slides (Detailed)</option>
+                <option value="5">5 Slides</option>
+                <option value="8">8 Slides</option>
+                <option value="12">10–12 Slides</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
                 <ChevronDown className="w-3.5 h-3.5" />
@@ -564,6 +565,30 @@ export default function Step01Understand({
                 <option value="Standard-Narrative">Standard Narrative</option>
                 <option value="SCR">Problem &amp; Solution</option>
                 <option value="WhatIsCouldBe">Case Study Analysis</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
+                <ChevronDown className="w-3.5 h-3.5" />
+              </div>
+            </div>
+          </div>
+
+          {/* Audience Level */}
+          <div className="space-y-1">
+            <label htmlFor="audience-level" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+              <span>Audience Level</span>
+              <span className="text-rose-500 text-xs">*</span>
+            </label>
+            <div className="relative">
+              <select
+                id="audience-level"
+                value={audienceLevel}
+                onChange={(e) => setAudienceLevel(e.target.value as 'general' | 'executive' | 'academic')}
+                aria-label="Audience Level"
+                className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
+              >
+                <option value="general">General Audience</option>
+                <option value="executive">Executive / Leadership</option>
+                <option value="academic">Technical / Academic</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
                 <ChevronDown className="w-3.5 h-3.5" />
