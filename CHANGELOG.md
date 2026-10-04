@@ -5,6 +5,26 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-10-04
+
+### Presentation Studio Zero-Ghost Outlines, Scope Cards & Style Binding
+- **Eradicated "Presentation Takeaway" & Enforced Zero-Ghost Rule (`Step01Understand.tsx`, `slideGenerator.ts`, `slideTitleGenerator.ts`)**:
+  - Completely purged all fallback loops generating generic `"Presentation Takeaway"` headers and repetitive dummy subtitles.
+  - Implemented the Zero-Ghost state: before a user uploads a brief or enters a topic, the outline container renders a clean dashed prompt box (`"Ready to outline your presentation. Enter a topic or upload your assignment brief above to generate your slides."`) instead of 5 fake slide cards.
+  - Dynamic question-to-slide breakdown: parses distinct questions into real analytical takeaways (e.g. Zappos $2,000 quit bonus, Schein's 3 levels, artifacts vs. culture, leadership intervention levers, candidate interview diagnostics) with 1-sentence analytical summaries.
+- **Green & Yellow/Orange Scope Cards (`Step01Understand.tsx`, `presentationScopeClassifier.ts`)**:
+  - Mounted side-by-side above the generated outline directly mirroring Coursework Phase 1.
+  - **Green Card** (`"What This Presentation Covers"`): 5 key points with item count pill (`5 Key Points · Editable`), editable/removable items, and `+ Add Key Point`.
+  - **Yellow Card** (`"What to Avoid (Out of Scope)"`): 4 rules with item count pill (`4 Rules · Editable`), editable/removable rules, and `+ Add Rule`.
+  - Strictly purges line tags (`[L0xx]`) and technical regex tokens.
+- **Presentation Style Binding to Writing Engine (`Step01Understand.tsx`, `slideGenerator.ts`, `slides.ts`)**:
+  - Upgraded `Presentation Style` dropdown (`Standard Narrative`, `Problem & Solution (SCR)`, `Case Study Analysis`, `Executive Pitch`).
+  - Actively configures writing tone, layout distribution (heroMetricRatio, twoColumnRatio, splitMediaRatio), bullet rule (`strict-6x6`, `conversational-brief`, `data-led`), and narrative scaffolding across generation pipelines.
+- **Apple-Grade Theme Studio & "Ask Scholar" Right Drawer (`Step02Design.tsx`, `ThemeScreenshotCloner.tsx`, `AskScholarPresentationDrawer.tsx`)**:
+  - Added 3-way segmented switcher: `[ Curated Styles (4) ]` | `[ Explore Library ]` | `[ 📸 Screenshot Cloner ]`.
+  - Integrated client-side image palette extraction engine for instant theme cloning from screenshots.
+  - Mounted collapsible right-side "Ask Scholar" slide feedback assistant drawer with 6x6 rule audit, active slide tone suggestions, and layout feedback.
+
 ## [Unreleased] - 2026-10-03
 
 ### Presentation Studio Redesign & Coursework UX Alignment
