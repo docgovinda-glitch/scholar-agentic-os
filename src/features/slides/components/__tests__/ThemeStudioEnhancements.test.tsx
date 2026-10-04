@@ -48,9 +48,9 @@ describe('Theme Studio Enhancements (Step 02)', () => {
     );
 
     // Segmented tab bar
-    expect(screen.getByRole('tab', { name: /Curated \(4\)/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Theme Library/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Clone from Screenshot/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Curated (Styles )?\(4\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Explore Library|Theme Library/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Screenshot Cloner|Clone from Screenshot/i })).toBeInTheDocument();
 
     // Default tab is Curated (4)
     expect(screen.getByTestId('theme-card-sand-academic')).toBeInTheDocument();
@@ -71,7 +71,7 @@ describe('Theme Studio Enhancements (Step 02)', () => {
     );
 
     // Switch to Theme Library tab
-    const libraryTab = screen.getByRole('tab', { name: /Theme Library/i });
+    const libraryTab = screen.getByRole('tab', { name: /Explore Library|Theme Library/i });
     fireEvent.click(libraryTab);
 
     expect(screen.getByTestId('theme-library-grid')).toBeInTheDocument();
@@ -114,7 +114,7 @@ describe('Theme Studio Enhancements (Step 02)', () => {
     );
 
     // Switch to cloner tab
-    const clonerTab = screen.getByRole('tab', { name: /Clone from Screenshot/i });
+    const clonerTab = screen.getByRole('tab', { name: /Screenshot Cloner|Clone from Screenshot/i });
     fireEvent.click(clonerTab);
 
     expect(screen.getByTestId('theme-screenshot-cloner')).toBeInTheDocument();

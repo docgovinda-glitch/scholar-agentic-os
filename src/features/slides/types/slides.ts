@@ -23,7 +23,8 @@ export type SlideLayoutType =
   | 'quote-evidence'
   | 'cover'
   | 'metrics'
-  | 'categories';
+  | 'categories'
+  | 'framework';
 
 export interface ActionHeaderBlock {
   type: 'action-header';
@@ -87,28 +88,29 @@ export type SlideBlock =
   | QuoteEvidenceBlock
   | ImageBlock;
 
-export type NarrativeFramework = 'Standard-Narrative' | 'SCR' | 'WhatIsCouldBe' | 'ABT' | (string & {});
+export type NarrativeFramework = 'Standard-Narrative' | 'SCR' | 'WhatIsCouldBe' | 'ABT' | 'visual-storytelling' | (string & {});
 
 export type PresentationStyleId =
   | 'narrative'
   | 'problem-solution'
   | 'case-study'
   | 'executive-pitch'
+  | 'visual-storytelling'
   | 'Standard-Narrative'
   | 'SCR'
   | 'WhatIsCouldBe';
 
 export interface PresentationStyleProfile {
-  id: 'narrative' | 'problem-solution' | 'case-study' | 'executive-pitch';
+  id: 'narrative' | 'problem-solution' | 'case-study' | 'executive-pitch' | 'visual-storytelling';
   label: string;
   writingTone: string;
-  bulletRule: 'strict-6x6' | 'conversational-brief' | 'data-led';
+  bulletRule: 'strict-6x6' | 'conversational-brief' | 'data-led' | 'one-line-impact';
   layoutDistribution: {
     heroMetricRatio: number; // e.g. 0.2 = 20% of slides feature big metric callouts
     twoColumnRatio: number;   // e.g. 0.4 = 40% comparative blocks
     splitMediaRatio: number;  // e.g. 0.2 = 20% image-split slides
   };
-  narrativeScaffolding: 'SCR' | 'WhatIsCouldBe' | 'EmpiricalCase' | 'Standard-Narrative';
+  narrativeScaffolding: 'SCR' | 'WhatIsCouldBe' | 'EmpiricalCase' | 'Standard-Narrative' | 'VisualNarrative';
   systemInstruction: string;
 }
 

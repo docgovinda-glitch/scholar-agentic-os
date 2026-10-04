@@ -23,7 +23,7 @@ describe('SlideOutlinePillCard', () => {
     render(<SlideOutlinePillCard slide={slide} index={0} />);
 
     expect(screen.getByTestId('slide-outline-pill-card-1')).toBeInTheDocument();
-    expect(screen.getByText('Slide 1')).toBeInTheDocument();
+    expect(screen.getByText(/SLIDE 1/i)).toBeInTheDocument();
     expect(screen.getByText('Metric Focus')).toBeInTheDocument();
     expect(screen.getByText('Why Zappos Pays New Hires $2,000 to Quit')).toBeInTheDocument();
     expect(
@@ -46,7 +46,7 @@ describe('SlideOutlinePillCard', () => {
 
     render(<SlideOutlinePillCard slide={slide} index={1} />);
 
-    expect(screen.getByText('Slide 2')).toBeInTheDocument();
+    expect(screen.getByText(/SLIDE 2/i)).toBeInTheDocument();
     expect(screen.getByText('2-Column Comparison')).toBeInTheDocument();
     expect(screen.getByText("Schein's Three Levels of Organizational Culture")).toBeInTheDocument();
     expect(

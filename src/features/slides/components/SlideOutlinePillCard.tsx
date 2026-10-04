@@ -6,13 +6,18 @@ export interface SlideOutlinePillCardProps {
   index: number;
 }
 
-function getLayoutLabel(layoutType?: string): string {
+function getLayoutLabel(layoutType?: string, frameworkPhase?: string): string {
+  if (frameworkPhase?.toLowerCase().includes('framework') || layoutType === 'framework') {
+    return 'Framework';
+  }
   switch (layoutType) {
     case 'metric-focus':
     case 'metrics':
       return 'Metric Focus';
     case 'two-column':
       return '2-Column Comparison';
+    case 'framework':
+      return 'Framework';
     case 'image-split':
       return 'Split Image + Text';
     case 'image-hero':
@@ -29,7 +34,7 @@ export default function SlideOutlinePillCard({
   index,
 }: SlideOutlinePillCardProps) {
   const slideNum = index + 1;
-  const layoutLabel = getLayoutLabel(slide.layoutType);
+  const layoutLabel = getLayoutLabel(slide.layoutType, slide.frameworkPhase);
 
   // 1-sentence analytical takeaway summary
   const summaryText =
@@ -45,10 +50,10 @@ export default function SlideOutlinePillCard({
     >
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200 font-mono">
-            Slide {slideNum}
+          <span className="inline-flex items-center justify-center whitespace-nowrap shrink-0 rounded-md bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase text-neutral-700 dark:text-neutral-300">
+            SLIDE {index + 1}
           </span>
-          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium whitespace-nowrap">
             {layoutLabel}
           </span>
         </div>

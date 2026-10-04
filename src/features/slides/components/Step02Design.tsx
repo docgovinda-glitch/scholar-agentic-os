@@ -282,7 +282,7 @@ export default function Step02Design({
         <div
           role="tablist"
           aria-label="Presentation Design Modes"
-          className="inline-flex p-1 rounded-xl bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-white/5 text-xs font-medium"
+          className="inline-flex p-1 rounded-xl bg-neutral-200/50 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-white/5 text-xs font-medium"
         >
           <button
             type="button"
@@ -297,7 +297,7 @@ export default function Step02Design({
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>Curated (4)</span>
+            <span>Curated Styles (4)</span>
           </button>
 
           <button
@@ -313,7 +313,7 @@ export default function Step02Design({
             }`}
           >
             <Library className="w-3.5 h-3.5" />
-            <span>Theme Library</span>
+            <span>Explore Library</span>
           </button>
 
           <button
@@ -329,7 +329,7 @@ export default function Step02Design({
             }`}
           >
             <Camera className="w-3.5 h-3.5" />
-            <span>📸 Clone from Screenshot</span>
+            <span>📸 Screenshot Cloner</span>
           </button>
         </div>
       </div>

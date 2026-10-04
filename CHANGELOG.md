@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-04
 
+### Presentation Studio Mega-Overhaul: Layout Repair, Ask Scholar Drawer, Scope-to-Outline Binding & Apple/Airbnb Design Restoration
+- **Layout Architecture & "Ask Scholar" Right Drawer Repair (`PresentationWorkspace.tsx`, `AskScholarPresentationDrawer.tsx`)**:
+  - Fixed layout collapse and orphaned input glitch where an input bar detached and floated across the top header while blanking out the canvas.
+  - Implemented root flex column layout (`flex h-screen w-full flex-col overflow-hidden bg-[#F7F5F0] dark:bg-[#171717]`).
+  - Mounted `AskScholarPresentationDrawer` cleanly inside a collapsible right-side `<aside>` container (`w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] flex flex-col h-full shadow-lg z-20`).
+  - Styled drawer header with avatar, title `"Ask Scholar"`, subtitle `"Slide & Outline Advisor"`, and close button (`✕`).
+  - Added 4 quick action chips: `"Improve action headlines"`, `"Audit 6x6 bullet rules"`, `"Check visual pacing"`, `"Suggest image ideas"`.
+  - Anchored bottom dock input bar firmly to drawer bottom (`border-t border-neutral-200/60 dark:border-white/10 p-4 bg-white dark:bg-[#1C1C1E] shrink-0`) with zero floating inputs.
+- **Header Navigation Cleanup & Step 04 Presentation Controls (`PresentationWorkspace.tsx`, `Step04Delivery.tsx`)**:
+  - Purged premature `"Present Fullscreen"` pill from top global navigation in Steps 01, 02, and 03.
+  - Relocated presentation delivery triggers exclusively to Step 04 ("04 Present"), where `"Start Presentation (F)"` launches the native browser Fullscreen API and Live Slide Player.
+  - Streamlined header with back arrow `←`, category tag `PRESENTATION STUDIO ·`, auto-save indicator (green dot with `"Saved"`), and inline editable title.
+- **Step 02 Theme Studio Visibility, Curated Presets & Screenshot Cloner (`Step02Design.tsx`)**:
+  - Restored 100% visibility and interactivity with Apple-grade segmented switcher: `[ Curated Styles (4) ]` | `[ Explore Library ]` | `[ 📸 Screenshot Cloner ]`.
+  - Rendered 4 handcrafted aesthetic heroes (`Sand Academic`, `Minimal Clean`, `Editorial Warm`, `Deep Midnight`) dynamically displaying actual Slide 1 action headline.
+  - Integrated client-side canvas palette extraction engine with live preview card and instant theme application.
+- **Step 01 Scope 1-to-1 Outline Binding & Badge Stacking Fix (`SlideOutlinePillCard.tsx`, `slideGenerator.ts`, `slideTitleGenerator.ts`, `Step01Understand.tsx`)**:
+  - Permanently eradicated `"Key Analytical Synthesis"` across the entire codebase (zero occurrences).
+  - Bound 5 covered points directly 1-to-1 into the 5 slide cards with question-grounded action headlines and single-sentence summaries:
+    - Slide 01: `"Why Zappos Pays New Hires $2,000 to Quit"`
+    - Slide 02: `"Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions"`
+    - Slide 03: `"The Limits of Artifacts: Why Changing Perks Fails to Shift Culture"`
+    - Slide 04: `"Leadership Intervention: Targeting Values and Habits to Shift Assumptions"`
+    - Slide 05: `"Assessing Organizational Culture in Candidate Job Interviews"`
+  - Fixed `SLIDE 3` badge wrapping bug by applying `inline-flex items-center justify-center whitespace-nowrap shrink-0`.
+- **Presentation Style Writing Tone & Narrative Architecture (`slideGenerator.ts`, `slides.ts`)**:
+  - Bound `Presentation Style` dropdown (`Academic & Case Study`, `Executive Problem & Solution`, `Visual Storytelling`, `Standard Key Concept`) to writing tone, bullet constraint rules (e.g. strict 6x6, 1-line impact), and layout block distributions.
+- **Automated Verification Script (`scripts/verify-scholar-presentation-mega.mjs`)**:
+  - Implemented end-to-end regression script validating all 8 verification gates, passing with 100% success.
+
 ### Presentation Studio Zero-Ghost Outlines, Scope Cards & Style Binding
 - **Eradicated "Presentation Takeaway" & Enforced Zero-Ghost Rule (`Step01Understand.tsx`, `slideGenerator.ts`, `slideTitleGenerator.ts`)**:
   - Completely purged all fallback loops generating generic `"Presentation Takeaway"` headers and repetitive dummy subtitles.

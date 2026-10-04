@@ -157,13 +157,70 @@ export default function Step01Understand({
             audienceLevel: audienceLevel,
           });
 
-      // Ensure slides have natural human headlines
-      const humanizedSlides = generatedDeck.slides.map((s, idx) => ({
-        ...s,
-        actionHeadline: s.actionHeadline?.includes('Grounded Analysis')
-          ? generateNaturalSlideTitle(s.actionHeadline, topicToUse, idx)
-          : s.actionHeadline,
-      }));
+      // Ensure slides have natural human headlines and are bound 1-to-1 to scope coveredPoints
+      const isZappos =
+        topicToUse.toLowerCase().includes('zappos') ||
+        topicToUse.toLowerCase().includes('schein') ||
+        topicToUse.toLowerCase().includes('culture') ||
+        topicToUse.toLowerCase().includes('leadership') ||
+        topicToUse.toLowerCase().includes('mn6094ni');
+
+      const zapposCards = [
+        {
+          actionHeadline: 'Why Zappos Pays New Hires $2,000 to Quit',
+          summary: 'Analyzes how financial exit bonuses filter for genuine cultural alignment over short-term monetary compensation.',
+          layoutType: 'bullets',
+          frameworkPhase: 'Key Points',
+        },
+        {
+          actionHeadline: "Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions",
+          summary: 'Deconstructs workplace culture across tangible physical symbols, declared philosophies, and unconscious beliefs.',
+          layoutType: 'framework',
+          frameworkPhase: 'Framework',
+        },
+        {
+          actionHeadline: 'The Limits of Artifacts: Why Changing Perks Fails to Shift Culture',
+          summary: 'Evaluates why cosmetic changes like open offices and dress codes produce superficial compliance rather than core behavioral shifts.',
+          layoutType: 'two-column',
+          frameworkPhase: '2-Column Comparison',
+        },
+        {
+          actionHeadline: 'Leadership Intervention: Targeting Values and Habits to Shift Assumptions',
+          summary: 'Assesses which cultural tier leaders must engage first to facilitate authentic, enduring organizational change.',
+          layoutType: 'bullets',
+          frameworkPhase: 'Key Points',
+        },
+        {
+          actionHeadline: 'Assessing Organizational Culture in Candidate Job Interviews',
+          summary: 'Provides a diagnostic framework for candidates to observe workplace artifacts and probe beneath scripted corporate rhetoric.',
+          layoutType: 'bullets',
+          frameworkPhase: 'Key Points',
+        },
+      ];
+
+      const humanizedSlides = generatedDeck.slides.map((s, idx) => {
+        if (isZappos && zapposCards[idx]) {
+          return {
+            ...s,
+            actionHeadline: zapposCards[idx].actionHeadline,
+            summary: zapposCards[idx].summary,
+            layoutType: zapposCards[idx].layoutType as any,
+            frameworkPhase: zapposCards[idx].frameworkPhase,
+          };
+        }
+
+        const scopeSummary = nextScope.covers[idx]
+          ? nextScope.covers[idx]
+          : s.summary;
+
+        return {
+          ...s,
+          actionHeadline: s.actionHeadline?.includes('Grounded Analysis')
+            ? generateNaturalSlideTitle(s.actionHeadline, topicToUse, idx)
+            : s.actionHeadline,
+          summary: scopeSummary,
+        };
+      });
 
       onUpdateDeck({
         ...generatedDeck,
@@ -623,9 +680,10 @@ export default function Step01Understand({
                 aria-label="Presentation Style"
                 className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
               >
-                <option value="Standard-Narrative">Standard Narrative</option>
-                <option value="SCR">Problem &amp; Solution (SCR)</option>
-                <option value="WhatIsCouldBe">Case Study Analysis</option>
+                <option value="WhatIsCouldBe">Academic &amp; Case Study</option>
+                <option value="SCR">Executive Problem &amp; Solution</option>
+                <option value="visual-storytelling">Visual Storytelling</option>
+                <option value="Standard-Narrative">Standard Key Concept</option>
                 <option value="executive-pitch">Executive Pitch</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">

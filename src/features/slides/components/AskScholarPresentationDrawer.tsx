@@ -23,10 +23,10 @@ export interface ChatMessage {
 }
 
 export const SUGGESTED_PROMPT_PILLS = [
-  'Suggest stronger action headlines',
-  'Audit slides for 6x6 bullet rule',
-  'Critique slide visual pacing',
-  'Recommend image & layout ideas',
+  'Improve action headlines',
+  'Audit 6x6 bullet rules',
+  'Check visual pacing',
+  'Suggest image ideas',
 ];
 
 export default function AskScholarPresentationDrawer({
@@ -54,7 +54,7 @@ export default function AskScholarPresentationDrawer({
     const slideCount = deck.slides?.length || 0;
     const activeSlide = deck.slides?.[deck.activeSlideIndex || 0];
 
-    if (q.includes('action headline') || q.includes('stronger headline') || q.includes('headline')) {
+    if (q.includes('headline') || q.includes('action') || q.includes('stronger')) {
       const suggestions = deck.slides.map((s, idx) => {
         const headline = s.actionHeadline;
         // Transform passive or descriptive phrases into conclusive action claims
@@ -106,7 +106,7 @@ export default function AskScholarPresentationDrawer({
       return `⚠️ **6x6 Rule Audit: ${totalViolations} slide(s) require tightening:**\n\n${reportLines.join('\n')}\n\n*Recommendation: Condense compound clauses and split multi-layered arguments across adjacent slides.*`;
     }
 
-    if (q.includes('pacing') || q.includes('visual pacing') || q.includes('flow')) {
+    if (q.includes('pacing') || q.includes('visual') || q.includes('flow')) {
       const layouts = deck.slides.map((s) => s.layoutType || 'bullets');
       const bulletCount = layouts.filter((l) => l === 'bullets').length;
       const visualCount = layouts.filter((l) => l !== 'bullets').length;
@@ -119,15 +119,15 @@ export default function AskScholarPresentationDrawer({
           : `*Excellent Rhythm*: You have a balanced cadence of conceptual lists and visual callouts, keeping audience retention high across a 10-minute presentation.`);
     }
 
-    if (q.includes('image') || q.includes('layout') || q.includes('recommend')) {
+    if (q.includes('image') || q.includes('layout') || q.includes('suggest') || q.includes('recommend')) {
       const activeIdx = (deck.activeSlideIndex || 0) + 1;
       const currentLayout = activeSlide?.layoutType || 'bullets';
 
-      return `💡 **Layout Recommendations for Slide ${activeIdx}**:\n\n` +
+      return `💡 **Layout & Image Recommendations for Slide ${activeIdx}**:\n\n` +
         `• Current Layout: \`${currentLayout}\`\n` +
-        `• **Recommendation 1**: Switch to **Split Image + Text** if presenting case study evidence or an organizational diagram.\n` +
-        `• **Recommendation 2**: Switch to **Big Metric Focus** if highlighting statistical lift or quantitative results (e.g. 4.2x, 84%).\n` +
-        `• **Recommendation 3**: Use **2-Column Comparison** if contrasting legacy models with modern strategic approaches.`;
+        `• **Recommendation 1**: Switch to **Split Image + Text** with 50% image dropzone for visual grounding.\n` +
+        `• **Recommendation 2**: Switch to **Big Metric Focus** for quantitative proof points.\n` +
+        `• **Recommendation 3**: Use **2-Column Comparison** to contrast baseline vs proposed solutions.`;
     }
 
     // Default scholarly advice
@@ -167,7 +167,7 @@ export default function AskScholarPresentationDrawer({
 
   return (
     <aside
-      className={`w-80 lg:w-96 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] flex flex-col h-full transition-all duration-300 shrink-0 select-text z-20 ${className}`}
+      className={`w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] flex flex-col h-full shadow-lg z-20 transition-all duration-300 select-text ${className}`}
       data-testid="ask-scholar-drawer"
       aria-label="Ask Scholar Presentation Copilot"
     >
@@ -182,25 +182,25 @@ export default function AskScholarPresentationDrawer({
               Ask Scholar
             </h3>
             <p className="text-[10px] uppercase tracking-wider text-neutral-500 dark:text-neutral-400 font-bold truncate">
-              Presentation Advisor &amp; Slide Copilot
+              Slide &amp; Outline Advisor
             </p>
           </div>
         </div>
 
-        {/* Collapse Button */}
+        {/* Close Button ✕ */}
         <button
           type="button"
           onClick={onClose}
           aria-label="Close Ask Scholar drawer"
-          title="Collapse drawer"
-          className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+          title="Close Ask Scholar"
+          className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer shrink-0 font-medium"
         >
-          <ChevronsRight className="w-4 h-4" />
+          ✕
         </button>
       </div>
 
       {/* Drawer Body: Chat History & Suggested Prompt Pills */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 ? (
           <div className="space-y-4">
             <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/5 space-y-1">
@@ -235,7 +235,7 @@ export default function AskScholarPresentationDrawer({
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -290,7 +290,7 @@ export default function AskScholarPresentationDrawer({
       )}
 
       {/* Bottom Dock Input Pill */}
-      <div className="p-3.5 sm:p-4 border-t border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shrink-0">
+      <div className="border-t border-neutral-200/60 dark:border-white/10 p-4 bg-white dark:bg-[#1C1C1E] shrink-0">
         <form
           onSubmit={(e) => {
             e.preventDefault();

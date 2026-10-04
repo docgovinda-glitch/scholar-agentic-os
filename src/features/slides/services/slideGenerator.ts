@@ -115,6 +115,19 @@ export const PRESENTATION_STYLE_PROFILES: Record<string, PresentationStyleProfil
     narrativeScaffolding: 'EmpiricalCase',
     systemInstruction: 'Focus on strategic levers, quantitative ROI milestones, and immediate executive decisions.',
   },
+  'visual-storytelling': {
+    id: 'visual-storytelling',
+    label: 'Visual Storytelling',
+    writingTone: 'Narrative, emotionally resonant, visually grounded',
+    bulletRule: 'one-line-impact',
+    layoutDistribution: {
+      heroMetricRatio: 0.2,
+      twoColumnRatio: 0.1,
+      splitMediaRatio: 0.6,
+    },
+    narrativeScaffolding: 'VisualNarrative',
+    systemInstruction: 'Assign Split Image + Text layouts with short, 1-line impact statements and evocative framing.',
+  },
 };
 
 export interface DecomposeInput {
@@ -172,7 +185,7 @@ export function transformToActiveHeadline(raw: string, contextTopic?: string): s
     return generateNaturalSlideTitle(trimmed, contextTopic);
   }
 
-  return cleanHumanTitle(trimmed) || 'Key Analytical Synthesis';
+  return cleanHumanTitle(trimmed) || 'Core Strategic Takeaway';
 }
 
 /**
@@ -233,11 +246,11 @@ function generateSlidesForTopic(
         id: 'slide-1',
         order: 1,
         actionHeadline: 'Why Zappos Pays New Hires $2,000 to Quit',
-        summary: 'Analyzes how financial exit bonuses filter for genuine cultural alignment over short-term monetary motivation.',
-        layoutType: 'metric-focus',
+        summary: 'Analyzes how financial exit bonuses filter for genuine cultural alignment over short-term monetary compensation.',
+        layoutType: 'bullets',
         beatPhase: 'beat-1-action-hook',
         framework,
-        frameworkPhase: styleProfile.id === 'executive-pitch' ? 'Executive ROI Filter' : 'Action Hook',
+        frameworkPhase: 'Action Hook',
         blocks: [
           {
             type: 'action-header',
@@ -246,12 +259,13 @@ function generateSlidesForTopic(
             subheadline: 'Filtering for intrinsic cultural alignment over monetary expedience',
           },
           {
-            type: 'metric-callout',
-            value: '$2,000',
-            metric: '$2,000',
-            label: 'Exit Offer Bonus',
-            context: 'Offered to new customer service trainees to filter for cultural dedication',
-            trend: 'up',
+            type: 'bullet-list',
+            items: [
+              '$2,000 exit offer to all trainees',
+              'Filters for intrinsic cultural dedication',
+              'Protects core high-touch customer focus',
+              'Eliminates short-term transactional hires',
+            ].map(condenseToSixWords),
           },
         ],
         speakerNotes: 'Why does Zappos pay trainees $2,000 to leave? By offering a cash buyout, Zappos weeds out candidates who are only present for short-term compensation, protecting its core cultural commitment.',
@@ -261,16 +275,16 @@ function generateSlidesForTopic(
       {
         id: 'slide-2',
         order: 2,
-        actionHeadline: "Schein's Three Levels of Organizational Culture",
-        summary: 'Deconstructs workplace culture across visible artifacts, espoused values, and basic underlying assumptions.',
-        layoutType: 'two-column',
+        actionHeadline: "Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions",
+        summary: 'Deconstructs workplace culture across tangible physical symbols, declared philosophies, and unconscious beliefs.',
+        layoutType: 'framework',
         beatPhase: 'beat-2-tension-context',
         framework,
-        frameworkPhase: 'Theoretical Framing',
+        frameworkPhase: 'Framework',
         blocks: [
           {
             type: 'action-header',
-            headline: "Schein's Three Levels of Organizational Culture",
+            headline: "Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions",
             category: 'Theoretical Foundations',
             subheadline: 'Artifacts, Espoused Values, and Underlying Assumptions',
           },
@@ -297,16 +311,16 @@ function generateSlidesForTopic(
       {
         id: 'slide-3',
         order: 3,
-        actionHeadline: 'Can Changing Artifacts Alone Transform Culture?',
-        summary: 'Evaluates why cosmetic changes like office redesigns fail without shifting underlying beliefs.',
+        actionHeadline: 'The Limits of Artifacts: Why Changing Perks Fails to Shift Culture',
+        summary: 'Evaluates why cosmetic changes like open offices and dress codes produce superficial compliance rather than core behavioral shifts.',
         layoutType: 'two-column',
         beatPhase: 'beat-3-mechanical-principle',
         framework,
-        frameworkPhase: 'Critical Evaluation',
+        frameworkPhase: '2-Column Comparison',
         blocks: [
           {
             type: 'action-header',
-            headline: 'Can Changing Artifacts Alone Transform Culture?',
+            headline: 'The Limits of Artifacts: Why Changing Perks Fails to Shift Culture',
             category: 'Intervention Analysis',
             subheadline: 'Why cosmetic changes fail without shifting core assumptions',
           },
@@ -333,8 +347,8 @@ function generateSlidesForTopic(
       {
         id: 'slide-4',
         order: 4,
-        actionHeadline: 'Targeting the Right Cultural Level for Leadership Intervention',
-        summary: 'Examines why leaders must address espoused values and behavioral habits to alter deep assumptions.',
+        actionHeadline: 'Leadership Intervention: Targeting Values and Habits to Shift Assumptions',
+        summary: 'Assesses which cultural tier leaders must engage first to facilitate authentic, enduring organizational change.',
         layoutType: 'bullets',
         beatPhase: 'beat-4-empirical-proof',
         framework,
@@ -342,7 +356,7 @@ function generateSlidesForTopic(
         blocks: [
           {
             type: 'action-header',
-            headline: 'Targeting the Right Cultural Level for Leadership Intervention',
+            headline: 'Leadership Intervention: Targeting Values and Habits to Shift Assumptions',
             category: 'Leadership Levers',
             subheadline: 'Aligning stated values with everyday decisions and incentives',
           },
@@ -364,33 +378,28 @@ function generateSlidesForTopic(
       {
         id: 'slide-5',
         order: 5,
-        actionHeadline: 'Assessing Organizational Culture in Job Interviews',
-        summary: 'Provides a practical diagnostic framework for candidates to observe artifacts and probe unwritten rules.',
-        layoutType: 'two-column',
+        actionHeadline: 'Assessing Organizational Culture in Candidate Job Interviews',
+        summary: 'Provides a diagnostic framework for candidates to observe workplace artifacts and probe beneath scripted corporate rhetoric.',
+        layoutType: 'bullets',
         beatPhase: 'beat-5-strategic-horizon',
         framework,
         frameworkPhase: 'Diagnostic Framework',
         blocks: [
           {
             type: 'action-header',
-            headline: 'Assessing Organizational Culture in Job Interviews',
+            headline: 'Assessing Organizational Culture in Candidate Job Interviews',
             category: 'Practical Application',
             subheadline: 'Observing workplace artifacts and asking diagnostic questions',
           },
           {
-            type: 'two-column',
-            leftHeader: 'Observational Cues',
-            leftContent: [
-              'How employees interact in hallways',
-              'Physical clutter vs. open collaboration',
-              'Punctuality and energy in meetings',
-            ],
-            rightHeader: 'Probing Questions',
-            rightContent: [
-              'How are critical errors handled?',
-              'What behaviors get rewarded here?',
-              'How are conflicting priorities resolved?',
-            ],
+            type: 'bullet-list',
+            items: [
+              'Observe employee interactions in hallways',
+              'Probe how critical errors are handled',
+              'Ask what specific behaviors get rewarded',
+              'Notice physical clutter vs collaboration',
+              'Examine unwritten rules and norms',
+            ].map(condenseToSixWords),
           },
         ],
         speakerNotes: 'Job candidates can evaluate prospective employer culture by triangulating observed office artifacts with pointed behavioral questions during interviews.',
@@ -753,7 +762,7 @@ export function generateSlideDeck(input: DecomposeInput): SlideDeck {
     const slideSummary =
       relegatedNotes.length > 0 && relegatedNotes[0]
         ? `${relegatedNotes[0].slice(0, 110)}...`
-        : `Analytical synthesis and key implications for ${actionHeadline.toLowerCase()}.`;
+        : `Key takeaways and strategic implications for ${actionHeadline.toLowerCase()}.`;
 
     slides.push({
       id: `slide-${i + 1}`,

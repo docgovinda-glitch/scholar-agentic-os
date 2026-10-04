@@ -164,8 +164,28 @@ describe("PresentationWorkspace", () => {
     vi.useRealTimers();
   });
 
-  it("opens LiveSlidePlayer when Present Fullscreen is clicked and closes on Exit", async () => {
-    render(<PresentationWorkspace projectId="proj-pres-1" initialStep="studio" />);
+  it("does not render Present Fullscreen in header during Steps 01, 02, and 03, and mounts it exclusively in Step 04", () => {
+    render(<PresentationWorkspace projectId="proj-pres-clean-header" initialStep="studio" />);
+
+    // In Step 03, header has no Present Fullscreen button
+    expect(screen.queryByTestId("present-fullscreen-btn")).not.toBeInTheDocument();
+
+    // Step 01 Understand: no Present Fullscreen button
+    fireEvent.click(screen.getByRole("button", { name: /01 Understand/i }));
+    expect(screen.queryByTestId("present-fullscreen-btn")).not.toBeInTheDocument();
+
+    // Step 02 Design: no Present Fullscreen button
+    fireEvent.click(screen.getByRole("button", { name: /02 Design/i }));
+    expect(screen.queryByTestId("present-fullscreen-btn")).not.toBeInTheDocument();
+
+    // Step 04 Present: Present Fullscreen button is properly mounted
+    fireEvent.click(screen.getByRole("button", { name: /04 Present/i }));
+    expect(screen.getByTestId("present-fullscreen-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("present-fullscreen-btn")).toHaveTextContent(/Start Presentation \(F\)/i);
+  });
+
+  it("opens LiveSlidePlayer when Present Fullscreen is clicked in Step 04 and closes on Exit", async () => {
+    render(<PresentationWorkspace projectId="proj-pres-1" initialStep="delivery" />);
 
     const presentBtn = screen.getByTestId("present-fullscreen-btn");
     fireEvent.click(presentBtn);
@@ -249,11 +269,11 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
 
     expect(screen.getByTestId("ask-scholar-drawer")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Ask Scholar" })).toBeInTheDocument();
-    expect(screen.getByText(/Presentation Advisor & Slide Copilot/i)).toBeInTheDocument();
+    expect(screen.getByText(/Slide & Outline Advisor|Presentation Advisor/i)).toBeInTheDocument();
 
     // Suggested actions appear in drawer
-    expect(screen.getByText("Suggest stronger action headlines")).toBeInTheDocument();
-    expect(screen.getByText("Audit slides for 6x6 bullet rule")).toBeInTheDocument();
+    expect(screen.getByText(/Improve action headlines|Suggest stronger action headlines/i)).toBeInTheDocument();
+    expect(screen.getByText(/Audit 6x6 bullet rules|Audit slides for 6x6 bullet rule/i)).toBeInTheDocument();
 
     // Toggle close via drawer chevron button
     const closeBtn = screen.getByLabelText("Close Ask Scholar drawer");

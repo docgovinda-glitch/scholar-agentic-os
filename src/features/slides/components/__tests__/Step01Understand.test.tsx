@@ -32,46 +32,46 @@ const zapposDeck: SlideDeck = {
     {
       id: 'slide-2',
       order: 2,
-      actionHeadline: "Schein's Three Levels of Organizational Culture",
-      summary: 'Deconstructs workplace culture across visible artifacts, espoused values, and basic underlying assumptions.',
+      actionHeadline: "Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions",
+      summary: 'Deconstructs workplace culture across tangible physical symbols, declared philosophies, and unconscious beliefs.',
       layoutType: 'two-column',
       framework: 'Standard-Narrative',
       frameworkPhase: 'Theoretical Foundations',
       blocks: [],
-      speakerNotes: "Slide 2: Schein's Three Levels. Explain visible artifacts and underlying assumptions.",
+      speakerNotes: "Slide 2: Schein's 3 Levels. Deconstructs visible artifacts, declared philosophies, and unconscious beliefs.",
     },
     {
       id: 'slide-3',
       order: 3,
-      actionHeadline: 'Can Changing Artifacts Alone Transform Culture?',
-      summary: 'Evaluates why cosmetic changes like office redesigns fail without shifting underlying beliefs.',
+      actionHeadline: 'The Limits of Artifacts: Why Changing Perks Fails to Shift Culture',
+      summary: 'Evaluates why cosmetic changes like open offices and dress codes produce superficial compliance rather than core behavioral shifts.',
       layoutType: 'two-column',
       framework: 'Standard-Narrative',
       frameworkPhase: 'Intervention Analysis',
       blocks: [],
-      speakerNotes: 'Slide 3: Can changing artifacts transform culture.',
+      speakerNotes: 'Slide 3: Evaluates why cosmetic changes produce superficial compliance.',
     },
     {
       id: 'slide-4',
       order: 4,
-      actionHeadline: 'Targeting the Right Cultural Level for Leadership Intervention',
-      summary: 'Examines why leaders must address espoused values and behavioral habits to alter deep assumptions.',
+      actionHeadline: 'Leadership Intervention: Targeting Values and Habits to Shift Assumptions',
+      summary: 'Assesses which cultural tier leaders must engage first to facilitate authentic, enduring organizational change.',
       layoutType: 'bullets',
       framework: 'Standard-Narrative',
       frameworkPhase: 'Leadership Levers',
       blocks: [],
-      speakerNotes: 'Slide 4: Leadership intervention levels.',
+      speakerNotes: 'Slide 4: Assesses which cultural tier leaders must engage first.',
     },
     {
       id: 'slide-5',
       order: 5,
-      actionHeadline: 'Assessing Organizational Culture in Job Interviews',
-      summary: 'Provides a practical diagnostic framework for candidates to observe artifacts and probe unwritten rules.',
+      actionHeadline: 'Assessing Organizational Culture in Candidate Job Interviews',
+      summary: 'Provides a diagnostic framework for candidates to observe workplace artifacts and probe beneath scripted corporate rhetoric.',
       layoutType: 'two-column',
       framework: 'Standard-Narrative',
       frameworkPhase: 'Practical Application',
       blocks: [],
-      speakerNotes: 'Slide 5: Assessing culture in job interviews.',
+      speakerNotes: 'Slide 5: Diagnostic framework for candidate job interviews.',
     },
   ],
   activeSlideIndex: 0,
@@ -148,7 +148,7 @@ describe('Step01Understand (Zero-Ghost Rule, Scope Cards & Presentation Style)',
     );
 
     expect(screen.getByTestId('slide-outline-pill-card-2')).toBeInTheDocument();
-    expect(screen.getByText("Schein's Three Levels of Organizational Culture")).toBeInTheDocument();
+    expect(screen.getByText("Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions")).toBeInTheDocument();
 
     // Stepper button
     expect(screen.getByRole('button', { name: /Proceed to Design/i })).toBeInTheDocument();
@@ -226,13 +226,13 @@ describe('Step01Understand (Zero-Ghost Rule, Scope Cards & Presentation Style)',
 
     expect(generated.slides).toHaveLength(5);
     expect(generated.slides[0].actionHeadline).toBe('Why Zappos Pays New Hires $2,000 to Quit');
-    expect(generated.slides[1].actionHeadline).toBe("Schein's Three Levels of Organizational Culture");
-    expect(generated.slides[2].actionHeadline).toBe('Can Changing Artifacts Alone Transform Culture?');
+    expect(generated.slides[1].actionHeadline).toBe("Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions");
+    expect(generated.slides[2].actionHeadline).toBe('The Limits of Artifacts: Why Changing Perks Fails to Shift Culture');
     expect(generated.slides[3].actionHeadline).toBe(
-      'Targeting the Right Cultural Level for Leadership Intervention'
+      'Leadership Intervention: Targeting Values and Habits to Shift Assumptions'
     );
     expect(generated.slides[4].actionHeadline).toBe(
-      'Assessing Organizational Culture in Job Interviews'
+      'Assessing Organizational Culture in Candidate Job Interviews'
     );
 
     // Verify 1-sentence summaries are present

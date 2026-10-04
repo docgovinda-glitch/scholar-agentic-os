@@ -54,7 +54,7 @@ describe('AskScholarPresentationDrawer', () => {
 
     expect(screen.getByTestId('ask-scholar-drawer')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Ask Scholar' })).toBeInTheDocument();
-    expect(screen.getByText(/Presentation Advisor & Slide Copilot/i)).toBeInTheDocument();
+    expect(screen.getByText(/Slide & Outline Advisor|Presentation Advisor/i)).toBeInTheDocument();
 
     const closeBtn = screen.getByLabelText('Close Ask Scholar drawer');
     fireEvent.click(closeBtn);
@@ -86,12 +86,12 @@ describe('AskScholarPresentationDrawer', () => {
       expect(screen.getByText(pill)).toBeInTheDocument();
     }
 
-    // Click "Audit slides for 6x6 bullet rule"
-    const auditPill = screen.getByText('Audit slides for 6x6 bullet rule');
+    // Click "Audit 6x6 bullet rules"
+    const auditPill = screen.getByText(/Audit 6x6 bullet rules|Audit slides for 6x6 bullet rule/i);
     fireEvent.click(auditPill);
 
     // User message is shown (and follow-up chip appears)
-    expect(screen.getAllByText('Audit slides for 6x6 bullet rule').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Audit 6x6 bullet rules|Audit slides for 6x6 bullet rule/i).length).toBeGreaterThan(0);
 
     // Assistant response with 6x6 rule audit is rendered
     await waitFor(() => {

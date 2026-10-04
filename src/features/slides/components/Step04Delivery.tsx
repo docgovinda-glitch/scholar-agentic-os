@@ -156,6 +156,17 @@ export default function Step04Delivery({ deck, onPrevStep, onClose }: Step04Deli
             </button>
           </div>
 
+          {/* Fullscreen Start Presentation Trigger */}
+          <button
+            type="button"
+            data-testid="start-presentation-btn"
+            onClick={toggleFullscreen}
+            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <span>⤢</span>
+            <span>Start Presentation (F)</span>
+          </button>
+
           {/* Export Dropdown */}
           <div className="relative">
             <button

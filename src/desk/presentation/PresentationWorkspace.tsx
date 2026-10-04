@@ -72,8 +72,8 @@ export default function PresentationWorkspace({
       });
     }
 
-    // If step was requested as studio, provide starter slides for editing canvas
-    if (computedInitialStep === 'studio') {
+    // If step was requested as studio or delivery, provide starter slides for editing/delivery canvas
+    if (computedInitialStep === 'studio' || computedInitialStep === 'delivery') {
       return generateSlideDeck({
         topic: 'Research Synthesis & Presentation',
         framework: 'Standard-Narrative',
@@ -219,7 +219,7 @@ export default function PresentationWorkspace({
       targetAudience: 'Scholarly Presentation',
       narrativeHook: 'Verified Empirical Evidence',
       coreInsight: 'Structured Synthesis and Analysis',
-      slides: deck.slides.map((s, idx) => ({
+      slides: deck.slides.length > 0 ? deck.slides.map((s, idx) => ({
         slideNumber: idx + 1,
         type: 'architecture' as const,
         title: s.actionHeadline,
@@ -228,7 +228,18 @@ export default function PresentationWorkspace({
         keyPoints: (s.blocks.find((b) => b.type === 'bullet-list') as any)?.items || [s.actionHeadline],
         speakerNotes: s.speakerNotes,
         targetDurationSeconds: 120,
-      })),
+      })) : [
+        {
+          slideNumber: 1,
+          type: 'architecture' as const,
+          title: deck.title || 'Empirical Presentation',
+          subtitle: 'Empirical Synthesis',
+          visualFocus: 'Introduction',
+          keyPoints: ['Structured empirical findings and analysis'],
+          speakerNotes: 'Slide overview',
+          targetDurationSeconds: 120,
+        },
+      ],
     };
 
     return (
@@ -242,32 +253,31 @@ export default function PresentationWorkspace({
 
   return (
     <div
-      className="min-h-screen bg-[#F7F5F0] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 flex flex-col font-sans"
+      className="flex h-screen w-full flex-col overflow-hidden bg-[#F7F5F0] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200"
       data-testid="presentation-workspace"
     >
-      {/* Studio Top Control Header */}
-      <header className="sticky top-0 z-30 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-md border-b border-neutral-200/80 dark:border-white/10 px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Studio Top Control Header (Height: 56px) */}
+      <header className="h-14 border-b border-neutral-200/80 dark:border-white/10 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between gap-4 shrink-0 z-30">
         {/* Title and Module Identity (Matching Coursework Image 19 & 20) */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {onClose && (
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 -ml-1 text-neutral-500 hover:text-neutral-900 dark:hover:text-white rounded-lg hover:bg-neutral-100 dark:hover:bg-white/5 transition-all cursor-pointer font-bold"
+              className="p-1.5 -ml-1 text-neutral-500 hover:text-neutral-900 dark:hover:text-white rounded-lg hover:bg-neutral-100 dark:hover:bg-white/5 transition-all cursor-pointer font-bold shrink-0"
               aria-label="Back"
               title="Back"
             >
               <span className="text-base leading-none">←</span>
             </button>
           )}
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                Presentation Studio
+              <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
+                PRESENTATION STUDIO ·
               </span>
-              <span className="text-neutral-400 dark:text-neutral-600">·</span>
               <span
-                className={`text-xs flex items-center gap-1.5 ${
+                className={`text-xs flex items-center gap-1.5 whitespace-nowrap ${
                   autosaveStatus === 'saving'
                     ? 'text-amber-500'
                     : 'text-neutral-500 dark:text-neutral-400'
@@ -290,8 +300,8 @@ export default function PresentationWorkspace({
                   handleUpdateDeck(updated);
                 }}
                 aria-label="Presentation Title"
-                className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-white bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-neutral-700 focus:border-neutral-900 dark:focus:border-white focus:outline-none transition-colors max-w-md truncate"
-                placeholder="Untitled Presentation"
+                className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-neutral-700 focus:border-neutral-900 dark:focus:border-white focus:outline-none transition-colors max-w-xs sm:max-w-md truncate"
+                placeholder="MN6094NI Developing Breakthrough Leadership"
               />
             </div>
           </div>
@@ -300,7 +310,7 @@ export default function PresentationWorkspace({
         {/* 4-Step Stepper Navigation */}
         <nav
           aria-label="Presentation Studio Workflow"
-          className="flex items-center bg-neutral-100 dark:bg-white/5 p-1 rounded-xl gap-1 overflow-x-auto"
+          className="flex items-center bg-neutral-100 dark:bg-white/5 p-1 rounded-xl gap-1 overflow-x-auto shrink-0"
         >
           {STEPS.map((step) => {
             const isCurrent =
@@ -324,17 +334,30 @@ export default function PresentationWorkspace({
           })}
         </nav>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
-          {/* Ask Scholar Drawer Toggle */}
+        {/* Action Buttons: Relocated Present Fullscreen exclusively to Step 04 */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Present Fullscreen Button: Only visible in Step 04 ("04 Present") */}
+          {currentStep === 'delivery' && (
+            <button
+              type="button"
+              data-testid="present-fullscreen-btn"
+              onClick={() => setShowLivePlayer(true)}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <span>⤢</span>
+              <span>Start Presentation (F)</span>
+            </button>
+          )}
+
+          {/* Ask Scholar Drawer Toggle Pill */}
           <button
             type="button"
             onClick={() => setIsAskScholarOpen(!isAskScholarOpen)}
             data-testid="toggle-ask-scholar-btn"
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`rounded-full px-3.5 py-1.5 text-xs font-medium border border-neutral-200/80 bg-white hover:bg-neutral-50 dark:border-white/10 dark:bg-[#1C1C1E] dark:hover:bg-neutral-800 transition-colors flex items-center gap-1.5 cursor-pointer ${
               isAskScholarOpen
-                ? 'bg-neutral-200/80 dark:bg-white/10 text-neutral-900 dark:text-white shadow-2xs font-bold'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5'
+                ? 'ring-2 ring-blue-500/20 font-bold border-blue-500/40 text-neutral-900 dark:text-white'
+                : 'text-neutral-700 dark:text-neutral-300'
             }`}
             title="Toggle Ask Scholar drawer"
             aria-label="Toggle Ask Scholar"
@@ -343,21 +366,11 @@ export default function PresentationWorkspace({
             <span className="hidden sm:inline">Ask Scholar</span>
           </button>
 
-          <button
-            type="button"
-            data-testid="present-fullscreen-btn"
-            onClick={() => setShowLivePlayer(true)}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-          >
-            <span>⤢</span>
-            <span>Present Fullscreen</span>
-          </button>
-
           {onClose && (
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer"
+              className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer font-bold"
               title="Close Presentation Studio"
             >
               ✕
@@ -366,9 +379,10 @@ export default function PresentationWorkspace({
         </div>
       </header>
 
-      {/* Workspace Body: Center Presentation Stage & Collapsible Right Ask Scholar Drawer */}
-      <div className="flex-1 flex overflow-hidden relative">
-        <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6">
+      {/* Main Workspace Body */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Center Canvas Viewport */}
+        <main className="flex-1 overflow-y-auto px-6 py-8 transition-all duration-300">
           {(currentStep === 'understand' || currentStep === 'scaffolding') && (
             <Step01Understand
               deck={deck}
@@ -419,14 +433,17 @@ export default function PresentationWorkspace({
           )}
         </main>
 
-        {/* Collapsible Right-Side Ask Scholar Copilot Drawer */}
+        {/* Right-Side Collapsible Drawer */}
         {isAskScholarOpen && (
-          <AskScholarPresentationDrawer
-            deck={deck}
-            onUpdateDeck={handleUpdateDeck}
-            isOpen={isAskScholarOpen}
-            onClose={() => setIsAskScholarOpen(false)}
-          />
+          <aside className="w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] flex flex-col h-full shadow-lg z-20 transition-all duration-300">
+            <AskScholarPresentationDrawer
+              deck={deck}
+              onUpdateDeck={handleUpdateDeck}
+              isOpen={isAskScholarOpen}
+              onClose={() => setIsAskScholarOpen(false)}
+              className="w-full border-none shadow-none"
+            />
+          </aside>
         )}
       </div>
     </div>
