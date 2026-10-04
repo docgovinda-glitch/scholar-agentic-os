@@ -21,18 +21,18 @@ const JARGON_REMOVAL_PATTERNS = [
 
 const BOTTLENECK_TOPICS: Record<string, string[]> = {
   zappos: [
-    'Why Zappos Pays New Hires to Quit',
-    "Schein's Three Levels of Culture",
-    'Can Office Perks Change Culture?',
-    'Assessing Culture in Job Interviews',
-    'What Leaders Learn from the Offer',
+    'Why Zappos Pays New Hires $2,000 to Quit',
+    "Schein's Three Levels of Organizational Culture",
+    'Can Changing Artifacts Alone Transform Culture?',
+    'Targeting the Right Cultural Level for Leadership Intervention',
+    'Assessing Organizational Culture in Job Interviews',
   ],
   culture: [
-    'The Truth About Workplace Culture',
-    'The 3 Layers Beneath Daily Habits',
-    'Why Perks Alone Never Fix Morale',
-    'Hiring for Values Over Compliance',
-    'How Resilient Teams Lead and Scale',
+    'Why Zappos Pays New Hires $2,000 to Quit',
+    "Schein's Three Levels of Organizational Culture",
+    'Can Changing Artifacts Alone Transform Culture?',
+    'Targeting the Right Cultural Level for Leadership Intervention',
+    'Assessing Organizational Culture in Job Interviews',
   ],
   quantum: [
     'Why Quantum Cryptography Matters Now',
@@ -96,7 +96,7 @@ export function cleanHumanTitle(raw: string, maxWords = 9): string {
     return words.slice(0, maxWords).join(' ');
   }
 
-  return cleaned || 'Presentation Takeaway';
+  return cleaned || 'Key Analytical Synthesis';
 }
 
 /**

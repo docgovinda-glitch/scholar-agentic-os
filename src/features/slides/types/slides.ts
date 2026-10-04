@@ -89,6 +89,35 @@ export type SlideBlock =
 
 export type NarrativeFramework = 'Standard-Narrative' | 'SCR' | 'WhatIsCouldBe' | 'ABT' | (string & {});
 
+export type PresentationStyleId =
+  | 'narrative'
+  | 'problem-solution'
+  | 'case-study'
+  | 'executive-pitch'
+  | 'Standard-Narrative'
+  | 'SCR'
+  | 'WhatIsCouldBe';
+
+export interface PresentationStyleProfile {
+  id: 'narrative' | 'problem-solution' | 'case-study' | 'executive-pitch';
+  label: string;
+  writingTone: string;
+  bulletRule: 'strict-6x6' | 'conversational-brief' | 'data-led';
+  layoutDistribution: {
+    heroMetricRatio: number; // e.g. 0.2 = 20% of slides feature big metric callouts
+    twoColumnRatio: number;   // e.g. 0.4 = 40% comparative blocks
+    splitMediaRatio: number;  // e.g. 0.2 = 20% image-split slides
+  };
+  narrativeScaffolding: 'SCR' | 'WhatIsCouldBe' | 'EmpiricalCase' | 'Standard-Narrative';
+  systemInstruction: string;
+}
+
+export interface PresentationScopeBoundaries {
+  summaryBanner: string;
+  covers: string[];
+  avoids: string[];
+}
+
 export type SlideOutlinePhase =
   | 'overview-action-hook'
   | 'tension-context'
@@ -125,6 +154,7 @@ export interface SlideCard {
   id: string;
   order: number;
   actionHeadline: string;
+  summary?: string; // 1-sentence analytical takeaway for outline pill cards
   blocks: SlideBlock[];
   speakerNotes: string;
   framework: NarrativeFramework;

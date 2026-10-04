@@ -7,6 +7,8 @@ export {
 export * from './services/universalDecomposer';
 export * from './services/slideGenerator';
 export * from './services/slideReplicaService';
+export * from './services/presentationScopeClassifier';
+export { default as SlideOutlinePillCard } from './components/SlideOutlinePillCard';
 export { default as SlideCanvas } from './components/SlideCanvas';
 export { default as SlideCardBlock } from './components/SlideCardBlock';
 export { default as PresentationController } from './components/PresentationController';

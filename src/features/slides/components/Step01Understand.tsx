@@ -1,11 +1,26 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, CheckCircle2, AlertCircle, Trash2, Sparkles, ChevronDown, Image as ImageIcon } from 'lucide-react';
-import type { SlideDeck, NarrativeFramework } from '../types/slides';
+import {
+  Upload,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  AlertTriangle,
+  Trash2,
+  Sparkles,
+  ChevronDown,
+  Image as ImageIcon,
+  Plus,
+  X,
+} from 'lucide-react';
+import type { SlideDeck, NarrativeFramework, PresentationScopeBoundaries } from '../types/slides';
 import {
   generateSlideDeck,
   decomposeToSwissEditorial,
+  PRESENTATION_STYLE_PROFILES,
 } from '../services/slideGenerator';
 import { generateNaturalSlideTitle } from '../services/slideTitleGenerator';
+import { classifyPresentationScope } from '../services/presentationScopeClassifier';
+import SlideOutlinePillCard from './SlideOutlinePillCard';
 
 export interface Step01UnderstandProps {
   deck: SlideDeck;
@@ -43,6 +58,48 @@ export default function Step01Understand({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Green ("What This Covers") & Yellow/Orange ("What to Avoid") Scope State
+  const [scope, setScope] = useState<PresentationScopeBoundaries>(() => {
+    return classifyPresentationScope(
+      deck.slides[0]?.speakerNotes || '',
+      deck.topic || (deck.title && deck.title !== 'Untitled Presentation' ? deck.title : '')
+    );
+  });
+  const [newCoverInput, setNewCoverInput] = useState('');
+  const [showAddCover, setShowAddCover] = useState(false);
+  const [newAvoidInput, setNewAvoidInput] = useState('');
+  const [showAddAvoid, setShowAddAvoid] = useState(false);
+
+  const handleRemoveCover = (idxToRemove: number) => {
+    setScope((prev) => ({
+      ...prev,
+      covers: prev.covers.filter((_, idx) => idx !== idxToRemove),
+    }));
+  };
+
+  const handleAddCover = (newPoint: string) => {
+    if (!newPoint.trim()) return;
+    setScope((prev) => ({
+      ...prev,
+      covers: [...prev.covers, newPoint.trim()],
+    }));
+  };
+
+  const handleRemoveAvoid = (idxToRemove: number) => {
+    setScope((prev) => ({
+      ...prev,
+      avoids: prev.avoids.filter((_, idx) => idx !== idxToRemove),
+    }));
+  };
+
+  const handleAddAvoid = (newRule: string) => {
+    if (!newRule.trim()) return;
+    setScope((prev) => ({
+      ...prev,
+      avoids: [...prev.avoids, newRule.trim()],
+    }));
+  };
+
   // Global Screenshot / Image Paste Support (Cmd+V)
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
@@ -70,6 +127,10 @@ export default function Step01Understand({
     try {
       const textToUse = overrideText !== undefined ? overrideText : (rawTextInput || undefined);
       const topicToUse = overrideTopic !== undefined ? overrideTopic : topicInput;
+
+      // Update green/yellow scope boundaries
+      const nextScope = classifyPresentationScope(textToUse || '', topicToUse || '');
+      setScope(nextScope);
 
       const isSwiss =
         topicToUse.toLowerCase().includes('bird') ||
@@ -563,8 +624,9 @@ export default function Step01Understand({
                 className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
               >
                 <option value="Standard-Narrative">Standard Narrative</option>
-                <option value="SCR">Problem &amp; Solution</option>
+                <option value="SCR">Problem &amp; Solution (SCR)</option>
                 <option value="WhatIsCouldBe">Case Study Analysis</option>
+                <option value="executive-pitch">Executive Pitch</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
                 <ChevronDown className="w-3.5 h-3.5" />
@@ -621,58 +683,230 @@ export default function Step01Understand({
         </div>
       </div>
 
-      {/* Clean Outline Cards (No Repetitive Jargon or Formulaic Beat Chips) */}
-      {deck.slides.length > 0 && (
-        <div className="space-y-4" data-testid="generated-outline-section">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200">
-              Generated Presentation Outline ({deck.slides.length} Slides)
-            </h2>
-            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">
-              1 Idea Per Slide
-            </span>
+      {/* Zero-Ghost State: Empty State when no brief or topic has been outlined */}
+      {deck.slides.length === 0 ? (
+        <div
+          data-testid="zero-ghost-outline-empty-state"
+          className="border-2 border-dashed border-neutral-200/80 dark:border-white/10 rounded-2xl p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-2.5 bg-neutral-50/50 dark:bg-white/[0.02]"
+        >
+          <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-white/5 flex items-center justify-center text-neutral-400 dark:text-neutral-500 mb-0.5">
+            <FileText className="w-5 h-5" />
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            {deck.slides.map((slide, idx) => {
-              const slideNum = idx + 1;
-              return (
-                <div
-                  key={slide.id || idx}
-                  className="p-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-2xs space-y-2 flex flex-col justify-between"
-                >
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-                        Slide {slideNum}
-                      </span>
-                      <span className="text-[10px] text-neutral-400 font-mono">
-                        {slide.layoutType || 'bullets'}
-                      </span>
-                    </div>
-                    <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 line-clamp-2 leading-snug">
-                      {slide.actionHeadline}
-                    </div>
-                  </div>
-
-                  <div className="text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-2">
-                    {slide.speakerNotes ? `${slide.speakerNotes.slice(0, 80)}...` : slide.frameworkPhase || 'Slide overview'}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Stepper Navigation Proceed */}
-          <div className="flex justify-end pt-4">
-            <button
-              type="button"
-              onClick={onNextStep}
-              className="px-6 py-2.5 rounded-xl font-medium text-xs bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-90 shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+          <p className="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-400 max-w-md leading-relaxed">
+            Ready to outline your presentation. Enter a topic or upload your assignment brief above to generate your slides.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6" data-testid="generated-outline-section">
+          {/* Green & Yellow Scope Cards (Replicating Coursework Phase 1 Image 6) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="presentation-scope-cards">
+            {/* Green Card — What This Presentation Covers */}
+            <div
+              data-testid="presentation-scope-covers-card"
+              className="p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/10 space-y-3 flex flex-col justify-between"
             >
-              <span>Proceed to Design</span>
-              <span>→</span>
-            </button>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20">
+                  <h3 className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>What This Presentation Covers</span>
+                  </h3>
+                  <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                    {scope.covers.length} Key Points · Editable
+                  </span>
+                </div>
+
+                <ul className="space-y-2">
+                  {scope.covers.map((item, idx) => (
+                    <li
+                      key={idx}
+                      className="text-xs text-emerald-900 dark:text-emerald-200/90 leading-relaxed flex items-start justify-between gap-2 bg-emerald-500/10 dark:bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/15 group"
+                    >
+                      <div className="flex items-start gap-2 min-w-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
+                        <span>{item}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCover(idx)}
+                        className="opacity-0 group-hover:opacity-100 hover:text-red-500 text-neutral-400 transition-opacity p-0.5 shrink-0 cursor-pointer"
+                        title="Remove point"
+                        aria-label={`Remove point ${idx + 1}`}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Add Key Point */}
+                {showAddCover ? (
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={newCoverInput}
+                      onChange={(e) => setNewCoverInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddCover(newCoverInput);
+                          setNewCoverInput('');
+                          setShowAddCover(false);
+                        }
+                      }}
+                      placeholder="Add a key focus point..."
+                      className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-emerald-500/30 bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleAddCover(newCoverInput);
+                        setNewCoverInput('');
+                        setShowAddCover(false);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCover(false)}
+                      className="p-1 text-neutral-400 hover:text-neutral-600 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCover(true)}
+                    className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1 cursor-pointer pt-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add Key Point</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Yellow/Orange Card — What to Avoid (Out of Scope) */}
+            <div
+              data-testid="presentation-scope-avoids-card"
+              className="p-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 dark:bg-amber-950/10 space-y-3 flex flex-col justify-between"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-amber-500/20">
+                  <h3 className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>What to Avoid (Out of Scope)</span>
+                  </h3>
+                  <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                    {scope.avoids.length} Rules · Editable
+                  </span>
+                </div>
+
+                <ul className="space-y-2">
+                  {scope.avoids.map((item, idx) => (
+                    <li
+                      key={idx}
+                      className="text-xs text-amber-900 dark:text-amber-200/90 leading-relaxed flex items-start justify-between gap-2 bg-amber-500/10 dark:bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/15 group"
+                    >
+                      <div className="flex items-start gap-2 min-w-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1.5" />
+                        <span>{item}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAvoid(idx)}
+                        className="opacity-0 group-hover:opacity-100 hover:text-red-500 text-neutral-400 transition-opacity p-0.5 shrink-0 cursor-pointer"
+                        title="Remove rule"
+                        aria-label={`Remove rule ${idx + 1}`}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Add Rule */}
+                {showAddAvoid ? (
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={newAvoidInput}
+                      onChange={(e) => setNewAvoidInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddAvoid(newAvoidInput);
+                          setNewAvoidInput('');
+                          setShowAddAvoid(false);
+                        }
+                      }}
+                      placeholder="Add an out-of-scope rule..."
+                      className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-amber-500/30 bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleAddAvoid(newAvoidInput);
+                        setNewAvoidInput('');
+                        setShowAddAvoid(false);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 cursor-pointer"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddAvoid(false)}
+                      className="p-1 text-neutral-400 hover:text-neutral-600 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddAvoid(true)}
+                    className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-800 flex items-center gap-1 cursor-pointer pt-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add Rule</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Clean Tactile Outline Cards with SlideOutlinePillCard */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200">
+                Generated Presentation Outline ({deck.slides.length} Slides)
+              </h2>
+              <span className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">
+                1 Idea Per Slide
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              {deck.slides.map((slide, idx) => (
+                <SlideOutlinePillCard key={slide.id || idx} slide={slide} index={idx} />
+              ))}
+            </div>
+
+            {/* Stepper Navigation Proceed */}
+            <div className="flex justify-end pt-4">
+              <button
+                type="button"
+                onClick={onNextStep}
+                className="px-6 py-2.5 rounded-xl font-medium text-xs bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-90 shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <span>Proceed to Design</span>
+                <span>→</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
