@@ -13,6 +13,7 @@ import {
 import SlideMotifGraphic from './SlideMotifGraphic';
 import ThemeScreenshotCloner from './ThemeScreenshotCloner';
 import ThemeLibraryGrid from './ThemeLibraryGrid';
+import SlideCreativeSketchIllustration from './SlideCreativeSketchIllustration';
 import type { BestSlideDesign } from '../data/bestSlideDesigns100';
 
 export interface Step02DesignProps {
@@ -459,17 +460,34 @@ export default function Step02Design({
                       </div>
                     </div>
 
-                    {/* Main Dynamic Headline & Styled Takeaway */}
-                    <div className="my-auto space-y-1.5 pr-2 relative z-10">
-                      <div className="text-xs sm:text-sm font-bold leading-tight line-clamp-2">
+                    {/* Bespoke 2D Creative Sketch Illustration & Stylized Human Figures */}
+                    <div className="my-auto relative z-10 w-full overflow-hidden flex items-center justify-center py-1">
+                      <SlideCreativeSketchIllustration
+                        themeId={preset.id}
+                        category={
+                          preset.id === 'sand-academic'
+                            ? 'academic'
+                            : preset.id === 'editorial-warm'
+                            ? 'editorial'
+                            : preset.id === 'obsidian-aurora'
+                            ? 'executive'
+                            : 'apple-keynote'
+                        }
+                        layoutArchetype="quote-spotlight"
+                        accent={effectiveAccent}
+                        cardBg={preset.cardHex}
+                        canvasBg={preset.canvasHex}
+                        textPrimary={preset.textColor}
+                        textSecondary={preset.textColor}
+                        mode={preset.mode}
+                        isMini={true}
+                      />
+                    </div>
+
+                    {/* Main Dynamic Headline */}
+                    <div className="relative z-10 pb-1">
+                      <div className="text-xs font-bold leading-tight line-clamp-1">
                         {headlinePreviewText}
-                      </div>
-                      <div className="flex items-center gap-1.5 opacity-80">
-                        <span
-                          className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ backgroundColor: effectiveAccent }}
-                        />
-                        <span className="text-[10px] font-medium">Clear ideas &amp; key takeaways</span>
                       </div>
                     </div>
 

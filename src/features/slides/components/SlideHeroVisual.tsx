@@ -1,5 +1,6 @@
 import React from 'react';
 import type { VisualMotif, SlideTheme } from '../types/themes';
+import SlideCreativeSketchIllustration from './SlideCreativeSketchIllustration';
 
 export interface SlideHeroVisualProps {
   motif?: VisualMotif;
@@ -290,10 +291,28 @@ export default function SlideHeroVisual({
 
     case 'editorial-split':
     default: {
+      if (theme) {
+        return (
+          <SlideCreativeSketchIllustration
+            themeId={theme.id}
+            category={theme.category}
+            themeName={theme.name}
+            accent={accent}
+            cardBg={theme.cardBg}
+            canvasBg={theme.canvasBg}
+            textPrimary={theme.textPrimary}
+            textSecondary={theme.textSecondary}
+            isMini={isMini}
+            mode={theme.mode || 'light'}
+            className={className}
+          />
+        );
+      }
+
       // Apricot White Brief / Silk Yellow: Modern architectural / structure layout
       return (
         <div
-          className={`w-full h-full rounded-xl border flex flex-col justify-between p-3 relative overflow-hidden bg-neutral-500/5 ${theme?.metricBorder || 'border-neutral-300/40'} ${className}`}
+          className={`w-full h-full rounded-xl border flex flex-col justify-between p-3 relative overflow-hidden bg-neutral-500/5 border-neutral-300/40 ${className}`}
         >
           <div className="flex items-center justify-between text-[9px] font-mono opacity-70">
             <span>FACILITY ASSET // 01</span>

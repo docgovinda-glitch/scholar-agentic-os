@@ -107,14 +107,23 @@ Scholar OS **Presentation Studio** is a web-native, academic-grade slide authori
     - **Apple Keynote & High-Growth Tech (20)**: Apple Cupertino Minimal, Space Black Pro, Stripe Developer Velocity, Linear Modernist, Arc Browser Glass, Figma Neo-Canvas, etc.
     - **Editorial & Publishing Longform (15)**: The New Yorker Monograph, The Economist Briefing, Financial Times Salmon, The Atlantic Longform, Monocle Tokyo Paper, etc.
     - **Scientific & Data-Dense Infographics (15)**: BioRender Cellular Topology, Genomic Atlas Chromosome, NASA Jet Propulsion Blueprint, Climate Science Flux, etc.
-    - **Conference Showcase & TED Keynotes (10)**: TED Global Horizon, Y Combinator Demo Day Pitch, Davos World Economic Forum, SXSW Interactive Signal, etc.
-  - **Diverse Layout Archetypes**:
-    - `2x2-matrix`: Strategic 4-quadrant positioning cards with accent outlines.
-    - `pillar-cards`: 3-column architecture breakdown cards with distinct header blocks.
-    - `timeline-milestone`: Horizontal sequence track with connected milestone nodes.
-    - `contrast-split`: Friction / Problem vs Breakthrough / Solution comparative split.
-    - `executive-stat`: Oversized bold metric (+84.2%) with context note and trend indicator.
-    - `quote-spotlight`: High-impact editorial quotation block with author/journal attribution.
+  - **Creative 2D Vector Sketches with Human Figures & Bespoke Frameworks (`SlideCreativeSketchIllustration.tsx`)**:
+    - **Zero Generic Wireframes**: Replaced repetitive generic wireframe placeholder boxes with 100% royalty-free, public domain vector SVG art that dynamically adapts to each theme's color palette.
+    - **Human Figures & Consulting Frameworks**:
+      - **McKinsey Pyramid Principle**: 2D consultant sketch in suit pointing with stylus to a 3-tier governing strategy pyramid with MECE supporting evidence.
+      - **BCG Growth-Share Matrix**: 2D business analyst sketch standing beside a 2x2 matrix with 🌟 Stars, ❓ Question Marks, 🐄 Cash Cows, and 🐕 Harvest/Dogs.
+      - **Bain Strategic Horizons**: 2D visionary sketch with telescope surveying Horizon 1 (Core), Horizon 2 (Emerging), and Horizon 3 (Disruptive) stair platforms.
+      - **Deloitte Digital Transformation**: 2D engineer sketch with tablet calibrating interlocking mechanical gears and cloud circuits with green dot signal.
+      - **Harvard Law Casebook**: 2D legal advocate sketch in gown holding gavel beside the classical scales of justice and law citation folio.
+      - **MIT Linear Algebra**: 2D researcher sketch at chalkboard with 3D coordinate frame, orthogonal planes, and matrix eigenvectors ($Av = \lambda v$).
+      - **NASA Jet Propulsion Blueprint**: 2D aerospace engineer sketch with telemetry headset observing an orbital satellite probe, solar panels, and planetary transfer ellipse.
+      - **TED Global Keynote**: 2D speaker sketch on the iconic circular red rug on stage, headset mic, dramatic dual spotlight cone beams from above, and curved amphitheater audience silhouettes.
+      - **YC Demo Day Pitch**: 2D tech founder sketch pitching exponential hockey-stick ARR chart on big screen with YC badge.
+      - **Academic & Thesis (Oxford, Cambridge, Sorbonne)**: 2D professor sketch at wooden lectern with spectacles, open folio, and Gaussian normal distribution curve on chalkboard.
+      - **Apple & Tech (Apple, Stripe, Linear, Figma, Arc)**: 2D developer sketch seated at dual-monitor workstation with headphones and sleek bento code window.
+      - **BioRender & Scientific (Cellular & Genomic)**: 2D eukaryotic cell topology cross-section with membrane receptors, nucleus, mitochondria, DNA double-helix, and lab scientist with pipette.
+      - **Editorial & Publishing (New Yorker, FT, Monocle)**: 2D New Yorker-style pen-and-ink café reader sketch with open broadsheet newspaper, coffee cup, and vintage masthead.
+    - **Mounted Across Presentation Studio**: Active across `ThemeLibraryGrid.tsx` (card previews), `Step02Design.tsx` (the 4 curated cards), `SlideCardBlock.tsx` (default image block visuals), and `SlideHeroVisual.tsx` (split-hero slides).
   - **Instant Filtering & WCAG AA Verification**: Category pills (`All (100+)`, `Academic`, `Minimal`, `Executive`, `Editorial`, `Vibrant`, `Apple & Tech`, `Scientific`, `Conference`), Day/Night mode filter, and instant search across titles, motifs, and archetypes.
 - **Tab 3: Screenshot Cloner (`ThemeScreenshotCloner.tsx`)**:
   - Drag-and-drop dropzone for slide screenshots, posters, and brand imagery.

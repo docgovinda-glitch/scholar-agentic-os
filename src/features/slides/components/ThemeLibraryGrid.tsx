@@ -13,6 +13,7 @@ import {
   type DesignLayoutArchetype,
 } from '../data/bestSlideDesigns100';
 import SlideMotifGraphic from './SlideMotifGraphic';
+import SlideCreativeSketchIllustration from './SlideCreativeSketchIllustration';
 
 export type LibraryCategory =
   | 'all'
@@ -414,120 +415,26 @@ export default function ThemeLibraryGrid({
                     </div>
                   </div>
 
-                  {/* Archetype-Specific Visual Graphic in Center */}
-                  <div className="my-auto relative z-10">
-                    {theme.layoutArchetype === '2x2-matrix' ? (
-                      <div className="grid grid-cols-2 gap-1 my-0.5">
-                        <div
-                          className="p-1 rounded text-[7px] font-mono border"
-                          style={{ borderColor: `${theme.accent}40`, backgroundColor: `${theme.accent}08` }}
-                        >
-                          <span className="font-bold">I. High Impact</span>
-                        </div>
-                        <div className="p-1 rounded text-[7px] font-mono border border-black/10 dark:border-white/10 opacity-70">
-                          <span>II. Quick Wins</span>
-                        </div>
-                        <div className="p-1 rounded text-[7px] font-mono border border-black/10 dark:border-white/10 opacity-70">
-                          <span>III. Deprioritize</span>
-                        </div>
-                        <div className="p-1 rounded text-[7px] font-mono border border-black/10 dark:border-white/10 opacity-70">
-                          <span>IV. Strategic Bet</span>
-                        </div>
-                      </div>
-                    ) : theme.layoutArchetype === 'pillar-cards' ? (
-                      <div className="grid grid-cols-3 gap-1 my-0.5">
-                        <div
-                          className="p-1 rounded text-[7px] border-t-2"
-                          style={{ borderColor: theme.accent, backgroundColor: `${theme.accent}08` }}
-                        >
-                          <span className="font-bold block">Pillar 01</span>
-                          <span className="text-[6px] opacity-60">Architecture</span>
-                        </div>
-                        <div className="p-1 rounded text-[7px] border-t-2 border-neutral-400/30 bg-black/5 dark:bg-white/5">
-                          <span className="font-bold block">Pillar 02</span>
-                          <span className="text-[6px] opacity-60">Execution</span>
-                        </div>
-                        <div className="p-1 rounded text-[7px] border-t-2 border-neutral-400/30 bg-black/5 dark:bg-white/5">
-                          <span className="font-bold block">Pillar 03</span>
-                          <span className="text-[6px] opacity-60">Scale</span>
-                        </div>
-                      </div>
-                    ) : theme.layoutArchetype === 'timeline-milestone' ? (
-                      <div className="space-y-1 my-0.5">
-                        <div className="flex items-center justify-between text-[7px] font-mono">
-                          <span style={{ color: theme.accent }} className="font-bold">
-                            Q1: Alpha
-                          </span>
-                          <span className="opacity-70">Q2: Beta</span>
-                          <span className="opacity-70">Q3: Launch</span>
-                        </div>
-                        <div className="w-full h-1 bg-black/10 dark:bg-white/10 rounded-full flex items-center justify-between px-1">
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: theme.accent }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
-                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
-                        </div>
-                      </div>
-                    ) : theme.layoutArchetype === 'executive-stat' ? (
-                      <div className="flex items-baseline gap-2 my-0.5">
-                        <span
-                          className="text-lg font-black tracking-tight"
-                          style={{ color: theme.accent }}
-                        >
-                          +84.2%
-                        </span>
-                        <div className="text-[8px] leading-tight opacity-80">
-                          <span className="font-bold block">Core Retention</span>
-                          <span className="text-[7px]">Verified Trial</span>
-                        </div>
-                      </div>
-                    ) : theme.layoutArchetype === 'contrast-split' ? (
-                      <div className="grid grid-cols-2 gap-1 my-0.5">
-                        <div className="p-1 rounded text-[7px] bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
-                          <span className="font-bold block">Friction / Legacy</span>
-                          <span className="text-[6px]">High latency</span>
-                        </div>
-                        <div
-                          className="p-1 rounded text-[7px] border"
-                          style={{ borderColor: `${theme.accent}40`, backgroundColor: `${theme.accent}12` }}
-                        >
-                          <span className="font-bold block" style={{ color: theme.accent }}>
-                            Breakthrough
-                          </span>
-                          <span className="text-[6px] opacity-80">Autonomous flow</span>
-                        </div>
-                      </div>
-                    ) : theme.layoutArchetype === 'quote-spotlight' ? (
-                      <div
-                        className="border-l-2 pl-2 my-0.5 space-y-0.5"
-                        style={{ borderColor: theme.accent }}
-                      >
-                        <p className="text-[9px] italic line-clamp-1 leading-tight">
-                          &ldquo;Rigorous architecture grounds all high-velocity decisions.&rdquo;
-                        </p>
-                        <span className="text-[7px] font-mono opacity-60 block">
-                          — Empirical Faculty Journal
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="space-y-1 pr-1">
-                        <div className="text-xs font-bold leading-tight line-clamp-2">
-                          {headlinePreviewText}
-                        </div>
-                        <div className="flex items-center gap-1 opacity-70">
-                          <span
-                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ backgroundColor: theme.accent }}
-                          />
-                          <span className="text-[9px] font-medium">Curated typographic balance</span>
-                        </div>
-                      </div>
-                    )}
+                  {/* Bespoke 2D Creative Sketch Illustration & Stylized Human Figures */}
+                  <div className="my-auto relative z-10 w-full overflow-hidden flex items-center justify-center py-1">
+                    <SlideCreativeSketchIllustration
+                      themeId={theme.id}
+                      category={theme.category}
+                      layoutArchetype={theme.layoutArchetype as any}
+                      accent={theme.accent}
+                      cardBg={theme.cardBg}
+                      canvasBg={theme.canvasBg}
+                      textPrimary={theme.textPrimary}
+                      textSecondary={theme.textSecondary}
+                      mode={theme.mode}
+                      isMini={true}
+                    />
                   </div>
 
-                  {/* Footer Stamp */}
-                  <div className="text-[8px] font-mono opacity-50 flex items-center justify-between border-t border-current/10 pt-1 relative z-10">
-                    <span>16:9</span>
-                    <span>{passWcag ? 'WCAG AA' : 'ACCENT'}</span>
+                  {/* Footer Stamp with Theme Name and Archetype Tag */}
+                  <div className="text-[8px] font-mono opacity-60 flex items-center justify-between border-t border-current/10 pt-1 relative z-10">
+                    <span className="truncate max-w-[130px] font-semibold">{theme.name}</span>
+                    <span>{passWcag ? 'WCAG AA' : '16:9'}</span>
                   </div>
                 </div>
               </button>
