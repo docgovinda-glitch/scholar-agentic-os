@@ -123,9 +123,25 @@ Scholar OS **Presentation Studio** is a web-native, academic-grade slide authori
       - **Apple & Tech (Apple, Stripe, Linear, Figma, Arc)**: 2D developer sketch seated at dual-monitor workstation with headphones and sleek bento code window.
       - **BioRender & Scientific (Cellular & Genomic)**: 2D eukaryotic cell topology cross-section with membrane receptors, nucleus, mitochondria, DNA double-helix, and lab scientist with pipette.
       - **Editorial & Publishing (New Yorker, FT, Monocle)**: 2D New Yorker-style pen-and-ink café reader sketch with open broadsheet newspaper, coffee cup, and vintage masthead.
-    - **Mounted Across Presentation Studio**: Active across `ThemeLibraryGrid.tsx` (card previews), `Step02Design.tsx` (the 4 curated cards), `SlideCardBlock.tsx` (default image block visuals), and `SlideHeroVisual.tsx` (split-hero slides).
+  - **Canva & Gamma Style 5-Slide Progression (`MultiSlideDeckPreview.tsx`)**:
+    - Every theme card in the Library and Curated Styles now features interactive multi-slide preview controls (`[ 1 ] [ 2 ] [ 3 ] [ 4 ] [ 5 ]` and `< >` arrows) showing the full 5-slide presentation arc:
+      1. **Slide 1 (Cover)**: High-impact hero title, presenter attribution, subtitle, category badge, and motif watermark.
+      2. **Slide 2 (Executive Synthesis)**: 2-column comparative contrast (Legacy Inertia vs Target Value).
+      3. **Slide 3 (Signature Framework)**: Authentic bespoke 2D vector sketch & consulting framework diagram (`SlideCreativeSketchIllustration.tsx`).
+      4. **Slide 4 (Quantitative Metrics)**: 3-pillar KPI metrics with bold stats (`+84.2%`, `3.8x`, `<12ms`) and context markers.
+      5. **Slide 5 (Strategic Roadmap)**: Phased execution governance milestones and closing takeaway.
+    - **Expanded 5-Slide Modal (`DeckPreviewModal.tsx`)**: Click the expand icon on any theme to view all 5 slides laid out simultaneously in a high-resolution presentation strip.
   - **Instant Filtering & WCAG AA Verification**: Category pills (`All (100+)`, `Academic`, `Minimal`, `Executive`, `Editorial`, `Vibrant`, `Apple & Tech`, `Scientific`, `Conference`), Day/Night mode filter, and instant search across titles, motifs, and archetypes.
-- **Tab 3: Screenshot Cloner (`ThemeScreenshotCloner.tsx`)**:
+
+- **Tab 3: Bring Your Own Theme (`CustomThemeStudio.tsx`)**:
+  - **Custom Design System Builder**: Define bespoke 60/30/10 color architecture (canvas background, card surface, brand accent, primary/secondary text).
+  - **Typography & Motif Pairing**: Switch between Inter Sans, Newsreader Serif, and JetBrains Mono with customizable visual watermark motifs.
+  - **Real-Time WCAG AA Contrast**: Live contrast score calculations for accent and text against card backgrounds with instant Pass/Fail indicators.
+  - **JSON Export & Import Portability**: One-click JSON export to share custom brand themes with teammates or clients, and JSON import modal to load external theme configurations.
+  - **Local Storage Persistence**: Save custom themes to the local library so they persist across sessions and appear seamlessly in the theme selector.
+  - **Live Multi-Slide Preview**: Real-time 5-slide preview dynamically updating as users tweak colors, fonts, and layout options.
+
+- **Tab 4: Screenshot Cloner (`ThemeScreenshotCloner.tsx`)**:
   - Drag-and-drop dropzone for slide screenshots, posters, and brand imagery.
   - Client-side HTML5 canvas color extraction (background luminance, card surface, structural typography, accent signal).
   - Real-time swatch inspection and instant live preview with `"Apply Cloned Theme"`.

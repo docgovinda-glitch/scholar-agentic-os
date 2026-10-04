@@ -14,6 +14,9 @@ import {
 } from '../data/bestSlideDesigns100';
 import SlideMotifGraphic from './SlideMotifGraphic';
 import SlideCreativeSketchIllustration from './SlideCreativeSketchIllustration';
+import MultiSlideDeckPreview from './MultiSlideDeckPreview';
+import DeckPreviewModal from './DeckPreviewModal';
+import { getStoredCustomThemes } from '../services/themeExtractorService';
 
 export type LibraryCategory =
   | 'all'
@@ -72,6 +75,7 @@ export default function ThemeLibraryGrid({
   const [selectedCategory, setSelectedCategory] = useState<LibraryCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [modeFilter, setModeFilter] = useState<'all' | 'light' | 'dark'>('all');
+  const [expandedTheme, setExpandedTheme] = useState<UnifiedThemeItem | null>(null);
 
   const headlinePreviewText =
     deck.slides?.[0]?.actionHeadline ||
@@ -80,13 +84,40 @@ export default function ThemeLibraryGrid({
       ? deck.title
       : 'Why Zappos Pays New Hires $2,000 to Quit');
 
-  // Unified theme dataset: 100 Best Royalty-Free Slide Designs + User's favored Warm Clay Quartz
-  // Vibrant neon themes (Cyber Quantum, Monokai, Freestyle Mesh, Aqua Charity, etc.) are 100% removed.
+  // Unified theme dataset: Custom user themes + 100 Best Royalty-Free Slide Designs + User's favored Warm Clay Quartz
   const allThemesList = useMemo<UnifiedThemeItem[]>(() => {
     const list: UnifiedThemeItem[] = [];
     const seenIds = new Set<string>();
 
-    // 1. PRIMARY: 100 Curated Royalty-Free Slide Designs (Shown First!)
+    // 0. User's Saved Custom Themes (Shown at the very top!)
+    try {
+      const stored = getStoredCustomThemes();
+      stored.forEach((st) => {
+        if (!seenIds.has(st.id)) {
+          seenIds.add(st.id);
+          list.push({
+            id: st.id,
+            name: `${st.name} ★`,
+            category: (st.category === 'dark' || !st.category ? 'executive' : st.category) as LibraryCategory,
+            tagline: st.tagline || 'Custom user-created design theme',
+            mode: st.mode,
+            canvasBg: st.canvasBg,
+            cardBg: st.cardBg,
+            accent: st.accent,
+            textPrimary: st.textPrimary,
+            textSecondary: st.textSecondary,
+            layoutArchetype: st.layoutArchetype || 'standard-card',
+            visualMotif: st.visualMotif,
+            swatch: st.swatch,
+            fontPairing: st.fontFamily === 'serif' ? 'Newsreader Serif' : st.fontFamily === 'mono' ? 'JetBrains Mono' : 'Inter Sans',
+          });
+        }
+      });
+    } catch {
+      // Ignore storage errors in test or restricted environments
+    }
+
+    // 1. PRIMARY: 100 Curated Royalty-Free Slide Designs
     BEST_100_SLIDE_DESIGNS.forEach((d) => {
       seenIds.add(d.id);
       list.push({
@@ -369,78 +400,70 @@ export default function ThemeLibraryGrid({
                   </div>
                 </div>
 
-                {/* Live 16:9 Mini-Slide Preview */}
-                <div
-                  className="w-full aspect-[16/9] p-3 rounded-xl border flex flex-col justify-between overflow-hidden shadow-2xs relative"
-                  style={{
-                    backgroundColor: theme.cardBg,
-                    borderColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                    color: theme.textPrimary,
-                  }}
-                >
-                  <SlideMotifGraphic
-                    motif={theme.visualMotif as any}
-                    theme={theme as any}
-                    isMini={true}
-                    className="opacity-25"
+                {/* Multi-Slide Deck Preview (Canva & Gamma 5-Slide Progression) */}
+                <div className="w-full">
+                  <MultiSlideDeckPreview
+                    theme={{
+                      id: theme.id,
+                      name: theme.name,
+                      category: theme.category,
+                      layoutArchetype: theme.layoutArchetype,
+                      mode: theme.mode,
+                      canvasBg: theme.canvasBg,
+                      cardBg: theme.cardBg,
+                      accent: theme.accent,
+                      textPrimary: theme.textPrimary,
+                      textSecondary: theme.textSecondary,
+                      fontFamily: theme.fontPairing?.toLowerCase().includes('serif')
+                        ? 'serif'
+                        : theme.fontPairing?.toLowerCase().includes('mono')
+                        ? 'mono'
+                        : 'sans',
+                      visualMotif: theme.visualMotif,
+                    }}
+                    deckTitle={headlinePreviewText}
+                    initialSlide={0}
+                    showControls={true}
+                    showExpandButton={true}
+                    onExpandAll={() => setExpandedTheme(theme)}
                   />
-
-                  {/* Top Bar with Badge & Color Dots */}
-                  <div className="flex items-center justify-between relative z-10">
-                    <span
-                      className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded font-mono"
-                      style={{
-                        backgroundColor: `${theme.accent}20`,
-                        color: theme.accent,
-                      }}
-                    >
-                      {theme.layoutArchetype ? theme.layoutArchetype.toUpperCase() : 'SLIDE 01'}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <span
-                        className="w-2 h-2 rounded-full border border-black/10 dark:border-white/20"
-                        style={{ backgroundColor: theme.canvasBg }}
-                        title={`Canvas: ${theme.canvasBg}`}
-                      />
-                      <span
-                        className="w-2 h-2 rounded-full border border-black/10 dark:border-white/20"
-                        style={{ backgroundColor: theme.cardBg }}
-                        title={`Card: ${theme.cardBg}`}
-                      />
-                      <span
-                        className="w-2 h-2 rounded-full border border-black/10 dark:border-white/20"
-                        style={{ backgroundColor: theme.accent }}
-                        title={`Accent: ${theme.accent}`}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Bespoke 2D Creative Sketch Illustration & Stylized Human Figures */}
-                  <div className="my-auto relative z-10 w-full overflow-hidden flex items-center justify-center py-1">
-                    <SlideCreativeSketchIllustration
-                      themeId={theme.id}
-                      category={theme.category}
-                      layoutArchetype={theme.layoutArchetype as any}
-                      accent={theme.accent}
-                      cardBg={theme.cardBg}
-                      canvasBg={theme.canvasBg}
-                      textPrimary={theme.textPrimary}
-                      textSecondary={theme.textSecondary}
-                      mode={theme.mode}
-                      isMini={true}
-                    />
-                  </div>
-
-                  {/* Footer Stamp with Theme Name and Archetype Tag */}
-                  <div className="text-[8px] font-mono opacity-60 flex items-center justify-between border-t border-current/10 pt-1 relative z-10">
-                    <span className="truncate max-w-[130px] font-semibold">{theme.name}</span>
-                    <span>{passWcag ? 'WCAG AA' : '16:9'}</span>
-                  </div>
                 </div>
               </button>
             );
           })}
         </div>
+      )}
+
+      {/* Expanded 5-Slide Modal */}
+      {expandedTheme && (
+        <DeckPreviewModal
+          isOpen={true}
+          onClose={() => setExpandedTheme(null)}
+          theme={{
+            id: expandedTheme.id,
+            name: expandedTheme.name,
+            tagline: expandedTheme.tagline,
+            category: expandedTheme.category,
+            mode: expandedTheme.mode,
+            canvasBg: expandedTheme.canvasBg,
+            cardBg: expandedTheme.cardBg,
+            accent: expandedTheme.accent,
+            textPrimary: expandedTheme.textPrimary,
+            textSecondary: expandedTheme.textSecondary,
+            fontFamily: expandedTheme.fontPairing?.toLowerCase().includes('serif')
+              ? 'serif'
+              : expandedTheme.fontPairing?.toLowerCase().includes('mono')
+              ? 'mono'
+              : 'sans',
+            visualMotif: expandedTheme.visualMotif,
+            layoutArchetype: expandedTheme.layoutArchetype,
+          }}
+          deckTitle={headlinePreviewText}
+          onApplyTheme={(themeId) => {
+            onSelectTheme(themeId, expandedTheme.bestDesign);
+            setExpandedTheme(null);
+          }}
+        />
       )}
     </div>
   );

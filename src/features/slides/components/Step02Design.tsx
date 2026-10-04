@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Check, ArrowRight, ArrowLeft, Layers, Library, Camera } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Layers, Library, Camera, Palette } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import {
   SLIDE_THEMES,
@@ -14,6 +14,9 @@ import SlideMotifGraphic from './SlideMotifGraphic';
 import ThemeScreenshotCloner from './ThemeScreenshotCloner';
 import ThemeLibraryGrid from './ThemeLibraryGrid';
 import SlideCreativeSketchIllustration from './SlideCreativeSketchIllustration';
+import MultiSlideDeckPreview from './MultiSlideDeckPreview';
+import DeckPreviewModal from './DeckPreviewModal';
+import CustomThemeStudio from './CustomThemeStudio';
 import type { BestSlideDesign } from '../data/bestSlideDesigns100';
 
 export interface Step02DesignProps {
@@ -23,7 +26,7 @@ export interface Step02DesignProps {
   onNextStep: () => void;
 }
 
-export type DesignStudioTab = 'curated' | 'library' | 'cloner';
+export type DesignStudioTab = 'curated' | 'library' | 'custom' | 'cloner';
 
 export interface CuratedThemePreset {
   id: SlideThemeId;
@@ -105,6 +108,7 @@ export default function Step02Design({
   const baseTheme = SLIDE_THEMES[currentThemeId] || SLIDE_THEMES['sand-academic'];
 
   const [activeTab, setActiveTab] = useState<DesignStudioTab>('curated');
+  const [expandedCuratedTheme, setExpandedCuratedTheme] = useState<CuratedThemePreset | null>(null);
 
   const [selectedAccent, setSelectedAccent] = useState(
     deck.customTheme?.accentColor || baseTheme.accent || '#2563EB'
@@ -307,6 +311,22 @@ export default function Step02Design({
           <button
             type="button"
             role="tab"
+            aria-selected={activeTab === 'custom'}
+            onClick={() => setActiveTab('custom')}
+            data-testid="tab-custom-theme-studio"
+            className={`px-3.5 py-1.5 rounded-lg font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'custom'
+                ? 'bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-neutral-100 shadow-sm font-semibold'
+                : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+            }`}
+          >
+            <Palette className="w-3.5 h-3.5 text-purple-500" />
+            <span>🎨 Bring Your Own Theme</span>
+          </button>
+
+          <button
+            type="button"
+            role="tab"
             aria-selected={activeTab === 'cloner'}
             onClick={() => setActiveTab('cloner')}
             data-testid="tab-screenshot-cloner"
@@ -410,92 +430,28 @@ export default function Step02Design({
                     </div>
                   </div>
 
-                  {/* Live Topic 16:9 Mini-Slide Visual Preview */}
-                  <div
-                    className="w-full aspect-[16/9] p-4 rounded-xl border flex flex-col justify-between overflow-hidden shadow-2xs relative"
-                    style={{
-                      backgroundColor: preset.cardHex,
-                      borderColor: preset.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                      color: preset.textColor,
-                    }}
-                  >
-                    {/* Vector Motif Accent in Background */}
-                    <SlideMotifGraphic
-                      motif={fullTheme.visualMotif}
+                  {/* Multi-Slide Deck Preview (Canva & Gamma 5-Slide Progression) */}
+                  <div className="w-full">
+                    <MultiSlideDeckPreview
                       theme={{
-                        ...fullTheme,
+                        id: preset.id,
+                        name: preset.name,
+                        mode: preset.mode,
+                        canvasBg: preset.canvasHex,
+                        cardBg: preset.cardHex,
                         accent: effectiveAccent,
+                        textPrimary: preset.textColor,
+                        textSecondary: preset.mode === 'dark' ? '#94A3B8' : '#64748B',
+                        fontFamily: fullTheme.fontFamily,
+                        visualMotif: fullTheme.visualMotif,
+                        layoutArchetype: fullTheme.layoutArchetype,
                       }}
-                      isMini={true}
-                      className="opacity-30"
+                      deckTitle={headlinePreviewText}
+                      initialSlide={0}
+                      showControls={true}
+                      showExpandButton={true}
+                      onExpandAll={() => setExpandedCuratedTheme(preset)}
                     />
-
-                    {/* Top Bar with Badge & Color Dots */}
-                    <div className="flex items-center justify-between relative z-10">
-                      <span
-                        className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded font-mono"
-                        style={{
-                          backgroundColor: `${effectiveAccent}18`,
-                          color: effectiveAccent,
-                        }}
-                      >
-                        SLIDE 01
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full border border-black/10 dark:border-white/20"
-                          style={{ backgroundColor: preset.canvasHex }}
-                          title={`Canvas: ${preset.canvasHex}`}
-                        />
-                        <span
-                          className="w-2.5 h-2.5 rounded-full border border-black/10 dark:border-white/20"
-                          style={{ backgroundColor: preset.cardHex }}
-                          title={`Card: ${preset.cardHex}`}
-                        />
-                        <span
-                          className="w-2.5 h-2.5 rounded-full border border-black/10 dark:border-white/20"
-                          style={{ backgroundColor: effectiveAccent }}
-                          title={`Accent: ${effectiveAccent}`}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Bespoke 2D Creative Sketch Illustration & Stylized Human Figures */}
-                    <div className="my-auto relative z-10 w-full overflow-hidden flex items-center justify-center py-1">
-                      <SlideCreativeSketchIllustration
-                        themeId={preset.id}
-                        category={
-                          preset.id === 'sand-academic'
-                            ? 'academic'
-                            : preset.id === 'editorial-warm'
-                            ? 'editorial'
-                            : preset.id === 'obsidian-aurora'
-                            ? 'executive'
-                            : 'apple-keynote'
-                        }
-                        layoutArchetype="quote-spotlight"
-                        accent={effectiveAccent}
-                        cardBg={preset.cardHex}
-                        canvasBg={preset.canvasHex}
-                        textPrimary={preset.textColor}
-                        textSecondary={preset.textColor}
-                        mode={preset.mode}
-                        isMini={true}
-                      />
-                    </div>
-
-                    {/* Main Dynamic Headline */}
-                    <div className="relative z-10 pb-1">
-                      <div className="text-xs font-bold leading-tight line-clamp-1">
-                        {headlinePreviewText}
-                      </div>
-                    </div>
-
-                    {/* Footer Stamp */}
-                    <div className="text-[9px] font-mono opacity-50 flex items-center justify-between border-t border-current/10 pt-1 relative z-10">
-                      <span>SLIDE 1 OF {deck.slides?.length || 5}</span>
-                      <span>16:9 SCREEN</span>
-                    </div>
                   </div>
                 </button>
               );
@@ -672,11 +628,50 @@ export default function Step02Design({
         </div>
       )}
 
-      {/* Tab 3: Screenshot Theme Cloner */}
+      {/* Tab 3: Custom Theme Studio (Bring Your Own Theme) */}
+      {activeTab === 'custom' && (
+        <CustomThemeStudio
+          deck={deck}
+          onUpdateDeck={onUpdateDeck}
+          onApplyTheme={(th) => {
+            setSelectedAccent(th.accent);
+            handleSelectLibraryTheme(th.id);
+          }}
+        />
+      )}
+
+      {/* Tab 4: Screenshot Theme Cloner */}
       {activeTab === 'cloner' && (
         <ThemeScreenshotCloner
           deck={deck}
           onApplyClonedTheme={handleApplyClonedTheme}
+        />
+      )}
+
+      {/* Expanded Curated Theme Modal */}
+      {expandedCuratedTheme && (
+        <DeckPreviewModal
+          isOpen={true}
+          onClose={() => setExpandedCuratedTheme(null)}
+          theme={{
+            id: expandedCuratedTheme.id,
+            name: expandedCuratedTheme.name,
+            tagline: expandedCuratedTheme.description,
+            mode: expandedCuratedTheme.mode,
+            canvasBg: expandedCuratedTheme.canvasHex,
+            cardBg: expandedCuratedTheme.cardHex,
+            accent: expandedCuratedTheme.accentHex,
+            textPrimary: expandedCuratedTheme.textColor,
+            textSecondary: expandedCuratedTheme.mode === 'dark' ? '#94A3B8' : '#64748B',
+            fontFamily: SLIDE_THEMES[expandedCuratedTheme.id]?.fontFamily || 'sans',
+            visualMotif: SLIDE_THEMES[expandedCuratedTheme.id]?.visualMotif || 'minimal-frame',
+            layoutArchetype: SLIDE_THEMES[expandedCuratedTheme.id]?.layoutArchetype || 'standard-card',
+          }}
+          deckTitle={headlinePreviewText}
+          onApplyTheme={() => {
+            handleSelectTheme(expandedCuratedTheme);
+            setExpandedCuratedTheme(null);
+          }}
         />
       )}
 
