@@ -485,23 +485,455 @@ export default function MultiSlideDeckPreview({
           )}
 
           {/* =========================================================================
-              SLIDE 3: SIGNATURE 2D VECTOR FRAMEWORK & BESPOKE ARTWORK
+              SLIDE 3: SIGNATURE ARCHITECTURAL CONCEPT & FRAMEWORK (Canva & Gamma Style)
              ========================================================================= */}
           {activeSlide === 2 && (
-            <div className="w-full flex items-center justify-center py-0.5">
-              <SlideCreativeSketchIllustration
-                themeId={theme.id}
-                themeName={theme.name}
-                category={theme.category}
-                layoutArchetype={theme.layoutArchetype as any}
-                accent={theme.accent}
-                cardBg={theme.cardBg}
-                canvasBg={theme.canvasBg}
-                textPrimary={theme.textPrimary}
-                textSecondary={theme.textSecondary}
-                mode={theme.mode}
-                isMini={true}
-              />
+            <div className={`w-full py-0.5 text-left ${fontClass}`}>
+              {/* ARCHETYPE 1: BENTO GRID (Apple Keynote, Modern Tech, Linear, Stripe, Modernist) */}
+              {theme.layoutArchetype === 'bento-grid' || theme.category === 'apple-keynote' ? (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[7.5px] sm:text-[8px] font-bold tracking-tight opacity-90 truncate font-mono">
+                      MODULAR SYSTEM ARCHITECTURE
+                    </span>
+                    <span className="text-[6.5px] font-mono px-1 rounded bg-blue-500/10 text-blue-500 font-bold">
+                      PRO SPEC
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1">
+                    {/* Main Feature Bento Card */}
+                    <div
+                      className="col-span-3 p-1.5 rounded-lg border space-y-1 relative overflow-hidden backdrop-blur-md"
+                      style={{
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+                        borderColor: `${theme.accent}40`,
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[6.5px] font-mono font-bold uppercase tracking-wider" style={{ color: theme.accent }}>
+                          ● 3NM NEURAL ENGINE
+                        </span>
+                        <span className="text-[6px] font-mono opacity-50">&lt;1.2ms P99</span>
+                      </div>
+                      <div className="text-[7.5px] sm:text-[8px] font-bold leading-tight">
+                        Autonomous Core &amp; On-Chip Tensor Fusion
+                      </div>
+                      <div className="flex items-center gap-1 text-[6px] font-mono opacity-70">
+                        <span className="px-1 py-0.2 rounded bg-black/5 dark:bg-white/10">50B Transistors</span>
+                        <span className="px-1 py-0.2 rounded bg-black/5 dark:bg-white/10">Zero Cold Start</span>
+                      </div>
+                    </div>
+
+                    {/* Stacked Secondary Bento Cards */}
+                    <div className="col-span-2 flex flex-col gap-1">
+                      <div
+                        className="p-1 rounded-lg border text-[6.5px] flex-1 flex flex-col justify-center"
+                        style={{
+                          backgroundColor: `${theme.accent}10`,
+                          borderColor: `${theme.accent}30`,
+                        }}
+                      >
+                        <span className="font-bold block" style={{ color: theme.accent }}>
+                          800 GB/s Bus
+                        </span>
+                        <span className="opacity-75 text-[6px]">Unified Memory Pool</span>
+                      </div>
+                      <div
+                        className="p-1 rounded-lg border text-[6.5px] flex-1 flex flex-col justify-center border-black/10 dark:border-white/10"
+                        style={{
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                        }}
+                      >
+                        <span className="font-bold text-emerald-500 block">✓ Secure Enclave</span>
+                        <span className="opacity-75 text-[6px]">Zero-Trust Isolation</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : theme.layoutArchetype === 'timeline-milestone' ? (
+                /* ARCHETYPE 2: TIMELINE MILESTONE JOURNEY (Gamma & Canva Roadmap) */
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[7.5px] sm:text-[8px] font-bold tracking-tight opacity-90 truncate font-mono">
+                      STRATEGIC EXECUTION HORIZON
+                    </span>
+                    <span className="text-[6.5px] font-mono opacity-60">Q1 - Q3 TRAJECTORY</span>
+                  </div>
+                  {/* Connected Horizontal Timeline Nodes */}
+                  <div className="relative py-1">
+                    {/* Connecting Track Line */}
+                    <div className="absolute top-1/2 left-4 right-4 h-0.5 -translate-y-1/2 bg-black/10 dark:bg-white/15" />
+                    <div
+                      className="absolute top-1/2 left-4 w-1/2 h-0.5 -translate-y-1/2"
+                      style={{ backgroundColor: theme.accent }}
+                    />
+                    <div className="relative z-10 grid grid-cols-3 gap-1">
+                      {/* Station 1: Completed */}
+                      <div className="p-1 rounded-lg border text-[6.5px] space-y-0.5 text-center bg-white dark:bg-[#1C1C1E] shadow-2xs"
+                        style={{ borderColor: `${theme.accent}50` }}
+                      >
+                        <div className="w-3.5 h-3.5 mx-auto rounded-full flex items-center justify-center text-[6px] font-bold text-white shadow-2xs"
+                          style={{ backgroundColor: theme.accent }}
+                        >
+                          ✓
+                        </div>
+                        <div className="font-bold truncate" style={{ color: theme.accent }}>Q1: Lock</div>
+                        <div className="opacity-70 text-[5.5px] leading-tight line-clamp-1">Deterministic Base</div>
+                      </div>
+
+                      {/* Station 2: Active Glow */}
+                      <div className="p-1 rounded-lg border text-[6.5px] space-y-0.5 text-center bg-white dark:bg-[#1C1C1E] ring-1 ring-blue-500/20 shadow-2xs"
+                        style={{ borderColor: theme.accent }}
+                      >
+                        <div className="w-3.5 h-3.5 mx-auto rounded-full flex items-center justify-center text-[6px] font-bold border-2"
+                          style={{ borderColor: theme.accent, color: theme.accent }}
+                        >
+                          ●
+                        </div>
+                        <div className="font-bold truncate text-neutral-900 dark:text-white">Q2: Scale</div>
+                        <div className="opacity-70 text-[5.5px] leading-tight line-clamp-1">Multi-Agent Engine</div>
+                      </div>
+
+                      {/* Station 3: Future Target */}
+                      <div className="p-1 rounded-lg border text-[6.5px] space-y-0.5 text-center bg-white dark:bg-[#1C1C1E] border-black/10 dark:border-white/10 opacity-75">
+                        <div className="w-3.5 h-3.5 mx-auto rounded-full flex items-center justify-center text-[6px] font-bold border border-dashed opacity-50">
+                          3
+                        </div>
+                        <div className="font-bold truncate">Q3: Launch</div>
+                        <div className="opacity-70 text-[5.5px] leading-tight line-clamp-1">Enterprise Moat</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : theme.layoutArchetype === 'pillar-cards' ? (
+                /* ARCHETYPE 3: THREE-PILLAR ARCHITECTURE CARDS */
+                <div className="space-y-1">
+                  <div className="text-[7.5px] sm:text-[8px] font-bold tracking-tight opacity-90 truncate">
+                    Tri-Partite Strategic Foundation &amp; Execution
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {/* Pillar 01 */}
+                    <div
+                      className="p-1.5 rounded-lg border space-y-1 text-left relative overflow-hidden"
+                      style={{
+                        backgroundColor: `${theme.accent}08`,
+                        borderTopWidth: '2.5px',
+                        borderTopColor: theme.accent,
+                        borderColor: `${theme.accent}30`,
+                      }}
+                    >
+                      <div className="text-[6px] font-mono font-bold uppercase tracking-wider" style={{ color: theme.accent }}>
+                        01 / FOUNDATION
+                      </div>
+                      <div className="text-[7px] font-bold leading-tight line-clamp-1">
+                        Deterministic Core
+                      </div>
+                      <div className="text-[5.5px] opacity-70 leading-tight">
+                        Zero hallucination bounds with schema lock.
+                      </div>
+                      <span className="inline-block text-[5.5px] font-mono font-semibold px-1 py-0.2 rounded bg-black/5 dark:bg-white/10">
+                        99.98% SLA
+                      </span>
+                    </div>
+
+                    {/* Pillar 02 */}
+                    <div
+                      className="p-1.5 rounded-lg border space-y-1 text-left relative overflow-hidden bg-black/5 dark:bg-white/5"
+                      style={{
+                        borderTopWidth: '2.5px',
+                        borderTopColor: isDark ? '#E2E8F0' : '#1E293B',
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                      }}
+                    >
+                      <div className="text-[6px] font-mono font-bold uppercase tracking-wider opacity-60">
+                        02 / VELOCITY
+                      </div>
+                      <div className="text-[7px] font-bold leading-tight line-clamp-1">
+                        Autonomous Speed
+                      </div>
+                      <div className="text-[5.5px] opacity-70 leading-tight">
+                        Sub-second pipeline handoffs across agents.
+                      </div>
+                      <span className="inline-block text-[5.5px] font-mono font-semibold px-1 py-0.2 rounded bg-black/5 dark:bg-white/10">
+                        3.8x Speedup
+                      </span>
+                    </div>
+
+                    {/* Pillar 03 */}
+                    <div
+                      className="p-1.5 rounded-lg border space-y-1 text-left relative overflow-hidden bg-black/5 dark:bg-white/5"
+                      style={{
+                        borderTopWidth: '2.5px',
+                        borderTopColor: isDark ? '#E2E8F0' : '#1E293B',
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                      }}
+                    >
+                      <div className="text-[6px] font-mono font-bold uppercase tracking-wider opacity-60">
+                        03 / GOVERNANCE
+                      </div>
+                      <div className="text-[7px] font-bold leading-tight line-clamp-1">
+                        Verifiable Proof
+                      </div>
+                      <div className="text-[5.5px] opacity-70 leading-tight">
+                        Immutable citation audit trails per assertion.
+                      </div>
+                      <span className="inline-block text-[5.5px] font-mono font-semibold px-1 py-0.2 rounded bg-black/5 dark:bg-white/10">
+                        100% Provenance
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : theme.layoutArchetype === '2x2-matrix' ? (
+                /* ARCHETYPE 4: 2X2 STRATEGIC QUADRANT MATRIX */
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[7.5px] sm:text-[8px] font-bold tracking-tight opacity-90 truncate font-mono">
+                      STRATEGIC IMPACT VS. FEASIBILITY MATRIX
+                    </span>
+                    <span className="text-[6px] font-mono opacity-50">BCG CLUSTER</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-[6.5px]">
+                    {/* Top-Left: Quick Wins */}
+                    <div className="p-1.5 rounded border border-emerald-500/30 bg-emerald-500/10 space-y-0.5">
+                      <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-bold text-[6px]">
+                        <span>⚡ QUICK WINS</span>
+                        <span>HIGH FEASIBILITY</span>
+                      </div>
+                      <div className="font-semibold text-[7px] leading-tight">Automated Research Ingestion</div>
+                      <div className="text-[5.5px] opacity-70">Immediate workflow acceleration</div>
+                    </div>
+
+                    {/* Top-Right: Strategic Bets */}
+                    <div
+                      className="p-1.5 rounded border space-y-0.5"
+                      style={{ borderColor: theme.accent, backgroundColor: `${theme.accent}15` }}
+                    >
+                      <div className="flex items-center justify-between font-bold text-[6px]" style={{ color: theme.accent }}>
+                        <span>★ STRATEGIC BETS</span>
+                        <span>MAX IMPACT</span>
+                      </div>
+                      <div className="font-semibold text-[7px] leading-tight">Autonomous Multi-Agent Studio</div>
+                      <div className="text-[5.5px] opacity-80">Sovereign enterprise transformation</div>
+                    </div>
+
+                    {/* Bottom-Left: Deprioritize */}
+                    <div className="p-1.5 rounded border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 opacity-60 space-y-0.5">
+                      <div className="flex items-center justify-between font-bold text-[6px]">
+                        <span>✕ DEPRIORITIZE</span>
+                        <span>LOW LEVERAGE</span>
+                      </div>
+                      <div className="font-semibold text-[7px] leading-tight">Manual Slide Re-formatting</div>
+                      <div className="text-[5.5px] opacity-70">High friction, low retention</div>
+                    </div>
+
+                    {/* Bottom-Right: Selective Scale */}
+                    <div className="p-1.5 rounded border border-amber-500/30 bg-amber-500/10 space-y-0.5">
+                      <div className="flex items-center justify-between text-amber-600 dark:text-amber-400 font-bold text-[6px]">
+                        <span>◆ SELECTIVE SCALE</span>
+                        <span>SPECIALIZED</span>
+                      </div>
+                      <div className="font-semibold text-[7px] leading-tight">Domain Specialized Fine-Tuning</div>
+                      <div className="text-[5.5px] opacity-70">Targeted high-conviction trials</div>
+                    </div>
+                  </div>
+                </div>
+              ) : theme.layoutArchetype === 'contrast-split' ? (
+                /* ARCHETYPE 5: ASYMMETRIC CONTRAST SPLIT (Problem vs Solution) */
+                <div className="space-y-1">
+                  <div className="text-[7.5px] sm:text-[8px] font-bold tracking-tight opacity-90 truncate">
+                    Operational Contrast: Baseline Friction vs. Target Velocity
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {/* Left: Legacy Inertia */}
+                    <div
+                      className="col-span-2 p-1.5 rounded-lg border space-y-1 bg-red-500/5 border-red-500/20 text-left"
+                    >
+                      <span className="text-[6px] font-mono font-bold text-red-500 uppercase tracking-wider block">
+                        ✕ LEGACY FRICTION
+                      </span>
+                      <div className="text-[7px] font-bold text-neutral-900 dark:text-neutral-200">
+                        Fragmented Silos
+                      </div>
+                      <ul className="text-[5.5px] text-neutral-600 dark:text-neutral-400 space-y-0.5 list-disc list-inside">
+                        <li>Manual copy-paste reviews</li>
+                        <li>High review cycle latency</li>
+                        <li>No continuous proof checks</li>
+                      </ul>
+                    </div>
+
+                    {/* Right: Autonomous Target */}
+                    <div
+                      className="col-span-3 p-1.5 rounded-lg border space-y-1 text-left relative overflow-hidden"
+                      style={{
+                        backgroundColor: `${theme.accent}12`,
+                        borderColor: `${theme.accent}50`,
+                      }}
+                    >
+                      <span className="text-[6px] font-mono font-bold uppercase tracking-wider block" style={{ color: theme.accent }}>
+                        ★ TARGET VELOCITY
+                      </span>
+                      <div className="text-[7px] font-bold text-neutral-900 dark:text-white">
+                        Autonomous Unified Consensus
+                      </div>
+                      <ul className="text-[5.5px] opacity-90 space-y-0.5 list-disc list-inside">
+                        <li>Sub-second real-time citations</li>
+                        <li>Deterministic layout switching</li>
+                        <li>Continuous WCAG AA validation</li>
+                      </ul>
+                      <div className="pt-0.5">
+                        <span className="text-[5.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-white/80 dark:bg-black/40" style={{ color: theme.accent }}>
+                          ● 3.8X OPERATIONAL VELOCITY UNLOCK
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : theme.layoutArchetype === 'quote-spotlight' || theme.category === 'editorial' ? (
+                /* ARCHETYPE 6: EDITORIAL QUOTE SPOTLIGHT & BROADSHEET LEDGER */
+                <div
+                  className="p-2 sm:p-2.5 rounded-lg border space-y-1 relative overflow-hidden text-left"
+                  style={{
+                    backgroundColor: `${theme.accent}06`,
+                    borderColor: `${theme.accent}30`,
+                  }}
+                >
+                  <div className="flex items-center justify-between border-b pb-0.5 border-black/10 dark:border-white/10">
+                    <span className="text-[6px] font-serif uppercase tracking-widest font-black" style={{ color: theme.accent }}>
+                      EDITORIAL AXIOM · ESSENTIAL CRITIQUE
+                    </span>
+                    <span className="text-[5.5px] font-mono opacity-50">FOLIO 42</span>
+                  </div>
+                  <div className="relative pt-0.5">
+                    <span className="absolute -top-1 -left-1 text-3xl font-serif leading-none opacity-15 pointer-events-none" style={{ color: theme.accent }}>
+                      &ldquo;
+                    </span>
+                    <p className="text-[8px] sm:text-[9px] font-serif italic font-medium leading-snug opacity-95 pl-2">
+                      Rigorous architecture is never mere procedural overhead—it is the indispensable foundation that makes high-velocity innovation irreversible.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between pt-0.5 border-t border-black/5 dark:border-white/5 text-[6px] font-serif opacity-70">
+                    <span className="font-bold">— OXFORD FACULTY SENATE REVIEW</span>
+                    <span className="font-mono">DOI: 10.1038/s41586</span>
+                  </div>
+                </div>
+              ) : theme.category === 'academic' ? (
+                /* ARCHETYPE 7: ACADEMIC METHODOLOGY & CAUSAL PROOF LEDGER */
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[7.5px] sm:text-[8px] font-serif font-bold tracking-tight opacity-90 truncate">
+                      IDENTIFICATION STRATEGY &amp; ECONOMETRIC SPECIFICATION
+                    </span>
+                    <span className="text-[6px] font-mono opacity-50">PEER REVIEW</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 font-serif text-[6.5px]">
+                    {/* Math Formulation Box */}
+                    <div
+                      className="p-1.5 rounded border space-y-0.5"
+                      style={{
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                        borderColor: `${theme.accent}40`,
+                      }}
+                    >
+                      <span className="font-bold text-[6px] font-mono block" style={{ color: theme.accent }}>
+                        § 3.1 EMPIRICAL MODEL
+                      </span>
+                      <div className="font-mono text-[6.5px] py-0.5 opacity-90">
+                        Y_it = β₁·Treat_it + X_it&apos;γ + ε_it
+                      </div>
+                      <div className="text-[5.5px] font-mono opacity-70">
+                        p &lt; 0.001 · n = 12,450 · 95% CI
+                      </div>
+                    </div>
+
+                    {/* Causal Verification Steps */}
+                    <div className="p-1.5 rounded border border-black/10 dark:border-white/10 space-y-0.5">
+                      <span className="font-bold text-[6px] font-mono block opacity-60">
+                        CAUSAL IDENTIFICATION
+                      </span>
+                      <div className="text-[5.5px] leading-tight space-y-0.5 opacity-80">
+                        <div>1. Stratified quasi-experimental split</div>
+                        <div>2. Two-way clustered standard errors</div>
+                        <div>3. Permutation falsification bounds</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : theme.category === 'scientific' ? (
+                /* ARCHETYPE 8: SCIENTIFIC TELEMETRY & BIORENDER ASSAY */
+                <div className="space-y-1 font-mono">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[7.5px] sm:text-[8px] font-bold tracking-tight opacity-90 truncate">
+                      SPECTRAL TELEMETRY &amp; RESOLUTION BOUNDS
+                    </span>
+                    <span className="text-[6px] text-emerald-500 font-bold">SENSOR LOCKED</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-[6.5px]">
+                    <div className="p-1 rounded border space-y-0.5" style={{ borderColor: `${theme.accent}40`, backgroundColor: `${theme.accent}08` }}>
+                      <span className="text-[5.5px] block opacity-60">CRYO-EM</span>
+                      <span className="font-bold text-[7px] block" style={{ color: theme.accent }}>0.18 Å</span>
+                      <span className="text-[5px] opacity-70">Sub-angstrom</span>
+                    </div>
+                    <div className="p-1 rounded border space-y-0.5 border-black/10 dark:border-white/10">
+                      <span className="text-[5.5px] block opacity-60">AFFINITY</span>
+                      <span className="font-bold text-[7px] block text-emerald-500">Kd 0.42 nM</span>
+                      <span className="text-[5px] opacity-70">High specificity</span>
+                    </div>
+                    <div className="p-1 rounded border space-y-0.5 border-black/10 dark:border-white/10">
+                      <span className="text-[5.5px] block opacity-60">PURITY</span>
+                      <span className="font-bold text-[7px] block text-cyan-400">99.99%</span>
+                      <span className="text-[5px] opacity-70">Mass-spec assay</span>
+                    </div>
+                  </div>
+                </div>
+              ) : theme.category === 'conference' ? (
+                /* ARCHETYPE 9: TED CONFERENCE STAGE PROVOCATION */
+                <div
+                  className="p-2 sm:p-2.5 rounded-xl border text-center space-y-1 relative overflow-hidden bg-gradient-to-b from-red-500/10 via-transparent to-transparent"
+                  style={{ borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }}
+                >
+                  <span className="inline-block px-1.5 py-0.2 rounded text-[6px] font-bold uppercase tracking-widest bg-red-600 text-white font-mono">
+                    STAGE CONVICTION AXIOM
+                  </span>
+                  <div className="text-[9px] sm:text-[10px] font-black tracking-tight leading-snug px-1">
+                    &ldquo;We don&apos;t have a generation crisis. We have an alignment crisis.&rdquo;
+                  </div>
+                  <div className="flex items-center justify-center gap-2 text-[5.5px] font-mono opacity-60 pt-0.5">
+                    <span>1. Challenge Inertia</span>
+                    <span>•</span>
+                    <span>2. Build Truth</span>
+                    <span>•</span>
+                    <span>3. Unlock Scale</span>
+                  </div>
+                </div>
+              ) : (
+                /* ARCHETYPE 10: EXECUTIVE STRATEGY / MCKINSEY PYRAMID PRINCIPLE */
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[7.5px] sm:text-[8px] font-bold tracking-tight opacity-90 truncate font-mono">
+                      STRATEGIC ARCHITECTURE &amp; MECE FRAMEWORK
+                    </span>
+                    <span className="text-[6px] font-mono opacity-50">MCKINSEY &amp; BCG</span>
+                  </div>
+                  <div
+                    className="p-1 rounded border text-center text-[7px]"
+                    style={{ backgroundColor: `${theme.accent}15`, borderColor: `${theme.accent}40`, color: theme.accent }}
+                  >
+                    <span className="font-bold">GOVERNING THOUGHT</span>: Autonomous Multi-Agent Synthesis
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-[6.5px]">
+                    <div className="p-1 rounded border border-black/10 dark:border-white/10 space-y-0.5">
+                      <span className="font-bold text-[6px] block opacity-70">ARGUMENT A: Cost Rationalization</span>
+                      <p className="text-[5.5px] opacity-75 leading-tight">Eliminate manual formatting and redundant reviews.</p>
+                      <span className="text-[5px] font-mono text-emerald-500 font-bold block">EVIDENCE 01: -$180M OpEx</span>
+                    </div>
+                    <div className="p-1 rounded border border-black/10 dark:border-white/10 space-y-0.5">
+                      <span className="font-bold text-[6px] block opacity-70">ARGUMENT B: Velocity Acceleration</span>
+                      <p className="text-[5.5px] opacity-75 leading-tight">Deterministic generation with verified audit trails.</p>
+                      <span className="text-[5px] font-mono font-bold block" style={{ color: theme.accent }}>EVIDENCE 02: 3.8x Speed</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
