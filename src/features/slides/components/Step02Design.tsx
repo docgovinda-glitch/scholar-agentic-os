@@ -19,6 +19,7 @@ import DeckPreviewModal from './DeckPreviewModal';
 import CustomThemeStudio from './CustomThemeStudio';
 import type { BestSlideDesign } from '../data/bestSlideDesigns100';
 import { apply5SlideDeckProgression } from '../services/deckProgressionService';
+import { createBlankSheetDeck } from '../services/blankSheetService';
 
 export interface Step02DesignProps {
   deck: SlideDeck;
@@ -252,26 +253,44 @@ export default function Step02Design({
     onUpdateDeck(updated);
   };
 
+  const handleStartBlankSheet = () => {
+    const blankDeck = createBlankSheetDeck(deck, activeTheme.mode || 'light');
+    onUpdateDeck(blankDeck);
+    onNextStep();
+  };
+
   return (
     <div
       className="max-w-5xl mx-auto space-y-6 p-4 sm:p-6"
       data-testid="step-02-design"
     >
       {/* Header Banner */}
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200">
-            02 Design · Slide Styles
-          </span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200">
+              02 Design · Slide Styles
+            </span>
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
+              Choose Presentation Design
+            </h1>
+            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
+              Select a curated aesthetic, browse the full library, or start with a blank sheet to design yourself.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
-            Choose Presentation Design
-          </h1>
-          <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
-            Select a curated aesthetic, browse the full library, or clone colors directly from an image.
-          </p>
-        </div>
+
+        <button
+          type="button"
+          onClick={handleStartBlankSheet}
+          data-testid="header-blank-sheet-btn"
+          className="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-300 hover:bg-amber-500/20 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer shrink-0"
+          title="Start with an empty canvas and design freely in the Studio"
+        >
+          <span>🎨 Start from Blank Sheet</span>
+        </button>
       </div>
 
       {/* Apple-Style Top Segmented Control Bar */}
@@ -686,6 +705,7 @@ export default function Step02Design({
         <CustomThemeStudio
           deck={deck}
           onUpdateDeck={onUpdateDeck}
+          onProceedToStudio={onNextStep}
           onApplyTheme={(th) => {
             setSelectedAccent(th.accent);
             handleSelectLibraryTheme(th.id);

@@ -240,4 +240,42 @@ describe('CustomThemeStudio ("Bring Your Own Theme")', () => {
 
     expect(screen.getByText(/My Saved Custom Themes/)).toBeInTheDocument();
   });
+
+  it('starts from blank sheet when Blank Sheet button is clicked', () => {
+    const handleUpdate = vi.fn();
+    const handleProceed = vi.fn();
+    render(
+      <CustomThemeStudio
+        deck={mockDeck}
+        onUpdateDeck={handleUpdate}
+        onProceedToStudio={handleProceed}
+      />
+    );
+
+    const blankSheetBtn = screen.getByTestId('blank-sheet-btn');
+    fireEvent.click(blankSheetBtn);
+
+    expect(handleUpdate).toHaveBeenCalledTimes(1);
+    const updated = handleUpdate.mock.calls[0][0];
+    expect(updated.slides).toHaveLength(5);
+    expect(updated.themeId).toBe('minimal-slate');
+    expect(handleProceed).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders upload presentation deck dropzone for recreating decks', () => {
+    const handleUpdate = vi.fn();
+    render(
+      <CustomThemeStudio
+        deck={mockDeck}
+        onUpdateDeck={handleUpdate}
+      />
+    );
+
+    expect(
+      screen.getByText(/Upload Existing Presentation to Recreate Design/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Upload Presentation Deck/i })
+    ).toBeInTheDocument();
+  });
 });

@@ -40,4 +40,6 @@ export { default as SlideCreativeSketchIllustration } from './components/SlideCr
 export { default as InSlidePromptCopilot } from './components/InSlidePromptCopilot';
 export * from './services/deckProgressionService';
 export * from './services/slideMutationService';
+export * from './services/blankSheetService';
+export * from './services/deckRecreatorService';
 

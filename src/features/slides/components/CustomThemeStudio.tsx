@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Palette,
   Sparkles,
@@ -12,6 +12,12 @@ import {
   FileCode,
   CheckCircle2,
   AlertTriangle,
+  FileUp,
+  FileText,
+  Wand2,
+  RefreshCw,
+  ArrowRight,
+  ExternalLink,
 } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import {
@@ -27,13 +33,18 @@ import { apply5SlideDeckProgression } from '../services/deckProgressionService';
 import {
   getStoredCustomThemes,
   saveCustomThemeToStorage,
+  generateThemeFromPrompt,
+  compileSlideTheme,
 } from '../services/themeExtractorService';
+import { createBlankSheetDeck } from '../services/blankSheetService';
+import { recreateDeckFromFile, type RecreatedDeckResult } from '../services/deckRecreatorService';
 import MultiSlideDeckPreview from './MultiSlideDeckPreview';
 
 export interface CustomThemeStudioProps {
   deck: SlideDeck;
   onUpdateDeck: (updated: SlideDeck) => void;
   onApplyTheme?: (theme: SlideTheme) => void;
+  onProceedToStudio?: () => void;
 }
 
 const DESIGNER_PRESETS: Array<{
@@ -119,6 +130,7 @@ export default function CustomThemeStudio({
   deck,
   onUpdateDeck,
   onApplyTheme,
+  onProceedToStudio,
 }: CustomThemeStudioProps) {
   // Theme Builder State
   const [themeName, setThemeName] = useState('Custom Brand Architecture');
@@ -131,6 +143,14 @@ export default function CustomThemeStudio({
   const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'mono'>('sans');
   const [visualMotif, setVisualMotif] = useState<VisualMotif>('minimal-frame');
   const [category, setCategory] = useState('executive');
+
+  // Deck Recreator & Blank Sheet States
+  const [isUploadingDeck, setIsUploadingDeck] = useState(false);
+  const [recreatedResult, setRecreatedResult] = useState<RecreatedDeckResult | null>(null);
+  const [aiPromptInput, setAiPromptInput] = useState('');
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [showJsonTools, setShowJsonTools] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Persistence & Sharing States
   const [savedThemes, setSavedThemes] = useState<SlideTheme[]>([]);
@@ -212,6 +232,81 @@ export default function CustomThemeStudio({
     onUpdateDeck(updated);
     if (onApplyTheme) onApplyTheme(theme);
     showToast(`✓ Applied "${theme.name}" to your 5 presentation slides!`);
+  };
+
+  // Blank Sheet action: resets to pure minimal slate for freeform design in Step 03 Studio Canvas
+  const handleStartBlankSheet = (targetMode: 'light' | 'dark' = mode) => {
+    const blankDeck = createBlankSheetDeck(deck, targetMode);
+    onUpdateDeck(blankDeck);
+    showToast('✓ Blank canvas ready! Proceeding to Studio where you can design freely.');
+    if (onProceedToStudio) {
+      onProceedToStudio();
+    }
+  };
+
+  // Presentation Deck File Recreator (.pptx, .ppt, .pdf, .html, slide images)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingDeck(true);
+    try {
+      const result = await recreateDeckFromFile(file, deck);
+      setRecreatedResult(result);
+
+      // Populate form state from recreated theme so live preview syncs immediately
+      setThemeName(result.recreatedTheme.name);
+      setCanvasBg(result.recreatedTheme.canvasBg);
+      setCardBg(result.recreatedTheme.cardBg);
+      setAccent(result.recreatedTheme.accent);
+      setTextPrimary(result.recreatedTheme.textPrimary);
+      setTextSecondary(result.recreatedTheme.textSecondary);
+      setMode(result.recreatedTheme.mode);
+      setFontFamily(result.recreatedTheme.fontFamily || 'sans');
+      setVisualMotif(result.recreatedTheme.visualMotif || 'minimal-frame');
+
+      showToast(`✓ Extracted content and recreated design theme from "${file.name}"!`);
+    } catch (err: any) {
+      console.error(err);
+      alert(`Could not parse deck: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsUploadingDeck(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // Apply recreated deck (content + theme) and open studio
+  const handleApplyRecreatedDeck = () => {
+    if (!recreatedResult) return;
+    onUpdateDeck(recreatedResult.deck);
+    showToast(`✓ Recreated deck applied! Opening in Canvas Studio.`);
+    if (onProceedToStudio) {
+      onProceedToStudio();
+    }
+  };
+
+  // AI Prompt Theme Generator
+  const handleGenerateFromAiPrompt = () => {
+    if (!aiPromptInput.trim()) return;
+    setIsGeneratingAi(true);
+    try {
+      const result = generateThemeFromPrompt(aiPromptInput);
+      setThemeName(result.name);
+      setCanvasBg(result.canvasBg);
+      setCardBg(result.cardBg);
+      setAccent(result.accent);
+      setTextPrimary(result.textPrimary);
+      setTextSecondary(result.textSecondary);
+      setMode(result.mode);
+      setFontFamily(result.fontFamily);
+      setVisualMotif(result.visualMotif);
+      setCategory(result.category);
+      showToast(`✓ AI generated "${result.name}" aesthetic!`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsGeneratingAi(false);
+    }
   };
 
   const handleSaveToStorage = () => {
@@ -316,10 +411,10 @@ export default function CustomThemeStudio({
       )}
 
       {/* Header & Quick Action Buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#1C1C1E] p-5 rounded-2xl border border-neutral-200/80 dark:border-white/10">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#1C1C1E] p-5 rounded-2xl border border-neutral-200/80 dark:border-white/10 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+            <span className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
               <Palette className="w-5 h-5" />
             </span>
             <h3 className="text-base font-bold text-neutral-900 dark:text-white">
@@ -327,42 +422,208 @@ export default function CustomThemeStudio({
             </h3>
           </div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-xl">
-            Design, code, export, and share bespoke presentation design systems. Control your 60/30/10 color palette, typography pairing, card treatment, and multi-slide layout progression.
+            Design from scratch on a blank sheet, upload an existing presentation (.pptx, .ppt, .pdf, .html, images) to recreate its design, or customize your 60/30/10 palette.
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Start from Blank Sheet CTA */}
           <button
             type="button"
-            onClick={() => setShowJsonModal(true)}
-            className="px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            onClick={() => handleStartBlankSheet('light')}
+            data-testid="blank-sheet-btn"
+            className="px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Wipe away templates and start on an empty canvas to design yourself"
           >
-            <Upload className="w-3.5 h-3.5" />
-            Import JSON
+            <FileText className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <span>🎨 Start from Blank Sheet</span>
           </button>
-          <button
-            type="button"
-            onClick={() => handleExportJson()}
-            className="px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <Copy className="w-3.5 h-3.5" />
-            Export JSON
-          </button>
+
           <button
             type="button"
             onClick={handleSaveToStorage}
-            className="px-3 py-1.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+            aria-label="Save to My Library"
+            className="px-3 py-2 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
           >
             <Check className="w-3.5 h-3.5" />
             Save to My Library
           </button>
+
+          {/* JSON Tools Modal Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowJsonTools(!showJsonTools)}
+            className="px-2.5 py-2 rounded-xl border border-neutral-200 dark:border-white/10 text-neutral-500 hover:text-neutral-900 dark:hover:text-white text-xs font-medium flex items-center gap-1 cursor-pointer"
+            title="Developer JSON Export / Import"
+          >
+            <FileCode className="w-3.5 h-3.5" />
+            <span>JSON</span>
+          </button>
         </div>
+      </div>
+
+      {/* Developer JSON Tools Bar (Optional Accordion) */}
+      {showJsonTools && (
+        <div className="p-3.5 rounded-xl bg-neutral-100 dark:bg-neutral-900/70 border border-neutral-200 dark:border-white/10 flex items-center justify-between text-xs animate-in fade-in">
+          <div className="flex items-center gap-2 text-neutral-600 dark:text-neutral-300">
+            <FileCode className="w-4 h-4 text-blue-500" />
+            <span>Developer Theme Code Tools (JSON Format)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowJsonModal(true)}
+              className="px-2.5 py-1 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-medium hover:bg-neutral-50 cursor-pointer flex items-center gap-1"
+            >
+              <Upload className="w-3 h-3" />
+              Import JSON
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExportJson()}
+              className="px-2.5 py-1 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-medium hover:bg-neutral-50 cursor-pointer flex items-center gap-1"
+            >
+              <Copy className="w-3 h-3" />
+              Export JSON
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* FEATURE 1: Universal Deck Recreator (Upload PPTX, PPT, PDF, HTML, or Slide Screenshots) */}
+      <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-50/70 via-indigo-50/60 to-purple-50/70 dark:from-blue-950/20 dark:via-indigo-950/20 dark:to-purple-950/20 border border-blue-200/80 dark:border-blue-900/40 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-blue-600 text-white font-bold text-xs">
+                ⚡ DECK &amp; DESIGN EXTRACTOR
+              </span>
+              <h4 className="text-sm font-bold text-neutral-900 dark:text-white">
+                Upload Existing Presentation to Recreate Design (.pptx, .ppt, .pdf, .html, slide images)
+              </h4>
+            </div>
+            <p className="text-xs text-neutral-600 dark:text-neutral-300 mt-1 max-w-2xl">
+              Don't have a JSON file? Upload real PowerPoint presentations, PDFs, web slides (HTML), or slide screenshots. We automatically extract your content and recreate the visual design theme.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploadingDeck}
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer shrink-0 disabled:opacity-50"
+          >
+            {isUploadingDeck ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span>Extracting &amp; Recreating...</span>
+              </>
+            ) : (
+              <>
+                <FileUp className="w-3.5 h-3.5" />
+                <span>Upload Presentation Deck</span>
+              </>
+            )}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pptx,.ppt,.pdf,.html,.htm,.png,.jpg,.jpeg,.webp,.docx,.txt,.md"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+        </div>
+
+        {/* Recreated Deck Ready Banner */}
+        {recreatedResult && (
+          <div className="p-4 rounded-xl bg-white dark:bg-[#1C1C1E] border border-blue-200 dark:border-blue-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold text-neutral-900 dark:text-white">
+                  {recreatedResult.fileName} (Extracted {recreatedResult.wordCount} words)
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+                  {recreatedResult.recreatedTheme.mode.toUpperCase()}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 pt-0.5">
+                <span className="text-[11px] text-neutral-500">Recreated Palette:</span>
+                <span className="w-3.5 h-3.5 rounded-full border border-neutral-300" style={{ backgroundColor: recreatedResult.recreatedTheme.canvasBg }} title="Canvas Ground" />
+                <span className="w-3.5 h-3.5 rounded-full border border-neutral-300" style={{ backgroundColor: recreatedResult.recreatedTheme.cardBg }} title="Card Surface" />
+                <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: recreatedResult.recreatedTheme.accent }} title="Accent Signal" />
+                <span className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 ml-1">
+                  Accent: {recreatedResult.recreatedTheme.accent}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleApplyRecreatedDeck}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              >
+                <span>⚡ Recreate Deck &amp; Open in Studio</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Studio Grid: Left = Design Controls, Right = Live 5-Slide Deck Preview */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Design Controls (7 Cols) */}
+        {/* Left Column: Design Controls (6 Cols) */}
         <div className="lg:col-span-6 space-y-5 bg-white dark:bg-[#1C1C1E] p-5 rounded-2xl border border-neutral-200/80 dark:border-white/10 shadow-xs">
+          
+          {/* FEATURE 2: Blank Sheet Quick Card (Design by Yourself) */}
+          <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-white/10 flex items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-bold text-neutral-900 dark:text-white block">
+                Want to design by yourself from scratch?
+              </span>
+              <span className="text-[11px] text-neutral-500 dark:text-neutral-400 block mt-0.5">
+                Get a clean blank canvas with zero rigid constraints to design freely in the studio.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleStartBlankSheet('light')}
+              className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer shrink-0 shadow-xs"
+            >
+              Start Blank Sheet
+            </button>
+          </div>
+
+          {/* FEATURE 3: AI Prompt Aesthetic Styler (No hex code typing required!) */}
+          <div className="space-y-2">
+            <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider block">
+              ✨ AI Prompt Aesthetic Styler
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={aiPromptInput}
+                onChange={(e) => setAiPromptInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleGenerateFromAiPrompt()}
+                placeholder="Describe your style (e.g. Apple Keynote dark mode with electric cyan, or Swiss serif)"
+                className="flex-1 px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-purple-500"
+              />
+              <button
+                type="button"
+                onClick={handleGenerateFromAiPrompt}
+                disabled={!aiPromptInput.trim() || isGeneratingAi}
+                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+              >
+                <Wand2 className="w-3.5 h-3.5" />
+                <span>Generate</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="h-px bg-neutral-200 dark:bg-white/10" />
+
           {/* Quick Presets */}
           <div>
             <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider block mb-2">
@@ -679,7 +940,7 @@ export default function CustomThemeStudio({
           </div>
         </div>
 
-        {/* Right Column: Live 5-Slide Multi-Slide Deck Preview (5 Cols) */}
+        {/* Right Column: Live 5-Slide Multi-Slide Deck Preview (6 Cols) */}
         <div className="lg:col-span-6 space-y-4">
           <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-2xl border border-neutral-200/80 dark:border-white/10 shadow-xs">
             <div className="flex items-center justify-between mb-3">

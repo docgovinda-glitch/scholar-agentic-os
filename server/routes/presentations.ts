@@ -36,7 +36,7 @@ async function extractTextFromPdf(buffer: Buffer): Promise<{ text: string }> {
   return { text: "" };
 }
 
-async function extractTextFromPptx(buffer: Buffer): Promise<string> {
+async function extractTextFromPptx(buffer: Buffer): Promise<{ text: string; themeColors?: { accent?: string; canvasBg?: string; cardBg?: string; textPrimary?: string } }> {
   try {
     const zip = await JSZip.loadAsync(buffer);
     const slideFiles = Object.keys(zip.files).filter((name) =>
@@ -60,11 +60,70 @@ async function extractTextFromPptx(buffer: Buffer): Promise<string> {
         slideTexts.push(extracted);
       }
     }
-    return slideTexts.join("\n\n");
+
+    // Try extracting theme colors from ppt/theme/theme1.xml
+    let themeColors: { accent?: string; canvasBg?: string; cardBg?: string; textPrimary?: string } | undefined;
+    const themeFile = zip.files["ppt/theme/theme1.xml"];
+    if (themeFile) {
+      const themeXml = await themeFile.async("text");
+      const accentMatch = themeXml.match(/<a:accent1>\s*<(?:a:srgbClr\s+val="([0-9A-Fa-f]{6})"[^>]*|a:sysClr[^>]*lastClr="([0-9A-Fa-f]{6})")/);
+      const accentHex = accentMatch ? `#${accentMatch[1] || accentMatch[2]}` : undefined;
+
+      const dkMatch = themeXml.match(/<a:dk1>\s*<(?:a:srgbClr\s+val="([0-9A-Fa-f]{6})"[^>]*|a:sysClr[^>]*lastClr="([0-9A-Fa-f]{6})")/);
+      const ltMatch = themeXml.match(/<a:lt1>\s*<(?:a:srgbClr\s+val="([0-9A-Fa-f]{6})"[^>]*|a:sysClr[^>]*lastClr="([0-9A-Fa-f]{6})")/);
+
+      if (accentHex || dkMatch || ltMatch) {
+        themeColors = {
+          accent: accentHex || "#2563EB",
+          cardBg: ltMatch ? `#${ltMatch[1] || ltMatch[2]}` : "#FFFFFF",
+          canvasBg: ltMatch ? `#${ltMatch[1] || ltMatch[2]}` : "#F8FAFC",
+          textPrimary: dkMatch ? `#${dkMatch[1] || dkMatch[2]}` : "#0F172A",
+        };
+      }
+    }
+
+    return { text: slideTexts.join("\n\n"), themeColors };
   } catch (err) {
     console.warn("[presentations.ts] PPTX parse fallback error:", err);
-    return buffer.toString("utf-8").replace(/[^\x20-\x7E\n]/g, " ").trim();
+    return { text: buffer.toString("utf-8").replace(/[^\x20-\x7E\n]/g, " ").trim() };
   }
+}
+
+function extractHtmlPresentationData(htmlString: string): {
+  text: string;
+  title?: string;
+  themeColors?: { accent?: string; canvasBg?: string; cardBg?: string };
+} {
+  const titleMatch = htmlString.match(/<title[^>]*>([^<]+)<\/title>/i) || htmlString.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+  const title = titleMatch ? titleMatch[1].trim() : undefined;
+
+  let accent: string | undefined;
+  const hexColors = htmlString.match(/#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g);
+  if (hexColors && hexColors.length > 0) {
+    const coloredHex = hexColors.find((c) => !/^#(000000|ffffff|fff|000|111|222|333|eee|ddd|ccc)$/i.test(c));
+    if (coloredHex) accent = coloredHex;
+  }
+
+  const clean = htmlString
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
+    .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, "\n\n## $1\n")
+    .replace(/<li[^>]*>(.*?)<\/li>/gi, "\n- $1")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<p[^>]*>(.*?)<\/p>/gi, "\n\n$1\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\n\s*\n\s*\n/g, "\n\n")
+    .trim();
+
+  return {
+    text: clean,
+    title,
+    themeColors: accent ? { accent, canvasBg: "#F8FAFC", cardBg: "#FFFFFF" } : undefined,
+  };
 }
 
 export interface PresentationDeckRow extends Record<string, unknown> {
@@ -162,6 +221,8 @@ router.post("/parse-document", upload.single("file"), async (req: Request, res: 
       file.mimetype?.startsWith("image/") ||
       /\.(png|jpe?g|webp|gif|svg)$/i.test(lowerName);
 
+    let detectedTheme: any = null;
+
     if (isImage) {
       const cleanBaseName = file.originalname
         .replace(/\.[^/.]+$/, "")
@@ -183,12 +244,24 @@ router.post("/parse-document", upload.single("file"), async (req: Request, res: 
       const data = await extractTextFromPdf(file.buffer);
       text = data.text;
     } else if (
+      file.mimetype === "text/html" ||
+      lowerName.endsWith(".html") ||
+      lowerName.endsWith(".htm")
+    ) {
+      const htmlString = file.buffer.toString("utf-8");
+      const htmlData = extractHtmlPresentationData(htmlString);
+      text = htmlData.text;
+      if (htmlData.title) detectedTitle = htmlData.title;
+      if (htmlData.themeColors) detectedTheme = htmlData.themeColors;
+    } else if (
       file.mimetype === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
       file.mimetype === "application/vnd.ms-powerpoint" ||
       lowerName.endsWith(".pptx") ||
       lowerName.endsWith(".ppt")
     ) {
-      text = await extractTextFromPptx(file.buffer);
+      const pptxData = await extractTextFromPptx(file.buffer);
+      text = pptxData.text;
+      if (pptxData.themeColors) detectedTheme = pptxData.themeColors;
     } else if (
       file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       lowerName.endsWith(".docx") ||
@@ -239,6 +312,7 @@ router.post("/parse-document", upload.single("file"), async (req: Request, res: 
       wordCount,
       fileName: file.originalname,
       fileSize: file.size,
+      detectedTheme,
     });
   } catch (err: any) {
     console.error("[presentations.ts] Document parsing error:", err);
