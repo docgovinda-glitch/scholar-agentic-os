@@ -30,7 +30,16 @@ export type SlideThemeId =
   | 'swiss-editorial'
   | (string & {});
 
-export type ThemeCategory = 'academic' | 'minimal' | 'dark' | 'vibrant';
+export type ThemeCategory =
+  | 'academic'
+  | 'minimal'
+  | 'dark'
+  | 'vibrant'
+  | 'editorial'
+  | 'executive'
+  | 'apple-keynote'
+  | 'scientific'
+  | 'conference';
 export type ThemeSector = 'Work' | 'Finance' | 'Promotion' | 'Academic' | 'Consulting';
 export type ThemeMode = 'light' | 'dark';
 
@@ -87,7 +96,7 @@ export interface SlideTheme {
   id: SlideThemeId;
   name: string;
   tagline: string;
-  category: 'academic' | 'minimal' | 'dark' | 'vibrant';
+  category: ThemeCategory;
   sector?: ThemeSector;
   mode: ThemeMode;
   visualMotif: VisualMotif;
@@ -880,7 +889,7 @@ export const SLIDE_THEMES: Record<SlideThemeId, SlideTheme> = {
     id: 'rose-quartz',
     name: 'Warm Clay Works (Rose Quartz)',
     tagline: 'Warm terracotta tones with modern rounded architectural arch frame and 3 key metrics',
-    category: 'vibrant',
+    category: 'editorial',
     mode: 'light',
     visualMotif: 'editorial-split',
     layoutArchetype: 'data-ledger',

@@ -193,5 +193,23 @@ The Presentation Studio is protected by automated regression suites:
   4. Step 02 Theme Studio visibility and 3-tab segmented control.
   5. Step 01 Scope 1-to-1 outline binding and `SLIDE {N}` `whitespace-nowrap` badge fix.
   6. Presentation Style writing tone and narrative scaffolding binding.
-  7. Vitest test suite (22 test files, 110 tests passing).
+  7. Vitest test suite (23 test files, 117 tests passing).
   8. TypeScript (`tsc --noEmit`) and ESLint with 0 errors and 0 warnings.
+
+---
+
+## 7. 100 Best Royalty-Free Slide Designs Library
+
+### Taxonomy & Curated Disciplines
+1. **Academic & Thesis Defense (20 templates)**: Oxford Empirical Monograph, Cambridge Quadrangle, Harvard Law Casebook, MIT Linear Algebra, Sorbonne Scholastic, Max Planck Quantum...
+2. **Executive & McKinsey/BCG Consulting (20 templates)**: McKinsey Pyramid Principle, BCG Growth-Share Matrix, Bain Strategic Horizon, Deloitte Digital Transformation...
+3. **Apple Keynote & High-Growth Tech (20 templates)**: Apple Cupertino Minimal, Space Black Pro, Stripe Developer Velocity, Linear Modernist, Arc Browser Glass, Figma Neo-Canvas...
+4. **Editorial & Publishing Longform (15 templates)**: The New Yorker Monograph, The Economist Briefing, Financial Times Salmon, The Atlantic Longform, Monocle Tokyo Paper...
+5. **Scientific & Data-Dense Infographics (15 templates)**: BioRender Cellular Topology, Genomic Atlas Chromosome, NASA Jet Propulsion Blueprint, Climate Science Flux...
+6. **Conference Showcase & TED Keynotes (10 templates)**: TED Global Horizon, Y Combinator Demo Day Pitch, Davos World Economic Forum, SXSW Interactive Signal...
+
+### Design Polish & Safeguards
+- **Vibrant Category Purged**: Neon cyber themes (`cyber-cyan`, `monokai-terminal`, `neo-tokyo`, `sunset-velvet`, `solar-amber`, `midnight-onyx`, `obsidian-aurora`, `aqua-charity`) completely removed.
+- **Warm Clay Works Preserved**: "Warm Clay Works (Rose Quartz)" retained and reassigned to the Editorial category.
+- **Immediate Discovery**: Step 02 Tab 1 features a prominent quick-jump banner directing users to the 100-template library, and Tab 2 provides full category filtering, real-time search, and instant accent customization.
+

@@ -75,7 +75,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'cambridge-blue-quantitative',
-    name: 'Cambridge Quantitative Blue',
+    name: 'Cambridge Quadrangle',
     category: 'academic',
     tagline: 'Academic chalk blue canvas (#F1F5F9) with crisp white card and classic Cambridge cobalt signal.',
     mode: 'light',
@@ -93,7 +93,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'harvard-crimson-scholarly',
-    name: 'Harvard Crimson Review',
+    name: 'Harvard Law Casebook',
     category: 'academic',
     tagline: 'Warm off-white paper canvas with deep crimson accents for institutional governance and peer review.',
     mode: 'light',
@@ -129,7 +129,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'mit-slate-technical',
-    name: 'MIT Slate Technical Report',
+    name: 'MIT Linear Algebra',
     category: 'academic',
     tagline: 'Technical slate dark canvas (#0F172A) with silver metallic card and laser red signal (#EF4444).',
     mode: 'dark',
@@ -183,7 +183,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'max-planck-quantum',
-    name: 'Max Planck Quantum Navy',
+    name: 'Max Planck Quantum',
     category: 'academic',
     tagline: 'Deep cosmic indigo (#0B1120) with elevated glassmorphic card and amber luminescence.',
     mode: 'dark',
@@ -201,7 +201,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'sorbonne-classical-parchment',
-    name: 'Sorbonne Classical Parchment',
+    name: 'Sorbonne Scholastic',
     category: 'academic',
     tagline: 'Historic French cream (#FAF6EE) with warm dark oak card and burgundy velvet accent.',
     mode: 'light',
@@ -421,7 +421,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   // =========================================================================
   {
     id: 'mckinsey-pyramid-strategy',
-    name: 'McKinsey Pyramid Strategy',
+    name: 'McKinsey Pyramid Principle',
     category: 'executive',
     tagline: 'The quintessential management consulting palette: Navy (#001E38), crisp white card, and sky blue accents.',
     mode: 'light',
@@ -457,7 +457,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'bain-macro-economics',
-    name: 'Bain Strategy Crimson',
+    name: 'Bain Strategic Horizon',
     category: 'executive',
     tagline: 'Bold Bain Crimson (#CC0000) on stark clean boardroom card with high-impact executive takeaway stack.',
     mode: 'light',
@@ -475,7 +475,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'deloitte-green-dot',
-    name: 'Deloitte Enterprise Matrix',
+    name: 'Deloitte Digital Transformation',
     category: 'executive',
     tagline: 'Black slate backdrop with signature vibrant green dot signal (#86BC25) for enterprise transformation.',
     mode: 'dark',
@@ -803,7 +803,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'apple-pro-space-black',
-    name: 'Apple Pro Space Black',
+    name: 'Space Black Pro',
     category: 'apple-keynote',
     tagline: 'Titanium Space Black (#000000 / #1C1C1E) with subtle specular card highlights and iridescent neon signal.',
     mode: 'dark',
@@ -839,7 +839,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'stripe-radial-violet',
-    name: 'Stripe Radial Violet',
+    name: 'Stripe Developer Velocity',
     category: 'apple-keynote',
     tagline: 'The iconic fintech gradient: deep indigo canvas with smooth blur luminescence and violet accent (#6366F1).',
     mode: 'dark',
@@ -875,7 +875,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'linear-dark-graphite',
-    name: 'Linear Precision Graphite',
+    name: 'Linear Modernist',
     category: 'apple-keynote',
     tagline: 'Crafted software elegance: dark graphite (#111113) with ultra-thin purple hairline (#5E6AD2).',
     mode: 'dark',
@@ -893,7 +893,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'figma-craft-lilac',
-    name: 'Figma Craft Lilac',
+    name: 'Figma Neo-Canvas',
     category: 'apple-keynote',
     tagline: 'Design system canvas: soft lavender (#F8F7FF) with vibrant purple accent (#7C3AED) and pure black headings.',
     mode: 'light',
@@ -947,7 +947,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'arc-browser-neon',
-    name: 'Arc Neon Glow',
+    name: 'Arc Browser Glass',
     category: 'apple-keynote',
     tagline: 'Vibrant neon gradient with frosted glass card container and high-energy magenta highlight (#EC4899).',
     mode: 'dark',
@@ -1149,7 +1149,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   // =========================================================================
   {
     id: 'new-yorker-editorial-warm',
-    name: 'New Yorker Editorial Warm',
+    name: 'The New Yorker Monograph',
     category: 'editorial',
     tagline: 'Warm cream paper (#FAF8F5) with classic serif typography, charcoal ink, and terracotta highlight.',
     mode: 'light',
@@ -1167,7 +1167,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'economist-deep-navy',
-    name: 'The Economist Deep Navy',
+    name: 'The Economist Briefing',
     category: 'editorial',
     tagline: 'Authoritative geopolitical journalism: deep navy canvas with iconic red masthead banner (#E3120B).',
     mode: 'light',
@@ -1185,7 +1185,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'ft-salmon-pink',
-    name: 'Financial Times Salmon Paper',
+    name: 'Financial Times Salmon',
     category: 'editorial',
     tagline: 'World-renowned FT salmon pink paper (#FCD8B8) with Oxford navy typography (#00284D) and crimson badge.',
     mode: 'light',
@@ -1203,7 +1203,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'atlantic-heritage-serif',
-    name: 'The Atlantic Heritage Serif',
+    name: 'The Atlantic Longform',
     category: 'editorial',
     tagline: 'American longform essay aesthetic: antique ivory card with bold drop-cap pull quotes and navy ink.',
     mode: 'light',
@@ -1221,7 +1221,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'monocle-modernist-olive',
-    name: 'Monocle Modernist Olive',
+    name: 'Monocle Tokyo Paper',
     category: 'editorial',
     tagline: 'Global affairs & design briefing: Japanese minimal grey with olive green signal (#4D6A34).',
     mode: 'light',
@@ -1423,7 +1423,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   // =========================================================================
   {
     id: 'biorender-cellular-cyan',
-    name: 'BioRender Cellular Cyan',
+    name: 'BioRender Cellular Topology',
     category: 'scientific',
     tagline: 'Biomedical research aesthetic: deep navy canvas with luminous cyan (#06B6D4) and biological diagram grids.',
     mode: 'dark',
@@ -1441,7 +1441,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'genomic-atlas-midnight',
-    name: 'Genomic Atlas Midnight',
+    name: 'Genomic Atlas Chromosome',
     category: 'scientific',
     tagline: 'Computational genomics: deep graphite with DNA double-helix neon purple (#A855F7) and sequence metrics.',
     mode: 'dark',
@@ -1459,7 +1459,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'nasa-deep-space-aurora',
-    name: 'NASA Deep Space Aurora',
+    name: 'NASA Jet Propulsion Blueprint',
     category: 'scientific',
     tagline: 'Cosmic telemetry: deep space void (#030712) with stellar aurora emerald (#10B981) and telemetry grids.',
     mode: 'dark',
@@ -1477,7 +1477,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'climate-variance-thermal',
-    name: 'Climate Variance Thermal',
+    name: 'Climate Science Flux',
     category: 'scientific',
     tagline: 'Atmospheric science: cool polar white backdrop with thermal orange anomaly indicator (#EA580C).',
     mode: 'light',
@@ -1697,7 +1697,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   // =========================================================================
   {
     id: 'ted-global-crimson',
-    name: 'TED Global Crimson Impact',
+    name: 'TED Global Horizon',
     category: 'conference',
     tagline: 'Ideas worth spreading: pure black backdrop with iconic TED red (#E62B1E) and massive billboard typography.',
     mode: 'dark',
@@ -1715,7 +1715,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'yc-demo-day-pitch',
-    name: 'Y Combinator Fast Pitch',
+    name: 'Y Combinator Demo Day Pitch',
     category: 'conference',
     tagline: 'YC Demo Day 3-minute deck: high-contrast white card with signature YC orange (#FF6600) and traction stats.',
     mode: 'light',
@@ -1733,7 +1733,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'sxsw-electric-horizon',
-    name: 'SXSW Electric Horizon',
+    name: 'SXSW Interactive Signal',
     category: 'conference',
     tagline: 'Austin creative festival: deep purple with vibrant coral-pink neon (#F43F5E) for cultural innovation.',
     mode: 'dark',
@@ -1751,7 +1751,7 @@ export const BEST_100_SLIDE_DESIGNS: BestSlideDesign[] = [
   },
   {
     id: 'davos-plenary-gold',
-    name: 'Davos Plenary Stage Gold',
+    name: 'Davos World Economic Forum',
     category: 'conference',
     tagline: 'World economic plenary: sovereign midnight card with refined Swiss gold accent (#E5A93C).',
     mode: 'dark',

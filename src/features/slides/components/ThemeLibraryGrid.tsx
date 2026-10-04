@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Check, Sun, Moon, Sparkles, LayoutGrid } from 'lucide-react';
+import { Search, Check, Sun, Moon } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import {
   SLIDE_THEMES,
@@ -17,13 +17,12 @@ import SlideMotifGraphic from './SlideMotifGraphic';
 export type LibraryCategory =
   | 'all'
   | 'academic'
-  | 'minimal'
   | 'executive'
-  | 'editorial'
-  | 'vibrant'
   | 'apple-keynote'
+  | 'editorial'
   | 'scientific'
-  | 'conference';
+  | 'conference'
+  | 'minimal';
 
 export interface ThemeLibraryGridProps {
   deck: SlideDeck;
@@ -49,46 +48,19 @@ interface UnifiedThemeItem {
   bestDesign?: BestSlideDesign;
 }
 
-const CATEGORY_MAP: Record<string, LibraryCategory> = {
-  'sand-academic': 'academic',
-  'oxford-navy': 'academic',
-  'parchment-ink': 'academic',
-  'emerald-scholar': 'academic',
-  'ivory-crisp': 'academic',
-  'minimal-slate': 'minimal',
-  'pure-mono': 'minimal',
-  'nordic-frost': 'minimal',
-  'deep-charcoal': 'minimal',
-  'moon-white-imagery': 'minimal',
-  'swiss-typographic': 'executive',
-  'champagne-gold': 'executive',
-  'blue-flame-brand': 'executive',
-  'beyond-2027': 'executive',
-  'editorial-warm': 'editorial',
-  'cream-editorial': 'editorial',
-  'swiss-editorial': 'editorial',
-  'travel-green-handbook': 'editorial',
-  'obsidian-aurora': 'vibrant',
-  'cyber-cyan': 'vibrant',
-  'neo-tokyo': 'vibrant',
-  'pacific-teal': 'vibrant',
-  'sunset-velvet': 'vibrant',
-  'rose-quartz': 'vibrant',
-  'solar-amber': 'vibrant',
-  'monokai-terminal': 'vibrant',
-  'midnight-onyx': 'vibrant',
-};
-
-const CATEGORIES: Array<{ id: LibraryCategory; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'academic', label: 'Academic' },
-  { id: 'minimal', label: 'Minimal' },
-  { id: 'executive', label: 'Executive' },
-  { id: 'editorial', label: 'Editorial' },
-  { id: 'vibrant', label: 'Vibrant' },
-  { id: 'apple-keynote', label: 'Apple & Tech' },
-  { id: 'scientific', label: 'Scientific' },
-  { id: 'conference', label: 'Conference' },
+export const CATEGORIES: Array<{
+  id: LibraryCategory;
+  label: string;
+  ariaLabel: string;
+}> = [
+  { id: 'all', label: 'All (100+)', ariaLabel: 'All' },
+  { id: 'academic', label: 'Academic & Defense (20)', ariaLabel: 'Academic' },
+  { id: 'executive', label: 'McKinsey & Consulting (20)', ariaLabel: 'Executive' },
+  { id: 'apple-keynote', label: 'Apple Keynote & Tech (20)', ariaLabel: 'Apple & Tech' },
+  { id: 'editorial', label: 'Editorial Longform (15)', ariaLabel: 'Editorial' },
+  { id: 'scientific', label: 'Scientific Infographics (15)', ariaLabel: 'Scientific' },
+  { id: 'conference', label: 'TED & Conference (10)', ariaLabel: 'Conference' },
+  { id: 'minimal', label: 'Minimal Clean', ariaLabel: 'Minimal' },
 ];
 
 export default function ThemeLibraryGrid({
@@ -107,51 +79,83 @@ export default function ThemeLibraryGrid({
       ? deck.title
       : 'Why Zappos Pays New Hires $2,000 to Quit');
 
-  // Build unified list of themes combining SLIDE_THEMES and the 100 Best Slide Designs
+  // Unified theme dataset: 100 Best Royalty-Free Slide Designs + User's favored Warm Clay Quartz
+  // Vibrant neon themes (Cyber Quantum, Monokai, Freestyle Mesh, Aqua Charity, etc.) are 100% removed.
   const allThemesList = useMemo<UnifiedThemeItem[]>(() => {
     const list: UnifiedThemeItem[] = [];
     const seenIds = new Set<string>();
 
-    // 1. Classic Curated Presets
-    Object.values(SLIDE_THEMES).forEach((t) => {
-      seenIds.add(t.id);
+    // 1. PRIMARY: 100 Curated Royalty-Free Slide Designs (Shown First!)
+    BEST_100_SLIDE_DESIGNS.forEach((d) => {
+      seenIds.add(d.id);
       list.push({
-        id: t.id,
-        name: t.name,
-        category: CATEGORY_MAP[t.id] || (t.category as LibraryCategory) || 'academic',
-        tagline: t.tagline,
-        mode: t.mode,
-        canvasBg: t.canvasBg,
-        cardBg: t.cardBg,
-        accent: t.accent,
-        textPrimary: t.textPrimary,
-        textSecondary: t.textSecondary,
-        layoutArchetype: t.layoutArchetype,
-        visualMotif: t.visualMotif,
-        swatch: t.swatch,
+        id: d.id,
+        name: d.name,
+        category: d.category,
+        tagline: d.tagline,
+        mode: d.mode,
+        canvasBg: d.canvasBg,
+        cardBg: d.cardBg,
+        accent: d.accent,
+        textPrimary: d.textPrimary,
+        textSecondary: d.textSecondary,
+        layoutArchetype: d.layoutArchetype,
+        visualMotif: d.visualMotif,
+        swatch: d.swatch,
+        fontPairing: d.fontPairing,
+        bestDesign: d,
       });
     });
 
-    // 2. 100 Best Royalty-Free Slide Designs
-    BEST_100_SLIDE_DESIGNS.forEach((d) => {
-      if (!seenIds.has(d.id)) {
-        seenIds.add(d.id);
+    // 2. User's explicitly favored Warm Clay Quartz (Rose Quartz) — kept in Editorial!
+    if (!seenIds.has('rose-quartz')) {
+      seenIds.add('rose-quartz');
+      const rq = SLIDE_THEMES['rose-quartz'];
+      if (rq) {
         list.push({
-          id: d.id,
-          name: d.name,
-          category: d.category,
-          tagline: d.tagline,
-          mode: d.mode,
-          canvasBg: d.canvasBg,
-          cardBg: d.cardBg,
-          accent: d.accent,
-          textPrimary: d.textPrimary,
-          textSecondary: d.textSecondary,
-          layoutArchetype: d.layoutArchetype,
-          visualMotif: d.visualMotif,
-          swatch: d.swatch,
-          fontPairing: d.fontPairing,
-          bestDesign: d,
+          id: 'rose-quartz',
+          name: 'Warm Clay Quartz (Rose Quartz)',
+          category: 'editorial',
+          tagline: 'Warm terracotta clay with soft quartz paper ground and terracotta signal for human-centered essays',
+          mode: rq.mode,
+          canvasBg: rq.canvasBg,
+          cardBg: rq.cardBg,
+          accent: rq.accent,
+          textPrimary: rq.textPrimary,
+          textSecondary: rq.textSecondary,
+          layoutArchetype: 'standard-card',
+          visualMotif: 'editorial-split',
+          swatch: rq.swatch,
+        });
+      }
+    }
+
+    // 3. Keep classic baseline heroes in their respective real categories
+    const baselineKeepers: Array<{ id: SlideThemeId; category: LibraryCategory }> = [
+      { id: 'sand-academic', category: 'academic' },
+      { id: 'oxford-navy', category: 'academic' },
+      { id: 'minimal-slate', category: 'minimal' },
+      { id: 'editorial-warm', category: 'editorial' },
+    ];
+
+    baselineKeepers.forEach(({ id, category }) => {
+      if (!seenIds.has(id) && SLIDE_THEMES[id]) {
+        seenIds.add(id);
+        const t = SLIDE_THEMES[id];
+        list.push({
+          id: t.id,
+          name: t.name,
+          category,
+          tagline: t.tagline,
+          mode: t.mode,
+          canvasBg: t.canvasBg,
+          cardBg: t.cardBg,
+          accent: t.accent,
+          textPrimary: t.textPrimary,
+          textSecondary: t.textSecondary,
+          layoutArchetype: t.layoutArchetype,
+          visualMotif: t.visualMotif,
+          swatch: t.swatch,
         });
       }
     });
@@ -163,7 +167,19 @@ export default function ThemeLibraryGrid({
     return allThemesList.filter((theme) => {
       // Category filter
       if (selectedCategory !== 'all') {
-        if (theme.category !== selectedCategory) return false;
+        if (selectedCategory === 'minimal') {
+          if (
+            theme.id !== 'minimal-slate' &&
+            theme.id !== 'apple-cupertino-minimal' &&
+            theme.id !== 'vercel-clean-monochrome' &&
+            theme.id !== 'linear-modernist-software' &&
+            theme.id !== 'arc-browser-glass'
+          ) {
+            return false;
+          }
+        } else if (theme.category !== selectedCategory) {
+          return false;
+        }
       }
 
       // Mode filter
@@ -251,7 +267,7 @@ export default function ThemeLibraryGrid({
         </div>
       </div>
 
-      {/* Category Pills (Single-Row) */}
+      {/* Category Pills (Single-Row with exact labels and accessible aria-labels) */}
       <div
         className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar"
         role="tablist"
@@ -265,6 +281,7 @@ export default function ThemeLibraryGrid({
               type="button"
               role="tab"
               aria-selected={isActive}
+              aria-label={cat.ariaLabel}
               onClick={() => setSelectedCategory(cat.id)}
               className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                 isActive
@@ -281,7 +298,7 @@ export default function ThemeLibraryGrid({
       {/* Summary Counter */}
       <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 px-1">
         <span>Showing {filteredThemes.length} curated design templates</span>
-        <span className="font-mono text-[11px]">100% Royalty-Free &amp; Public Domain</span>
+        <span className="font-mono text-[11px]">100% Royalty-Free &amp; Public Domain · Zero Copyright</span>
       </div>
 
       {/* Grid of Theme Cards */}

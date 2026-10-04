@@ -82,7 +82,9 @@ describe('Theme Studio Enhancements (Step 02)', () => {
     expect(screen.getByRole('tab', { name: /^Minimal$/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /^Executive$/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /^Editorial$/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /^Vibrant$/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^Apple/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^Scientific/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^Conference/i })).toBeInTheDocument();
 
     // Filter by Academic
     fireEvent.click(screen.getByRole('tab', { name: /^Academic$/i }));

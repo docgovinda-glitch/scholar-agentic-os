@@ -290,6 +290,7 @@ export default function Step02Design({
             type="button"
             role="tab"
             aria-selected={activeTab === 'library'}
+            aria-label="Explore Library"
             onClick={() => setActiveTab('library')}
             data-testid="tab-theme-library"
             className={`px-3.5 py-1.5 rounded-lg font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
@@ -298,8 +299,8 @@ export default function Step02Design({
                 : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
             }`}
           >
-            <Library className="w-3.5 h-3.5" />
-            <span>Explore Library</span>
+            <Library className="w-3.5 h-3.5 text-blue-500" />
+            <span>Explore Library (100 Best Designs)</span>
           </button>
 
           <button
@@ -323,6 +324,35 @@ export default function Step02Design({
       {/* Tab 1: Exactly 4 Handcrafted Aesthetic Cards Grid */}
       {activeTab === 'curated' && (
         <div className="space-y-6">
+          {/* Quick-Jump Discovery Banner to 100 Best Slide Designs */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-purple-50/90 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-purple-950/40 border border-blue-200/80 dark:border-blue-800/40 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs tracking-wider shadow-sm shrink-0">
+                100+
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                  <span>100 Best Slide Designs Library Available</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
+                    100% Royalty Free
+                  </span>
+                </h2>
+                <p className="text-xs text-neutral-600 dark:text-neutral-300 mt-0.5">
+                  Academic (Oxford, MIT, Harvard), McKinsey &amp; BCG, Apple Keynote, Editorial (New Yorker, FT), Scientific (NASA, BioRender) &amp; TED.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('library')}
+              data-testid="jump-to-100-library-btn"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 transition-all shadow-sm shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <span>Browse All 100 Designs</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {CURATED_FOUR_THEMES.map((preset) => {
               const isSelected =
@@ -537,11 +567,91 @@ export default function Step02Design({
 
       {/* Tab 2: Extended Theme Library Grid */}
       {activeTab === 'library' && (
-        <ThemeLibraryGrid
-          deck={deck}
-          selectedThemeId={currentThemeId}
-          onSelectTheme={handleSelectLibraryTheme}
-        />
+        <div className="space-y-6">
+          <ThemeLibraryGrid
+            deck={deck}
+            selectedThemeId={currentThemeId}
+            onSelectTheme={handleSelectLibraryTheme}
+          />
+
+          {/* Accent Color Customizer for Selected Library Theme */}
+          <div
+            className="bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-2xl p-5 shadow-xs space-y-4"
+            data-testid="library-accent-picker"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-neutral-100 dark:border-white/5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200">
+                    Personalize Selected Theme Accent
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  Fine-tune the key highlight color for {activeTheme.name}.
+                </p>
+              </div>
+
+              {/* WCAG AA Compliance Status */}
+              <div className="flex items-center gap-2 shrink-0">
+                <span
+                  className={`px-3 py-1 rounded-full text-[11px] font-mono font-semibold flex items-center gap-1.5 ${
+                    passWcag
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                      : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                  }`}
+                >
+                  <span>{passWcag ? '●' : '▲'}</span>
+                  <span>{passWcag ? 'WCAG AA Pass' : 'Low Contrast'}</span>
+                </span>
+              </div>
+            </div>
+
+            {/* 5 Curated Color Dots + Native Color Wheel */}
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              {CURATED_ACCENT_DOTS.map((dot) => {
+                const isSelected = selectedAccent.toLowerCase() === dot.hex.toLowerCase();
+                return (
+                  <button
+                    key={dot.hex}
+                    type="button"
+                    onClick={() => handleAccentChange(dot.hex)}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer relative ${
+                      isSelected
+                        ? 'ring-3 ring-blue-500 ring-offset-2 dark:ring-offset-[#1C1C1E] scale-105'
+                        : 'hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: dot.hex }}
+                    title={dot.name}
+                    aria-label={dot.name}
+                  >
+                    {isSelected && <Check className="w-4 h-4 text-white drop-shadow" />}
+                  </button>
+                );
+              })}
+
+              <div className="flex items-center gap-2 pl-3 border-l border-neutral-200 dark:border-white/10">
+                <label
+                  htmlFor="custom-accent-color-picker-lib"
+                  className="text-xs text-neutral-500 dark:text-neutral-400 font-medium"
+                >
+                  Custom:
+                </label>
+                <input
+                  id="custom-accent-color-picker-lib"
+                  type="color"
+                  value={selectedAccent}
+                  onChange={(e) => handleAccentChange(e.target.value)}
+                  className="w-8 h-8 rounded-lg cursor-pointer border border-neutral-200 dark:border-white/10 bg-transparent p-0"
+                  title="Pick custom accent color"
+                  aria-label="Custom Accent Color"
+                />
+                <span className="text-xs font-mono text-neutral-600 dark:text-neutral-400">
+                  {selectedAccent.toUpperCase()}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Tab 3: Screenshot Theme Cloner */}
