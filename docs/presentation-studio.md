@@ -101,8 +101,21 @@ Scholar OS **Presentation Studio** is a web-native, academic-grade slide authori
   - **Docked Custom Accent Picker**: Custom color picker with live WCAG AA contrast calculation. Redundant inline `Day / Night` toggle pill purged; theme toggling belongs exclusively to the global Scholar Core sidebar switcher.
 
 - **Tab 2: Explore Library (`ThemeLibraryGrid.tsx`)**:
-  - Category filters (`All`, `Academic`, `Minimal`, `Executive`, `Editorial`, `Vibrant`).
-  - Search filter input with live theme card previews.
+  - **100 Curated Royalty-Free & Public Domain Slide Designs**:
+    - **Academic & Thesis Defense (20)**: Oxford Empirical Monograph, Cambridge Quadrangle, Harvard Law Casebook, MIT Linear Algebra, Sorbonne Scholastic, Max Planck Quantum, etc.
+    - **Executive & McKinsey/BCG Consulting (20)**: McKinsey Pyramid Principle, BCG Growth-Share Matrix, Bain Strategic Horizon, Deloitte Digital Transformation, etc.
+    - **Apple Keynote & High-Growth Tech (20)**: Apple Cupertino Minimal, Space Black Pro, Stripe Developer Velocity, Linear Modernist, Arc Browser Glass, Figma Neo-Canvas, etc.
+    - **Editorial & Publishing Longform (15)**: The New Yorker Monograph, The Economist Briefing, Financial Times Salmon, The Atlantic Longform, Monocle Tokyo Paper, etc.
+    - **Scientific & Data-Dense Infographics (15)**: BioRender Cellular Topology, Genomic Atlas Chromosome, NASA Jet Propulsion Blueprint, Climate Science Flux, etc.
+    - **Conference Showcase & TED Keynotes (10)**: TED Global Horizon, Y Combinator Demo Day Pitch, Davos World Economic Forum, SXSW Interactive Signal, etc.
+  - **Diverse Layout Archetypes**:
+    - `2x2-matrix`: Strategic 4-quadrant positioning cards with accent outlines.
+    - `pillar-cards`: 3-column architecture breakdown cards with distinct header blocks.
+    - `timeline-milestone`: Horizontal sequence track with connected milestone nodes.
+    - `contrast-split`: Friction / Problem vs Breakthrough / Solution comparative split.
+    - `executive-stat`: Oversized bold metric (+84.2%) with context note and trend indicator.
+    - `quote-spotlight`: High-impact editorial quotation block with author/journal attribution.
+  - **Instant Filtering & WCAG AA Verification**: Category pills (`All (100+)`, `Academic`, `Minimal`, `Executive`, `Editorial`, `Vibrant`, `Apple & Tech`, `Scientific`, `Conference`), Day/Night mode filter, and instant search across titles, motifs, and archetypes.
 - **Tab 3: Screenshot Cloner (`ThemeScreenshotCloner.tsx`)**:
   - Drag-and-drop dropzone for slide screenshots, posters, and brand imagery.
   - Client-side HTML5 canvas color extraction (background luminance, card surface, structural typography, accent signal).

@@ -204,11 +204,12 @@ export default function ScholarSidebar({
               <span>AI Access</span>
             </button>
 
-            {/* Active Pill: Presentation Studio */}
+            {/* Active Pill: Scholar Slides (Presentation Studio) */}
             <button
               type="button"
               onClick={() => handleNav('/presentation')}
               aria-label="Presentation Studio"
+              title="Scholar Slides"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group ${
                 activeItem === 'presentation'
                   ? 'bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-bold border-l-2 border-neutral-900 dark:border-white pl-2.5'
@@ -216,7 +217,7 @@ export default function ScholarSidebar({
               }`}
             >
               <Presentation className="h-4 w-4 text-neutral-900 dark:text-white flex-shrink-0" />
-              <span>Presentation Studio</span>
+              <span>Scholar Slides</span>
             </button>
 
             <button

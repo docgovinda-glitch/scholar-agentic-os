@@ -1,3 +1,5 @@
+import { BEST_100_SLIDE_DESIGNS } from '../data/bestSlideDesigns100';
+
 export type SlideThemeId =
   | 'sand-academic'
   | 'minimal-slate'
@@ -25,7 +27,8 @@ export type SlideThemeId =
   | 'blue-flame-brand'
   | 'moon-white-imagery'
   | 'beyond-2027'
-  | 'swiss-editorial';
+  | 'swiss-editorial'
+  | (string & {});
 
 export type ThemeCategory = 'academic' | 'minimal' | 'dark' | 'vibrant';
 export type ThemeSector = 'Work' | 'Finance' | 'Promotion' | 'Academic' | 'Consulting';
@@ -161,7 +164,44 @@ export const isWcagAA = validateWcagAA;
  * Resolves the active slide theme incorporating any custom accents or background motifs.
  */
 export function resolveSlideTheme(themeId?: string, customTheme?: CustomTheme | null): SlideTheme {
-  const base = (themeId && SLIDE_THEMES[themeId as SlideThemeId]) || SLIDE_THEMES['sand-academic'];
+  const found100 = BEST_100_SLIDE_DESIGNS.find((d) => d.id === themeId);
+  const baseFrom100: SlideTheme | undefined = found100
+    ? {
+        id: found100.id,
+        name: found100.name,
+        tagline: found100.tagline,
+        category: (found100.category === 'academic' ? 'academic' : found100.mode === 'dark' ? 'dark' : 'minimal') as any,
+        mode: found100.mode,
+        visualMotif: (found100.visualMotif as VisualMotif) || 'blueprint-grid',
+        layoutArchetype: (found100.layoutArchetype as any) || 'standard-card',
+        headerStamp: `${found100.name.toUpperCase()} // MODULE 01`,
+        swatch: found100.swatch,
+        canvasBg: found100.canvasBg,
+        canvasClass: `text-[${found100.textPrimary}]`,
+        cardBg: found100.cardBg,
+        cardClass: `text-[${found100.textPrimary}] shadow-xl`,
+        cardBorder: `border-[${found100.borderHex}]`,
+        accent: found100.accent,
+        accentBadgeBg: 'bg-neutral-500/10',
+        accentBadgeText: `text-[${found100.accent}] font-semibold`,
+        accentBadgeBorder: 'border-neutral-500/20',
+        metricColor: `text-[${found100.accent}]`,
+        metricBg: 'bg-neutral-500/10',
+        metricBorder: 'border-neutral-500/20',
+        textPrimary: `text-[${found100.textPrimary}]`,
+        textSecondary: `text-[${found100.textSecondary}]`,
+        textMuted: `text-[${found100.textSecondary}]`,
+        fontFamily: found100.fontFamily,
+        bulletColor: `bg-[${found100.accent}]`,
+        quoteBorder: `border-[${found100.accent}]`,
+      }
+    : undefined;
+
+  const base =
+    (themeId && SLIDE_THEMES[themeId as SlideThemeId]) ||
+    baseFrom100 ||
+    SLIDE_THEMES['sand-academic'];
+
   if (!customTheme) return base;
 
   const mode = customTheme.mode || base.mode;

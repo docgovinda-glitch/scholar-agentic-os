@@ -13,6 +13,7 @@ import {
 import SlideMotifGraphic from './SlideMotifGraphic';
 import ThemeScreenshotCloner from './ThemeScreenshotCloner';
 import ThemeLibraryGrid from './ThemeLibraryGrid';
+import type { BestSlideDesign } from '../data/bestSlideDesigns100';
 
 export interface Step02DesignProps {
   deck: SlideDeck;
@@ -157,7 +158,34 @@ export default function Step02Design({
     });
   };
 
-  const handleSelectLibraryTheme = (themeId: SlideThemeId) => {
+  const handleSelectLibraryTheme = (themeId: SlideThemeId, design?: BestSlideDesign) => {
+    if (design) {
+      const ratio = calculateContrastRatio(design.accent, design.cardBg);
+      setSelectedAccent(design.accent);
+      onUpdateDeck({
+        ...deck,
+        themeId: design.id as SlideThemeId,
+        customTheme: {
+          name: design.name,
+          accentColor: design.accent,
+          fontPairing: (design.fontFamily === 'serif' ? 'Newsreader Serif' : 'Inter') as any,
+          surfaceTreatment: 'elevated',
+          contrastRatio: ratio,
+          isValidWcagAA: isWcagAA(ratio),
+          visualMotif: (design.visualMotif as any) || 'blueprint-grid',
+          canvasBg: design.canvasBg,
+          cardBg: design.cardBg,
+          textPrimary: design.textPrimary,
+          textSecondary: design.textSecondary,
+          mode: design.mode,
+          swatch: design.swatch,
+          source: 'preset',
+        },
+        updatedAt: new Date().toISOString(),
+      });
+      return;
+    }
+
     const selected = SLIDE_THEMES[themeId] || SLIDE_THEMES['sand-academic'];
     const ratio = calculateContrastRatio(selected.accent, selected.cardBg);
     setSelectedAccent(selected.accent);

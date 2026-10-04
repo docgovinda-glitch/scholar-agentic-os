@@ -1,24 +1,55 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Check, Sun, Moon, Filter } from 'lucide-react';
+import { Search, Check, Sun, Moon, Sparkles, LayoutGrid } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import {
   SLIDE_THEMES,
-  type SlideTheme,
   type SlideThemeId,
   calculateContrastRatio,
   isWcagAA,
 } from '../types/themes';
+import {
+  BEST_100_SLIDE_DESIGNS,
+  type BestSlideDesign,
+  type DesignLayoutArchetype,
+} from '../data/bestSlideDesigns100';
 import SlideMotifGraphic from './SlideMotifGraphic';
 
-export type LibraryCategory = 'all' | 'academic' | 'minimal' | 'executive' | 'editorial' | 'vibrant';
+export type LibraryCategory =
+  | 'all'
+  | 'academic'
+  | 'minimal'
+  | 'executive'
+  | 'editorial'
+  | 'vibrant'
+  | 'apple-keynote'
+  | 'scientific'
+  | 'conference';
 
 export interface ThemeLibraryGridProps {
   deck: SlideDeck;
-  onSelectTheme: (themeId: SlideThemeId) => void;
+  onSelectTheme: (themeId: SlideThemeId, design?: BestSlideDesign) => void;
   selectedThemeId?: SlideThemeId;
 }
 
-const CATEGORY_MAP: Record<SlideThemeId, 'academic' | 'minimal' | 'executive' | 'editorial' | 'vibrant'> = {
+interface UnifiedThemeItem {
+  id: string;
+  name: string;
+  category: LibraryCategory;
+  tagline: string;
+  mode: 'light' | 'dark';
+  canvasBg: string;
+  cardBg: string;
+  accent: string;
+  textPrimary: string;
+  textSecondary: string;
+  layoutArchetype?: DesignLayoutArchetype | string;
+  visualMotif: string;
+  swatch: [string, string, string];
+  fontPairing?: string;
+  bestDesign?: BestSlideDesign;
+}
+
+const CATEGORY_MAP: Record<string, LibraryCategory> = {
   'sand-academic': 'academic',
   'oxford-navy': 'academic',
   'parchment-ink': 'academic',
@@ -55,6 +86,9 @@ const CATEGORIES: Array<{ id: LibraryCategory; label: string }> = [
   { id: 'executive', label: 'Executive' },
   { id: 'editorial', label: 'Editorial' },
   { id: 'vibrant', label: 'Vibrant' },
+  { id: 'apple-keynote', label: 'Apple & Tech' },
+  { id: 'scientific', label: 'Scientific' },
+  { id: 'conference', label: 'Conference' },
 ];
 
 export default function ThemeLibraryGrid({
@@ -73,16 +107,63 @@ export default function ThemeLibraryGrid({
       ? deck.title
       : 'Why Zappos Pays New Hires $2,000 to Quit');
 
-  const allThemesList = useMemo(() => {
-    return Object.values(SLIDE_THEMES);
+  // Build unified list of themes combining SLIDE_THEMES and the 100 Best Slide Designs
+  const allThemesList = useMemo<UnifiedThemeItem[]>(() => {
+    const list: UnifiedThemeItem[] = [];
+    const seenIds = new Set<string>();
+
+    // 1. Classic Curated Presets
+    Object.values(SLIDE_THEMES).forEach((t) => {
+      seenIds.add(t.id);
+      list.push({
+        id: t.id,
+        name: t.name,
+        category: CATEGORY_MAP[t.id] || (t.category as LibraryCategory) || 'academic',
+        tagline: t.tagline,
+        mode: t.mode,
+        canvasBg: t.canvasBg,
+        cardBg: t.cardBg,
+        accent: t.accent,
+        textPrimary: t.textPrimary,
+        textSecondary: t.textSecondary,
+        layoutArchetype: t.layoutArchetype,
+        visualMotif: t.visualMotif,
+        swatch: t.swatch,
+      });
+    });
+
+    // 2. 100 Best Royalty-Free Slide Designs
+    BEST_100_SLIDE_DESIGNS.forEach((d) => {
+      if (!seenIds.has(d.id)) {
+        seenIds.add(d.id);
+        list.push({
+          id: d.id,
+          name: d.name,
+          category: d.category,
+          tagline: d.tagline,
+          mode: d.mode,
+          canvasBg: d.canvasBg,
+          cardBg: d.cardBg,
+          accent: d.accent,
+          textPrimary: d.textPrimary,
+          textSecondary: d.textSecondary,
+          layoutArchetype: d.layoutArchetype,
+          visualMotif: d.visualMotif,
+          swatch: d.swatch,
+          fontPairing: d.fontPairing,
+          bestDesign: d,
+        });
+      }
+    });
+
+    return list;
   }, []);
 
   const filteredThemes = useMemo(() => {
     return allThemesList.filter((theme) => {
       // Category filter
       if (selectedCategory !== 'all') {
-        const themeCat = CATEGORY_MAP[theme.id] || theme.category;
-        if (themeCat !== selectedCategory) return false;
+        if (theme.category !== selectedCategory) return false;
       }
 
       // Mode filter
@@ -96,8 +177,17 @@ export default function ThemeLibraryGrid({
         const matchesName = theme.name.toLowerCase().includes(q);
         const matchesTagline = theme.tagline.toLowerCase().includes(q);
         const matchesMotif = theme.visualMotif.toLowerCase().includes(q);
-        const matchesCategory = (CATEGORY_MAP[theme.id] || theme.category).toLowerCase().includes(q);
-        return matchesName || matchesTagline || matchesMotif || matchesCategory;
+        const matchesCategory = theme.category.toLowerCase().includes(q);
+        const matchesArchetype = (theme.layoutArchetype || '').toLowerCase().includes(q);
+        const matchesFont = (theme.fontPairing || '').toLowerCase().includes(q);
+        return (
+          matchesName ||
+          matchesTagline ||
+          matchesMotif ||
+          matchesCategory ||
+          matchesArchetype ||
+          matchesFont
+        );
       }
 
       return true;
@@ -115,7 +205,7 @@ export default function ThemeLibraryGrid({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search themes by name, style, or motif..."
+            placeholder="Search themes (100+ styles, layouts, matrices, timelines)..."
             aria-label="Search themes"
             className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:border-blue-500 transition-colors shadow-2xs"
           />
@@ -188,6 +278,12 @@ export default function ThemeLibraryGrid({
         })}
       </div>
 
+      {/* Summary Counter */}
+      <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 px-1">
+        <span>Showing {filteredThemes.length} curated design templates</span>
+        <span className="font-mono text-[11px]">100% Royalty-Free &amp; Public Domain</span>
+      </div>
+
       {/* Grid of Theme Cards */}
       {filteredThemes.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/80 dark:border-white/10 p-6 space-y-2">
@@ -202,7 +298,6 @@ export default function ThemeLibraryGrid({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredThemes.map((theme) => {
             const isSelected = selectedThemeId === theme.id;
-            const categoryLabel = CATEGORY_MAP[theme.id] || theme.category;
             const ratio = calculateContrastRatio(theme.accent, theme.cardBg);
             const passWcag = isWcagAA(ratio);
 
@@ -210,7 +305,7 @@ export default function ThemeLibraryGrid({
               <button
                 key={theme.id}
                 type="button"
-                onClick={() => onSelectTheme(theme.id)}
+                onClick={() => onSelectTheme(theme.id as SlideThemeId, theme.bestDesign)}
                 className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative group flex flex-col justify-between space-y-3 ${
                   isSelected
                     ? 'border-blue-600 ring-2 ring-blue-500/20 shadow-md bg-white dark:bg-[#1C1C1E]'
@@ -218,9 +313,9 @@ export default function ThemeLibraryGrid({
                 }`}
                 data-testid={`library-theme-card-${theme.id}`}
               >
-                {/* Header: Title, Category & Selection Checkmark */}
+                {/* Header: Title, Category, Layout Tag & Selection Checkmark */}
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-sm font-bold text-neutral-900 dark:text-white truncate">
                         {theme.name}
@@ -234,10 +329,15 @@ export default function ThemeLibraryGrid({
                       >
                         {theme.mode}
                       </span>
+                      {theme.layoutArchetype && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 uppercase font-semibold shrink-0">
+                          {theme.layoutArchetype.replace('-', ' ')}
+                        </span>
+                      )}
                     </div>
-                    <span className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 capitalize block mt-0.5">
-                      {categoryLabel} · {theme.visualMotif}
-                    </span>
+                    <p className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 line-clamp-1 mt-0.5">
+                      {theme.tagline}
+                    </p>
                   </div>
 
                   <div
@@ -261,10 +361,10 @@ export default function ThemeLibraryGrid({
                   }}
                 >
                   <SlideMotifGraphic
-                    motif={theme.visualMotif}
-                    theme={theme}
+                    motif={theme.visualMotif as any}
+                    theme={theme as any}
                     isMini={true}
-                    className="opacity-30"
+                    className="opacity-25"
                   />
 
                   {/* Top Bar with Badge & Color Dots */}
@@ -276,7 +376,7 @@ export default function ThemeLibraryGrid({
                         color: theme.accent,
                       }}
                     >
-                      SLIDE 01
+                      {theme.layoutArchetype ? theme.layoutArchetype.toUpperCase() : 'SLIDE 01'}
                     </span>
                     <div className="flex items-center gap-1">
                       <span
@@ -297,18 +397,114 @@ export default function ThemeLibraryGrid({
                     </div>
                   </div>
 
-                  {/* Main Headline */}
-                  <div className="my-auto space-y-1 pr-1 relative z-10">
-                    <div className="text-xs font-bold leading-tight line-clamp-2">
-                      {headlinePreviewText}
-                    </div>
-                    <div className="flex items-center gap-1 opacity-70">
-                      <span
-                        className="w-1.5 h-1.5 rounded-full shrink-0"
-                        style={{ backgroundColor: theme.accent }}
-                      />
-                      <span className="text-[9px] font-medium">Curated typographic balance</span>
-                    </div>
+                  {/* Archetype-Specific Visual Graphic in Center */}
+                  <div className="my-auto relative z-10">
+                    {theme.layoutArchetype === '2x2-matrix' ? (
+                      <div className="grid grid-cols-2 gap-1 my-0.5">
+                        <div
+                          className="p-1 rounded text-[7px] font-mono border"
+                          style={{ borderColor: `${theme.accent}40`, backgroundColor: `${theme.accent}08` }}
+                        >
+                          <span className="font-bold">I. High Impact</span>
+                        </div>
+                        <div className="p-1 rounded text-[7px] font-mono border border-black/10 dark:border-white/10 opacity-70">
+                          <span>II. Quick Wins</span>
+                        </div>
+                        <div className="p-1 rounded text-[7px] font-mono border border-black/10 dark:border-white/10 opacity-70">
+                          <span>III. Deprioritize</span>
+                        </div>
+                        <div className="p-1 rounded text-[7px] font-mono border border-black/10 dark:border-white/10 opacity-70">
+                          <span>IV. Strategic Bet</span>
+                        </div>
+                      </div>
+                    ) : theme.layoutArchetype === 'pillar-cards' ? (
+                      <div className="grid grid-cols-3 gap-1 my-0.5">
+                        <div
+                          className="p-1 rounded text-[7px] border-t-2"
+                          style={{ borderColor: theme.accent, backgroundColor: `${theme.accent}08` }}
+                        >
+                          <span className="font-bold block">Pillar 01</span>
+                          <span className="text-[6px] opacity-60">Architecture</span>
+                        </div>
+                        <div className="p-1 rounded text-[7px] border-t-2 border-neutral-400/30 bg-black/5 dark:bg-white/5">
+                          <span className="font-bold block">Pillar 02</span>
+                          <span className="text-[6px] opacity-60">Execution</span>
+                        </div>
+                        <div className="p-1 rounded text-[7px] border-t-2 border-neutral-400/30 bg-black/5 dark:bg-white/5">
+                          <span className="font-bold block">Pillar 03</span>
+                          <span className="text-[6px] opacity-60">Scale</span>
+                        </div>
+                      </div>
+                    ) : theme.layoutArchetype === 'timeline-milestone' ? (
+                      <div className="space-y-1 my-0.5">
+                        <div className="flex items-center justify-between text-[7px] font-mono">
+                          <span style={{ color: theme.accent }} className="font-bold">
+                            Q1: Alpha
+                          </span>
+                          <span className="opacity-70">Q2: Beta</span>
+                          <span className="opacity-70">Q3: Launch</span>
+                        </div>
+                        <div className="w-full h-1 bg-black/10 dark:bg-white/10 rounded-full flex items-center justify-between px-1">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: theme.accent }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
+                        </div>
+                      </div>
+                    ) : theme.layoutArchetype === 'executive-stat' ? (
+                      <div className="flex items-baseline gap-2 my-0.5">
+                        <span
+                          className="text-lg font-black tracking-tight"
+                          style={{ color: theme.accent }}
+                        >
+                          +84.2%
+                        </span>
+                        <div className="text-[8px] leading-tight opacity-80">
+                          <span className="font-bold block">Core Retention</span>
+                          <span className="text-[7px]">Verified Trial</span>
+                        </div>
+                      </div>
+                    ) : theme.layoutArchetype === 'contrast-split' ? (
+                      <div className="grid grid-cols-2 gap-1 my-0.5">
+                        <div className="p-1 rounded text-[7px] bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                          <span className="font-bold block">Friction / Legacy</span>
+                          <span className="text-[6px]">High latency</span>
+                        </div>
+                        <div
+                          className="p-1 rounded text-[7px] border"
+                          style={{ borderColor: `${theme.accent}40`, backgroundColor: `${theme.accent}12` }}
+                        >
+                          <span className="font-bold block" style={{ color: theme.accent }}>
+                            Breakthrough
+                          </span>
+                          <span className="text-[6px] opacity-80">Autonomous flow</span>
+                        </div>
+                      </div>
+                    ) : theme.layoutArchetype === 'quote-spotlight' ? (
+                      <div
+                        className="border-l-2 pl-2 my-0.5 space-y-0.5"
+                        style={{ borderColor: theme.accent }}
+                      >
+                        <p className="text-[9px] italic line-clamp-1 leading-tight">
+                          &ldquo;Rigorous architecture grounds all high-velocity decisions.&rdquo;
+                        </p>
+                        <span className="text-[7px] font-mono opacity-60 block">
+                          — Empirical Faculty Journal
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="space-y-1 pr-1">
+                        <div className="text-xs font-bold leading-tight line-clamp-2">
+                          {headlinePreviewText}
+                        </div>
+                        <div className="flex items-center gap-1 opacity-70">
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ backgroundColor: theme.accent }}
+                          />
+                          <span className="text-[9px] font-medium">Curated typographic balance</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Footer Stamp */}

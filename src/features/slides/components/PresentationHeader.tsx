@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowLeft, Sparkles, PanelLeftOpen } from 'lucide-react';
 import type { PresentationStudioStep } from '../types/slides';
+import ScholarCoreLogo from '../../../components/ScholarCoreLogo';
 
 export interface StepItem {
   id: PresentationStudioStep;
@@ -89,36 +90,44 @@ export default function PresentationHeader({
 
         <div className="h-4 w-px bg-neutral-200 dark:bg-white/10 shrink-0" />
 
-        {/* Studio Badge & Inline Title */}
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
-              PRESENTATION STUDIO ·
-            </span>
-            <span
-              className={`text-xs flex items-center gap-1.5 whitespace-nowrap ${
-                autosaveStatus === 'saving'
-                  ? 'text-amber-500'
-                  : 'text-neutral-500 dark:text-neutral-400'
-              }`}
-              data-testid="autosave-status"
-            >
-              <span className={autosaveStatus === 'saving' ? 'text-amber-500' : 'text-emerald-500'}>
-                {autosaveStatus === 'saving' ? '◌' : '●'}
-              </span>
-              <span>{autosaveStatus === 'saving' ? 'Saving changes...' : 'Saved'}</span>
-              {lastSavedTime && <span className="opacity-70">({lastSavedTime})</span>}
-            </span>
+        {/* Scholar Core Logo & Module Identity */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-6 h-6 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center flex-shrink-0 shadow-xs">
+            <ScholarCoreLogo size="sm" className="text-white dark:text-neutral-900" />
           </div>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => onTitleChange(e.target.value)}
-              aria-label="Presentation Title"
-              className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-neutral-700 focus:border-neutral-900 dark:focus:border-white focus:outline-none transition-colors max-w-xs sm:max-w-md truncate"
-              placeholder="MN6094NI Developing Breakthrough Leadership"
-            />
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200 whitespace-nowrap">
+                SCHOLAR SLIDES ·
+              </span>
+              <span className="sr-only">Presentation Studio</span>
+              <span
+                className={`text-xs flex items-center gap-1.5 whitespace-nowrap ${
+                  autosaveStatus === 'saving'
+                    ? 'text-amber-500'
+                    : 'text-neutral-500 dark:text-neutral-400'
+                }`}
+                data-testid="autosave-status"
+              >
+                <span className={autosaveStatus === 'saving' ? 'text-amber-500' : 'text-emerald-500'}>
+                  {autosaveStatus === 'saving' ? '◌' : '●'}
+                </span>
+                <span>{autosaveStatus === 'saving' ? 'Saving changes...' : 'Saved'}</span>
+                {lastSavedTime && <span className="opacity-70">({lastSavedTime})</span>}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => onTitleChange(e.target.value)}
+                aria-label="Presentation Title"
+                className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-neutral-700 focus:border-neutral-900 dark:focus:border-white focus:outline-none transition-colors max-w-xs sm:max-w-md truncate"
+                placeholder="MN6094NI Developing Breakthrough Leadership"
+              />
+            </div>
           </div>
         </div>
       </div>
