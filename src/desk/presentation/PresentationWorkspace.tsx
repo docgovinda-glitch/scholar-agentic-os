@@ -334,9 +334,9 @@ export default function PresentationWorkspace({
           })}
         </nav>
 
-        {/* Action Buttons: Relocated Present Fullscreen exclusively to Step 04 */}
+        {/* Action Buttons: Relocated presentation controls exclusively to Step 04 */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Present Fullscreen Button: Only visible in Step 04 ("04 Present") */}
+          {/* Start Presentation Button: Only visible in Step 04 ("04 Present") */}
           {currentStep === 'delivery' && (
             <button
               type="button"

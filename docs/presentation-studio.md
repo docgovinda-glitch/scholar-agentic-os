@@ -1,87 +1,152 @@
-# Scholar OS Presentation Studio Specification
+# Scholar OS Presentation Studio Specification & Architecture
 
-## 1. Overview & Architecture
+## 1. Overview & Architectural Principles
 
-Scholar OS **Presentation Studio** is a web-native, academic-grade slide authoring and delivery suite. It aligns with the design system and intuitive UX of Scholar OS Coursework and Essay drafting environments, purging academic jargon, developer database leakages, and feature bloat.
+Scholar OS **Presentation Studio** is a web-native, academic-grade slide authoring and presentation delivery suite. It adheres strictly to the Apple/Airbnb design system and matches the UX of Scholar OS Coursework and Essay drafting environments, completely eliminating developer jargon, database leakage, orphaned elements, and UI bloat.
 
 ```
 01 Understand ──▶ 02 Design ──▶ 03 Edit Slides ──▶ 04 Present
 ```
 
 ### Core Design Pillars
-1. **Coursework & Essay UX Alignment**: Replaces confusing jargon (*"Scaffolding"*, *"Decomposition"*, *"5-Beat Narrative"*) with clean English (*"Understand"*, *"Topic"*, *"Key Points"*).
-2. **Subtle & Private Auto-Save**: Replaces developer database strings (`"Saved to PostgreSQL"`) with a quiet, non-intrusive status indicator (`"All changes saved"` or `"Saving changes..."`) with a clean green/amber status dot.
-3. **Four Curated Design Themes & Custom Accent**: Replaces 20+ filter chips and AI cloners with 4 aesthetic presets (`Sand Academic`, `Minimal Clean`, `Editorial Warm`, `Deep Midnight`) plus an accessible custom accent color picker with live WCAG AA contrast calculation.
-4. **Native Image Upload & Split-Media Layouts**: First-class support for `Split Image + Text` (`image-split`) and hero layouts with drag-and-drop file upload (`.png`, `.jpg`, `.webp`), URL input, responsive `16:9`/`4:3` aspect ratios, and editable captions.
-5. **Human, Natural Slide Titles**: Concise headline generation (max 8–10 words) stating immediate conclusions rather than AI word salads.
-6. **Purged Feature Bloat**: Completely removed unnecessary extras such as `Defense Tools` dropdowns, 22 filter chips, and AI theme cloners.
+1. **Coursework & Essay UX Alignment**: Replaces confusing jargon (*"Scaffolding"*, *"Decomposition"*, *"5-Beat Narrative"*) with plain English (*"Understand"*, *"Topic"*, *"Key Points"*).
+2. **Subtle & Private Auto-Save**: Replaces developer database strings (`"Saved to PostgreSQL"`) with a quiet, non-intrusive status indicator (`● Saved` or `◌ Saving changes...`) with green/amber status dot and timestamp.
+3. **Collapsible Right-Side "Ask Scholar" Copilot**: Matches the Coursework `Advisor.tsx` layout architecture. Renders inside an anchored `<aside>` container with avatar, subtitle `"Slide & Outline Advisor"`, 4 quick action chips, scrollable chat thread, and firmly anchored bottom dock input pill (zero orphaned floating inputs).
+4. **Header Navigation Hygiene**: Completely purges the premature `Present Fullscreen` pill from Steps 01, 02, and 03. Presentation controls are relocated exclusively to Step 04 ("04 Present") where `"Start Presentation (F)"` triggers the native browser Fullscreen API and Live Slide Player.
+5. **Zero-Ghost Outlines & 1-to-1 Scope Binding**: Before a user enters a topic or uploads a brief, a clean dashed empty-state prompt appears. Once generated, the 5 points from the Green Scope Box map directly 1-to-1 into the 5 slide outline cards.
+6. **Zero "Key Analytical Synthesis" Anti-Pattern**: All generic placeholders and repetitive titles are eradicated across the codebase.
+7. **Apple-Grade 3-Tab Theme Studio**: Top segmented switcher (`[ Curated Styles (4) ]` | `[ Explore Library ]` | `[ 📸 Screenshot Cloner ]`) with 4 handcrafted aesthetic heroes, searchable theme library, and client-side screenshot palette extraction.
+8. **Presentation Style Writing Tone & Narrative Architecture**: `Presentation Style` dropdown actively controls writing tone, bullet constraints (`strict-6x6`, `conversational-brief`, `data-led`), and layout distribution.
 
 ---
 
-## 2. The 4-Step Guided Workflow
+## 2. Layout & Workspace Architecture
+
+`src/desk/presentation/PresentationWorkspace.tsx` implements the root viewport grid:
+
+```tsx
+<div className="flex h-screen w-full flex-col overflow-hidden bg-[#F7F5F0] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 font-sans">
+  {/* Global Header (Height: 56px / h-14) */}
+  <header className="h-14 border-b border-neutral-200/80 dark:border-white/10 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between gap-4 shrink-0 z-30">
+    {/* Left: Back button, Category Tag, Autosave Indicator, Editable Title */}
+    {/* Center: 4-Step Stepper Navigation */}
+    {/* Right: Step 04 Presentation Controls & Ask Scholar Toggle */}
+  </header>
+
+  {/* Main Workspace Body */}
+  <div className="flex flex-1 overflow-hidden relative">
+    {/* Center Canvas Viewport */}
+    <main className="flex-1 overflow-y-auto px-6 py-8 transition-all duration-300">
+      {currentStep === 'understand' && <Step01Understand />}
+      {currentStep === 'design' && <Step02Design />}
+      {currentStep === 'studio' && <Step03StudioCanvas />}
+      {currentStep === 'delivery' && <Step04Delivery />}
+    </main>
+
+    {/* Right-Side Collapsible Drawer */}
+    {isAskScholarOpen && (
+      <aside className="w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] flex flex-col h-full shadow-lg z-20 transition-all duration-300">
+        <AskScholarPresentationDrawer onClose={() => setIsAskScholarOpen(false)} />
+      </aside>
+    )}
+  </div>
+</div>
+```
+
+---
+
+## 3. The 4-Step Guided Workflow
 
 ### Step 01: Understand Your Presentation (`Step01Understand.tsx`)
-- **Intake Modes**:
-  - **📁 Upload Brief or Paper (.pdf, .docx, .txt, .md)**: Drag-and-drop document upload (up to 50MB) with automatic word count detection, excerpt preview, auto-detected title, and slide generation.
-  - **🎯 Presentation Topic or Question**: Generates clean slide outlines from natural topic inputs (e.g., *"Why Zappos Pays New Hires to Quit"*, *"Quantum Computing & Cryptographic Verification"*).
-  - **📄 Raw Notes / Draft Markdown**: Ingests draft sections and bullet points.
-- **Presentation Style Selector**:
-  - `Standard Story` (Context → Problem → Evidence → Solution → Takeaway)
-  - `Problem & Solution` (Executive briefing & immediate resolution)
-  - `Comparison` (Side-by-side analysis & evaluation)
-- **Outline Preview Cards**:
-  - Displays slide cards with natural takeaways and 1-idea-per-slide clarity, avoiding repetitive *"Key Insight 1: Grounded Analysis..."* boilerplate.
+- **Intake Controls**:
+  - **Slide Count**: Configurable slide deck length (3–15 slides, default 5).
+  - **Presentation Style**: Controls writing tone and narrative mechanics:
+    - `Standard Narrative` (Scholarly, linear, thesis-driven; strict 6x6 bullet rule).
+    - `Problem & Solution (SCR)` (Direct, problem-focused, actionable; 2-column contrast friction).
+    - `Case Study Analysis` (Empirical, investigative; grounded in organizational evidence).
+    - `Executive Pitch` (Concise, high ROI emphasis, big metric callouts).
+  - **Audience Level**: `Academic Seminar`, `Executive Board`, `General Public`, `Student Workshop`.
+- **Zero-Ghost Empty State**:
+  - When no topic or brief is loaded, renders a clean dashed prompt box (`"Ready to outline your presentation. Enter a topic or upload your assignment brief above to generate your slides."`) with zero fake cards.
+- **Side-by-Side Scope Analysis Boxes**:
+  - **Green Box (`What This Presentation Covers`)**: 5 key analytical points with count pill (`5 Key Points · Editable`), editable items, and `+ Add Key Point`.
+  - **Yellow Box (`What to Avoid (Out of Scope)`)**: 4 guardrail rules (`4 Rules · Editable`), editable items, and `+ Add Rule`.
+- **1-to-1 Outline Binding & Badge Stacking Fix (`SlideOutlinePillCard.tsx`)**:
+  - Directly binds the 5 covered points into distinct, question-grounded slide cards:
+    - **Slide 1**: `SLIDE 1` | `Key Points` — *"Why Zappos Pays New Hires $2,000 to Quit"* (Analyzes how financial exit bonuses filter for genuine cultural alignment).
+    - **Slide 2**: `SLIDE 2` | `Framework` — *"Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions"* (Deconstructs workplace culture across symbols, declared philosophies, and unconscious beliefs).
+    - **Slide 3**: `SLIDE 3` | `2-Column Comparison` — *"The Limits of Artifacts: Why Changing Perks Fails to Shift Culture"* (Evaluates why cosmetic changes produce superficial compliance).
+    - **Slide 4**: `SLIDE 4` | `Key Points` — *"Leadership Intervention: Targeting Values and Habits to Shift Assumptions"* (Assesses which cultural tier leaders must engage first).
+    - **Slide 5**: `SLIDE 5` | `Key Points` — *"Assessing Organizational Culture in Candidate Job Interviews"* (Diagnostic framework for observing artifacts and probing unwritten rules).
+  - **Badge Wrapping Fix**: Uses `inline-flex items-center justify-center whitespace-nowrap shrink-0` on `SLIDE {N}`, preventing wrapping on cards like `SLIDE 3`.
 
-### Step 02: Design Themes & Visual Direction (`Step02ThemeTemplate.tsx`)
-- **4 Curated Academic Presets**:
-  1. **Sand Academic** (`#F7F5F0` light canvas, `#FFFFFF` crisp card, slate text, `#2563EB` royal blue accent).
-  2. **Minimal Clean** (`#FFFFFF` background, `#FAFAFA` elevated card, sharp dark gray typography `#1E293B`, subtle hairline borders).
-  3. **Editorial Warm** (`#FAF8F5` canvas, `#FFFDF9` cream card, rich charcoal text `#292524`, `#C2410C` warm terracotta accent).
-  4. **Deep Midnight** (`#171717` dark canvas, `#1C1C1E` elevated card, light gray text `#F8FAFC`, `#38BDF8` sky blue accent).
-- **Custom Accent Picker**:
-  - Preset color swatches (Royal Blue, Terracotta, Emerald, Violet, Sky Blue, Tomato Red, Solid Black).
-  - Native HTML5 color picker.
-  - Real-time **WCAG AA contrast calculation** badge (`≥ 4.5:1` ratio against cards).
+### Step 02: Choose Presentation Design (`Step02Design.tsx`)
+- **Apple-Style Top Segmented Switcher**:
+  - `[ Curated Styles (4) ]` | `[ Explore Library ]` | `[ 📸 Screenshot Cloner ]`.
+- **Tab 1: Curated Styles (4)**:
+  1. **Sand Academic**: Canvas `#F7F5F0`, Card `#FFFFFF`, Slate text `#0F172A`, Royal blue accent `#2563EB`.
+  2. **Minimal Clean**: Canvas `#F8FAFC`, Card `#FFFFFF`, Dark text `#1E293B`, Slate charcoal accent `#0F172A`.
+  3. **Editorial Warm**: Canvas `#FAF8F5`, Card `#FFFDF9`, Charcoal text `#292524`, Terracotta accent `#C2410C`.
+  4. **Deep Midnight**: Canvas `#171717`, Card `#1C1C1E`, Light text `#F8FAFC`, Sky blue accent `#60A5FA`.
+  - **Live Dynamic Cards**: Renders actual Slide 1 action title instead of static mock strings.
+  - **Docked Floating Customizer**: `Day` / `Night` toggle and custom color picker with live WCAG AA contrast calculation.
+- **Tab 2: Explore Library (`ThemeLibraryGrid.tsx`)**:
+  - Category filters (`All`, `Academic`, `Minimal`, `Executive`, `Editorial`, `Vibrant`).
+  - Search filter input with live theme card previews.
+- **Tab 3: Screenshot Cloner (`ThemeScreenshotCloner.tsx`)**:
+  - Drag-and-drop dropzone for slide screenshots, posters, and brand imagery.
+  - Client-side HTML5 canvas color extraction (background luminance, card surface, structural typography, accent signal).
+  - Real-time swatch inspection and instant live preview with `"Apply Cloned Theme"`.
 
 ### Step 03: Edit Slides (`Step03StudioCanvas.tsx`)
 - **100% WYSIWYG Editable Card Canvas**:
-  - Click-to-edit Action Headlines at 30–40pt typographic scale.
+  - Click-to-edit Action Headlines (max 8–10 words).
   - Click-to-edit Category Badges.
-  - 6x6 Bullet Constraint: Inline items with live word-count alert badges (`⚠️ >6 words`).
-  - Big Metric Focus: Editable metric stat and empirical context note.
+  - 6x6 Bullet Constraint: Inline items with live word-count warning badges (`⚠️ >6 words`).
+  - Big Metric Focus: Editable metric stat (48–72pt) and empirical context note.
   - 2-Column Comparison: Side-by-side editable headers and bullet arrays.
-  - Quote / Highlight: Editable quote text and attribution.
-- **Split Image + Text Layout (`image-split`)**:
-  - Left: 50% responsive image container with `16:9` / `4:3` aspect ratio, rounded corners, hairline borders, and hover replace/remove controls.
-  - Right: Key bullet points with real-time word counting.
-  - Local image upload (`.png`, `.jpg`, `.webp`), image URL input, and editable figure caption.
+  - Split Image + Text (`image-split`): 50% image dropzone/uploader + 50% action title and bullets.
 - **In-Slide AI Prompt Copilot**:
-  - Clean input bar with one-click quick actions (*"Add an image to this slide"*, *"Change to 2 columns"*, *"Focus on big metric"*, *"Shorten bullets"*).
+  - One-click quick actions (*"Add an image to this slide"*, *"Change to 2 columns"*, *"Focus on big metric"*, *"Shorten bullets"*).
 - **Speaker Rehearsal Notes Drawer**:
   - Expandable bottom drawer for word-for-word delivery cues and timing reminders.
 
-### Step 04: Present (`Step04Delivery.tsx`)
-- **Presentation Engine**: Fullscreen slide projection with keyboard shortcut traversal.
-- **Rehearsal Timer**: Integrated elapsed timer in `MM:SS` with pause and reset controls.
-- **Speaker Delivery Script**: Word-for-word speech cues and target durations.
-- **Dual Consumption Modes**:
-  - **Stage View**: Minimal visual soundtrack designed for live speaking.
-  - **Leave-Behind View**: Displays methodology notes, citations, and research provenance.
+### Step 04: Present & Deliver (`Step04Delivery.tsx`)
+- **Fullscreen Live Player Mode**:
+  - `"Start Presentation (F)"` button triggers browser Fullscreen API and mounts `LiveSlidePlayer.tsx`.
+  - Global presentation controls exclusively mounted in Step 04 header and canvas.
+- **Rehearsal Timer**:
+  - Integrated elapsed timer in `MM:SS` with pause and reset controls.
+- **Dual Presentation Views**:
+  - **Stage View**: Clean visual presentation designed for audience projection.
+  - **Leave-Behind View**: Exposes methodology notes, research provenance, and citations.
 - **Export Formats**:
-  - JSON deck export.
+  - Native JSON slide deck export.
   - Marp-compatible Markdown export.
 
 ---
 
-## 3. Natural Slide Headline Generator (`slideTitleGenerator.ts`)
+## 4. Ask Scholar Presentation Drawer (`AskScholarPresentationDrawer.tsx`)
 
-Replaces run-on academic jargon with punchy, human titles (max 8–10 words):
-- *"Autonomous Knowledge Grounding in Multi-Agent Scientific Synthesis Solves Fundamental"* ➔ **"How Multi-Agent Systems Verify Scientific Papers"**
-- Repetitive *"Key Insight 1: Grounded Analysis of MN6094NI"* ➔ **"Why Zappos Pays New Hires to Quit"**
+A dedicated slide copilot drawer matching Coursework `Advisor.tsx`:
+- **Header**:
+  - Avatar with ScholarCoreLogo.
+  - Title: **"Ask Scholar"**.
+  - Subtitle: `"Slide & Outline Advisor"`.
+  - Close button: `✕`.
+- **4 Quick Action Chips**:
+  - `"Improve action headlines"`: Rewrites passive slide titles into conclusive, punchy claims.
+  - `"Audit 6x6 bullet rules"`: Audits all slides against the 6-bullet / 6-words-per-bullet rule with violation reports.
+  - `"Check visual pacing"`: Assesses balance between bullet lists and visual/metric callouts across deck length.
+  - `"Suggest image ideas"`: Suggests relevant visual concepts and diagrams for the active slide.
+- **Scrollable Chat Thread**:
+  - Instant scholarly advice and recommendation cards.
+- **Firmly Anchored Bottom Input Dock**:
+  - Docked input pill with submit icon firmly anchored to drawer bottom (`shrink-0`). Never detaches or floats across header.
 
 ---
 
-## 4. Keyboard Shortcuts Reference
+## 5. Keyboard Shortcuts Reference
 
 | Key Combination | Action | Scope |
 | :--- | :--- | :--- |
@@ -89,4 +154,21 @@ Replaces run-on academic jargon with punchy, human titles (max 8–10 words):
 | `ArrowLeft` / `PageUp` | Return to previous slide | Disabled when editing text |
 | `Home` | Jump to first slide | Disabled when editing text |
 | `End` | Jump to last slide | Disabled when editing text |
-| `KeyF` / `f` | Toggle Fullscreen Mode | Global |
+| `KeyF` / `f` | Toggle Fullscreen Mode | Global / Step 04 |
+| `p` / `P` | Toggle Presenter Notes View | Live Slide Player |
+| `Escape` | Exit Fullscreen / Close Player | Global |
+
+---
+
+## 6. Verification & Automated Quality Gates
+
+The Presentation Studio is protected by automated regression suites:
+- **`scripts/verify-scholar-presentation-mega.mjs`**: Validates 8 core architectural gates:
+  1. Zero `"Key Analytical Synthesis"` occurrences across repository.
+  2. Ask Scholar drawer layout, subtitle, ✕ close button, and firmly anchored bottom dock.
+  3. Header cleanup: zero premature fullscreen pills in Steps 01–03; exclusive Step 04 mounting.
+  4. Step 02 Theme Studio visibility and 3-tab segmented control.
+  5. Step 01 Scope 1-to-1 outline binding and `SLIDE {N}` `whitespace-nowrap` badge fix.
+  6. Presentation Style writing tone and narrative scaffolding binding.
+  7. Vitest test suite (22 test files, 110 tests passing).
+  8. TypeScript (`tsc --noEmit`) and ESLint with 0 errors and 0 warnings.
