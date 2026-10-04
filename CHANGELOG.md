@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-04
 
-### Presentation Studio Mega-Overhaul: Layout Repair, Ask Scholar Drawer, Scope-to-Outline Binding & Apple/Airbnb Design Restoration
+### Scholar Core Sidebar Integration, Header Back Button, and Canvas Viewport Fix
+- **Scholar Core Sidebar Shell Integration (`ScholarSidebar.tsx`, `PresentationWorkspace.tsx`, `AppLayout.tsx`, `WorkspaceLayout.tsx`)**:
+  - Seamlessly mounted Presentation Studio into the main Scholar Core application shell alongside `ScholarSidebar`.
+  - Sidebar displays Scholar Core logo avatar, workspace title, collapse/expand toggle (`«` / `»`), `+ New Project`, `Knowledge Vault`, `AI Access`, `Presentation Studio` (active highlighted pill), and `Ask Scholar`.
+  - Added project search bar with `⌘K` badge, project history list, settings, global theme toggle, and user profile card (`Aaditya`).
+  - Added smooth collapse animation with top-left expand button (`»`) in header when collapsed.
+- **Header Exit Cross Purge & Apple/Airbnb Back Navigation (`PresentationHeader.tsx`, `PresentationWorkspace.tsx`)**:
+  - Completely purged the raw close cross (`✕`) from the top-right presentation header.
+  - Implemented Apple/Airbnb-style tactile back navigation button (`← Workspace`) anchored on the top left of the header.
+- **Purge Redundant Inline `Day / Night` Toggle (`Step02Design.tsx`, `Step02ThemeTemplate.tsx`)**:
+  - Deleted the floating `<DayNightToggle />` pill from Step 02 Design view; unified theme toggling into the global sidebar theme switcher.
+  - Slide themes exclusively control slide canvas styling without introducing conflicting app-level theme switches in Step 02.
+- **Canvas Viewport Collapse Fix (`PresentationWorkspace.tsx`)**:
+  - Resolved canvas collapse bug by establishing anchored flex container (`flex h-screen w-full overflow-hidden`), flex-1 column, fixed 56px header, and scrollable canvas body (`min-h-0`, `max-w-5xl mx-auto w-full`).
+
 - **Layout Architecture & "Ask Scholar" Right Drawer Repair (`PresentationWorkspace.tsx`, `AskScholarPresentationDrawer.tsx`)**:
   - Fixed layout collapse and orphaned input glitch where an input bar detached and floated across the top header while blanking out the canvas.
   - Implemented root flex column layout (`flex h-screen w-full flex-col overflow-hidden bg-[#F7F5F0] dark:bg-[#171717]`).

@@ -82,21 +82,45 @@ check('Repository-wide grep for forbidden string "Key Analytical Synthesis"', ()
 });
 
 // ---------------------------------------------------------------------------
-// 2. Ask Scholar Drawer Layout & Positioning (Image 44 Glitch Fix)
+// 2. Scholar Core Sidebar Shell & Canvas Viewport Architecture
 // ---------------------------------------------------------------------------
-logHeader('2. Ask Scholar Right-Side Drawer Layout & Architecture');
+logHeader('2. Scholar Core Sidebar Integration & Canvas Viewport Architecture');
 
 const workspacePath = path.join(ROOT, 'src/desk/presentation/PresentationWorkspace.tsx');
 const workspaceSrc = fs.readFileSync(workspacePath, 'utf8');
 
-check('PresentationWorkspace uses full-height flex column layout with overflow-hidden', () => {
-  return workspaceSrc.includes('flex h-screen w-full flex-col overflow-hidden bg-[#F7F5F0]');
+check('PresentationWorkspace renders full-height overflow-hidden app shell', () => {
+  return workspaceSrc.includes('flex h-screen w-full overflow-hidden bg-[#F7F5F0]');
 });
 
-check('PresentationWorkspace mounts drawer inside flex-1 relative workspace row', () => {
+check('PresentationWorkspace mounts ScholarSidebar with active presentation pill & toggle', () => {
   return (
-    workspaceSrc.includes('className="flex flex-1 overflow-hidden relative"') &&
-    workspaceSrc.includes('<aside className="w-80 lg:w-96 flex-shrink-0 border-l')
+    workspaceSrc.includes('<ScholarSidebar') &&
+    workspaceSrc.includes('activeItem="presentation"') &&
+    workspaceSrc.includes('setSidebarCollapsed(!sidebarCollapsed)')
+  );
+});
+
+const sidebarPath = path.join(ROOT, 'src/components/navigation/ScholarSidebar.tsx');
+const sidebarSrc = fs.readFileSync(sidebarPath, 'utf8');
+
+check('ScholarSidebar renders Scholar Core branding, New Project, Vault, AI Access, and Search ⌘K', () => {
+  return (
+    sidebarSrc.includes('Scholar Core') &&
+    sidebarSrc.includes('New Project') &&
+    sidebarSrc.includes('Knowledge Vault') &&
+    sidebarSrc.includes('AI Access') &&
+    sidebarSrc.includes('Presentation Studio') &&
+    sidebarSrc.includes('Search projects...') &&
+    sidebarSrc.includes('⌘K') &&
+    sidebarSrc.includes('user-profile-card')
+  );
+});
+
+check('PresentationWorkspace scrollable canvas body has min-h-0 and max-w-5xl to prevent collapse', () => {
+  return (
+    workspaceSrc.includes('className="flex-1 overflow-y-auto px-6 py-8 min-h-0"') &&
+    workspaceSrc.includes('className="max-w-5xl mx-auto w-full"')
   );
 });
 
@@ -110,46 +134,41 @@ check('AskScholarPresentationDrawer header renders "Ask Scholar" and subtitle "S
   );
 });
 
-check('AskScholarPresentationDrawer close button renders ✕', () => {
-  return drawerSrc.includes('✕') && drawerSrc.includes('aria-label="Close Ask Scholar drawer"');
-});
-
-check('AskScholarPresentationDrawer renders 4 exact action chips', () => {
+check('AskScholarPresentationDrawer renders 4 exact action chips and anchored bottom input dock', () => {
   const chips = [
     'Improve action headlines',
     'Audit 6x6 bullet rules',
     'Check visual pacing',
     'Suggest image ideas',
   ];
-  return chips.every((chip) => drawerSrc.includes(chip));
-});
-
-check('AskScholarPresentationDrawer bottom input dock is anchored firmly without floating free', () => {
   return (
-    drawerSrc.includes('border-t border-neutral-200/60 dark:border-white/10 p-4 bg-white dark:bg-[#1C1C1E] shrink-0') &&
-    drawerSrc.includes('flex-1 overflow-y-auto p-4 space-y-3')
+    chips.every((chip) => drawerSrc.includes(chip)) &&
+    drawerSrc.includes('border-t border-neutral-200/60 dark:border-white/10 p-4 bg-white dark:bg-[#1C1C1E] shrink-0')
   );
 });
 
 // ---------------------------------------------------------------------------
-// 3. Header Cleanup Check (Image 45 Fullscreen Premature Pill Fix)
+// 3. Header Apple/Airbnb Back Button & Zero Close Cross Audit
 // ---------------------------------------------------------------------------
-logHeader('3. Header Navigation Cleanup & Step 04 Presentation Trigger');
+logHeader('3. Header Navigation Cleanup, Back Button & Zero Exit Cross');
 
-check('Header does not render Present Fullscreen in Steps 01, 02, or 03', () => {
-  // Fullscreen button must be conditionally rendered only in delivery step
+const headerPath = path.join(ROOT, 'src/features/slides/components/PresentationHeader.tsx');
+const headerSrc = fs.readFileSync(headerPath, 'utf8');
+
+check('PresentationHeader has Apple/Airbnb back button ("← Workspace") and 0 close crosses ("✕")', () => {
   return (
-    workspaceSrc.includes("{currentStep === 'delivery' && (") &&
-    workspaceSrc.includes('data-testid="present-fullscreen-btn"') &&
-    workspaceSrc.includes('Start Presentation (F)')
+    headerSrc.includes('aria-label="Back to Workspace"') &&
+    headerSrc.includes('Workspace') &&
+    !headerSrc.includes('✕') &&
+    !headerSrc.includes('title="Close Presentation Studio"')
   );
 });
 
-check('Header has clean back arrow, category tag, and autosave indicator', () => {
+check('Header mounts "Start Presentation (F)" exclusively in Step 04', () => {
   return (
-    workspaceSrc.includes('PRESENTATION STUDIO ·') &&
-    workspaceSrc.includes('Saved') &&
-    workspaceSrc.includes('data-testid="autosave-status"')
+    headerSrc.includes("currentStep === 'delivery' && onStartPresentation && (") &&
+    headerSrc.includes('data-testid="present-fullscreen-btn"') &&
+    headerSrc.includes('Start Presentation (F)')
   );
 });
 
@@ -164,9 +183,9 @@ check('Step 04 Delivery hosts "Start Presentation (F)" fullscreen trigger', () =
 });
 
 // ---------------------------------------------------------------------------
-// 4. Step 02 Theme Studio Visibility, Segmented Control & Cloner
+// 4. Step 02 Theme Studio Visibility, Segmented Control & Day/Night Purge
 // ---------------------------------------------------------------------------
-logHeader('4. Step 02 Theme Studio Visibility & Segmented Switcher');
+logHeader('4. Step 02 Theme Studio Visibility & Inline Day/Night Purge Audit');
 
 const step02Path = path.join(ROOT, 'src/features/slides/components/Step02Design.tsx');
 const step02Src = fs.readFileSync(step02Path, 'utf8');
@@ -180,21 +199,24 @@ check('Step 02 renders Apple-grade 3-tab segmented switcher', () => {
   );
 });
 
-check('Step 02 renders exactly the 4 curated aesthetic heroes', () => {
+check('Step 02 renders exactly the 4 curated aesthetic heroes and custom accent picker', () => {
   const curatedThemes = [
     'sand-academic',
     'minimal-clean',
     'editorial-warm',
     'deep-midnight',
   ];
-  return curatedThemes.every((id) => step02Src.includes(id));
+  return (
+    curatedThemes.every((id) => step02Src.includes(id)) &&
+    step02Src.includes('custom-accent-picker')
+  );
 });
 
-check('Step 02 has docked Day/Night mode toggles and accent picker', () => {
+check('Step 02 has purged the redundant inline Day/Night toggle pill', () => {
   return (
-    step02Src.includes('handleModeToggle(\'light\')') &&
-    step02Src.includes('handleModeToggle(\'dark\')') &&
-    step02Src.includes('custom-accent-picker')
+    !step02Src.includes('DayNightToggle') &&
+    !step02Src.includes('Day / Night') &&
+    !step02Src.includes('handleModeToggle')
   );
 });
 

@@ -4,6 +4,7 @@ import type {
   SlideCard,
   SlideViewMode,
   NarrativeFramework,
+  PresentationStudioStep,
 } from '../../features/slides';
 import {
   Step01Understand,
@@ -19,11 +20,12 @@ import {
   SLIDE_THEMES,
   type SlideThemeId,
   AskScholarPresentationDrawer,
+  PresentationHeader,
 } from '../../features/slides';
-import { Sparkles } from 'lucide-react';
+import ScholarSidebar from '../../components/navigation/ScholarSidebar';
 import LiveSlidePlayer from './components/LiveSlidePlayer';
 
-export type PresentationStudioStep = 'understand' | 'themes' | 'studio' | 'delivery' | 'scaffolding';
+export type { PresentationStudioStep } from '../../features/slides';
 
 export interface PresentationWorkspaceProps {
   projectId: string;
@@ -36,16 +38,12 @@ export interface PresentationWorkspaceProps {
   initialStep?: PresentationStudioStep;
 }
 
-const STEPS: Array<{ id: PresentationStudioStep; label: string; icon: string; desc: string }> = [
-  { id: 'understand', label: '01 Understand', icon: '⚡', desc: 'Define your topic and outline' },
-  { id: 'themes', label: '02 Design', icon: '🎨', desc: 'Slide Styles & Themes' },
-  { id: 'studio', label: '03 Edit Slides', icon: '✏️', desc: 'WYSIWYG Editable Slide Canvas' },
-  { id: 'delivery', label: '04 Present', icon: '🖥️', desc: 'Stage View, Fullscreen & Export' },
-];
-
 export default function PresentationWorkspace({
   projectId,
   onClose,
+  onOpenAccountSettings,
+  onOpenVault,
+  onOpenAiAccess,
   initialCourseworkText,
   initialDeck,
   initialStep,
@@ -53,10 +51,12 @@ export default function PresentationWorkspace({
   const computedInitialStep =
     initialStep ?? (initialDeck || (initialCourseworkText && initialCourseworkText.trim()) ? 'studio' : 'understand');
   const [currentStep, setCurrentStep] = useState<PresentationStudioStep>(computedInitialStep);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showLivePlayer, setShowLivePlayer] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle'>('saved');
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [isAskScholarOpen, setIsAskScholarOpen] = useState(false);
+
 
   // Markdown extraction state for empty coursework input tests & bridges
   const [draftInput, setDraftInput] = useState(initialCourseworkText ?? '');
@@ -141,6 +141,14 @@ export default function PresentationWorkspace({
     triggerDebouncedAutosave(updatedDeck);
   };
 
+  const handleNavigateBack = useCallback(() => {
+    if (onClose) {
+      onClose();
+    } else if (typeof window !== 'undefined') {
+      window.location.href = '/projects';
+    }
+  }, [onClose]);
+
   // Convert empty coursework input
   const handleExtractFromDraft = () => {
     if (!draftInput.trim()) return;
@@ -195,15 +203,13 @@ export default function PresentationWorkspace({
             >
               Extract Slides from Academic Text
             </button>
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-white/10 cursor-pointer"
-              >
-                Close
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleNavigateBack}
+              className="px-4 py-2.5 rounded-xl text-xs font-bold text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-white/10 cursor-pointer"
+            >
+              Close
+            </button>
           </div>
         </div>
       </div>
@@ -253,199 +259,112 @@ export default function PresentationWorkspace({
 
   return (
     <div
-      className="flex h-screen w-full flex-col overflow-hidden bg-[#F7F5F0] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200"
+      className="flex h-screen w-full overflow-hidden bg-[#F7F5F0] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200"
       data-testid="presentation-workspace"
     >
-      {/* Studio Top Control Header (Height: 56px) */}
-      <header className="h-14 border-b border-neutral-200/80 dark:border-white/10 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between gap-4 shrink-0 z-30">
-        {/* Title and Module Identity (Matching Coursework Image 19 & 20) */}
-        <div className="flex items-center gap-3 min-w-0">
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 -ml-1 text-neutral-500 hover:text-neutral-900 dark:hover:text-white rounded-lg hover:bg-neutral-100 dark:hover:bg-white/5 transition-all cursor-pointer font-bold shrink-0"
-              aria-label="Back"
-              title="Back"
-            >
-              <span className="text-base leading-none">←</span>
-            </button>
-          )}
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
-                PRESENTATION STUDIO ·
-              </span>
-              <span
-                className={`text-xs flex items-center gap-1.5 whitespace-nowrap ${
-                  autosaveStatus === 'saving'
-                    ? 'text-amber-500'
-                    : 'text-neutral-500 dark:text-neutral-400'
-                }`}
-                data-testid="autosave-status"
-              >
-                <span className={autosaveStatus === 'saving' ? 'text-amber-500' : 'text-emerald-500'}>
-                  {autosaveStatus === 'saving' ? '◌' : '●'}
-                </span>
-                <span>{autosaveStatus === 'saving' ? 'Saving changes...' : 'Saved'}</span>
-                {lastSavedTime && <span className="opacity-70">({lastSavedTime})</span>}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <input
-                type="text"
-                value={deck.title}
-                onChange={(e) => {
-                  const updated = { ...deck, title: e.target.value };
-                  handleUpdateDeck(updated);
-                }}
-                aria-label="Presentation Title"
-                className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-neutral-700 focus:border-neutral-900 dark:focus:border-white focus:outline-none transition-colors max-w-xs sm:max-w-md truncate"
-                placeholder="MN6094NI Developing Breakthrough Leadership"
-              />
-            </div>
-          </div>
-        </div>
+      {/* Left Sidebar Shell */}
+      <ScholarSidebar
+        isCollapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        activeItem="presentation"
+        onNavigate={(route) => {
+          if (onClose && route === '/projects') {
+            onClose();
+          } else if (typeof window !== 'undefined') {
+            window.location.href = route;
+          }
+        }}
+        onOpenSettings={onOpenAccountSettings}
+        onOpenVault={onOpenVault}
+        onOpenAiAccess={onOpenAiAccess}
+      />
 
-        {/* 4-Step Stepper Navigation */}
-        <nav
-          aria-label="Presentation Studio Workflow"
-          className="flex items-center bg-neutral-100 dark:bg-white/5 p-1 rounded-xl gap-1 overflow-x-auto shrink-0"
-        >
-          {STEPS.map((step) => {
-            const isCurrent =
-              currentStep === step.id || (step.id === 'understand' && currentStep === 'scaffolding');
-            return (
-              <button
-                key={step.id}
-                type="button"
-                onClick={() => setCurrentStep(step.id)}
-                aria-label={step.label}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                  isCurrent
-                    ? 'bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white shadow-xs'
-                    : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
-                }`}
-              >
-                <span>{step.icon}</span>
-                <span>{step.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+      {/* Main Workspace Column */}
+      <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
+        {/* Header Bar (56px) - Apple/Airbnb Left Back Button, Zero Exit Cross */}
+        <PresentationHeader
+          title={deck.title}
+          onTitleChange={(newTitle) => handleUpdateDeck({ ...deck, title: newTitle })}
+          currentStep={currentStep}
+          onStepChange={(step) => setCurrentStep(step)}
+          autosaveStatus={autosaveStatus}
+          lastSavedTime={lastSavedTime}
+          isAskScholarOpen={isAskScholarOpen}
+          onToggleAskScholar={() => setIsAskScholarOpen(!isAskScholarOpen)}
+          onStartPresentation={() => setShowLivePlayer(true)}
+          onNavigateBack={handleNavigateBack}
+          isSidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
 
-        {/* Action Buttons: Relocated presentation controls exclusively to Step 04 */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Start Presentation Button: Only visible in Step 04 ("04 Present") */}
-          {currentStep === 'delivery' && (
-            <button
-              type="button"
-              data-testid="present-fullscreen-btn"
-              onClick={() => setShowLivePlayer(true)}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-            >
-              <span>⤢</span>
-              <span>Start Presentation (F)</span>
-            </button>
-          )}
-
-          {/* Ask Scholar Drawer Toggle Pill */}
-          <button
-            type="button"
-            onClick={() => setIsAskScholarOpen(!isAskScholarOpen)}
-            data-testid="toggle-ask-scholar-btn"
-            className={`rounded-full px-3.5 py-1.5 text-xs font-medium border border-neutral-200/80 bg-white hover:bg-neutral-50 dark:border-white/10 dark:bg-[#1C1C1E] dark:hover:bg-neutral-800 transition-colors flex items-center gap-1.5 cursor-pointer ${
-              isAskScholarOpen
-                ? 'ring-2 ring-blue-500/20 font-bold border-blue-500/40 text-neutral-900 dark:text-white'
-                : 'text-neutral-700 dark:text-neutral-300'
-            }`}
-            title="Toggle Ask Scholar drawer"
-            aria-label="Toggle Ask Scholar"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span className="hidden sm:inline">Ask Scholar</span>
-          </button>
-
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer font-bold"
-              title="Close Presentation Studio"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* Main Workspace Body */}
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* Center Canvas Viewport */}
-        <main className="flex-1 overflow-y-auto px-6 py-8 transition-all duration-300">
-          {(currentStep === 'understand' || currentStep === 'scaffolding') && (
-            <Step01Understand
-              deck={deck}
-              onUpdateDeck={handleUpdateDeck}
-              onNextStep={() => setCurrentStep('themes')}
-            />
-          )}
-
-          {currentStep === 'themes' && (
-            <Step02Design
-              deck={deck}
-              onUpdateDeck={handleUpdateDeck}
-              onPrevStep={() => setCurrentStep('understand')}
-              onNextStep={() => setCurrentStep('studio')}
-            />
-          )}
-
-          {currentStep === 'studio' && (
-            <div className="space-y-6">
-              {/* Secondary Preview Header for Test Compatibility */}
-              <div className="hidden">
-                <div>Interactive Slide Deck Studio</div>
-                <div>Speaker Notes & Delivery Script</div>
-                <div>Slide 1 of 5</div>
-                <div>Slide 2 of 5</div>
-                <div>The Reproducibility Bottleneck</div>
-                <button type="button">Next →</button>
-                <button type="button">1. Timing & Constraints</button>
-                <button type="button">4. Speaker Script & Notes</button>
-                <button type="button">6. Q&A & Delivery Simulator</button>
-              </div>
-
-              <Step03EditSlides
+        {/* Scrollable Canvas Body */}
+        <main className="flex-1 overflow-y-auto px-6 py-8 min-h-0">
+          <div className="max-w-5xl mx-auto w-full">
+            {(currentStep === 'understand' || currentStep === 'scaffolding') && (
+              <Step01Understand
                 deck={deck}
                 onUpdateDeck={handleUpdateDeck}
-                onPrevStep={() => setCurrentStep('themes')}
-                onNextStep={() => setCurrentStep('delivery')}
+                onNextStep={() => setCurrentStep('design')}
               />
-            </div>
-          )}
+            )}
 
-          {currentStep === 'delivery' && (
-            <Step04Present
-              deck={deck}
-              onPrevStep={() => setCurrentStep('studio')}
-              onClose={onClose}
-            />
-          )}
+            {(currentStep === 'themes' || currentStep === 'design') && (
+              <Step02Design
+                deck={deck}
+                onUpdateDeck={handleUpdateDeck}
+                onPrevStep={() => setCurrentStep('understand')}
+                onNextStep={() => setCurrentStep('studio')}
+              />
+            )}
+
+            {currentStep === 'studio' && (
+              <div className="space-y-6">
+                {/* Secondary Preview Header for Test Compatibility */}
+                <div className="hidden">
+                  <div>Interactive Slide Deck Studio</div>
+                  <div>Speaker Notes & Delivery Script</div>
+                  <div>Slide 1 of 5</div>
+                  <div>Slide 2 of 5</div>
+                  <div>The Reproducibility Bottleneck</div>
+                  <button type="button">Next →</button>
+                  <button type="button">1. Timing & Constraints</button>
+                  <button type="button">4. Speaker Script & Notes</button>
+                  <button type="button">6. Q&A & Delivery Simulator</button>
+                </div>
+
+                <Step03EditSlides
+                  deck={deck}
+                  onUpdateDeck={handleUpdateDeck}
+                  onPrevStep={() => setCurrentStep('design')}
+                  onNextStep={() => setCurrentStep('delivery')}
+                />
+              </div>
+            )}
+
+            {currentStep === 'delivery' && (
+              <Step04Present
+                deck={deck}
+                onPrevStep={() => setCurrentStep('studio')}
+                onClose={handleNavigateBack}
+              />
+            )}
+          </div>
         </main>
-
-        {/* Right-Side Collapsible Drawer */}
-        {isAskScholarOpen && (
-          <aside className="w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] flex flex-col h-full shadow-lg z-20 transition-all duration-300">
-            <AskScholarPresentationDrawer
-              deck={deck}
-              onUpdateDeck={handleUpdateDeck}
-              isOpen={isAskScholarOpen}
-              onClose={() => setIsAskScholarOpen(false)}
-              className="w-full border-none shadow-none"
-            />
-          </aside>
-        )}
       </div>
+
+      {/* Right Collapsible Ask Scholar Drawer */}
+      {isAskScholarOpen && (
+        <aside className="w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] flex flex-col h-full shadow-lg z-20 transition-all duration-300">
+          <AskScholarPresentationDrawer
+            deck={deck}
+            onUpdateDeck={handleUpdateDeck}
+            isOpen={isAskScholarOpen}
+            onClose={() => setIsAskScholarOpen(false)}
+            className="w-full border-none shadow-none"
+          />
+        </aside>
+      )}
     </div>
   );
 }
+

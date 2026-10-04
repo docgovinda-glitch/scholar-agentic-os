@@ -22,34 +22,43 @@ Scholar OS **Presentation Studio** is a web-native, academic-grade slide authori
 
 ## 2. Layout & Workspace Architecture
 
-`src/desk/presentation/PresentationWorkspace.tsx` implements the root viewport grid:
+`src/desk/presentation/PresentationWorkspace.tsx` and `src/layouts/AppLayout.tsx` integrate Presentation Studio seamlessly into the Scholar Core navigation shell:
 
 ```tsx
-<div className="flex h-screen w-full flex-col overflow-hidden bg-[#F7F5F0] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 font-sans">
-  {/* Global Header (Height: 56px / h-14) */}
-  <header className="h-14 border-b border-neutral-200/80 dark:border-white/10 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between gap-4 shrink-0 z-30">
-    {/* Left: Back button, Category Tag, Autosave Indicator, Editable Title */}
-    {/* Center: 4-Step Stepper Navigation */}
-    {/* Right: Step 04 Presentation Controls & Ask Scholar Toggle */}
-  </header>
+<div className="flex h-screen w-full overflow-hidden bg-[#F7F5F0] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 font-sans">
+  {/* Left Sidebar Shell (Scholar Core Navigation Rail) */}
+  <ScholarSidebar
+    isCollapsed={sidebarCollapsed}
+    onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+    activeItem="presentation"
+  />
 
-  {/* Main Workspace Body */}
-  <div className="flex flex-1 overflow-hidden relative">
-    {/* Center Canvas Viewport */}
-    <main className="flex-1 overflow-y-auto px-6 py-8 transition-all duration-300">
-      {currentStep === 'understand' && <Step01Understand />}
-      {currentStep === 'design' && <Step02Design />}
-      {currentStep === 'studio' && <Step03StudioCanvas />}
-      {currentStep === 'delivery' && <Step04Delivery />}
+  {/* Main Workspace Column */}
+  <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
+    {/* Global Header (Height: 56px / h-14) - Zero ✕ exit cross, Apple/Airbnb ← Workspace back button */}
+    <PresentationHeader
+      onNavigateBack={handleNavigateBack}
+      isSidebarCollapsed={sidebarCollapsed}
+      onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+    />
+
+    {/* Scrollable Canvas Body */}
+    <main className="flex-1 overflow-y-auto px-6 py-8 min-h-0">
+      <div className="max-w-5xl mx-auto w-full">
+        {currentStep === 'understand' && <Step01Understand />}
+        {currentStep === 'design' && <Step02Design />}
+        {currentStep === 'studio' && <Step03EditSlides />}
+        {currentStep === 'delivery' && <Step04Present />}
+      </div>
     </main>
-
-    {/* Right-Side Collapsible Drawer */}
-    {isAskScholarOpen && (
-      <aside className="w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] flex flex-col h-full shadow-lg z-20 transition-all duration-300">
-        <AskScholarPresentationDrawer onClose={() => setIsAskScholarOpen(false)} />
-      </aside>
-    )}
   </div>
+
+  {/* Right Collapsible Ask Scholar Drawer */}
+  {isAskScholarOpen && (
+    <aside className="w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] h-full shadow-lg z-20">
+      <AskScholarPresentationDrawer onClose={() => setIsAskScholarOpen(false)} />
+    </aside>
+  )}
 </div>
 ```
 
@@ -89,7 +98,8 @@ Scholar OS **Presentation Studio** is a web-native, academic-grade slide authori
   3. **Editorial Warm**: Canvas `#FAF8F5`, Card `#FFFDF9`, Charcoal text `#292524`, Terracotta accent `#C2410C`.
   4. **Deep Midnight**: Canvas `#171717`, Card `#1C1C1E`, Light text `#F8FAFC`, Sky blue accent `#60A5FA`.
   - **Live Dynamic Cards**: Renders actual Slide 1 action title instead of static mock strings.
-  - **Docked Floating Customizer**: `Day` / `Night` toggle and custom color picker with live WCAG AA contrast calculation.
+  - **Docked Custom Accent Picker**: Custom color picker with live WCAG AA contrast calculation. Redundant inline `Day / Night` toggle pill purged; theme toggling belongs exclusively to the global Scholar Core sidebar switcher.
+
 - **Tab 2: Explore Library (`ThemeLibraryGrid.tsx`)**:
   - Category filters (`All`, `Academic`, `Minimal`, `Executive`, `Editorial`, `Vibrant`).
   - Search filter input with live theme card previews.

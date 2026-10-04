@@ -32,3 +32,5 @@ export * from './hooks/useKeynoteShortcuts'; // Deprecated alias
 export { default as ThemeScreenshotCloner } from './components/ThemeScreenshotCloner';
 export { default as ThemeLibraryGrid } from './components/ThemeLibraryGrid';
 export { default as AskScholarPresentationDrawer } from './components/AskScholarPresentationDrawer';
+export { default as PresentationHeader } from './components/PresentationHeader';
+

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Check, ArrowRight, ArrowLeft, Sun, Moon, Layers, Library, Camera } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Layers, Library, Camera } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import {
   SLIDE_THEMES,
@@ -213,18 +213,6 @@ export default function Step02Design({
     });
   };
 
-  const handleModeToggle = (targetMode: 'light' | 'dark') => {
-    if (targetMode === 'dark') {
-      const darkPreset = CURATED_FOUR_THEMES.find((t) => t.mode === 'dark') || CURATED_FOUR_THEMES[3];
-      handleSelectTheme(darkPreset);
-    } else {
-      const lightPreset =
-        CURATED_FOUR_THEMES.find((t) => t.id === currentThemeId && t.mode === 'light') ||
-        CURATED_FOUR_THEMES[0];
-      handleSelectTheme(lightPreset);
-    }
-  };
-
   return (
     <div
       className="max-w-5xl mx-auto space-y-6 p-4 sm:p-6"
@@ -237,43 +225,13 @@ export default function Step02Design({
             02 Design · Slide Styles
           </span>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
-              Choose Presentation Design
-            </h1>
-            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
-              Select a curated aesthetic, browse the full library, or clone colors directly from an image.
-            </p>
-          </div>
-
-          {/* Floating Day / Night Toggle Pill (Available across tabs) */}
-          <div className="inline-flex p-1 rounded-xl bg-neutral-100 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 text-xs self-start sm:self-auto shrink-0">
-            <button
-              type="button"
-              onClick={() => handleModeToggle('light')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeTheme.mode === 'light'
-                  ? 'bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
-              }`}
-            >
-              <Sun className="w-3.5 h-3.5 text-amber-500" />
-              <span>Day</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleModeToggle('dark')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeTheme.mode === 'dark'
-                  ? 'bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
-              }`}
-            >
-              <Moon className="w-3.5 h-3.5 text-blue-400" />
-              <span>Night</span>
-            </button>
-          </div>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
+            Choose Presentation Design
+          </h1>
+          <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
+            Select a curated aesthetic, browse the full library, or clone colors directly from an image.
+          </p>
         </div>
       </div>
 

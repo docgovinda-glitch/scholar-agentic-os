@@ -16,7 +16,8 @@ describe("PresentationWorkspace", () => {
   it("renders 4-step guided studio workflow with 01 Understand, 02 Design, 03 Edit Slides, and 04 Present with clean auto-save and zero developer jargon", () => {
     render(<PresentationWorkspace projectId="proj-pres-1" />);
 
-    expect(screen.getByText(/Presentation Studio/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Presentation Studio/i).length).toBeGreaterThan(0);
+
     expect(screen.getByRole("button", { name: /01 Understand/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /02 Design/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /03 Edit Slides/i })).toBeInTheDocument();
@@ -281,4 +282,54 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
 
     expect(screen.queryByTestId("ask-scholar-drawer")).not.toBeInTheDocument();
   });
+
+  it("integrates ScholarSidebar with active Presentation Studio pill and collapsible toggle", () => {
+    render(<PresentationWorkspace projectId="proj-pres-sidebar" />);
+
+    // ScholarSidebar is mounted
+    const sidebar = screen.getByTestId("scholar-sidebar");
+    expect(sidebar).toBeInTheDocument();
+    expect(screen.getByText("Scholar Core")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /New Project/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Knowledge Vault/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Manage AI Access/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Search projects\.\.\./i)).toBeInTheDocument();
+    expect(screen.getByTestId("user-profile-card")).toBeInTheDocument();
+
+    // Presentation Studio item has active highlight
+    const presStudioNavBtn = screen.getByRole("button", { name: "Presentation Studio" });
+    expect(presStudioNavBtn).toBeInTheDocument();
+    expect(presStudioNavBtn.className).toContain("font-bold");
+
+    // Collapse toggle button («) collapses sidebar
+    const collapseBtn = screen.getByTestId("collapse-sidebar-btn");
+    fireEvent.click(collapseBtn);
+    expect(sidebar.className).toContain("w-0");
+
+    // In header, expand button (») appears
+    const expandBtn = screen.getByTestId("expand-sidebar-btn");
+    expect(expandBtn).toBeInTheDocument();
+
+    // Clicking expand restores sidebar
+    fireEvent.click(expandBtn);
+    expect(sidebar.className).toContain("w-[260px]");
+  });
+
+  it("replaces abrupt header close cross with Apple/Airbnb back button and invokes onClose", () => {
+    const handleClose = vi.fn();
+    render(<PresentationWorkspace projectId="proj-pres-back" onClose={handleClose} />);
+
+    // Zero raw close cross (✕) in the header
+    expect(screen.queryByTitle("Close Presentation Studio")).not.toBeInTheDocument();
+    expect(screen.queryByText("✕")).not.toBeInTheDocument();
+
+    // Left-anchored Apple/Airbnb back button
+    const backBtn = screen.getByRole("button", { name: /Back to Workspace/i });
+    expect(backBtn).toBeInTheDocument();
+    expect(backBtn).toHaveTextContent("Workspace");
+
+    fireEvent.click(backBtn);
+    expect(handleClose).toHaveBeenCalledTimes(1);
+  });
 });
+

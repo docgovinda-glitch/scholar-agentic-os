@@ -226,3 +226,12 @@ export interface CopilotMutationResponse {
   mutatedSlide: SlideCard;
   appliedPrompt: string;
 }
+
+export type PresentationStudioStep =
+  | 'understand'
+  | 'themes'
+  | 'design'
+  | 'studio'
+  | 'delivery'
+  | 'scaffolding';
+
