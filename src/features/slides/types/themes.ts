@@ -63,12 +63,21 @@ export interface SlideKpiMetric {
 }
 
 export interface CustomTheme {
+  name?: string;
   accentColor: string;
   fontPairing: TypographyPairing;
   surfaceTreatment: SurfaceTreatment;
   contrastRatio: number;
   isValidWcagAA: boolean;
   visualMotif?: VisualMotif;
+  canvasBg?: string;
+  cardBg?: string;
+  textPrimary?: string;
+  textSecondary?: string;
+  mode?: ThemeMode;
+  swatch?: [string, string, string] | [string, string, string, string];
+  source?: 'preset' | 'cloned' | 'custom';
+  clonedFromImage?: string;
 }
 
 export interface SlideTheme {
@@ -155,10 +164,22 @@ export function resolveSlideTheme(themeId?: string, customTheme?: CustomTheme | 
   const base = (themeId && SLIDE_THEMES[themeId as SlideThemeId]) || SLIDE_THEMES['sand-academic'];
   if (!customTheme) return base;
 
+  const mode = customTheme.mode || base.mode;
   return {
     ...base,
+    name: customTheme.name || base.name,
     accent: customTheme.accentColor || base.accent,
     visualMotif: customTheme.visualMotif || base.visualMotif,
+    mode,
+    canvasBg: customTheme.canvasBg || base.canvasBg,
+    cardBg: customTheme.cardBg || base.cardBg,
+    textPrimary: customTheme.textPrimary || base.textPrimary,
+    textSecondary: customTheme.textSecondary || base.textSecondary,
+    swatch: customTheme.swatch
+      ? [customTheme.swatch[0], customTheme.swatch[1], customTheme.swatch[customTheme.swatch.length - 1]]
+      : base.swatch,
+    metricColor: customTheme.accentColor || base.metricColor,
+    bulletColor: customTheme.accentColor || base.bulletColor,
   };
 }
 

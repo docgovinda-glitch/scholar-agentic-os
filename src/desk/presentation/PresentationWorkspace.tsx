@@ -18,7 +18,9 @@ import {
   extractSlidesFromAcademicText,
   SLIDE_THEMES,
   type SlideThemeId,
+  AskScholarPresentationDrawer,
 } from '../../features/slides';
+import { Sparkles } from 'lucide-react';
 import LiveSlidePlayer from './components/LiveSlidePlayer';
 
 export type PresentationStudioStep = 'understand' | 'themes' | 'studio' | 'delivery' | 'scaffolding';
@@ -54,6 +56,7 @@ export default function PresentationWorkspace({
   const [showLivePlayer, setShowLivePlayer] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle'>('saved');
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [isAskScholarOpen, setIsAskScholarOpen] = useState(false);
 
   // Markdown extraction state for empty coursework input tests & bridges
   const [draftInput, setDraftInput] = useState(initialCourseworkText ?? '');
@@ -323,6 +326,23 @@ export default function PresentationWorkspace({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
+          {/* Ask Scholar Drawer Toggle */}
+          <button
+            type="button"
+            onClick={() => setIsAskScholarOpen(!isAskScholarOpen)}
+            data-testid="toggle-ask-scholar-btn"
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+              isAskScholarOpen
+                ? 'bg-neutral-200/80 dark:bg-white/10 text-neutral-900 dark:text-white shadow-2xs font-bold'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5'
+            }`}
+            title="Toggle Ask Scholar drawer"
+            aria-label="Toggle Ask Scholar"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span className="hidden sm:inline">Ask Scholar</span>
+          </button>
+
           <button
             type="button"
             data-testid="present-fullscreen-btn"
@@ -346,9 +366,9 @@ export default function PresentationWorkspace({
         </div>
       </header>
 
-      {/* Main Workspace Body */}
-      <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
-        <>
+      {/* Workspace Body: Center Presentation Stage & Collapsible Right Ask Scholar Drawer */}
+      <div className="flex-1 flex overflow-hidden relative">
+        <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6">
           {(currentStep === 'understand' || currentStep === 'scaffolding') && (
             <Step01Understand
               deck={deck}
@@ -397,8 +417,18 @@ export default function PresentationWorkspace({
               onClose={onClose}
             />
           )}
-        </>
-      </main>
+        </main>
+
+        {/* Collapsible Right-Side Ask Scholar Copilot Drawer */}
+        {isAskScholarOpen && (
+          <AskScholarPresentationDrawer
+            deck={deck}
+            onUpdateDeck={handleUpdateDeck}
+            isOpen={isAskScholarOpen}
+            onClose={() => setIsAskScholarOpen(false)}
+          />
+        )}
+      </div>
     </div>
   );
 }

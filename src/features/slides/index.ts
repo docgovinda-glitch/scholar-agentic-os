@@ -22,5 +22,11 @@ export { default as Step03StudioCanvas } from './components/Step03StudioCanvas';
 export { default as Step04Present } from './components/Step04Present';
 export { default as Step04Delivery } from './components/Step04Delivery'; // Deprecated alias
 
+export * from './services/imagePaletteExtractor';
 export * from './hooks/usePresentationShortcuts';
 export * from './hooks/useKeynoteShortcuts'; // Deprecated alias
+
+// Theme Studio & Copilot Components
+export { default as ThemeScreenshotCloner } from './components/ThemeScreenshotCloner';
+export { default as ThemeLibraryGrid } from './components/ThemeLibraryGrid';
+export { default as AskScholarPresentationDrawer } from './components/AskScholarPresentationDrawer';

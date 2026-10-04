@@ -236,4 +236,29 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
     expect(screen.getByTestId("step-03-studio-canvas")).toBeInTheDocument();
     expect(screen.getByDisplayValue("99.8%")).toBeInTheDocument();
   });
+
+  it("mounts collapsible right-side 'Ask Scholar' drawer and toggles smoothly via header button", async () => {
+    render(<PresentationWorkspace projectId="proj-pres-drawer" initialStep="studio" />);
+
+    // Initially closed
+    expect(screen.queryByTestId("ask-scholar-drawer")).not.toBeInTheDocument();
+
+    // Toggle open
+    const toggleBtn = screen.getByTestId("toggle-ask-scholar-btn");
+    fireEvent.click(toggleBtn);
+
+    expect(screen.getByTestId("ask-scholar-drawer")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ask Scholar" })).toBeInTheDocument();
+    expect(screen.getByText(/Presentation Advisor & Slide Copilot/i)).toBeInTheDocument();
+
+    // Suggested actions appear in drawer
+    expect(screen.getByText("Suggest stronger action headlines")).toBeInTheDocument();
+    expect(screen.getByText("Audit slides for 6x6 bullet rule")).toBeInTheDocument();
+
+    // Toggle close via drawer chevron button
+    const closeBtn = screen.getByLabelText("Close Ask Scholar drawer");
+    fireEvent.click(closeBtn);
+
+    expect(screen.queryByTestId("ask-scholar-drawer")).not.toBeInTheDocument();
+  });
 });
