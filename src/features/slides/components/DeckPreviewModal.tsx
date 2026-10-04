@@ -24,6 +24,7 @@ export interface DeckPreviewModalProps {
   } | null;
   deckTitle?: string;
   onApplyTheme: (themeId: SlideThemeId, design?: BestSlideDesign) => void;
+  onApplyProgression?: (themeId: SlideThemeId) => void;
 }
 
 export default function DeckPreviewModal({
@@ -32,6 +33,7 @@ export default function DeckPreviewModal({
   theme,
   deckTitle,
   onApplyTheme,
+  onApplyProgression,
 }: DeckPreviewModalProps) {
   if (!isOpen || !theme) return null;
 
@@ -58,17 +60,33 @@ export default function DeckPreviewModal({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => {
+                if (onApplyProgression) {
+                  onApplyProgression(theme.id as SlideThemeId);
+                }
+                onApplyTheme(theme.id as SlideThemeId);
+                onClose();
+              }}
+              className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              title="Apply This Design (5-Slide Deck)"
+              aria-label="Apply This Design"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>Apply This Design (5-Slide Deck)</span>
+            </button>
             <button
               type="button"
               onClick={() => {
                 onApplyTheme(theme.id as SlideThemeId);
                 onClose();
               }}
-              className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-2 rounded-xl border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300 text-xs font-semibold hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
             >
               <Check className="w-3.5 h-3.5" />
-              Apply This Design
+              <span>Theme Only</span>
             </button>
             <button
               type="button"

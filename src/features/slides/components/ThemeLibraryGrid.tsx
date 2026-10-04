@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Check, Sun, Moon } from 'lucide-react';
+import { Search, Check, Sun, Moon, Sparkles } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import {
   SLIDE_THEMES,
@@ -31,6 +31,7 @@ export type LibraryCategory =
 export interface ThemeLibraryGridProps {
   deck: SlideDeck;
   onSelectTheme: (themeId: SlideThemeId, design?: BestSlideDesign) => void;
+  onApplyProgression?: (themeId: SlideThemeId, design?: BestSlideDesign) => void;
   selectedThemeId?: SlideThemeId;
 }
 
@@ -70,6 +71,7 @@ export const CATEGORIES: Array<{
 export default function ThemeLibraryGrid({
   deck,
   onSelectTheme,
+  onApplyProgression,
   selectedThemeId = (deck.themeId as SlideThemeId) || 'sand-academic',
 }: ThemeLibraryGridProps) {
   const [selectedCategory, setSelectedCategory] = useState<LibraryCategory>('all');
@@ -351,9 +353,16 @@ export default function ThemeLibraryGrid({
             const passWcag = isWcagAA(ratio);
 
             return (
-              <button
+              <div
                 key={theme.id}
-                type="button"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelectTheme(theme.id as SlideThemeId, theme.bestDesign);
+                  }
+                }}
                 onClick={() => onSelectTheme(theme.id as SlideThemeId, theme.bestDesign)}
                 className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative group flex flex-col justify-between space-y-3 ${
                   isSelected
@@ -428,7 +437,27 @@ export default function ThemeLibraryGrid({
                     onExpandAll={() => setExpandedTheme(theme)}
                   />
                 </div>
-              </button>
+
+                {/* One-Click 5-Slide Progression Trigger Button */}
+                <div className="w-full pt-1 border-t border-neutral-100 dark:border-white/5">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onApplyProgression) {
+                        onApplyProgression(theme.id as SlideThemeId, theme.bestDesign);
+                      } else {
+                        onSelectTheme(theme.id as SlideThemeId, theme.bestDesign);
+                      }
+                    }}
+                    className="w-full py-1.5 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-900/40 text-[11px] font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    title="Apply 5 unique slide archetypes: Cover, Synthesis, 2D Sketch, Metrics, Roadmap"
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-500" />
+                    <span>Apply 5-Slide Progression</span>
+                  </button>
+                </div>
+              </div>
             );
           })}
         </div>
@@ -461,6 +490,14 @@ export default function ThemeLibraryGrid({
           deckTitle={headlinePreviewText}
           onApplyTheme={(themeId) => {
             onSelectTheme(themeId, expandedTheme.bestDesign);
+            setExpandedTheme(null);
+          }}
+          onApplyProgression={(themeId) => {
+            if (onApplyProgression) {
+              onApplyProgression(themeId, expandedTheme.bestDesign);
+            } else {
+              onSelectTheme(themeId, expandedTheme.bestDesign);
+            }
             setExpandedTheme(null);
           }}
         />

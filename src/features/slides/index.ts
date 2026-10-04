@@ -33,4 +33,9 @@ export { default as ThemeScreenshotCloner } from './components/ThemeScreenshotCl
 export { default as ThemeLibraryGrid } from './components/ThemeLibraryGrid';
 export { default as AskScholarPresentationDrawer } from './components/AskScholarPresentationDrawer';
 export { default as PresentationHeader } from './components/PresentationHeader';
+export { default as MultiSlideDeckPreview } from './components/MultiSlideDeckPreview';
+export { default as CustomThemeStudio } from './components/CustomThemeStudio';
+export { default as DeckPreviewModal } from './components/DeckPreviewModal';
+export { default as SlideCreativeSketchIllustration } from './components/SlideCreativeSketchIllustration';
+export * from './services/deckProgressionService';
 

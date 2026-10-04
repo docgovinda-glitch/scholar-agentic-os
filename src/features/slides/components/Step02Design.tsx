@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Check, ArrowRight, ArrowLeft, Layers, Library, Camera, Palette } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Layers, Library, Camera, Palette, Sparkles } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
 import {
   SLIDE_THEMES,
@@ -18,6 +18,7 @@ import MultiSlideDeckPreview from './MultiSlideDeckPreview';
 import DeckPreviewModal from './DeckPreviewModal';
 import CustomThemeStudio from './CustomThemeStudio';
 import type { BestSlideDesign } from '../data/bestSlideDesigns100';
+import { apply5SlideDeckProgression } from '../services/deckProgressionService';
 
 export interface Step02DesignProps {
   deck: SlideDeck;
@@ -246,6 +247,11 @@ export default function Step02Design({
     });
   };
 
+  const handleApply5SlideProgression = (themeId: SlideThemeId, customTheme?: CustomTheme) => {
+    const updated = apply5SlideDeckProgression(deck, themeId, customTheme);
+    onUpdateDeck(updated);
+  };
+
   return (
     <div
       className="max-w-5xl mx-auto space-y-6 p-4 sm:p-6"
@@ -385,9 +391,16 @@ export default function Step02Design({
               const effectiveAccent = isSelected ? selectedAccent : preset.accentHex;
 
               return (
-                <button
+                <div
                   key={preset.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSelectTheme(preset);
+                    }
+                  }}
                   onClick={() => handleSelectTheme(preset)}
                   className={`p-5 rounded-2xl border text-left transition-all cursor-pointer relative group flex flex-col justify-between space-y-4 ${
                     isSelected
@@ -453,7 +466,23 @@ export default function Step02Design({
                       onExpandAll={() => setExpandedCuratedTheme(preset)}
                     />
                   </div>
-                </button>
+
+                  {/* One-Click 5-Slide Progression Trigger Button */}
+                  <div className="w-full pt-1 border-t border-neutral-100 dark:border-white/5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleApply5SlideProgression(preset.id);
+                      }}
+                      className="w-full py-2 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-900/40 text-[11px] font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      title="Format your deck with Cover, Synthesis, 2D Sketch, Metrics, and Roadmap"
+                    >
+                      <Sparkles className="w-3 h-3 text-amber-500" />
+                      <span>Apply 5-Slide Progression</span>
+                    </button>
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -546,6 +575,30 @@ export default function Step02Design({
             deck={deck}
             selectedThemeId={currentThemeId}
             onSelectTheme={handleSelectLibraryTheme}
+            onApplyProgression={(themeId, design) => {
+              if (design) {
+                const ratio = calculateContrastRatio(design.accent, design.cardBg);
+                const customTh: CustomTheme = {
+                  name: design.name,
+                  accentColor: design.accent,
+                  fontPairing: (design.fontFamily === 'serif' ? 'Newsreader Serif' : 'Inter') as any,
+                  surfaceTreatment: 'elevated',
+                  contrastRatio: ratio,
+                  isValidWcagAA: isWcagAA(ratio),
+                  visualMotif: (design.visualMotif as any) || 'blueprint-grid',
+                  canvasBg: design.canvasBg,
+                  cardBg: design.cardBg,
+                  textPrimary: design.textPrimary,
+                  textSecondary: design.textSecondary,
+                  mode: design.mode,
+                  swatch: design.swatch,
+                  source: 'preset',
+                };
+                handleApply5SlideProgression(themeId, customTh);
+              } else {
+                handleApply5SlideProgression(themeId);
+              }
+            }}
           />
 
           {/* Accent Color Customizer for Selected Library Theme */}
@@ -670,6 +723,10 @@ export default function Step02Design({
           deckTitle={headlinePreviewText}
           onApplyTheme={() => {
             handleSelectTheme(expandedCuratedTheme);
+            setExpandedCuratedTheme(null);
+          }}
+          onApplyProgression={() => {
+            handleApply5SlideProgression(expandedCuratedTheme.id);
             setExpandedCuratedTheme(null);
           }}
         />

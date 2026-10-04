@@ -18,10 +18,12 @@ import {
   type SlideTheme,
   type ThemeMode,
   type VisualMotif,
+  type CustomTheme,
   calculateContrastRatio,
   isWcagAA,
   resolveSlideTheme,
 } from '../types/themes';
+import { apply5SlideDeckProgression } from '../services/deckProgressionService';
 import {
   getStoredCustomThemes,
   saveCustomThemeToStorage,
@@ -631,13 +633,47 @@ export default function CustomThemeStudio({
           </div>
 
           {/* Primary Action: Apply Theme */}
-          <div className="pt-2">
+          <div className="pt-2 space-y-2">
+            <button
+              type="button"
+              onClick={() => {
+                const theme = buildCurrentThemeObject();
+                const customThemeData: CustomTheme = {
+                  name: theme.name,
+                  accentColor: theme.accent,
+                  fontPairing: theme.fontFamily === 'serif' ? 'Newsreader Serif' : theme.fontFamily === 'mono' ? 'Noto Sans' : 'Inter',
+                  surfaceTreatment: 'elevated',
+                  contrastRatio: contrastAccent,
+                  isValidWcagAA: isAccentWcag,
+                  visualMotif: theme.visualMotif,
+                  canvasBg: theme.canvasBg,
+                  cardBg: theme.cardBg,
+                  textPrimary: theme.textPrimary,
+                  textSecondary: theme.textSecondary,
+                  mode: theme.mode,
+                  swatch: [theme.canvasBg, theme.cardBg, theme.accent],
+                  source: 'custom',
+                };
+                const updatedDeck = apply5SlideDeckProgression(
+                  { ...deck, customTheme: customThemeData },
+                  'sand-academic',
+                  customThemeData
+                );
+                onUpdateDeck(updatedDeck);
+                if (onApplyTheme) onApplyTheme(theme);
+                showToast('Applied 5-slide progression (Cover, Synthesis, 2D Framework, Metrics, Roadmap)!');
+              }}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs sm:text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              Apply 5-Slide Progression with Custom Theme
+            </button>
             <button
               type="button"
               onClick={() => handleApplyToDeck()}
-              className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold text-xs sm:text-sm hover:bg-blue-700 transition-colors shadow-md cursor-pointer flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-xl border border-neutral-200 dark:border-white/10 text-neutral-800 dark:text-neutral-200 font-semibold text-xs hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-center justify-center gap-2"
             >
-              <Sparkles className="w-4 h-4" />
+              <Check className="w-3.5 h-3.5" />
               Apply Custom Theme to Presentation Deck
             </button>
           </div>

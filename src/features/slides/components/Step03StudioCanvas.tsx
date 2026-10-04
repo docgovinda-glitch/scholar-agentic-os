@@ -16,6 +16,8 @@ import { condenseToSixWords } from '../services/semanticSlideExtractor';
 import { replicateSlideFromScreenshot } from '../services/slideReplicaService';
 import SlideMotifGraphic from './SlideMotifGraphic';
 import SlideHeroVisual from './SlideHeroVisual';
+import SlideCreativeSketchIllustration from './SlideCreativeSketchIllustration';
+import { apply5SlideDeckProgression } from '../services/deckProgressionService';
 
 export interface Step03StudioCanvasProps {
   deck: SlideDeck;
@@ -25,14 +27,14 @@ export interface Step03StudioCanvasProps {
 }
 
 const LAYOUT_OPTIONS: Array<{ id: SlideLayoutType; label: string; icon: string; ariaLabel?: string }> = [
+  { id: 'cover', label: 'Cover Hero', icon: '🚩', ariaLabel: 'Cover Hero' },
+  { id: 'two-column', label: '2-Col Synthesis', icon: '⚖️', ariaLabel: '2-Column Comparison (2-Column Comparative)' },
+  { id: 'framework', label: '2D Sketch & Framework', icon: '📐', ariaLabel: '2D Sketch & Framework' },
+  { id: 'metric-focus', label: 'Quantitative Metrics', icon: '📈', ariaLabel: 'Big Metric Focus' },
+  { id: 'categories', label: 'Phased Roadmap', icon: '🗺️', ariaLabel: 'Pillars' },
   { id: 'bullets', label: 'Header & Bullets', icon: '📝', ariaLabel: 'Header & Bullets' },
-  { id: 'image-split', label: 'Split Image + Text', icon: '🖼️', ariaLabel: 'Split Image + Text' },
-  { id: 'metric-focus', label: 'Big Metric Focus', icon: '📈', ariaLabel: 'Big Metric Focus' },
-  { id: 'two-column', label: '2-Column Comparison', icon: '⚖️', ariaLabel: '2-Column Comparison (2-Column Comparative)' },
+  { id: 'image-split', label: 'Custom Image + Text', icon: '🖼️', ariaLabel: 'Split Image + Text' },
   { id: 'quote-evidence', label: 'Quote / Highlight', icon: '💬', ariaLabel: 'Quote / Highlight (Quote / Evidence)' },
-  { id: 'cover', label: 'Swiss Cover', icon: '🚩', ariaLabel: 'Swiss Cover' },
-  { id: 'metrics', label: 'Ratio Metrics', icon: '📊', ariaLabel: 'Ratio Metrics' },
-  { id: 'categories', label: 'Pillars', icon: '🏛️', ariaLabel: 'Pillars' },
 ];
 
 export default function Step03StudioCanvas({
@@ -239,12 +241,33 @@ export default function Step03StudioCanvas({
             'Cryptographic proof of reference provenance verified',
           ],
         });
+      } else if (newLayout === 'framework') {
+        newBlocks.push({
+          type: 'image',
+          imageUrl: '',
+          caption: `${activeTheme.name} 2D Signature Framework`,
+          layout: 'split',
+          aspectRatio: '16:9',
+        });
+        newBlocks.push({
+          type: 'bullet-list',
+          items: [
+            'Governing Thought: Action-oriented strategic synthesis',
+            'Logical MECE Structure: Mutually exclusive, distinct tiers',
+            'Empirical Evidentiary Grounding: Zero unanchored drift',
+          ],
+        });
+        return {
+          ...slide,
+          layoutType: 'framework',
+          imageUrl: '',
+          imageCaption: `${activeTheme.name} 2D Signature Framework`,
+          blocks: newBlocks,
+        };
       } else if (newLayout === 'image-split') {
-        const defaultImg =
-          slide.imageUrl ||
-          'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80';
+        const defaultImg = slide.imageUrl || '';
         const defaultCaption =
-          slide.imageCaption || 'Empirical architecture data flow and verification graph';
+          slide.imageCaption || `${activeTheme.name} 2D Signature Framework`;
         newBlocks.push({
           type: 'image',
           imageUrl: defaultImg,
@@ -695,6 +718,7 @@ export default function Step03StudioCanvas({
                     : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
                 }`}
                 title={opt.label}
+                aria-label={opt.ariaLabel || opt.label}
               >
                 <span>{opt.icon}</span>
                 <span className="hidden md:inline">{opt.label}</span>
@@ -712,13 +736,28 @@ export default function Step03StudioCanvas({
             <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
               Slide Outline ({deck.slides.length})
             </span>
-            <button
-              type="button"
-              onClick={handleAddSlide}
-              className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              + Add Slide
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = apply5SlideDeckProgression(deck, deck.themeId, deck.customTheme || undefined);
+                  onUpdateDeck(updated);
+                  setActiveSlideIndex(0);
+                }}
+                className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                title="Format into Canva/Gamma 5-slide progression (Cover, Synthesis, 2D Sketch, Metrics, Roadmap)"
+              >
+                <Sparkles className="w-3 h-3 text-amber-500" />
+                <span>5-Slide Deck</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleAddSlide}
+                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+              >
+                + Add Slide
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
@@ -735,9 +774,24 @@ export default function Step03StudioCanvas({
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-bold font-mono px-1.5 py-0.2 rounded bg-neutral-200 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-                      {idx + 1}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold font-mono px-1.5 py-0.2 rounded bg-neutral-200 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
+                        {idx + 1}
+                      </span>
+                      <span className="text-[9px] font-mono px-1 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 uppercase font-semibold">
+                        {s.layoutType === 'cover'
+                          ? 'Cover'
+                          : s.layoutType === 'two-column'
+                          ? 'Synthesis'
+                          : s.layoutType === 'framework'
+                          ? '2D Sketch'
+                          : s.layoutType === 'metric-focus'
+                          ? 'Metrics'
+                          : s.layoutType === 'categories'
+                          ? 'Roadmap'
+                          : s.layoutType || 'Slide'}
+                      </span>
+                    </div>
                     <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
                       <button
                         type="button"
@@ -1092,15 +1146,15 @@ export default function Step03StudioCanvas({
                 </div>
               )}
 
-              {/* Split Image + Text Dedicated Layout View */}
-              {activeSlide.layoutType === 'image-split' && (
+              {/* Split Image + Text / 2D Framework Dedicated Layout View */}
+              {(activeSlide.layoutType === 'image-split' || activeSlide.layoutType === 'framework') && (
                 <div
                   className="grid grid-cols-1 md:grid-cols-2 gap-6 my-3 items-start"
                   data-testid="split-image-text-container"
                 >
-                  {/* Left Column: 50% responsive image container with upload/replace button and caption */}
+                  {/* Left Column: 50% responsive image / 2D vector sketch illustration */}
                   <div className="space-y-2">
-                    <div className="relative group rounded-xl overflow-hidden border border-neutral-200/60 dark:border-white/10 bg-neutral-100 dark:bg-black/30 shadow-xs aspect-16/9 sm:aspect-4/3 flex items-center justify-center">
+                    <div className="relative group rounded-xl overflow-hidden border border-neutral-200/60 dark:border-white/10 bg-neutral-100 dark:bg-black/30 shadow-xs aspect-16/9 sm:aspect-4/3 flex items-center justify-center p-2">
                       {activeSlide.imageUrl ? (
                         <>
                           <img
@@ -1113,43 +1167,47 @@ export default function Step03StudioCanvas({
                             <button
                               type="button"
                               onClick={() => imageFileInputRef.current?.click()}
-                              className="px-3 py-1.5 rounded-lg bg-white/95 text-neutral-900 text-xs font-bold shadow hover:bg-white transition-all flex items-center gap-1.5"
+                              className="px-3 py-1.5 rounded-lg bg-white/95 text-neutral-900 text-xs font-bold shadow hover:bg-white transition-all flex items-center gap-1.5 cursor-pointer"
                             >
                               <span>📷 Replace</span>
                             </button>
                             <button
                               type="button"
                               onClick={handleRemoveImage}
-                              className="px-3 py-1.5 rounded-lg bg-red-600/90 text-white text-xs font-bold shadow hover:bg-red-600 transition-all flex items-center gap-1.5"
+                              className="px-3 py-1.5 rounded-lg bg-red-600/90 text-white text-xs font-bold shadow hover:bg-red-600 transition-all flex items-center gap-1.5 cursor-pointer"
                             >
                               <span>✕ Remove</span>
                             </button>
                           </div>
                         </>
                       ) : (
-                        <div
-                          onClick={() => imageFileInputRef.current?.click()}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            const file = e.dataTransfer.files?.[0];
-                            if (file) handleImageFileUpload(file);
-                          }}
-                          className="w-full h-full flex flex-col items-center justify-center p-6 text-center cursor-pointer hover:bg-neutral-200/50 dark:hover:bg-white/5 transition-colors border-2 border-dashed border-neutral-300 dark:border-white/20 rounded-xl"
-                        >
-                          <span className="text-3xl mb-1">🖼️</span>
-                          <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
-                            Click or drag image here
-                          </p>
-                          <p className="text-[10px] text-neutral-400 mt-0.5">
-                            Supports PNG, JPG, WebP
-                          </p>
-                          <button
-                            type="button"
-                            className="mt-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs"
-                          >
-                            Upload Local Image
-                          </button>
+                        <div className="w-full h-full flex flex-col items-center justify-between p-2 relative">
+                          <div className="w-full flex-1 flex items-center justify-center">
+                            <SlideCreativeSketchIllustration
+                              themeId={activeTheme.id}
+                              themeName={activeSlide.imageCaption || activeTheme.name}
+                              category={activeTheme.category}
+                              layoutArchetype={activeTheme.layoutArchetype}
+                              accent={activeTheme.accent}
+                              cardBg={activeTheme.cardBg}
+                              canvasBg={activeTheme.canvasBg}
+                              textPrimary={activeTheme.textPrimary}
+                              textSecondary={activeTheme.textSecondary}
+                              mode={activeTheme.mode || 'light'}
+                            />
+                          </div>
+                          <div className="w-full flex items-center justify-between pt-1 border-t border-black/5 dark:border-white/5 text-[10px]">
+                            <span className="font-mono text-neutral-500 font-semibold truncate">
+                              // 2D Vector: {activeTheme.name}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => imageFileInputRef.current?.click()}
+                              className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-semibold cursor-pointer"
+                            >
+                              Upload Custom Image
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
