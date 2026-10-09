@@ -14,6 +14,9 @@ function fakeDb(rows: Record<string, unknown>[] = []): PgQueryable & { calls: { 
     calls,
     async query(text: string, params?: unknown[]) {
       calls.push({ text, params });
+      if (text.toLowerCase().includes("returning project_id") && rows.length === 0) {
+        return { rows: [{ project_id: params?.[0] || "proj-mock" }] };
+      }
       return { rows };
     },
   };
@@ -38,8 +41,9 @@ describe("services/store: pgProjectStore", () => {
     expect(db.calls).toHaveLength(1);
     expect(db.calls[0].text).toMatch(/insert into public\.projects/i);
     expect(db.calls[0].params?.[0]).toBe(record.projectId);
-    expect(db.calls[0].params?.[1]).toBe("11111111-1111-4111-8111-111111111111"); // owner_id
-    expect(db.calls[0].params?.[2]).toBe("OT-07");
+    expect(db.calls[0].params?.[1]).toBe(1); // version
+    expect(db.calls[0].params?.[2]).toBe("11111111-1111-4111-8111-111111111111"); // owner_id
+    expect(db.calls[0].params?.[3]).toBe("OT-07");
   });
 
   it("get() maps a jsonb row back into a ProjectRecord, treating null document/rubric_report as undefined", async () => {
@@ -66,7 +70,7 @@ describe("services/store: pgProjectStore", () => {
     expect(record?.answers).toEqual({ research_question: "provisional" });
     // Row predates the submissions column — must default to an empty list, not undefined.
     expect(record?.submissions).toEqual([]);
-    expect(db.calls[0].text).toMatch(/select \* from public\.projects where project_id = \$1/i);
+    expect(db.calls[0].text).toMatch(/FROM public\.projects p/i);
     expect(db.calls[0].params).toEqual(["proj-abc"]);
   });
 
@@ -94,8 +98,8 @@ describe("services/store: pgProjectStore", () => {
     const saved = await store.save(record);
     expect(saved).toBe(record);
     expect(db.calls[0].text).toMatch(/on conflict \(project_id\) do update/i);
-    expect(db.calls[0].params?.[6]).toBeNull(); // document
-    expect(db.calls[0].params?.[7]).toBeNull(); // rubric_report
+    expect(db.calls[0].params?.[7]).toBeNull(); // document
+    expect(db.calls[0].params?.[8]).toBeNull(); // rubric_report
   });
 
   it("listByOwner() scopes the query to the owner in SQL, not in memory", async () => {
@@ -106,7 +110,7 @@ describe("services/store: pgProjectStore", () => {
     // The owner filter must be in the WHERE clause. Selecting every row and
     // filtering after the fact would put one bug between a user and everyone
     // else's projects.
-    expect(db.calls[0].text).toMatch(/where owner_id = \$1/i);
+    expect(db.calls[0].text).toMatch(/WHERE p\.owner_id = \$1/i);
     expect(db.calls[0].params).toEqual(["11111111-1111-4111-8111-111111111111"]);
   });
 
@@ -127,7 +131,7 @@ describe("services/store: pgProjectStore", () => {
     };
 
     await store.save(record);
-    const documentParam = db.calls[0].params?.[6];
+    const documentParam = db.calls[0].params?.[7]; // shifted by +1 for version
     expect(typeof documentParam).toBe("string");
     expect(JSON.parse(documentParam as string)).toEqual(record.document);
   });
@@ -147,7 +151,7 @@ describe("services/store: pgProjectStore", () => {
       evidenceLedger: { sources: [], items: [] },
     };
     await insertStore.save(withoutRequirements);
-    expect(insertDb.calls[0].params?.[11]).toBeNull();
+    expect(insertDb.calls[0].params?.[12]).toBeNull();
 
     const journalRequirements: ProjectRecord["journalRequirements"] = {
       journalName: "Water Research",
@@ -160,7 +164,7 @@ describe("services/store: pgProjectStore", () => {
     const withDb = fakeDb();
     const withStore = createPgProjectStore(withDb);
     await withStore.save({ ...withoutRequirements, journalRequirements });
-    const updateParam = withDb.calls[0].params?.[11];
+    const updateParam = withDb.calls[0].params?.[12];
     expect(typeof updateParam).toBe("string");
     expect(JSON.parse(updateParam as string)).toEqual(journalRequirements);
 
@@ -203,7 +207,7 @@ describe("services/store: pgProjectStore", () => {
     };
     const saveDb = fakeDb();
     await createPgProjectStore(saveDb).save(record);
-    const param = saveDb.calls[0].params?.[12];
+    const param = saveDb.calls[0].params?.[13];
     expect(typeof param).toBe("string");
     expect(JSON.parse(param as string)).toEqual(record.evidenceLedger);
 
@@ -266,7 +270,7 @@ describe("services/store: pgProjectStore", () => {
     };
     const saveDb = fakeDb();
     await createPgProjectStore(saveDb).save(record);
-    const param = saveDb.calls[0].params?.[13];
+    const param = saveDb.calls[0].params?.[14];
     expect(typeof param).toBe("string");
     expect(JSON.parse(param as string)).toEqual(generationJob);
 
@@ -307,7 +311,7 @@ describe("services/store: pgProjectStore", () => {
     };
     const saveDb = fakeDb();
     await createPgProjectStore(saveDb).save(record);
-    const param = saveDb.calls[0].params?.[14];
+    const param = saveDb.calls[0].params?.[15];
     expect(typeof param).toBe("string");
     expect(JSON.parse(param as string)).toEqual(peerReviewHistory);
 
@@ -373,9 +377,9 @@ describe("services/store: pgProjectStore", () => {
     const saveDb = fakeDb();
     await createPgProjectStore(saveDb).save(record);
     const params = saveDb.calls[0].params;
-    expect(JSON.parse(params?.[15] as string)).toEqual(coverLetter);
-    expect(JSON.parse(params?.[16] as string)).toEqual(anonymizationReport);
-    expect(JSON.parse(params?.[17] as string)).toEqual(anonymizedDocument);
+    expect(JSON.parse(params?.[16] as string)).toEqual(coverLetter);
+    expect(JSON.parse(params?.[17] as string)).toEqual(anonymizationReport);
+    expect(JSON.parse(params?.[18] as string)).toEqual(anonymizedDocument);
 
     const staleRowDb = fakeDb([
       {
@@ -437,7 +441,7 @@ describe("services/store: pgProjectStore", () => {
     };
     const saveDb = fakeDb();
     await createPgProjectStore(saveDb).save(record);
-    expect(JSON.parse(saveDb.calls[0].params?.[18] as string)).toEqual(record.sourceCountOverride);
+    expect(JSON.parse(saveDb.calls[0].params?.[19] as string)).toEqual(record.sourceCountOverride);
 
     const staleRowDb = fakeDb([
       {

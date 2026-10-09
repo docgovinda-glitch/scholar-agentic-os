@@ -24,3 +24,10 @@ export interface ProjectStore {
   listByOwner(ownerId: string): Promise<ProjectRecord[]>;
   delete(projectId: string): Promise<void>;
 }
+
+export class OptimisticLockError extends Error {
+  constructor(projectId: string) {
+    super(`OptimisticLockError: Project ${projectId} has been modified by another request.`);
+    this.name = "OptimisticLockError";
+  }
+}

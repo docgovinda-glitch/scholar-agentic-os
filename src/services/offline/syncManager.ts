@@ -82,27 +82,31 @@ class PocketSyncManager {
     let processed = 0;
     let errors = 0;
 
+    const byProject = new Map<string, typeof mutations>();
     for (const mut of mutations) {
-      try {
-        let endpoint = `/api/projects/${mut.projectId}/sync`;
-        if (mut.type === "approve_source") {
-          endpoint = `/api/projects/${mut.projectId}/sources/approve`;
-        } else if (mut.type === "reject_source") {
-          endpoint = `/api/projects/${mut.projectId}/sources/reject`;
-        } else if (mut.type === "save_draft") {
-          endpoint = `/api/projects/${mut.projectId}/draft`;
-        }
+      if (!byProject.has(mut.projectId)) byProject.set(mut.projectId, []);
+      byProject.get(mut.projectId)!.push(mut);
+    }
 
-        const res = await authedJsonFetch(endpoint, "POST", mut.payload);
+    for (const [projectId, projectMutations] of byProject.entries()) {
+      try {
+        const endpoint = `/api/projects/${projectId}/sync`;
+        const res = await authedJsonFetch(endpoint, "POST", { mutations: projectMutations });
         if (res.ok) {
-          await removePendingMutation(mut.id);
-          processed++;
+          for (const mut of projectMutations) {
+            await removePendingMutation(mut.id);
+            processed++;
+          }
         } else {
-          errors++;
+          // If we hit a 409 (OptimisticLockError), the sync endpoint (if correctly batched) 
+          // shouldn't 409 unless there's an active race *during* replay. 
+          // But if it does, leaving it in the queue for a retry next flush is safe, 
+          // because our /sync endpoint natively reconciles them on top of the latest state!
+          errors += projectMutations.length;
         }
       } catch (err) {
-        console.warn(`[SyncManager] Failed to sync mutation ${mut.id}:`, err);
-        errors++;
+        console.warn(`[SyncManager] Failed to sync project ${projectId}:`, err);
+        errors += projectMutations.length;
       }
     }
 

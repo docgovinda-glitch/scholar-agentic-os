@@ -161,14 +161,18 @@ erDiagram
 
 #### `public.projects`
 - `id` (uuid, primary key, default `gen_random_uuid()`)
+- `version` (integer, default `1`) — **Optimistic Locking**: Used to prevent lost updates via last-write-wins.
 - `user_id` (uuid, references `auth.users(id)` on delete cascade)
 - `title` (text, not null)
 - `output_type_id` (text, not null)
 - `state` (jsonb, default `'{}'::jsonb`)
+- `answers` (jsonb, default `'{}'::jsonb`) — Monolithic answers store (Targeted for normalization)
 - `authors` (jsonb, default `'[]'::jsonb`)
 - `created_at` (timestamptz, default `now()`)
 - `updated_at` (timestamptz, default `now()`)
 - *RLS*: Enabled (`auth.uid() = user_id`).
+
+*(Note: The monolithic `answers` and `state` JSONB columns are currently being migrated to granular, normalized tables including `project_answers`, `project_sources`, `project_uploaded_sources`, and `project_evidence` to resolve monolithic state serialization and network limits.)*
 
 #### `public.assignment_projects`
 - `project_id` (uuid, primary key, references `public.projects(id)` on delete cascade)

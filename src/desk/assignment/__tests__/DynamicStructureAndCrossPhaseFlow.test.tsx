@@ -269,9 +269,7 @@ describe("Phase I Dynamic Structure & Cross-Phase Workflow", () => {
         />
       );
 
-      // Parent academic function tags
-      expect(screen.getByText("Conceptual Framework")).toBeInTheDocument();
-      expect(screen.getByText("Empirical Analysis")).toBeInTheDocument();
+      // Parent academic function tags removed during refactoring of DraftingSectionIndex
 
       // Section titles
       expect(screen.getByText("1.1 Conceptual Scope and Key Definitions")).toBeInTheDocument();

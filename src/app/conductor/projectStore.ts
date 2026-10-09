@@ -42,6 +42,7 @@ export interface Author {
 
 export interface ProjectRecord {
   projectId: string;
+  version: number;
   /**
    * Supabase user id of the project's owner.
    *
@@ -117,6 +118,7 @@ export function createProject(outputTypeId: string, ownerId: string): ProjectRec
   const projectId = generateProjectId();
   const record: ProjectRecord = {
     projectId,
+    version: 1,
     ownerId,
     outputTypeId,
     answers: {},

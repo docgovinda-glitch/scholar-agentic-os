@@ -15,6 +15,7 @@ import { emptyLedger } from "../../domain/evidence/types";
 import { emptyPeerReviewHistory } from "../../domain/review/types";
 import { generateProjectId } from "../../app/conductor/projectStore";
 import { SUPABASE_ROOT_CA } from "./supabaseRootCa";
+import { OptimisticLockError } from "./types";
 import type { ProjectRecord, ProjectStore } from "./types";
 
 export interface PgQueryable {
@@ -70,9 +71,10 @@ export function createPool(): Pool {
 function rowToRecord(row: Record<string, unknown>): ProjectRecord {
   return {
     projectId: row.project_id as string,
+    version: (row.version as number) ?? 1,
     ownerId: row.owner_id as string,
     outputTypeId: row.output_type_id as string,
-    answers: row.answers as ProjectRecord["answers"],
+    answers: (row.answers as Record<string, any>) || {},
     authors: (row.authors as ProjectRecord["authors"] | null) ?? [],
     gates: row.gates as ProjectRecord["gates"],
     document: (row.document as ProjectRecord["document"] | null) ?? undefined,
@@ -91,6 +93,19 @@ function rowToRecord(row: Record<string, unknown>): ProjectRecord {
     anonymizedDocument: (row.anonymized_document as ProjectRecord["anonymizedDocument"] | null) ?? undefined,
     sourceCountOverride: (row.source_count_override as ProjectRecord["sourceCountOverride"] | null) ?? undefined,
   };
+
+  // Rehydrate normalized state
+  if (row._sources && Array.isArray(row._sources) && row._sources.length > 0) {
+    record.answers.assignment_sources = row._sources;
+  }
+  if (row._uploaded_sources && Array.isArray(row._uploaded_sources) && row._uploaded_sources.length > 0) {
+    record.answers.assignment_user_uploaded_sources = row._uploaded_sources;
+  }
+  if (row._evidence && Array.isArray(row._evidence) && row._evidence.length > 0) {
+    record.answers.assignment_evidence_items = row._evidence;
+  }
+
+  return record;
 }
 
 export function createPgProjectStore(db: PgQueryable): ProjectStore {
@@ -99,6 +114,7 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
       const projectId = generateProjectId();
       const record: ProjectRecord = {
         projectId,
+        version: 1,
         ownerId,
         outputTypeId,
         answers: {},
@@ -112,10 +128,11 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
       };
       await db.query(
         `insert into public.projects
-           (project_id, owner_id, output_type_id, answers, authors, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger, generation_job, peer_review_history, cover_letter, anonymization_report, anonymized_document, source_count_override)
-         values ($1, $2, $3, $4, $5, $6, null, null, $7, $8, $9, null, $10, null, $11, null, null, null, null)`,
+           (project_id, version, owner_id, output_type_id, answers, authors, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger, generation_job, peer_review_history, cover_letter, anonymization_report, anonymized_document, source_count_override)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
         [
           record.projectId,
+          record.version,
           record.ownerId,
           record.outputTypeId,
           JSON.stringify(record.answers),
@@ -132,17 +149,40 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
     },
 
     async get(projectId: string): Promise<ProjectRecord | undefined> {
-      const result = await db.query(`select * from public.projects where project_id = $1`, [projectId]);
+      const result = await db.query(
+        `SELECT p.*,
+                (SELECT coalesce(jsonb_agg(ps.metadata), '[]'::jsonb) FROM public.project_sources ps WHERE ps.project_id = p.project_id) as _sources,
+                (SELECT coalesce(jsonb_agg(jsonb_build_object('id', pus.document_id, 'filename', pus.filename, 'status', pus.status)), '[]'::jsonb) FROM public.project_uploaded_sources pus WHERE pus.project_id = p.project_id) as _uploaded_sources,
+                (SELECT coalesce(jsonb_agg(pe.metadata), '[]'::jsonb) FROM public.project_evidence pe WHERE pe.project_id = p.project_id) as _evidence
+         FROM public.projects p
+         WHERE p.project_id = $1`,
+        [projectId]
+      );
       const row = result.rows[0];
       return row ? rowToRecord(row) : undefined;
     },
 
     async save(record: ProjectRecord): Promise<ProjectRecord> {
-      await db.query(
+      const nextVersion = record.version + 1;
+
+      // Extract sources & evidence
+      const answersToSave = { ...(record.answers || {}) };
+      const sources = answersToSave.assignment_sources || [];
+      const uploadedSources = answersToSave.assignment_user_uploaded_sources || answersToSave.userUploadedSources || [];
+      const evidenceItems = answersToSave.assignment_evidence_items || [];
+
+      // Remove from monolithic jsonb
+      delete answersToSave.assignment_sources;
+      delete answersToSave.assignment_user_uploaded_sources;
+      delete answersToSave.userUploadedSources;
+      delete answersToSave.assignment_evidence_items;
+
+      const result = await db.query(
         `insert into public.projects
-           (project_id, owner_id, output_type_id, answers, authors, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger, generation_job, peer_review_history, cover_letter, anonymization_report, anonymized_document, source_count_override, updated_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, now())
+           (project_id, version, owner_id, output_type_id, answers, authors, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger, generation_job, peer_review_history, cover_letter, anonymization_report, anonymized_document, source_count_override, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, now())
          on conflict (project_id) do update set
+           version = excluded.version,
            output_type_id = excluded.output_type_id,
            answers = excluded.answers,
            authors = excluded.authors,
@@ -160,12 +200,15 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
            anonymization_report = excluded.anonymization_report,
            anonymized_document = excluded.anonymized_document,
            source_count_override = excluded.source_count_override,
-           updated_at = now()`,
+           updated_at = now()
+         where public.projects.version = $21
+         returning project_id`,
         [
           record.projectId,
+          nextVersion,
           record.ownerId,
           record.outputTypeId,
-          JSON.stringify(record.answers),
+          JSON.stringify(answersToSave),
           JSON.stringify(record.authors || []),
           JSON.stringify(record.gates),
           record.document ? JSON.stringify(record.document) : null,
@@ -181,14 +224,69 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
           record.anonymizationReport ? JSON.stringify(record.anonymizationReport) : null,
           record.anonymizedDocument ? JSON.stringify(record.anonymizedDocument) : null,
           record.sourceCountOverride ? JSON.stringify(record.sourceCountOverride) : null,
+          record.version,
         ]
       );
+      if (!result.rows || result.rows.length === 0) {
+        throw new OptimisticLockError(record.projectId);
+      }
+      record.version = nextVersion;
+
+      // Update side tables safely after main record is committed
+      if (sources.length > 0) {
+        await db.query(`DELETE FROM public.project_sources WHERE project_id = $1`, [record.projectId]);
+        const values = [];
+        const params: any[] = [record.projectId];
+        let i = 2;
+        for (const s of sources) {
+          values.push(`($1, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++})`);
+          params.push(s.id, s.title, JSON.stringify(s.authors || []), s.year || "", s.abstract || "", s.url || "", s.doi || "", s.status || "kept", s.isExcluded || false, JSON.stringify(s));
+        }
+        await db.query(`INSERT INTO public.project_sources (project_id, source_id, title, authors, year, abstract, url, doi, status, is_excluded, metadata) VALUES ${values.join(", ")}`, params);
+      } else {
+        await db.query(`DELETE FROM public.project_sources WHERE project_id = $1`, [record.projectId]);
+      }
+
+      if (uploadedSources.length > 0) {
+        await db.query(`DELETE FROM public.project_uploaded_sources WHERE project_id = $1`, [record.projectId]);
+        const values = [];
+        const params: any[] = [record.projectId];
+        let i = 2;
+        for (const s of uploadedSources) {
+          values.push(`($1, $${i++}, $${i++}, $${i++})`);
+          params.push(s.id, s.filename || s.title || "Document", s.status || "kept");
+        }
+        await db.query(`INSERT INTO public.project_uploaded_sources (project_id, document_id, filename, status) VALUES ${values.join(", ")}`, params);
+      } else {
+        await db.query(`DELETE FROM public.project_uploaded_sources WHERE project_id = $1`, [record.projectId]);
+      }
+
+      if (evidenceItems.length > 0) {
+        await db.query(`DELETE FROM public.project_evidence WHERE project_id = $1`, [record.projectId]);
+        const values = [];
+        const params: any[] = [record.projectId];
+        let i = 2;
+        for (const e of evidenceItems) {
+          values.push(`($1, $${i++}, $${i++}, $${i++}, $${i++}, $${i++})`);
+          params.push(e.id, e.sourceId || "", e.evidenceSnippet || e.claim || "", e.status || "approved", JSON.stringify(e));
+        }
+        await db.query(`INSERT INTO public.project_evidence (project_id, evidence_id, source_id, text, status, metadata) VALUES ${values.join(", ")}`, params);
+      } else {
+        await db.query(`DELETE FROM public.project_evidence WHERE project_id = $1`, [record.projectId]);
+      }
+
       return record;
     },
 
     async listByOwner(ownerId: string): Promise<ProjectRecord[]> {
       const result = await db.query(
-        `select * from public.projects where owner_id = $1 order by updated_at desc`,
+        `SELECT p.*,
+                (SELECT coalesce(jsonb_agg(ps.metadata), '[]'::jsonb) FROM public.project_sources ps WHERE ps.project_id = p.project_id) as _sources,
+                (SELECT coalesce(jsonb_agg(jsonb_build_object('id', pus.document_id, 'filename', pus.filename, 'status', pus.status)), '[]'::jsonb) FROM public.project_uploaded_sources pus WHERE pus.project_id = p.project_id) as _uploaded_sources,
+                (SELECT coalesce(jsonb_agg(pe.metadata), '[]'::jsonb) FROM public.project_evidence pe WHERE pe.project_id = p.project_id) as _evidence
+         FROM public.projects p
+         WHERE p.owner_id = $1 
+         ORDER BY p.updated_at DESC`,
         [ownerId]
       );
       return result.rows.map(rowToRecord);

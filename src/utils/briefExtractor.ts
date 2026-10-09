@@ -311,7 +311,7 @@ export function extractSubstantiveBriefQuestions(rawText: string): string[] {
 
     // Sentence questions ending in ?
     if (line.endsWith("?") && line.length >= 15 && !line.toLowerCase().includes("pay people to leave")) {
-      const qText = line.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
+      const qText = line.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").replace(/\?+$/, "").trim();
       if (!seen.has(qText.toLowerCase())) {
         seen.add(qText.toLowerCase());
         questions.push(qText);

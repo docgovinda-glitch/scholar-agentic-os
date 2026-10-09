@@ -56,6 +56,7 @@ import { getProjectStore } from "../../src/services/store/projectStore.ts";
 import type { ProjectStore } from "../../src/services/store/types.ts";
 import { requireAuth } from "../src/middleware/auth.ts";
 import type { ProjectRecord } from "../../src/services/store/types.ts";
+import { OptimisticLockError } from "../../src/services/store/types.ts";
 import { exportDocument } from "../../src/app/export/export.ts";
 import type { ExportFormat } from "../../src/app/export/types.ts";
 import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../src/app/rubric/rubric.ts";
@@ -1029,6 +1030,9 @@ export function asyncRoute(
       console.error(`${req.method} ${req.originalUrl} failed:`, err);
       // A handler may already have answered before throwing.
       if (res.headersSent) return next(err);
+      if (err instanceof OptimisticLockError) {
+        return res.status(409).json({ error: "Conflict: The project was modified by another request. Please refresh and try again." });
+      }
       res.status(500).json({ error: "Something went wrong handling that request." });
     });
   };
@@ -1155,15 +1159,69 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     const { mutations, document, answers } = req.body ?? {};
     let updated = record;
 
-    if (answers && typeof answers === "object") {
-      updated = { ...updated, answers: { ...updated.answers, ...answers } };
+    if (Array.isArray(mutations)) {
+      for (const mut of mutations) {
+        if (!mut || !mut.type || !mut.payload) continue;
+
+        switch (mut.type) {
+          case "approve_source": {
+            const { sourceId, evidenceId, actor = currentUserId(req) } = mut.payload;
+            const targetId = evidenceId || sourceId;
+            if (targetId) {
+              const item = updated.evidenceLedger.items.find(i => i.id === targetId || i.sourceId === targetId);
+              if (item) {
+                try {
+                  updated.evidenceLedger = approveEvidence(updated.evidenceLedger, item.id, actor);
+                } catch (_) {} // Ignore domain errors (e.g. already approved) during replay
+              }
+            }
+            break;
+          }
+          case "reject_source": {
+            const { sourceId, evidenceId, actor = currentUserId(req), reason } = mut.payload;
+            const targetId = evidenceId || sourceId;
+            if (targetId) {
+              const item = updated.evidenceLedger.items.find(i => i.id === targetId || i.sourceId === targetId);
+              if (item) {
+                try {
+                  updated.evidenceLedger = rejectEvidence(updated.evidenceLedger, item.id, actor, reason || "Rejected by user");
+                } catch (_) {}
+              }
+            }
+            break;
+          }
+          case "save_draft": {
+            const draftDoc = mut.payload.document;
+            const draftAns = mut.payload.answers;
+            if (draftAns && typeof draftAns === "object") {
+              updated = { ...updated, answers: { ...updated.answers, ...draftAns } };
+            }
+            if (draftDoc && isValidDocument(draftDoc)) {
+              updated = { ...updated, document: draftDoc };
+            }
+            break;
+          }
+        }
+      }
+    } else {
+      // Legacy fallback
+      if (answers && typeof answers === "object") {
+        updated = { ...updated, answers: { ...updated.answers, ...answers } };
+      }
+      if (document && isValidDocument(document)) {
+        updated = { ...updated, document };
+      }
     }
-    if (document && isValidDocument(document)) {
-      const { rubricReport, gates: gatesAfterG6 } = recomputeG6(updated, document);
-      const gatesAfterG3 = recomputeG3({ ...updated, gates: gatesAfterG6 }, document, updated.answers);
-      const gates = recomputeG4({ ...updated, gates: gatesAfterG3 }, document);
-      updated = { ...updated, document, rubricReport, gates };
+
+    // Recompute gates based on the final merged state
+    updated.gates = recomputeG2(updated);
+    if (updated.document && isValidDocument(updated.document)) {
+      const { rubricReport, gates: gatesAfterG6 } = recomputeG6(updated, updated.document);
+      const gatesAfterG3 = recomputeG3({ ...updated, gates: gatesAfterG6 }, updated.document, updated.answers);
+      updated.gates = recomputeG4({ ...updated, gates: gatesAfterG3 }, updated.document);
+      updated.rubricReport = rubricReport;
     }
+
     const saved = await store.save(updated);
     res.json({ success: true, processed: Array.isArray(mutations) ? mutations.length : 1, project: projectView(saved) });
   }));
