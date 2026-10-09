@@ -5,6 +5,7 @@ import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { saveIntakeAnswers, authedStreamFetch } from "../../api";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export type AcademicDatabase =
   | "CrossRef"
@@ -1137,6 +1138,23 @@ export default function ExternalResearchStage({
 
       {/* 3. Main Scrollable Workspace */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 4 · Claim Extraction & Synthesis"
+          stageLabel="External Academic Crawler & Deep Literature Harvest"
+          description="Autonomous scholarly crawler interrogating CrossRef, arXiv, Semantic Scholar, PubMed, and IEEE Xplore to discover preprints and peer-reviewed literature bridging your anchor gap."
+          instructions={[
+            "Configure target academic databases and set relevance threshold (e.g., ≥ 75%)",
+            "Click 'Start Academic Crawler' to launch multi-registry discovery stream",
+            "Inspect candidate papers, citations, open access links, and matching rationales",
+            "Queue discovered papers for approval triage before claim matrix synthesis",
+          ]}
+          targetJournal={project?.answers?.["target_journal"]}
+          tips={[
+            "Grounding your paper with recent preprints (2024-2026) demonstrates command of the bleeding edge of the discipline.",
+            "All crawled papers capture real DOIs, minimizing editorial verification overhead.",
+          ]}
+        />
+
         {/* Crawler Configuration Panel */}
         <div className="max-w-5xl mx-auto bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-2xl p-5 shadow-xs space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[color:var(--border-subtle)]">

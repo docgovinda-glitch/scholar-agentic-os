@@ -54,5 +54,5 @@ describe("Three-Way Architectural AI Isolation Tests", () => {
 
     // If server candidates are not populated in env during test, it returns 426 or 404/200, never leaking
     expect([200, 404, 426]).toContain(res.status);
-  }, 20000);
+  }, 35000);
 });

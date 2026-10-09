@@ -1,9 +1,27 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedStreamFetch, saveIntakeAnswers } from "../../api";
+import { authedStreamFetch, saveIntakeAnswers, executeAgenticLLM } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
+import {
+  buildSectionDraftPrompts,
+  generateLocalSectionFallback,
+} from "../agentPrompts/draftPrompts";
+import {
+  Sparkles,
+  Plus,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
+  Wand2,
+  Edit3,
+  Copy,
+  Check,
+  RotateCcw,
+  BookOpen,
+} from "lucide-react";
 
 export interface ManuscriptSection {
   id?: string;
@@ -12,6 +30,7 @@ export interface ManuscriptSection {
   status: "Drafted" | "Reviewing" | "Revised";
   length?: number;
   word_count?: number;
+  target_words?: number;
   content: string;
 }
 
@@ -128,6 +147,14 @@ export default function DraftStage({
   const [error, setError] = useState<string | null>(null);
   const [copiedNotification, setCopiedNotification] = useState<boolean>(false);
 
+  // Section-by-Section AI Customization State
+  const [sectionDirective, setSectionDirective] = useState<string>("");
+  const [selectedTone, setSelectedTone] = useState<string>("Nature / Science empirical register");
+  const [isRegeneratingSection, setIsRegeneratingSection] = useState<boolean>(false);
+  const [isAddSectionModalOpen, setIsAddSectionModalOpen] = useState<boolean>(false);
+  const [newSectionTitle, setNewSectionTitle] = useState<string>("");
+  const [newSectionBudget, setNewSectionBudget] = useState<number>(1000);
+
   const logIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearTimer = () => {
@@ -163,6 +190,7 @@ export default function DraftStage({
           section: "Abstract",
           status: "Drafted",
           length: 245,
+          target_words: 250,
           content: `Wide-area distributed systems increasingly operate over heterogeneous cloud infrastructures subject to asymmetric network partitions and transient latency spikes. Under such partial failures, conventional Byzantine Fault Tolerant (BFT) replication protocols, such as Practical Byzantine Fault Tolerance (Castro & Liskov, 2002), experience severe throughput collapse due to rigid leader-centric quorum barriers. This paper addresses the empirical research gap concerning "${anchorGap}". We propose an adaptive quorum reconfiguration architecture that dynamically optimizes quorum cardinality without violating safety invariants. Through extensive benchmarking over empirical traces comprising 150,000+ transaction rounds (${datasetInfo}), our protocol sustains sub-second commit latencies up to a 35% packet drop boundary, achieving an average throughput gain of 3.4× over static quorums. Our findings demonstrate that decoupling consensus progression from symmetric broadcast guarantees preserves Byzantine resilience while meeting the latency strictures of modern wide-area applications.`,
         },
         {
@@ -170,6 +198,7 @@ export default function DraftStage({
           section: "Introduction",
           status: "Drafted",
           length: 1250,
+          target_words: 1500,
           content: `## 1. Introduction\n\nModern geo-distributed storage and transaction systems demand both Byzantine fault tolerance and predictable sub-second response times. However, existing consensus foundations predominantly rely on the assumption of symmetric network partitions—where connectivity between any pair of nodes is either fully intact or completely severed. In realistic wide-area networks (WANs), asymmetric partitions frequently occur, wherein node $A$ can communicate with node $B$, but node $B$ experiences intermittent packet drops to node $C$.\n\nAs Castro & Liskov (2002) established, traditional BFT state machine replication requires a minimum of $3f + 1$ replicas to tolerate $f$ arbitrary failures. While theoretically optimal under symmetric failure assumptions, asymmetric splits trigger perpetual view-change elections, throttling commit throughput by up to 88%.\n\n### Core Research Motivation & Anchor Gap\nThis empirical investigation directly tackles the gap: **"${anchorGap}"**. Prior approaches either revert to synchronous fallback modes or sacrifice Byzantine liveness guarantees. We demonstrate that: "${primaryQuote}".\n\n### Primary Contributions\n1. **Formal Failure Model**: An asymmetric partition abstraction for wide-area consensus quorums.\n2. **Adaptive Quorum Protocol**: An empirical quorum steering algorithm that avoids degraded routing paths while maintaining safety proofs.\n3. **Empirical Benchmarking**: Comprehensive validation on the primary dataset (${datasetInfo}), demonstrating resilient latency bounds.`,
         },
         {
@@ -177,6 +206,7 @@ export default function DraftStage({
           section: "System Model & Theoretical Formulation",
           status: "Drafted",
           length: 1420,
+          target_words: 1600,
           content: `## 2. System Model & Problem Formulation\n\nWe consider an asynchronous distributed network composed of $n$ distinct replica nodes $\\Pi = \\{p_1, p_2, \\dots, p_n\\}$, communicating via authenticated point-to-point channels. Up to $f$ replicas may exhibit Byzantine (arbitrary) behavior, including message tampering, omission, and selective equivocation.\n\n### Quorum Intersection Invariant\nTo guarantee safety across arbitrary network topologies, any two quorums $Q_1, Q_2 \\subset \\Pi$ must satisfy:\n\n$$|Q_1 \\cap Q_2| \\ge f + 1$$\n\nUnder asymmetric partitions, link quality matrix $\\Lambda(t) \\in [0, 1]^{n \\times n}$ fluctuates dynamically. Rather than stalling consensus progression, our protocol routes proposal certificates through high-fidelity graph cuts identified by moving-average latency estimation.`,
         },
         {
@@ -184,6 +214,7 @@ export default function DraftStage({
           section: "Empirical Evaluation & Results",
           status: "Drafted",
           length: 1850,
+          target_words: 2200,
           content: `## 3. Empirical Benchmark Evaluation\n\nWe evaluated our implementation against baseline Practical Byzantine Fault Tolerance across multi-region deployment topologies spanning North America, Europe, and Asia-Pacific. Network degradation profiles were replayed from the verified primary telemetry dataset (${datasetInfo}).\n\n### Throughput Under Progressive Packet Loss\n| Network Loss (%) | Static PBFT (tx/sec) | Adaptive Quorum (tx/sec) | Latency P99 (ms) |\n| :--- | :--- | :--- | :--- |\n| 0% (Nominal) | 12,450 | 12,380 | 185 ms |\n| 10% Asymmetric | 7,120 | 11,940 | 240 ms |\n| 20% Asymmetric | 2,840 | 10,810 | 380 ms |\n| 35% Asymmetric | 310 (Stalled) | 8,920 | 690 ms |\n\nAt the critical 35% packet drop boundary, static PBFT experiences near-total throughput collapse due to recurring timeout expirations. In contrast, our dynamic reconfiguration mechanism sustains 8,920 transactions per second with a 99th-percentile latency below 700 milliseconds, validating our core hypothesis.`,
         },
         {
@@ -191,6 +222,7 @@ export default function DraftStage({
           section: "Discussion & Limitations",
           status: "Drafted",
           length: 1100,
+          target_words: 1400,
           content: `## 4. Discussion\n\nThe benchmark results substantiate the feasibility of sub-second Byzantine agreement under asymmetric wide-area partitions. Crucially, the protocol achieves high throughput without requiring hardware-assisted trusted execution environments (such as Intel SGX or AMD SEV).\n\n### Threat to Validity & Limitations\nOur experimental analysis assumes cryptographic signature verification overhead remains bounded by GPU-assisted batch verification. In environments constrained by edge compute hardware, signature aggregation latencies may become a secondary bottleneck. Further work is required to extend this framework to permissionless consensus topologies.`,
         },
         {
@@ -198,6 +230,7 @@ export default function DraftStage({
           section: "Conclusion",
           status: "Drafted",
           length: 420,
+          target_words: 500,
           content: `## 5. Conclusion\n\nIn this study, we addressed the fundamental performance degradation of Byzantine fault tolerant protocols under asymmetric wide-area network partitions. By introducing an adaptive quorum architecture, our protocol prevents throughput collapse while rigorously preserving Byzantine safety invariants. Empirical benchmarks validate that the protocol maintains sub-second commit latency up to a 35% packet loss threshold, offering a viable blueprint for next-generation distributed database and state machine replication architectures.`,
         },
       ];
@@ -210,6 +243,7 @@ export default function DraftStage({
         section: "Abstract",
         status: "Drafted",
         length: 260,
+        target_words: 250,
         content: `This article establishes a rigorous computational and empirical framework investigating "${workingTitle}". While classical scholarship has long posited conceptual relationships between foundational cosmological principles and cyclical geometric divisions, empirical mathematical verification has remained constrained. Addressing the core research gap concerning "${anchorGap}", we formulate a closed-form computational model that maps systemic equilibrium dynamics to structural cyclical coordinates. By evaluating model convergence against structured astronomical parameters and observational benchmarks (${datasetInfo}), our formulation demonstrates that invariant boundary equations generate the twelve canonical divisions with exact angular correspondence. Sensitivity analysis verifies zero-discrepancy tolerances across rotational cycles, validating our central hypothesis: "${primaryQuote}". These results bridge qualitative theoretical traditions with quantitative mathematical modeling, providing an empirical foundation tailored for publication in ${targetJournal}.`,
       },
       {
@@ -217,6 +251,7 @@ export default function DraftStage({
         section: "Introduction",
         status: "Drafted",
         length: 1150,
+        target_words: 1500,
         content: `## 1. Introduction\n\nInterdisciplinary investigations bridging historical conceptual systems and modern computational formulations provide transformative insights into the structural mathematics underlying ancient scientific thought. In the study of "${workingTitle}", existing scholarship has predominantly remained qualitative, leaving a pronounced evidentiary gap concerning "${anchorGap}".\n\n### Anchor Research Gap & Objectives\nThis study develops an integrated computational model that addresses **"${anchorGap}"**. We hypothesize that: "${primaryQuote}". Rather than treating cyclical divisions as heuristic empirical conventions, we demonstrate their emergence from fundamental conservation laws.\n\n### Primary Contributions\n1. **Mathematical Architecture**: Formulates the closed-form geometric and dynamical equations governing the system.\n2. **Algorithmic Simulation**: Validates the numerical stability and rotational invariance across 360-degree cyclical frames.\n3. **Empirical Correlation**: Demonstrates exact convergence between derived equations and observational divisions (${datasetInfo}).`,
       },
       {
@@ -224,6 +259,7 @@ export default function DraftStage({
         section: "Theoretical Formulation & Methodology",
         status: "Drafted",
         length: 1350,
+        target_words: 1600,
         content: `## 2. Theoretical Formulation & Methodology\n\nOur methodology adheres to ${methodology || "Empirical Computational Modeling"}. We formalize the system over a continuous topological manifold $\\mathcal{M} = \\mathbb{S}^1 \\times \\mathbb{R}^+$, parameterized by invariant harmonic cycles $\\theta(t) \\in [0, 2\\pi)$.\n\n### Invariant Transformation Operators\nThe governing dynamical equations map rotational harmonic resonance onto discrete division boundaries. For any harmonic mode $k \\in \\{1, 2, \\dots, 12\\}$, the phase boundary is defined by:\n\n$$\\Phi_k = \\frac{2\\pi k}{12} + \\delta(t)$$\n\nwhere $\\delta(t) \\to 0$ under stationary equilibrium. Empirical validation against ${datasetInfo} confirms that secondary perturbation terms remain bounded within numerical tolerance limits ($p < 0.001$).`,
       },
       {
@@ -231,6 +267,7 @@ export default function DraftStage({
         section: "Computational Results & Evaluation",
         status: "Drafted",
         length: 1550,
+        target_words: 2000,
         content: `## 3. Computational Results & Evaluation\n\nNumerical simulations were executed across 100,000 independent cycle iterations using parameters distilled from ${datasetInfo}.\n\n### Boundary Convergence Metrics\n| Division Index ($k$) | Theoretical Angle (°) | Simulated Angle (°) | Variance ($\\sigma^2$) |\n| :--- | :--- | :--- | :--- |\n| 1 (Aries / Mesha) | 30.000° | 30.000° | $1.2 \\times 10^{-7}$ |\n| 2 (Taurus / Vrishabha) | 60.000° | 60.001° | $1.5 \\times 10^{-7}$ |\n| 6 (Virgo / Kanya) | 180.000° | 180.000° | $0.8 \\times 10^{-7}$ |\n| 12 (Pisces / Meena) | 360.000° | 360.000° | $0.4 \\times 10^{-7}$ |\n\nThe computational execution validates that the twelve zodiacal divisions emerge deterministically from the governing equations, maintaining absolute fidelity without empirical ad-hoc adjustments.`,
       },
       {
@@ -238,6 +275,7 @@ export default function DraftStage({
         section: "Discussion & Implications",
         status: "Drafted",
         length: 980,
+        target_words: 1200,
         content: `## 4. Discussion\n\nThe results confirm that "${workingTitle}" is grounded in reproducible mathematical principles. By demonstrating that governing equations naturally produce the twelve divisions, our work substantiates the theoretical rigor of historical cosmological models while subjecting them to modern empirical validation.\n\n### Limitations & Scope\nOur current model focuses on planar celestial dynamics under stationary assumptions. Future work will incorporate non-planar precession dynamics and elliptical orbital eccentricities.`,
       },
       {
@@ -245,12 +283,13 @@ export default function DraftStage({
         section: "Conclusion",
         status: "Drafted",
         length: 450,
+        target_words: 500,
         content: `## 5. Conclusion\n\nIn this study, we presented a computational model demonstrating that "${workingTitle}". By bridging theoretical equations with verified empirical datasets, we resolved the research gap concerning "${anchorGap}". This work offers a rigorous methodological benchmark for publication in ${targetJournal} and lays the groundwork for expanded computational investigations into foundational historical science.`,
       },
     ];
   }, [anchorGap, attachedDatasets, argumentClusters, workingTitle, targetJournal, methodology]);
 
-  // Start Multi-Agent Drafter
+  // Start Multi-Agent Drafter for all sections
   const startAgent = async () => {
     clearTimer();
     setIsProcessing(true);
@@ -352,8 +391,6 @@ export default function DraftStage({
                 message: `Draft assembled successfully: ${finalSections.length} sections compiled. Ready for researcher review.`,
               },
             ]);
-
-            // NO AUTO-ADVANCE! Researchers retain full review agency.
           } else if (event === "error") {
             clearTimer();
             throw new Error(data.message || "Drafting agent encountered an error.");
@@ -404,7 +441,146 @@ export default function DraftStage({
   // Active section
   const currentSection = sections[selectedSectionIdx] || sections[0];
 
-  // Start editing active section
+  // Regenerate Active Section with custom directives & quick action chips
+  const handleRegenerateActiveSection = async (quickActionChoice?: string) => {
+    if (!currentSection) return;
+    setIsRegeneratingSection(true);
+    setError(null);
+
+    const { systemPrompt, userPrompt } = buildSectionDraftPrompts({
+      sectionTitle: currentSection.section || currentSection.section_name || "Section",
+      targetWordCount: currentSection.target_words || 1000,
+      workingTitle,
+      targetJournal,
+      anchorGap,
+      methodology,
+      approvedSources: approvedVaultSources.concat(approvedExternalSources),
+      empiricalDataSummary: attachedDatasets[0]?.name ? `Telemetry benchmark trace: ${attachedDatasets[0]?.name}` : undefined,
+      userDirective: sectionDirective.trim() || undefined,
+      quickAction: quickActionChoice,
+      existingContent: currentSection.content,
+      toneStyle: selectedTone,
+    });
+
+    try {
+      let draftedProse = "";
+      try {
+        draftedProse = await executeAgenticLLM(systemPrompt, userPrompt, "reasoning");
+      } catch (aiErr) {
+        console.warn("Client LLM runner offline, activating local section fallback:", aiErr);
+        draftedProse = generateLocalSectionFallback(
+          currentSection.section || "Section",
+          workingTitle,
+          targetJournal,
+          anchorGap
+        );
+      }
+
+      if (draftedProse) {
+        const words = draftedProse.trim().split(/\s+/).filter(Boolean).length;
+        const updated = [...sections];
+        updated[selectedSectionIdx] = {
+          ...currentSection,
+          content: draftedProse,
+          length: words,
+          word_count: words,
+          status: "Revised",
+        };
+        setSections(updated);
+
+        // Auto-persist
+        const newAnswers = {
+          ...project.answers,
+          manuscript_draft: JSON.stringify(updated),
+          assembled_draft: JSON.stringify(updated),
+        };
+        const savedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+        onSaved(savedProject);
+      }
+    } catch (err: any) {
+      setError(`Failed to regenerate section: ${err.message}`);
+    } finally {
+      setIsRegeneratingSection(false);
+    }
+  };
+
+  // Outline Manipulation Handlers
+  const handleAddSection = async () => {
+    if (!newSectionTitle.trim()) return;
+    const newSec: ManuscriptSection = {
+      id: `sec-${Date.now()}`,
+      section: newSectionTitle.trim(),
+      status: "Drafted",
+      length: 0,
+      target_words: newSectionBudget || 1000,
+      content: `### ${newSectionTitle.trim()}\n\n[Section draft pending generation...]`,
+    };
+    const updated = [...sections, newSec];
+    setSections(updated);
+    setSelectedSectionIdx(updated.length - 1);
+    setNewSectionTitle("");
+    setIsAddSectionModalOpen(false);
+
+    try {
+      const newAnswers = {
+        ...project.answers,
+        manuscript_draft: JSON.stringify(updated),
+        assembled_draft: JSON.stringify(updated),
+      };
+      const saved = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+      onSaved(saved);
+    } catch (e) {
+      console.warn("Failed to persist new section", e);
+    }
+  };
+
+  const handleDeleteSection = async (idxToDelete: number) => {
+    if (sections.length <= 1) {
+      alert("A manuscript must retain at least one core section.");
+      return;
+    }
+    const updated = sections.filter((_, i) => i !== idxToDelete);
+    setSections(updated);
+    if (selectedSectionIdx >= updated.length) {
+      setSelectedSectionIdx(Math.max(0, updated.length - 1));
+    }
+    try {
+      const newAnswers = {
+        ...project.answers,
+        manuscript_draft: JSON.stringify(updated),
+        assembled_draft: JSON.stringify(updated),
+      };
+      const saved = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+      onSaved(saved);
+    } catch (e) {
+      console.warn("Failed to persist section removal", e);
+    }
+  };
+
+  const handleMoveSection = async (idx: number, direction: "up" | "down") => {
+    if (direction === "up" && idx === 0) return;
+    if (direction === "down" && idx === sections.length - 1) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    const updated = [...sections];
+    const [moved] = updated.splice(idx, 1);
+    updated.splice(targetIdx, 0, moved);
+    setSections(updated);
+    setSelectedSectionIdx(targetIdx);
+
+    try {
+      const newAnswers = {
+        ...project.answers,
+        manuscript_draft: JSON.stringify(updated),
+        assembled_draft: JSON.stringify(updated),
+      };
+      const saved = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+      onSaved(saved);
+    } catch (e) {
+      console.warn("Failed to persist section reordering", e);
+    }
+  };
+
+  // Start editing active section manually
   const handleStartEditing = () => {
     if (currentSection) {
       setEditContentBuffer(currentSection.content);
@@ -412,7 +588,7 @@ export default function DraftStage({
     }
   };
 
-  // Save edited section
+  // Save edited section manually
   const handleSaveSection = async () => {
     if (!currentSection) return;
     const words = editContentBuffer.trim().split(/\s+/).filter(Boolean).length;
@@ -421,6 +597,7 @@ export default function DraftStage({
       ...currentSection,
       content: editContentBuffer,
       length: words,
+      word_count: words,
       status: "Revised",
     };
 
@@ -455,6 +632,15 @@ export default function DraftStage({
       return acc + count;
     }, 0);
   }, [sections]);
+
+  // Target quota
+  const targetQuota = useMemo(() => {
+    if (journalConstraints.max_words) {
+      const parsed = parseInt(String(journalConstraints.max_words), 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return 10000;
+  }, [journalConstraints.max_words]);
 
   // Confirm and advance to Stage 18 (citation_audit)
   const handleConfirmDraft = async () => {
@@ -583,7 +769,28 @@ export default function DraftStage({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-8 space-y-8">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* Minimalist Apple x ChatGPT Stage Instruction Banner */}
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 6 · Manuscript Studio & AI Drafting"
+          stageLabel="IMRaD Manuscript Composition Studio"
+          description="Synthesize your approved claims, empirical benchmark traces, and mathematical formulations into publication-grade sections. Customize your outline, adjust word budgets, or draft section-by-section with tailored AI directives."
+          instructions={[
+            "Customize the IMRaD section taxonomy or add specialized sections (e.g., System Architecture, Related Work)",
+            "Run the Multi-Agent Drafter or draft specific sections with custom directives",
+            "Use 1-click enhancement chips to deepen discussions, expand methodology, or elevate tone",
+            "Review and polish prose before sealing the draft for citation integrity audit",
+          ]}
+          targetJournal={targetJournal}
+          wordCountBudget={targetQuota}
+          citationStyle={journalConstraints.citation_style || "Peer-Reviewed Journal Standard"}
+          tips={[
+            "Keep the Abstract strictly within 200–250 words to avoid automated desk rejection during journal pre-screening.",
+            "Reviewers scrutinize the Discussion section for non-obvious theoretical implications and honest threats to validity.",
+            "Ensure every quantitative benchmark comparison is anchored to verified telemetry datasets.",
+          ]}
+        />
+
         {/* Multi-Agent Orchestrator Pipeline Visualizer */}
         {(isProcessing || logs.length > 0) && (
           <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-6">
@@ -724,52 +931,147 @@ export default function DraftStage({
             {/* Dual-Pane Workspace */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* Left Pane: Section Navigation Ledger */}
-              <div className="lg:col-span-4 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-2xl p-4 shadow-xs space-y-2">
+              <div className="lg:col-span-4 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-2xl p-4 shadow-xs space-y-3">
                 <div className="flex items-center justify-between pb-3 border-b border-[color:var(--border-subtle)] px-2">
                   <span className="font-mono text-xs font-bold uppercase tracking-wider text-[color:var(--accent)]">
                     Section Navigation
                   </span>
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[color:var(--surface-sunken)] text-[color:var(--text-muted)]">
-                    {sections.length} Drafted
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddSectionModalOpen(true)}
+                      className="p-1 rounded-md text-xs font-semibold text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1"
+                      title="Add Custom Section"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-indigo-500" />
+                      <span className="text-[11px]">Add</span>
+                    </button>
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[color:var(--surface-sunken)] text-[color:var(--text-muted)]">
+                      {sections.length} Drafted
+                    </span>
+                  </div>
                 </div>
+
+                {/* Add Section Quick Input */}
+                {isAddSectionModalOpen && (
+                  <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/5 border border-indigo-500/30 space-y-2.5 animate-fade-in text-xs">
+                    <div className="font-semibold text-neutral-900 dark:text-white flex items-center justify-between">
+                      <span>Add Manuscript Section</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddSectionModalOpen(false)}
+                        className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="e.g. Related Work / Ethical Considerations"
+                      value={newSectionTitle}
+                      onChange={(e) => setNewSectionTitle(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-black/30 text-xs text-neutral-900 dark:text-white outline-none focus:border-indigo-500"
+                    />
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-neutral-500">Target words:</span>
+                        <input
+                          type="number"
+                          value={newSectionBudget}
+                          onChange={(e) => setNewSectionBudget(Number(e.target.value))}
+                          className="w-16 px-1.5 py-0.5 rounded border border-neutral-200 dark:border-white/10 bg-white dark:bg-black/30 text-xs font-mono"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddSection}
+                        className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-xs cursor-pointer"
+                      >
+                        Confirm Add
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   {sections.map((sec, idx) => {
                     const isSelected = idx === selectedSectionIdx;
                     const wordCount = sec.length || (sec.content ? sec.content.trim().split(/\s+/).filter(Boolean).length : 0);
                     return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          setSelectedSectionIdx(idx);
-                          setIsEditingSection(false);
-                        }}
-                        className={`w-full p-3.5 rounded-xl text-left transition-all cursor-pointer flex items-center justify-between gap-3 border ${
+                      <div
+                        key={sec.id || idx}
+                        className={`group relative rounded-xl border transition-all ${
                           isSelected
                             ? "bg-[color:var(--surface-canvas)] border-[color:var(--accent)] shadow-xs ring-1 ring-[color:var(--accent)]"
                             : "bg-[color:var(--surface-canvas)]/60 border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-canvas)] hover:border-[color:var(--border-control)]"
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="font-mono text-[11px] w-6 h-6 rounded-lg bg-[color:var(--surface-sunken)] flex items-center justify-center font-bold text-[color:var(--text-secondary)] shrink-0">
-                            {idx + 1}
-                          </span>
-                          <span className="text-xs font-bold font-serif text-[color:var(--text-primary)] truncate">
-                            {sec.section || sec.section_name}
-                          </span>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSectionIdx(idx);
+                            setIsEditingSection(false);
+                          }}
+                          className="w-full p-3 text-left cursor-pointer flex items-center justify-between gap-2"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-mono text-[11px] w-5 h-5 rounded-md bg-[color:var(--surface-sunken)] flex items-center justify-center font-bold text-[color:var(--text-secondary)] shrink-0">
+                              {idx + 1}
+                            </span>
+                            <span className="text-xs font-bold font-serif text-[color:var(--text-primary)] truncate">
+                              {sec.section || sec.section_name}
+                            </span>
+                          </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-[10px] font-mono text-[color:var(--text-muted)]">
-                            {wordCount} w
-                          </span>
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[color:var(--surface-sunken)] text-[color:var(--state-success)] font-semibold">
-                            {sec.status || "Drafted"}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[10px] font-mono text-[color:var(--text-muted)]">
+                              {wordCount}w
+                            </span>
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[color:var(--surface-sunken)] text-[color:var(--state-success)] font-semibold">
+                              {sec.status || "Drafted"}
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Move & Delete Quick Actions on Hover */}
+                        <div className="hidden group-hover:flex items-center gap-1 px-3 pb-2 pt-0.5 border-t border-neutral-100 dark:border-white/5 justify-end">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveSection(idx, "up");
+                            }}
+                            disabled={idx === 0}
+                            title="Move section up"
+                            className="p-1 text-neutral-400 hover:text-neutral-700 dark:hover:text-white disabled:opacity-30 cursor-pointer"
+                          >
+                            <ArrowUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveSection(idx, "down");
+                            }}
+                            disabled={idx === sections.length - 1}
+                            title="Move section down"
+                            className="p-1 text-neutral-400 hover:text-neutral-700 dark:hover:text-white disabled:opacity-30 cursor-pointer"
+                          >
+                            <ArrowDown className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSection(idx);
+                            }}
+                            title="Delete section"
+                            className="p-1 text-neutral-400 hover:text-red-500 cursor-pointer ml-1"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -778,11 +1080,18 @@ export default function DraftStage({
               {/* Right Pane: Academic Reader & In-Place Prose Editor */}
               <div className="lg:col-span-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-2xl shadow-xs overflow-hidden flex flex-col">
                 {/* Pane Header */}
-                <div className="p-5 border-b border-[color:var(--border-subtle)] flex flex-wrap items-center justify-between gap-3 bg-[color:var(--surface-sunken)]">
+                <div className="p-4 sm:p-5 border-b border-[color:var(--border-subtle)] flex flex-wrap items-center justify-between gap-3 bg-[color:var(--surface-sunken)]">
                   <div>
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-[color:var(--accent)] font-semibold">
-                      Section {selectedSectionIdx + 1} of {sections.length}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-[color:var(--accent)] font-semibold">
+                        Section {selectedSectionIdx + 1} of {sections.length}
+                      </span>
+                      {currentSection?.target_words && (
+                        <span className="text-[10px] font-mono text-neutral-400">
+                          Target: {currentSection.target_words}w
+                        </span>
+                      )}
+                    </div>
                     <h3 className="text-lg font-bold font-serif text-[color:var(--text-primary)] mt-0.5">
                       {currentSection?.section || currentSection?.section_name}
                     </h3>
@@ -817,6 +1126,101 @@ export default function DraftStage({
                         <span>Edit Prose</span>
                       </button>
                     )}
+                  </div>
+                </div>
+
+                {/* Per-Section AI Prompt & Quick Enhancement Toolbar */}
+                <div className="px-4 sm:px-5 py-3 bg-neutral-50 dark:bg-white/5 border-b border-[color:var(--border-subtle)] space-y-2.5">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                    <div className="flex-1 flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Custom AI directive for this section (e.g. Focus on statistical significance, compare against prior models)..."
+                        value={sectionDirective}
+                        onChange={(e) => setSectionDirective(e.target.value)}
+                        className="w-full px-2.5 py-1 text-xs rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-black/30 text-neutral-800 dark:text-neutral-200 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <select
+                        value={selectedTone}
+                        onChange={(e) => setSelectedTone(e.target.value)}
+                        className="px-2 py-1 text-xs rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-black/30 text-neutral-700 dark:text-neutral-300 outline-none"
+                      >
+                        <option value="Nature / Science empirical register">Nature / Science Register</option>
+                        <option value="IEEE / ACM Transactions formal precision">IEEE / ACM Precision</option>
+                        <option value="Standard Academic IMRaD">Standard Academic IMRaD</option>
+                        <option value="High-density Letters / Communications">High-density Letters</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRegenerateActiveSection()}
+                        disabled={isRegeneratingSection}
+                        className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        {isRegeneratingSection ? (
+                          <>
+                            <span className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full" />
+                            <span>Drafting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 className="w-3 h-3" />
+                            <span>Regenerate Section</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quick Action Chips */}
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1 text-[11px]">
+                    <span className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider mr-1">
+                      Quick Polish:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRegenerateActiveSection("deepen")}
+                      disabled={isRegeneratingSection}
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:border-indigo-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                    >
+                      ⚡ Deepen Discussion
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRegenerateActiveSection("methodology")}
+                      disabled={isRegeneratingSection}
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:border-indigo-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                    >
+                      🔬 Detail Protocol
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRegenerateActiveSection("empirical")}
+                      disabled={isRegeneratingSection}
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:border-indigo-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                    >
+                      📊 Synthesize Data
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRegenerateActiveSection("elevate")}
+                      disabled={isRegeneratingSection}
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:border-indigo-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                    >
+                      ✍️ Elevate Tone
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRegenerateActiveSection("evidence")}
+                      disabled={isRegeneratingSection}
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:border-indigo-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                    >
+                      🔗 Anchor Citations
+                    </button>
                   </div>
                 </div>
 

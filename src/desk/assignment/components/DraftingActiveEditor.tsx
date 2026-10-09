@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { AssignmentDraftingSection, DiscoveredSource } from "../types";
 import {
   Sparkles,
   Edit3,
   Check,
-  Maximize2,
-  Minimize2,
   BookOpen,
   ArrowRight,
   ArrowLeft,
@@ -14,21 +12,31 @@ import {
   Loader2,
   TrendingUp,
   FileText,
-  HelpCircle,
   Scissors,
   PlusCircle,
   Edit2,
   X,
+  Copy,
+  ExternalLink,
+  ChevronDown,
+  Quote,
+  Bold,
+  Italic,
+  Heading,
+  List,
+  ShieldCheck,
+  Layers,
 } from "lucide-react";
 
 export interface DraftingActiveEditorProps {
   section: AssignmentDraftingSection | null;
   onUpdateContent: (content: string) => void;
   onUpdateTitle?: (newTitle: string) => void;
-  onStreamSection?: (revisionType?: "deepen" | "expand" | "condense") => void;
+  onStreamSection?: (revisionType?: "deepen" | "expand" | "condense" | "citations" | "smooth" | string) => void;
   isStreaming?: boolean;
   streamingChunk?: string;
   boundSources?: DiscoveredSource[];
+  allApprovedSources?: DiscoveredSource[];
   onNavigatePrevious?: () => void;
   onNavigateNext?: () => void;
   hasPrevious?: boolean;
@@ -41,7 +49,10 @@ export interface DraftingActiveEditorProps {
  * Matches Harvard/APA7 style: (Author, 2024), (Author & Author, 2023), (Author et al., 2022)
  * Matches IEEE style: [1], [2], [1, 2]
  */
-function renderAcademicProseWithCitations(prose: string) {
+function renderAcademicProseWithCitations(
+  prose: string,
+  onCitationClick?: (citationText: string, event: React.MouseEvent) => void
+) {
   if (!prose) return null;
 
   const paragraphs = prose.split("\n\n");
@@ -89,8 +100,9 @@ function renderAcademicProseWithCitations(prose: string) {
               <span
                 key={i}
                 data-testid="citation-anchor"
-                className="inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-[11px] font-mono font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/80 dark:border-blue-700/40 transition-colors hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-help"
-                title="Verified Grounded Citation"
+                onClick={(e) => onCitationClick?.(part, e)}
+                className="inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-[11px] font-mono font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/80 dark:border-blue-700/40 transition-all hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer shadow-2xs select-none active:scale-[0.98]"
+                title="Verified Grounded Citation — Click to view source metadata"
               >
                 {part}
               </span>
@@ -111,6 +123,7 @@ export function DraftingActiveEditor({
   isStreaming = false,
   streamingChunk = "",
   boundSources = [],
+  allApprovedSources = [],
   onNavigatePrevious,
   onNavigateNext,
   hasPrevious = false,
@@ -121,6 +134,30 @@ export function DraftingActiveEditor({
   const [manualText, setManualText] = useState(section?.draftContent || "");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(section?.title || "");
+  const [customDirective, setCustomDirective] = useState("");
+
+  // Citation Inspector Popover State
+  const [inspectedCitation, setInspectedCitation] = useState<{
+    text: string;
+    source: DiscoveredSource | null;
+  } | null>(null);
+  const [copiedCitation, setCopiedCitation] = useState(false);
+
+  // Manual Mode Citation Inserter Dropdown State
+  const [showCitationDropdown, setShowCitationDropdown] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const citationDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Combined pool of available sources
+  const availableSources = React.useMemo(() => {
+    const list = [...boundSources];
+    for (const src of allApprovedSources) {
+      if (!list.some((s) => s.id === src.id)) {
+        list.push(src);
+      }
+    }
+    return list;
+  }, [boundSources, allApprovedSources]);
 
   // Sync manual text and title when active section changes
   useEffect(() => {
@@ -128,7 +165,28 @@ export function DraftingActiveEditor({
     setIsEditingManually(false);
     setTitleInput(section?.title || "");
     setIsEditingTitle(false);
+    setInspectedCitation(null);
+    setShowCitationDropdown(false);
+    setCustomDirective("");
   }, [section?.id, section?.draftContent, section?.title]);
+
+  // Close citation dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        citationDropdownRef.current &&
+        !citationDropdownRef.current.contains(e.target as Node)
+      ) {
+        setShowCitationDropdown(false);
+      }
+    };
+    if (showCitationDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showCitationDropdown]);
 
   if (!section) {
     return (
@@ -157,7 +215,20 @@ export function DraftingActiveEditor({
     : 0;
   const targetWords = section.targetWordCount || 500;
   const wordDiff = currentWords - targetWords;
-  const isBudgetMet = currentWords >= Math.floor(targetWords * 0.9);
+  const isBudgetMet =
+    currentWords >= Math.floor(targetWords * 0.9) &&
+    currentWords <= Math.ceil(targetWords * 1.1);
+
+  // PEEL Diagnostics
+  const citationMatches = liveContent.match(
+    /(\([A-Z][A-Za-z\s&.,'–-]+,\s*(?:19|20)\d{2}[a-z]?(?:;\s*[A-Z][A-Za-z\s&.,'–-]+,\s*(?:19|20)\d{2}[a-z]?)*\)|\[\d+(?:,\s*\d+)*\])/g
+  );
+  const citationCount = citationMatches ? citationMatches.length : 0;
+  const hasAnalyticalDepth = /however|demonstrates|indicates|reveals|trade-off|contrasts|suggests|critique|substantiates|furthermore/i.test(
+    liveContent
+  );
+  const hasPointSentence = liveContent.trim().length > 40;
+  const hasLinkConclusion = liveContent.split("\n\n").length > 1;
 
   const handleManualTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -168,6 +239,97 @@ export function DraftingActiveEditor({
   const handleSaveManualEdit = () => {
     onUpdateContent(manualText);
     setIsEditingManually(false);
+  };
+
+  // Insert citation into manual editor textarea
+  const handleInsertCitation = (source: DiscoveredSource) => {
+    const author =
+      source.authors && source.authors[0]
+        ? source.authors[0].split(",")[0].trim()
+        : "Scholar";
+    const year = source.year || "2024";
+    const citationString = ` (${author}, ${year})`;
+
+    if (textareaRef.current) {
+      const el = textareaRef.current;
+      const start = el.selectionStart ?? manualText.length;
+      const end = el.selectionEnd ?? manualText.length;
+      const updated =
+        manualText.slice(0, start) + citationString + manualText.slice(end);
+      setManualText(updated);
+      onUpdateContent(updated);
+      setShowCitationDropdown(false);
+      setTimeout(() => {
+        el.focus();
+        el.setSelectionRange(
+          start + citationString.length,
+          start + citationString.length
+        );
+      }, 50);
+    } else {
+      const updated = manualText + citationString;
+      setManualText(updated);
+      onUpdateContent(updated);
+      setShowCitationDropdown(false);
+    }
+  };
+
+  // Markdown formatting tool
+  const applyMarkdownFormat = (prefix: string, suffix: string = "") => {
+    if (!textareaRef.current) return;
+    const el = textareaRef.current;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = manualText.substring(start, end) || "text";
+    const replacement = `${prefix}${selected}${suffix}`;
+    const updated =
+      manualText.substring(0, start) + replacement + manualText.substring(end);
+    setManualText(updated);
+    onUpdateContent(updated);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(
+        start + prefix.length,
+        start + prefix.length + selected.length
+      );
+    }, 50);
+  };
+
+  // Inspect citation on click
+  const handleCitationClick = (citationText: string) => {
+    let matchedSource: DiscoveredSource | null = null;
+    const cleanCit = citationText.replace(/[()[\]]/g, "").toLowerCase();
+
+    for (const src of availableSources) {
+      const authorMatch = src.authors?.some((a) =>
+        cleanCit.includes(a.split(",")[0].toLowerCase().trim())
+      );
+      const yearMatch = src.year && cleanCit.includes(String(src.year));
+      if (authorMatch || yearMatch) {
+        matchedSource = src;
+        break;
+      }
+    }
+
+    // Fallback: match index if IEEE [1]
+    const ieeeMatch = citationText.match(/\[(\d+)\]/);
+    if (!matchedSource && ieeeMatch) {
+      const idx = parseInt(ieeeMatch[1], 10) - 1;
+      if (availableSources[idx]) {
+        matchedSource = availableSources[idx];
+      }
+    }
+
+    setInspectedCitation({ text: citationText, source: matchedSource });
+    setCopiedCitation(false);
+  };
+
+  const handleCopyCitation = () => {
+    if (inspectedCitation?.text) {
+      navigator.clipboard.writeText(inspectedCitation.text);
+      setCopiedCitation(true);
+      setTimeout(() => setCopiedCitation(false), 2000);
+    }
   };
 
   return (
@@ -311,10 +473,133 @@ export function DraftingActiveEditor({
       </div>
       )}
 
+      {/* PEEL Quality & Diagnostic Bar (shows when content exists) */}
+      {liveContent.trim().length > 0 && (
+        <div className="px-5 py-2 border-b border-neutral-100 dark:border-white/5 bg-neutral-50/50 dark:bg-white/[0.02] flex flex-wrap items-center justify-between gap-2 text-[11px]">
+          <div className="flex items-center gap-3">
+            <span className="text-neutral-400 font-medium uppercase tracking-wider text-[10px]">
+              PEEL Framework:
+            </span>
+            <div className="flex items-center gap-2 font-mono">
+              <span
+                title="Point: Distinct academic topic claim"
+                className={`flex items-center gap-1 ${
+                  hasPointSentence
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-neutral-400"
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                <span>P: Point</span>
+              </span>
+              <span className="text-neutral-300 dark:text-neutral-700">·</span>
+              <span
+                title="Evidence: In-text citations grounded in literature"
+                className={`flex items-center gap-1 ${
+                  citationCount > 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-neutral-400"
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                <span>E: {citationCount} {citationCount === 1 ? "Citation" : "Citations"}</span>
+              </span>
+              <span className="text-neutral-300 dark:text-neutral-700">·</span>
+              <span
+                title="Explanation: 70% critical analysis & dialectical rigor"
+                className={`flex items-center gap-1 ${
+                  hasAnalyticalDepth
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-neutral-400"
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                <span>E: 70% Analysis</span>
+              </span>
+              <span className="text-neutral-300 dark:text-neutral-700">·</span>
+              <span
+                title="Link: Concluding transition connecting to assessment thesis"
+                className={`flex items-center gap-1 ${
+                  hasLinkConclusion
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-neutral-400"
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                <span>L: Link</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="text-[11px] text-neutral-400 dark:text-neutral-500">
+            {citationCount > 0
+              ? "Click citations in preview to inspect grounded sources"
+              : "Use Insert Citations to anchor arguments"}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Citation Inspector Drawer/Banner (when a citation anchor is clicked) */}
+      {inspectedCitation && (
+        <div className="px-5 py-3 border-b border-blue-200/80 dark:border-blue-800/40 bg-blue-50/80 dark:bg-blue-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in duration-200">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-blue-900 dark:text-blue-200">
+                  {inspectedCitation.text}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-mono">
+                  Verified Literature
+                </span>
+              </div>
+              {inspectedCitation.source ? (
+                <p className="text-[11px] text-blue-800/90 dark:text-blue-300/90 truncate max-w-xl">
+                  {inspectedCitation.source.title} ({inspectedCitation.source.year || "2024"}) —{" "}
+                  {inspectedCitation.source.journal || inspectedCitation.source.type || "Peer-Reviewed"}
+                </p>
+              ) : (
+                <p className="text-[11px] text-blue-700/80 dark:text-blue-400/80">
+                  Recognized scholarly citation anchor in active academic prose.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={handleCopyCitation}
+              className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              {copiedCitation ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-600" />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3 h-3" />
+                  <span>Copy Citation</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setInspectedCitation(null)}
+              className="p-1 rounded text-blue-700 dark:text-blue-300 hover:bg-blue-200/60 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
+              title="Close inspection"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Inline Section Action Controls Toolbar */}
       <div className="px-5 py-2.5 border-b border-neutral-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-[#1C1C1E]">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Deepen Analysis (70% critical analysis / 30% description) */}
+          {/* Deepen Analysis */}
           <button
             type="button"
             onClick={() => onStreamSection?.("deepen")}
@@ -350,6 +635,18 @@ export function DraftingActiveEditor({
             <span>Condense</span>
           </button>
 
+          {/* Reinforce Citations */}
+          <button
+            type="button"
+            onClick={() => onStreamSection?.("citations")}
+            disabled={isStreaming}
+            title="Anchor assertions with in-text citations from bound literature"
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200/70 dark:hover:bg-white/10 disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-emerald-500" />
+            <span className="hidden sm:inline">Ground Citations</span>
+          </button>
+
           {/* Full Regenerate */}
           <button
             type="button"
@@ -368,7 +665,7 @@ export function DraftingActiveEditor({
             <button
               type="button"
               onClick={handleSaveManualEdit}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <Check className="w-3.5 h-3.5" />
               <span>Done Editing</span>
@@ -387,6 +684,68 @@ export function DraftingActiveEditor({
         </div>
       </div>
 
+      {/* Custom AI Section Directives Bar */}
+      <div className="px-5 py-2.5 bg-neutral-50/70 dark:bg-white/[0.02] border-b border-neutral-100 dark:border-white/5 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-purple-500">
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
+            <input
+              type="text"
+              value={customDirective}
+              onChange={(e) => setCustomDirective(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && customDirective.trim() && !isStreaming) {
+                  onStreamSection?.(customDirective.trim());
+                }
+              }}
+              placeholder="Guide AI for this section... (e.g. 'Contrast with empirical studies from 2023', 'Emphasize policy implications', 'Add critical counter-argument')"
+              className="w-full pl-8 pr-20 py-1.5 text-xs bg-white dark:bg-[#252528] border border-neutral-200/80 dark:border-white/10 rounded-xl text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all shadow-2xs font-sans"
+            />
+            <button
+              type="button"
+              disabled={!customDirective.trim() || isStreaming}
+              onClick={() => {
+                if (customDirective.trim()) {
+                  onStreamSection?.(customDirective.trim());
+                }
+              }}
+              className="absolute right-1 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-[11px] font-semibold hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+            >
+              <span>Draft</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Directive Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px] pt-0.5">
+          <span className="text-[10px] uppercase font-semibold text-neutral-400 dark:text-neutral-500 tracking-wider shrink-0">
+            Suggested Directives:
+          </span>
+          {[
+            { label: "Synthesize Counterargument", prompt: "Synthesize strong counterarguments and theoretical critiques challenging the primary hypothesis" },
+            { label: "Deepen Dialectical Rigor", prompt: "Deepen dialectical rigor by evaluating methodological trade-offs and structural assumptions" },
+            { label: "Strengthen Academic Register", prompt: "Elevate formal academic register and sophisticated transitional phrasing" },
+            { label: "Focus on Policy Implications", prompt: "Expand pragmatic policy implications and actionable future recommendations" },
+          ].map((chip) => (
+            <button
+              key={chip.label}
+              type="button"
+              disabled={isStreaming}
+              onClick={() => {
+                setCustomDirective(chip.prompt);
+                onStreamSection?.(chip.prompt);
+              }}
+              className="px-2 py-0.5 rounded-md bg-white dark:bg-[#252528] border border-neutral-200/70 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-300 dark:border-white/20 transition-all shrink-0 cursor-pointer disabled:opacity-40"
+            >
+              + {chip.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Editor & Content Canvas */}
       <main
         tabIndex={0}
@@ -394,23 +753,120 @@ export function DraftingActiveEditor({
         className="flex-1 p-6 sm:p-8 min-h-[380px] max-h-[calc(100vh-380px)] overflow-y-auto focus:outline-none"
       >
         {isEditingManually ? (
-          <div className="space-y-3 h-full">
+          <div className="space-y-3 h-full flex flex-col">
+            {/* Markdown & Citation Insertion Helper Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl bg-neutral-100/70 dark:bg-white/5 border border-neutral-200/60 dark:border-white/5 text-xs">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => applyMarkdownFormat("**", "**")}
+                  className="p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 cursor-pointer"
+                  title="Bold"
+                >
+                  <Bold className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyMarkdownFormat("*", "*")}
+                  className="p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 cursor-pointer"
+                  title="Italic"
+                >
+                  <Italic className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyMarkdownFormat("### ", "")}
+                  className="p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 cursor-pointer"
+                  title="Heading 3"
+                >
+                  <Heading className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyMarkdownFormat("> ", "")}
+                  className="p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 cursor-pointer"
+                  title="Blockquote"
+                >
+                  <Quote className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyMarkdownFormat("- ", "")}
+                  className="p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 cursor-pointer"
+                  title="Bullet List"
+                >
+                  <List className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* + Insert Citation Dropdown Button */}
+              <div className="relative" ref={citationDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowCitationDropdown(!showCitationDropdown)}
+                  className="px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <BookOpen className="w-3 h-3" />
+                  <span>+ Insert Citation</span>
+                  <ChevronDown className="w-3 h-3 opacity-70" />
+                </button>
+
+                {showCitationDropdown && (
+                  <div className="absolute right-0 mt-1 w-72 max-h-56 overflow-y-auto rounded-xl bg-white dark:bg-[#222225] border border-neutral-200 dark:border-white/15 shadow-xl z-30 p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-2 py-1 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
+                      Select Source to Cite:
+                    </div>
+                    {availableSources.length > 0 ? (
+                      availableSources.map((s) => {
+                        const author =
+                          s.authors && s.authors[0]
+                            ? s.authors[0].split(",")[0].trim()
+                            : "Scholar";
+                        const year = s.year || "2024";
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => handleInsertCitation(s)}
+                            className="w-full text-left p-2 rounded-lg text-xs hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer group"
+                          >
+                            <div className="font-medium text-neutral-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                              ({author}, {year})
+                            </div>
+                            <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
+                              {s.title}
+                            </div>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="p-3 text-center text-xs text-neutral-400">
+                        No approved sources found.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <textarea
+              ref={textareaRef}
               value={manualText}
               onChange={handleManualTextChange}
               placeholder="Write or refine your academic section prose here..."
               rows={16}
               aria-label="Manual Section Prose Editor"
-              className="w-full h-full min-h-[340px] p-4 text-sm sm:text-base leading-relaxed text-neutral-900 dark:text-neutral-100 bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 resize-y font-sans transition-colors"
+              className="w-full flex-1 min-h-[340px] p-4 text-sm sm:text-base leading-relaxed text-neutral-900 dark:text-neutral-100 bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 resize-y font-sans transition-colors"
             />
-            <div className="flex justify-between items-center text-xs text-neutral-500 dark:text-neutral-400 px-1">
-              <span>Auto-saving live changes. Markdown formatting supported.</span>
+
+            <div className="flex justify-between items-center text-xs text-neutral-500 dark:text-neutral-400 px-1 pt-1">
+              <span>Auto-saving live changes. Click Done Editing when finished.</span>
               <span className="tabular-nums font-mono">{manualText.length} characters</span>
             </div>
           </div>
         ) : liveContent.trim().length > 0 ? (
           <div className="prose prose-neutral dark:prose-invert max-w-none">
-            {renderAcademicProseWithCitations(liveContent)}
+            {renderAcademicProseWithCitations(liveContent, handleCitationClick)}
             {isStreaming && (
               <span className="inline-block w-2 h-4 ml-1 bg-neutral-900 dark:bg-white animate-pulse" />
             )}

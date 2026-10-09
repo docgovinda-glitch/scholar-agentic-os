@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { getOutputTypeSpec, saveIntakeAnswers, saveAuthors, executeAgenticLLM } from "../../api";
 import type { OutputTypeSpec, ProjectView, Author } from "../../types";
 import { STAGE_MAP } from "../types";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 import {
   STUDY_DESIGN_GUIDELINES,
   buildFinerDiagnosticPrompts,
@@ -803,6 +804,24 @@ export default function DefinitionStage({
               <div className="flex-1">{error}</div>
             </div>
           )}
+
+          {/* Minimalist Apple x ChatGPT Stage Guidance */}
+          <JournalStageInstructionBanner
+            milestoneTitle="Milestone 1 · Scope & Literature Discovery"
+            stageLabel="Research Definition & Methodological Charter"
+            description="Establish the foundational scope, primary research question, PICO/FINER criteria, and CRediT author governance for your journal article."
+            instructions={[
+              "Define the core research question and working academic title",
+              "Select your study design and methodological framework (PICO / FINER criteria)",
+              "Configure authors, affiliations, and CRediT contributor roles",
+              "Verify institutional ethics, preprint intentions, and funding governance",
+            ]}
+            targetJournal={answers.target_journal}
+            tips={[
+              "Journals require explicit alignment between research questions and methodology. Use FINER diagnostics to test feasibility.",
+              "CRediT roles prevent authorship disputes during peer review and ensure compliance with ICMJE standards.",
+            ]}
+          />
 
           {/* TAB 1: INQUIRY & SCOPE */}
           {activeTab === "inquiry" && (

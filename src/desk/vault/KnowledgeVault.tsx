@@ -41,6 +41,7 @@ import {
   matchesProjectSearch,
   isDuplicateProjectTitle,
   getFormatLabel,
+  deduplicateProjectList,
 } from "../projectNaming";
 import SourceLibraryScreen from "./SourceLibraryScreen";
 import SettingsView from "./SettingsView";
@@ -146,6 +147,12 @@ export default function KnowledgeVault({
       } catch {
         // ignore
       }
+      const seen = new Set<string>();
+      items = items.filter((p) => {
+        if (!p?.projectId || seen.has(p.projectId)) return false;
+        seen.add(p.projectId);
+        return true;
+      });
       setProjects(items);
       setTypes(typeRes?.items || []);
     } catch (err: unknown) {
@@ -171,7 +178,6 @@ export default function KnowledgeVault({
     return map;
   }, [types]);
 
-  // Filter projects by format and search query using canonical search matching
   const filteredProjects = useMemo(() => {
     if (!projects) return [];
     let list = projects;
@@ -181,7 +187,7 @@ export default function KnowledgeVault({
     if (searchQuery.trim()) {
       list = list.filter((p) => matchesProjectSearch(p, searchQuery, projects));
     }
-    return list;
+    return deduplicateProjectList(list, projects);
   }, [projects, selectedTypeFilter, searchQuery]);
 
   // Save renamed project heading inline
@@ -286,13 +292,40 @@ export default function KnowledgeVault({
     };
 
     // Immediately close modal, mark deleted, and update local state
+    const targetTitle = (
+      targetProject.title ||
+      (targetProject.answers as any)?.title ||
+      getProjectDisplayName(targetProject, projects || [])
+    ).trim().toLowerCase();
+
+    const companionIds = targetTitle
+      ? (projects || [])
+          .filter((p) => {
+            if (!p || p.projectId === targetProject.projectId) return false;
+            const pTitle = (
+              p.title ||
+              (p.answers as any)?.title ||
+              getProjectDisplayName(p, projects || [])
+            ).trim().toLowerCase();
+            return pTitle === targetTitle;
+          })
+          .map((p) => p.projectId)
+      : [];
+
+    const allIdsToDelete = [targetProject.projectId, ...companionIds];
+
     setProjectToDelete(null);
-    markDeleted(targetProject.projectId);
-    setProjects((prev) => (prev ? prev.filter((p) => p.projectId !== targetProject.projectId) : []));
+    allIdsToDelete.forEach((id) => markDeleted(id));
+    setProjects((prev) => (prev ? prev.filter((p) => !allIdsToDelete.includes(p.projectId)) : []));
 
     try {
       if (!targetProject.projectId.startsWith("demo-")) {
         await deleteProject(targetProject.projectId);
+      }
+      for (const compId of companionIds) {
+        if (!compId.startsWith("demo-")) {
+          deleteProject(compId).catch(() => {});
+        }
       }
     } catch (err: unknown) {
       console.error("Failed to delete project:", err);

@@ -3,6 +3,7 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import { authedStreamFetch, saveIntakeAnswers } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export interface RevisionPatch {
   id: string;
@@ -590,6 +591,23 @@ export default function RevisionStage({
 
       {/* 3. Main Workspace Area */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 8 · Peer Review & Live Revision"
+          stageLabel="Autonomous AI Revision & Interactive Patch Engine"
+          description="Resolve peer review critiques through targeted semantic diff patches. Review exact find-and-replace deltas, edit suggestions in real time, and selectively accept or reject modifications."
+          instructions={[
+            "Click 'Generate AI Revision Patches' to formulate targeted diffs for active critiques",
+            "Examine diff previews showing previous text alongside proposed enhancements",
+            "Accept individual patches, customize replacements, or use 'Accept All Patches'",
+            "Commit revised draft and proceed to the Final Editorial Desk",
+          ]}
+          targetJournal={project?.answers?.["selected_journal_name"] || project?.answers?.["target_journal"]}
+          tips={[
+            "Interactive patching allows surgical improvement without risking unintentional deletions elsewhere in the section.",
+            "You can customize any patch before accepting it to preserve your authentic author voice.",
+          ]}
+        />
+
         {/* Error notification */}
         {error && (
           <div className="p-4 rounded-xl bg-[color:var(--state-danger-subtle)] border border-[color:var(--state-danger)] text-[color:var(--state-danger)] text-sm flex items-center justify-between font-sans">

@@ -4,6 +4,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedStreamFetch, saveIntakeAnswers } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export interface JournalCandidate {
   id: string;
@@ -635,7 +636,24 @@ export default function JournalDiscoveryStage({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-8 space-y-8">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 5 · Target Journal & Requirements"
+          stageLabel="Scholarly Venue & Target Journal Discovery"
+          description="Scan global academic databases (Scopus, Web of Science, ACM, IEEE, PubMed) to identify premier Q1/Q2 target journals matching your empirical methodology and citation network."
+          instructions={[
+            "Scan or search candidate peer-reviewed journals aligned with your topic",
+            "Evaluate Impact Factor, SJR Quartile, and review timeline speeds",
+            "Select your anchor target journal or register a custom venue",
+            "Proceed to extract submission constraints and author guidelines",
+          ]}
+          targetJournal={selectedJournalTitle}
+          tips={[
+            "Targeting Q1 journals with relevant special issues often accelerates review cycles while maximizing scholarly reach.",
+            "Confirm whether your funding body mandates immediate Gold Open Access (cOAlition S / Plan S compliance).",
+          ]}
+        />
+
         {/* Radar Terminal & Status Display */}
         {(isProcessing || logs.length > 0) && (
           <div ref={terminalRef} className="max-w-5xl mx-auto flex flex-col md:flex-row gap-6">

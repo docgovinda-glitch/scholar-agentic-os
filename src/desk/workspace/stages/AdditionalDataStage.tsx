@@ -6,6 +6,7 @@ import { saveIntakeAnswers } from "../../api";
 import { addVaultItem } from "../../../services/vaultContents";
 import { getSupabaseClient } from "../../../services/supabaseClient";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export type DatasetFormat = "csv" | "tsv" | "json" | "pdf" | "markdown" | "text";
 
@@ -355,6 +356,25 @@ export default function AdditionalDataStage({
             🔬 {methodology}
           </span>
         </div>
+      </div>
+
+      <div className="shrink-0 px-4 sm:px-6 lg:px-8 py-3 bg-[color:var(--surface-canvas)]">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 3 · Evidence Desk & Source Vault"
+          stageLabel="Empirical Datasets & Supplementary Artifact Ingestion"
+          description="Attach raw benchmarks, survey CSVs, computational traces, or supplemental tables to ground your Results and Discussion sections with reproducible empirical data."
+          instructions={[
+            "Upload structured data files (.csv, .tsv, .json) or paste tabular benchmark matrices",
+            "Preview uploaded records, column headers, and data distributions",
+            "Ground your empirical findings with real numbers and verifiable measurements",
+            "Proceed to claim extraction to synthesize empirical findings into the claims matrix",
+          ]}
+          targetJournal={targetJournal}
+          tips={[
+            "Top-tier journals require Data Availability statements. Attaching your raw tables here ensures complete reproducibility.",
+            "Tabular data ingested here can be directly referenced by the drafting agents to generate accurate markdown tables.",
+          ]}
+        />
       </div>
 
       {/* 3. Main Workspace Split Layout */}

@@ -335,6 +335,28 @@ export function DraftingSectionIndex({
                   </div>
                 )}
               </div>
+
+              {/* Subsection Word Budget Micro Progress Meter */}
+              <div className="w-full bg-neutral-100 dark:bg-white/5 h-1 rounded-full overflow-hidden mt-1.5">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    isCompleted
+                      ? "bg-emerald-500"
+                      : isSectionGenerating
+                      ? "bg-blue-500 animate-pulse"
+                      : "bg-neutral-300 dark:bg-neutral-600"
+                  }`}
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      Math.round(
+                        ((section.currentWordCount || 0) / (section.targetWordCount || 500)) *
+                          100
+                      )
+                    )}%`,
+                  }}
+                />
+              </div>
             </>
           );
 

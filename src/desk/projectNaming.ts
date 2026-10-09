@@ -275,13 +275,15 @@ export function getNextUntitledProjectTitle(
 }
 
 /**
- * Identifies if an existing "Untitled Project" has zero content so it can be
- * reused or focused instead of proliferating empty drafts.
+ * Identifies if an existing "Untitled Project" (or project matching targetTitle) has zero content
+ * so it can be reused or focused instead of proliferating empty drafts.
  */
 export function findReusableEmptyProject(
   existingProjects: ProjectTitleItem[],
-  outputTypeId?: string
+  outputTypeId?: string,
+  targetTitle?: string
 ): ProjectTitleItem | null {
+  const normTarget = targetTitle?.trim().toLowerCase();
   return (
     existingProjects.find((p) => {
       const title = getProjectTitle(p).trim().toLowerCase();
@@ -291,12 +293,78 @@ export function findReusableEmptyProject(
         title.startsWith("untitled project") ||
         title === "academic assignment" ||
         title === "synthesized research project";
+      const matchesTarget =
+        Boolean(normTarget) &&
+        (title === normTarget ||
+          getProjectDisplayName(p, existingProjects).trim().toLowerCase() === normTarget);
       const hasZeroContent = !p.hasDocument && (p.intakeCompleteness ?? 0) === 0 && isBlankProject(p);
       const typeMatches = !outputTypeId || p.outputTypeId === outputTypeId;
-      return isUntitled && hasZeroContent && typeMatches;
+      return (isUntitled || matchesTarget) && hasZeroContent && typeMatches;
     }) ?? null
   );
 }
+
+/**
+ * Deduplicates a list of project items by unique project ID and normalized display title.
+ * 
+ * - Ensures no project ID appears more than once.
+ * - Ensures no duplicate display title appears in the list (case-insensitive, trimmed).
+ * - Strips trailing ellipsis (e.g. "..." or "…") during comparison to unify truncated titles.
+ * - Preserves the first (most recently updated) occurrence of each unique title.
+ * - If pinnedIds is supplied, a pinned project takes precedence over an unpinned project
+ *   sharing the same title.
+ * - Preserves format-aware numbered untitled drafts (e.g. "Untitled Assignment 1", "Untitled Assignment 2")
+ *   since their display titles are already distinct.
+ */
+export function deduplicateProjectList<T extends ProjectTitleItem>(
+  projectsToFilter: T[],
+  contextProjects?: ProjectTitleItem[],
+  pinnedIds?: string[]
+): T[] {
+  if (!projectsToFilter || projectsToFilter.length <= 1) {
+    return projectsToFilter ? [...projectsToFilter] : [];
+  }
+
+  const allProjects = contextProjects || projectsToFilter;
+  const pinnedSet = new Set(pinnedIds || []);
+
+  const seenIds = new Set<string>();
+  const seenTitles = new Map<string, number>(); // normalizedTitle -> index in result
+  const result: T[] = [];
+
+  for (const p of projectsToFilter) {
+    if (!p) continue;
+    const id = getProjectId(p);
+    if (!id || seenIds.has(id)) continue;
+
+    const title = getProjectDisplayName(p, allProjects);
+    const normalizedTitle = title
+      .trim()
+      .replace(/(?:\.\.\.|…)+$/, "")
+      .trim()
+      .toLowerCase();
+
+    if (!seenTitles.has(normalizedTitle)) {
+      seenIds.add(id);
+      seenTitles.set(normalizedTitle, result.length);
+      result.push(p);
+    } else {
+      // Title already seen. If current project is pinned and existing one is not, swap it in.
+      const existingIdx = seenTitles.get(normalizedTitle)!;
+      const existingProject = result[existingIdx];
+      const existingId = getProjectId(existingProject);
+
+      if (pinnedSet.has(id) && !pinnedSet.has(existingId)) {
+        seenIds.delete(existingId);
+        seenIds.add(id);
+        result[existingIdx] = p;
+      }
+    }
+  }
+
+  return result;
+}
+
 
 function capitalizeTitleWords(str: string): string {
   const minor = new Set(["a", "an", "the", "and", "but", "or", "for", "nor", "on", "at", "to", "from", "by", "in", "of", "with"]);

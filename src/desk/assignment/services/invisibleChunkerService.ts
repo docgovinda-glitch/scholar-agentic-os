@@ -1151,6 +1151,15 @@ function generateAcademicPeelProse(params: {
     bodyContent =
       `A critical evaluation confirms that architectural constraints govern computational outcomes by dictating physical coherence and gate overheads ${cit1}. ` +
       `Analytical interrogation demonstrates that empirical performance depends upon holistic hardware-software co-design ${cit2}.`;
+  } else if (revisionPrompt === "citations") {
+    bodyContent +=
+      `\n\nSubstantiating this finding through primary empirical corroboration, recent meta-analyses verify that empirical validation across independent cohorts confirms these foundational limits ${cit1}, reinforcing the imperative for standardized methodological benchmarks ${cit2}.`;
+  } else if (revisionPrompt === "smooth") {
+    bodyContent +=
+      `\n\nSynthesizing these interrelated dimensions, the analytical findings converge to establish that procedural mechanisms must be interpreted through this broader conceptual framework before progressing to downstream operational implementations.`;
+  } else if (revisionPrompt && typeof revisionPrompt === "string" && revisionPrompt.trim()) {
+    bodyContent +=
+      `\n\nDirectly addressing the directive to "${revisionPrompt.trim()}": critical evaluation substantiates this specific nuance, integrating empirical corroboration ${cit1} to challenge prevailing orthodoxies while validating core theoretical benchmarks ${cit2}.`;
   }
 
   return bodyContent;

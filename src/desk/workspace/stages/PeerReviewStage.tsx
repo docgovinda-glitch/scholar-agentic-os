@@ -4,6 +4,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedFetch, authedJsonFetch, authedStreamFetch, saveIntakeAnswers } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export interface AcademicCritique {
   id: string;
@@ -675,6 +676,23 @@ export default function PeerReviewStage({
 
       {/* 3. Main Body */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 8 · Peer Review & Live Revision"
+          stageLabel="7-Lens Autonomous Academic Peer Review"
+          description="Subject your manuscript to multi-persona adversarial peer review across 7 academic dimensions (Coherence, Rigor, Venue Scope, Synthesis, Falsifiability, Register, and Compliance)."
+          instructions={[
+            "Click 'Begin 7-Lens Critique' to launch adversarial reviewer simulations",
+            "Examine critique severity distribution across Major, Moderate, Minor, and Advisory",
+            "Review section-by-section critiques and specific revision directives",
+            "Waive minor non-critical advisories with an explanation or proceed to Live Revision",
+          ]}
+          targetJournal={project?.answers?.["selected_journal_name"] || project?.answers?.["target_journal"]}
+          tips={[
+            "Simulating rigorous peer review before formal submission eliminates over 80% of common desk rejection grounds.",
+            "Directives generated here will guide the live AI revision agent in the next stage.",
+          ]}
+        />
+
         {/* Terminal during critique scan */}
         {(isProcessing || logs.length > 0) && (
           <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-5">

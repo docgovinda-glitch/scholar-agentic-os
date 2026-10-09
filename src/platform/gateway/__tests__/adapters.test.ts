@@ -129,7 +129,7 @@ describe("platform/gateway/adapters: Gemini", () => {
     expect(result.text).toBe("response from fallback model");
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0][0]).toContain("/models/invalid-model:generateContent");
-    expect(fetchMock.mock.calls[1][0]).toContain("/models/gemini-2.5-flash:generateContent");
+    expect(fetchMock.mock.calls[1][0]).toContain("/models/gemini-3.1-flash-lite:generateContent");
   });
 
   it("does NOT fall back on 401 or 403 authentication errors", async () => {

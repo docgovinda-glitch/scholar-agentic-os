@@ -299,7 +299,7 @@ function ProjectRoute() {
               onClick={() => navigate("/projects")}
               className="w-full sm:flex-1 rounded-xl border border-neutral-200 dark:border-white/10 px-4 py-2.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
             >
-              Saved Projects
+              Back to your work
             </button>
           </div>
         </div>
@@ -320,7 +320,7 @@ function ProjectRoute() {
 
   const targetProjectId = effectiveProjectId || urlProjectId || "";
 
-  if (outputTypeId === "OT-01") {
+  if (outputTypeId === "OT-01" || outputTypeId === "OT-02") {
     return (
       <AssignmentWorkspace
         projectId={targetProjectId}

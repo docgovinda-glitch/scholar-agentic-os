@@ -5,6 +5,7 @@ import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { saveIntakeAnswers, authedStreamFetch } from "../../api";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export type ArgumentStrength = "Very High" | "High" | "Moderate";
 
@@ -702,6 +703,23 @@ export default function EvidenceAnalysisStage({
 
       {/* 3. Main Scrollable Workspace */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 4 · Claim Extraction & Synthesis"
+          stageLabel="Thematic Argument Synthesis & Evidence Matrix"
+          description="Cluster extracted claims, empirical benchmarks, and external literature into high-level argumentative pillars (Corroboration, Extension, Counter-Perspective, and Methodological Grounding)."
+          instructions={[
+            "Click 'Run Automated Matrix Synthesis' to cluster claims into thematic pillars",
+            "Review argument strength (Very High, High, Moderate) and alignment types",
+            "Synthesize primary claims against corroborating external evidence",
+            "Manually add or refine argumentative threads using '+ Add Argument Thread'",
+          ]}
+          targetJournal={project?.answers?.["target_journal"]}
+          tips={[
+            "Strong manuscripts present coherent thematic clusters rather than isolated factual statements.",
+            "Structuring both corroborating evidence and counter-perspectives preempts reviewer objections.",
+          ]}
+        />
+
         {/* Terminal Logs During Synthesis */}
         {(isProcessing || logs.length > 0) && (
           <div className="max-w-5xl mx-auto">

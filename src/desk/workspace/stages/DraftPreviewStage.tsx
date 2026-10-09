@@ -4,6 +4,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedStreamFetch, saveIntakeAnswers } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export interface ManuscriptPreviewSection {
   title: string;
@@ -536,6 +537,24 @@ export default function DraftPreviewStage({
 
       {/* 3. Main Workspace */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 7 · Integrity & Pre-Flight Audit"
+          stageLabel="Unified Manuscript Assembly & Pre-Review Inspection"
+          description="Consolidate all individually drafted sections into an integrated end-to-end manuscript with formatted metadata, author affiliations, section headings, and consolidated reference list."
+          instructions={[
+            "Inspect the assembled preprint across Title, Abstract, IMRaD sections, and References",
+            "Verify word count distribution and estimated page budget against journal targets",
+            "Review the 6-point Pre-Review Readiness Charter before releasing to peer reviewers",
+            "Click 'Advance to Phase IV: Peer Review' to initiate autonomous reviewer panels",
+          ]}
+          targetJournal={targetJournal}
+          wordCountBudget={parseInt(project?.answers?.["word_count_limit"] || project?.answers?.["word_count_target"] || "4500", 10) || 4500}
+          tips={[
+            "Viewing your paper as a continuous document allows you to evaluate narrative flow and cross-section coherence.",
+            "Use 'Copy Markdown' to test local typesetting or quick sharing with co-authors.",
+          ]}
+        />
+
         {/* Terminal during assembly */}
         {(isProcessing || logs.length > 0) && (
           <div className="max-w-5xl mx-auto">

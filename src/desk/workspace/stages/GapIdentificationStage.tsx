@@ -3,6 +3,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { executeAgenticLLM, saveIntakeAnswers } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
 import type { ProjectView } from "../../types";
 import {
@@ -428,6 +429,23 @@ export default function GapIdentificationStage({
 
       {/* 2. Main Scrollable Container */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 2 · Gap Analysis & Title Lock"
+          stageLabel="Empirical & Conceptual Void Discovery"
+          description="Synthesize your literature corpus against research objectives to identify unresolved contradictions, methodological deficits, and high-impact conceptual voids."
+          instructions={[
+            "Run automated gap identification across the ingested literature",
+            "Evaluate identified discoveries across empirical, conceptual, and procedural dimensions",
+            "Rate impact, novelty, and target journal viability",
+            "Proceed to gap selection to crown your manuscript's anchor research contribution",
+          ]}
+          targetJournal={project?.answers?.["target_journal"]}
+          tips={[
+            "Top-tier journals prioritize papers with well-defined empirical or methodological gaps over purely descriptive reviews.",
+            "A clearly articulated gap forms the spine of your Introduction and Discussion sections.",
+          ]}
+        />
+
         {/* Empty State / Initial Hero */}
         {(!gaps || gaps.length === 0) && !isProcessing && (
           <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-2xl p-6 sm:p-10 text-center max-w-xl mx-auto my-8 sm:my-12 shadow-sm space-y-4">

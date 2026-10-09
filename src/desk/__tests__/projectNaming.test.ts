@@ -10,6 +10,7 @@ import {
   getProjectHeadingPlaceholder,
   matchesProjectSearch,
   getFormatLabel,
+  deduplicateProjectList,
 } from "../projectNaming";
 
 describe("projectNaming utilities", () => {
@@ -374,6 +375,84 @@ describe("projectNaming utilities", () => {
       };
       expect(matchesProjectSearch(untitled, "Assignment")).toBe(true);
       expect(matchesProjectSearch(untitled, "Untitled")).toBe(true);
+    });
+  });
+
+  describe("deduplicateProjectList", () => {
+    it("deduplicates identical project titles, keeping the most recent one", () => {
+      const projects = [
+        { projectId: "p-china-new", answers: { title: "Role of China in Advanced Manufacturing" } },
+        { projectId: "p-rasuwa-1", answers: { title: "Rasuwa Flood" } },
+        { projectId: "p-rasuwa-2", answers: { title: "Rasuwa Flood" } },
+        { projectId: "p-rasuwa-3", answers: { title: "Rasuwa Flood" } },
+        { projectId: "p-jasmine", answers: { title: "Jasmine Ojha" } },
+        { projectId: "p-kastha-1", answers: { title: "History of Kasthamandap" } },
+        { projectId: "p-kastha-2", answers: { title: "History of Kasthamandap" } },
+        { projectId: "p-climate", answers: { title: "What Are Causes of Climate Change" } },
+        { projectId: "p-china-old1", answers: { title: "Role of China in Advanced Manufacturing" } },
+        { projectId: "p-china-old2", answers: { title: "Role of China in Advanced Manufacturing" } },
+        { projectId: "p-un", answers: { title: "Is United Nations Successful" } },
+      ];
+
+      const deduped = deduplicateProjectList(projects);
+      expect(deduped.map((p) => p.projectId)).toEqual([
+        "p-china-new",
+        "p-rasuwa-1",
+        "p-jasmine",
+        "p-kastha-1",
+        "p-climate",
+        "p-un",
+      ]);
+    });
+
+    it("deduplicates duplicate project IDs", () => {
+      const projects = [
+        { projectId: "p-1", answers: { title: "Project Alpha" } },
+        { projectId: "p-1", answers: { title: "Project Alpha" } },
+        { projectId: "p-2", answers: { title: "Project Beta" } },
+      ];
+      const deduped = deduplicateProjectList(projects);
+      expect(deduped).toHaveLength(2);
+      expect(deduped.map((p) => p.projectId)).toEqual(["p-1", "p-2"]);
+    });
+
+    it("unifies titles with and without trailing ellipsis", () => {
+      const projects = [
+        { projectId: "p-1", answers: { title: "Role of China in Advanced Manufacturing..." } },
+        { projectId: "p-2", answers: { title: "Role of China in Advanced Manufacturing" } },
+      ];
+      const deduped = deduplicateProjectList(projects);
+      expect(deduped).toHaveLength(1);
+      expect(deduped[0].projectId).toBe("p-1");
+    });
+
+    it("prioritizes pinned project when duplicate title exists", () => {
+      const projects = [
+        { projectId: "p-unpinned", answers: { title: "Rasuwa Flood" } },
+        { projectId: "p-pinned", answers: { title: "Rasuwa Flood" } },
+      ];
+      const deduped = deduplicateProjectList(projects, undefined, ["p-pinned"]);
+      expect(deduped).toHaveLength(1);
+      expect(deduped[0].projectId).toBe("p-pinned");
+    });
+
+    it("preserves distinct numbered untitled projects", () => {
+      const projects = [
+        { projectId: "p-u1", outputTypeId: "OT-01", answers: {} },
+        { projectId: "p-u2", outputTypeId: "OT-01", answers: {} },
+        { projectId: "p-pres", outputTypeId: "OT-22", answers: {} },
+      ];
+      const deduped = deduplicateProjectList(projects);
+      expect(deduped).toHaveLength(3);
+      expect(getProjectDisplayName(deduped[0], deduped)).toBe("Untitled Assignment 1");
+      expect(getProjectDisplayName(deduped[1], deduped)).toBe("Untitled Assignment 2");
+      expect(getProjectDisplayName(deduped[2], deduped)).toBe("Untitled Presentation");
+    });
+
+    it("handles empty or single item arrays safely", () => {
+      expect(deduplicateProjectList([])).toEqual([]);
+      const single = [{ projectId: "p-1", answers: { title: "Single" } }];
+      expect(deduplicateProjectList(single)).toEqual(single);
     });
   });
 });

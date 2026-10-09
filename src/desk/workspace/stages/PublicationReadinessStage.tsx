@@ -3,6 +3,7 @@ import type { ProjectView, CanonicalDocument, Block } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import { authedJsonFetch, getDocument, saveIntakeAnswers } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export interface ComplianceCheck {
   id: string;
@@ -122,6 +123,10 @@ export default function PublicationReadinessStage({
       0
     ) || 3480;
   }, [manuscriptText, doc]);
+
+  const targetWordCount = useMemo(() => {
+    return parseInt(project?.answers?.["word_count_limit"] || project?.answers?.["word_count_target"] || "4500", 10) || 4500;
+  }, [project?.answers]);
 
   const citationCount = useMemo(() => {
     const matches = manuscriptText.match(/\[@[^\]]+\]|\([A-Z][a-zA-Z\s]+,\s*\d{4}\)/g);
@@ -493,6 +498,24 @@ export default function PublicationReadinessStage({
 
       {/* 3. Main Workspace Area */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 9 · Camera-Ready Typesetting & Export"
+          stageLabel="Pre-Flight Submission Compliance & Integrity Gate"
+          description={`Execute multi-dimensional compliance verification against ${targetJournal} editorial rubrics, auditing word budgets, citation provenance, and required declarations.`}
+          instructions={[
+            "Run automated compliance audit against target journal submission standards",
+            "Audit word quotas, structured abstract bounds, and section completeness",
+            "Verify all evidence citations are confirmed and declarations are present",
+            "Certify publication readiness to proceed to Camera-Ready Typesetting",
+          ]}
+          targetJournal={targetJournal}
+          wordCountBudget={targetWordCount}
+          tips={[
+            "Papers that exceed target word counts by >10% frequently face immediate desk returns without review.",
+            "Double-check that Data Availability and Conflict of Interest declarations are explicit before final camera-ready generation.",
+          ]}
+        />
+
         {/* Error banner */}
         {error && (
           <div className="p-4 rounded-xl bg-[color:var(--state-danger-subtle)] border border-[color:var(--state-danger)] text-[color:var(--state-danger)] text-sm flex items-center justify-between font-sans">

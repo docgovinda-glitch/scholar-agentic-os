@@ -95,7 +95,7 @@ const REPLACEMENT_POOL: DiscoveredSource[] = [
     isOpenAccess: false,
     isVerifiedAcademic: true,
     sourceCredibility: "peer-reviewed",
-    status: "unreviewed",
+    status: "kept",
   },
   {
     id: "src-curated-alt-2",
@@ -119,7 +119,7 @@ const REPLACEMENT_POOL: DiscoveredSource[] = [
     isOpenAccess: false,
     isVerifiedAcademic: true,
     sourceCredibility: "academic-press",
-    status: "unreviewed",
+    status: "kept",
   },
   {
     id: "src-curated-alt-3",
@@ -143,7 +143,7 @@ const REPLACEMENT_POOL: DiscoveredSource[] = [
     isOpenAccess: true,
     isVerifiedAcademic: true,
     sourceCredibility: "institutional-report",
-    status: "unreviewed",
+    status: "kept",
   },
 ];
 
@@ -229,6 +229,11 @@ export default function AssignmentSourcesStage({
   const [isDiscoveringInitial, setIsDiscoveringInitial] = useState(false);
   const [discoverySuccessMsg, setDiscoverySuccessMsg] = useState<string | null>(null);
   const [altPoolIndex, setAltPoolIndex] = useState(0);
+
+  // AI Literature Discovery & Search state
+  const [aiSearchPrompt, setAiSearchPrompt] = useState("");
+  const [isAISearching, setIsAISearching] = useState(false);
+  const [recentlyRemovedSource, setRecentlyRemovedSource] = useState<DiscoveredSource | null>(null);
 
   // Reference editing & copy state
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
@@ -478,6 +483,9 @@ export default function AssignmentSourcesStage({
     try {
       const discovered = await discoverRealScholarlySourcesFromServer(question, citationStyle);
       await setSources(discovered);
+      if (setApprovedSourceIds && approvedSourceIds.length > 0) {
+        await setApprovedSourceIds(discovered.map((s) => s.id));
+      }
       const isReal = discovered.length > 0 && discovered[0].retrievalSource;
       setDiscoverySuccessMsg(
         isReal
@@ -487,6 +495,9 @@ export default function AssignmentSourcesStage({
     } catch {
       const generated = generateCuratedLiteratureSources(question, citationStyle);
       await setSources(generated);
+      if (setApprovedSourceIds && approvedSourceIds.length > 0) {
+        await setApprovedSourceIds(generated.map((s) => s.id));
+      }
       setDiscoverySuccessMsg(`Curated ${generated.length} literature sources matching your assignment prompt.`);
     }
     setIsFindingMore(false);
@@ -500,20 +511,86 @@ export default function AssignmentSourcesStage({
       const moreBatch = await fetchMoreRealSources(sources, question, 10);
       const nextSources = [...sources, ...moreBatch];
       await setSources(nextSources);
+      if (setApprovedSourceIds) {
+        await setApprovedSourceIds(Array.from(new Set([...approvedSourceIds, ...moreBatch.map((s) => s.id)])));
+      }
       const isReal = moreBatch.length > 0 && moreBatch[0].retrievalSource;
       setDiscoverySuccessMsg(
         isReal
-          ? `Retrieved ${moreBatch.length} additional scholarly sources from academic databases.`
-          : `Retrieved ${moreBatch.length} additional literature sources.`
+          ? `Retrieved and added ${moreBatch.length} additional scholarly sources from academic databases.`
+          : `Retrieved and added ${moreBatch.length} additional literature sources.`
       );
     } catch {
       const moreBatch = fetchMoreLiteratureSources(sources, question, 10);
       const nextSources = [...sources, ...moreBatch];
       await setSources(nextSources);
-      setDiscoverySuccessMsg(`Retrieved ${moreBatch.length} additional literature sources.`);
+      if (setApprovedSourceIds) {
+        await setApprovedSourceIds(Array.from(new Set([...approvedSourceIds, ...moreBatch.map((s) => s.id)])));
+      }
+      setDiscoverySuccessMsg(`Retrieved and added ${moreBatch.length} additional literature sources.`);
     }
     setIsFindingMore(false);
     setTimeout(() => setDiscoverySuccessMsg(null), 5000);
+  };
+
+  // AI-Powered Targeted Literature Discovery
+  const handleAISearchLiterature = async (customQuery?: string) => {
+    const queryToRun = (customQuery || aiSearchPrompt).trim();
+    if (!queryToRun) return;
+
+    setIsAISearching(true);
+    try {
+      const combinedTopic = question ? `${question} — ${queryToRun}` : queryToRun;
+      let newSources: DiscoveredSource[] = [];
+      try {
+        newSources = await discoverRealScholarlySourcesFromServer(combinedTopic, citationStyle);
+      } catch {
+        newSources = fetchMoreLiteratureSources(sources, combinedTopic, 6);
+      }
+
+      const existingIds = new Set(sources.map((s) => s.id));
+      const freshBatch = newSources
+        .filter((s) => !existingIds.has(s.id))
+        .slice(0, 5)
+        .map((s, idx) => ({
+          ...s,
+          id: s.id.startsWith("src-") ? s.id : `src-ai-${Date.now()}-${idx}`,
+          sourceOrigin: "ai_research" as const,
+          originTag: "ai-research" as const,
+          status: "kept" as const,
+          roleInAssignment: queryToRun.toLowerCase().includes("counter")
+            ? "Counter-argument"
+            : queryToRun.toLowerCase().includes("theory")
+            ? "Theoretical framework"
+            : "Empirical evidence",
+        }));
+
+      const toAdd = freshBatch.length > 0 ? freshBatch : newSources.slice(0, 4).map((s, idx) => ({
+        ...s,
+        id: `src-ai-${Date.now()}-${idx}`,
+        sourceOrigin: "ai_research" as const,
+        originTag: "ai-research" as const,
+        status: "kept" as const,
+      }));
+
+      const nextSources = [...toAdd, ...sources];
+      await setSources(nextSources);
+
+      // Auto-add newly discovered AI sources into the assignment
+      if (setApprovedSourceIds) {
+        const nextApproved = Array.from(new Set([...approvedSourceIds, ...toAdd.map((s) => s.id)]));
+        await setApprovedSourceIds(nextApproved);
+      }
+
+      setAiSearchPrompt("");
+      setDiscoverySuccessMsg(`AI found and added ${toAdd.length} source(s) on "${queryToRun}" to your assignment.`);
+    } catch (err) {
+      console.error("AI Literature Search error:", err);
+      setDiscoverySuccessMsg("Could not retrieve additional sources for this query. Try another keyword.");
+    } finally {
+      setIsAISearching(false);
+      setTimeout(() => setDiscoverySuccessMsg(null), 5000);
+    }
   };
 
   // Toggle Bookmark
@@ -530,24 +607,53 @@ export default function AssignmentSourcesStage({
     await setSources(nextSources);
   };
 
-  // Dismiss / Replace source with real discovery replacement when possible
+  // Dismiss / Delete source with clean removal & Undo option
   const handleDismissSource = async (sourceId: string) => {
     const isUserDoc = userUploadedSources.some((doc) => doc.id === sourceId);
     if (isUserDoc) {
       await removeUserUploadedSource(sourceId);
+      setDiscoverySuccessMsg("Removed uploaded material from assignment.");
+      setTimeout(() => setDiscoverySuccessMsg(null), 3000);
       return;
     }
-    let nextReplacement: DiscoveredSource | undefined;
-    try {
-      // Try to get a real replacement from the server
-      const freshBatch = await fetchMoreRealSources(sources, question, 1);
-      nextReplacement = freshBatch[0];
-    } catch {
-      // Fallback to mock replacement pool
-      nextReplacement = REPLACEMENT_POOL[altPoolIndex % REPLACEMENT_POOL.length];
-      setAltPoolIndex((prev) => prev + 1);
+
+    const removedSource = sources.find((s) => s.id === sourceId);
+    if (removedSource) {
+      setRecentlyRemovedSource(removedSource);
     }
-    await dismissSource(sourceId, nextReplacement);
+
+    // Remove from approvedSourceIds
+    const nextApproved = approvedSourceIds.filter((id) => id !== sourceId);
+    if (setApprovedSourceIds) {
+      await setApprovedSourceIds(nextApproved);
+    }
+
+    // Mark as excluded / removed from active list
+    setExcludedIds((prev) => Array.from(new Set([...prev, sourceId])));
+    const nextSources = sources.map((s) =>
+      s.id === sourceId ? { ...s, isExcluded: true, status: "removed" as const } : s
+    );
+    await setSources(nextSources);
+
+    setDiscoverySuccessMsg(`Removed "${removedSource?.title?.slice(0, 42) || "source"}..." from assignment.`);
+    setTimeout(() => setDiscoverySuccessMsg(null), 5000);
+  };
+
+  // Undo accidental removal
+  const handleUndoDismiss = async () => {
+    if (!recentlyRemovedSource) return;
+    const restoredId = recentlyRemovedSource.id;
+    setExcludedIds((prev) => prev.filter((id) => id !== restoredId));
+    const nextSources = sources.map((s) =>
+      s.id === restoredId ? { ...s, isExcluded: false, status: "kept" as const } : s
+    );
+    await setSources(nextSources);
+    if (setApprovedSourceIds) {
+      await setApprovedSourceIds(Array.from(new Set([...approvedSourceIds, restoredId])));
+    }
+    setRecentlyRemovedSource(null);
+    setDiscoverySuccessMsg("Restored source back into assignment.");
+    setTimeout(() => setDiscoverySuccessMsg(null), 3000);
   };
 
   // Restore excluded source
@@ -556,14 +662,23 @@ export default function AssignmentSourcesStage({
     setExcludedIds(nextExcluded);
 
     const nextSources = sources.map((s) =>
-      s.id === sourceId ? { ...s, isExcluded: false, status: "unreviewed" as const } : s
+      s.id === sourceId ? { ...s, isExcluded: false, status: "kept" as const } : s
     );
     await setSources(nextSources);
+    if (setApprovedSourceIds) {
+      await setApprovedSourceIds(Array.from(new Set([...approvedSourceIds, sourceId])));
+    }
+    setDiscoverySuccessMsg("Restored source to assignment.");
+    setTimeout(() => setDiscoverySuccessMsg(null), 3000);
   };
 
   const handleLectureUpload = async (docs: UploadedSourceDocument[], newEvidences?: EvidenceItem[]) => {
     for (const doc of docs) {
       await addUserUploadedSource(doc);
+    }
+    if (setApprovedSourceIds) {
+      const docIds = docs.map((d) => d.id);
+      await setApprovedSourceIds(Array.from(new Set([...approvedSourceIds, ...docIds])));
     }
     if (newEvidences && newEvidences.length > 0 && addEvidenceItem) {
       for (const ev of newEvidences) {
@@ -580,6 +695,8 @@ export default function AssignmentSourcesStage({
         });
       }
     }
+    setDiscoverySuccessMsg(`Added and analyzed ${docs.length} course material(s). Grounded in your assignment.`);
+    setTimeout(() => setDiscoverySuccessMsg(null), 4000);
   };
 
   const handleLectureRemove = async (docId: string) => {
@@ -611,9 +728,11 @@ export default function AssignmentSourcesStage({
     if (!hasTopic && !hasUploadedDocs) {
       return [];
     }
-    // Use whatever sources are in state; the useEffect handles async discovery
+    // Use whatever sources are in state; fallback to synchronous generator while async discovery resolves
     const raw = (sources && sources.length > 0)
       ? sources
+      : (hasTopic || hasUploadedDocs)
+      ? generateCuratedLiteratureSources(question, citationStyle)
       : [];
 
     return raw.map((s, idx) => ({
@@ -856,7 +975,7 @@ export default function AssignmentSourcesStage({
   const progressPercent = Math.min(100, Math.round((Math.max(approvedCount, totalActiveSources) / minimumRequired) * 100));
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 space-y-7 animate-in fade-in duration-200">
+    <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 pb-32 space-y-7 animate-in fade-in duration-200">
       {/* Stage Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200/80 dark:border-white/10 pb-5">
         <div className="space-y-1">
@@ -926,6 +1045,21 @@ export default function AssignmentSourcesStage({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Minimal Step Guidance Banner */}
+      <div className="p-3.5 sm:p-4 rounded-xl bg-neutral-100/60 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center font-mono font-bold text-[10px] shrink-0">
+            2
+          </div>
+          <p className="text-neutral-600 dark:text-neutral-400 text-xs leading-relaxed">
+            Curate peer-reviewed literature and course materials. Kept and approved sources are automatically linked to your outline sections for grounded drafting with verified in-text citations.
+          </p>
+        </div>
+        <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 shrink-0 self-start sm:self-auto">
+          Scholarly Evidence Grounding
+        </span>
       </div>
 
       {isDiscoveringInitial && allMasterSources.length === 0 ? (
@@ -1128,6 +1262,67 @@ export default function AssignmentSourcesStage({
                 </button>
               </div>
             )}
+
+            {/* AI Literature Discovery & Query Bar */}
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-purple-500/[0.07] via-indigo-500/[0.04] to-blue-500/[0.07] dark:from-purple-500/10 dark:via-indigo-500/10 dark:to-blue-500/10 border border-purple-500/20 dark:border-purple-500/30 space-y-3 shadow-2xs">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="relative flex-1">
+                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={aiSearchPrompt}
+                    onChange={(e) => setAiSearchPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAISearchLiterature();
+                      }
+                    }}
+                    placeholder="Ask AI to find specific sources (e.g. 'empirical studies on...', 'counter-arguments to...', '2024–2026 data')"
+                    className="w-full pl-10 pr-4 py-2 rounded-xl text-xs bg-white dark:bg-[#1C1C1E] border border-purple-200 dark:border-purple-900/40 focus:border-purple-500 text-neutral-900 dark:text-white placeholder-neutral-400 outline-none shadow-2xs"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleAISearchLiterature()}
+                  disabled={isAISearching || !aiSearchPrompt.trim()}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50 shrink-0"
+                >
+                  {isAISearching ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Discovering...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Find with AI</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Quick Discovery Topic Chips */}
+              <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                <span className="text-neutral-500 dark:text-neutral-400 font-medium mr-1">Quick Discovery:</span>
+                {[
+                  "Seminal Theoretical Frameworks",
+                  "Recent Empirical Evidence (2024–2026)",
+                  "Counter-Arguments & Critical Perspectives",
+                  "Policy & Institutional Reports",
+                ].map((promptChip) => (
+                  <button
+                    key={promptChip}
+                    type="button"
+                    disabled={isAISearching}
+                    onClick={() => handleAISearchLiterature(promptChip)}
+                    className="px-2.5 py-1 rounded-lg bg-white/90 dark:bg-white/10 hover:bg-purple-100 dark:hover:bg-purple-950/40 text-neutral-700 dark:text-neutral-200 border border-neutral-200/80 dark:border-white/10 text-[11px] font-medium transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    + {promptChip}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Filter Navigation Bar & Status Tabs */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
@@ -1628,20 +1823,31 @@ export default function AssignmentSourcesStage({
               </div>
             )}
 
-            {/* Notification Toast when discovering more literature */}
+            {/* Notification Toast with Undo */}
             {discoverySuccessMsg && (
-              <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/50 text-xs flex items-center justify-between gap-2 animate-in fade-in duration-200">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />
-                  <span className="font-medium">{discoverySuccessMsg}</span>
+              <div className="p-3 rounded-xl bg-neutral-900 text-white dark:bg-neutral-800 border border-neutral-700/80 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-200 shadow-lg">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Sparkles className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span className="font-medium text-neutral-100 truncate">{discoverySuccessMsg}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setDiscoverySuccessMsg(null)}
-                  className="text-blue-600 dark:text-blue-400 hover:opacity-75"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {recentlyRemovedSource && (
+                    <button
+                      type="button"
+                      onClick={handleUndoDismiss}
+                      className="px-2.5 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white font-semibold text-xs cursor-pointer transition-colors"
+                    >
+                      Undo
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setDiscoverySuccessMsg(null)}
+                    className="text-neutral-400 hover:text-white cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             )}
 

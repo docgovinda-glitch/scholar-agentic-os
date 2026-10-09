@@ -58,6 +58,7 @@ import {
   type InternalSectionPlan,
 } from "../services/invisibleChunkerService";
 import { auditCitations, evaluateRubricCompliance } from "../services/submissionAuditService";
+import { generateCuratedLiteratureSources } from "../services/scholarlyDiscoveryService";
 import { getCitationCoverage } from "../services/citationAnchoringService";
 import { generateReferenceListBlock } from "../services/referenceListGenerator";
 import { stripCircularReferences } from "../../../utils/briefExtractor";
@@ -751,7 +752,7 @@ export function AssignmentProvider({
 
   const approvedSourceIds: string[] = useMemo(() => {
     const raw = answers["approved_source_ids"] || answers["approvedSourceIds"];
-    if (raw) {
+    if (raw !== undefined && raw !== null) {
       try {
         const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
         if (Array.isArray(parsed)) return parsed;
@@ -759,10 +760,12 @@ export function AssignmentProvider({
         // fallback
       }
     }
-    const fromSources = sources.filter((s) => s.status === "kept").map((s) => s.id);
+    const fromSources = (sources && sources.length > 0 ? sources : generateCuratedLiteratureSources(question, citationStyle))
+      .filter((s) => s.status !== "removed" && !s.isExcluded)
+      .map((s) => s.id);
     const fromUploaded = userUploadedSources.map((u) => u.id);
     return Array.from(new Set([...fromSources, ...fromUploaded]));
-  }, [answers, sources, userUploadedSources]);
+  }, [answers, sources, userUploadedSources, question, citationStyle]);
 
   const rubricCriteriaList: AssignmentBriefRubricCriterion[] = useMemo(() => {
     const raw = answers["rubricCriteria"] || answers["rubric_criteria"];

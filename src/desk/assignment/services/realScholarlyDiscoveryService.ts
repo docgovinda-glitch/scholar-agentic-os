@@ -114,7 +114,7 @@ function mapDraftToDiscoveredSource(
     mainFinding: "", // Never synthesize findings from metadata alone
     suggestedUse: "",
     citation: generateCitationString(draft),
-    status: "unreviewed",
+    status: "kept",
 
     // Canonical Source Registry Fields (Production Spec §3.3)
     verificationStatus: determineVerificationStatus(draft),

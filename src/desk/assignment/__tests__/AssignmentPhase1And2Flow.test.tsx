@@ -54,6 +54,7 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
         academic_level: "undergraduate",
         assignment_type: "critical_essay",
         marking_rubric: "1. Critical Analysis: 40%\n2. Evidence & Citations: 30%\n3. Structure & Cohesion: 30%",
+        approved_source_ids: [],
       },
       gates: [],
     });

@@ -24,6 +24,7 @@ import {
   Layers,
   ShieldCheck,
   CheckCheck,
+  FileUp,
 } from "lucide-react";
 import {
   extractProjectEvidence,
@@ -408,9 +409,41 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                 <p className="text-xs text-neutral-500 dark:text-neutral-400">
                   Drop lecture slides, syllabus, or readings here, or browse files
                 </p>
-                <p className="text-[10px] text-neutral-400 dark:text-neutral-500">
-                  PDF, DOCX, PPTX, XLSX, CSV, images, and text notes
-                </p>
+                <div className="flex items-center gap-2 pt-1 flex-wrap justify-center">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileInputRef.current?.click();
+                    }}
+                    className="px-3.5 py-1.5 rounded-full border border-neutral-200 dark:border-white/15 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <FileUp className="w-3.5 h-3.5" />
+                    <span>Browse Files</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowUrlModal(true);
+                    }}
+                    className="px-3.5 py-1.5 rounded-full border border-neutral-200 dark:border-white/15 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Globe className="w-3.5 h-3.5 text-sky-500" />
+                    <span>+ Add Web Link</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowTextModal(true);
+                    }}
+                    className="px-3.5 py-1.5 rounded-full border border-neutral-200 dark:border-white/15 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <FileCode className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>+ Paste Notes</span>
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -446,14 +479,33 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isProcessing}
                 className="px-3.5 py-1.5 rounded-full border border-neutral-200 dark:border-white/15 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
+                <FileUp className="w-3.5 h-3.5" />
                 <span>Browse Files</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowUrlModal(true)}
+                disabled={isProcessing}
+                className="px-3 py-1.5 rounded-full border border-neutral-200 dark:border-white/15 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Globe className="w-3.5 h-3.5 text-sky-500" />
+                <span>+ Web Link</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowTextModal(true)}
+                disabled={isProcessing}
+                className="px-3 py-1.5 rounded-full border border-neutral-200 dark:border-white/15 bg-white dark:bg-neutral-800 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <FileCode className="w-3.5 h-3.5 text-emerald-500" />
+                <span>+ Notes</span>
               </button>
             </div>
           </div>

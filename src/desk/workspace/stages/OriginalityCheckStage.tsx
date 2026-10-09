@@ -4,6 +4,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedStreamFetch, saveIntakeAnswers } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export interface OriginalityFlag {
   id: string;
@@ -552,6 +553,23 @@ export default function OriginalityCheckStage({
 
       {/* 3. Main Body */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 7 · Integrity & Pre-Flight Audit"
+          stageLabel="Academic Originality & Cross-Corpus Overlap Scan"
+          description="N-gram semantic similarity scanner auditing section drafts against literature and preprints to detect unintentional verbatim phrasing and ensure academic voice uniqueness."
+          instructions={[
+            "Click 'Begin Originality Scan' to trigger 16-gram overlap detection across all sections",
+            "Review detected similarity index and individual phrasing flags",
+            "Use one-click 'Auto-Paraphrase' to rewrite flagged conventional expressions",
+            "Confirm originality certification before proceeding to Draft Preview",
+          ]}
+          targetJournal={project?.answers?.["selected_journal_name"] || project?.answers?.["target_journal"]}
+          tips={[
+            "Top journals flag manuscripts with >15% aggregate similarity or clusters of verbatim phrasing.",
+            "Standard mathematical definitions and bibliographies are filtered automatically.",
+          ]}
+        />
+
         {/* Terminal during scan */}
         {(isProcessing || logs.length > 0) && (
           <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-5">

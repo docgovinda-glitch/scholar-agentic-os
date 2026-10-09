@@ -517,6 +517,49 @@ describe("sidebar projects & platform navigation", () => {
     expect(within(aside!).queryByText("Untitled Assignment 1")).not.toBeInTheDocument();
     expect(within(aside!).queryByText("Untitled Assignment 2")).not.toBeInTheDocument();
   });
+
+  it("deduplicates repeated project listings in sidebar so each unique topic appears exactly once", async () => {
+    const repeatedProjects = [
+      { projectId: "p-china-1", outputTypeId: "OT-01", answers: { title: "Role of China in Advanced Manufacturing" } },
+      { projectId: "p-rasuwa-1", outputTypeId: "OT-01", answers: { title: "Rasuwa Flood" } },
+      { projectId: "p-rasuwa-2", outputTypeId: "OT-01", answers: { title: "Rasuwa Flood" } },
+      { projectId: "p-rasuwa-3", outputTypeId: "OT-01", answers: { title: "Rasuwa Flood" } },
+      { projectId: "p-jasmine", outputTypeId: "OT-01", answers: { title: "Jasmine Ojha" } },
+      { projectId: "p-kastha-1", outputTypeId: "OT-01", answers: { title: "History of Kasthamandap" } },
+      { projectId: "p-kastha-2", outputTypeId: "OT-01", answers: { title: "History of Kasthamandap" } },
+      { projectId: "p-climate", outputTypeId: "OT-01", answers: { title: "What Are Causes of Climate Change" } },
+      { projectId: "p-china-2", outputTypeId: "OT-01", answers: { title: "Role of China in Advanced Manufacturing" } },
+      { projectId: "p-china-3", outputTypeId: "OT-01", answers: { title: "Role of China in Advanced Manufacturing" } },
+      { projectId: "p-china-4", outputTypeId: "OT-01", answers: { title: "Role of China in Advanced Manufacturing" } },
+      { projectId: "p-china-5", outputTypeId: "OT-01", answers: { title: "Role of China in Advanced Manufacturing" } },
+      { projectId: "p-un", outputTypeId: "OT-01", answers: { title: "Is United Nations Successful" } },
+    ];
+
+    listProjects.mockResolvedValue({ items: repeatedProjects });
+    const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const aside = container.querySelector("aside");
+    expect(aside).toBeInTheDocument();
+
+    // Verify each title appears exactly once in the sidebar
+    expect(await within(aside!).findByText("Role of China in Advanced Manufacturing")).toBeInTheDocument();
+    expect(within(aside!).getAllByText("Role of China in Advanced Manufacturing")).toHaveLength(1);
+
+    expect(within(aside!).getByText("Rasuwa Flood")).toBeInTheDocument();
+    expect(within(aside!).getAllByText("Rasuwa Flood")).toHaveLength(1);
+
+    expect(within(aside!).getByText("History of Kasthamandap")).toBeInTheDocument();
+    expect(within(aside!).getAllByText("History of Kasthamandap")).toHaveLength(1);
+
+    expect(within(aside!).getByText("Jasmine Ojha")).toBeInTheDocument();
+    expect(within(aside!).getAllByText("Jasmine Ojha")).toHaveLength(1);
+
+    expect(within(aside!).getByText("What Are Causes of Climate Change")).toBeInTheDocument();
+    expect(within(aside!).getAllByText("What Are Causes of Climate Change")).toHaveLength(1);
+
+    expect(within(aside!).getByText("Is United Nations Successful")).toBeInTheDocument();
+    expect(within(aside!).getAllByText("Is United Nations Successful")).toHaveLength(1);
+  });
 });
 
 describe("landing workspace hero & academic workspace cards", () => {

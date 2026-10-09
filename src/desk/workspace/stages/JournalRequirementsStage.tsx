@@ -4,6 +4,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedStreamFetch, saveIntakeAnswers } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export interface JournalConstraints {
   max_words: number | string;
@@ -583,7 +584,26 @@ export default function JournalRequirementsStage({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-8 space-y-8">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 5 · Target Journal & Requirements"
+          stageLabel="Target Journal Guidelines & Submission Constraints"
+          description={`Deconstruct author guidelines for ${selectedJournal} into structural quotas, citation rules, and required sections governing AI drafting.`}
+          instructions={[
+            `Review or extract submission constraints for ${selectedJournal}`,
+            "Customize the maximum word count and abstract length quotas",
+            "Audit required sections (e.g., Abstract, Methodology, Discussion, Declarations)",
+            "Seal editorial constraints to anchor the AI drafting and citation verification stages",
+          ]}
+          targetJournal={selectedJournal}
+          wordCountBudget={constraints?.max_words || 8000}
+          citationStyle={constraints?.citation_style || "IEEE / Peer-Reviewed Standard"}
+          tips={[
+            "Target journals mandate specific declaration headings (Ethics, Funding, Data Availability). scholar-agentic-os guarantees compliance.",
+            "Double-blind journals require omitting all author identities, affiliations, and grant codes from the main manuscript text.",
+          ]}
+        />
+
         {/* Radar & Agent Terminal */}
         {(isProcessing || logs.length > 0) && (
           <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-6">

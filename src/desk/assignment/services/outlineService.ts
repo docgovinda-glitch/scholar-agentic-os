@@ -774,6 +774,14 @@ export function extractTargetFrameworks(
   // Domain heuristics if fewer than 3 frameworks found
   if (frameworks.length < 3) {
     if (
+      (combined.includes("china") || combined.includes("geopolitic")) &&
+      (combined.includes("ai") || combined.includes("tech") || combined.includes("artificial intelligence") || combined.includes("semiconductor") || combined.includes("chips"))
+    ) {
+      addIfNotPresent(frameworks, "Techno-Nationalism & Sovereign Innovation Systems");
+      addIfNotPresent(frameworks, "Weaponized Interdependence (Farrell & Newman)");
+      addIfNotPresent(frameworks, "Developmental State Industrial Policy");
+      addIfNotPresent(frameworks, "Compute Governance & Semiconductor Value Chains");
+    } else if (
       combined.includes("economic interdependence") ||
       combined.includes("commercial peace") ||
       (combined.includes("trade") && (combined.includes("conflict") || combined.includes("peace") || combined.includes("friction") || combined.includes("war") || combined.includes("interstate"))) ||
@@ -2105,7 +2113,20 @@ export function generateDynamicAssignmentStructure(
     !isNepalIndia &&
     !isCellTherapyCancer;
 
+  const isChinaAIOrTech =
+    (qLower.includes("china") || qLower.includes("chinese")) &&
+    (qLower.includes("ai") ||
+      qLower.includes("artificial intelligence") ||
+      qLower.includes("machine learning") ||
+      qLower.includes("technology") ||
+      qLower.includes("tech") ||
+      qLower.includes("semiconductor") ||
+      qLower.includes("computing") ||
+      qLower.includes("algorithm") ||
+      qLower.includes("chips"));
+
   const isChinaOrGeopolitics =
+    !isChinaAIOrTech &&
     !isNepalIndia &&
     (qLower.includes("china") ||
       qLower.includes("belt and road") ||
@@ -2378,6 +2399,63 @@ export function generateDynamicAssignmentStructure(
             ratio: 0.14,
             guidance: "Synthesize innovations addressing physical stroma barriers, immunosuppressive cytokines, and universal allogeneic donor platforms.",
             keyPoints: ["Immunosuppressive microenvironment", "Allogeneic 'off-the-shelf' gene editing", "Long-term curative outlook"],
+          },
+        ],
+      },
+    ];
+  } else if (isChinaAIOrTech) {
+    specs = [
+      {
+        title: "State-Led Strategy, Industrial Policy & Institutional Frameworks for AI Development",
+        notes: "Examine national strategy blueprints, government guidance funds, and elite research talent infrastructure in China.",
+        subheadings: [
+          {
+            title: "National Strategic Blueprints & Next Generation AI Development Goals",
+            ratio: 0.16,
+            guidance: "Critically evaluate state development plans (e.g. Next Generation AI Development Plan, Made in China 2025) and municipal tech innovation clusters.",
+            keyPoints: ["National AI development directives", "State subsidies & municipal guidance funds", "Strategic civil-military synergy"],
+          },
+          {
+            title: "Research Ecosystem, Academic Output & STEM Talent Pipelines",
+            ratio: 0.16,
+            guidance: "Analyze elite academic institutions (Tsinghua, Peking, CAS), global peer-reviewed citation volumes, and domestic talent cultivation.",
+            keyPoints: ["Elite university laboratories & research output", "Global citation impact and conference publications", "Talent retention and international recruitment"],
+          },
+        ],
+      },
+      {
+        title: "Technological Capabilities, Commercial Deployment & Infrastructure Bottlenecks",
+        notes: "Evaluate platform champions, foundation models, consumer applications, and semiconductor supply chain constraints.",
+        subheadings: [
+          {
+            title: "Domestic Tech Champions, Foundation Models & Applied Commercial Scale",
+            ratio: 0.18,
+            guidance: "Assess industry leaders (Baidu, Alibaba, Tencent, emerging labs), open-source foundation models, and massive domestic data flywheels.",
+            keyPoints: ["Platform tech giants & frontier LLM architectures", "Open-source developer ecosystems", "Ubiquitous mobile data integration & adoption"],
+          },
+          {
+            title: "Compute Constraints, Domestic Silicon & Supply Chain Resilience",
+            ratio: 0.18,
+            guidance: "Investigate fabrication dependencies, advanced lithography bottlenecks, multilateral export controls, and sovereign accelerator development.",
+            keyPoints: ["Advanced semiconductor fabrication & lithography limits", "Export controls & GPU compute restrictions", "Domestic ASIC/accelerator architectures"],
+          },
+        ],
+      },
+      {
+        title: "Global Norms, Strategic Competition & Geopolitical AI Horizons",
+        notes: "Examine global tech governance, international standard setting, and bilateral strategic competition.",
+        subheadings: [
+          {
+            title: "International Standards, Digital Silk Road & Global Tech Diffusion",
+            ratio: 0.16,
+            guidance: "Evaluate the export of smart city systems, multilateral standard-setting bodies (ITU/ISO), and Global South technology adoption.",
+            keyPoints: ["Smart-city & digital infrastructure exports", "Multilateral AI standards participation", "Global South technology partnerships"],
+          },
+          {
+            title: "Geopolitical Tech Bifurcation, Ethical Governance & Alignment Paradigms",
+            ratio: 0.16,
+            guidance: "Synthesize regulatory frameworks for generative AI, technological bifurcation between major powers, and international AI safety dialogues.",
+            keyPoints: ["Generative AI regulatory frameworks", "US-China technological decoupling & bifurcation", "Global frontier safety vs rapid capability deployment"],
           },
         ],
       },
@@ -3002,8 +3080,8 @@ CRITICAL RULES:
 
 Generate the tailored academic outline JSON now:`;
 
-    // Timeout after specified ms (default 1800ms) to keep UI responsive and snappy
-    const timeoutMs = (options as any).timeoutMs ?? 1800;
+    // Timeout after specified ms (default 15000ms for thorough AI generation)
+    const timeoutMs = (options as any).timeoutMs ?? 15000;
     const llmCaller = (options as any).llmCaller;
     if (typeof llmCaller !== "function") {
       return fallbackStructure;
@@ -3019,12 +3097,32 @@ Generate the tailored academic outline JSON now:`;
       return fallbackStructure;
     }
 
-    const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return fallbackStructure;
+    let parsed: any = null;
+    const trimmed = rawResponse.trim();
+    // 1. Try direct or code fence parse
+    const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fenceMatch && fenceMatch[1]) {
+      try {
+        parsed = JSON.parse(fenceMatch[1].trim());
+      } catch (_) {}
+    }
+    if (!parsed) {
+      const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch (_) {}
+      }
+    }
+    if (!parsed) {
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch (_) {}
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    if (!parsed) {
+      return fallbackStructure;
+    }
 
     // Handle AskScholar outline tree format (sections array)
     if (parsed.sections && Array.isArray(parsed.sections) && parsed.sections.length > 0) {

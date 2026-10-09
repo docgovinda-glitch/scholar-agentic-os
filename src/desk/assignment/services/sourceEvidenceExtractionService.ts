@@ -202,16 +202,30 @@ export async function extractProjectEvidence(
 
   // Try AI-powered contextual evidence extraction first
   let aiExtractionWorked = false;
+  let aiTitle: string | undefined;
+  let aiAuthor: string | undefined;
+  let aiYear: string | undefined;
+  let aiMainFinding: string | undefined;
+
   if (assignmentQuestion.trim().length > 5) {
     try {
       const systemPrompt = `You are a scholarly research assistant. Analyze the provided source text in the context of the user's assignment question.
-Extract only the 2 to 3 most relevant factual, theoretical, or empirical excerpts that directly answer or provide evidence for the question.
-For each excerpt:
-1. "excerpt": The exact quotation or factual passage.
-2. "context": The immediate surrounding 1-2 sentences explaining why this excerpt is meaningful.
-3. "sourceLocation": The precise location reference provided in the text.
-4. "claim": The specific thesis claim or academic argument this evidence supports.
-Return ONLY valid JSON array with keys: excerpt, context, sourceLocation, claim.`;
+Extract the key academic metadata and the 2 to 3 most relevant evidentiary excerpts:
+{
+  "title": "Clean, formal title of the material (cleaning up raw filenames, underscores, or extensions)",
+  "author": "Author, professor, lecturer, or issuing institution if discernible from text/slides, else null",
+  "year": "Publication or lecture year if discernible, else null",
+  "mainFinding": "Concise 1-2 sentence core insight or finding from this source directly relevant to the assignment",
+  "excerpts": [
+    {
+      "excerpt": "The exact quotation or factual passage.",
+      "context": "1-2 surrounding sentences explaining why this excerpt is meaningful.",
+      "sourceLocation": "The precise location reference (e.g. Page X, Slide Y).",
+      "claim": "The specific thesis claim or academic argument this evidence supports."
+    }
+  ]
+}
+Return ONLY valid JSON.`;
 
       const userPrompt = `Assignment Question: "${assignmentQuestion}"
 Source: "${payload.title}" (${payload.sourceType})
@@ -220,10 +234,31 @@ ${candidateSegments.map((s) => `[Location: ${s.location}]\n${s.text}`).join("\n\
 
       const aiResponse = await executeAgenticLLM(systemPrompt, userPrompt, "reasoning");
       const cleanedJson = aiResponse.replace(/```json\n?|\n?```/g, "").trim();
-      const parsedArray = JSON.parse(cleanedJson);
+      const parsedData = JSON.parse(cleanedJson);
 
-      if (Array.isArray(parsedArray) && parsedArray.length > 0) {
-        parsedArray.slice(0, 4).forEach((item: any, idx: number) => {
+      let excerptItems: any[] = [];
+      if (Array.isArray(parsedData)) {
+        excerptItems = parsedData;
+      } else if (parsedData && typeof parsedData === "object") {
+        if (parsedData.title && typeof parsedData.title === "string" && parsedData.title.trim().length > 3) {
+          aiTitle = parsedData.title.trim();
+        }
+        if (parsedData.author && typeof parsedData.author === "string" && parsedData.author.trim()) {
+          aiAuthor = parsedData.author.trim();
+        }
+        if (parsedData.year && (typeof parsedData.year === "string" || typeof parsedData.year === "number")) {
+          aiYear = String(parsedData.year).trim();
+        }
+        if (parsedData.mainFinding && typeof parsedData.mainFinding === "string" && parsedData.mainFinding.trim()) {
+          aiMainFinding = parsedData.mainFinding.trim();
+        }
+        if (Array.isArray(parsedData.excerpts)) {
+          excerptItems = parsedData.excerpts;
+        }
+      }
+
+      if (excerptItems.length > 0) {
+        excerptItems.slice(0, 4).forEach((item: any, idx: number) => {
           if (item.excerpt) {
             const evId = `ev-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`;
             const evidenceEntry: ExtractedSourceEvidence = {
@@ -239,13 +274,13 @@ ${candidateSegments.map((s) => `[Location: ${s.location}]\n${s.text}`).join("\n\
               id: evId,
               claim: item.claim || `Evidentiary grounding for ${assignmentQuestion.slice(0, 50)}...`,
               evidenceSnippet: evidenceEntry.excerpt,
-              sourceTitle: payload.title,
+              sourceTitle: aiTitle || payload.title,
               sourceType: payload.sourceType === "weblink" ? "web" : "file",
-              citation,
+              citation: generateCitationString(aiTitle || payload.title, aiAuthor || payload.author, aiYear || payload.year, payload.sourceType, citationStyle),
               status: "approved",
               theme: "Course & Primary Sources",
-              authors: payload.author ? [payload.author] : ["Course Instructor"],
-              year: payload.year || new Date().getFullYear().toString(),
+              authors: (aiAuthor || payload.author) ? [aiAuthor || payload.author!] : ["Course Instructor"],
+              year: aiYear || payload.year || new Date().getFullYear().toString(),
             });
           }
         });
@@ -372,27 +407,38 @@ ${candidateSegments.map((s) => `[Location: ${s.location}]\n${s.text}`).join("\n\
     mappedSections,
   };
 
+  const effectiveTitle = aiTitle || payload.title;
+  const effectiveAuthor = aiAuthor || payload.author;
+  const effectiveYear = aiYear || payload.year;
+  const effectiveCitation = generateCitationString(
+    effectiveTitle,
+    effectiveAuthor,
+    effectiveYear,
+    payload.sourceType,
+    citationStyle
+  );
+
   // Construct lightweight document record (CRITICAL: full text is discarded!)
   const document: UploadedSourceDocument = {
     id: `src-doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    name: payload.title,
+    name: effectiveTitle,
     sourceType: payload.sourceType,
     fileSize: payload.fileSize,
     uploadedAt: new Date().toISOString(),
     mimeType: payload.metadata?.mimeType,
     url: payload.url,
-    author: payload.author,
-    publicationDate: payload.year,
-    citation,
+    author: effectiveAuthor,
+    publicationDate: effectiveYear,
+    citation: effectiveCitation,
     evidenceCount: extractedEvidences.length,
     extractedEvidences,
     structuredDataSummary,
-    relevanceSummary: `Extracted ${extractedEvidences.length} verified excerpt(s) directly aligned with assignment research question.`,
+    relevanceSummary: aiMainFinding || (keyFindings[0] ? keyFindings[0] : `Extracted ${extractedEvidences.length} verified excerpt(s) directly aligned with assignment research question.`),
     processingStatus: "extracted",
     abstract,
     keyFindings,
     methodology,
-    citationsList,
+    citationsList: [effectiveCitation, inTextCitation],
     usedInAssignment,
   };
 

@@ -483,8 +483,9 @@ export async function executeWithFailover<T>(
       ? {
           ...worst.error,
           message:
-            worst.error.message ||
-            "AI generation is temporarily unavailable. Your research data is safe. Retry when a provider becomes available.",
+            worst.error.message && worst.error.message.includes("AI generation is temporarily unavailable")
+              ? worst.error.message
+              : `AI generation is temporarily unavailable (${worst.error.message || "all candidates exhausted"}). Your research data is safe. Retry when a provider becomes available.`,
         }
       : {
           kind: "unknown",

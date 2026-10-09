@@ -17,7 +17,7 @@ import {
   Clock,
 } from "lucide-react";
 import type { ProjectView } from "../types";
-import { getProjectDisplayName, matchesProjectSearch, getFormatLabel } from "../projectNaming";
+import { getProjectDisplayName, matchesProjectSearch, getFormatLabel, deduplicateProjectList } from "../projectNaming";
 
 export interface CommandPaletteProps {
   isOpen: boolean;
@@ -142,7 +142,9 @@ export function CommandPalette({
       return !q || matchesProjectSearch(p, q, projects);
     });
 
-    for (const p of matchingProjects.slice(0, 8)) {
+    const uniqueMatchingProjects = deduplicateProjectList(matchingProjects, projects);
+
+    for (const p of uniqueMatchingProjects.slice(0, 8)) {
       const title = getProjectDisplayName(p, projects);
       list.push({
         id: `proj-${p.projectId}`,

@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   BookOpen,
   LinkIcon,
+  Edit2,
 } from "lucide-react";
 
 export interface AssignmentSubmissionStageProps {
@@ -46,11 +47,27 @@ export function AssignmentSubmissionStage({
     isAuditingSubmission,
     citationAuditResult,
     setPhase,
+    saveAnswers,
   } = useAssignmentWorkspace();
 
   const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+
+  // Customizable Cover Sheet Metadata
+  const [studentName, setStudentName] = useState(
+    project?.answers?.["student_name"] || "Academic Candidate"
+  );
+  const [studentId, setStudentId] = useState(
+    project?.answers?.["student_id"] || "SCH-2026-X01"
+  );
+  const [courseName, setCourseName] = useState(
+    project?.answers?.["course_name"] || projectState.brief.courseDetails?.courseName || "Academic Course"
+  );
+  const [institutionName, setInstitutionName] = useState(
+    project?.answers?.["institution"] || "University Faculty of Arts & Sciences"
+  );
+  const [showMetadataForm, setShowMetadataForm] = useState(false);
 
   // Auto-run submission audit on mount if report is not yet generated
   useEffect(() => {
@@ -82,12 +99,20 @@ export function AssignmentSubmissionStage({
     setIsExportingDocx(true);
     setExportError(null);
     try {
+      if (saveAnswers) {
+        saveAnswers({
+          student_name: studentName,
+          student_id: studentId,
+          course_name: courseName,
+          institution: institutionName,
+        });
+      }
       await exportAssignmentToDocx({
         title: assignmentTitle,
-        studentName: project?.answers?.["student_name"] || "Academic Candidate",
-        studentId: project?.answers?.["student_id"] || "SCH-2026-X01",
-        courseName: project?.answers?.["course_name"] || projectState.brief.courseDetails?.courseName || "Academic Course",
-        institution: project?.answers?.["institution"] || "University Faculty of Arts & Sciences",
+        studentName: studentName || "Academic Candidate",
+        studentId: studentId || "SCH-2026-X01",
+        courseName: courseName || projectState.brief.courseDetails?.courseName || "Academic Course",
+        institution: institutionName || "University Faculty of Arts & Sciences",
         brief: projectState.brief,
         sections: activeSections,
         sources: projectState.sources.curated,
@@ -102,12 +127,20 @@ export function AssignmentSubmissionStage({
 
   const handleExportPdf = () => {
     try {
+      if (saveAnswers) {
+        saveAnswers({
+          student_name: studentName,
+          student_id: studentId,
+          course_name: courseName,
+          institution: institutionName,
+        });
+      }
       exportAssignmentToPdf({
         title: assignmentTitle,
-        studentName: project?.answers?.["student_name"] || "Academic Candidate",
-        studentId: project?.answers?.["student_id"] || "SCH-2026-X01",
-        courseName: project?.answers?.["course_name"] || projectState.brief.courseDetails?.courseName || "Academic Course",
-        institution: project?.answers?.["institution"] || "University Faculty of Arts & Sciences",
+        studentName: studentName || "Academic Candidate",
+        studentId: studentId || "SCH-2026-X01",
+        courseName: courseName || projectState.brief.courseDetails?.courseName || "Academic Course",
+        institution: institutionName || "University Faculty of Arts & Sciences",
         brief: projectState.brief,
         sections: activeSections,
         sources: projectState.sources.curated,
@@ -153,6 +186,21 @@ export function AssignmentSubmissionStage({
 
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 text-neutral-900 dark:text-neutral-100">
+      {/* Minimal Step Guidance Banner */}
+      <div className="p-3.5 sm:p-4 rounded-xl bg-neutral-100/60 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-mono font-bold text-[10px] shrink-0">
+            4
+          </div>
+          <p className="text-neutral-600 dark:text-neutral-400 text-xs leading-relaxed">
+            Verify academic rubric compliance, reconcile citations against verified references, and export camera-ready submissions with university title pages and bibliographies.
+          </p>
+        </div>
+        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0 self-start sm:self-auto">
+          Audit &amp; Export Checkpoint
+        </span>
+      </div>
+
       {/* Phase 4 Header / Overview Bar */}
       <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-100 dark:border-white/5 pb-5">
@@ -322,6 +370,63 @@ export function AssignmentSubmissionStage({
               Formatted with standard 1-inch margins, title sheet, running headers, and formatted bibliography according to {citationStyle.toUpperCase()}.
             </p>
           </div>
+        </div>
+
+        {/* Customizable Title Sheet Details */}
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={() => setShowMetadataForm(!showMetadataForm)}
+            className="text-xs font-medium text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 inline-flex items-center gap-1.5 transition-colors cursor-pointer py-1"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+            <span>{showMetadataForm ? "Hide Cover Sheet Metadata" : "Customize Cover Page Metadata (Student Name, ID, Course, University)"}</span>
+          </button>
+
+          {showMetadataForm && (
+            <div className="mt-3 p-4 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 animate-in fade-in duration-150">
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Student Name</label>
+                <input
+                  type="text"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  placeholder="Candidate Name"
+                  className="w-full bg-white dark:bg-[#252528] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Candidate / Student ID</label>
+                <input
+                  type="text"
+                  value={studentId}
+                  onChange={(e) => setStudentId(e.target.value)}
+                  placeholder="e.g. SCH-2026-X01"
+                  className="w-full bg-white dark:bg-[#252528] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Course / Module</label>
+                <input
+                  type="text"
+                  value={courseName}
+                  onChange={(e) => setCourseName(e.target.value)}
+                  placeholder="e.g. POLI3002 International Security"
+                  className="w-full bg-white dark:bg-[#252528] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">University / Institution</label>
+                <input
+                  type="text"
+                  value={institutionName}
+                  onChange={(e) => setInstitutionName(e.target.value)}
+                  placeholder="e.g. University Faculty"
+                  className="w-full bg-white dark:bg-[#252528] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">

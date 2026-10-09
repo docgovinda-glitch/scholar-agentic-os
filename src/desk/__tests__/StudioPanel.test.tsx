@@ -631,7 +631,7 @@ describe("Desk — StudioPanel", () => {
       fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "Some text to refine." } });
       fireEvent.click(screen.getByText("Refine"));
 
-      expect(await screen.findByText(/AI used: gemini \(gemini-(?:3\.6|2\.5)-flash\) · free/)).toBeInTheDocument();
+      expect(await screen.findByText(/AI used: gemini \((?:gemini-(?:3\.6|2\.5)-flash|gemini-3\.1-flash-lite)\) · free/)).toBeInTheDocument();
     });
 
     it("surfaces the router's own reasoning when no AI source is available at all", async () => {

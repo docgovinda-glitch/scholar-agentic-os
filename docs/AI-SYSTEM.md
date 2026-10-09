@@ -159,3 +159,29 @@ All AI requests flow through structured endpoints:
 - `POST /api/ai/chat`: Conversational endpoint for Copilot personas.
 - `POST /api/ai/stream`: Server-Sent Events (SSE) streaming endpoint for live real-time drafting text generation.
 - `POST /api/ai/agent`: Complex multi-step reasoning endpoint for deep research and question deconstruction.
+
+---
+
+## 8. Server AI Token Isolation & Entitlement Gate (`server/utils/llm.ts`)
+
+To protect platform-funded API credentials (`OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`) from unauthorized drainage:
+- **Fail-Closed Entitlement Enforcement**:
+  - `isServerAiAuthorized(req)` queries the user's active entitlement in `public.user_entitlements`.
+  - Non-premium and unauthenticated requests are strictly rejected with HTTP `426 Upgrade Required` (`{ requireFrontendLLM: true }`).
+  - The client application intercepts HTTP 426 and smoothly routes the execution through the user's client-held BYOK or local runner without interrupting the research workflow.
+- **Client-Side Key Confidentiality**:
+  - BYOK API keys are strictly client-held. The backend rejects client-supplied API keys with HTTP `400 Bad Request` to guarantee user secrets are never logged or stored in server memory.
+
+---
+
+## 9. Provider Failover Resilience & Error Recovery (`providerFailover.ts`)
+
+- **Automatic Model Quarantining**:
+  - When an upstream provider returns HTTP 400 (`model_decommissioned`) or 404 (`model_not_found`), the failing model is immediately quarantined in-memory for that session, preventing costly retries against dead endpoints.
+- **Dynamic Fallback Chains**:
+  - The system dynamically selects verified alternative models from the provider catalog (e.g. falling back to `gemini-3.1-flash-lite` or Groq fast tiers).
+- **Terminal Exhaustion Sanitization**:
+  - In the event that all candidates across all configured providers are exhausted (e.g. major multi-cloud outage), the system cleanly surfaces a reassuring, academic-safe status message:
+    `"AI generation is temporarily unavailable. Your research data is safe. Retry when a provider becomes available."`
+  - Raw upstream provider stack traces and error payloads are shielded from the user interface while persisting into the audit log.
+

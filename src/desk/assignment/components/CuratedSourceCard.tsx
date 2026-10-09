@@ -22,6 +22,7 @@ import {
   Search,
   Edit2,
   Copy,
+  Trash2,
 } from "lucide-react";
 
 export interface CuratedSourceCardProps {
@@ -173,6 +174,14 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
               <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 flex items-center gap-0.5">
                 <Unlock className="w-2.5 h-2.5" />
                 <span>OA</span>
+              </span>
+            )}
+
+            {/* In Assignment Status Badge */}
+            {isApproved && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                <Check className="w-2.5 h-2.5" />
+                <span>IN ASSIGNMENT</span>
               </span>
             )}
           </div>
@@ -454,10 +463,11 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
           onClick={() => onDismiss && onDismiss(source.id)}
           disabled={isReplacing}
           aria-label={`Dismiss or replace ${source.title}`}
-          className="text-xs text-neutral-400 hover:text-red-500 dark:hover:text-red-400 py-1.5 px-2 rounded-lg hover:bg-red-500/10 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+          title="Remove source from assignment"
+          className="text-xs text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 py-1.5 px-2.5 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
         >
-          <X className="w-3.5 h-3.5" />
-          <span>{source.isUserUploaded ? "Remove from project" : "Dismiss"}</span>
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>{source.isUserUploaded ? "Remove from assignment" : "Remove"}</span>
         </button>
 
         <button

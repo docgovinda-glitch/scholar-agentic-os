@@ -19,6 +19,7 @@ import {
   isBlankProject,
   getProjectDisplayName,
   matchesProjectSearch,
+  deduplicateProjectList,
 } from "./projectNaming";
 import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
@@ -1305,6 +1306,8 @@ export default function ProjectListScreen({
     };
   }, [isResizingAiSidebar]);
 
+  const [pinnedRecentIds, setPinnedRecentIds] = useState<string[]>([]);
+
   const recentProjectsList = useMemo(() => {
     if (!userEmail || !projects || projects.length === 0) {
       return [];
@@ -1315,7 +1318,9 @@ export default function ProjectListScreen({
       filtered = projects.filter((p) => matchesProjectSearch(p, searchQuery, projects));
     }
 
-    return filtered.map((p) => {
+    const uniqueProjects = deduplicateProjectList(filtered, projects, pinnedRecentIds);
+
+    return uniqueProjects.map((p) => {
       const title = getProjectDisplayName(p, projects);
       return {
         id: p.projectId,
@@ -1323,7 +1328,7 @@ export default function ProjectListScreen({
         title,
       };
     });
-  }, [userEmail, projects, searchQuery]);
+  }, [userEmail, projects, searchQuery, pinnedRecentIds]);
 
   const [activeProviderLabel, setActiveProviderLabel] = useState<string>("Ready");
 
@@ -1351,7 +1356,13 @@ export default function ProjectListScreen({
     listProjects()
       .then((r) => {
         const deleted = deletedProjectIdsRef.current;
-        setProjects(r.items.filter((p) => !deleted.has(p.projectId)));
+        const seen = new Set<string>();
+        const uniqueItems = (r.items || []).filter((p) => {
+          if (!p?.projectId || seen.has(p.projectId)) return false;
+          seen.add(p.projectId);
+          return !deleted.has(p.projectId);
+        });
+        setProjects(uniqueItems);
       })
       .catch(() => {
         setProjects([]);
@@ -1822,7 +1833,6 @@ export default function ProjectListScreen({
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [activeRecentMenuId, setActiveRecentMenuId] = useState<string | null>(null);
-  const [pinnedRecentIds, setPinnedRecentIds] = useState<string[]>([]);
   const recentMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1955,28 +1965,63 @@ export default function ProjectListScreen({
     const targetId = projectToDelete.projectId;
     const previousProjects = projects;
 
+    const targetTitle = (
+      projectToDelete.title ||
+      (projectToDelete.answers as any)?.title ||
+      getProjectDisplayName(projectToDelete, projects || [])
+    ).trim().toLowerCase();
+
+    // Identify any companion duplicate projects sharing the exact same title
+    const companionIds = targetTitle
+      ? (projects || [])
+          .filter((p) => {
+            if (!p || p.projectId === targetId) return false;
+            const pTitle = (
+              p.title ||
+              (p.answers as any)?.title ||
+              getProjectDisplayName(p, projects || [])
+            ).trim().toLowerCase();
+            return pTitle === targetTitle;
+          })
+          .map((p) => p.projectId)
+      : [];
+
+    const allIdsToDelete = [targetId, ...companionIds];
+
     // 1. Instantly close the modal dialog without delay
     setProjectToDelete(null);
 
-    // 2. Mark project as deleted immediately to prevent race conditions & ghost resurrection
-    markProjectAsDeleted(targetId);
+    // 2. Mark project(s) as deleted immediately to prevent race conditions & ghost resurrection
+    allIdsToDelete.forEach((id) => markProjectAsDeleted(id));
 
     // 3. Instantly filter the project out of the local state
-    setProjects((curr) => (curr ? curr.filter((p) => p.projectId !== targetId) : []));
+    setProjects((curr) => (curr ? curr.filter((p) => !allIdsToDelete.includes(p.projectId)) : []));
 
     // 4. Perform backend deletion
     try {
       if (!targetId.startsWith("demo-")) {
         await deleteProject(targetId);
       }
+      for (const compId of companionIds) {
+        if (!compId.startsWith("demo-")) {
+          deleteProject(compId).catch(() => {});
+        }
+      }
       // Re-sync project list with server in background, filtering out any deleted IDs
       const res = await listProjects();
       const deleted = deletedProjectIdsRef.current;
-      setProjects(res.items.filter((p) => !deleted.has(p.projectId)));
+      const seen = new Set<string>();
+      setProjects(
+        res.items.filter((p) => {
+          if (!p?.projectId || seen.has(p.projectId)) return false;
+          seen.add(p.projectId);
+          return !deleted.has(p.projectId);
+        })
+      );
     } catch (e) {
       console.error("Failed to delete project:", e);
       // Rollback on failure
-      unmarkProjectAsDeleted(targetId);
+      allIdsToDelete.forEach((id) => unmarkProjectAsDeleted(id));
       setProjects(previousProjects);
       setError((e as Error).message || "Failed to delete project. Please try again.");
     }

@@ -4,6 +4,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { saveIntakeAnswers, executeAgenticLLM } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 import {
   buildTitlePrompts,
   buildTitlePolishPrompt,
@@ -460,6 +461,23 @@ export default function TitleSelectionStage({
       {/* 2. Main Scrollable Container */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
         <div className="max-w-4xl mx-auto space-y-6">
+          <JournalStageInstructionBanner
+            milestoneTitle="Milestone 2 · Gap Analysis & Title Lock"
+            stageLabel="Academic Title Generation & Formulation"
+            description="Synthesize high-impact title candidates across standard scholarly archetypes (Declarative, Compound Colon, Methodological, Inquisitive) tailored for your target journal."
+            instructions={[
+              "Generate title proposals grounded in your anchor gap and target venue",
+              "Filter candidates across declarative, compound, and methodological archetypes",
+              "Refine, edit, or customize working title and subtitle",
+              "Select and proceed to Title Lock to establish your definitive research charter",
+            ]}
+            targetJournal={targetJournal}
+            tips={[
+              "Declarative titles state the breakthrough directly and attract high citation rates in natural sciences.",
+              "Compound colon titles remain the gold standard in computing, engineering, and social sciences.",
+            ]}
+          />
+
           {/* Grounding Context Strip */}
           {(anchorGapTitle || targetJournal) && (
             <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-2xl p-4 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">

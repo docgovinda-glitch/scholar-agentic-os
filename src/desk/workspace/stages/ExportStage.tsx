@@ -3,6 +3,13 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import { authedJsonFetch, saveIntakeAnswers } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
+import {
+  exportJournalToDocx,
+  printJournalManuscript,
+  generateJournalLatex,
+  downloadBlob,
+} from "../services/journalExportService";
 
 export type AcademicTemplate = "ieee" | "nature" | "acm" | "apa7" | "typst_modern" | "elsevier";
 
@@ -316,17 +323,67 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
       } else {
-        // High-fidelity fallback download payload
-        const header = `% Scholar Agentic OS — Camera-Ready Export (${format.toUpperCase()})\n% Venue: ${targetJournal}\n% Template: ${selectedTemplate}\n% Title: ${workingTitle}\n% Timestamp: ${new Date().toISOString()}\n\n`;
-        const blob = new Blob([header + manuscriptContent], { type: meta.mime });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${meta.name}_${selectedTemplate}.${meta.ext}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+        // High-fidelity fallback export generators
+        const parsedSections: Array<{ section: string; content: string }> = [];
+        try {
+          const raw = project?.answers?.manuscript_draft || project?.answers?.assembled_draft;
+          if (raw) {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list)) {
+              list.forEach((s: any) => {
+                parsedSections.push({
+                  section: s.section || s.section_name || "Section",
+                  content: s.content || "",
+                });
+              });
+            }
+          }
+        } catch {
+          // Ignore
+        }
+
+        if (parsedSections.length === 0) {
+          const blocks = manuscriptContent.split(/\n(?=##?\s+)/);
+          blocks.forEach((b, i) => {
+            const lines = b.trim().split("\n");
+            const title = lines[0].replace(/^##?\s+/, "").trim() || `Section ${i + 1}`;
+            const body = lines.slice(1).join("\n").trim();
+            parsedSections.push({ section: title, content: body });
+          });
+        }
+
+        if (format === "docx") {
+          await exportJournalToDocx({
+            title: workingTitle,
+            targetJournal,
+            template: selectedTemplate,
+            authors: project?.authors,
+            sections: parsedSections,
+          });
+        } else if (format === "latex") {
+          const { tex } = generateJournalLatex({
+            title: workingTitle,
+            targetJournal,
+            template: selectedTemplate,
+            authors: project?.authors,
+            sections: parsedSections,
+          });
+          const cleanTitle = (workingTitle || "Manuscript").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 32);
+          const blob = new Blob([tex], { type: "text/x-tex" });
+          downloadBlob(blob, `${cleanTitle}_LaTeX.tex`);
+        } else if (format === "pdf") {
+          printJournalManuscript({
+            title: workingTitle,
+            targetJournal,
+            template: selectedTemplate,
+            authors: project?.authors,
+            sections: parsedSections,
+          });
+        } else {
+          const header = `% Scholar Agentic OS — Camera-Ready Export (${format.toUpperCase()})\n% Venue: ${targetJournal}\n% Template: ${selectedTemplate}\n% Title: ${workingTitle}\n% Timestamp: ${new Date().toISOString()}\n\n`;
+          const blob = new Blob([header + manuscriptContent], { type: meta.mime });
+          downloadBlob(blob, `${meta.name}_${selectedTemplate}.${meta.ext}`);
+        }
       }
     } catch (err: any) {
       alert(`Export trigger: ${err.message}`);
@@ -483,6 +540,24 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
       {/* 3. Main Workspace Area */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
         <div className="max-w-5xl mx-auto space-y-6">
+          <JournalStageInstructionBanner
+            milestoneTitle="Milestone 9 · Camera-Ready Typesetting & Export"
+            stageLabel="Multi-Format Publication Typesetting & Dossier Export"
+            description={`Generate camera-ready submission packages formatted strictly to ${targetJournal} guidelines across Microsoft Word DOCX, PDF preview, LaTeX archive, and Typst formats.`}
+            instructions={[
+              `Select your target venue layout profile (e.g., ${currentTpl.name})`,
+              "Click 'Generate Camera-Ready Package' to typeset equations, tables, and references",
+              "Download authentic Word document with journal title page, declarations, and formatted citations",
+              "Download compilable LaTeX source with BibTeX references or print camera-ready PDF",
+            ]}
+            targetJournal={targetJournal}
+            citationStyle={currentTpl.badge}
+            tips={[
+              "The exported .docx file contains genuine Word styles, formal author affiliation markers, and structured declarations.",
+              "For IEEE and ACM submissions, LaTeX source bundles include standard documentclass preambles and complete BibTeX keys.",
+            ]}
+          />
+
           {error && (
             <div className="p-4 rounded-xl bg-[color:var(--state-danger-subtle)] border border-[color:var(--state-danger)] text-[color:var(--state-danger)] text-sm flex items-center justify-between font-sans">
               <span>{error}</span>

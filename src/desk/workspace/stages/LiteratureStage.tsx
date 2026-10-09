@@ -3,6 +3,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { executeAgenticLLM, saveIntakeAnswers } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
 import type { ProjectView } from "../../types";
 import {
@@ -712,6 +713,23 @@ export default function LiteratureStage({
 
       {/* 2. Main Scrollable Container */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 1 · Scope & Literature Discovery"
+          stageLabel="Scholarly Literature Discovery & Thematic Harvesting"
+          description="Automated multi-portal harvesting (CrossRef, OpenAlex, Semantic Scholar, PubMed) to build an authoritative foundation of peer-reviewed literature."
+          instructions={[
+            "Execute multi-portal scholarly literature discovery",
+            "Filter and review discovered papers by relevance, portal, and thematic cluster",
+            "Flag landmark papers and prune off-topic sources",
+            "Export reference citations or proceed to knowledge gap identification",
+          ]}
+          targetJournal={project?.answers?.["target_journal"]}
+          tips={[
+            "High-impact journal articles typically ground their introduction in 30–50 verified peer-reviewed studies.",
+            "Flag foundational landmark papers to anchor the theoretical background and methodology.",
+          ]}
+        />
+
         {/* Initial Empty State */}
         {results === null && !isProcessing && (
           <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-2xl p-10 text-center max-w-xl mx-auto my-12 shadow-sm space-y-4">

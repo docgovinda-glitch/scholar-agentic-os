@@ -4,6 +4,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedStreamFetch, saveIntakeAnswers } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export interface AuditClaim {
   id: string;
@@ -629,6 +630,23 @@ export default function CitationAuditStage({
 
       {/* 3. Main Body */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 7 · Integrity & Pre-Flight Audit"
+          stageLabel="Claim-to-Evidence Provenance & Citation Verification"
+          description="Deterministic citation audit matching all draft claims back to approved literature, empirical datasets, and verified DOIs."
+          instructions={[
+            "Click 'Begin Citation Audit' to evaluate every citation across all drafted sections",
+            "Review provenance confidence scores and flag unverified claims",
+            "Verify DOI alignments and bibliography cross-references",
+            "Approve audited citations before proceeding to Originality and Plagiarism checks",
+          ]}
+          targetJournal={project?.answers?.["selected_journal_name"] || project?.answers?.["target_journal"]}
+          tips={[
+            "Peer reviewers immediately reject papers with misattributed or non-existent citations.",
+            "All verified claims in this audit receive permanent provenance hashes.",
+          ]}
+        />
+
         {/* Terminal during audit */}
         {(isProcessing || logs.length > 0) && (
           <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-5">

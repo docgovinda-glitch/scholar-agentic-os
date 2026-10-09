@@ -3,6 +3,7 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import { authedFetch, saveIntakeAnswers } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 interface ParsedSection {
   title: string;
@@ -571,6 +572,27 @@ Our findings substantiate the structural validity of the proposed model while de
             <span className="text-[color:var(--state-success)] font-bold">Level 18.2</span> (Post-Grad)
           </div>
         </div>
+      </div>
+
+      {/* Stage Instruction Banner */}
+      <div className="shrink-0 px-6 py-2.5 bg-[color:var(--surface-canvas)]">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 9 · Camera-Ready Typesetting & Export"
+          stageLabel="Live Manuscript Editor & Markdown IDE"
+          description="Direct bi-directional manuscript editor with instant live preview, section navigation, citation insertion, and LaTeX math formatting before camera-ready typesetting."
+          instructions={[
+            "Edit manuscript markdown directly in the left editor pane with real-time preview",
+            "Use academic toolbar for quick insertion of bold, italics, citations [@key], and math $E=mc^2$",
+            "Navigate sections using the outline sidebar on the left",
+            "Click 'Save Draft' or 'Certify & Proceed to Compliance Check' to enter pre-flight verification",
+          ]}
+          targetJournal={targetJournal}
+          wordCountBudget={parseInt(project?.answers?.["word_count_limit"] || project?.answers?.["word_count_target"] || "4500", 10) || 4500}
+          tips={[
+            "Changes made in this editor are synchronized directly to your manuscript draft state.",
+            "Use Ctrl+S or ⌘+S at any time to immediately save your working edits.",
+          ]}
+        />
       </div>
 
       {/* 4. Main Studio Workspace */}

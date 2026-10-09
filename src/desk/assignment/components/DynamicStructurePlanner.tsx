@@ -229,8 +229,8 @@ export function DynamicStructurePlanner({
               </span>
             )}
           </div>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-            Dynamic Assignment Structure &amp; Word Allocation calibrated from your question. Add, rename, reorder, and calibrate word targets.
+          <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
+            Dynamic Assignment Structure &amp; Word Allocation
           </p>
         </div>
 
@@ -368,19 +368,14 @@ export function DynamicStructurePlanner({
               <span className="w-6 h-6 rounded-md bg-purple-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                 T
               </span>
-              <div>
-                <h4 className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-                  <span>Introduction &amp; Core Working Thesis</span>
-                  {writingTone && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 capitalize">
-                      {safeFormatLabel(writingTone)} tone
-                    </span>
-                  )}
-                </h4>
-                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                  Tone-calibrated problem statement and working thesis to anchor analysis and evidence synthesis.
-                </p>
-              </div>
+              <h4 className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+                <span>Introduction &amp; Core Working Thesis</span>
+                {writingTone && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 capitalize">
+                    {safeFormatLabel(writingTone)} tone
+                  </span>
+                )}
+              </h4>
             </div>
           </div>
           <textarea
@@ -389,7 +384,7 @@ export function DynamicStructurePlanner({
               const updated = updateThesisStatement(structure, e.target.value);
               notifyChange(updated);
             }}
-            placeholder="Core thesis statement or problem formulation tailored to your selected tone..."
+            placeholder="Core thesis statement or problem formulation tailored to your assignment..."
             rows={2}
             className="w-full text-xs p-2.5 rounded-lg bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/90 dark:border-white/10 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-purple-500 resize-y font-normal leading-relaxed"
           />
@@ -476,9 +471,10 @@ export function DynamicStructurePlanner({
                 className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E20] shadow-xs overflow-hidden transition-all group/heading"
               >
                 {/* Main Heading Header */}
-                <div className="p-3.5 sm:px-4 bg-neutral-100/60 dark:bg-white/[0.04] border-b border-neutral-200/60 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0 flex items-center gap-2.5">
-                    <span className="w-6 h-6 rounded-md bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-[11px] font-bold flex items-center justify-center shrink-0">
+                <div className="p-3.5 sm:p-4 bg-neutral-100/70 dark:bg-white/[0.04] border-b border-neutral-200/60 dark:border-white/5 space-y-3">
+                  {/* Row 1: Section Number & Full-Width Title (Zero Truncation) */}
+                  <div className="flex items-center gap-2.5 w-full">
+                    <span className="w-6 h-6 rounded-md bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-bold flex items-center justify-center shrink-0 shadow-2xs">
                       {heading.number}
                     </span>
                     <span className="sr-only">{heading.title}</span>
@@ -492,127 +488,131 @@ export function DynamicStructurePlanner({
                         }}
                         placeholder="Main Heading Title"
                         aria-label={`Heading ${heading.number}: ${heading.title}`}
-                        className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-neutral-100 bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-neutral-500 focus:outline-none py-0.5 truncate w-full pr-6"
+                        className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-neutral-100 bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-neutral-500 focus:outline-none py-1 w-full pr-6"
                       />
                       <Edit2 className="w-3 h-3 text-neutral-400 absolute right-1 pointer-events-none opacity-40 group-hover/heading:opacity-100 transition-opacity" />
                     </div>
                   </div>
 
-                  {/* Heading Word Budget & Controls */}
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 tabular-nums">
-                      {heading.targetWordCount.toLocaleString()} words
-                    </span>
-                    <span className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500 tabular-nums hidden sm:inline">
-                      (~{headingPercentage}%)
-                    </span>
-
-                    {/* Section Word Count Stepper & Input */}
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => handleAdjustHeadingWords(heading.id, -50)}
-                        className="px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded bg-neutral-200/60 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
-                        title="Decrease section word budget by 50 words"
-                        aria-label={`Decrease section ${heading.number} word count by 50`}
-                      >
-                        -50
-                      </button>
-                      <div className="relative flex items-center">
-                        <input
-                          type="number"
-                          min={0}
-                          step={25}
-                          value={heading.targetWordCount || ""}
-                          onChange={(e) =>
-                            handleExactHeadingWords(heading.id, parseInt(e.target.value, 10) || 0)
-                          }
-                          aria-label={`Word count for section ${heading.title}`}
-                          className="w-16 bg-white dark:bg-[#2C2C2E] border border-neutral-200/90 dark:border-white/10 rounded px-1.5 py-0.5 text-right text-[11px] font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white pr-5 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        <span className="pointer-events-none absolute right-1 text-[9px] text-neutral-400">
-                          w
-                        </span>
+                  {/* Row 2: Word Budget & Actions Cluster */}
+                  <div className="flex items-center justify-between gap-3 flex-wrap pt-0.5 text-xs">
+                    {/* Left: Word count stepper & percentage */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg p-0.5 shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => handleAdjustHeadingWords(heading.id, -50)}
+                          className="px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer"
+                          title="Decrease section word budget by 50 words"
+                          aria-label={`Decrease section ${heading.number} word count by 50`}
+                        >
+                          -50
+                        </button>
+                        <div className="relative flex items-center">
+                          <input
+                            type="number"
+                            min={0}
+                            step={25}
+                            value={heading.targetWordCount || ""}
+                            onChange={(e) =>
+                              handleExactHeadingWords(heading.id, parseInt(e.target.value, 10) || 0)
+                            }
+                            aria-label={`Word count for section ${heading.title}`}
+                            className="w-14 bg-transparent text-right text-[11px] font-semibold text-neutral-900 dark:text-white focus:outline-none pr-4 tabular-nums"
+                          />
+                          <span className="pointer-events-none absolute right-1 text-[9px] text-neutral-400">
+                            w
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAdjustHeadingWords(heading.id, 50)}
+                          className="px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer"
+                          title="Increase section word budget by 50 words"
+                          aria-label={`Increase section ${heading.number} word count by 50`}
+                        >
+                          +50
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleAdjustHeadingWords(heading.id, 50)}
-                        className="px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded bg-neutral-200/60 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
-                        title="Increase section word budget by 50 words"
-                        aria-label={`Increase section ${heading.number} word count by 50`}
-                      >
-                        +50
-                      </button>
+
+                      <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 tabular-nums">
+                        {heading.targetWordCount.toLocaleString()} words
+                      </span>
+                      <span className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500 tabular-nums">
+                        (~{headingPercentage}%)
+                      </span>
                     </div>
 
-                    {/* Reorder Buttons */}
-                    <div className="flex items-center gap-0.5 text-neutral-400">
-                      <button
-                        type="button"
-                        onClick={() => handleMoveHeading(hIdx, hIdx - 1)}
-                        disabled={hIdx === 0}
-                        title="Move heading up"
-                        className="p-1 rounded hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
-                      >
-                        <ArrowUp className="w-3 h-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMoveHeading(hIdx, hIdx + 1)}
-                        disabled={hIdx === structure.headings.length - 1}
-                        title="Move heading down"
-                        className="p-1 rounded hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
-                      >
-                        <ArrowDown className="w-3 h-3" />
-                      </button>
-                    </div>
+                    {/* Right: Actions cluster */}
+                    <div className="flex items-center gap-1.5">
+                      {/* Reorder Buttons */}
+                      <div className="flex items-center gap-0.5 text-neutral-400">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveHeading(hIdx, hIdx - 1)}
+                          disabled={hIdx === 0}
+                          title="Move heading up"
+                          className="p-1 rounded hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          <ArrowUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMoveHeading(hIdx, hIdx + 1)}
+                          disabled={hIdx === structure.headings.length - 1}
+                          title="Move heading down"
+                          className="p-1 rounded hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          <ArrowDown className="w-3 h-3" />
+                        </button>
+                      </div>
 
-                    {/* Research Blueprint Toggle */}
-                    {/* Research Basis & Sources Toggle */}
-                    <button
-                      type="button"
-                      onClick={() => toggleHeadingBlueprint(heading.id)}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
-                        expandedBlueprintHeadings[heading.id]
-                          ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-2xs"
-                          : "bg-neutral-100 hover:bg-neutral-200 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 border border-neutral-200/70 dark:border-white/10"
-                      }`}
-                      title="View research basis and supporting scholarly sources"
-                      aria-label={`Research basis for section ${heading.number}`}
-                    >
-                      <BookOpen className="w-3 h-3 text-indigo-500 dark:text-indigo-400" />
-                      <span className="hidden sm:inline">Research basis</span>
-                      {(heading.scholarlySources || []).length > 0 && (
-                        <span className="text-[10px] opacity-75 font-mono">
-                          · {heading.scholarlySources?.length}
-                        </span>
+                      {/* Research Basis Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => toggleHeadingBlueprint(heading.id)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                          expandedBlueprintHeadings[heading.id]
+                            ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-2xs"
+                            : "bg-neutral-100 hover:bg-neutral-200 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 border border-neutral-200/70 dark:border-white/10"
+                        }`}
+                        title="View research basis and supporting scholarly sources"
+                        aria-label={`Research basis for section ${heading.number}`}
+                      >
+                        <BookOpen className="w-3 h-3 text-indigo-500 dark:text-indigo-400" />
+                        <span>Research basis</span>
+                        {(heading.scholarlySources || []).length > 0 && (
+                          <span className="text-[10px] opacity-75 font-mono">
+                            · {heading.scholarlySources?.length}
+                          </span>
+                        )}
+                      </button>
+
+                      {/* Add Subheading Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleCreateSubheading(heading.id)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-neutral-200/70 hover:bg-neutral-300 dark:bg-white/10 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
+                        title="Add a subheading to this section"
+                        aria-label={`Add subheading to section ${heading.number}`}
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Subheading</span>
+                      </button>
+
+                      {/* Delete Heading */}
+                      {structure.headings.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteHeading(heading.id)}
+                          className="p-1 text-neutral-400 hover:text-rose-500 hover:bg-rose-500/10 rounded transition-colors cursor-pointer"
+                          title="Delete main heading"
+                          aria-label={`Delete heading ${heading.title}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       )}
-                    </button>
-
-                    {/* Add Subheading Button */}
-                    <button
-                      type="button"
-                      onClick={() => handleCreateSubheading(heading.id)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-neutral-200/70 hover:bg-neutral-300 dark:bg-white/10 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
-                      title="Add a subheading to this section"
-                      aria-label={`Add subheading to section ${heading.number}`}
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span className="hidden sm:inline">Subheading</span>
-                    </button>
-
-                    {/* Delete Heading */}
-                    {structure.headings.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteHeading(heading.id)}
-                        className="p-1 text-neutral-400 hover:text-rose-500 hover:bg-rose-500/10 rounded transition-colors cursor-pointer"
-                        title="Delete main heading"
-                        aria-label={`Delete heading ${heading.title}`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                    </div>
                   </div>
                 </div>
 
@@ -862,12 +862,12 @@ export function DynamicStructurePlanner({
                             </div>
                           </div>
 
-                        {/* H3 Arguments, Evidence & Focus Areas */}
+                        {/* Focus Arguments & Evidence */}
                         <div className="pt-2 border-t border-neutral-200/50 dark:border-white/5 space-y-1.5">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] uppercase font-semibold text-neutral-500 dark:text-neutral-400 tracking-wider flex items-center gap-1.5">
+                            <span className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                              <span>H3 Specific Arguments &amp; Evidence Points ({(sub.keyPoints || []).length})</span>
+                              <span>Focus Arguments &amp; Evidence ({(sub.keyPoints || []).length})</span>
                             </span>
                           </div>
 
@@ -885,7 +885,7 @@ export function DynamicStructurePlanner({
                                       const updated = updateKeyPoint(structure, sub.id, pIdx, e.target.value);
                                       notifyChange(updated);
                                     }}
-                                    placeholder="H3 argument or focus point..."
+                                    placeholder="Focus argument or evidence point..."
                                     className="flex-1 text-xs py-0.5 px-1.5 rounded bg-transparent border border-transparent hover:border-neutral-200 dark:hover:border-white/10 focus:border-neutral-400 dark:focus:border-white/20 focus:bg-white dark:focus:bg-[#2C2C2E] text-neutral-800 dark:text-neutral-200 transition-colors"
                                   />
                                   <button
@@ -895,8 +895,8 @@ export function DynamicStructurePlanner({
                                       notifyChange(updated);
                                     }}
                                     className="opacity-0 group-hover/h3:opacity-100 p-0.5 text-neutral-400 hover:text-rose-500 transition-opacity cursor-pointer"
-                                    title="Remove H3 focus point"
-                                    aria-label={`Remove H3 focus point ${point}`}
+                                    title="Remove focus point"
+                                    aria-label={`Remove focus point ${point}`}
                                   >
                                     <X className="w-3 h-3" />
                                   </button>
@@ -905,11 +905,11 @@ export function DynamicStructurePlanner({
                             </div>
                           )}
 
-                          {/* Add H3 focus point input */}
+                          {/* Add focus point input */}
                           <div className="flex items-center gap-1.5 pl-2 pt-0.5">
                             <input
                               type="text"
-                              placeholder="+ Add H3 specific argument or evidence focus (Press Enter)..."
+                              placeholder="+ Add argument or evidence point (Press Enter)..."
                               onKeyDown={(e) => {
                                 if (e.key === "Enter" && e.currentTarget.value.trim()) {
                                   const updated = addKeyPoint(structure, sub.id, e.currentTarget.value.trim());
@@ -926,8 +926,7 @@ export function DynamicStructurePlanner({
                         {(isNotesOpen || sub.notes) && (
                           <div className="pt-2 border-t border-neutral-200/50 dark:border-white/5 space-y-1.5 animate-in fade-in duration-100">
                             <label className="text-[10px] uppercase font-semibold text-neutral-500 tracking-wider flex items-center justify-between">
-                              <span>Author Notes & Research Instructions for Drafting:</span>
-                              <span className="text-neutral-400 normal-case font-normal">Passed directly to research & drafting engine</span>
+                              <span>Drafting Notes</span>
                             </label>
                             <input
                               type="text"
@@ -936,12 +935,12 @@ export function DynamicStructurePlanner({
                                 const updated = updateSubheadingNotes(structure, sub.id, e.target.value);
                                 notifyChange(updated);
                               }}
-                              placeholder="e.g. Focus on empirical evidence from 2022-2025; address debt-trap critique..."
+                              placeholder="e.g. Focus on empirical evidence from 2022-2025..."
                               className="w-full text-xs p-2 rounded-lg bg-white dark:bg-[#2C2C2E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
                             />
                             {sub.guidance && (
                               <p className="text-[11px] text-neutral-500 dark:text-neutral-400 italic">
-                                AI Academic Scope: {sub.guidance}
+                                Scope: {sub.guidance}
                               </p>
                             )}
                           </div>

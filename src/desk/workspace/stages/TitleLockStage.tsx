@@ -6,6 +6,7 @@ import { executeTitleLockAndProceed } from "../titleLockContract";
 import { saveIntakeAnswers } from "../../api";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
 import type { GapItem } from "../agentPrompts/gapPrompts";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export default function TitleLockStage({
   stage,
@@ -237,6 +238,24 @@ export default function TitleLockStage({
               </button>
             </div>
           )}
+
+          {/* Stage Instruction Banner */}
+          <JournalStageInstructionBanner
+            milestoneTitle="Milestone 2 · Gap Analysis & Title Lock"
+            stageLabel="Executive Research Charter & Title Lock"
+            description="Review and finalize your foundational research blueprint. Sealing this specification locks the working title, research question, target venue, and anchor gap to govern evidence extraction and manuscript drafting in subsequent phases."
+            instructions={[
+              "Inspect the executive research charter for scope and methodological alignment",
+              "Verify the primary research question and target venue guidelines",
+              "Confirm the designated anchor gap and author contributions",
+              "Click 'Lock & Proceed' to freeze the Phase I contract and unlock Phase II evidence collection",
+            ]}
+            targetJournal={targetJournal}
+            tips={[
+              "Locking your title establishes deterministic alignment across all downstream AI agent prompts.",
+              "If revisions are needed later, you can unlock this charter at any time with full audit traceability.",
+            ]}
+          />
 
           {/* Phase I Lock Status Banner */}
           {isTitleLocked ? (

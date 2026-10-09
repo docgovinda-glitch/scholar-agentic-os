@@ -30,6 +30,7 @@ import {
 } from "../../../src/desk/assignment/types.ts";
 import {
   generateDynamicAssignmentStructure,
+  generateAiEnhancedOutline,
   extractTargetFrameworks,
   sanitizeOutlineHeadings,
   assignmentStructureToOutlineTree,
@@ -780,13 +781,38 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       ...(updatedTitle ? { title: updatedTitle, assignment_title: updatedTitle } : {}),
     };
 
-    const structure = generateDynamicAssignmentStructure({
+    const candidates = getCandidates();
+    const structure = await generateAiEnhancedOutline({
       question,
       assignmentType: assignmentType as any,
       academicLevel: academicLevel as any,
       targetWordCount: targetWords,
       citationStyle,
       briefText,
+      timeoutMs: 25000,
+      llmCaller: async (sys, usr) => {
+        try {
+          const response = await completeWithFailover(
+            {
+              taskClass: "drafting",
+              systemPrompt: sys,
+              userPrompt: usr,
+              responseFormat: "json",
+              segments: [{ label: "Brief", text: usr }],
+            },
+            { candidates },
+            buildAuthorizedPolicy(candidates)
+          );
+          if (response.ok) {
+            return response.value?.text || "";
+          }
+          console.warn("completeWithFailover non-ok in assignment outline:", response.error);
+          return "";
+        } catch (llmErr) {
+          console.warn("completeWithFailover exception in assignment outline:", llmErr);
+          return "";
+        }
+      }
     });
 
     project.answers.assignment_structure = JSON.stringify(structure);
@@ -1845,6 +1871,16 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
       ? "REVISION FOCUS: Expand scholarly elaboration. Introduce detailed comparative nuances while maintaining empirical citation grounding."
       : revisionPrompt === "condense"
       ? "REVISION FOCUS: Condense prose. Tighten argumentation and eliminate redundancies to fit the exact target word count."
+      : revisionPrompt === "citations"
+      ? "REVISION FOCUS: Reinforce citation grounding. Seamlessly integrate in-text citations from the bound sources to substantiate claims and strengthen academic credibility."
+      : revisionPrompt === "smooth"
+      ? "REVISION FOCUS: Enhance academic transitions and cohesion. Craft seamless transitional linkages between paragraphs and ensure strong analytical flow."
+      : revisionPrompt
+      ? `REVISION FOCUS: ${revisionPrompt}`
+      : "";
+
+    const existingBlock = (existingContent && revisionPrompt)
+      ? `EXISTING DRAFT CONTENT TO REVISE:\n"""\n${existingContent}\n"""\nPlease revise and upgrade this draft following the revision focus above while preserving accurate empirical citations.\n`
       : "";
 
     const briefRaw = [
@@ -1876,7 +1912,7 @@ Central Thesis: "${thesis}"
 Assignment Topic: "${assignmentTopic}"
 
 ${revisionInstruction}
-
+${existingBlock}
 ${evidencePackPrompt ? evidenceBlock : `BOUND EVIDENCE (Use these sources for in-text citations; do NOT fabricate external sources):\n${evidenceBlock || "Use standard scholarly reasoning."}`}
 
 ${frameworkGuidelines}

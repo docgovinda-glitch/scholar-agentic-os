@@ -8,6 +8,7 @@ import { getSupabaseClient } from "../../../services/supabaseClient";
 import { listVaultItems, addVaultItem, type VaultItem } from "../../../services/vaultContents";
 import { rankVaultItemsForProject, type SemanticSearchResult } from "../../../services/vault/semanticSearchService";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export interface VaultSourceItem {
   id: string;
@@ -750,6 +751,23 @@ export default function VaultSourcesStage({
 
       {/* 4. Main Scrollable Workspace Area */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 3 · Evidence Desk & Source Vault"
+          stageLabel="Knowledge Vault & Corpus Inventory"
+          description="Discover, triage, and ingest primary research items from your cross-project Knowledge Vault into your paper's dedicated evidence pipeline."
+          instructions={[
+            "Scan existing items in your Scholar Knowledge Vault matching your locked title",
+            "Use 'Semantic AI Search' to calculate relevance match against your anchor gap",
+            "Select high-relevance papers and datasets to stage for formal review",
+            "Click 'Stage Selected Sources' to advance candidate items into source approval",
+          ]}
+          targetJournal={project?.answers?.["target_journal"]}
+          tips={[
+            "Grounding your manuscript in high-credibility primary sources early prevents hallucination during drafting.",
+            "You can upload PDFs or ingest external references directly into the vault at any time.",
+          ]}
+        />
+
         {/* Terminal logs when running or finished */}
         {(isProcessing || logs.length > 0) && activeTab === "radar" && (
           <div className="max-w-5xl mx-auto">

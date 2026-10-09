@@ -4,6 +4,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import { saveIntakeAnswers } from "../../api";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export type EvidentiaryRole =
   | "benchmark"
@@ -423,6 +424,25 @@ export default function SourceApprovalStage({
             🔬 {methodology}
           </span>
         </div>
+      </div>
+
+      <div className="shrink-0 px-4 sm:px-6 lg:px-8 py-3 bg-[color:var(--surface-canvas)]">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 3 · Evidence Desk & Source Vault"
+          stageLabel="Source Approval & Anti-Fabrication Triage Desk"
+          description="Evaluate candidate literature and assign evidentiary roles (Benchmark, Dataset, Methodology, Theory). Strict human-in-the-loop validation ensures zero unverified citations reach the drafting phase."
+          instructions={[
+            "Review candidate sources staged from your knowledge vault",
+            "Assign evidentiary roles (Benchmark Baseline, Empirical Dataset, Methodological Grounding, Theoretical Foundation)",
+            "Discard spurious or low-relevance papers to prevent hallucinated citations",
+            "Click 'Lock Approved Sources & Proceed' once your evidence corpus satisfies target journal standards",
+          ]}
+          targetJournal={targetJournal}
+          tips={[
+            "Papers with clear evidentiary roles produce significantly higher-scoring Literature Review and Methodology sections.",
+            "Approved sources are cryptographically anchored and cited using verified metadata.",
+          ]}
+        />
       </div>
 
       {/* 3. Triage Workbench Layout */}

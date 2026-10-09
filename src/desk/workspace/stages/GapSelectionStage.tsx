@@ -3,6 +3,7 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import { saveIntakeAnswers } from "../../api";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
 import { generateLocalGapFallback, type GapItem } from "../agentPrompts/gapPrompts";
 
@@ -316,6 +317,22 @@ export default function GapSelectionStage({
       {/* 2. Main Scrollable Container */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
         <div className="max-w-4xl mx-auto space-y-6">
+          <JournalStageInstructionBanner
+            milestoneTitle="Milestone 2 · Gap Analysis & Title Lock"
+            stageLabel="Anchor Research Gap Selection & Crown"
+            description="Select and seal the primary anchor gap that your manuscript directly resolves. This anchor gap forms the spine of your title, empirical evaluation, and peer-review defense."
+            instructions={[
+              "Compare identified candidate gaps across empirical feasibility and scholarly novelty",
+              "Select and designate your primary anchor research gap",
+              "Confirm alignment with your target journal's scope",
+              "Proceed to Title Generation to formulate high-impact candidate titles",
+            ]}
+            targetJournal={project?.answers?.["target_journal"]}
+            tips={[
+              "Reviewers value focused papers that definitively resolve one well-formulated anchor gap over broad papers with diffuse objectives.",
+            ]}
+          />
+
           {/* Error Alert */}
           {error && (
             <div className="p-4 bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] rounded-xl border border-[color:var(--state-danger)] text-xs flex items-center justify-between">

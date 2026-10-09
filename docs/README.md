@@ -30,12 +30,12 @@ The documentation is organized into focused, authoritative specifications:
 
 ## Major Application Modules
 
-1. **Coursework & Essay Engine (`OT-01`)**
-   - 4-phase structured workflow:
+1. **Coursework & Essay Engine (`OT-01` & `OT-02`)**
+   - 9-milestone structured workflow:
      - **Phase 1 · Understand & Structure**: Dual-tab brief intake, dynamic analytical outline generator & editor (`DynamicStructurePlanner`), word count allocation controls, and authentic academic voice selection (`WritingStyleSelector`).
-     - **Phase 2 · Sources & Discovery**: Question deconstruction, multi-angle literature discovery, lecture upload dropzone, relevance categorization, and approved evidence shelf.
-     - **Phase 3 · Drafting**: Subheading-by-subheading drafting alignment, live word count targets, citation insertion shortcuts, and evidence binding.
-     - **Phase 4 · Submission**: 10-point rubric evaluator, citation audit reconciliation (100% in-text to bibliography match), and one-click `.docx` / PDF export.
+     - **Phase 2 · Sources & Discovery**: Question deconstruction, multi-angle literature discovery (30+ authentic scholarly sources), lecture upload dropzone, relevance categorization, and approved evidence shelf.
+     - **Phase 3 · Drafting**: Subheading-by-subheading drafting alignment, live word count targets, invisible academic chunker, citation insertion shortcuts, and evidence binding.
+     - **Phase 4 · Submission & Verification**: 10-point rubric evaluator, citation audit reconciliation (100% in-text to bibliography match), automated reference list generation, and one-click `.docx` / PDF export.
      - **Copilot Personas**: Phase-specific copilots (Advisor, Librarian, Scribe, Examiner).
 
 2. **Journal Article Workspace (`OT-10`)**

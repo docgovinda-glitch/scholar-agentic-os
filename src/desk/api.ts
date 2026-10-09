@@ -662,7 +662,18 @@ export function createDatabaseProject(outputTypeId: string): Promise<ProjectView
 
 /** The signed-in user's own projects, most recently updated first. */
 export function listProjects(): Promise<{ items: ProjectView[] }> {
-  return authedFetch("/api/projects").then((r) => json(r));
+  return authedFetch("/api/projects")
+    .then((r) => json<{ items: ProjectView[] }>(r))
+    .then((data) => {
+      if (!data?.items || !Array.isArray(data.items)) return { items: [] };
+      const seen = new Set<string>();
+      const uniqueItems = data.items.filter((p) => {
+        if (!p?.projectId || seen.has(p.projectId)) return false;
+        seen.add(p.projectId);
+        return true;
+      });
+      return { items: uniqueItems };
+    });
 }
 
 /**

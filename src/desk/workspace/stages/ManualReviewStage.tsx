@@ -4,6 +4,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import { saveIntakeAnswers } from "../../api";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export type LedgerTab = "matrix" | "literature" | "datasets" | "claims";
 
@@ -297,6 +298,24 @@ export default function ManualReviewStage({
             <span>{error}</span>
           </div>
         )}
+
+        {/* Instruction Banner */}
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 4 · Claim Extraction & Synthesis"
+          stageLabel="Manual Researcher Review & Zero-Fabrication Signoff"
+          description="Final human-in-the-loop audit of your evidentiary base. Sign off on primary claims, baseline metrics, and author directives before advancing to the AI drafting engine."
+          instructions={[
+            "Inspect the 5 evidentiary verification pillars (Anchor Void, Vault Sources, External Corroboration, Empirical Claims, Thematic Matrix)",
+            "Review evidence ledger tabs across Matrix, Literature, Datasets, and Claims",
+            "Set author directives and emphasis chips to steer section-by-section writing",
+            "Click 'Certify Evidence Base & Proceed' to lock evidence and unlock Phase III Drafting",
+          ]}
+          targetJournal={targetJournal}
+          tips={[
+            "Author directives entered here will be injected as top-priority system instructions into the multi-agent drafter.",
+            "Zero-fabrication certification guarantees that every factual assertion in the draft maps back to an approved source ID.",
+          ]}
+        />
 
         {/* Phase II Evidentiary Integrity Audit Checklist */}
         <div className="max-w-5xl mx-auto bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-4">

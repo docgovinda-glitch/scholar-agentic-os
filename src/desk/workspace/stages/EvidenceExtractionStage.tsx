@@ -5,6 +5,7 @@ import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { saveIntakeAnswers, authedStreamFetch } from "../../api";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
+import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 
 export type ClaimStrength = "Strong" | "Moderate" | "Weak";
 export type ClaimType =
@@ -722,6 +723,23 @@ export default function EvidenceExtractionStage({
 
       {/* 3. Main Scrollable Workspace */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <JournalStageInstructionBanner
+          milestoneTitle="Milestone 4 · Claim Extraction & Synthesis"
+          stageLabel="Claim Extraction & Evidentiary Matrix"
+          description="Extract verified empirical claims, benchmark statistics, theoretical theorems, and methodological arguments from your approved sources and datasets."
+          instructions={[
+            "Click 'Run AI Deep Extraction' to parse claims from authorized sources and datasets",
+            "Classify claims across Empirical Support, Benchmark Statistic, and Theoretical Proof",
+            "Tag claims with section targets (e.g., #Results, #Methodology, #Discussion)",
+            "Manually add or edit claims using '+ New Claim' to ensure completeness",
+          ]}
+          targetJournal={project?.answers?.["target_journal"]}
+          tips={[
+            "Every claim extracted here is assigned a permanent source identifier, preventing citation mismatch in your final manuscript.",
+            "Higher claim density in Results and Discussion directly correlates with smoother peer review.",
+          ]}
+        />
+
         {/* Terminal logs during extraction */}
         {(isProcessing || logs.length > 0) && (
           <div className="max-w-5xl mx-auto">

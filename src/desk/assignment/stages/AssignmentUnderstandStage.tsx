@@ -882,7 +882,7 @@ export default function AssignmentUnderstandStage() {
     try {
       const targetProjectId = await ensurePersisted();
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Structure generation timeout")), 6000)
+        setTimeout(() => reject(new Error("Structure generation timeout")), 30000)
       );
 
       const response = await Promise.race([
@@ -1276,8 +1276,27 @@ export default function AssignmentUnderstandStage() {
           Understand Your Brief
         </h1>
         <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
-          Define your assignment question, academic parameters, and generate an analytical structure.
+          {understandStep === "outline_review"
+            ? "Calibrate word targets and outline structure before gathering evidence."
+            : "Define your assignment question, parameters, and analytical structure."}
         </p>
+      </div>
+
+      {/* Minimal Step Guidance Banner */}
+      <div className="p-3.5 sm:p-4 rounded-xl bg-neutral-100/60 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-5 h-5 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 flex items-center justify-center font-mono font-bold text-[10px] shrink-0">
+            1
+          </div>
+          <p className="text-neutral-600 dark:text-neutral-400 text-xs leading-relaxed">
+            {understandStep === "outline_review"
+              ? "Review and customize your AI-generated structure. You can edit section titles, adjust word budgets, or regenerate the outline before moving to sources."
+              : "Paste your essay prompt or upload your syllabus brief. Select your target length and tone to generate a balanced academic outline."}
+          </p>
+        </div>
+        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0 self-start sm:self-auto">
+          {understandStep === "outline_review" ? "Outline Ready" : "AI Deconstruction Ready"}
+        </span>
       </div>
 
       {understandStep === "brief_input" ? (
@@ -1831,10 +1850,10 @@ export default function AssignmentUnderstandStage() {
         /* Step 2: Dynamic Outline Review Mode */
         <div className="space-y-5 animate-in fade-in duration-200">
           {/* Locked / Collapsed Brief Summary Card */}
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/80 dark:border-white/10 p-4 sm:p-5 shadow-xs space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-100 dark:border-white/5">
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-xl border border-neutral-200/80 dark:border-white/10 p-4 shadow-2xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-neutral-100 dark:border-white/5">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                 <span className="text-xs font-semibold text-neutral-900 dark:text-white uppercase tracking-wider">
                   Assignment Brief
                 </span>
@@ -1847,35 +1866,35 @@ export default function AssignmentUnderstandStage() {
                 type="button"
                 onClick={() => setUnderstandStep("brief_input")}
                 aria-label="Edit Brief"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-white/10 hover:bg-neutral-200 dark:hover:bg-white/15 transition-all cursor-pointer w-fit"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer w-fit"
               >
-                <Edit2 className="w-3.5 h-3.5" />
+                <Edit2 className="w-3 h-3" />
                 <span>Edit Brief</span>
               </button>
             </div>
 
             {/* Prompt Excerpt */}
-            <div className="text-xs text-neutral-800 dark:text-neutral-200 bg-neutral-50/70 dark:bg-white/[0.02] p-3 rounded-xl border border-neutral-200/60 dark:border-white/5 line-clamp-3">
-              <span className="font-semibold text-neutral-500 dark:text-neutral-400 mr-1.5">Prompt:</span>
+            <div className="text-xs text-neutral-800 dark:text-neutral-200 bg-neutral-50/70 dark:bg-white/[0.02] p-2.5 sm:p-3 rounded-lg border border-neutral-200/60 dark:border-white/5 font-medium leading-relaxed">
+              <span className="font-semibold text-neutral-400 dark:text-neutral-500 mr-1.5">Prompt:</span>
               {localQuestion}
             </div>
 
             {/* Parameter Badges */}
-            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-              <span className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 font-medium">
-                Level: <strong className="font-semibold capitalize">{safeFormatLabel(localLevel)}</strong>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300">
+                Level: <strong className="font-semibold capitalize text-neutral-900 dark:text-white">{safeFormatLabel(localLevel)}</strong>
               </span>
-              <span className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 font-medium">
-                Type: <strong className="font-semibold capitalize">{safeFormatLabel(localType)}</strong>
+              <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300">
+                Type: <strong className="font-semibold capitalize text-neutral-900 dark:text-white">{safeFormatLabel(localType)}</strong>
               </span>
-              <span className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 font-medium">
-                Citation: <strong className="font-semibold uppercase">{localCitation}</strong>
+              <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300">
+                Citation: <strong className="font-semibold uppercase text-neutral-900 dark:text-white">{localCitation}</strong>
               </span>
-              <span className="px-2.5 py-1 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-medium">
+              <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
                 Tone: <strong className="font-semibold capitalize">{safeFormatLabel(localTone)}</strong>
               </span>
-              <span className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 font-medium">
-                Target: <strong className="font-semibold">{localWordCount.toLocaleString()} words</strong>
+              <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300">
+                Target: <strong className="font-semibold text-neutral-900 dark:text-white">{localWordCount.toLocaleString()} words</strong>
               </span>
             </div>
           </div>

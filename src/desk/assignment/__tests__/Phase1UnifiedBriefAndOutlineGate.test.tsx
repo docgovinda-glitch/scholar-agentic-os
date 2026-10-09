@@ -102,7 +102,7 @@ describe("Unified Assignment Brief & 2-Step Outline Review Progression", () => {
     expect(screen.getByText(/persuasive tone/i)).toBeInTheDocument();
 
     // Check H1, H2, and H3 arguments/evidence exist
-    const h3Inputs = screen.getAllByPlaceholderText(/\+ Add H3 specific argument or evidence focus/i);
+    const h3Inputs = screen.getAllByPlaceholderText(/\+ Add argument or evidence point|\+ Add H3 specific argument/i);
     expect(h3Inputs.length).toBeGreaterThan(0);
 
     // Check Regenerate Outline secondary button exists

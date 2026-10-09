@@ -311,7 +311,7 @@ export function AssignmentDraftingStage({
               Grounded Section-by-Section Drafting
             </h1>
             <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-2xl">
-              Write your assignment section-by-section with 70% critical analysis / 30% description, automated citation binding, and real-time budget convergence.
+              Write your assignment section-by-section with 70% critical analysis / 30% description, automated citation binding, and real-time budget convergence. Customize section directives, revise with AI, or edit prose directly.
             </p>
           </div>
 
@@ -424,6 +424,7 @@ export function AssignmentDraftingStage({
             isStreaming={Boolean(activeStreamingSectionId && activeStreamingSectionId === activeSection?.id)}
             streamingChunk={activeStreamingSectionId === activeSection?.id ? streamingChunk : ""}
             boundSources={approvedSources.filter((s) => activeSection?.boundSourceIds?.includes(s.id))}
+            allApprovedSources={approvedSources}
             hasPrevious={hasPrevious}
             hasNext={hasNext}
             onNavigatePrevious={() => {
