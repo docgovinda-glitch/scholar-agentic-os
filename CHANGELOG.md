@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-04
 
+### Academic Drafting Enhancements
+- **Interactive Rubric Matcher (`AssignmentUnderstandStage.tsx`)**:
+  - Implemented interactive UI mapping user project goals against university assessment criteria.
+- **AI "Devil's Advocate" (`sectionDraftingEngine.ts`, `DraftingActiveEditor.tsx`)**:
+  - Integrated "Challenge" stream mode to generate academic counterarguments and critiques within the prose.
+- **Automated In-Text Citation & Bibliography Management (`DraftingActiveEditor.tsx`, `AssignmentDraftingStage.tsx`)**:
+  - Enabled one-click citation insertion from approved literature sources.
+  - Added live auto-updating bibliography section at the bottom of the drafting workspace.
+- **"Flow & Transitions" Auditor (`submissionAuditService.ts`, `FlowReconciliationCard.tsx`)**:
+  - Built a heuristic analysis engine that scans inter-paragraph logical flow and flags sudden jumps.
+  - Added dedicated Flow Auditor scorecard to the Submission Audit stage with suggested transitions.
+- **Focus/Zen Mode with "Writer's Block" Nudges (`DraftingActiveEditor.tsx`)**:
+  - Developed a full-screen, minimalist writing overlay for distraction-free drafting.
+  - Implemented an intelligent 2-minute inactivity timeout that provides gentle, context-aware nudges based on section key points.
+- **Paraphrasing & Academic Tone Enhancer (`DraftingActiveEditor.tsx`)**:
+  - Added "Elevate Tone" capability for manually selected text in the editor.
+  - Provided a side-by-side diff comparison overlay (Original vs. Enhanced) with Accept/Reject controls.
+
 ### Scholar Core Sidebar Integration, Header Back Button, and Canvas Viewport Fix
 - **Scholar Core Sidebar Shell Integration (`ScholarSidebar.tsx`, `PresentationWorkspace.tsx`, `AppLayout.tsx`, `WorkspaceLayout.tsx`)**:
   - Seamlessly mounted Presentation Studio into the main Scholar Core application shell alongside `ScholarSidebar`.

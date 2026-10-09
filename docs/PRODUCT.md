@@ -40,10 +40,10 @@ Scholar Core provides purpose-built workspaces tailored to specific deliverable 
 - **Status**: Production Active.
 - **Target Deliverables**: Academic Essays, Module Coursework, Analytical Papers, Policy Briefs, Case Studies, Lab Reports.
 - **Core Architecture**: 4-Phase Lifecycle:
-  1. **Phase 1 · Understand & Structure**: Dual-tab brief intake (paste prompt or upload PDF/DOCX brief document), level and citation style calibration, AskScholar-enriched dynamic analytical outline generation (banning generic placeholders, enforcing H1/H2/H3 depth, dialectical progression for essays, and applied problem decomposition for coursework), target theoretical frameworks chip manager, custom word allocations (`DynamicStructurePlanner`), and voice/style selection (`WritingStyleSelector`).
+  1. **Phase 1 · Understand & Structure**: Dual-tab brief intake (paste prompt or upload PDF/DOCX brief document), level and citation style calibration, interactive **Rubric Matcher** (mapping user goals against university assessment criteria), AskScholar-enriched dynamic analytical outline generation, target theoretical frameworks chip manager, custom word allocations (`DynamicStructurePlanner`), and voice/style selection (`WritingStyleSelector`).
   2. **Phase 2 · Sources & Discovery**: Question deconstruction, multi-angle scholarly discovery, lecture/slide dropzone with automatic chunking, relevance scoring, and approved evidence shelf.
-  3. **Phase 3 · Drafting**: Subheading-by-subheading drafting alignment, live word count progress tracking against section budgets, citation insertion, and evidence passage binding.
-  4. **Phase 4 · Submission**: 10-point rubric evaluator, citation audit reconciliation, and formatted `.docx` and PDF export.
+  3. **Phase 3 · Drafting**: Subheading-by-subheading drafting alignment, **Focus/Zen Mode** with intelligent 2-minute "Writer's Block" nudges, live word count progress tracking against section budgets, **Automated In-Text Citation & Bibliography Management** (one-click citation insertion with live auto-updating bibliography), **AI "Devil's Advocate"** (critique and counterargument streaming), **Paraphrasing & Academic Tone Enhancer** (side-by-side diff overlay for text refinement), and evidence passage binding.
+  4. **Phase 4 · Submission**: 10-point rubric evaluator, citation audit reconciliation, **"Flow & Transitions" Auditor** (scanning inter-paragraph logical flow for sudden jumps), and formatted `.docx` and PDF export.
 - **Copilot Integration**: 4 stage-specific copilot personas (Advisor, Librarian, Scribe, Examiner).
 
 ### 3.2 Journal Article Workspace (`OT-10`)
