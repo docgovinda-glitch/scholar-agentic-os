@@ -20,8 +20,10 @@ import {
   Layers,
   FileCheck,
   RotateCcw,
+  Book,
 } from "lucide-react";
 import { SlideCanvas, extractSlidesFromAcademicText, type SlideDeck } from "../../../features/slides";
+import { buildFormattedBibliography } from "../services/assignmentExportService";
 
 export interface AssignmentDraftingStageProps {
   onProceed?: () => void;
@@ -438,6 +440,21 @@ export function AssignmentDraftingStage({
               }
             }}
           />
+
+          {/* Live Bibliography Section */}
+          {approvedSources.length > 0 && (
+            <div className="mt-6 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs overflow-hidden">
+              <div className="px-5 py-3 border-b border-neutral-100 dark:border-white/5 flex items-center gap-2 bg-neutral-50/50 dark:bg-white/[0.02]">
+                <Book className="w-4 h-4 text-emerald-500" />
+                <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Live Bibliography</h3>
+              </div>
+              <div className="p-5 text-[13px] text-neutral-700 dark:text-neutral-300 leading-relaxed space-y-4">
+                {buildFormattedBibliography(approvedSources, citationStyle || "harvard").map((bib, i) => (
+                  <p key={i} className="pl-6 -indent-6" dangerouslySetInnerHTML={{ __html: bib }} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

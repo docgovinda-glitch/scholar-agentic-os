@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { RubricComplianceCard } from "../components/RubricComplianceCard";
 import { CitationReconciliationCard } from "../components/CitationReconciliationCard";
+import { FlowReconciliationCard } from "../components/FlowReconciliationCard";
 import {
   exportAssignmentToDocx,
   exportAssignmentToPdf,
@@ -46,6 +47,7 @@ export function AssignmentSubmissionStage({
     runSubmissionAudit,
     isAuditingSubmission,
     citationAuditResult,
+    flowAuditResult,
     setPhase,
     saveAnswers,
   } = useAssignmentWorkspace();
@@ -289,21 +291,34 @@ export function AssignmentSubmissionStage({
         </div>
       )}
 
-      {/* Two-Column Audit Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      {/* Three-Column Audit Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
         {/* Left Column: Rubric Compliance Card */}
-        <RubricComplianceCard
-          report={submissionReport as any}
-          isLoading={isAuditingSubmission}
-          onReRunAudit={runSubmissionAudit}
-        />
+        <div className="lg:col-span-1 min-h-[400px]">
+          <RubricComplianceCard
+            report={submissionReport as any}
+            isLoading={isAuditingSubmission}
+            onReRunAudit={runSubmissionAudit}
+          />
+        </div>
 
-        {/* Right Column: Citation Reconciliation Card */}
-        <CitationReconciliationCard
-          audit={citationAuditResult}
-          isLoading={isAuditingSubmission}
-          onReRunAudit={runSubmissionAudit}
-        />
+        {/* Center Column: Citation Reconciliation Card */}
+        <div className="lg:col-span-1 min-h-[400px]">
+          <CitationReconciliationCard
+            audit={citationAuditResult}
+            isLoading={isAuditingSubmission}
+            onReRunAudit={runSubmissionAudit}
+          />
+        </div>
+
+        {/* Right Column: Flow Reconciliation Card */}
+        <div className="lg:col-span-1 min-h-[400px]">
+          <FlowReconciliationCard
+            audit={flowAuditResult || null}
+            isAuditing={isAuditingSubmission}
+            onReRunAudit={runSubmissionAudit}
+          />
+        </div>
       </div>
 
       {/* Citation Coverage Statistics Card (Production Spec §5) */}

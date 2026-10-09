@@ -26,13 +26,16 @@ import {
   List,
   ShieldCheck,
   Layers,
+  Maximize2,
+  Minimize2,
+  Brain,
 } from "lucide-react";
 
 export interface DraftingActiveEditorProps {
   section: AssignmentDraftingSection | null;
   onUpdateContent: (content: string) => void;
   onUpdateTitle?: (newTitle: string) => void;
-  onStreamSection?: (revisionType?: "deepen" | "expand" | "condense" | "citations" | "smooth" | string) => void;
+  onStreamSection?: (revisionType?: "deepen" | "expand" | "condense" | "citations" | "smooth" | "challenge" | string) => void;
   isStreaming?: boolean;
   streamingChunk?: string;
   boundSources?: DiscoveredSource[];
@@ -136,6 +139,19 @@ export function DraftingActiveEditor({
   const [titleInput, setTitleInput] = useState(section?.title || "");
   const [customDirective, setCustomDirective] = useState("");
 
+  // Zen Mode & Writer's Block Nudge State
+  const [isZenMode, setIsZenMode] = useState(false);
+  const [showWriterBlockNudge, setShowWriterBlockNudge] = useState(false);
+  const writerBlockTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Tone Enhancer State
+  const [toneEnhancement, setToneEnhancement] = useState<{
+    original: string;
+    enhanced: string;
+    start: number;
+    end: number;
+  } | null>(null);
+
   // Citation Inspector Popover State
   const [inspectedCitation, setInspectedCitation] = useState<{
     text: string;
@@ -168,7 +184,33 @@ export function DraftingActiveEditor({
     setInspectedCitation(null);
     setShowCitationDropdown(false);
     setCustomDirective("");
+    setIsZenMode(false);
+    setShowWriterBlockNudge(false);
   }, [section?.id, section?.draftContent, section?.title]);
+
+  // Writer's Block Nudge Effect
+  useEffect(() => {
+    if (isEditingManually && isZenMode) {
+      if (writerBlockTimeoutRef.current) {
+        clearTimeout(writerBlockTimeoutRef.current);
+      }
+      setShowWriterBlockNudge(false);
+      
+      // 120,000 ms = 2 minutes. Setting to 120s as per spec.
+      writerBlockTimeoutRef.current = setTimeout(() => {
+        setShowWriterBlockNudge(true);
+      }, 120000);
+    } else {
+      if (writerBlockTimeoutRef.current) {
+        clearTimeout(writerBlockTimeoutRef.current);
+      }
+      setShowWriterBlockNudge(false);
+    }
+    
+    return () => {
+      if (writerBlockTimeoutRef.current) clearTimeout(writerBlockTimeoutRef.current);
+    };
+  }, [manualText, isEditingManually, isZenMode]);
 
   // Close citation dropdown on outside click
   useEffect(() => {
@@ -295,6 +337,39 @@ export function DraftingActiveEditor({
     }, 50);
   };
 
+  const handleElevateTone = () => {
+    if (!textareaRef.current) return;
+    const el = textareaRef.current;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    if (start === end) {
+      alert("Please select some text to elevate.");
+      return;
+    }
+    const selectedText = manualText.substring(start, end);
+    // Simulated Academic Rewrite
+    const enhanced = selectedText
+      .replace(/\b(good|bad)\b/gi, (m) => (m.toLowerCase() === "good" ? "optimal" : "suboptimal"))
+      .replace(/\b(very|really)\b/gi, "significantly")
+      .replace(/\b(show|shows)\b/gi, "demonstrates")
+      .replace(/\b(say|says)\b/gi, "asserts")
+      .replace(/\b(use)\b/gi, "utilize")
+      .replace(/\b(think)\b/gi, "postulate") + " [Academic Tone Enhanced]";
+      
+    setToneEnhancement({ original: selectedText, enhanced, start, end });
+  };
+
+  const applyToneEnhancement = () => {
+    if (!toneEnhancement) return;
+    const newText =
+      manualText.substring(0, toneEnhancement.start) +
+      toneEnhancement.enhanced +
+      manualText.substring(toneEnhancement.end);
+    setManualText(newText);
+    onUpdateContent(newText);
+    setToneEnhancement(null);
+  };
+
   // Inspect citation on click
   const handleCitationClick = (citationText: string) => {
     let matchedSource: DiscoveredSource | null = null;
@@ -331,6 +406,79 @@ export function DraftingActiveEditor({
       setTimeout(() => setCopiedCitation(false), 2000);
     }
   };
+
+  if (isZenMode) {
+    return (
+      <div className="fixed inset-0 z-50 bg-white dark:bg-[#1C1C1E] flex flex-col items-center py-12 overflow-y-auto animate-in fade-in duration-300">
+        <div className="w-full max-w-3xl px-6">
+          <div className="flex items-center justify-between mb-8 text-neutral-400">
+            <h2 className="text-sm font-medium tracking-wide">FOCUS MODE</h2>
+            <button
+              onClick={() => setIsZenMode(false)}
+              className="p-2 hover:bg-neutral-100 dark:hover:bg-white/5 rounded-lg transition-colors flex items-center gap-2 text-xs"
+            >
+              <Minimize2 className="w-4 h-4" />
+              Exit Focus Mode
+            </button>
+          </div>
+          
+          {isEditingTitle ? (
+            <input
+              type="text"
+              value={titleInput}
+              onChange={(e) => setTitleInput(e.target.value)}
+              onBlur={() => {
+                setIsEditingTitle(false);
+                if (titleInput.trim() && titleInput !== section.title) {
+                  onUpdateTitle?.(titleInput);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              autoFocus
+              className="text-4xl font-bold text-neutral-900 dark:text-white bg-transparent border-none outline-none w-full mb-8 font-serif"
+            />
+          ) : (
+            <h1 
+              onClick={() => setIsEditingTitle(true)}
+              className="text-4xl font-bold text-neutral-900 dark:text-white mb-8 font-serif cursor-text"
+            >
+              {section.title}
+            </h1>
+          )}
+
+          {showWriterBlockNudge && (
+            <div className="mb-6 p-4 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/30 flex items-start gap-3 animate-in slide-in-from-top-2 fade-in duration-300">
+              <Brain className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-indigo-900 dark:text-indigo-200 font-medium">Stuck? Try focusing on:</p>
+                <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-1">
+                  {section.keyPoints?.[0] || section.guidance || "the main argument of this section."}
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowWriterBlockNudge(false)}
+                className="ml-auto p-1 text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <textarea
+            ref={textareaRef}
+            value={manualText}
+            onChange={handleManualTextChange}
+            onBlur={handleSaveManualEdit}
+            placeholder="Start drafting..."
+            className="w-full h-full min-h-[60vh] bg-transparent border-none outline-none resize-none text-lg text-neutral-800 dark:text-neutral-200 leading-relaxed font-serif"
+            autoFocus
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <article
@@ -647,6 +795,18 @@ export function DraftingActiveEditor({
             <span className="hidden sm:inline">Ground Citations</span>
           </button>
 
+          {/* Devil's Advocate */}
+          <button
+            type="button"
+            onClick={() => onStreamSection?.("challenge")}
+            disabled={isStreaming}
+            title="Devil's Advocate: Identify weak spots and suggest counter-arguments"
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200/70 dark:hover:bg-white/10 disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-rose-500" />
+            <span className="hidden sm:inline">Challenge Me</span>
+          </button>
+
           {/* Full Regenerate */}
           <button
             type="button"
@@ -797,6 +957,25 @@ export function DraftingActiveEditor({
                 >
                   <List className="w-3.5 h-3.5" />
                 </button>
+                <div className="w-px h-4 bg-neutral-200 dark:bg-white/10 mx-1" />
+                <button
+                  type="button"
+                  onClick={handleElevateTone}
+                  className="px-2 py-1 rounded text-[11px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 flex items-center gap-1 transition-colors"
+                  title="Elevate Academic Tone of selected text"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Elevate Tone
+                </button>
+                <div className="w-px h-4 bg-neutral-200 dark:bg-white/10 mx-1" />
+                <button
+                  type="button"
+                  onClick={() => setIsZenMode(true)}
+                  className="p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 cursor-pointer"
+                  title="Enter Focus Mode"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
               </div>
 
               {/* + Insert Citation Dropdown Button */}
@@ -863,6 +1042,37 @@ export function DraftingActiveEditor({
               <span>Auto-saving live changes. Click Done Editing when finished.</span>
               <span className="tabular-nums font-mono">{manualText.length} characters</span>
             </div>
+
+            {/* Tone Enhancer Diff Overlay */}
+            {toneEnhancement && (
+              <div className="absolute inset-x-4 bottom-4 p-4 rounded-xl bg-white dark:bg-[#2A2A2C] border border-indigo-200 dark:border-indigo-900/50 shadow-2xl z-20 animate-in slide-in-from-bottom-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-semibold text-sm">
+                    <Sparkles className="w-4 h-4" />
+                    Academic Tone Enhancement
+                  </div>
+                  <button onClick={() => setToneEnhancement(null)} className="p-1 hover:bg-neutral-100 dark:hover:bg-white/5 rounded text-neutral-400">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="p-3 rounded-lg bg-neutral-50 dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-sm line-through opacity-70">
+                    {toneEnhancement.original}
+                  </div>
+                  <div className="p-3 rounded-lg bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/30 text-sm text-indigo-900 dark:text-indigo-100">
+                    {toneEnhancement.enhanced}
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setToneEnhancement(null)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200 dark:hover:bg-white/10 transition-colors">
+                    Reject
+                  </button>
+                  <button onClick={applyToneEnhancement} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+                    Accept Enhancement
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : liveContent.trim().length > 0 ? (
           <div className="prose prose-neutral dark:prose-invert max-w-none">

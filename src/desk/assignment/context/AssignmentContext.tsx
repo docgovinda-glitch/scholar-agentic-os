@@ -57,7 +57,7 @@ import {
   tuneSectionsToQuestion,
   type InternalSectionPlan,
 } from "../services/invisibleChunkerService";
-import { auditCitations, evaluateRubricCompliance } from "../services/submissionAuditService";
+import { auditCitations, evaluateRubricCompliance, auditFlowAndTransitions } from "../services/submissionAuditService";
 import { generateCuratedLiteratureSources } from "../services/scholarlyDiscoveryService";
 import { getCitationCoverage } from "../services/citationAnchoringService";
 import { generateReferenceListBlock } from "../services/referenceListGenerator";
@@ -165,6 +165,7 @@ export interface AssignmentContextValue {
   runSubmissionAudit: () => Promise<{ citationAudit: CitationAuditResult; rubricReport: RubricScoreReport } | undefined>;
   isAuditingSubmission: boolean;
   citationAuditResult: CitationAuditResult | null;
+  flowAuditResult: FlowAuditResult | null;
 
   // AI Tutor & Rubric Estimator
   tutorMode: TutorMode;
@@ -873,14 +874,24 @@ export function AssignmentProvider({
         : answers["assignment_citation_audit"])
     : null;
 
+  const initialFlowAudit: FlowAuditResult | null = answers["assignment_flow_audit"]
+    ? (typeof answers["assignment_flow_audit"] === "string"
+        ? JSON.parse(answers["assignment_flow_audit"])
+        : answers["assignment_flow_audit"])
+    : null;
+
   const [citationAuditResult, setCitationAuditResult] = useState<CitationAuditResult | null>(initialCitationAudit);
+  const [flowAuditResult, setFlowAuditResult] = useState<FlowAuditResult | null>(initialFlowAudit);
   const [isAuditingSubmission, setIsAuditingSubmission] = useState(false);
 
   useEffect(() => {
     if (initialCitationAudit) {
       setCitationAuditResult(initialCitationAudit);
     }
-  }, [initialCitationAudit]);
+    if (initialFlowAudit) {
+      setFlowAuditResult(initialFlowAudit);
+    }
+  }, [initialCitationAudit, initialFlowAudit]);
 
   // Setters
   const setAnalysis = useCallback(
@@ -1511,6 +1522,7 @@ export function AssignmentProvider({
       submission: {
         rubricScoreReport: submissionReport,
         citationAudit: citationAuditResult,
+        flowAudit: flowAuditResult,
         isReadyForSubmission: Boolean(
           submissionReport &&
           ((submissionReport as any).readinessPercentage !== undefined
@@ -1547,6 +1559,7 @@ export function AssignmentProvider({
     thinkingMap,
     submissionReport,
     citationAuditResult,
+    flowAuditResult,
   ]);
 
   // Phase 4: Submission Quality Audit Runner
@@ -1590,12 +1603,17 @@ export function AssignmentProvider({
         citationCoverage
       );
 
+      // 3. Flow & Transitions Audit
+      const flowAudit = auditFlowAndTransitions(fullMarkdown);
+      setFlowAuditResult(flowAudit);
+
       await saveAnswers({
         assignment_submission_report: rubricReport,
         assignment_citation_audit: citAudit,
+        assignment_flow_audit: flowAudit,
       });
 
-      return { citationAudit: citAudit, rubricReport };
+      return { citationAudit: citAudit, rubricReport, flowAudit };
     } finally {
       setIsAuditingSubmission(false);
     }
@@ -1699,6 +1717,7 @@ export function AssignmentProvider({
         runSubmissionAudit,
         isAuditingSubmission,
         citationAuditResult,
+        flowAuditResult,
         tutorMode,
         setTutorMode,
         tutorMessages,

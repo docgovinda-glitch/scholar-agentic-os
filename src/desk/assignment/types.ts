@@ -1206,9 +1206,24 @@ export interface CitationAuditResult {
 
 export type CitationAuditReport = CitationAuditResult;
 
+export interface FlowAuditIssue {
+  paragraphIndex: number;
+  textSnippet: string;
+  issue: string;
+  severity: "error" | "warning";
+  suggestedTransition: string;
+}
+
+export interface FlowAuditResult {
+  totalParagraphs: number;
+  issues: FlowAuditIssue[];
+  score: number; // out of 100
+}
+
 export interface AssignmentSubmissionState {
   rubricScoreReport: RubricScoreReport | SubmissionCheckReport | null;
   citationAudit: CitationAuditReport | null;
+  flowAudit?: FlowAuditResult | null;
   isReadyForSubmission: boolean;
   submittedAt?: string;
   exportFormats?: ("docx" | "pdf" | "markdown")[];

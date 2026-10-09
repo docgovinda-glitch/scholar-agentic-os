@@ -540,6 +540,9 @@ export function generateSectionDraft(params: SectionDraftParams): string {
       draft =
         `A concise evaluation of ${cleanTitle} demonstrates that theoretical rigor requires empirical verification and careful interrogation of operational boundary conditions${cit1}. ` +
         `Systematic analysis confirms that substantive academic progress depends on reconciling competing perspectives against verified evidence${cit2}.`;
+    } else if (revisionPrompt === "challenge") {
+      draft +=
+        `\n\nPlaying Devil's Advocate, a counter-perspective suggests that prioritizing these structural elements may inherently restrict operational flexibility. If theoretical alignment enforces rigid compliance, organizations could become systematically blind to emergent, asymmetrical challenges that require adaptive, rather than strictly coordinated, responses${cit2}.`;
     }
   }
 

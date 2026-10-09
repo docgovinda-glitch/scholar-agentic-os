@@ -31,6 +31,7 @@ import {
   Layers,
   RotateCcw,
   BookOpen,
+  FileUp,
 } from "lucide-react";
 import type { SectionBreakdown } from "../../../components/forms/TargetWordCountInput";
 import DynamicStructurePlanner from "../components/DynamicStructurePlanner";
@@ -293,6 +294,7 @@ export default function AssignmentUnderstandStage() {
   const [deadline, setDeadline] = useState(deadlineDate);
   const [rubricText, setRubricText] = useState(markingRubricText);
   const [showAdditional, setShowAdditional] = useState(false);
+  const rubricFileInputRef = useRef<HTMLInputElement>(null);
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [uploadingBrief, setUploadingBrief] = useState(false);
@@ -747,6 +749,27 @@ export default function AssignmentUnderstandStage() {
         rubric: rubricText,
       },
     });
+  };
+
+  const handleRubricFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      setRubricText(text);
+      const parsedCriteria = parseRubricCriteria(text);
+      saveAnswers({
+        marking_rubric: text,
+        rubric: text,
+        rubricCriteria: parsedCriteria,
+        rubric_criteria: parsedCriteria,
+      });
+    };
+    reader.readAsText(file);
+    if (e.target) {
+      e.target.value = "";
+    }
   };
 
   const canProceedToSources =
@@ -1740,7 +1763,24 @@ export default function AssignmentUnderstandStage() {
                     />
                   </div>
                   <div className="md:col-span-3 space-y-1 pt-1">
-                    <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Marking Rubric / Assessment Criteria</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Marking Rubric / Assessment Criteria</label>
+                      <button
+                        type="button"
+                        onClick={() => rubricFileInputRef.current?.click()}
+                        className="text-[10px] font-semibold flex items-center gap-1.5 px-2 py-1 rounded border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                      >
+                        <FileUp className="w-3 h-3" />
+                        <span>Upload File</span>
+                      </button>
+                      <input
+                        type="file"
+                        ref={rubricFileInputRef}
+                        accept=".txt,.md,.csv,.json"
+                        className="hidden"
+                        onChange={handleRubricFileUpload}
+                      />
+                    </div>
                     <textarea
                       value={rubricText}
                       onChange={(e) => setRubricText(e.target.value)}
