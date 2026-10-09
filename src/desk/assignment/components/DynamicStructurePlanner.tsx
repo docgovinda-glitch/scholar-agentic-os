@@ -21,7 +21,11 @@ import {
   BookmarkCheck,
   ExternalLink,
   HelpCircle,
+  GripVertical,
 } from "lucide-react";
+import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type {
   AssignmentStructure,
   AssignmentMainHeading,
@@ -52,6 +56,30 @@ import {
   removeTargetFramework,
 } from "../services/outlineService";
 import { safeFormatLabel } from "../../../utils/briefExtractor";
+
+function SortableHeadingWrapper({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 50 : 1,
+    position: isDragging ? ("relative" as const) : undefined,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="group/sortable relative">
+      <div
+        {...attributes}
+        {...listeners}
+        title="Drag to reorder"
+        className="absolute -left-2 sm:-left-3.5 top-4 p-0.5 cursor-grab active:cursor-grabbing text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hidden sm:group-hover/sortable:flex items-center justify-center transition-colors bg-white dark:bg-[#2C2C2E] border border-neutral-200 dark:border-white/10 rounded shadow-sm z-20"
+      >
+        <GripVertical className="w-3.5 h-3.5" />
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export interface DynamicStructurePlannerProps {
   structure: AssignmentStructure;
@@ -109,6 +137,18 @@ export function DynamicStructurePlanner({
   const notifyChange = (updated: AssignmentStructure) => {
     onStructureChange?.(updated);
     onChange?.(updated);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = structure.headings.findIndex((h) => h.id === active.id);
+      const newIndex = structure.headings.findIndex((h) => h.id === over.id);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const updated = reorderHeadings(structure, oldIndex, newIndex);
+        notifyChange(updated);
+      }
+    }
   };
 
   const handleAddFramework = (name: string) => {
@@ -458,18 +498,20 @@ export function DynamicStructurePlanner({
         })()}
 
         {/* Dynamic Main Headings & Subheadings List */}
-        <div className="space-y-4">
-          {structure.headings.map((heading, hIdx) => {
-            const headingPercentage =
-              targetWordCount > 0
-                ? Math.round((heading.targetWordCount / targetWordCount) * 100)
-                : 0;
+        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={structure.headings.map(h => h.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-4 sm:pl-3">
+              {structure.headings.map((heading, hIdx) => {
+                const headingPercentage =
+                  targetWordCount > 0
+                    ? Math.round((heading.targetWordCount / targetWordCount) * 100)
+                    : 0;
 
-            return (
-              <div
-                key={heading.id}
-                className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E20] shadow-xs overflow-hidden transition-all group/heading"
-              >
+                return (
+                  <SortableHeadingWrapper key={heading.id} id={heading.id}>
+                    <div
+                      className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E20] shadow-xs overflow-hidden transition-all group/heading"
+                    >
                 {/* Main Heading Header */}
                 <div className="p-3.5 sm:p-4 bg-neutral-100/70 dark:bg-white/[0.04] border-b border-neutral-200/60 dark:border-white/5 space-y-3">
                   {/* Row 1: Section Number & Full-Width Title (Zero Truncation) */}
@@ -1004,10 +1046,13 @@ export function DynamicStructurePlanner({
                     );
                   }))}
                 </div>
-              </div>
-            );
-          })}
-        </div>
+                    </div>
+                  </SortableHeadingWrapper>
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
 
         {/* Add Main Heading Button / Form */}
         <div className="pt-1">

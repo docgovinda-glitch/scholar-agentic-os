@@ -22,6 +22,7 @@ import { useDeskSession } from "./useDeskSession";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 import type { SectionId } from "./aiAccess/AiAccessPage";
 import GlobalLoader from "./components/GlobalLoader";
+import SyncToast from "./components/SyncToast";
 import { LoadingProvider } from "./context/LoadingContext";
 
 // Lazy loaded heavy screens
@@ -523,6 +524,7 @@ export default function DeskApp() {
               </Route>
             </Route>
           </Routes>
+          <SyncToast />
         </Suspense>
       </LoadingProvider>
     </div>

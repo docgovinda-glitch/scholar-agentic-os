@@ -218,36 +218,81 @@ export async function discoverRealScholarlySourcesFromServer(
       }
     );
 
-    if (!response.ok) {
-      console.warn(`[RealDiscovery] Server responded ${response.status}, falling back to mock catalog`);
-      return generateCuratedLiteratureSources(question, citationStyle);
+    if (response && response.ok) {
+      const data: MultiPortalResponse = await response.json();
+      if (data.success && Array.isArray(data.sources) && data.sources.length > 0) {
+        const mapped = data.sources.map((draft, idx) =>
+          mapDraftToDiscoveredSource(draft, idx, question)
+        );
+        const deduplicated = deduplicateSources(mapped);
+        console.log(`[RealDiscovery] Discovered ${deduplicated.length} real scholarly sources via server API.`);
+        return deduplicated;
+      }
     }
-
-    const data: MultiPortalResponse = await response.json();
-
-    if (!data.success || !Array.isArray(data.sources) || data.sources.length === 0) {
-      console.warn("[RealDiscovery] Empty server response, falling back to mock catalog");
-      return generateCuratedLiteratureSources(question, citationStyle);
-    }
-
-    // Map server drafts to canonical DiscoveredSource objects
-    const mapped = data.sources.map((draft, idx) =>
-      mapDraftToDiscoveredSource(draft, idx, question)
-    );
-
-    // Deduplicate
-    const deduplicated = deduplicateSources(mapped);
-
-    console.log(
-      `[RealDiscovery] Discovered ${deduplicated.length} real scholarly sources ` +
-      `(${data.sources.length} raw from server, after dedup)`
-    );
-
-    return deduplicated;
   } catch (err) {
-    console.warn("[RealDiscovery] Server discovery failed, falling back to mock catalog:", err);
-    return generateCuratedLiteratureSources(question, citationStyle);
+    console.warn("[RealDiscovery] Server discovery failed:", err);
   }
+
+  // Fallback 1: Live OpenAlex API (Frontend direct)
+  try {
+    console.log("[RealDiscovery] Falling back to direct OpenAlex API...");
+    const openAlexUrl = `https://api.openalex.org/works?search=${encodeURIComponent(queries[0])}&per-page=${maxResults}`;
+    const oaRes = await fetch(openAlexUrl);
+    
+    if (oaRes.ok) {
+      const oaData = await oaRes.json();
+      if (oaData.results && oaData.results.length > 0) {
+        const drafts: DiscoveredSourceDraft[] = oaData.results.map((w: any) => ({
+          title: w.title || w.display_name || "Untitled",
+          authors: (w.authorships || []).map((a: any) => a.author?.display_name).filter(Boolean),
+          url: w.doi || w.primary_location?.landing_page_url,
+          year: w.publication_year,
+          venue: w.primary_location?.source?.display_name,
+          sourceType: "scholarly",
+          authorityTier: (w.type === "article" && w.primary_location?.source?.type === "journal") ? "A" : "B",
+          discoveredVia: "openalex"
+        }));
+        
+        const mapped = drafts.map((draft, idx) => mapDraftToDiscoveredSource(draft, idx, question));
+        const deduplicated = deduplicateSources(mapped);
+        return deduplicated;
+      }
+    }
+  } catch (err) {
+    console.warn("[RealDiscovery] OpenAlex fallback failed:", err);
+  }
+
+  // Fallback 2: Live Semantic Scholar API (Frontend direct)
+  try {
+    console.log("[RealDiscovery] Falling back to direct Semantic Scholar API...");
+    const s2Url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(queries[0])}&limit=${maxResults}&fields=title,authors,year,url,venue`;
+    const s2Res = await fetch(s2Url);
+    
+    if (s2Res.ok) {
+      const s2Data = await s2Res.json();
+      if (s2Data.data && s2Data.data.length > 0) {
+        const drafts: DiscoveredSourceDraft[] = s2Data.data.map((w: any) => ({
+          title: w.title || "Untitled",
+          authors: (w.authors || []).map((a: any) => a.name).filter(Boolean),
+          url: w.url,
+          year: w.year,
+          venue: w.venue,
+          sourceType: "scholarly",
+          authorityTier: "A", // Semantic Scholar mostly indexes peer-reviewed
+          discoveredVia: "semantic_scholar"
+        }));
+        
+        const mapped = drafts.map((draft, idx) => mapDraftToDiscoveredSource(draft, idx, question));
+        const deduplicated = deduplicateSources(mapped);
+        return deduplicated;
+      }
+    }
+  } catch (err) {
+    console.warn("[RealDiscovery] Semantic Scholar fallback failed:", err);
+  }
+
+  console.warn("[RealDiscovery] All live APIs failed. Falling back to mock catalog.");
+  return generateCuratedLiteratureSources(question, citationStyle);
 }
 
 /**
