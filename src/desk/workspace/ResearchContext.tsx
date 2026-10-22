@@ -172,7 +172,7 @@ export function ResearchProvider({
     try {
       const updated = await saveIntakeAnswers(projectId, { current_stage: stage });
       setProject(updated);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[ResearchNavigation] Failed to persist stage change, reconciling state:", err);
       latestStageRef.current = previousStage;
       setProject((prev) => (prev ? { ...prev, answers: previousAnswers || prev.answers } : prev));
@@ -203,7 +203,7 @@ export function ResearchProvider({
     try {
       const updated = await saveIntakeAnswers(projectId, { current_stage: nextStage });
       setProject(updated);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[ResearchNavigation] Failed to persist stage progression, reconciling state:", err);
       latestStageRef.current = previousStage;
       setProject((prev) => (prev ? { ...prev, answers: previousAnswers || prev.answers } : prev));

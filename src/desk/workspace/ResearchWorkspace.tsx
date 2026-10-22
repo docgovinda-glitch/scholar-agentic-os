@@ -1,10 +1,10 @@
 import React, { Suspense, useState } from "react";
-import type { ResearchStage } from "./types";
+import { isResearchStage, type ResearchStage } from "./types";
 import StageNavigation from "./StageNavigation";
 import ContextPanel from "./ContextPanel";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 import { ResearchProvider, useResearchWorkspace } from "./ResearchContext";
-import { StageRegistry } from "./StageRegistry";
+import { StageRegistry, type ResearchStageProps } from "./StageRegistry";
 import PlaceholderStage from "./stages/PlaceholderStage";
 import { useAiAccess } from "../aiAccess/useAiAccess";
 import Tray from "../regions/Tray";
@@ -126,7 +126,13 @@ function ResearchWorkspaceInner({
     );
   }
 
-  const ActiveStageComponent = (StageRegistry[currentStage] || PlaceholderStage) as any;
+  const ActiveStageComponent = (StageRegistry[currentStage as keyof typeof StageRegistry] || PlaceholderStage) as React.ComponentType<ResearchStageProps>;
+
+  const handleAdvance = (stageStr: string) => {
+    if (isResearchStage(stageStr)) {
+      advanceStage(stageStr);
+    }
+  };
 
   return (
     <div className="h-screen flex flex-col bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
@@ -551,7 +557,7 @@ function ResearchWorkspaceInner({
               projectId={projectId} 
               project={project} 
               onSaved={setProject} 
-              onAdvance={advanceStage} 
+              onAdvance={handleAdvance} 
             />
           </Suspense>
         </div>

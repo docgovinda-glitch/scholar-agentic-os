@@ -1,8 +1,17 @@
 import React, { lazy } from 'react';
+import type { ProjectView } from '../types';
 import type { ResearchStage } from './types';
 
-// Lazy load all stages
-export const StageRegistry: Record<ResearchStage, React.LazyExoticComponent<any>> = {
+export interface ResearchStageProps {
+  stage: ResearchStage;
+  projectId: string;
+  project?: ProjectView | null;
+  onSaved?: (updated: ProjectView) => void;
+  onAdvance?: (stage: string) => void;
+}
+
+// Lazy load all stages with strict typing (Zero-any policy)
+export const StageRegistry = {
   definition: lazy(() => import('./stages/DefinitionStage')),
   literature: lazy(() => import('./stages/LiteratureStage')),
   gap_identification: lazy(() => import('./stages/GapIdentificationStage')),

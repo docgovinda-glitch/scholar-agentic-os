@@ -197,14 +197,29 @@ export function sanitizeScholarlyText(
   }
 
   if (options.stripCliches) {
-    // Softly rephrase known cliché transitions
+    // Softly rephrase known cliché transitions and banned LLM cliché tokens
     result = result
       .replace(/\bit is worth noting that\b/gi, "notably,")
       .replace(/\bit's worth noting that\b/gi, "notably,")
       .replace(/\ba testament to\b/gi, "evidence of")
+      .replace(/\btestament to\b/gi, "evidence of")
+      .replace(/\btestament\b/gi, "indication")
       .replace(/\bdelve into\b/gi, "investigate")
       .replace(/\bdelves into\b/gi, "investigates")
-      .replace(/\bdelving into\b/gi, "investigating");
+      .replace(/\bdelving into\b/gi, "investigating")
+      .replace(/\bdelve\b/gi, "examine")
+      .replace(/\bintricate tapestry\b/gi, "framework")
+      .replace(/\brich tapestry\b/gi, "corpus")
+      .replace(/\bgroundbreaking tapestry\b/gi, "system")
+      .replace(/\bmultifaceted tapestry\b/gi, "structure")
+      .replace(/\btapestry\b/gi, "framework")
+      .replace(/\bunderscores\b/gi, "emphasises")
+      .replace(/\bunderscore\b/gi, "emphasise")
+      .replace(/\bunderscoring\b/gi, "emphasising")
+      .replace(/\bpivotal\b/gi, "central")
+      .replace(/\bbeacon of\b/gi, "model of")
+      .replace(/\bgame-changer\b/gi, "significant advance")
+      .replace(/\bin conclusion, it is clear\b/gi, "in summary,");
   }
 
   return result;

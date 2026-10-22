@@ -18,6 +18,13 @@ export interface AcademicCritique {
   authorNote?: string;
 }
 
+export function normalizeSeverity(s: unknown): "Major" | "Moderate" | "Minor" | "Advisory" {
+  if (s === "Major" || s === "Critical") return "Major";
+  if (s === "Minor") return "Minor";
+  if (s === "Advisory") return "Advisory";
+  return "Moderate";
+}
+
 export const ACADEMIC_LENSES = [
   "Logical Flow & Coherence",
   "Methodological Rigor",
@@ -60,7 +67,7 @@ export default function PeerReviewStage({
 
   const anchorGap = useMemo(() => {
     return (
-      identifiedGaps.find((g: any) => g.id === anchorGapId)?.title ||
+      identifiedGaps.find((g: { id?: string; title?: string }) => g.id === anchorGapId)?.title ||
       identifiedGaps[0]?.title ||
       "Primary research gap"
     );
@@ -97,7 +104,7 @@ export default function PeerReviewStage({
     try {
       const draft = JSON.parse(project?.answers?.["manuscript_draft"] || "[]");
       if (Array.isArray(draft)) {
-        return draft.reduce((acc: number, s: any) => acc + (s.word_count || 0), 0);
+        return draft.reduce((acc: number, s: { word_count?: number }) => acc + (s.word_count || 0), 0);
       }
     } catch {
       // Ignore
@@ -163,15 +170,15 @@ export default function PeerReviewStage({
         const data = json.data;
         if (Array.isArray(data) && data.length > 0) {
           setCritiques(
-            data.map((c: any, idx: number) => ({
-              id: c.id || `crit-${idx + 1}`,
-              lens: c.lens || "Methodological Rigor",
-              section: c.section || "Methodology",
-              severity: c.severity || "Moderate",
-              feedback: c.feedback || c.critique || "Critique commentary",
-              revisionDirective: c.revisionDirective || "Revise accordingly",
+            data.map((c: Record<string, unknown>, idx: number) => ({
+              id: (c.id as string) || `crit-${idx + 1}`,
+              lens: (c.lens as string) || "Methodological Rigor",
+              section: (c.section as string) || "Methodology",
+              severity: normalizeSeverity(c.severity),
+              feedback: (c.feedback as string) || (c.critique as string) || "Critique commentary",
+              revisionDirective: (c.revisionDirective as string) || "Revise accordingly",
               waived: Boolean(c.waived),
-              waiveRationale: c.waiveRationale,
+              waiveRationale: c.waiveRationale as string | undefined,
             }))
           );
         }
@@ -391,15 +398,15 @@ export default function PeerReviewStage({
             const resData = data?.data;
 
             if (Array.isArray(resData) && resData.length > 0) {
-              incomingCritiques = resData.map((crit: any, idx: number) => ({
-                id: crit.id || `crit-${idx + 1}`,
-                lens: crit.lens || ACADEMIC_LENSES[idx % ACADEMIC_LENSES.length],
-                section: crit.section || (idx === 0 ? "Introduction" : idx === 1 ? "Methodology" : "Results"),
-                severity: crit.severity || (idx === 1 ? "Major" : "Moderate"),
-                feedback: crit.feedback || crit.description || "Detailed academic feedback.",
-                revisionDirective: crit.revisionDirective || "Address identified critique in manuscript revision.",
+              incomingCritiques = resData.map((crit: Record<string, unknown>, idx: number) => ({
+                id: (crit.id as string) || `crit-${idx + 1}`,
+                lens: (crit.lens as string) || ACADEMIC_LENSES[idx % ACADEMIC_LENSES.length],
+                section: (crit.section as string) || (idx === 0 ? "Introduction" : idx === 1 ? "Methodology" : "Results"),
+                severity: normalizeSeverity(crit.severity),
+                feedback: (crit.feedback as string) || (crit.description as string) || "Detailed academic feedback.",
+                revisionDirective: (crit.revisionDirective as string) || "Address identified critique in manuscript revision.",
                 waived: Boolean(crit.waived),
-                waiveRationale: crit.waiveRationale,
+                waiveRationale: crit.waiveRationale as string | undefined,
               }));
             }
 
@@ -436,7 +443,7 @@ export default function PeerReviewStage({
           }
         }
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTimer();
       console.warn("Remote review agent unavailable, engaging local 7-lens fallback:", err);
       const fallback = generateFallbackCritiques();

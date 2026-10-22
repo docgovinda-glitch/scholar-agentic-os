@@ -63,7 +63,7 @@ import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, Rule
 
 import { claimsRouter } from "./project/claims";
 import { evidenceRouter } from "./project/evidence";
-import { agenticRouter } from "./project/agentic";
+import { agenticRouter, manuscriptToCanonicalDocument } from "./project/agentic";
 import assignmentRouter from "./project/assignment";
 import thesisRouter from "./project/thesis";
 import proposalRouter from "./project/proposal";
@@ -1083,6 +1083,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   router.use("/:id/activity", activityRouter);
   router.use("/:id/files", filesRouter);
   router.use("/:id/agent", agenticRouter);
+  router.use("/:id/agentic", agenticRouter);
   router.use("/:id/assignment", assignmentRouter);
   router.use("/:id/thesis", thesisRouter);
   router.use("/:id/proposal", proposalRouter);
@@ -2468,25 +2469,80 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   const exportHandler = asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
-    if (!record.document) {
+
+    // Synthesize document if missing but manuscript draft is present in answers
+    let documentToExport = record.document;
+    if (!documentToExport) {
+      const rawManuscript =
+        record.answers?.["manuscript_markdown"] ||
+        record.answers?.["full_text_markdown"] ||
+        record.answers?.["assembled_draft"] ||
+        record.answers?.["manuscript_draft"];
+      if (rawManuscript) {
+        documentToExport = manuscriptToCanonicalDocument(
+          record.projectId,
+          record.answers?.["working_title"] || (record as { title?: string }).title || "Manuscript",
+          rawManuscript
+        );
+      }
+    }
+
+    if (!documentToExport) {
       return res.status(400).json({ error: "Cannot export a project with no document submitted yet." });
     }
 
-    const rawFormat = (req.params as any).format || req.body?.format;
+    const rawFormat = req.params?.format || req.body?.format;
     const format = typeof rawFormat === "string" ? rawFormat.toLowerCase() : "";
-    const validFormats = ["docx", "odt", "pdf", "latex", "typst", "camera_ready_pdf"];
+    const validFormats = ["docx", "odt", "pdf", "latex", "typst", "camera_ready_pdf", "markdown", "md"];
     if (!validFormats.includes(format)) {
       return res.status(400).json({ error: `Invalid export format. Must be one of: ${validFormats.join(", ")}` });
+    }
+
+    if (format === "markdown" || format === "md") {
+      let mdContent =
+        record.answers?.["manuscript_markdown"] ||
+        record.answers?.["full_text_markdown"] ||
+        documentToExport.blocks.map((b) => b.text).join("\n\n");
+
+      const title = record.answers?.["working_title"] || (record as { title?: string }).title || "Manuscript";
+      if (!mdContent.startsWith("# ")) {
+        mdContent = `# ${title}\n\n` + mdContent;
+      }
+
+      const includeRebuttal = req.body?.includeRebuttalAppendix ?? req.query?.includeRebuttalAppendix;
+      if (includeRebuttal && record.answers?.["rebuttal_matrix"]) {
+        try {
+          const matrix = JSON.parse(record.answers["rebuttal_matrix"]);
+          if (Array.isArray(matrix) && matrix.length > 0) {
+            mdContent += "\n\n## APPENDIX: POINT-BY-POINT REFEREE REBUTTAL MATRIX\n\n";
+            matrix.forEach((item: { refereeRole?: string; referee?: string; lens?: string; section?: string; critiqueSummary?: string; critique?: string; authorResponse?: string; revisionAction?: string }, idx: number) => {
+              mdContent += `### Item ${idx + 1}: ${item.refereeRole || item.referee || "Referee Critique"} (${item.lens || item.section || "General"})\n`;
+              mdContent += `**Critique**: ${item.critiqueSummary || item.critique || "Critique noted."}\n\n`;
+              mdContent += `**Author Response**: ${item.authorResponse || "Addressed in manuscript."}\n\n`;
+              mdContent += `**Revision Action**: ${item.revisionAction || "Updated corresponding section."}\n\n`;
+            });
+          }
+        } catch {}
+      }
+
+      const buffer = Buffer.from(mdContent, "utf-8");
+      res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.md"`
+      );
+      res.setHeader("Content-Length", buffer.length);
+      return res.send(buffer);
     }
 
     try {
       const template = req.body?.template;
       const targetFormat = (format === "pdf" && template) ? "camera_ready_pdf" : (format as ExportFormat);
       const result = await exportDocument({
-        document: record.document,
+        document: documentToExport,
         format: targetFormat,
-        title: record.document.title,
-        author: "Scholar OS",
+        title: documentToExport.title,
+        author: record.authors?.[0] ? `${record.authors[0].firstName} ${record.authors[0].surname}` : "Scholar OS",
         academicOptions: template ? { template } : undefined,
       });
 

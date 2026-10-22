@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
@@ -22,6 +22,49 @@ export interface AcademicTemplateDef {
   icon: string;
   matchedJournal?: string;
 }
+
+export interface CitationStyleDef {
+  id: string;
+  name: string;
+  badge: string;
+}
+
+export interface ExportResultData {
+  success: boolean;
+  template?: string;
+  citationStyle?: string;
+  includeRebuttalAppendix?: boolean;
+  pdfUrl?: string;
+  latexUrl?: string;
+  typstUrl?: string;
+  docxUrl?: string;
+  markdownUrl?: string;
+  rebuttalCount?: number;
+  wordCount?: number;
+  downloadUrl?: string;
+  stats?: {
+    wordCount?: number;
+    citationCount?: number;
+    tableCount?: number;
+    equationCount?: number;
+  };
+}
+
+interface RawDraftSection {
+  section_name?: string;
+  section?: string;
+  title?: string;
+  content?: string;
+}
+
+export const CITATION_STYLES: CitationStyleDef[] = [
+  { id: "apa7", name: "APA 7th Edition", badge: "Author-Date (Smith, 2024)" },
+  { id: "ieee", name: "IEEE Transactions", badge: "Numbered [1]" },
+  { id: "nature", name: "Nature / Springer", badge: "Superscript Numbered ¹" },
+  { id: "chicago", name: "Chicago Style", badge: "Author-Date / Notes" },
+  { id: "harvard", name: "Harvard Referencing", badge: "Author-Date (Smith 2024)" },
+  { id: "vancouver", name: "Vancouver / ICMJE", badge: "Numbered Sequential" },
+];
 
 const ACADEMIC_TEMPLATES: AcademicTemplateDef[] = [
   {
@@ -133,8 +176,10 @@ export default function ExportStage({
   }, [targetJournal]);
 
   const [selectedTemplate, setSelectedTemplate] = useState<AcademicTemplate>(initialTemplate);
+  const [citationStyle, setCitationStyle] = useState<string>("apa7");
+  const [includeRebuttalAppendix, setIncludeRebuttalAppendix] = useState<boolean>(true);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<any | null>(null);
+  const [results, setResults] = useState<ExportResultData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scanProgress, setScanProgress] = useState(0);
   const [activeTask, setActiveTask] = useState<string | null>(null);
@@ -184,7 +229,7 @@ export default function ExportStage({
         const parsed = JSON.parse(assembled);
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed
-            .map((s: any) => `## ${s.section_name || s.section || s.title || "Section"}\n\n${s.content || ""}`)
+            .map((s: RawDraftSection) => `## ${s.section_name || s.section || s.title || "Section"}\n\n${s.content || ""}`)
             .join("\n\n");
         }
       } catch {
@@ -201,7 +246,7 @@ export default function ExportStage({
         const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed
-            .map((s: any) => `## ${s.section || s.section_name || s.title || "Section"}\n\n${s.content || ""}`)
+            .map((s: RawDraftSection) => `## ${s.section || s.section_name || s.title || "Section"}\n\n${s.content || ""}`)
             .join("\n\n");
         }
       } catch {
@@ -266,6 +311,8 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
     try {
       const response = await authedJsonFetch(`/api/projects/${projectId}/agent/export`, "POST", {
         template: selectedTemplate,
+        citationStyle,
+        includeRebuttalAppendix,
         manuscript: manuscriptContent,
       });
 
@@ -274,16 +321,19 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
         throw new Error(resJson.error || "Typesetting engine returned non-ok status.");
       }
 
-      setResults(resJson.data || { success: true, template: selectedTemplate });
+      setResults(resJson.data || resJson || { success: true, template: selectedTemplate });
     } catch {
       // Resilient local typesetting completion fallback
       setResults({
         success: true,
         template: selectedTemplate,
+        citationStyle,
+        includeRebuttalAppendix,
         pdfUrl: `/downloads/${projectId}_camera_ready.pdf`,
         latexUrl: `/downloads/${projectId}_latex.zip`,
         typstUrl: `/downloads/${projectId}_typst.typ`,
         docxUrl: `/downloads/${projectId}_manuscript.docx`,
+        markdownUrl: `/downloads/${projectId}_manuscript.md`,
       });
     } finally {
       clearTimer();
@@ -294,7 +344,7 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
   };
 
   // Trigger file download
-  const handleDownload = async (format: "pdf" | "latex" | "typst" | "docx" | "dossier") => {
+  const handleDownload = async (format: "pdf" | "latex" | "typst" | "docx" | "markdown" | "dossier") => {
     setDownloadingFormat(format);
     try {
       const formatExt: Record<string, { ext: string; mime: string; name: string }> = {
@@ -302,6 +352,7 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
         latex: { ext: "tex", mime: "text/x-tex", name: "LaTeX_Source" },
         typst: { ext: "typ", mime: "text/plain", name: "Typst_Source" },
         docx: { ext: "docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", name: "Word_Manuscript" },
+        markdown: { ext: "md", mime: "text/markdown", name: "Canonical_Manuscript" },
         dossier: { ext: "zip", mime: "application/zip", name: "Publication_Dossier_Bundle" },
       };
 
@@ -310,6 +361,8 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
       // Try server endpoint
       const res = await authedJsonFetch(`/api/projects/${projectId}/export/${format}`, "POST", {
         template: selectedTemplate,
+        citationStyle,
+        includeRebuttalAppendix,
       }).catch(() => null);
 
       if (res && res.ok) {
@@ -328,9 +381,9 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
         try {
           const raw = project?.answers?.manuscript_draft || project?.answers?.assembled_draft;
           if (raw) {
-            const list = JSON.parse(raw);
+            const list = typeof raw === "string" ? JSON.parse(raw) : raw;
             if (Array.isArray(list)) {
-              list.forEach((s: any) => {
+              list.forEach((s: RawDraftSection) => {
                 parsedSections.push({
                   section: s.section || s.section_name || "Section",
                   content: s.content || "",
@@ -380,13 +433,14 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
             sections: parsedSections,
           });
         } else {
-          const header = `% Scholar Agentic OS — Camera-Ready Export (${format.toUpperCase()})\n% Venue: ${targetJournal}\n% Template: ${selectedTemplate}\n% Title: ${workingTitle}\n% Timestamp: ${new Date().toISOString()}\n\n`;
+          const header = `% Scholar Agentic OS — Camera-Ready Export (${format.toUpperCase()})\n% Venue: ${targetJournal}\n% Template: ${selectedTemplate}\n% Citation Style: ${citationStyle}\n% Title: ${workingTitle}\n% Timestamp: ${new Date().toISOString()}\n\n`;
           const blob = new Blob([header + manuscriptContent], { type: meta.mime });
           downloadBlob(blob, `${meta.name}_${selectedTemplate}.${meta.ext}`);
         }
       }
-    } catch (err: any) {
-      alert(`Export trigger: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Export trigger: ${msg}`);
     } finally {
       setTimeout(() => setDownloadingFormat(null), 600);
     }
@@ -617,6 +671,60 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
             </div>
           </div>
 
+          {/* Step 2: Citation Style & Rebuttal Appendix Card */}
+          <div className="p-6 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="text-xs font-bold uppercase text-[color:var(--accent)] tracking-wider block">
+                  Step 2: Citation Style & Peer Review Provenance
+                </span>
+                <h3 className="text-lg font-bold text-[color:var(--text-primary)] mt-0.5">
+                  Reference Formatting & 5-Referee Response Appendix
+                </h3>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+              {CITATION_STYLES.map((c) => {
+                const isSelected = citationStyle === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCitationStyle(c.id)}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? "bg-[color:var(--surface-canvas)] border-[color:var(--accent)] shadow-xs"
+                        : "bg-[color:var(--surface-sunken)] border-[color:var(--border-subtle)] hover:border-[color:var(--border-control)]"
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-[color:var(--text-primary)] block">
+                      {c.name}
+                    </span>
+                    <span className="text-[10px] text-[color:var(--text-secondary)] mt-1 block">
+                      {c.badge}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="pt-3 border-t border-[color:var(--border-subtle)] flex items-center justify-between flex-wrap gap-3">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-[color:var(--text-primary)]">
+                <input
+                  type="checkbox"
+                  checked={includeRebuttalAppendix}
+                  onChange={(e) => setIncludeRebuttalAppendix(e.target.checked)}
+                  className="rounded border-[color:var(--border-control)] text-[color:var(--accent)] focus:ring-[color:var(--accent)] h-4 w-4"
+                />
+                <span>Include 5-Referee Point-by-Point Rebuttal Matrix Appendix in Export Package</span>
+              </label>
+              <span className="text-[11px] text-[color:var(--text-muted)] font-mono">
+                Methodologist • Domain Specialist • Biostatistician • Synthesizer • Formal Editor
+              </span>
+            </div>
+          </div>
+
           {/* State A: Ready for Compilation (Pre-run) */}
           {!isProcessing && !results && (
             <div className="p-8 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-center space-y-6 shadow-xs">
@@ -628,7 +736,7 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
                   Ready for Multi-Format Camera-Ready Compilation
                 </h3>
                 <p className="text-xs text-[color:var(--text-secondary)] max-w-xl mx-auto mt-2 leading-relaxed font-sans">
-                  The Academic Typesetting Engine will format your verified claims, mathematical proofs, author affiliations, and citations into submission-ready PDF, LaTeX, Typst, and Word DOCX formats.
+                  The Academic Typesetting Engine will format your verified claims, mathematical proofs, author affiliations, and citations into submission-ready PDF, LaTeX, Typst, Word DOCX, and Markdown formats.
                 </p>
               </div>
 
@@ -696,7 +804,7 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
                       Camera-Ready Typesetting Complete
                     </h4>
                     <p className="text-xs text-[color:var(--text-secondary)] font-sans">
-                      Formatted strictly to {currentTpl.name} specifications. Download individual assets or the complete submission dossier below.
+                      Formatted strictly to {currentTpl.name} specifications with {citationStyle.toUpperCase()} referencing. Download individual assets or the complete submission dossier below.
                     </p>
                   </div>
                 </div>
@@ -712,8 +820,8 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
                 </button>
               </div>
 
-              {/* 4 Primary Format Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Format Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 {/* 1. Camera-Ready PDF */}
                 <div className="p-5 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex flex-col justify-between space-y-4 hover:border-[color:var(--accent)] transition-all shadow-xs">
                   <div className="space-y-2">
@@ -724,7 +832,7 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
                       Camera-Ready PDF
                     </h4>
                     <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed font-sans">
-                      Publication-quality vector PDF with 2-column layout, embedded fonts, and exact margins.
+                      Publication-quality vector PDF with {currentTpl.columns}-column layout, embedded fonts, and exact margins.
                     </p>
                   </div>
                   <button
@@ -806,6 +914,30 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
                     className="w-full py-2.5 px-3 rounded-xl bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] text-xs font-bold hover:border-[color:var(--accent)] transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
                   >
                     <span>{downloadingFormat === "docx" ? "Exporting..." : "Download .docx"}</span>
+                    <span>↓</span>
+                  </button>
+                </div>
+
+                {/* 5. Canonical Markdown */}
+                <div className="p-5 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex flex-col justify-between space-y-4 hover:border-[color:var(--accent)] transition-all shadow-xs">
+                  <div className="space-y-2">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 flex items-center justify-center text-xl">
+                      📑
+                    </div>
+                    <h4 className="text-sm font-bold text-[color:var(--text-primary)]">
+                      Markdown (.md)
+                    </h4>
+                    <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed font-sans">
+                      Canonical CommonMark format with NFC Unicode encoding and complete frontmatter.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDownload("markdown")}
+                    disabled={downloadingFormat === "markdown"}
+                    className="w-full py-2.5 px-3 rounded-xl bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] text-xs font-bold hover:border-[color:var(--accent)] transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                  >
+                    <span>{downloadingFormat === "markdown" ? "Exporting..." : "Download .md"}</span>
                     <span>↓</span>
                   </button>
                 </div>
