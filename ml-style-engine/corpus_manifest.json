@@ -10,7 +10,8 @@
         "pmcid": "PMC13402406",
         "title": "Teacher-regulated generative AI support, student agency, and perceived learning gains in higher education: the moderating role of perceived fairness.",
         "word_count": 9930,
-        "sha256": "ac3e79a7c4e482ba1a6aa435c76c8b4f35e75e9198cb1af950e73882c4d1d442"
+        "sha256": "ac3e79a7c4e482ba1a6aa435c76c8b4f35e75e9198cb1af950e73882c4d1d442",
+        "pubYear": 2026
       },
       {
         "filename": "essay_02_epistemology_scientific_inquiry.json",
@@ -18,7 +19,8 @@
         "pmcid": "PMC13680813",
         "title": "From data to wisdom: A new era of scientific inquiry.",
         "word_count": 4360,
-        "sha256": "27762a1a5faf41d5324f7201c389b99c92958e8a946e450bd3876f07269acfff"
+        "sha256": "27762a1a5faf41d5324f7201c389b99c92958e8a946e450bd3876f07269acfff",
+        "pubYear": 2027
       },
       {
         "filename": "essay_03_ethics_of_artificial_intelligence.json",
@@ -26,7 +28,8 @@
         "pmcid": "PMC13485923",
         "title": "Editorial: Research ethics and integrity in the artificial intelligence era.",
         "word_count": 2756,
-        "sha256": "169e60a003a8284bcf1bd46eb69a20b34ee9bfc3e5101046b3db49dd8ff508a2"
+        "sha256": "169e60a003a8284bcf1bd46eb69a20b34ee9bfc3e5101046b3db49dd8ff508a2",
+        "pubYear": 2026
       },
       {
         "filename": "essay_04_climate_justice_global_south.json",
@@ -34,7 +37,8 @@
         "pmcid": "PMC13602117",
         "title": "Enhancing youth resilience to agri-food system shocks: a pathway to climate justice",
         "word_count": 9061,
-        "sha256": "c326ce416d9dc9452ec7a7e99c14a4f1e7ae595be9b5f000523adf032ab4e66a"
+        "sha256": "c326ce416d9dc9452ec7a7e99c14a4f1e7ae595be9b5f000523adf032ab4e66a",
+        "pubYear": 2026
       },
       {
         "filename": "essay_05_digital_public_sphere_democracy.json",
@@ -42,7 +46,8 @@
         "pmcid": "PMC13087570",
         "title": "The Futures of Digital Democracy: Four Scenarios.",
         "word_count": 21185,
-        "sha256": "88362ad15a3bb072d93f608e1fd53cea6e45a79940c61b7963c65a03891ab637"
+        "sha256": "88362ad15a3bb072d93f608e1fd53cea6e45a79940c61b7963c65a03891ab637",
+        "pubYear": 2026
       },
       {
         "filename": "essay_06_public_health_social_determinants.json",
@@ -50,7 +55,8 @@
         "pmcid": "PMC13405126",
         "title": "The economic burden of Type 2 Diabetes by social determinants of health: A systematic review.",
         "word_count": 6053,
-        "sha256": "9d4af34a49f6a2a1df585b9aa02c758093626cd44a5de9a38b6103ffdd194956"
+        "sha256": "9d4af34a49f6a2a1df585b9aa02c758093626cd44a5de9a38b6103ffdd194956",
+        "pubYear": 2026
       },
       {
         "filename": "essay_07_urbanization_sustainable_cities.json",
@@ -58,7 +64,8 @@
         "pmcid": "PMC13136447",
         "title": "Asbestos Poverty as a New Paradigm for Multidimensional Urban Sustainability.",
         "word_count": 6397,
-        "sha256": "a9c8a2d1b653ff3e8a0ae0c8d3e7da0c9542da740e208934c8b65bbccc26d70c"
+        "sha256": "a9c8a2d1b653ff3e8a0ae0c8d3e7da0c9542da740e208934c8b65bbccc26d70c",
+        "pubYear": 2026
       },
       {
         "filename": "essay_08_behavioral_economics_rationality.json",
@@ -66,7 +73,8 @@
         "pmcid": "PMC13450792",
         "title": "Regret, uncertainty, and bounded rationality in norm-driven decisions.",
         "word_count": 11027,
-        "sha256": "d9be82caf28dda9805154cce98b2293f5de242fcd81a28e31c26538e2b4b8244"
+        "sha256": "d9be82caf28dda9805154cce98b2293f5de242fcd81a28e31c26538e2b4b8244",
+        "pubYear": 2026
       },
       {
         "filename": "essay_09_cultural_globalization_identity.json",
@@ -74,7 +82,8 @@
         "pmcid": "PMC13603725",
         "title": "The Association Between Physical Exercise and Local Cultural Identity: Indirect Associations Through Three Dimensions of Social Support.",
         "word_count": 6617,
-        "sha256": "a82025c391dc2d9ec037801893fda2cbdfb4f11cb0bf214d8b0d28f066727bf6"
+        "sha256": "a82025c391dc2d9ec037801893fda2cbdfb4f11cb0bf214d8b0d28f066727bf6",
+        "pubYear": 2026
       },
       {
         "filename": "essay_10_future_of_work_automation.json",
@@ -82,7 +91,8 @@
         "pmcid": "PMC13491148",
         "title": "AI-assisted automation will reduce the need for medical physics trainees and entry-level workforce.",
         "word_count": 2729,
-        "sha256": "79b832fb5b6033272a83c06581825c9d19d57c1b4fe8a39927c6303e92661a59"
+        "sha256": "79b832fb5b6033272a83c06581825c9d19d57c1b4fe8a39927c6303e92661a59",
+        "pubYear": 2026
       }
     ]
   },
@@ -97,7 +107,8 @@
         "pmcid": "PMC13601240",
         "title": "Identifying and alleviating ethical risks of artificial intelligence in physical education: a systematic review",
         "word_count": 10056,
-        "sha256": "29cc723c97f5e8a288503e61f7fbb329472839b644e2e09dd36dc1f5c7216fab"
+        "sha256": "29cc723c97f5e8a288503e61f7fbb329472839b644e2e09dd36dc1f5c7216fab",
+        "pubYear": 2026
       },
       {
         "filename": "lit_review_02_scoping_review_digital_mental_health.json",
@@ -105,7 +116,8 @@
         "pmcid": "PMC13450580",
         "title": "Therapists' time allocation in guided digital mental health interventions - A scoping review and case study.",
         "word_count": 6376,
-        "sha256": "829ac8529bec8208a68c67d37b1c25ddf8b422036bf21d8e235961000cc66e21"
+        "sha256": "829ac8529bec8208a68c67d37b1c25ddf8b422036bf21d8e235961000cc66e21",
+        "pubYear": 2026
       },
       {
         "filename": "lit_review_03_bibliometric_review_sustainable_finance.json",
@@ -113,7 +125,8 @@
         "pmcid": "PMC11847264",
         "title": "The evolution of green finance research: A comprehensive bibliometric analysis.",
         "word_count": 7999,
-        "sha256": "7c9fe4cdf873bf8b913058dd4ecf752b52c40451666a912a79fc7568adab6df0"
+        "sha256": "7c9fe4cdf873bf8b913058dd4ecf752b52c40451666a912a79fc7568adab6df0",
+        "pubYear": 2025
       },
       {
         "filename": "lit_review_04_integrative_review_organizational_resilience.json",
@@ -121,7 +134,8 @@
         "pmcid": "PMC13553246",
         "title": "Digital capability as a multilevel construct: a systematic literature review of its dimensions, antecedents, and consequences.",
         "word_count": 9250,
-        "sha256": "3fcb55a6e9823b93095b231675d22b5116cd4aed248a4015ec0d05eb4ab71c30"
+        "sha256": "3fcb55a6e9823b93095b231675d22b5116cd4aed248a4015ec0d05eb4ab71c30",
+        "pubYear": 2026
       },
       {
         "filename": "lit_review_05_umbrella_review_public_health_interventions.json",
@@ -129,7 +143,8 @@
         "pmcid": "PMC13523198",
         "title": "Implementation of healthcare guidelines in public health: an umbrella review.",
         "word_count": 5945,
-        "sha256": "a0ff6c6db6979d7bc6c16fde04b1cc8b59011685179d2efb5c952adac215939b"
+        "sha256": "a0ff6c6db6979d7bc6c16fde04b1cc8b59011685179d2efb5c952adac215939b",
+        "pubYear": 2026
       },
       {
         "filename": "lit_review_06_systematic_review_supply_chain_risk.json",
@@ -137,7 +152,8 @@
         "pmcid": "PMC13452151",
         "title": "Drug stock-outs in HIV, tuberculosis, and malaria programs: a systematic review.",
         "word_count": 9132,
-        "sha256": "d15134e73982b03a1063b4cf6d0f8297a23cccc1f18aad65e5c94423df8eee75"
+        "sha256": "d15134e73982b03a1063b4cf6d0f8297a23cccc1f18aad65e5c94423df8eee75",
+        "pubYear": 2026
       },
       {
         "filename": "lit_review_07_narrative_synthesis_remote_work_productivity.json",
@@ -145,7 +161,8 @@
         "pmcid": "PMC12652596",
         "title": "Remote Work, Well-Being, and Healthy Labor Force Participation Among Older Adults: A Scoping Review.",
         "word_count": 4473,
-        "sha256": "921a97ea55a741e235d956b240974c9f406377ec2c626312cdf40ecb24833d18"
+        "sha256": "921a97ea55a741e235d956b240974c9f406377ec2c626312cdf40ecb24833d18",
+        "pubYear": 2025
       },
       {
         "filename": "lit_review_08_meta_synthesis_technology_adoption_models.json",
@@ -153,7 +170,8 @@
         "pmcid": "PMC13234205",
         "title": "Cultural Determinants of Assistive Health Technology Acceptance in Asian Older Adults in Low- and Middle-Income Countries: A Mixed-Methods Systematic Review with Evidence Predominantly from East Asia.",
         "word_count": 4945,
-        "sha256": "53d7082d8fbbfb0ff0933fd6bceb5dcf962374eb3b2d8d8ed6d2126d2018c70f"
+        "sha256": "53d7082d8fbbfb0ff0933fd6bceb5dcf962374eb3b2d8d8ed6d2126d2018c70f",
+        "pubYear": 2026
       },
       {
         "filename": "lit_review_09_state_of_the_art_large_language_models.json",
@@ -161,7 +179,8 @@
         "pmcid": "PMC13668837",
         "title": "Performance of large language models in prescription review: a comparative study",
         "word_count": 5535,
-        "sha256": "63fe07a87c8adcd5d19ff5c75515aff1aa25e633c6fc76855747c79053d6de26"
+        "sha256": "63fe07a87c8adcd5d19ff5c75515aff1aa25e633c6fc76855747c79053d6de26",
+        "pubYear": 2026
       },
       {
         "filename": "lit_review_10_critical_review_circular_economy_metrics.json",
@@ -169,7 +188,8 @@
         "pmcid": "PMC13609598",
         "title": "Biobased Compounds and the Circular Economy: A Bibliometric Review of Waste Valorization and Environmental Sustainability.",
         "word_count": 12666,
-        "sha256": "4d81665c35210783e46ba33da2e1dd77e1eeef375a5369ebcf74fa23eebb440c"
+        "sha256": "4d81665c35210783e46ba33da2e1dd77e1eeef375a5369ebcf74fa23eebb440c",
+        "pubYear": 2026
       }
     ]
   },
@@ -182,9 +202,10 @@
         "filename": "research_paper_01_empirical_rct_educational_outcomes.json",
         "path": "/Users/aadityasah/Documents/Scholar Project/scholar-agentic-os/ml-style-engine/corpus/research_paper/research_paper_01_empirical_rct_educational_outcomes.json",
         "pmcid": "PMC13318364",
-        "title": "The Kia T\u012bmata Pai Randomized Controlled Trial: ENRICH Early Childhood Teacher Training Improves Toddlers' Oral Language and Self-Regulation.",
+        "title": "The Kia Tīmata Pai Randomized Controlled Trial: ENRICH Early Childhood Teacher Training Improves Toddlers' Oral Language and Self-Regulation.",
         "word_count": 8217,
-        "sha256": "ceb0498fbbf0d4a801d8bc30126e058007cf7d1e57ae16521b4a3c4027d6d7a6"
+        "sha256": "ceb0498fbbf0d4a801d8bc30126e058007cf7d1e57ae16521b4a3c4027d6d7a6",
+        "pubYear": 2026
       },
       {
         "filename": "research_paper_02_longitudinal_cohort_economic_mobility.json",
@@ -192,7 +213,8 @@
         "pmcid": "PMC13631764",
         "title": "Longitudinal Metabolic Control in Children With Early-Treated Phenylketonuria.",
         "word_count": 3227,
-        "sha256": "c4c4f7e42adc3f04661d0498c744d838971668fec4d18a3e4ae4d854ee49bff4"
+        "sha256": "c4c4f7e42adc3f04661d0498c744d838971668fec4d18a3e4ae4d854ee49bff4",
+        "pubYear": 2026
       },
       {
         "filename": "research_paper_03_cross_sectional_survey_consumer_trust.json",
@@ -200,7 +222,8 @@
         "pmcid": "PMC13423918",
         "title": "Understanding the role of cybersecurity in the internet of things within the health sector: an empirical study.",
         "word_count": 9184,
-        "sha256": "54aabb463e5199a781464a97b178b8ed360b7f2882ea578b0df86768da013f52"
+        "sha256": "54aabb463e5199a781464a97b178b8ed360b7f2882ea578b0df86768da013f52",
+        "pubYear": 2026
       },
       {
         "filename": "research_paper_04_mixed_methods_healthcare_accessibility.json",
@@ -208,7 +231,8 @@
         "pmcid": "PMC13655005",
         "title": "Unmet needs and associated factors among patients with melanoma: a mixed-methods study",
         "word_count": 4731,
-        "sha256": "4ae3d7cadb17ef0c9941340b69a346dc05b8663525e921e18dea0975d7bb0aa1"
+        "sha256": "4ae3d7cadb17ef0c9941340b69a346dc05b8663525e921e18dea0975d7bb0aa1",
+        "pubYear": 2026
       },
       {
         "filename": "research_paper_05_econometric_panel_renewable_energy.json",
@@ -216,7 +240,8 @@
         "pmcid": "PMC12585084",
         "title": "Uncovering economic impacts and dynamics of European energy policy: Evidence from DEMATEL, panel data, and cluster analysis.",
         "word_count": 9342,
-        "sha256": "3b4fd5a9e7f17930c45f1ed469ad25b47ac33074460fdf21e941151ffc5264d7"
+        "sha256": "3b4fd5a9e7f17930c45f1ed469ad25b47ac33074460fdf21e941151ffc5264d7",
+        "pubYear": 2025
       },
       {
         "filename": "research_paper_06_experimental_study_cognitive_load.json",
@@ -224,7 +249,8 @@
         "pmcid": "PMC13225224",
         "title": "Human and Robot Assistance for Cognitive Load in Younger and Older Adults: Multimodal Within-Subject Experimental Study.",
         "word_count": 6263,
-        "sha256": "ca592d6558b26291e0dc84754f4e1dc7323b987986f72287fb41f57b40fefc3d"
+        "sha256": "ca592d6558b26291e0dc84754f4e1dc7323b987986f72287fb41f57b40fefc3d",
+        "pubYear": 2026
       },
       {
         "filename": "research_paper_07_quasi_experimental_urban_transport.json",
@@ -232,7 +258,8 @@
         "pmcid": "PMC13502238",
         "title": "Nurse-Led Antenatal Care in Conflict-Affected Yemen: A Prospective Cohort Study with Difference-in-Differences Analysis.",
         "word_count": 6471,
-        "sha256": "6d8d0d399347a367d64b4e07438b1d27662344d6510fa42a741dc44d8fe90d80"
+        "sha256": "6d8d0d399347a367d64b4e07438b1d27662344d6510fa42a741dc44d8fe90d80",
+        "pubYear": 2026
       },
       {
         "filename": "research_paper_08_computational_benchmark_nlp_reasoning.json",
@@ -240,7 +267,8 @@
         "pmcid": "PMC13575932",
         "title": "A FAIR gold-standard benchmark for geographic entity recognition in cancer genomics literature for biomedical NLP.",
         "word_count": 5546,
-        "sha256": "182324b9febac66c164076c80f043f8881c9464d1a100a1bf9c9c75c76da22e9"
+        "sha256": "182324b9febac66c164076c80f043f8881c9464d1a100a1bf9c9c75c76da22e9",
+        "pubYear": 2026
       },
       {
         "filename": "research_paper_09_multivariate_analysis_fintech_adoption.json",
@@ -248,7 +276,8 @@
         "pmcid": "PMC13547046",
         "title": "The cognitive and affective pathways of FinTech adoption: a trait-to-state-to-intention mechanism.",
         "word_count": 7456,
-        "sha256": "d96abe9a142cdcddb4ac3e6bcba6b0acc4fefc2f59e49474e7fe190913bb109a"
+        "sha256": "d96abe9a142cdcddb4ac3e6bcba6b0acc4fefc2f59e49474e7fe190913bb109a",
+        "pubYear": 2026
       },
       {
         "filename": "research_paper_10_epidemiological_modeling_air_quality.json",
@@ -256,7 +285,8 @@
         "pmcid": "PMC13597756",
         "title": "Long-term exposure to fine particulate matter constituents and incident stroke risk among middle-aged and older adults in China: a cohort study.",
         "word_count": 6463,
-        "sha256": "21d5d6739de95a44b2b75a7dc567bd2bf69a507d1a2a91cf1bb0a0e55fda333d"
+        "sha256": "21d5d6739de95a44b2b75a7dc567bd2bf69a507d1a2a91cf1bb0a0e55fda333d",
+        "pubYear": 2026
       }
     ]
   },
@@ -271,7 +301,8 @@
         "pmcid": "PMC11346319",
         "title": "Do cash or digital payment modalities affect community health worker performance? - a case study of a remote refugee settlement in Western Uganda.",
         "word_count": 5946,
-        "sha256": "7e1e23bb4cbae1a64d64a0a0bcc78af12aa8be05399496f07ea151cb6c804dde"
+        "sha256": "7e1e23bb4cbae1a64d64a0a0bcc78af12aa8be05399496f07ea151cb6c804dde",
+        "pubYear": 2024
       },
       {
         "filename": "case_study_02_hospital_lean_management_transformation.json",
@@ -279,7 +310,8 @@
         "pmcid": "PMC13081539",
         "title": "Lean practice implementation in French healthcare: a longitudinal case study.",
         "word_count": 6747,
-        "sha256": "9535f56c2719f616cbbd959779a732fc5096fa697013f39661a7469c0f3f2367"
+        "sha256": "9535f56c2719f616cbbd959779a732fc5096fa697013f39661a7469c0f3f2367",
+        "pubYear": 2026
       },
       {
         "filename": "case_study_03_municipal_zero_waste_implementation.json",
@@ -287,7 +319,8 @@
         "pmcid": "PMC13474285",
         "title": "Comparative modeling of greenhouse gas emissions from source-separated organics: A case study in New York City.",
         "word_count": 5799,
-        "sha256": "6c719d7fc9753c66d4e882824b80f80e8be86fdcf4480077e5736718f69f376d"
+        "sha256": "6c719d7fc9753c66d4e882824b80f80e8be86fdcf4480077e5736718f69f376d",
+        "pubYear": 2026
       },
       {
         "filename": "case_study_04_post_disaster_supply_chain_recovery.json",
@@ -295,7 +328,8 @@
         "pmcid": "PMC13647991",
         "title": "Perceived contributions of long-term peer-led cooking activities to community resilience: a case study of nuclear evacuees in Fukushima",
         "word_count": 4252,
-        "sha256": "7c65ab33b8e1a5dd70bc6b42f6de859bc6fdbeade8cce442ffdac48fd1ddc3fe"
+        "sha256": "7c65ab33b8e1a5dd70bc6b42f6de859bc6fdbeade8cce442ffdac48fd1ddc3fe",
+        "pubYear": 2026
       },
       {
         "filename": "case_study_05_university_blended_learning_transition.json",
@@ -303,7 +337,8 @@
         "pmcid": "PMC13383306",
         "title": "A 15-Year Case Study of the Structures and Outcomes in a Blended Learning Postgraduate Master Programme for Periodontology and Implant Therapy.",
         "word_count": 5689,
-        "sha256": "6724f804798f5685691b9e2992feea4f61bba098be83663e9a316995029769e7"
+        "sha256": "6724f804798f5685691b9e2992feea4f61bba098be83663e9a316995029769e7",
+        "pubYear": 2026
       },
       {
         "filename": "case_study_06_smart_grid_microgrid_rural_electrification.json",
@@ -311,7 +346,8 @@
         "pmcid": "PMC13043760",
         "title": "Optimising hybrid renewable energy systems for remote tribal villages: A techno-economic case study from central and Eastern India.",
         "word_count": 6587,
-        "sha256": "7c2217e9f082d86ef8f0d770864ab46e1cc9da4788a1ac26f125346b55f458e1"
+        "sha256": "7c2217e9f082d86ef8f0d770864ab46e1cc9da4788a1ac26f125346b55f458e1",
+        "pubYear": 2026
       },
       {
         "filename": "case_study_07_corporate_esg_governance_restructuring.json",
@@ -319,7 +355,8 @@
         "pmcid": "PMC10839878",
         "title": "A multidimensional analysis of corporate governance mechanisms and their impact on sustainable economic development: A case study of Ghana's financial sector.",
         "word_count": 6124,
-        "sha256": "21269d57a0288ebd2d938dd75c8b0552f99a77504da720f1a36312d4003601e8"
+        "sha256": "21269d57a0288ebd2d938dd75c8b0552f99a77504da720f1a36312d4003601e8",
+        "pubYear": 2024
       },
       {
         "filename": "case_study_08_public_sector_agile_software_delivery.json",
@@ -327,7 +364,8 @@
         "pmcid": "PMC7134271",
         "title": "An e-Government Implementation Framework: A Developing Country Case Study",
         "word_count": 4382,
-        "sha256": "2e7f2faf0c90e6cf3778e930546eb5ec84213957c938c895129112eb24e6a870"
+        "sha256": "2e7f2faf0c90e6cf3778e930546eb5ec84213957c938c895129112eb24e6a870",
+        "pubYear": 2020
       },
       {
         "filename": "case_study_09_community_based_ecotourism_conservation.json",
@@ -335,7 +373,8 @@
         "pmcid": "PMC13619748",
         "title": "A Methodological Case Study for Integrating Virtual Reality and 3D Photogrammetry: A Pilot Digital Platform for Exploring Mangrove Environments.",
         "word_count": 4167,
-        "sha256": "bbaba9b844940726539d911c57d31ad810b2214f16a978e9ffe70d2db3dc567a"
+        "sha256": "bbaba9b844940726539d911c57d31ad810b2214f16a978e9ffe70d2db3dc567a",
+        "pubYear": 2026
       },
       {
         "filename": "case_study_10_cross_border_e_commerce_logistics.json",
@@ -343,7 +382,8 @@
         "pmcid": "PMC13196919",
         "title": "Cyberattacks in supply chains: A multi-case study.",
         "word_count": 8543,
-        "sha256": "dc5815703611fbdc5c2c3b30e10a4533fc9ecd3bf5af04d7ce3b5b1ad6dd51d7"
+        "sha256": "dc5815703611fbdc5c2c3b30e10a4533fc9ecd3bf5af04d7ce3b5b1ad6dd51d7",
+        "pubYear": 2026
       }
     ]
   },
@@ -358,7 +398,8 @@
         "pmcid": "PMC13228906",
         "title": "Korea 2024-2025 Influenza and Respiratory Virus Laboratory Surveillance Report.",
         "word_count": 1585,
-        "sha256": "137082c5d9285aa0060132be91595f9219ecd0dc1ff2be47d7274e79236fe0ee"
+        "sha256": "137082c5d9285aa0060132be91595f9219ecd0dc1ff2be47d7274e79236fe0ee",
+        "pubYear": 2026
       },
       {
         "filename": "report_02_environmental_impact_assessment_watershed.json",
@@ -366,7 +407,8 @@
         "pmcid": "PMC7504285",
         "title": "Health Technology Assessment Report on Vagus Nerve Stimulation in Drug-Resistant Epilepsy.",
         "word_count": 4152,
-        "sha256": "03ca749b5b6b34919c076d3bac6d177ae0a0adff6e3285200c5cfbb768aff137"
+        "sha256": "03ca749b5b6b34919c076d3bac6d177ae0a0adff6e3285200c5cfbb768aff137",
+        "pubYear": 2020
       },
       {
         "filename": "report_03_national_cybersecurity_readiness_audit.json",
@@ -374,7 +416,8 @@
         "pmcid": "PMC13533040",
         "title": "A Health Informatics System in the South Australian Public Health Network: Implementation Report.",
         "word_count": 3395,
-        "sha256": "d378f5d1d2fe087ec3d038a6269ea4e16d6b1a1760c341f15453080254b828c3"
+        "sha256": "d378f5d1d2fe087ec3d038a6269ea4e16d6b1a1760c341f15453080254b828c3",
+        "pubYear": 2026
       },
       {
         "filename": "report_04_renewable_energy_grid_integration_technical_report.json",
@@ -382,7 +425,8 @@
         "pmcid": "PMC13391132",
         "title": "Surgical Reduction Techniques and Outcomes for Cervical Spondyloptosis: A Technical Report and Case Series.",
         "word_count": 3247,
-        "sha256": "e4e45e1ea85eb19e8e312abd2d7cd39f620531aeccc99467e65a71b85025f7b6"
+        "sha256": "e4e45e1ea85eb19e8e312abd2d7cd39f620531aeccc99467e65a71b85025f7b6",
+        "pubYear": 2026
       },
       {
         "filename": "report_05_workforce_demographics_labor_market_report.json",
@@ -390,7 +434,8 @@
         "pmcid": "PMC13643047",
         "title": "AAPM DWWSS report 449: Evaluation of imaging physics workforce, workload, and future needs in the United States",
         "word_count": 9819,
-        "sha256": "f4d32f174ac7e8d8d68e8217eff5d31316d37f7c1267c5db552413ffe0bcb386"
+        "sha256": "f4d32f174ac7e8d8d68e8217eff5d31316d37f7c1267c5db552413ffe0bcb386",
+        "pubYear": 2026
       },
       {
         "filename": "report_06_pharmacovigilance_safety_monitoring_report.json",
@@ -398,7 +443,8 @@
         "pmcid": "PMC13624146",
         "title": "Zopiclone-associated hallucinations: a case report and database pharmacovigilance study.",
         "word_count": 3221,
-        "sha256": "cab4f708adedaa28fe5b9213d9bb3adffb553fba32ca9ec8aa00f4cfe9d280d1"
+        "sha256": "cab4f708adedaa28fe5b9213d9bb3adffb553fba32ca9ec8aa00f4cfe9d280d1",
+        "pubYear": 2026
       },
       {
         "filename": "report_07_agricultural_yield_climate_vulnerability_report.json",
@@ -406,15 +452,17 @@
         "pmcid": "PMC13677029",
         "title": "Interface of Climate and Environmental Change on Food Systems-A Report from the \"Agriculture and Diet: Value Added for Nutrition, Translation, and Adaptation in a Global Ecology\" (ADVANTAGE) Project Working Group 3.",
         "word_count": 12951,
-        "sha256": "dfec6c155c8236d7c9dae7150e470ced65e7325f495412d2ae1e610077bc7c50"
+        "sha256": "dfec6c155c8236d7c9dae7150e470ced65e7325f495412d2ae1e610077bc7c50",
+        "pubYear": 2026
       },
       {
         "filename": "report_08_public_transit_infrastructure_feasibility_report.json",
         "path": "/Users/aadityasah/Documents/Scholar Project/scholar-agentic-os/ml-style-engine/corpus/report/report_08_public_transit_infrastructure_feasibility_report.json",
         "pmcid": "PMC13659891",
-        "title": "ECMO in hinterland\u2014feasibility and challenges (case-based narrative review)",
+        "title": "ECMO in hinterland—feasibility and challenges (case-based narrative review)",
         "word_count": 6058,
-        "sha256": "f86b49c81ba6f196c1c926d98498e79c7f4a5f794a8f98cc657428d711acffee"
+        "sha256": "f86b49c81ba6f196c1c926d98498e79c7f4a5f794a8f98cc657428d711acffee",
+        "pubYear": 2026
       },
       {
         "filename": "report_09_higher_education_quality_assurance_audit.json",
@@ -422,7 +470,8 @@
         "pmcid": "PMC12421457",
         "title": "Quality assurance: A document review of moderation reports on final theoretical assessments.",
         "word_count": 3673,
-        "sha256": "204a39bbca9316c0c0764e52f074673539a4398c66342889d9a0588e6bee227e"
+        "sha256": "204a39bbca9316c0c0764e52f074673539a4398c66342889d9a0588e6bee227e",
+        "pubYear": 2025
       },
       {
         "filename": "report_10_digital_financial_inclusion_index_report.json",
@@ -430,7 +479,8 @@
         "pmcid": "PMC13365646",
         "title": "Financial Inclusion Reforms and Female Entrepreneurship in Latin America: Evidence With Health Equity Heterogeneity.",
         "word_count": 8746,
-        "sha256": "7f620bf5fdfeb84a232ee0fe14e4715aa1029694bd6b1a2570ce487e980ebb2d"
+        "sha256": "7f620bf5fdfeb84a232ee0fe14e4715aa1029694bd6b1a2570ce487e980ebb2d",
+        "pubYear": 2026
       }
     ]
   },
@@ -445,7 +495,8 @@
         "pmcid": "PMC12850621",
         "title": "The Coercive Edge of Kindness: A Critical Analysis of 'Random Acts' in Nursing.",
         "word_count": 4616,
-        "sha256": "55d6175fb2077546e71fd927720b0e67826ddaff28d9d6bd4c9ddee0e9e5d281"
+        "sha256": "55d6175fb2077546e71fd927720b0e67826ddaff28d9d6bd4c9ddee0e9e5d281",
+        "pubYear": 2026
       },
       {
         "filename": "critical_essay_02_methodological_flaws_in_social_psychology.json",
@@ -453,7 +504,8 @@
         "pmcid": "PMC13617129",
         "title": "The relational ground of emotion: an Ubuntu-based critique of individualist ontology in theories of emotion.",
         "word_count": 7651,
-        "sha256": "3ca66cee627d83b6e9e1cab7268ba0c238a19da7ba7ccbf9c6835994885fcd4c"
+        "sha256": "3ca66cee627d83b6e9e1cab7268ba0c238a19da7ba7ccbf9c6835994885fcd4c",
+        "pubYear": 2026
       },
       {
         "filename": "critical_essay_03_rethinking_gdp_as_welfare_indicator.json",
@@ -461,7 +513,8 @@
         "pmcid": "PMC13035633",
         "title": "'Beyond GDP' Requires Replacement, Not Just Additional Metrics.",
         "word_count": 2798,
-        "sha256": "cb558de02c036649f838726a01c63c9506a18e7f9790ca854431eb736d662aa8"
+        "sha256": "cb558de02c036649f838726a01c63c9506a18e7f9790ca854431eb736d662aa8",
+        "pubYear": 2026
       },
       {
         "filename": "critical_essay_04_algorithmic_bias_epistemic_injustice.json",
@@ -469,7 +522,8 @@
         "pmcid": "PMC13380250",
         "title": "Integrating Artificial Intelligence with Gamification in Medical Education: A Pedagogically Grounded Framework and Critical Review.",
         "word_count": 5217,
-        "sha256": "5d25fe2f9c1be60796a98983badee96f138b2a8b0e3cd974be3efa655e5dcea7"
+        "sha256": "5d25fe2f9c1be60796a98983badee96f138b2a8b0e3cd974be3efa655e5dcea7",
+        "pubYear": 2026
       },
       {
         "filename": "critical_essay_05_decolonizing_global_health_governance.json",
@@ -477,7 +531,8 @@
         "pmcid": "PMC13645769",
         "title": "Decolonizing global health governance through knowledge: a perspective on epistemic governance",
         "word_count": 2224,
-        "sha256": "580346972c31aa0fbdf54874b8fc61c725d2170eef549ba1418f374068e7d5fb"
+        "sha256": "580346972c31aa0fbdf54874b8fc61c725d2170eef549ba1418f374068e7d5fb",
+        "pubYear": 2026
       },
       {
         "filename": "critical_essay_06_limits_of_techno_solutionism_climate.json",
@@ -485,7 +540,8 @@
         "pmcid": "PMC12055627",
         "title": "A critical analysis of deployed use cases for quantum key distribution and comparison with post-quantum cryptography.",
         "word_count": 17839,
-        "sha256": "9b05b003128085524810c29a7441cf9ecefef93a46913e5857fa8052374bd402"
+        "sha256": "9b05b003128085524810c29a7441cf9ecefef93a46913e5857fa8052374bd402",
+        "pubYear": 2025
       },
       {
         "filename": "critical_essay_07_critique_of_evidence_based_policymaking.json",
@@ -493,7 +549,8 @@
         "pmcid": "PMC6296116",
         "title": "The evidence supporting WHO recommendations on the promotion of hand hygiene: a critique.",
         "word_count": 1878,
-        "sha256": "f521be07350527d1669eca41797618c84f425bb6f4aca68e5287592d566a4ea0"
+        "sha256": "f521be07350527d1669eca41797618c84f425bb6f4aca68e5287592d566a4ea0",
+        "pubYear": 2018
       },
       {
         "filename": "critical_essay_08_surveillance_capitalism_autonomy_critique.json",
@@ -501,7 +558,8 @@
         "pmcid": "PMC13385632",
         "title": "Feasibility of AI-driven disease surveillance systems at international airports in sub-Saharan Africa: a narrative review.",
         "word_count": 5400,
-        "sha256": "f60c61bb6b8ce3ab22677a689ea3baf0f897831786b9ec7492bb5d8083ace4bd"
+        "sha256": "f60c61bb6b8ce3ab22677a689ea3baf0f897831786b9ec7492bb5d8083ace4bd",
+        "pubYear": 2026
       },
       {
         "filename": "critical_essay_09_replication_crisis_biomedical_research.json",
@@ -509,7 +567,8 @@
         "pmcid": "PMC13228004",
         "title": "Reproducibility crisis in isothermal amplification: lessons from benchmarking LAMP assays.",
         "word_count": 5858,
-        "sha256": "b96865654486cce3e4e7067e160ccc23d0bc952250ae987e0c51e3e5b0c9e686"
+        "sha256": "b96865654486cce3e4e7067e160ccc23d0bc952250ae987e0c51e3e5b0c9e686",
+        "pubYear": 2026
       },
       {
         "filename": "critical_essay_10_post_development_theory_institutional_critique.json",
@@ -517,7 +576,8 @@
         "pmcid": "PMC11874177",
         "title": "A critical perspective on paediatric pulmonary tuberculosis and diagnostic advancements.",
         "word_count": 1208,
-        "sha256": "dc05430efae91221a365c75c248d11908dee6dd2dc3424b2947b96899ceeda0c"
+        "sha256": "dc05430efae91221a365c75c248d11908dee6dd2dc3424b2947b96899ceeda0c",
+        "pubYear": 2024
       }
     ]
   },
@@ -532,7 +592,8 @@
         "pmcid": "PMC13628894",
         "title": "Suffering, justice, and scarcity: philosophical reflections on the burden of cancer in LMICS using Nigeria as a case study.",
         "word_count": 8477,
-        "sha256": "9a7da1f0ff478ced617f731053a3daed69e62665263938b9814b3dac8b13dc35"
+        "sha256": "9a7da1f0ff478ced617f731053a3daed69e62665263938b9814b3dac8b13dc35",
+        "pubYear": 2026
       },
       {
         "filename": "argumentative_02_mandatory_open_science_data_sharing.json",
@@ -540,7 +601,8 @@
         "pmcid": "PMC11133148",
         "title": "Why we need to abandon fixed cutoffs for goodness-of-fit indices: An extensive simulation and possible solutions.",
         "word_count": 12181,
-        "sha256": "8342d52805619e5698b23659e8b5b014538922468c921b58af392f65ccf882c7"
+        "sha256": "8342d52805619e5698b23659e8b5b014538922468c921b58af392f65ccf882c7",
+        "pubYear": 2024
       },
       {
         "filename": "argumentative_03_precautionary_regulation_frontier_ai.json",
@@ -548,7 +610,8 @@
         "pmcid": "PMC13661411",
         "title": "Rethinking broad consent in the age of genomic AI: the Hungarian case",
         "word_count": 2355,
-        "sha256": "497f5e8a68a8becdb8c26a22f23490ec7c77ea1daa48fbdf9c60fb780b5a4288"
+        "sha256": "497f5e8a68a8becdb8c26a22f23490ec7c77ea1daa48fbdf9c60fb780b5a4288",
+        "pubYear": 2026
       },
       {
         "filename": "argumentative_04_carbon_border_adjustments_trade_equity.json",
@@ -556,7 +619,8 @@
         "pmcid": "PMC10784190",
         "title": "Carbon Pricing is not Unjust.",
         "word_count": 7180,
-        "sha256": "f87356f8e0952e8d5cc186d44684a87edde0dba22bb2852883dcf721d09ff60b"
+        "sha256": "f87356f8e0952e8d5cc186d44684a87edde0dba22bb2852883dcf721d09ff60b",
+        "pubYear": 2024
       },
       {
         "filename": "argumentative_05_abolishing_for_profit_academic_publishing.json",
@@ -564,7 +628,8 @@
         "pmcid": "PMC9755351",
         "title": "Open access and its potential impact on public health - A South African perspective.",
         "word_count": 11700,
-        "sha256": "39d34a817d0409659bff6cc2c34c0b48a8c39d6dff8c2444cc740433dde0b482"
+        "sha256": "39d34a817d0409659bff6cc2c34c0b48a8c39d6dff8c2444cc740433dde0b482",
+        "pubYear": 2022
       },
       {
         "filename": "argumentative_06_sovereign_digital_public_infrastructure.json",
@@ -572,7 +637,8 @@
         "pmcid": "PMC13575809",
         "title": "Market shaping via digital public infrastructure for assistive technology in low- and middle-income countries.",
         "word_count": 4038,
-        "sha256": "818491f3fcc2de79d2a214f0e460bc48216eeac1959f804b24dc93d1abac13e9"
+        "sha256": "818491f3fcc2de79d2a214f0e460bc48216eeac1959f804b24dc93d1abac13e9",
+        "pubYear": 2026
       },
       {
         "filename": "argumentative_07_four_day_workweek_macroeconomic_case.json",
@@ -580,7 +646,8 @@
         "pmcid": "PMC13553831",
         "title": "Extended working hours, income, and multidimensional wellbeing among physicians in China: a cross-sectional mediation analysis.",
         "word_count": 5620,
-        "sha256": "4d9c9ff6b3d7535c4c09fbc16a8748ab93eebbcbd4bbf7d57ce1d7fe448555b3"
+        "sha256": "4d9c9ff6b3d7535c4c09fbc16a8748ab93eebbcbd4bbf7d57ce1d7fe448555b3",
+        "pubYear": 2026
       },
       {
         "filename": "argumentative_08_intellectual_property_waivers_pandemics.json",
@@ -588,7 +655,8 @@
         "pmcid": "PMC13196229",
         "title": "Strategic solidarity: solidarity and self-interest in Scandinavian contributions to global Covid-19 vaccine equity.",
         "word_count": 8076,
-        "sha256": "f2d88a8aec41b369c823a473303edceba181cc6ba829e5efba1673be5ac72eeb"
+        "sha256": "f2d88a8aec41b369c823a473303edceba181cc6ba829e5efba1673be5ac72eeb",
+        "pubYear": 2026
       },
       {
         "filename": "argumentative_09_urban_congestion_pricing_equity_debate.json",
@@ -596,7 +664,8 @@
         "pmcid": "PMC13482149",
         "title": "Dynamic congestion pricing for traffic management and air quality in a real world Italian road corridor.",
         "word_count": 7769,
-        "sha256": "7e828b9f28f6238052c1bd00d8e591e234f214d2c8a61b475c753dcf96f7dae8"
+        "sha256": "7e828b9f28f6238052c1bd00d8e591e234f214d2c8a61b475c753dcf96f7dae8",
+        "pubYear": 2026
       },
       {
         "filename": "argumentative_10_nuclear_baseload_in_decarbonization.json",
@@ -604,7 +673,8 @@
         "pmcid": "PMC13128538",
         "title": "Advanced Nuclear Energy Pathways for a Net-Zero World: Fuel Cycles, Reactors, and Policy Readiness.",
         "word_count": 5533,
-        "sha256": "09c6d92119ff47bc58ec1cd267265f7cce81362b6f51e4abe882ed62640f49ec"
+        "sha256": "09c6d92119ff47bc58ec1cd267265f7cce81362b6f51e4abe882ed62640f49ec",
+        "pubYear": 2026
       }
     ]
   },
@@ -619,7 +689,8 @@
         "pmcid": "PMC12645102",
         "title": "A policy analysis of active travel in public healthcare organizations, Victoria Australia.",
         "word_count": 4307,
-        "sha256": "09095497b874e58f07a3ec77110ae5822f342a5c26f6a25f643221b9572d0e4a"
+        "sha256": "09095497b874e58f07a3ec77110ae5822f342a5c26f6a25f643221b9572d0e4a",
+        "pubYear": 2025
       },
       {
         "filename": "policy_analysis_02_ai_governance_risk_tier_regulatory_framework.json",
@@ -627,7 +698,8 @@
         "pmcid": "PMC13599951",
         "title": "When hospitals build their own AI: a comparison of the EU and US regulatory framework.",
         "word_count": 4769,
-        "sha256": "f3170e492f3db1a5463b4a2d8bad5849de0da0cf1da9f1a66a4239aecb9f593e"
+        "sha256": "f3170e492f3db1a5463b4a2d8bad5849de0da0cf1da9f1a66a4239aecb9f593e",
+        "pubYear": 2026
       },
       {
         "filename": "policy_analysis_03_universal_health_coverage_financing_options.json",
@@ -635,7 +707,8 @@
         "pmcid": "PMC13372806",
         "title": "'Mental health was always the last; always an afterthought': policy analysis of domestic financing and prioritisation for mental health in Ghana.",
         "word_count": 8905,
-        "sha256": "33487b43e6f068444bf56c77bdca2b5f0b614698110f0d76294679b93ac21253"
+        "sha256": "33487b43e6f068444bf56c77bdca2b5f0b614698110f0d76294679b93ac21253",
+        "pubYear": 2026
       },
       {
         "filename": "policy_analysis_04_affordable_housing_zoning_reform_tradeoffs.json",
@@ -643,7 +716,8 @@
         "pmcid": "PMC11441398",
         "title": "Getting to effective housing policy for health: a thematic synthesis of policy development and implementation.",
         "word_count": 9877,
-        "sha256": "13377421a308cb697f8a4d6f483d999330e8899ea6aa33e56ce3fd36294e0667"
+        "sha256": "13377421a308cb697f8a4d6f483d999330e8899ea6aa33e56ce3fd36294e0667",
+        "pubYear": 2024
       },
       {
         "filename": "policy_analysis_05_central_bank_digital_currency_monetary_policy.json",
@@ -651,7 +725,8 @@
         "pmcid": "PMC13605469",
         "title": "The Impact of Digital Currency Innovation: Risk Spillover Effects Between the Cryptocurrency and Traditional Financial Markets.",
         "word_count": 9498,
-        "sha256": "5fde812af1b4370f2f910fddb789c5920a8d5fb76c576897d63318eefdaafb36"
+        "sha256": "5fde812af1b4370f2f910fddb789c5920a8d5fb76c576897d63318eefdaafb36",
+        "pubYear": 2026
       },
       {
         "filename": "policy_analysis_06_antitrust_digital_platform_interoperability.json",
@@ -659,7 +734,8 @@
         "pmcid": "PMC13437408",
         "title": "Toward fairness in digital consumer protection: a comparative legal and socio-regulatory perspective on digital platform governance.",
         "word_count": 4932,
-        "sha256": "a7f25337799c44235683439000aada8b52c0a475b62f0fdcfd3276876f267a94"
+        "sha256": "a7f25337799c44235683439000aada8b52c0a475b62f0fdcfd3276876f267a94",
+        "pubYear": 2026
       },
       {
         "filename": "policy_analysis_07_antibiotic_stewardship_agricultural_regulation.json",
@@ -667,7 +743,8 @@
         "pmcid": "PMC13581701",
         "title": "Governing One Health under climate pressure: policy implementation in Botswana.",
         "word_count": 10090,
-        "sha256": "f7d46fd0eaa4c4d015535ede9878fa0a39a45c0ff1555a5de4a0f91f2739cd70"
+        "sha256": "f7d46fd0eaa4c4d015535ede9878fa0a39a45c0ff1555a5de4a0f91f2739cd70",
+        "pubYear": 2026
       },
       {
         "filename": "policy_analysis_08_electric_vehicle_subsidy_fiscal_impact.json",
@@ -675,15 +752,17 @@
         "pmcid": "PMC13682884",
         "title": "Optimizing for happiness in EU technology policy to repay public subsidies for AI",
         "word_count": 18757,
-        "sha256": "65fdcdbabe80fedfa1004623e6bc48255e497110f8b88b98d876e0004af3a4f6"
+        "sha256": "65fdcdbabe80fedfa1004623e6bc48255e497110f8b88b98d876e0004af3a4f6",
+        "pubYear": 2026
       },
       {
         "filename": "policy_analysis_09_cross_border_data_localization_compliance.json",
         "path": "/Users/aadityasah/Documents/Scholar Project/scholar-agentic-os/ml-style-engine/corpus/policy_analysis/policy_analysis_09_cross_border_data_localization_compliance.json",
         "pmcid": "PMC13574247",
-        "title": "Collective interests, health research ethics and data governance for Indigenous S\u00e1mi populations.",
+        "title": "Collective interests, health research ethics and data governance for Indigenous Sámi populations.",
         "word_count": 1517,
-        "sha256": "abbca14d354fb6b01c722e6382049a33387e357fed0ba5a4f2044e0dc9cdee24"
+        "sha256": "abbca14d354fb6b01c722e6382049a33387e357fed0ba5a4f2044e0dc9cdee24",
+        "pubYear": 2026
       },
       {
         "filename": "policy_analysis_10_early_childhood_education_subsidy_cost_benefit.json",
@@ -691,7 +770,8 @@
         "pmcid": "PMC12895295",
         "title": "Evaluating the Economic Impact of Learn-to-Swim Programmes: A Cost-Benefit Analysis of the First Lap Voucher Programme in Australia.",
         "word_count": 4149,
-        "sha256": "6c29147299b218c1061da2fc4aa79e0ac319ff0bc4f695aff1be821bce434d8d"
+        "sha256": "6c29147299b218c1061da2fc4aa79e0ac319ff0bc4f695aff1be821bce434d8d",
+        "pubYear": 2026
       }
     ]
   },
@@ -706,7 +786,8 @@
         "pmcid": "PMC13673587",
         "title": "Digital leadership from the perspective of dynamic capabilities: the effect on sustainable performance and resilience through agility.",
         "word_count": 10917,
-        "sha256": "1ab3951b51707af65a8141361fb90b439077d63800f03df6b5956a85a9213fa0"
+        "sha256": "1ab3951b51707af65a8141361fb90b439077d63800f03df6b5956a85a9213fa0",
+        "pubYear": 2026
       },
       {
         "filename": "business_02_omni_channel_retail_supply_chain_resilience.json",
@@ -714,7 +795,8 @@
         "pmcid": "PMC12886830",
         "title": "The impact of china's artificial intelligence pilot policies on enterprise supply chain resilience.",
         "word_count": 15131,
-        "sha256": "f83846509b852fd30c7e00ad9135101e957b7ce4edb785c289f4a893cdfa0cb2"
+        "sha256": "f83846509b852fd30c7e00ad9135101e957b7ce4edb785c289f4a893cdfa0cb2",
+        "pubYear": 2026
       },
       {
         "filename": "business_03_fintech_disruption_commercial_banking_strategy.json",
@@ -722,7 +804,8 @@
         "pmcid": "PMC13402630",
         "title": "Impact of adopting digital FinTech techniques on banks' cyber and systemic risks.",
         "word_count": 7218,
-        "sha256": "c5a7dd6da56217babff90d911f9828ea549405f45334444de8e36a20d9901a3a"
+        "sha256": "c5a7dd6da56217babff90d911f9828ea549405f45334444de8e36a20d9901a3a",
+        "pubYear": 2026
       },
       {
         "filename": "business_04_mergers_acquisitions_post_integration_synergy.json",
@@ -730,7 +813,8 @@
         "pmcid": "PMC13126959",
         "title": "Ownership changes in the pharmaceutical industry: understanding the 2023 pharma mergers and acquisitions landscape of Europe.",
         "word_count": 4441,
-        "sha256": "dd66d25deaff489bcbc520290d9d5a16e1260c89470376a46f371328befca9cc"
+        "sha256": "dd66d25deaff489bcbc520290d9d5a16e1260c89470376a46f371328befca9cc",
+        "pubYear": 2026
       },
       {
         "filename": "business_05_platform_ecosystem_network_effects_monetization.json",
@@ -738,7 +822,8 @@
         "pmcid": "PMC13384316",
         "title": "Drivers of international convergence in digital two-sided platform markets: The case of dominant business model components in online lending.",
         "word_count": 10204,
-        "sha256": "48207de4ef4c9f608025067d36ca93ee6896f512f06f2baeb603923439cb83a0"
+        "sha256": "48207de4ef4c9f608025067d36ca93ee6896f512f06f2baeb603923439cb83a0",
+        "pubYear": 2026
       },
       {
         "filename": "business_06_sustainable_value_chain_esg_financial_performance.json",
@@ -746,7 +831,8 @@
         "pmcid": "PMC13526686",
         "title": "Integrating ESG indicators into public health governance as a policy innovation for institutional accountability: a scoping review.",
         "word_count": 4960,
-        "sha256": "81cf476144d5ad241e4de9a971ea3b0daa4dced580e9c5c42aceefafe794d038"
+        "sha256": "81cf476144d5ad241e4de9a971ea3b0daa4dced580e9c5c42aceefafe794d038",
+        "pubYear": 2026
       },
       {
         "filename": "business_07_agile_transformation_organizational_culture.json",
@@ -754,7 +840,8 @@
         "pmcid": "PMC12613234",
         "title": "Developing the Agile Institute, an effort to incorporate agile methodologies into Hackensack Meridian Health.",
         "word_count": 5314,
-        "sha256": "b169084bd395c2cfd3654b4f769de25b45df3c7d2eac4774bd229ba5817b57b8"
+        "sha256": "b169084bd395c2cfd3654b4f769de25b45df3c7d2eac4774bd229ba5817b57b8",
+        "pubYear": 2025
       },
       {
         "filename": "business_08_b2b_saas_customer_retention_unit_economics.json",
@@ -762,7 +849,8 @@
         "pmcid": "PMC13183825",
         "title": "Linking customer big data analytics to firm performance: evidence from B2B organizations in an emerging market context.",
         "word_count": 6038,
-        "sha256": "e5a27cbc1bdbe742f76a1ba7f47cd38d457b8b60f0f3f0a576eaafcce4d11acd"
+        "sha256": "e5a27cbc1bdbe742f76a1ba7f47cd38d457b8b60f0f3f0a576eaafcce4d11acd",
+        "pubYear": 2026
       },
       {
         "filename": "business_09_emerging_market_entry_mode_joint_ventures.json",
@@ -770,7 +858,8 @@
         "pmcid": "PMC13672224",
         "title": "ADHD-related neurodiversity and innovation in marketing teams: a grounded theory framework of customer-oriented boundary-spanning",
         "word_count": 8314,
-        "sha256": "42938a8466c660e24bfe160489f0cef3ce7fe91cb98c7764b336cb9b5375551a"
+        "sha256": "42938a8466c660e24bfe160489f0cef3ce7fe91cb98c7764b336cb9b5375551a",
+        "pubYear": 2026
       },
       {
         "filename": "business_10_corporate_turnaround_working_capital_optimization.json",
@@ -778,7 +867,8 @@
         "pmcid": "PMC12013595",
         "title": "Skill and Strategy: How Managerial Ability Drives Working Capital Efficiency.",
         "word_count": 6675,
-        "sha256": "99b71909b24771ea8549e8afb16358318305207c8b17eda3e392454e83a15563"
+        "sha256": "99b71909b24771ea8549e8afb16358318305207c8b17eda3e392454e83a15563",
+        "pubYear": 2025
       }
     ]
   },
@@ -793,7 +883,8 @@
         "pmcid": "PMC13612432",
         "title": "Phase-specific sequential press-needle therapy for menstrual migraine: a randomized trial protocol.",
         "word_count": 6606,
-        "sha256": "3f631458eb951a728371543c3484309163ae966ef3807154e9e6d500128354d3"
+        "sha256": "3f631458eb951a728371543c3484309163ae966ef3807154e9e6d500128354d3",
+        "pubYear": 2026
       },
       {
         "filename": "journal_02_q1_computational_machine_learning_architecture.json",
@@ -801,7 +892,8 @@
         "pmcid": "PMC13635322",
         "title": "Federated deep learning for stroke detection: a privacy-preserving, explainable CNN-LSTM framework",
         "word_count": 5442,
-        "sha256": "2704f3a5164128c034d50e310eb2420f806935e97ca7613a46537562dd0f3dfa"
+        "sha256": "2704f3a5164128c034d50e310eb2420f806935e97ca7613a46537562dd0f3dfa",
+        "pubYear": 2026
       },
       {
         "filename": "journal_03_q1_econometric_causal_inference_panel.json",
@@ -809,7 +901,8 @@
         "pmcid": "PMC13601610",
         "title": "Causal inference for multiple risk factors and diseases from genomics data.",
         "word_count": 17908,
-        "sha256": "eeb4330de83af2289e486f58cd9b4eee3fe12b08199cedb9ebe8edb19dc179e7"
+        "sha256": "eeb4330de83af2289e486f58cd9b4eee3fe12b08199cedb9ebe8edb19dc179e7",
+        "pubYear": 2026
       },
       {
         "filename": "journal_04_q1_molecular_biology_experimental_protocol.json",
@@ -817,7 +910,8 @@
         "pmcid": "PMC13674235",
         "title": "Designing Cooperative Molecular Glues for FKBP12-MAPRE1 with Enhanced-Sampling Molecular Dynamics Simulations",
         "word_count": 6952,
-        "sha256": "e916b56be42b33ec31e2cddb54f982e8d4418152190cae84bd240498cd26727d"
+        "sha256": "e916b56be42b33ec31e2cddb54f982e8d4418152190cae84bd240498cd26727d",
+        "pubYear": 2026
       },
       {
         "filename": "journal_05_q1_environmental_science_geospatial_modeling.json",
@@ -825,7 +919,8 @@
         "pmcid": "PMC13468359",
         "title": "Foundation Models for Remote Sensing Semantic Segmentation: A Review of Architectures, Adaptations, and Prospects.",
         "word_count": 10908,
-        "sha256": "b1df7c141d35ed2a899ab69da7ffa50eb983127770537efa8052564ef47c244f"
+        "sha256": "b1df7c141d35ed2a899ab69da7ffa50eb983127770537efa8052564ef47c244f",
+        "pubYear": 2026
       },
       {
         "filename": "journal_06_q1_cognitive_neuroscience_behavioral_paradigm.json",
@@ -833,7 +928,8 @@
         "pmcid": "PMC13503407",
         "title": "Tetrix: A novel Tetris-based paradigm for neuroimaging research and clinical applications.",
         "word_count": 6379,
-        "sha256": "bd9515f66528af6d6f05b1123c305bca3dbc4d001168c05dfd0a3888847e5d25"
+        "sha256": "bd9515f66528af6d6f05b1123c305bca3dbc4d001168c05dfd0a3888847e5d25",
+        "pubYear": 2026
       },
       {
         "filename": "journal_07_q1_materials_engineering_characterization.json",
@@ -841,7 +937,8 @@
         "pmcid": "PMC13567087",
         "title": "Synthesis, Structural Characterization, and Magnetic Behavior of Fe Core-Shell-like Nanoparticles Dispersed in Carbon Matrices.",
         "word_count": 9688,
-        "sha256": "942a0e69c55fe7d27ff13150fe76f1623c29e7d1fbaf9a4db266663df8587eb2"
+        "sha256": "942a0e69c55fe7d27ff13150fe76f1623c29e7d1fbaf9a4db266663df8587eb2",
+        "pubYear": 2026
       },
       {
         "filename": "journal_08_q1_public_health_epidemiological_surveillance.json",
@@ -849,7 +946,8 @@
         "pmcid": "PMC13596805",
         "title": "Firearm injuries in a conflict affected region: A multicenter study of epidemiological trends, injury patterns, management, and outcomes in the West Bank of Palestine.",
         "word_count": 5721,
-        "sha256": "d073e7f3927cc78088ebbbf2cff7ff98423dc83621f02399ec073eaf4886faa8"
+        "sha256": "d073e7f3927cc78088ebbbf2cff7ff98423dc83621f02399ec073eaf4886faa8",
+        "pubYear": 2026
       },
       {
         "filename": "journal_09_q1_information_systems_design_science.json",
@@ -857,7 +955,8 @@
         "pmcid": "PMC13451874",
         "title": "The DSR-PRISMA protocol: Embedding systematic knowledge mapping into design science research for applied technology studies.",
         "word_count": 3806,
-        "sha256": "8c2117d2410103d7bc4924bb83f99f17ae39b80bc031d1703e7a3a4d9bf27c82"
+        "sha256": "8c2117d2410103d7bc4924bb83f99f17ae39b80bc031d1703e7a3a4d9bf27c82",
+        "pubYear": 2026
       },
       {
         "filename": "journal_10_q1_quantitative_sociology_network_analysis.json",
@@ -865,7 +964,8 @@
         "pmcid": "PMC13451059",
         "title": "Behavioral Characteristics of Medical Students on Social Media Platforms: Topic Modeling and Social Network Analysis.",
         "word_count": 4044,
-        "sha256": "9819ac5148eed72297aabeab08df71abff9521634d20729789d6bed065aeb665"
+        "sha256": "9819ac5148eed72297aabeab08df71abff9521634d20729789d6bed065aeb665",
+        "pubYear": 2026
       }
     ]
   },
@@ -880,7 +980,8 @@
         "pmcid": "PMC12507348",
         "title": "Oral Presentation",
         "word_count": 14137,
-        "sha256": "ff2e81393ef55b51253d9b0b92a02d71584e90523ba488d846c0143089c22b14"
+        "sha256": "ff2e81393ef55b51253d9b0b92a02d71584e90523ba488d846c0143089c22b14",
+        "pubYear": 2025
       },
       {
         "filename": "presentation_02_cognitive_load_multimedia_slide_design.json",
@@ -888,7 +989,8 @@
         "pmcid": "PMC13595666",
         "title": "Development and validation of the SMART-BPPV: a multimedia learning module for BPPV education.",
         "word_count": 2981,
-        "sha256": "4eb87f45c8d3c323be82833cb1086996886e423345b0d75a984e49fd90cf9eeb"
+        "sha256": "4eb87f45c8d3c323be82833cb1086996886e423345b0d75a984e49fd90cf9eeb",
+        "pubYear": 2026
       },
       {
         "filename": "presentation_03_data_visualization_graphical_perception.json",
@@ -896,7 +998,8 @@
         "pmcid": "PMC13460199",
         "title": "Challenges and Opportunities for Theory-Grounded Data Visualization in Extended Reality.",
         "word_count": 2827,
-        "sha256": "d646e8552b94fc4d109f1a4630102382df2002c8285d04189731e2c0efe98f6f"
+        "sha256": "d646e8552b94fc4d109f1a4630102382df2002c8285d04189731e2c0efe98f6f",
+        "pubYear": 2026
       },
       {
         "filename": "presentation_04_assertion_evidence_slide_structure.json",
@@ -904,7 +1007,8 @@
         "pmcid": "PMC13639794",
         "title": "Reforming pedagogy in biotechnology pharmaceutics education: a narrative review of emerging teaching strategies",
         "word_count": 7465,
-        "sha256": "e82546428f4a22c9da0f3db346b17420d1c33a6512d490883a95f581aacc9dde"
+        "sha256": "e82546428f4a22c9da0f3db346b17420d1c33a6512d490883a95f581aacc9dde",
+        "pubYear": 2026
       },
       {
         "filename": "presentation_05_scientific_storytelling_narrative_arc.json",
@@ -912,7 +1016,8 @@
         "pmcid": "PMC12917428",
         "title": "Art as a multiplier of science communication.",
         "word_count": 4113,
-        "sha256": "ff85d93da7b277aa5bdd1b14164abff86d98acafa8c95d42e26a426425671ddd"
+        "sha256": "ff85d93da7b277aa5bdd1b14164abff86d98acafa8c95d42e26a426425671ddd",
+        "pubYear": 2026
       },
       {
         "filename": "presentation_06_poster_and_short_talk_visual_abstracts.json",
@@ -920,7 +1025,8 @@
         "pmcid": "PMC7768377",
         "title": "Report from the Scientific Poster Session at the 15th Annual Cardiometabolic Health Congress Live Online, USA, 21-24 October 2020.",
         "word_count": 5319,
-        "sha256": "fe60cd21bf40675eee92f3a9dce04e054d53700de3fd43bc533efbd19042c22e"
+        "sha256": "fe60cd21bf40675eee92f3a9dce04e054d53700de3fd43bc533efbd19042c22e",
+        "pubYear": 2020
       },
       {
         "filename": "presentation_07_executive_briefing_decision_oriented_decks.json",
@@ -928,7 +1034,8 @@
         "pmcid": "PMC13216504",
         "title": "Visualizing epidemiological models for policy: design principles for effective communication.",
         "word_count": 3476,
-        "sha256": "97b15a28a3fa18bd68e736642c87183652893dcfc89b91c90352f48a631b1875"
+        "sha256": "97b15a28a3fa18bd68e736642c87183652893dcfc89b91c90352f48a631b1875",
+        "pubYear": 2026
       },
       {
         "filename": "presentation_08_accessible_typography_color_contrast_slides.json",
@@ -936,7 +1043,8 @@
         "pmcid": "PMC11390107",
         "title": "Identifying images in the biology literature that are problematic for people with a color-vision deficiency.",
         "word_count": 6043,
-        "sha256": "3171a246b2de2ce3dcf4aa9e1732524679ed634779a6cb3f85f11b4c421ec71c"
+        "sha256": "3171a246b2de2ce3dcf4aa9e1732524679ed634779a6cb3f85f11b4c421ec71c",
+        "pubYear": 2024
       },
       {
         "filename": "presentation_09_interactive_teaching_lectures_active_recall.json",
@@ -944,7 +1052,8 @@
         "pmcid": "PMC11734682",
         "title": "Lessons Learned from Integrating Educational Technology into the Preclerkship Teaching of Pulmonary Medicine.",
         "word_count": 4065,
-        "sha256": "ec1b9797dbd90ff688c70750dd53ab57bf3964417e4c4bf46f29ae8a51dc8dbd"
+        "sha256": "ec1b9797dbd90ff688c70750dd53ab57bf3964417e4c4bf46f29ae8a51dc8dbd",
+        "pubYear": 2024
       },
       {
         "filename": "presentation_10_defense_viva_voce_research_pitch_structure.json",
@@ -952,7 +1061,8 @@
         "pmcid": "PMC10700522",
         "title": "Light People: Professor Lan Fu.",
         "word_count": 2825,
-        "sha256": "ac57f7015edc2c232f31238bbddfdcd5564ace816fa7aec4e500d30cdd5ba45e"
+        "sha256": "ac57f7015edc2c232f31238bbddfdcd5564ace816fa7aec4e500d30cdd5ba45e",
+        "pubYear": 2023
       }
     ]
   }

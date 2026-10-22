@@ -121,11 +121,23 @@ def fetch_one_valid_paper(query: str, used_pmcids: set, used_hashes: set):
                     continue
                 used_pmcids.add(pmcid)
                 used_hashes.add(sha256_hash)
+                pub_year = item.get("pubYear")
+                if not pub_year or pub_year == "N/A":
+                    pub_date_tag = soup.find("pub-date")
+                    if pub_date_tag:
+                        yr_tag = pub_date_tag.find("year")
+                        if yr_tag and yr_tag.get_text(strip=True):
+                            pub_year = yr_tag.get_text(strip=True)
+                try:
+                    pub_year = int(pub_year)
+                except (ValueError, TypeError):
+                    pub_year = pub_year or "N/A"
+
                 return {
                     "pmcid": pmcid,
                     "doi": item.get("doi", "N/A"),
                     "title": item.get("title", "Untitled"),
-                    "pubYear": item.get("pubYear", "N/A"),
+                    "pubYear": pub_year,
                     "word_count": word_count,
                     "paragraphs": paragraphs,
                     "full_text": full_text,
