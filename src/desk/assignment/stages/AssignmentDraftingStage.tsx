@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { SlideCanvas, extractSlidesFromAcademicText, type SlideDeck } from "../../../features/slides";
 import { buildFormattedBibliography } from "../services/assignmentExportService";
+import { validateSectionUniqueness } from "../../../features/drafting/services/sectionDraftingEngine";
+import { auditAndEnforceCollegiateStyle } from "../../../features/coursework/services/courseworkOrchestrator";
 
 export interface AssignmentDraftingStageProps {
   onProceed?: () => void;
@@ -60,6 +62,7 @@ export function AssignmentDraftingStage({
     setGeneratingSection,
     generatingSectionIds,
     initializeDraftingPlan,
+    executionMode,
   } = useAssignmentWorkspace();
 
   const [streamingChunk, setStreamingChunk] = useState<string>("");
@@ -122,6 +125,33 @@ export function AssignmentDraftingStage({
     }
     return internalSections.find((s) => s.id === activeSectionId) || internalSections[0] || null;
   }, [activeSectionId, internalSections]);
+
+  // Detailed Mode Academic Integrity & Quality Gates
+  const uniquenessValidation = useMemo(() => {
+    return validateSectionUniqueness(
+      internalSections.map((s) => ({
+        id: s.id,
+        title: s.title,
+        content: s.draftContent || "",
+      }))
+    );
+  }, [internalSections]);
+
+  const activeProseAudit = useMemo(() => {
+    if (!activeSection?.draftContent) return null;
+    return auditAndEnforceCollegiateStyle(activeSection.draftContent);
+  }, [activeSection?.draftContent]);
+
+  const detectedCitationTokens = useMemo(() => {
+    if (!activeSection?.draftContent) return [];
+    const regex = /\[([^\[\]\(\)\r\n]+)\](?!\()/g;
+    const tokens: string[] = [];
+    let m;
+    while ((m = regex.exec(activeSection.draftContent)) !== null) {
+      tokens.push(m[1].trim());
+    }
+    return Array.from(new Set(tokens));
+  }, [activeSection?.draftContent]);
 
   const activeIndex = useMemo(() => {
     if (!activeSection) return -1;
@@ -388,6 +418,100 @@ export function AssignmentDraftingStage({
           </div>
         </div>
       </header>
+
+      {/* Detailed Mode Telemetry Panel: Overlap Validation (< 20%), Active-Voice & Anti-Fluff Metrics, Citation Tokens */}
+      {executionMode === "detailed" && (
+        <section
+          aria-label="Detailed Drafting Telemetry & Validation"
+          className="rounded-2xl p-5 bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-4 font-sans animate-in fade-in duration-200"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200/60 dark:border-zinc-800/60 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+                Detailed Mode · Academic Integrity & Citation Grounding Inspector
+              </h2>
+            </div>
+            <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+              Live Collegiate Directives Active
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            {/* 1. Inter-Section Uniqueness (< 20% Overlap) */}
+            <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Section Uniqueness</span>
+                <span
+                  className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full ${
+                    uniquenessValidation.isUnique
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                      : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                  }`}
+                >
+                  {uniquenessValidation.isUnique ? "< 20% Overlap (Pass)" : "Overlap Violation"}
+                </span>
+              </div>
+              <div className="text-base font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
+                {Math.round(uniquenessValidation.maxSimilarity * 100)}% Max Similarity
+              </div>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
+                {uniquenessValidation.isUnique
+                  ? "Zero cross-section argument replication across all sections."
+                  : `Redundancy between: "${uniquenessValidation.conflictingPair?.[0]}" & "${uniquenessValidation.conflictingPair?.[1]}".`}
+              </p>
+            </div>
+
+            {/* 2. Active-Voice & Anti-Fluff Metrics */}
+            <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Active-Voice Ratio</span>
+                <span
+                  className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full ${
+                    !activeProseAudit || activeProseAudit.activeVoiceRatio >= 0.8
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                  }`}
+                >
+                  {activeProseAudit ? `${Math.round(activeProseAudit.activeVoiceRatio * 100)}% (Target ≥80%)` : "Pending Draft"}
+                </span>
+              </div>
+              <div className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                {activeProseAudit?.isCompliant ? "Collegiate Prose Verified" : "Active Re-writing Needed"}
+              </div>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
+                {activeProseAudit && activeProseAudit.violations.length > 0
+                  ? `${activeProseAudit.violations.length} advisory detected: ${activeProseAudit.violations[0]}`
+                  : "Zero throat-clearing openings or banned nominalizations detected."}
+              </p>
+            </div>
+
+            {/* 3. Citation Token Mappings ([ev-uuid], [1]) */}
+            <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Citation Tokens</span>
+                <span className="text-[10px] font-mono uppercase font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                  {citationStyle.toUpperCase()} Interceptor
+                </span>
+              </div>
+              <div className="text-base font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
+                {detectedCitationTokens.length} Token{detectedCitationTokens.length !== 1 ? "s" : ""} Bound
+              </div>
+              <div className="flex flex-wrap gap-1 text-[10px] font-mono text-zinc-500 dark:text-zinc-400 truncate">
+                {detectedCitationTokens.length > 0 ? (
+                  detectedCitationTokens.slice(0, 4).map((tok, i) => (
+                    <span key={i} className="px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+                      [{tok}]
+                    </span>
+                  ))
+                ) : (
+                  <span>[1], [ev-uuid] tokens intercept into authoritative citations</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Main Drafting Workspace Layout (Left Rail Index + Center Active Editor) */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">

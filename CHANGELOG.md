@@ -5,7 +5,32 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-10-04
+## [Unreleased] - 2026-10-22
+
+### Phase 2: Supervised ML Style Engine, OT-01 Minimal/Detailed Modes & OT-10/OT-22 Synthesis Integration
+- **110-File Open-Access Peer-Reviewed Corpus (`ml-style-engine/corpus/`, `04_expand_corpus_110_files.py`, `02_verify_corpus.py`)**:
+  - Expanded scholarly corpus from 90 to 110 full-text peer-reviewed open-access papers across 11 archetypes by adding `journal_article` (10 files) and `presentation_slides` (10 files).
+  - Verified 100% compliance across all 110 files: 752,811 total words, 0 duplicate PMCIDs, 0 duplicate SHA-256 hashes, with all papers exceeding the 1,200-word threshold.
+- **11-Class Supervised ML Style Classifier (`ml-style-engine/scripts/03_train_model.py`)**:
+  - Trained TF-IDF vectorized classifier on 8,154 chunked text samples across all 110 papers.
+  - Exceeded the `>85%` Cross-Validation gate: Calibrated LinearSVC achieved **93.97% 5-Fold Stratified CV Accuracy and 93.97% Macro F1** (In-sample: **99.46%**).
+  - Exported joblib model (`archetype_classifier.joblib`) and runtime JSON model weights (`model_weights.json` and `src/features/coursework/data/archetype_model_weights.json`) enabling zero-latency deterministic dot-product inference in TypeScript.
+- **OT-01 Coursework & Essays Minimal vs. Detailed Modes (`CourseworkWorkspace.tsx`)**:
+  - Implemented `Minimal | Detailed` segmented execution mode toggle in the workspace header:
+    - **Minimal Mode**: Streamlined setup bar (Topic, Assignment Type, Word Count Target, Citation Style) and clean distraction-free canvas; hides 4-phase telemetry, overlap matrices, and referee/audit drawers unless explicitly toggled.
+    - **Detailed Mode**: Full configuration controls (Academic Tone selector, custom rubric/instructions, source filters) + live 4-phase atomic lifecycle stepper, OpenAlex/Crossref badges, `<20%` inter-section overlap indicator, and auto-expanded ML Style Compliance Audit panel.
+  - **Auto-Bound Academic Tone Mapping**: Selecting an assignment type automatically sets the recommended collegiate tone (`essay` -> `Formal Academic`, `literature_review` -> `Critical`, `case_study` -> `Analytical`, `report` -> `Objective`, `argumentative_essay` -> `Persuasive`, `policy_analysis` -> `Analytical`, `business_assignment` -> `Analytical`) while preserving manual user override.
+- **Learned Quantitative Style Targets in Drafting Prompt (`drafting.ts`)**:
+  - Injected explicit quantitative writing constraints into section drafting prompts: target mean sentence length, burstiness standard deviation (6.5–9.5 words), active voice threshold (`>= 80%`), bracket citation density, archetype transition n-grams, and anti-buzzword constraints.
+- **OT-10 Journal Articles Style Engine Integration (`generate.ts`, `ManuscriptGenerationPanel.tsx`)**:
+  - Injected learned Q1 Journal quantitative benchmarks (`Formal Academic` / `Objective`, 20–32 words sentence length, `>= 80%` active voice, `>= 2.2%` citation density) into manuscript section drafting prompts.
+  - Wired live **Q1 Journal Style Compliance score card** displaying sentence length, passive voice, lexical diversity, and citation density metrics across all generated sections.
+  - Added **Referee Style Evaluation** to the Peer Review history panel.
+- **OT-22 Slide Studio & Presentation Engine Integration (`PresentationHeader.tsx`, `slideGenerator.ts`)**:
+  - Mounted live **OT-22 Learned Style Compliance Badge** (`Conversational Academic · 6x6 Density`) in the PresentationHeader.
+  - Registered `presentation_slides` style profile and `buildPresentationPromptConstraints()` enforcing assertion-evidence headlines, zero throat-clearing, and 6x6 density constraints.
+
+## [1.2.0] - 2026-10-04
 
 ### Academic Drafting Enhancements
 - **Interactive Rubric Matcher (`AssignmentUnderstandStage.tsx`)**:

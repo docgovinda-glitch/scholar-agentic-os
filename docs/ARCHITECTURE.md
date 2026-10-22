@@ -144,3 +144,43 @@ In production, Helmet enforces a strict CSP policy in `server.ts` configured wit
 
 ### 4.4 Envelope Encryption for Credentials
 - User-provided BYOK keys (OpenAI, Anthropic, etc.) stored in the database are encrypted using envelope encryption primitives (`src/services/crypto/crypto.ts`) with user-scoped keys.
+
+---
+
+## 5. Supervised ML Style Engine Architecture (`ml-style-engine/`)
+
+Scholar Core embeds a high-precision, client-side capable Supervised Machine Learning Style Engine to guarantee that AI-drafted sections adhere to verified collegiate and peer-reviewed journal benchmarks:
+
+### 5.1 Corpus Architecture (110 Papers, 752,811 Words)
+- **Open-Access Verified Corpus**: 110 complete peer-reviewed papers fetched directly from EuropePMC XML across 11 scholarly archetypes:
+  - `essay` (10 files)
+  - `literature_review` (10 files)
+  - `research_paper` (10 files)
+  - `case_study` (10 files)
+  - `report` (10 files)
+  - `critical_essay` (10 files)
+  - `argumentative_essay` (10 files)
+  - `policy_analysis` (10 files)
+  - `business_assignment` (10 files)
+  - `journal_article` (10 files)
+  - `presentation_slides` (10 files)
+- **Integrity Gates**: 100% verified with 0 duplicate PMCIDs, 0 duplicate SHA-256 hashes, and every paper exceeding the 1,200-word substantive threshold.
+
+### 5.2 Supervised Classifier Pipeline (`03_train_model.py`)
+- **Sample Generation**: 8,154 chunked training samples with paragraph-level windowing.
+- **Model Evaluation**:
+  - Calibrated LinearSVC (Selected Production Model): **93.97% 5-Fold Stratified Cross-Validation Accuracy & Macro F1** (In-sample: 99.46%).
+  - Multinomial Naive Bayes: 93.18% CV Accuracy.
+  - L2 Logistic Regression: 93.08% CV Accuracy.
+- **Exported Runtime Weights**: Pre-computed vocabulary IDFs, class intercept offsets, and weight vectors exported to `src/features/coursework/data/archetype_model_weights.json`.
+
+### 5.3 Deterministic Client-Side Inference (`styleEngineService.ts`)
+- Evaluates text in-memory via TF-IDF dot products and softmax probability distribution.
+- Computes 5 quantitative collegiate style metrics:
+  - **Mean Sentence Length** (target: 18–32 words depending on archetype)
+  - **Sentence Length Burstiness** (std dev target: 6.5–9.5 words)
+  - **Active Voice Ratio** (enforces `>= 80%` active voice, max passive voice `<= 20%`)
+  - **Bracket Citation Density** (target: `>= 0.8%` to `>= 2.2%` per 100 words)
+  - **Lexical Diversity (Type-Token Ratio)** (target: `>= 0.40` to `>= 0.48`)
+- Injects archetype-specific learned rhetorical transition n-grams into the drafting prompt builder (`drafting.ts`, `generate.ts`, `slideGenerator.ts`).
+

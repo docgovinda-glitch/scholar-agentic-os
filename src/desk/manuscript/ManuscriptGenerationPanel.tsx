@@ -16,6 +16,7 @@ import {
 } from "../api";
 import { routeDecision } from "../aiAccess/aiAccessApi";
 import { readProviderKey } from "../../services/userAiSettings";
+import { auditStyleCompliance, type StyleAuditReport } from "../../features/coursework/services/styleEngineService";
 import type { CoherenceDimension, CoverLetter, GeneratedSection, GenerationJob, PeerReviewHistory, ReviewLens } from "../types";
 
 const DIMENSION_LABEL: Record<CoherenceDimension, string> = {
@@ -300,6 +301,11 @@ export default function ManuscriptGenerationPanel({
   const total = job.plan.length;
   const nextPlanned = job.plan[done];
 
+  const fullManuscriptText = (job?.sections ?? []).map((s) => s.text).join("\n\n");
+  const journalStyleAudit: StyleAuditReport | null = fullManuscriptText.trim()
+    ? auditStyleCompliance(fullManuscriptText, "journal_article")
+    : null;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -334,6 +340,64 @@ export default function ManuscriptGenerationPanel({
           style={{ width: `${total > 0 ? Math.round((done / total) * 100) : 0}%` }}
         />
       </div>
+
+      {journalStyleAudit && (
+        <div
+          data-testid="q1-journal-style-audit-card"
+          className="rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] p-3.5 space-y-2.5"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">
+                Q1 Journal Style Compliance
+              </span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                  journalStyleAudit.isCompliant
+                    ? "bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]"
+                    : "bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
+                }`}
+              >
+                {journalStyleAudit.overallScore}% · {journalStyleAudit.isCompliant ? "Pass" : "Attention"}
+              </span>
+            </div>
+            <span className="text-xs text-[color:var(--text-muted)] font-mono">
+              Benchmark: {journalStyleAudit.primaryTone} · {journalStyleAudit.secondaryTone}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <div className="p-2 rounded bg-[color:var(--surface-inset)]">
+              <div className="text-[10px] text-[color:var(--text-muted)]">Avg Sentence Length</div>
+              <div className="font-semibold text-[color:var(--text-primary)]">
+                {journalStyleAudit.metrics.avgSentenceLength} words
+              </div>
+              <div className="text-[10px] text-[color:var(--text-muted)]">Target: 20–32</div>
+            </div>
+            <div className="p-2 rounded bg-[color:var(--surface-inset)]">
+              <div className="text-[10px] text-[color:var(--text-muted)]">Passive Voice</div>
+              <div className="font-semibold text-[color:var(--text-primary)]">
+                {journalStyleAudit.metrics.passiveVoiceRatio.toFixed(1)}/sent
+              </div>
+              <div className="text-[10px] text-[color:var(--text-muted)]">Max: ≤3.5</div>
+            </div>
+            <div className="p-2 rounded bg-[color:var(--surface-inset)]">
+              <div className="text-[10px] text-[color:var(--text-muted)]">Lexical Diversity</div>
+              <div className="font-semibold text-[color:var(--text-primary)]">
+                {journalStyleAudit.metrics.lexicalDiversity.toFixed(2)}
+              </div>
+              <div className="text-[10px] text-[color:var(--text-muted)]">Min: ≥0.48</div>
+            </div>
+            <div className="p-2 rounded bg-[color:var(--surface-inset)]">
+              <div className="text-[10px] text-[color:var(--text-muted)]">Citation Density</div>
+              <div className="font-semibold text-[color:var(--text-primary)]">
+                {journalStyleAudit.metrics.citationDensity.toFixed(1)}%
+              </div>
+              <div className="text-[10px] text-[color:var(--text-muted)]">Min: ≥2.2%</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {job.lastError && (
         <p role="alert" className="text-xs text-[color:var(--state-danger)]">
@@ -466,6 +530,28 @@ export default function ManuscriptGenerationPanel({
                   )}
                 </div>
               ))}
+            </div>
+          )}
+          {journalStyleAudit && (
+            <div
+              data-testid="peer-review-style-evaluation"
+              className="mt-3 pt-3 border-t border-[color:var(--border-default)] flex flex-wrap items-center justify-between gap-2 text-xs"
+            >
+              <div>
+                <span className="font-semibold text-[color:var(--text-primary)]">Referee Style Evaluation: </span>
+                <span className="text-[color:var(--text-secondary)]">
+                  Q1 Journal Publication Standard ({journalStyleAudit.primaryTone} · {journalStyleAudit.secondaryTone})
+                </span>
+              </div>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                  journalStyleAudit.isCompliant
+                    ? "bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]"
+                    : "bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
+                }`}
+              >
+                Style Score: {journalStyleAudit.overallScore}% ({journalStyleAudit.isCompliant ? "Meets Q1 Standard" : "Revision Recommended"})
+              </span>
             </div>
           )}
         </div>

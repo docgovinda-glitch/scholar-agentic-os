@@ -31,6 +31,8 @@ interface ServerDiscoveredDraft {
   authorityTier: string;
 }
 
+type DiscoveredSourceDraft = ServerDiscoveredDraft;
+
 interface MultiPortalResponse {
   success: boolean;
   count: number;

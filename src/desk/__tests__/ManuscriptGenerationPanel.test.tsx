@@ -94,6 +94,8 @@ describe("Desk — ManuscriptGenerationPanel", () => {
     await screen.findByText(/1 of 2 sections/);
     expect(screen.getByText("Introduction")).toBeInTheDocument();
     expect(screen.getByText("Sets up the gap.")).toBeInTheDocument();
+    expect(screen.getByTestId("q1-journal-style-audit-card")).toBeInTheDocument();
+    expect(screen.getByText(/Q1 Journal Style Compliance/i)).toBeInTheDocument();
   });
 
   it("shows the AI Access Required state with a working Configure button when nothing is connected", async () => {
@@ -227,6 +229,8 @@ describe("Desk — ManuscriptGenerationPanel", () => {
     expect(await screen.findByText("Unsupported claim.")).toBeInTheDocument();
     expect(screen.getByText("Evidence is weak.")).toBeInTheDocument();
     expect(screen.getByText("Peer review (round 1)")).toBeInTheDocument();
+    expect(screen.getByTestId("peer-review-style-evaluation")).toBeInTheDocument();
+    expect(screen.getByText(/Referee Style Evaluation/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run another round" })).toBeInTheDocument();
   });
 

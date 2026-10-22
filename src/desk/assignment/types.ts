@@ -1038,6 +1038,7 @@ export interface AssignmentBriefState {
   writingStyle?: WritingStyleConfig;
   structure?: AssignmentStructure;
   writingTone?: WritingToneConfig;
+  executionMode?: "minimal" | "detailed";
   minWordCount?: number;
   maxWordCount?: number;
   academicLevel: AcademicLevel;

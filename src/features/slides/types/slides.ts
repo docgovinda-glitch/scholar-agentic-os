@@ -101,7 +101,7 @@ export type PresentationStyleId =
   | 'WhatIsCouldBe';
 
 export interface PresentationStyleProfile {
-  id: 'narrative' | 'problem-solution' | 'case-study' | 'executive-pitch' | 'visual-storytelling';
+  id: 'narrative' | 'problem-solution' | 'case-study' | 'executive-pitch' | 'visual-storytelling' | 'presentation_slides';
   label: string;
   writingTone: string;
   bulletRule: 'strict-6x6' | 'conversational-brief' | 'data-led' | 'one-line-impact';

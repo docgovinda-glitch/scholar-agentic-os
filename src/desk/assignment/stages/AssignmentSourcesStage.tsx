@@ -175,6 +175,7 @@ export default function AssignmentSourcesStage({
     addEvidenceItem,
     advancePhase,
     setPhase,
+    executionMode,
   } = useAssignmentWorkspace();
 
   // Active Main View: Unified Evidence Vault vs AI Analysis Workspace
@@ -194,7 +195,13 @@ export default function AssignmentSourcesStage({
   // Outline subheadings & view mode
   const subheadings = useMemo(() => flattenStructureSubheadings(structure), [structure]);
   const [selectedSubheadingId, setSelectedSubheadingId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"bar" | "card">("bar");
+  const [viewMode, setViewMode] = useState<"bar" | "card">(() => {
+    return executionMode === "detailed" ? "card" : "bar";
+  });
+
+  useEffect(() => {
+    setViewMode(executionMode === "detailed" ? "card" : "bar");
+  }, [executionMode]);
 
   const getSubheadingSources = useCallback(
     (subId: string, sourceList: DiscoveredSource[]) => {
@@ -1194,6 +1201,25 @@ export default function AssignmentSourcesStage({
 
           {/* Section 2: Curated Academic Literature & Source Collection */}
           <section className="space-y-4 pt-4 border-t border-neutral-200/60 dark:border-white/5">
+            {/* Detailed Mode Evidence Grounding Matrix Banner */}
+            {executionMode === "detailed" && (
+              <div className="rounded-2xl p-4 bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 text-xs space-y-2 font-sans animate-in fade-in duration-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider text-[11px]">
+                      Detailed Mode · OpenAlex & CrossRef Evidence Grounding Matrix
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                    {allMasterSources.length} Sources Active · Citation Token Interceptor Ready
+                  </span>
+                </div>
+                <p className="text-zinc-600 dark:text-zinc-400 text-[11px] leading-relaxed">
+                  Every approved source excerpt is assigned a deterministic token (e.g. <code>[1]</code> or <code>[ev-uuid]</code>) to ground factual statements before section drafting.
+                </p>
+              </div>
+            )}
             {/* Workspace Toolbar Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>

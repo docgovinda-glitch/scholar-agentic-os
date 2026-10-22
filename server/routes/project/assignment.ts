@@ -46,6 +46,68 @@ import {
   extractSubstantiveBriefQuestions,
   stripSlideArtifacts,
 } from "../../../src/utils/briefExtractor.ts";
+import { discoverMultiPortalSources, type DiscoveredSourceDraft } from "../../src/discovery/discovery.ts";
+import { getSupabaseRestConfig, SupabaseTable, type SupabaseRestConfig } from "../../src/supabaseRest.ts";
+import {
+  replaceBracketTokensWithDeterministicCitations,
+  compileDeterministicBibliographyMarkdown,
+  formatAskScholarInText,
+  formatAskScholarBibliographyEntry,
+  type WebsiteCitationItem,
+} from "../../../src/desk/scholarCitationEngine.ts";
+import type { DiscoveredSource } from "../../../src/desk/assignment/types.ts";
+
+interface SupabaseProjectSourceRecord extends Record<string, unknown> {
+  project_id: string;
+  source_id: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  doi?: string;
+  venue?: string;
+  journal?: string;
+  url?: string;
+  source_type: string;
+  authority_tier: string;
+  discovered_via: string;
+  discovered_at: string;
+}
+
+function getCourseworkSupabaseConfig(): SupabaseRestConfig | null {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) return null;
+  return { supabaseUrl, serviceRoleKey };
+}
+
+async function persistSourcesToSupabase(projectId: string, sources: DiscoveredSource[]): Promise<void> {
+  if (process.env.NODE_ENV === "test") return;
+  const config = getCourseworkSupabaseConfig();
+  if (!config) return;
+
+  const table = new SupabaseTable<SupabaseProjectSourceRecord>(config, "project_sources");
+  for (const src of sources) {
+    const yearNum = typeof src.year === "number" ? src.year : parseInt(String(src.year || ""), 10) || undefined;
+    const venue = src.journal || ((src as unknown as Record<string, unknown>).venue as string | undefined);
+    await table.upsert({
+      project_id: projectId,
+      source_id: src.id,
+      title: src.title,
+      authors: src.authors,
+      year: yearNum,
+      doi: src.doi,
+      venue,
+      journal: venue,
+      url: src.url,
+      source_type: typeof src.type === "string" ? src.type : "scholarly",
+      authority_tier: ((src as unknown as Record<string, unknown>).authorityTier as string) || "A",
+      discovered_via: src.retrievalSource || "openalex",
+      discovered_at: src.retrievedAt || new Date().toISOString(),
+    }, "project_id,source_id").catch((dbErr: unknown) => {
+      console.warn("Failed to persist source to Supabase project_sources:", dbErr);
+    });
+  }
+}
 
 const router = express.Router({ mergeParams: true });
 router.use(rejectClientCredentials);
@@ -1147,59 +1209,99 @@ router.post("/research", async (req: express.Request<{ id: string }>, res) => {
     academicLevel = project.answers["academic_level"] || "undergraduate",
     citationStyle = project.answers["citation_style"] || "apa7",
     plan = project.answers["assignment_research_plan"],
+    query: reqQuery,
   } = req.body || {};
 
+  const effectiveQuery = (
+    reqQuery ||
+    question ||
+    project.answers["research_topic"] ||
+    project.answers["working_title"] ||
+    project.answers["title"] ||
+    "academic research"
+  ).trim();
+
   try {
-    const prompt = `You are the Scholar Core Assignment Research Agent.
-Search and identify 8-12 high-impact, realistic scholarly sources for this assignment:
+    let discoveredDrafts: DiscoveredSourceDraft[] = [];
 
-Question: "${question}"
-Academic Level: ${academicLevel}
-Citation Style: ${citationStyle}
-Research Plan: ${JSON.stringify(plan || {})}
-
-For every source, provide:
-- High relevance to the prompt
-- Full citation formatted in ${citationStyle}
-- Author(s), year, publication type (journal/book/institutional)
-- Main finding or argument
-- Concrete guidance on how the student should use it in their assignment
-
-Return ONLY valid JSON matching:
-{
-  "sources": [
-    {
-      "id": "src-1",
-      "title": "...",
-      "authors": ["...", "..."],
-      "year": "2024",
-      "type": "journal",
-      "journal": "...",
-      "doi": "10.1016/j.sample.2024.01",
-      "relevanceScore": 95,
-      "mainFinding": "...",
-      "suggestedUse": "...",
-      "citation": "...",
-      "status": "unreviewed"
+    // Query multi-portal discovery (OpenAlex, Crossref, DOAJ, DataCite, arXiv)
+    try {
+      discoveredDrafts = await discoverMultiPortalSources(effectiveQuery, 25);
+    } catch (discErr) {
+      console.warn("Multi-portal discovery network call failed, attempting fallback:", discErr);
     }
-  ]
-}`;
 
-    const data = await callOpenRouterJSON(
-      req,
-      res,
-      "You are the Scholar Core Academic Research Discovery Agent.",
-      prompt,
-      "openrouter/auto",
-      "discovery"
-    );
-    if (!data) return;
-    res.json(data);
-  } catch (err: any) {
-    if (err?.message === "RequireFrontendLLMException") return;
+    let sources: DiscoveredSource[] = [];
+
+    if (discoveredDrafts && discoveredDrafts.length > 0) {
+      sources = discoveredDrafts.map((draft, idx) => {
+        const yearStr = draft.year ? String(draft.year) : "2024";
+        const srcId = `src-${Date.now()}-${idx + 1}`;
+        const authorStr =
+          draft.authors.length > 0
+            ? draft.authors.length > 2
+              ? `${draft.authors[0]} et al.`
+              : draft.authors.join(" & ")
+            : "Unknown Author";
+        const venue = draft.venue || "Academic Press";
+        const citationStr = `${authorStr} (${yearStr}). ${draft.title}.${draft.venue ? ` ${draft.venue}.` : ""}${
+          draft.doi ? ` https://doi.org/${draft.doi}` : ""
+        }`;
+
+        return {
+          id: srcId,
+          title: draft.title,
+          authors: draft.authors,
+          year: yearStr,
+          type: draft.sourceType === "scholarly" ? "journal" : "article",
+          journal: draft.venue,
+          doi: draft.doi,
+          url: draft.url,
+          relevanceScore: Math.max(75, 98 - idx * 2),
+          mainFinding: draft.venue
+            ? `Published in ${draft.venue}. Empirical literature addressing foundational aspects of the question.`
+            : "Peer-reviewed literature addressing central research question.",
+          suggestedUse:
+            draft.authorityTier === "A"
+              ? "Primary theoretical framework & empirical evidence grounding"
+              : "Supporting literature and contextual evidence",
+          citation: citationStr,
+          status: "unreviewed",
+          retrievalSource: draft.discoveredVia,
+          retrievedAt: new Date().toISOString(),
+          peerReviewed: draft.authorityTier === "A",
+          sourceCredibility:
+            draft.authorityTier === "A"
+              ? "Gold Standard (Leading Journal / Monograph)"
+              : "Standard Academic / University Press",
+        } as DiscoveredSource;
+      });
+    } else {
+      // Graceful fallback to curated discovery catalog if external APIs are unreachable (e.g. offline testing)
+      const mockResult = conductAskScholarResearchForOutline({
+        question: effectiveQuery,
+        assignmentType: (project.answers["assignment_type"] || "essay") as any,
+        academicLevel: academicLevel as any,
+        targetWordCount: Number(project.answers["targetWordCount"] || 2000),
+      });
+      if (mockResult?.curatedDiscoveredSources && mockResult.curatedDiscoveredSources.length > 0) {
+        sources = mockResult.curatedDiscoveredSources;
+      }
+    }
+
+    // Persist discovered sources to Supabase project_sources
+    await persistSourcesToSupabase(project.projectId, sources);
+
+    // Save discovered sources to project answers
+    project.answers["discovered_sources"] = JSON.stringify(sources);
+    await getProjectStore().save(project);
+
+    res.json({ sources });
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
     console.error("Assignment research error:", err);
     if (!res.headersSent) {
-      res.status(500).json({ error: err.message || "Failed to discover research sources" });
+      res.status(500).json({ error: errorMsg || "Failed to discover research sources" });
     }
   }
 });
@@ -1735,10 +1837,47 @@ router.post("/draft-section", async (req: express.Request<{ id: string }>, res) 
   }
 
   try {
-    const evidenceContext = approvedEvidence.length > 0
+    const mappedCitationItems: WebsiteCitationItem[] = (
+      Array.isArray(approvedEvidence) ? approvedEvidence : []
+    ).map((e: unknown, idx: number) => {
+      const ev = (e && typeof e === "object" ? e : {}) as Record<string, unknown>;
+      const id = (ev.id as string) || (ev.source_id as string) || (ev.sourceId as string) || `src-${idx + 1}`;
+      const title = (ev.title as string) || (ev.claim as string) || "Scholarly Resource";
+      const authors = Array.isArray(ev.authors)
+        ? (ev.authors as string[])
+        : typeof ev.authors === "string"
+        ? [ev.authors]
+        : typeof ev.author === "string"
+        ? [ev.author]
+        : ["Author"];
+      const year = (ev.year as string | number) || "2024";
+      const journal = (ev.journal as string) || (ev.venue as string) || undefined;
+      const doi = (ev.doi as string) || undefined;
+      const url = (ev.url as string) || undefined;
+      const citation = (ev.citation as string) || undefined;
+      const claim = (ev.claim as string) || undefined;
+      const evidenceSnippet = (ev.evidenceSnippet as string) || (ev.mainFinding as string) || undefined;
+
+      return {
+        id,
+        title,
+        authors,
+        year,
+        journal,
+        venue: journal,
+        doi,
+        url,
+        citation,
+        claim,
+        evidenceSnippet,
+        mainFinding: evidenceSnippet,
+      };
+    });
+
+    const evidenceContext = mappedCitationItems.length > 0
       ? `APPROVED EVIDENCE TO USE (DO NOT FABRICATE OTHER SOURCES):\n` +
-        approvedEvidence
-          .map((e: any, i: number) => `[${i + 1}] Claim: ${e.claim} | Evidence: ${e.evidenceSnippet} | Citation: ${e.citation}`)
+        mappedCitationItems
+          .map((e, i) => `[${i + 1}] (Token ID: [${e.id}]) Claim: ${e.claim || e.title} | Evidence: ${e.evidenceSnippet || e.title} | Citation: ${e.citation || e.title}`)
           .join("\n")
       : "No external evidence provided. Write conceptually and indicate where citations are needed.";
 
@@ -1767,15 +1906,16 @@ router.post("/draft-section", async (req: express.Request<{ id: string }>, res) 
       ? `CRITICAL TUTORIAL Q&A GUIDELINES:
 1. Directly answer the question in concise, conversational, and analytically grounded prose (~100-150 words).
 2. Do NOT write generic dissertation introductions, conclusion filler, artificial section summaries, or meta-commentary.
-3. ONLY cite external sources if provided in the approved evidence; do NOT invent or force fake citations.
+3. STRICT CITATION CONVENTION: You are strictly PROHIBITED from formatting in-text citations yourself (do NOT write "(Author, Year)" or author names with years) and strictly PROHIBITED from outputting a "References" or "Bibliography" section. When citing approved evidence, insert ONLY bracket tokens [1], [2], or token IDs like [${mappedCitationItems[0]?.id || "ev-id"}]. The citation interceptor will compile all citations deterministically.
 4. Adhere strictly to any custom section guidance provided by the student above.
 5. Provide ONLY the section draft text.`
       : `CRITICAL RULES:
 1. ONLY cite from the approved evidence provided above. Do NOT fabricate citations, authors, or statistics.
-2. Integrate in-text citations smoothly according to ${citationStyle}.
-3. Maintain rigorous paragraph structure and academic tone.
-4. Adhere strictly to any custom section guidance provided by the student above.
-5. Provide ONLY the section draft text.`;
+2. STRICT CITATION CONVENTION: You are strictly PROHIBITED from formatting in-text citations yourself (do NOT write "(Author, Year)", "(Author Year)", or author names with years) and strictly PROHIBITED from outputting any "References", "Bibliography", or "Works Cited" section at the end.
+3. When referencing approved evidence, you MUST insert ONLY bracket tokens like [1], [2], or bracket IDs like [${mappedCitationItems[0]?.id || "ev-id"}]. The deterministic Scholar Citation Interceptor will convert all bracket tokens into certified ${citationStyle} in-text citations and append references.
+4. Maintain rigorous paragraph structure and academic tone.
+5. Adhere strictly to any custom section guidance provided by the student above.
+6. Provide ONLY the section draft text.`;
 
     const prompt = `You are the Scholar Core Grounded Academic Drafting Agent.
 Write the draft for section: "${sectionTitle}".
@@ -1804,7 +1944,7 @@ ${tutorialOrPeelRules}`;
       "drafting"
     );
 
-    const effectiveDraft = draft?.trim()
+    let effectiveDraft = draft?.trim()
       ? draft.trim()
       : generateSectionDraft({
           sectionTitle,
@@ -1815,11 +1955,20 @@ ${tutorialOrPeelRules}`;
           citationStyle,
           thesis,
           keyPoints,
-          boundSources: approvedEvidence.map((e: any) => ({
-            title: e.claim,
+          boundSources: mappedCitationItems.map((e) => ({
+            title: e.claim || e.title || "Scholarly Resource",
             citation: e.citation,
+            authors: e.authors,
+            year: typeof e.year === "number" ? String(e.year) : e.year,
           })),
         });
+
+    // Deterministic Token Interceptor: strictly strips hallucinated references and compiles citations in project style
+    effectiveDraft = replaceBracketTokensWithDeterministicCitations(
+      effectiveDraft,
+      mappedCitationItems,
+      citationStyle
+    );
 
     res.json({ draft: effectiveDraft });
   } catch (err: any) {
@@ -1857,13 +2006,47 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
   res.flushHeaders?.();
 
   try {
+    const mappedSources: WebsiteCitationItem[] = (
+      Array.isArray(boundSources) ? boundSources : []
+    ).map((s: unknown, idx: number) => {
+      const src = (s && typeof s === "object" ? s : {}) as Record<string, unknown>;
+      const id = (src.id as string) || (src.source_id as string) || (src.sourceId as string) || `src-${idx + 1}`;
+      const title = (src.title as string) || "Scholarly Resource";
+      const authors = Array.isArray(src.authors)
+        ? (src.authors as string[])
+        : typeof src.authors === "string"
+        ? [src.authors]
+        : typeof src.author === "string"
+        ? [src.author]
+        : ["Author"];
+      const year = (src.year as string | number) || "2024";
+      const journal = (src.journal as string) || (src.venue as string) || (src.type as string) || undefined;
+      const doi = (src.doi as string) || undefined;
+      const url = (src.url as string) || undefined;
+      const citation = (src.citation as string) || undefined;
+
+      return {
+        id,
+        title,
+        authors,
+        year,
+        journal,
+        venue: journal,
+        doi,
+        url,
+        citation,
+        mainFinding: (src.mainFinding as string) || (src.suggestedUse as string) || undefined,
+        suggestedUse: (src.suggestedUse as string) || undefined,
+      };
+    });
+
     // Use structured evidence pack if provided (Production Spec §4.1–4.3),
     // otherwise fall back to the basic flat evidence list
     const evidenceBlock = evidencePackPrompt
       ? evidencePackPrompt
-      : (boundSources || [])
-        .map((s: any, i: number) => `[${i + 1}] Title: ${s.title} | Author(s): ${(s.authors || []).join(", ")} (${s.year || "n.d."}) | Venue: ${s.journal || s.type} | Rationale: ${s.suggestedUse || s.mainFinding || ""}`)
-        .join("\n");
+      : mappedSources
+          .map((s, i) => `[${i + 1}] (Token ID: [${s.id}]) Title: ${s.title} | Author(s): ${(s.authors || []).join(", ")} (${s.year || "n.d."}) | Venue: ${s.journal || "Scholarly"} | Rationale: ${s.suggestedUse || s.mainFinding || ""}`)
+          .join("\n");
 
     const revisionInstruction = revisionPrompt === "deepen"
       ? "REVISION FOCUS: Deepen analytical critique. Minimize passive descriptive text and amplify dialectical interrogation of theoretical assumptions (target 70% analysis / 30% description)."
@@ -1895,10 +2078,11 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
       ? `TUTORIAL & CASE STUDY Q&A GUIDELINES:
 - Directly answer the question in concise, conversational, and analytically grounded prose (~100-150 words).
 - Do NOT generate generic dissertation introductions, conclusion filler, artificial section summaries, or meta-commentary.
-- ONLY cite sources if explicitly provided in the bound evidence above; do NOT invent or force fake citations.`
+- STRICT CITATION CONVENTION: You are strictly PROHIBITED from formatting in-text citations as (Author, Year) or outputting a "References" section. Use ONLY bracket tokens like [1], [2], or token IDs like [${mappedSources[0]?.id || "ev-uuid"}].`
       : `MANDATORY PEEL PARAGRAPH FRAMEWORK:
 - Point: Distinct topic sentence advancing the central thesis.
-- Evidence: Grounded empirical citations from the bound sources.
+- Evidence: Grounded empirical citations referenced SOLELY via bracket tokens like [1], [2], or token IDs like [${mappedSources[0]?.id || "ev-uuid"}].
+- STRICT CITATION CONVENTION: Do NOT format author-year in-text citations or include a "References" section. All citations will be compiled deterministically by the Citation Interceptor according to ${citationStyle}.
 - Explanation: 70% critical analysis & evaluation / 30% descriptive exposition.
 - Link: Clear concluding transition linking back to the primary assessment prompt.`;
 
@@ -1928,7 +2112,7 @@ Output ONLY the section text in clean academic Markdown prose.`;
       "drafting"
     );
 
-    const effectiveDraft = draft?.trim()
+    let effectiveDraft = draft?.trim()
       ? draft.trim()
       : generateSectionDraft({
           sectionTitle,
@@ -1938,9 +2122,21 @@ Output ONLY the section text in clean academic Markdown prose.`;
           academicLevel,
           citationStyle,
           thesis,
-          boundSources,
+          boundSources: mappedSources.map((s) => ({
+            title: s.title || "Scholarly Resource",
+            citation: s.citation,
+            authors: s.authors,
+            year: typeof s.year === "number" ? String(s.year) : s.year,
+          })),
           revisionPrompt: revisionPrompt as any,
         });
+
+    // Pipe streamed draft through deterministic citation interceptor
+    effectiveDraft = replaceBracketTokensWithDeterministicCitations(
+      effectiveDraft,
+      mappedSources,
+      citationStyle
+    );
 
     const words = effectiveDraft.split(" ");
     for (let i = 0; i < words.length; i += 5) {
@@ -2746,6 +2942,79 @@ router.post("/citations-ground", async (req: express.Request<{ id: string }>, re
   } = req.body || {};
 
   try {
+    const effectiveQuery = (
+      question ||
+      project.answers["research_topic"] ||
+      project.answers["title"] ||
+      "academic research"
+    ).trim();
+
+    let drafts: DiscoveredSourceDraft[] = [];
+    try {
+      drafts = await discoverMultiPortalSources(effectiveQuery, 15);
+    } catch (discErr) {
+      console.warn("Multi-portal discovery failed in citations-ground, attempting fallback:", discErr);
+      drafts = [];
+    }
+
+    if (drafts.length > 0) {
+      const citations = drafts.map((d, idx) => {
+        const item: WebsiteCitationItem = {
+          id: `cit-${idx + 1}`,
+          title: d.title,
+          authors: d.authors,
+          year: d.year ? String(d.year) : "2024",
+          journal: d.venue,
+          venue: d.venue,
+          doi: d.doi,
+          url: d.url,
+        };
+        const inText = formatAskScholarInText(item, idx, citationStyle);
+        const bib = formatAskScholarBibliographyEntry(item, idx, citationStyle);
+
+        return {
+          id: `cit-${idx + 1}`,
+          sourceTitle: d.title,
+          authors: d.authors,
+          year: d.year ? String(d.year) : "2024",
+          journalOrPublisher: d.venue || "Academic Press",
+          doi: d.doi || "",
+          citationText: bib.formattedText,
+          inTextCitation: inText,
+          citationStyle,
+          verifiedPeerReviewed: d.authorityTier === "A",
+          linkedThemeIds: [],
+          quoteOrFindingSnippet: d.venue
+            ? `Published in ${d.venue}. Grounded scholarly literature addressing key dimensions of inquiry.`
+            : "Peer-reviewed literature supporting conceptual foundations.",
+        };
+      });
+
+      // Persist discovered citations as project sources
+      const sourcesToPersist: DiscoveredSource[] = drafts.map((d, idx) => ({
+        id: `src-ground-${Date.now()}-${idx + 1}`,
+        title: d.title,
+        authors: d.authors,
+        year: d.year ? String(d.year) : "2024",
+        type: d.sourceType === "scholarly" ? "journal" : "article",
+        journal: d.venue,
+        doi: d.doi,
+        url: d.url,
+        relevanceScore: 90,
+        mainFinding: "Peer-reviewed grounding literature.",
+        suggestedUse: "Core conceptual grounding",
+        citation: citations[idx].citationText,
+        status: "unreviewed",
+        retrievalSource: d.discoveredVia,
+        retrievedAt: new Date().toISOString(),
+        peerReviewed: d.authorityTier === "A",
+      }));
+      await persistSourcesToSupabase(project.projectId, sourcesToPersist);
+
+      return res.json({ citations });
+    }
+
+    // Fallback to LLM if external multi-portal search is empty or offline
     const prompt = `You are the Scholar Core Academic Citation & Grounding Agent.
 Identify and format 8-12 realistic, high-impact peer-reviewed scholarly sources to ground this assignment:
 
@@ -2791,11 +3060,11 @@ Return ONLY valid JSON matching:
     );
     if (!data) return;
     res.json(data);
-  } catch (err: any) {
-    if (err?.message === "RequireFrontendLLMException") return;
+  } catch (err: unknown) {
+    if ((err as Error)?.message === "RequireFrontendLLMException") return;
     console.error("Citation grounding error:", err);
     if (!res.headersSent) {
-      res.status(500).json({ error: err.message || "Failed to ground citations" });
+      res.status(500).json({ error: (err as Error).message || "Failed to ground citations" });
     }
   }
 });

@@ -177,6 +177,18 @@ export default function PresentationHeader({
           </button>
         )}
 
+        {/* Learned ML Style Compliance Badge (OT-22 presentation_slides) */}
+        <div
+          data-testid="presentation-style-badge"
+          className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium border border-neutral-200/80 dark:border-white/10 bg-neutral-50 dark:bg-neutral-800/60 text-neutral-700 dark:text-neutral-300 shadow-xs"
+          title="Style Engine: Conversational Academic (Assertion-Evidence 6x6)"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+          <span className="font-semibold text-neutral-900 dark:text-white">OT-22 Style:</span>
+          <span>Conversational Academic</span>
+          <span className="text-[10px] font-mono text-neutral-400">· 6x6 Density</span>
+        </div>
+
         {/* Ask Scholar Drawer Toggle Pill */}
         <button
           type="button"

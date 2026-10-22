@@ -128,7 +128,57 @@ export const PRESENTATION_STYLE_PROFILES: Record<string, PresentationStyleProfil
     narrativeScaffolding: 'VisualNarrative',
     systemInstruction: 'Assign Split Image + Text layouts with short, 1-line impact statements and evocative framing.',
   },
+  presentation_slides: {
+    id: 'presentation_slides',
+    label: 'Learned Presentation Slides Benchmark',
+    writingTone: 'Conversational Academic, Persuasive, Assertion-Evidence driven',
+    bulletRule: 'strict-6x6',
+    layoutDistribution: {
+      heroMetricRatio: 0.3,
+      twoColumnRatio: 0.3,
+      splitMediaRatio: 0.4,
+    },
+    narrativeScaffolding: 'Standard-Narrative',
+    systemInstruction:
+      'Enforce Conversational Academic & Persuasive tone, concise assertion-evidence phrasing, zero throat-clearing, and 6x6 bullet density.',
+  },
 };
+
+export interface PresentationLearnedStyleConstraints {
+  primaryTone: string;
+  secondaryTone: string;
+  assertionEvidenceRule: string;
+  throatClearingPolicy: string;
+  bulletDensityRule: string;
+  targetSentenceRange: [number, number];
+  systemPromptInjection: string;
+}
+
+/**
+ * Builds quantitative style and rhetorical constraints derived from the 110-paper
+ * peer-reviewed corpus for presentation_slides (OT-22).
+ */
+export function buildPresentationPromptConstraints(): PresentationLearnedStyleConstraints {
+  return {
+    primaryTone: 'Conversational Academic',
+    secondaryTone: 'Persuasive',
+    assertionEvidenceRule:
+      "Every slide headline must be a concise, assertive takeaway sentence (answering 'So What?'), followed by concrete empirical/visual proof.",
+    throatClearingPolicy:
+      'Zero throat-clearing: eliminate all introductory padding, rhetorical meta-announcements, and conversational fluff.',
+    bulletDensityRule:
+      'Strict 6x6 Density: maximum 6 bullet points per slide, maximum 6 words per bullet point, maximum 2 lines per bullet.',
+    targetSentenceRange: [12, 22],
+    systemPromptInjection: [
+      'ACADEMIC STYLE CONSTRAINTS (Learned OT-22 presentation_slides Benchmark):',
+      '- Tone: Conversational Academic (Primary) and Persuasive (Secondary).',
+      '- Structure: Assertion-Evidence framework. Formulate action headlines as clear claims (12-22 words max), never passive labels.',
+      '- Density: Strict 6x6 rule (<=6 bullets, <=6 words/bullet). Never exceed 2 lines per bullet.',
+      '- Zero Throat-Clearing: No introductory filler (e.g. "This slide illustrates..."). Lead immediately with the core finding.',
+      '- Transitions: Use active rhetorical signposts (e.g., "key takeaway: empirical data confirms", "visual evidence highlights a 3x gain", "in summary, three decisive factors emerge").',
+    ].join('\n'),
+  };
+}
 
 export interface DecomposeInput {
   text?: string;

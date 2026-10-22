@@ -9,33 +9,42 @@
 Rather than generic forms, each academic format in Scholar Core operates through its own purpose-built workspace tailored to the exact cognitive process of researchers:
 
 1. **📝 Coursework & Essay Engine (`OT-01`)**:
-   - **4-Phase Lifecycle**:
-     - **Phase 1 · Understand & Structure**: Unified assignment setup box (prompt input, academic level, assignment type, and citation style in a clean single-component workspace), question-specific analytical structure generator (`outlineService.ts`) decomposing prompts into relational entities without generic templates, calibrated thesis statement generation, dynamic word count allocator & editor (`DynamicStructurePlanner.tsx`), and authentic academic voice selection (`WritingStyleSelector.tsx`) across 6 styles.
-     - **Phase 2 · Sources & Discovery**: Question-led literature discovery engine (`scholarlyDiscoveryService.ts`), connecting directly to Phase 1 subheadings with research status indicators, explicit assignment roles (*Empirical evidence*, *Theoretical framework*, *Core theory*), relevance categorization, contextual justifications, 2024-2026 recency prioritization with seminal core theory anchors, and a lecture/slide upload dropzone (`LectureUploadDropzone.tsx`).
-     - **Phase 3 · Drafting**: Subheading-by-subheading drafting alignment matching the confirmed structure (`DraftingSectionIndex.tsx`), live target vs. actual word counters, TipTap WYSIWYG editor, and pre-formatted in-text citation insertion.
-     - **Phase 4 · Submission**: 10-point rubric compliance evaluator, citation reconciliation auditor (100% in-text citations checked against the bibliography), and one-click `.docx` and PDF export with running headers and formatted references.
-   - **Stage-Scoped Copilot Personas** (`ContextPanel.tsx`):
-     - Phase 1 → **Advisor** (prompt deconstruction and structural guidance)
-     - Phase 2 → **Librarian** (source curation and bibliographic rigor)
-     - Phase 3 → **Scribe** (PEEL structure and academic register)
-     - Phase 4 → **Examiner** (rubric evaluation and citation audit)
+   - **Dual Execution Modes (`Minimal | Detailed`)**:
+     - **Minimal Mode**: Streamlined setup (Topic, Assignment Type, Word Count Target, Citation Style) with a clean distraction-free writing canvas; defers intermediate telemetry and drawers.
+     - **Detailed Mode**: Full architectural controls (Academic Tone selector with auto-binding, custom rubric, database filters) + live 4-phase atomic lifecycle stepper, OpenAlex/Crossref citation badges, `<20%` inter-section overlap indicator, and expanded ML Style Compliance Audit panel.
+   - **4-Phase Atomic Lifecycle**:
+     - **Phase 1 · Understand & Structure**: Unified assignment setup, analytical structure generator (`outlineService.ts`), calibrated thesis generation, dynamic word count editor (`DynamicStructurePlanner.tsx`), and auto-bound collegiate tone mapping across 6 tones.
+     - **Phase 2 · Sources & Discovery**: Literature discovery engine (`scholarlyDiscoveryService.ts`), connecting directly to Phase 1 subheadings with research status indicators, explicit assignment roles (*Empirical evidence*, *Theoretical framework*, *Core theory*), and lecture/slide upload dropzone (`LectureUploadDropzone.tsx`).
+     - **Phase 3 · Drafting & Learned Prompt Injection**: Section drafting prompt generator (`drafting.ts`) injecting explicit quantitative writing constraints (mean sentence length 18–32 words, burstiness standard deviation 6.5–9.5 words, active voice `>= 80%`, citation density `>= 2.2%`, and archetype transition n-grams).
+     - **Phase 4 · Submission**: 10-point rubric compliance evaluator, citation reconciliation auditor (100% in-text citations verified against references), and one-click `.docx` and PDF export.
+   - **Stage-Scoped Copilot Personas** (`ContextPanel.tsx`): Advisor (Understand), Librarian (Sources), Scribe (Drafting), Examiner (Submission).
 
 2. **📄 Journal Article Workspace (`OT-10`)**:
    - **25-Stage Empirical Pipeline**: *Topic Definition → Literature Matrix → Gap Identification → Claim-Evidence Graph → Methodological Framing → Empirical Generation → Double-Blind Adversarial Peer Review*.
-   - Includes 5 specialized reviewer lenses (Methodologist, Domain Specialist, Biostatistician, Synthesizer, Formal Editor).
+   - **Q1 Journal Style Compliance Engine**: Live manuscript style compliance score card based on the 110-paper corpus, enforcing `Formal Academic` / `Objective` benchmarks during section generation and double-blind peer-review referee evaluation.
 
 3. **💡 Research Proposal Workspace (`OT-19`)**:
    - **Competitive Grant Pipeline**: *Funding Agency Alignment → 1-Page Specific Aims → Significance & Innovation → Research Strategy & Pitfalls → Timeline & Gantt Work Packages → Budget Justification*.
    - Includes a **Study Section Review Simulator (NIH / NSF Scoring Criteria)**.
 
 4. **📊 Academic Presentation Studio (`OT-22`)**:
-   - **4-Step Guided Workflow**: *01 Understand (Define Topic & Outline) → 02 Design (4 Curated Presets & Custom Accent Picker) → 03 Edit Slides (100% WYSIWYG Editable Canvas with Split Image + Text Layouts) → 04 Present (Stage View, Rehearsal Timing, & Clean Export)*. Zero developer database leakages and purged feature bloat.
+   - **4-Step Guided Workflow**: *01 Understand (Define Topic & Outline) → 02 Design (Curated Presets & Screenshot Cloner) → 03 Edit Slides (100% WYSIWYG Editable Canvas) → 04 Present (Stage View & Live Slide Player)*.
+   - **Learned Presentation Benchmark Integration**: Live `OT-22 Style: Conversational Academic · 6x6 Density` header badge and prompt builder enforcing concise assertion-evidence headlines, zero throat-clearing, and 6x6 bullet density.
 
 5. **🎓 Thesis & Dissertation Workspace (`OT-09` / `OT-07`)**:
    - Multi-chapter milestone tracker, literature synthesis matrix, and 15-question Viva Voce oral defense simulator.
 
 6. **💬 Full-Screen Conversational Ask Scholar (`/projects`)**:
    - Immersive dashboard research chat that collapses template starter cards upon interaction, creating an expansive full-screen canvas with citation grounding and direct project initiation.
+
+---
+
+## 🧠 Supervised ML Style Engine (110-Paper Open-Access Corpus)
+
+Scholar Core includes a dedicated Supervised Machine Learning Style Engine (`ml-style-engine/`):
+- **110-Paper Verified Corpus**: 10 full-text peer-reviewed open-access papers per archetype across 11 scholarly classes (`essay`, `literature_review`, `research_paper`, `case_study`, `report`, `critical_essay`, `argumentative_essay`, `policy_analysis`, `business_assignment`, `journal_article`, `presentation_slides`), totaling **752,811 verified words** with 0 duplicate PMCIDs and 0 duplicate hashes.
+- **High-Precision ML Classifier**: Calibrated LinearSVC achieves **93.97% 5-Fold Stratified Cross-Validation Accuracy & Macro F1** (exceeding the 85% qualification gate).
+- **Zero-Latency In-Memory Inference**: Model weights exported to JSON (`archetype_model_weights.json`) for deterministic client-side TF-IDF dot-product scoring and quantitative style auditing in TypeScript without network overhead.
 
 
 ---

@@ -1,0 +1,228 @@
+{
+  "architecture": "Calibrated LinearSVC",
+  "cv_accuracy": 0.9396624450354143,
+  "cv_f1_macro": 0.9397390965882751,
+  "train_accuracy": 0.9946038753985774,
+  "train_f1_macro": 0.9944202501790618,
+  "candidate_model_comparison": {
+    "Multinomial Naive Bayes": {
+      "accuracy": 0.9318134457764253,
+      "f1_macro": 0.9320955650033553
+    },
+    "Calibrated LinearSVC": {
+      "accuracy": 0.9396624450354143,
+      "f1_macro": 0.9397390965882751
+    },
+    "L2 Logistic Regression": {
+      "accuracy": 0.9308326029798423,
+      "f1_macro": 0.9306617304186655
+    }
+  },
+  "archetypes": [
+    "essay",
+    "literature_review",
+    "research_paper",
+    "case_study",
+    "report",
+    "critical_essay",
+    "argumentative_essay",
+    "policy_analysis",
+    "business_assignment",
+    "journal_article",
+    "presentation_slides"
+  ],
+  "tone_mapping": {
+    "essay": {
+      "primary": "Formal Academic",
+      "secondary": "Conversational Academic"
+    },
+    "literature_review": {
+      "primary": "Critical",
+      "secondary": "Analytical"
+    },
+    "research_paper": {
+      "primary": "Formal Academic",
+      "secondary": "Objective"
+    },
+    "case_study": {
+      "primary": "Analytical",
+      "secondary": "Objective"
+    },
+    "report": {
+      "primary": "Objective",
+      "secondary": "Analytical"
+    },
+    "critical_essay": {
+      "primary": "Critical",
+      "secondary": "Analytical"
+    },
+    "argumentative_essay": {
+      "primary": "Persuasive",
+      "secondary": "Formal Academic"
+    },
+    "policy_analysis": {
+      "primary": "Analytical",
+      "secondary": "Persuasive"
+    },
+    "business_assignment": {
+      "primary": "Analytical",
+      "secondary": "Objective"
+    },
+    "journal_article": {
+      "primary": "Formal Academic",
+      "secondary": "Objective"
+    },
+    "presentation_slides": {
+      "primary": "Conversational Academic",
+      "secondary": "Persuasive"
+    }
+  },
+  "vocabulary_size": 5000,
+  "num_documents": 110,
+  "total_samples": 8154,
+  "confusion_matrix": [
+    [
+      857,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      761,
+      2,
+      0,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      770,
+      0,
+      0,
+      0,
+      3,
+      0,
+      1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      1,
+      719,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      2,
+      0,
+      587,
+      0,
+      2,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      1,
+      3,
+      0,
+      0,
+      570,
+      3,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      2,
+      1,
+      0,
+      1,
+      724,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      904,
+      0,
+      1,
+      0
+    ],
+    [
+      0,
+      0,
+      4,
+      0,
+      2,
+      0,
+      2,
+      0,
+      832,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      857,
+      0
+    ],
+    [
+      1,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      2,
+      0,
+      1,
+      529
+    ]
+  ]
+}

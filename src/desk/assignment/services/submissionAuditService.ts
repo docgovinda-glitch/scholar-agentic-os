@@ -501,7 +501,6 @@ export function evaluateRubricCompliance(
     strengths,
     priorityFixes,
   };
-  };
 }
 
 /**

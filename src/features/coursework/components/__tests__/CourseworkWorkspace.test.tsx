@@ -65,4 +65,64 @@ describe('CourseworkWorkspace', () => {
     expect(screen.getByTestId('slide-canvas-viewport')).toBeInTheDocument();
     expect(screen.getByText('94.5%')).toBeInTheDocument();
   });
+
+  it('renders Minimal Mode by default with streamlined controls and toggles to Detailed Mode', () => {
+    render(<CourseworkWorkspace initialMode="minimal" />);
+
+    // Streamlined setup header and mode toggle
+    expect(screen.getByText(/Streamlined Setup/i)).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Minimal/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /Detailed/i })).toHaveAttribute('aria-checked', 'false');
+
+    // Streamlined inputs are present
+    expect(screen.getByLabelText('Topic')).toBeInTheDocument();
+    expect(screen.getByLabelText('Assignment Type')).toBeInTheDocument();
+    expect(screen.getByLabelText('Word Count')).toBeInTheDocument();
+    expect(screen.getByLabelText('Citation Style')).toBeInTheDocument();
+
+    // In Minimal Mode, detailed telemetry is hidden
+    expect(screen.queryByText(/Live 4-Phase Atomic Lifecycle Stepper/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Academic Tone')).not.toBeInTheDocument();
+
+    // Toggle to Detailed Mode
+    fireEvent.click(screen.getByRole('radio', { name: /Detailed/i }));
+
+    // Detailed Mode controls and telemetry appear
+    expect(screen.getByText(/Comprehensive Architecture Controls/i)).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Detailed/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByLabelText('Academic Tone')).toBeInTheDocument();
+    expect(screen.getByLabelText('Custom Rubric')).toBeInTheDocument();
+    expect(screen.getByText(/Live 4-Phase Atomic Lifecycle Stepper/i)).toBeInTheDocument();
+    expect(screen.getByText(/Inter-section Overlap: 4.8% \(PASS <20%\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/OpenAlex: 14 Indexed Sources/i)).toBeInTheDocument();
+    expect(screen.getByText(/Crossref: DOIs Verified/i)).toBeInTheDocument();
+    expect(screen.getByText(/OT-01 Supervised Style Engine \(110-Paper Corpus Benchmark\)/i)).toBeInTheDocument();
+  });
+
+  it('auto-binds Academic Tone when Assignment Type changes, allowing manual override', () => {
+    render(<CourseworkWorkspace initialMode="detailed" targetArchetype="essay" />);
+
+    const typeSelect = screen.getByLabelText('Assignment Type');
+    const toneSelect = screen.getByLabelText('Academic Tone') as HTMLSelectElement;
+
+    // Default for essay is Formal Academic
+    expect(toneSelect.value).toBe('Formal Academic');
+
+    // Change to literature_review -> auto-binds to Critical
+    fireEvent.change(typeSelect, { target: { value: 'literature_review' } });
+    expect(toneSelect.value).toBe('Critical');
+
+    // Change to policy_analysis -> auto-binds to Analytical
+    fireEvent.change(typeSelect, { target: { value: 'policy_analysis' } });
+    expect(toneSelect.value).toBe('Analytical');
+
+    // Change to argumentative_essay -> auto-binds to Persuasive
+    fireEvent.change(typeSelect, { target: { value: 'argumentative_essay' } });
+    expect(toneSelect.value).toBe('Persuasive');
+
+    // User can manually override tone
+    fireEvent.change(toneSelect, { target: { value: 'Conversational Academic' } });
+    expect(toneSelect.value).toBe('Conversational Academic');
+  });
 });
+

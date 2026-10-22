@@ -42,6 +42,9 @@ import { UpgradeModal } from "../../../components/modals/UpgradeModal";
 import { isDeepEqual, stripCircularReferences, safeFormatLabel } from "../../../utils/briefExtractor";
 import { validateBriefFile } from "../../../services/documentParser";
 import { classifyScopeBoundaries, stripLineTags } from "../../../features/understand/services/scopeClassifier";
+import CourseworkModeToggle from "../../../features/coursework/components/CourseworkModeToggle";
+import type { CourseworkExecutionMode, CourseworkProgressEvent } from "../../../features/coursework/types/orchestrator";
+import { executeDetailedAutonomousSynthesis } from "../../../features/coursework/services/courseworkOrchestrator";
 
 class DropzoneErrorBoundary extends React.Component<
   { children: React.ReactNode; onError?: (error: Error) => void },
@@ -116,6 +119,22 @@ export const WRITING_TONE_OPTIONS: { id: string; label: string }[] = [
   { id: "conversational_academic", label: "Conversational Academic" },
 ];
 
+export const ARCHETYPE_DEFAULT_TONES: Record<string, string> = {
+  essay: "formal_academic",
+  literature_review: "critical",
+  research_paper: "formal_academic",
+  case_study: "analytical",
+  report: "objective",
+  critical_essay: "critical",
+  argumentative_essay: "persuasive",
+  policy_analysis: "analytical",
+  business_assignment: "analytical",
+  analytical_essay: "analytical",
+  annotated_bibliography: "critical",
+  coursework: "formal_academic",
+  other: "formal_academic",
+};
+
 export const AGENTIC_THINKING_STAGES = [
   "Understanding your assignment",
   "Identifying the core questions",
@@ -149,6 +168,8 @@ export default function AssignmentUnderstandStage() {
     advanceStage,
     ensurePersisted,
     isLoading,
+    executionMode,
+    setExecutionMode,
   } = useAssignmentWorkspace();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -206,6 +227,110 @@ export default function AssignmentUnderstandStage() {
     if (raw) return "outline_review";
     return "brief_input";
   });
+
+  // Dual-mode prompt orchestrator state (Minimal vs Detailed)
+  const [autonomousProgress, setAutonomousProgress] = useState<CourseworkProgressEvent | null>(null);
+  const [isExecutingAutonomous, setIsExecutingAutonomous] = useState<boolean>(false);
+  const [autonomousError, setAutonomousError] = useState<string | null>(null);
+
+  const handleModeChange = (newMode: CourseworkExecutionMode) => {
+    setExecutionMode(newMode);
+  };
+
+  const handleRunAutonomousSynthesis = async () => {
+    const trimmed = localQuestion.trim();
+    if (!trimmed || trimmed.length < 10) {
+      alert("Please provide an assignment prompt (at least 10 characters) before running autonomous synthesis.");
+      return;
+    }
+    setIsExecutingAutonomous(true);
+    setAutonomousError(null);
+    try {
+      const result = await executeDetailedAutonomousSynthesis(
+        {
+          question: trimmed,
+          targetWordCount: localWordCount,
+          citationStyle: localCitation,
+          academicLevel: localLevel,
+          assignmentType: localType,
+          academicTone: localTone,
+          briefText: localBrief || trimmed,
+          courseName,
+        },
+        (progress) => {
+          setAutonomousProgress(progress);
+        }
+      );
+
+      // Persist synthesized sections, sources, bibliography, and rubric report
+      await saveAnswers({
+        execution_mode: "detailed",
+        orchestration_mode: "detailed",
+        assignment_prompt: trimmed,
+        rawPrompt: trimmed,
+        instructions: trimmed,
+        assignment_question: trimmed,
+        word_count: result.stats.totalWords,
+        targetWordCount: localWordCount,
+        citation_style: localCitation,
+        citationStyle: localCitation,
+        assignment_structure: {
+          title: result.title,
+          totalWordCount: result.stats.totalWords,
+          headings: result.outline.map((o) => ({
+            id: o.id,
+            title: o.title,
+            targetWordCount: o.targetWordCount,
+            currentWordCount: o.targetWordCount,
+            guidance: o.guidance || o.focus,
+            academicFunction: o.academicFunction,
+            keyPoints: o.keyPoints,
+          })),
+          isConfirmed: true,
+          confirmedAt: new Date().toISOString(),
+        },
+        assignment_internal_sections: result.sections.map((s) => ({
+          id: s.id,
+          title: s.title,
+          content: s.content,
+          targetWordCount: s.targetWordCount,
+          currentWordCount: s.wordCount,
+          status: "drafted",
+        })),
+        discovered_sources: result.sources,
+        sources: result.sources,
+        approved_source_ids: result.sources.map((s) => s.id),
+        submission_report: {
+          overallScore: result.rubricEvaluation.totalScore,
+          letterGrade: result.rubricEvaluation.letterGrade,
+          uniqueness: result.uniquenessValidation,
+          rubricEvaluation: result.rubricEvaluation,
+          completedAt: new Date().toISOString(),
+        },
+        bibliography_markdown: result.bibliography,
+        full_paper_markdown: result.fullDraft,
+      });
+
+      try {
+        await ensurePersisted();
+      } catch (persistErr) {
+        console.warn("Auto-persist after autonomous synthesis:", persistErr);
+      }
+
+      // Seamlessly advance to submission view to review camera-ready paper and rubric audit
+      if (advancePhase) {
+        advancePhase("submission");
+      } else if (setPhase) {
+        setPhase("submission");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Autonomous synthesis failed.";
+      console.error("Autonomous synthesis failure:", err);
+      setAutonomousError(msg);
+    } finally {
+      setIsExecutingAutonomous(false);
+    }
+  };
 
   // Dynamic Structure state (replaces hardcoded Intro/Body/Conclusion)
   const [localStructure, setLocalStructure] = useState<AssignmentStructure>(() => {
@@ -724,6 +849,10 @@ export default function AssignmentUnderstandStage() {
 
   const handleTypeChange = (t: AssignmentType) => {
     setLocalType(t);
+    const defaultTone = ARCHETYPE_DEFAULT_TONES[t];
+    if (defaultTone) {
+      handleToneChange(defaultTone);
+    }
     saveAnswers({ assignmentType: t, assignment_type: t });
   };
 
@@ -846,6 +975,8 @@ export default function AssignmentUnderstandStage() {
       rubric_criteria: parsedCriteria,
       marking_rubric: rubricText || markingRubricText,
       rubric: rubricText || markingRubricText,
+      execution_mode: executionMode,
+      orchestration_mode: executionMode,
       course_name: course,
       institution,
       deadline,
@@ -1321,6 +1452,88 @@ export default function AssignmentUnderstandStage() {
           {understandStep === "outline_review" ? "Outline Ready" : "AI Deconstruction Ready"}
         </span>
       </div>
+
+      {/* Coursework Execution Mode Toggle (Minimal vs Detailed) */}
+      <CourseworkModeToggle
+        mode={executionMode}
+        onChange={handleModeChange}
+        disabled={isExecutingAutonomous}
+      />
+
+      {/* Autonomous Synthesis Progress Banner (When in Detailed Mode) */}
+      {executionMode === "detailed" && (
+        <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/80 dark:bg-zinc-900/60 p-4 sm:p-5 space-y-3 font-sans transition-all">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+                  Detailed Mode · Autonomous Deep Synthesis
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Execute OpenAlex literature discovery, outline planning, paced sequential drafting with bracket tokens, and 10-point rubric audit in one click.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              disabled={isExecutingAutonomous || localQuestion.trim().length < 10}
+              onClick={handleRunAutonomousSynthesis}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-2 shrink-0 ${
+                isExecutingAutonomous
+                  ? "bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 cursor-not-allowed"
+                  : localQuestion.trim().length < 10
+                  ? "bg-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500 cursor-not-allowed"
+                  : "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 hover:opacity-90 shadow-xs"
+              }`}
+            >
+              {isExecutingAutonomous ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin" />
+                  <span>Synthesizing Paper...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                  <span>Start Autonomous Synthesis</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Real-time Streaming Progress Bar */}
+          {autonomousProgress && (
+            <div className="pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-400">
+                <span className="font-medium text-zinc-900 dark:text-zinc-200">
+                  {autonomousProgress.message}
+                </span>
+                <span className="font-mono text-zinc-500">
+                  {autonomousProgress.progressPercentage}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-zinc-900 dark:bg-zinc-100 rounded-full transition-all duration-300"
+                  style={{ width: `${autonomousProgress.progressPercentage}%` }}
+                />
+              </div>
+              {autonomousProgress.detail && (
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-mono">
+                  {autonomousProgress.detail}
+                </span>
+              )}
+            </div>
+          )}
+
+          {autonomousError && (
+            <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs">
+              {autonomousError}
+            </div>
+          )}
+        </div>
+      )}
 
       {understandStep === "brief_input" ? (
         /* Unified Assignment Setup Box (Step 1: Brief Input) */

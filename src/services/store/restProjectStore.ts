@@ -51,6 +51,7 @@ const REQUEST_TIMEOUT_MS = 10_000;
 /** Column names, kept beside the row mapper so the two cannot drift apart. */
 interface ProjectRow {
   project_id: string;
+  version?: number;
   owner_id: string;
   output_type_id: string;
   answers: ProjectRecord["answers"];
@@ -74,6 +75,7 @@ interface ProjectRow {
 function rowToRecord(row: ProjectRow): ProjectRecord {
   return {
     projectId: row.project_id,
+    version: row.version ?? 1,
     ownerId: row.owner_id,
     outputTypeId: row.output_type_id as string,
     answers: row.answers as ProjectRecord["answers"],
@@ -177,6 +179,7 @@ export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
       const projectId = generateProjectId();
       const record: ProjectRecord = {
         projectId,
+        version: 1,
         ownerId,
         outputTypeId,
         answers: {},

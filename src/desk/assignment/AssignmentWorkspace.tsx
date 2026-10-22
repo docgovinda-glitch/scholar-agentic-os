@@ -413,6 +413,8 @@ function AssignmentWorkspaceInner({
     error,
     saveAnswers,
     projectState,
+    executionMode,
+    setExecutionMode,
   } = useAssignmentWorkspace();
 
   const currentPhaseDef = ASSIGNMENT_PHASES.find((p) => p.id === currentPhase);
@@ -602,8 +604,44 @@ function AssignmentWorkspaceInner({
             </div>
           </div>
 
-          {/* Right Section: Socratic Tutor Drawer Toggle */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Right Section: Minimal vs Detailed Mode Toggle & Socratic Tutor Drawer Toggle */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* Minimal vs Detailed Segmented Control (OT-10 Parity) */}
+            <div
+              role="radiogroup"
+              aria-label="Workspace Display Mode"
+              className="flex items-center p-0.5 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-[11px] font-medium select-none"
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={executionMode === "minimal"}
+                onClick={() => setExecutionMode("minimal")}
+                className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer flex items-center gap-1.5 ${
+                  executionMode === "minimal"
+                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                }`}
+                title="Minimal Mode: Streamlined, distraction-free view focused on core drafting and final output"
+              >
+                <span>Minimal</span>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={executionMode === "detailed"}
+                onClick={() => setExecutionMode("detailed")}
+                className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer flex items-center gap-1.5 ${
+                  executionMode === "detailed"
+                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                }`}
+                title="Detailed Mode: Full atomic lifecycle granularity, live evidence telemetry, citation tokens & section uniqueness validation"
+              >
+                <span>Detailed</span>
+              </button>
+            </div>
+
             {/* Socratic Tutor Drawer Toggle Button */}
             <button
               type="button"

@@ -331,5 +331,16 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
     fireEvent.click(backBtn);
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
+
+  it("displays the OT-22 learned ML Style Compliance badge and exports quantitative constraints", () => {
+    render(<PresentationWorkspace projectId="proj-pres-style" />);
+
+    // Renders the learned style badge
+    const badge = screen.getByTestId("presentation-style-badge");
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent("OT-22 Style:");
+    expect(badge).toHaveTextContent("Conversational Academic");
+    expect(badge).toHaveTextContent("6x6 Density");
+  });
 });
 

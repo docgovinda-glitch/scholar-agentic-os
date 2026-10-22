@@ -11,6 +11,8 @@ import {
   formatAskScholarBibliography,
   extractDoi,
   stripRawReferencesSection,
+  replaceBracketTokensWithDeterministicCitations,
+  compileDeterministicBibliographyMarkdown,
   type WebsiteCitationItem,
 } from "../scholarCitationEngine.ts";
 import ProjectListScreen from "../ProjectListScreen.tsx";
@@ -170,6 +172,75 @@ describe("Ask Scholar Citation Engine & Referencing System", () => {
       const rawText = "Recent findings show high efficacy [1].\n\n### References\n1. Vaswani et al. 2017\n2. He et al. 2016";
       const cleaned = stripRawReferencesSection(rawText);
       expect(cleaned).toBe("Recent findings show high efficacy [1].");
+    });
+  });
+
+  describe("Deterministic Bracket Token Interceptor", () => {
+    const testSources: WebsiteCitationItem[] = [
+      {
+        id: "ev-vaswani-2017",
+        title: "Attention Is All You Need",
+        authors: ["Ashish Vaswani", "Noam Shazeer"],
+        year: 2017,
+        journal: "Advances in Neural Information Processing Systems",
+        doi: "10.48550/arXiv.1706.03762",
+      },
+      {
+        id: "ev-he-2016",
+        title: "Deep Residual Learning for Image Recognition",
+        authors: ["Kaiming He", "Xiangyu Zhang"],
+        year: 2016,
+        journal: "IEEE CVPR",
+        doi: "10.1109/CVPR.2016.90",
+      },
+    ];
+
+    it("replaces numeric bracket tokens [1] with APA author-date format", () => {
+      const input = "Transformers replace recurrence [1].";
+      const result = replaceBracketTokensWithDeterministicCitations(input, testSources, "apa");
+      expect(result).toBe("Transformers replace recurrence (Vaswani, A. & Shazeer, N., 2017).");
+    });
+
+    it("replaces compound bracket tokens [1, 2] with combined APA citation", () => {
+      const input = "Both paradigms scale effectively [1, 2].";
+      const result = replaceBracketTokensWithDeterministicCitations(input, testSources, "apa");
+      expect(result).toBe("Both paradigms scale effectively (Vaswani, A. & Shazeer, N., 2017; He, K. & Zhang, X., 2016).");
+    });
+
+    it("replaces identifier bracket tokens [ev-uuid] with APA citations", () => {
+      const input = "Residual architectures stabilize gradient flow [ev-he-2016].";
+      const result = replaceBracketTokensWithDeterministicCitations(input, testSources, "apa");
+      expect(result).toBe("Residual architectures stabilize gradient flow (He, K. & Zhang, X., 2016).");
+    });
+
+    it("preserves IEEE bracket numbering for numeric and identifier tokens", () => {
+      const input = "Models scale [1] and converge [ev-he-2016].";
+      const result = replaceBracketTokensWithDeterministicCitations(input, testSources, "ieee");
+      expect(result).toBe("Models scale [1] and converge [2].");
+    });
+
+    it("formats MLA9 in-text citations without publication year", () => {
+      const input = "The self-attention mechanism [1] fundamentally transformed NLP.";
+      const result = replaceBracketTokensWithDeterministicCitations(input, testSources, "mla");
+      expect(result).toBe("The self-attention mechanism (Vaswani) fundamentally transformed NLP.");
+    });
+
+    it("retains standard Markdown hyperlinks without corruption", () => {
+      const input = "Refer to the [official repo](https://github.com/scholar) and evidence [1].";
+      const result = replaceBracketTokensWithDeterministicCitations(input, testSources, "apa");
+      expect(result).toContain("[official repo](https://github.com/scholar)");
+      expect(result).toContain("(Vaswani, A. & Shazeer, N., 2017)");
+    });
+
+    it("strips raw LLM hallucinated references and compiles deterministic bibliography", () => {
+      const hallucinated = "Modern NLP models [1].\n\n## References\n1. Vaswani fake entry 2017";
+      const interceptedProse = replaceBracketTokensWithDeterministicCitations(hallucinated, testSources, "apa");
+      expect(interceptedProse).toBe("Modern NLP models (Vaswani, A. & Shazeer, N., 2017).");
+
+      const compiledBib = compileDeterministicBibliographyMarkdown(testSources, "apa");
+      expect(compiledBib).toContain("## References");
+      expect(compiledBib).toContain("Attention Is All You Need");
+      expect(compiledBib).toContain("Deep Residual Learning");
     });
   });
 

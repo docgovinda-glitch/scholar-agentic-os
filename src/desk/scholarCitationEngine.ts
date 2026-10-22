@@ -8,7 +8,31 @@
 
 import { CitationFormatterFactory, CitationStyleRegistry } from "../citation_compliance/formattingEngine";
 import type { CanonicalReference, ReferenceAuthor, ReferenceKind } from "../citation_compliance/model/reference";
-import type { WebsiteCitationItem } from "./ProjectListScreen";
+
+export interface WebsiteCitationItem {
+  id?: string;
+  title?: string;
+  url?: string;
+  snippet?: string;
+  domain?: string;
+  publisher?: string;
+  authorityBadge?: string;
+  authorityTier?: string;
+  source?: string;
+  venue?: string;
+  journal?: string;
+  year?: number | string;
+  author?: string;
+  authors?: string[];
+  doi?: string;
+  isPrimary?: boolean;
+  sourceType?: "official" | "scholarly" | "media" | "web" | string;
+  claim?: string;
+  citation?: string;
+  evidenceSnippet?: string;
+  mainFinding?: string;
+  suggestedUse?: string;
+}
 
 export type AskCitationStyleId = "apa" | "mla" | "chicago" | "harvard" | "ieee" | "vancouver";
 
@@ -345,3 +369,102 @@ export function stripRawReferencesSection(markdown: string): string {
   const refHeaderRegex = /(?:\n\s*---\s*\n)?\n\s*(?:##|###)\s*(?:References|References\s*&\s*Evidence\s*Base|Sources|Works\s*Cited|Bibliography)[\s\S]*$/i;
   return markdown.replace(refHeaderRegex, "").trim();
 }
+
+/**
+ * Deterministically replaces bracket reference tokens ([1], [2], [1, 2])
+ * with authoritative in-text citations according to the selected citation style (APA, Harvard, IEEE, MLA, etc.).
+ * Strictly strips any raw hallucinated bibliography section.
+ */
+export function replaceBracketTokensWithDeterministicCitations(
+  prose: string,
+  sources: WebsiteCitationItem[],
+  styleId: string
+): string {
+  if (!prose) return "";
+  const cleaned = stripRawReferencesSection(prose);
+  if (!sources || sources.length === 0) return cleaned;
+
+  const styleInfo = getCitationStyleInfo(styleId);
+
+  // Match bracket tokens not followed by '(' (which would indicate a Markdown link [text](url))
+  const bracketRegex = /\[([^\[\]\(\)\r\n]+)\](?!\()/g;
+  return cleaned.replace(bracketRegex, (match, innerStr) => {
+    const trimmed = innerStr.trim();
+
+    // 1. Numeric index tokens: [1], [2], [1, 2]
+    if (/^\d+(?:\s*,\s*\d+)*$/.test(trimmed)) {
+      const indices = trimmed
+        .split(",")
+        .map((s: string) => parseInt(s.trim(), 10))
+        .filter((n: number) => !isNaN(n));
+
+      const validNums = indices.filter((n: number) => n >= 1 && n <= sources.length);
+      if (validNums.length === 0) return match;
+
+      if (styleInfo.id === "ieee") {
+        return `[${validNums.join(", ")}]`;
+      }
+      if (styleInfo.id === "vancouver") {
+        return `(${validNums.join(", ")})`;
+      }
+
+      const formattedCites = validNums.map((n: number) => {
+        const cite = formatAskScholarInText(sources[n - 1], n - 1, styleId);
+        return cite.replace(/^\s*\(\s*(.+?)\s*\)\s*$/, "$1").trim();
+      });
+
+      if (styleInfo.id === "mla") {
+        return `(${formattedCites.join("; ")})`;
+      }
+      return `(${formattedCites.join("; ")})`;
+    }
+
+    // 2. Identifier tokens: [ev-uuid], [src-1], [ev-1], matching source.id
+    const matchedIdx = sources.findIndex((s, idx) => {
+      if (s.id && (s.id === trimmed || s.id.toLowerCase() === trimmed.toLowerCase())) {
+        return true;
+      }
+      const lower = trimmed.toLowerCase();
+      if (lower === `ev-${idx + 1}` || lower === `src-${idx + 1}`) {
+        return true;
+      }
+      return false;
+    });
+
+    if (matchedIdx !== -1) {
+      if (styleInfo.id === "ieee") {
+        return `[${matchedIdx + 1}]`;
+      }
+      if (styleInfo.id === "vancouver") {
+        return `(${matchedIdx + 1})`;
+      }
+      const cite = formatAskScholarInText(sources[matchedIdx], matchedIdx, styleId);
+      const trimmedCite = cite.replace(/^\s*\(\s*(.+?)\s*\)\s*$/, "$1").trim();
+      return `(${trimmedCite})`;
+    }
+
+    return match;
+  });
+}
+
+/**
+ * Compiles a formatted markdown bibliography section for the given citations.
+ */
+export function compileDeterministicBibliographyMarkdown(
+  sources: WebsiteCitationItem[],
+  styleId: string
+): string {
+  if (!sources || sources.length === 0) return "";
+  const entries = formatAskScholarBibliography(sources, styleId);
+  if (entries.length === 0) return "";
+
+  const styleInfo = getCitationStyleInfo(styleId);
+  const heading = styleInfo.id === "mla" ? "Works Cited" : "References";
+
+  let markdown = `\n\n## ${heading}\n\n`;
+  entries.forEach((e) => {
+    markdown += `${e.displayIndex}. ${e.formattedText}\n`;
+  });
+  return markdown.trimEnd();
+}
+

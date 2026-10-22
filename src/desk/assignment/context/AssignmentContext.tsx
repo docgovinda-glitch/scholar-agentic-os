@@ -39,6 +39,7 @@ import type {
   WritingStyleConfig,
   WritingStylePreset,
   AssignmentStructure,
+  FlowAuditResult,
 } from "../types";
 import {
   ASSIGNMENT_PHASES,
@@ -62,6 +63,7 @@ import { generateCuratedLiteratureSources } from "../services/scholarlyDiscovery
 import { getCitationCoverage } from "../services/citationAnchoringService";
 import { generateReferenceListBlock } from "../services/referenceListGenerator";
 import { stripCircularReferences } from "../../../utils/briefExtractor";
+import type { CourseworkExecutionMode } from "../../../features/coursework/types/orchestrator";
 
 export interface AssignmentContextValue {
   projectId: string;
@@ -88,6 +90,10 @@ export interface AssignmentContextValue {
 
   isLoading: boolean;
   error: string | null;
+
+  // Minimal vs Detailed Execution Mode (OT-10 Parity)
+  executionMode: CourseworkExecutionMode;
+  setExecutionMode: (mode: CourseworkExecutionMode) => Promise<void>;
 
   // Key Domain Properties
   academicLevel: AcademicLevel;
@@ -269,6 +275,26 @@ export function AssignmentProvider({
   // Phase 3 Drafting Engine state
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [generatingSectionIds, setGeneratingSectionIds] = useState<Record<string, boolean>>({});
+
+  // Minimal vs Detailed Execution Mode (OT-10 Parity)
+  const [executionMode, setExecutionModeState] = useState<CourseworkExecutionMode>(() => {
+    try {
+      const saved = localStorage.getItem("scholar_coursework_mode");
+      if (saved === "detailed" || saved === "minimal") return saved;
+    } catch {
+      // Ignore
+    }
+    const raw = project?.answers?.["execution_mode"] || project?.answers?.["orchestration_mode"];
+    if (raw === "detailed" || raw === "minimal") return raw;
+    return "minimal";
+  });
+
+  useEffect(() => {
+    const raw = project?.answers?.["execution_mode"] || project?.answers?.["orchestration_mode"];
+    if (raw === "detailed" || raw === "minimal") {
+      setExecutionModeState(raw);
+    }
+  }, [project?.answers?.["execution_mode"], project?.answers?.["orchestration_mode"]]);
 
   // Load project data with phase auto-migration
   const load = useCallback(async () => {
@@ -1727,6 +1753,19 @@ export function AssignmentProvider({
         lastRubricEstimation,
         estimateRubricGrade,
         applyTutorSuggestionToDraft,
+        executionMode,
+        setExecutionMode: async (newMode: CourseworkExecutionMode) => {
+          setExecutionModeState(newMode);
+          try {
+            localStorage.setItem("scholar_coursework_mode", newMode);
+          } catch {
+            // Ignore
+          }
+          await saveAnswers({
+            execution_mode: newMode,
+            orchestration_mode: newMode,
+          });
+        },
         saveAnswers,
         updateProjectAnswers: saveAnswers,
       }}
