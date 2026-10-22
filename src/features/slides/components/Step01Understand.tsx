@@ -23,12 +23,14 @@ import { classifyPresentationScope } from '../services/presentationScopeClassifi
 import SlideOutlinePillCard from './SlideOutlinePillCard';
 
 export interface Step01UnderstandProps {
+  projectId?: string;
   deck: SlideDeck;
   onUpdateDeck: (updated: SlideDeck) => void;
   onNextStep: () => void;
 }
 
 export default function Step01Understand({
+  projectId,
   deck,
   onUpdateDeck,
   onNextStep,
@@ -229,6 +231,60 @@ export default function Step01Understand({
         themeId: isSwiss ? 'swiss-editorial' : (deck.themeId || 'sand-academic'),
         customTheme: deck.customTheme,
       });
+    } finally {
+      setIsDecomposing(false);
+    }
+  };
+
+  // AI Live Deck Generation from Scoped Project Research
+  const handleLiveAiDeckGeneration = async () => {
+    if (!projectId) {
+      handleDecompose();
+      return;
+    }
+    setIsDecomposing(true);
+    try {
+      const topicToUse = topicInput || deck.topic || deck.title;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const authKey = Object.keys(localStorage).find((k) => k.startsWith('sb-') && k.endsWith('-auth-token'));
+          if (authKey) {
+            const parsed = JSON.parse(localStorage.getItem(authKey) || '{}');
+            if (parsed?.access_token) {
+              headers['Authorization'] = `Bearer ${parsed.access_token}`;
+            }
+          }
+        }
+      } catch {}
+
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/presentation/generate-deck`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          topic: topicToUse,
+          framework: selectedFramework,
+          slideCount: Number(slideCount),
+          audienceLevel,
+          rawText: rawTextInput || undefined,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.deck && Array.isArray(data.deck.slides) && data.deck.slides.length > 0) {
+          onUpdateDeck({
+            ...data.deck,
+            id: deck.id || data.deck.id,
+            themeId: deck.themeId || 'sand-academic',
+            customTheme: deck.customTheme,
+          });
+          return;
+        }
+      }
+      handleDecompose();
+    } catch {
+      handleDecompose();
     } finally {
       setIsDecomposing(false);
     }

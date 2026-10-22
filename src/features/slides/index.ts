@@ -38,6 +38,7 @@ export { default as CustomThemeStudio } from './components/CustomThemeStudio';
 export { default as DeckPreviewModal } from './components/DeckPreviewModal';
 export { default as SlideCreativeSketchIllustration } from './components/SlideCreativeSketchIllustration';
 export { default as InSlidePromptCopilot } from './components/InSlidePromptCopilot';
+export { default as AudienceQaSimulator, type AudienceQaQuestion, type AudienceQaSimulatorProps } from './components/AudienceQaSimulator';
 export * from './services/deckProgressionService';
 export * from './services/slideMutationService';
 export * from './services/blankSheetService';

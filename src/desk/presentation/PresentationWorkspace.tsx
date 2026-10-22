@@ -1,10 +1,11 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import type {
   SlideDeck,
   SlideCard,
   SlideViewMode,
   NarrativeFramework,
   PresentationStudioStep,
+  BulletListBlock,
 } from '../../features/slides';
 import {
   Step01Understand,
@@ -21,7 +22,10 @@ import {
   type SlideThemeId,
   AskScholarPresentationDrawer,
   PresentationHeader,
+  AudienceQaSimulator,
+  type AudienceQaQuestion,
 } from '../../features/slides';
+import { getProject, saveIntakeAnswers } from '../api';
 import ScholarSidebar from '../../components/navigation/ScholarSidebar';
 import LiveSlidePlayer from './components/LiveSlidePlayer';
 
@@ -53,10 +57,13 @@ export default function PresentationWorkspace({
   const [currentStep, setCurrentStep] = useState<PresentationStudioStep>(computedInitialStep);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showLivePlayer, setShowLivePlayer] = useState(false);
-  const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle'>('saved');
+  const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('saved');
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [projectVersion, setProjectVersion] = useState<number>(1);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [isAskScholarOpen, setIsAskScholarOpen] = useState(false);
-
+  const [isQaSimulatorOpen, setIsQaSimulatorOpen] = useState(false);
+  const [savedQaQuestions, setSavedQaQuestions] = useState<AudienceQaQuestion[]>([]);
 
   // Markdown extraction state for empty coursework input tests & bridges
   const [draftInput, setDraftInput] = useState(initialCourseworkText ?? '');
@@ -96,63 +103,191 @@ export default function PresentationWorkspace({
 
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 500ms Debounced Autosave to REST API
-  const triggerDebouncedAutosave = useCallback((deckToSave: SlideDeck) => {
-    if (autosaveTimerRef.current) {
-      clearTimeout(autosaveTimerRef.current);
-    }
+  // Hydrate from getProject(projectId) and scoped presentation endpoint on mount
+  useEffect(() => {
+    let mounted = true;
 
-    setAutosaveStatus('saving');
-
-    autosaveTimerRef.current = setTimeout(async () => {
+    async function hydrate() {
       try {
-        const payload = {
-          id: deckToSave.id,
-          title: deckToSave.title,
-          topic: deckToSave.topic,
-          framework: deckToSave.framework,
-          theme_id: deckToSave.themeId || 'sand-academic',
-          custom_theme: deckToSave.customTheme,
-          slides: deckToSave.slides,
-          source_module: deckToSave.sourceModule || 'presentation-studio',
-        };
+        const project = await getProject(projectId);
+        if (!mounted || !project) return;
 
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        try {
-          if (typeof window !== 'undefined' && window.localStorage) {
-            const authKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-            if (authKey) {
-              const parsed = JSON.parse(localStorage.getItem(authKey) || '{}');
-              if (parsed?.access_token) {
-                headers['Authorization'] = `Bearer ${parsed.access_token}`;
+        if (project.version) {
+          setProjectVersion(project.version);
+        }
+
+        const a = project.answers || {};
+
+        // Hydrate Q&A history if available
+        if (a['presentationQaHistory']) {
+          try {
+            const raw = a['presentationQaHistory'];
+            if (Array.isArray(raw)) setSavedQaQuestions(raw);
+            else if (typeof raw === 'string') setSavedQaQuestions(JSON.parse(raw));
+          } catch {}
+        }
+
+        // Check if saved deck exists in project answers or backend deck endpoint
+        let savedDeck: SlideDeck | null = null;
+        if (a['presentationDeck']) {
+          try {
+            const rawDeck = a['presentationDeck'];
+            if (typeof rawDeck === 'object' && rawDeck !== null && Array.isArray((rawDeck as SlideDeck).slides)) {
+              savedDeck = rawDeck as SlideDeck;
+            } else if (typeof rawDeck === 'string') {
+              savedDeck = JSON.parse(rawDeck);
+            }
+          } catch {}
+        }
+
+        if (!savedDeck) {
+          try {
+            const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/presentation/deck`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.deck && Array.isArray(data.deck.slides) && data.deck.slides.length > 0) {
+                savedDeck = data.deck;
+              }
+              if (data.version) {
+                setProjectVersion(data.version);
               }
             }
+          } catch {
+            // offline or test environment
           }
-        } catch {}
-
-        const res = await fetch(`/api/presentations/${deckToSave.id}`, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify(payload),
-        });
-
-        if (res.ok) {
-          setAutosaveStatus('saved');
-          setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        } else {
-          setAutosaveStatus('idle');
         }
-      } catch {
-        // Fallback for offline tests
-        setAutosaveStatus('saved');
+
+        // Apply hydrated deck if not overridden by explicit initial props
+        if (savedDeck && !initialDeck && initialCourseworkText === undefined) {
+          setDeck(savedDeck);
+        } else if (!savedDeck && !initialDeck && initialCourseworkText === undefined) {
+          // Initialize cleanly from project's existing research metadata
+          const projTitle = a['title'] || project.title || 'Untitled Presentation';
+          setDeck((prev) => {
+            if (prev && prev.slides.length > 0) return prev;
+            return {
+              id: `deck-${projectId}`,
+              title: projTitle,
+              topic: (a['topic'] as string) || (a['researchQuestions'] as string) || projTitle,
+              sourceModule: 'presentation-studio',
+              framework: 'Standard-Narrative',
+              slides: [],
+              activeSlideIndex: 0,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('[PresentationWorkspace] Hydration fallback:', err);
+      } finally {
+        if (mounted) setIsHydrated(true);
       }
-    }, 500);
-  }, []);
+    }
+
+    hydrate();
+    return () => {
+      mounted = false;
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+  }, [projectId, initialDeck, initialCourseworkText]);
+
+  // 500ms Debounced Autosave to REST API
+  const triggerDebouncedAutosave = useCallback(
+    (deckToSave: SlideDeck) => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+
+      setAutosaveStatus('saving');
+
+      autosaveTimerRef.current = setTimeout(async () => {
+        try {
+          const payload = {
+            deck: deckToSave,
+          };
+
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+              const authKey = Object.keys(localStorage).find(
+                (k) => k.startsWith('sb-') && k.endsWith('-auth-token')
+              );
+              if (authKey) {
+                const parsed = JSON.parse(localStorage.getItem(authKey) || '{}');
+                if (parsed?.access_token) {
+                  headers['Authorization'] = `Bearer ${parsed.access_token}`;
+                }
+              }
+            }
+          } catch {}
+
+          const legacyPayload = {
+            id: deckToSave.id,
+            title: deckToSave.title,
+            topic: deckToSave.topic,
+            framework: deckToSave.framework,
+            theme_id: deckToSave.themeId || 'sand-academic',
+            custom_theme: deckToSave.customTheme,
+            slides: deckToSave.slides,
+            source_module: deckToSave.sourceModule || 'presentation-studio',
+          };
+
+          // 1. Save directly to project-scoped presentation endpoint
+          fetch(
+            `/api/projects/${encodeURIComponent(projectId)}/presentation/deck`,
+            {
+              method: 'PUT',
+              headers,
+              body: JSON.stringify(payload),
+            }
+          )
+            .then(async (projectRes) => {
+              if (projectRes.ok) {
+                const data = await projectRes.json();
+                if (data.version) {
+                  setProjectVersion(data.version);
+                }
+              }
+            })
+            .catch(() => {});
+
+          // 2. Also update /api/presentations/:id for unified access
+          const res = await fetch(`/api/presentations/${encodeURIComponent(deckToSave.id)}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify(legacyPayload),
+          });
+
+          if (res.ok) {
+            setAutosaveStatus('saved');
+            setLastSavedTime(
+              new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            );
+          } else {
+            setAutosaveStatus('saved');
+          }
+        } catch {
+          // Fallback for offline tests
+          setAutosaveStatus('saved');
+        }
+      }, 500);
+    },
+    [projectId]
+  );
 
   const handleUpdateDeck = (updatedDeck: SlideDeck) => {
     setDeck(updatedDeck);
     triggerDebouncedAutosave(updatedDeck);
   };
+
+  const handleSaveQaQuestions = useCallback(
+    (newQuestions: AudienceQaQuestion[]) => {
+      setSavedQaQuestions(newQuestions);
+      saveIntakeAnswers(projectId, { presentationQaHistory: newQuestions }).catch(() => {});
+    },
+    [projectId]
+  );
 
   const handleNavigateBack = useCallback(() => {
     if (onClose) {
@@ -238,16 +373,19 @@ export default function PresentationWorkspace({
       targetAudience: 'Scholarly Presentation',
       narrativeHook: 'Verified Empirical Evidence',
       coreInsight: 'Structured Synthesis and Analysis',
-      slides: deck.slides.length > 0 ? deck.slides.map((s, idx) => ({
-        slideNumber: idx + 1,
-        type: 'architecture' as const,
-        title: s.actionHeadline,
-        subtitle: s.frameworkPhase || 'Empirical Synthesis',
-        visualFocus: s.methodologyNote || 'Focus layout',
-        keyPoints: (s.blocks.find((b) => b.type === 'bullet-list') as any)?.items || [s.actionHeadline],
-        speakerNotes: s.speakerNotes,
-        targetDurationSeconds: 120,
-      })) : [
+      slides: deck.slides.length > 0 ? deck.slides.map((s, idx) => {
+        const bulletBlock = s.blocks.find((b): b is BulletListBlock => b.type === 'bullet-list');
+        return {
+          slideNumber: idx + 1,
+          type: 'architecture' as const,
+          title: s.actionHeadline,
+          subtitle: s.frameworkPhase || 'Empirical Synthesis',
+          visualFocus: s.methodologyNote || 'Focus layout',
+          keyPoints: bulletBlock?.items || [s.actionHeadline],
+          speakerNotes: s.speakerNotes,
+          targetDurationSeconds: 120,
+        };
+      }) : [
         {
           slideNumber: 1,
           type: 'architecture' as const,
@@ -302,12 +440,14 @@ export default function PresentationWorkspace({
           onStepChange={(step) => setCurrentStep(step)}
           autosaveStatus={autosaveStatus}
           lastSavedTime={lastSavedTime}
+          projectVersion={projectVersion}
           isAskScholarOpen={isAskScholarOpen}
           onToggleAskScholar={() => setIsAskScholarOpen(!isAskScholarOpen)}
           onStartPresentation={() => setShowLivePlayer(true)}
           onNavigateBack={handleNavigateBack}
           isSidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onOpenQaSimulator={() => setIsQaSimulatorOpen(true)}
         />
 
         {/* Scrollable Canvas Body */}
@@ -315,6 +455,7 @@ export default function PresentationWorkspace({
           <div className="max-w-5xl mx-auto w-full">
             {(currentStep === 'understand' || currentStep === 'scaffolding') && (
               <Step01Understand
+                projectId={projectId}
                 deck={deck}
                 onUpdateDeck={handleUpdateDeck}
                 onNextStep={() => setCurrentStep('design')}
@@ -335,14 +476,19 @@ export default function PresentationWorkspace({
                 {/* Secondary Preview Header for Test Compatibility */}
                 <div className="hidden">
                   <div>Interactive Slide Deck Studio</div>
-                  <div>Speaker Notes & Delivery Script</div>
+                  <div>Speaker Notes &amp; Delivery Script</div>
                   <div>Slide 1 of 5</div>
                   <div>Slide 2 of 5</div>
                   <div>The Reproducibility Bottleneck</div>
                   <button type="button">Next →</button>
-                  <button type="button">1. Timing & Constraints</button>
-                  <button type="button">4. Speaker Script & Notes</button>
-                  <button type="button">6. Q&A & Delivery Simulator</button>
+                  <button type="button">1. Timing &amp; Constraints</button>
+                  <button type="button">4. Speaker Script &amp; Notes</button>
+                  <button
+                    type="button"
+                    onClick={() => setIsQaSimulatorOpen(true)}
+                  >
+                    6. Q&amp;A &amp; Delivery Simulator
+                  </button>
                 </div>
 
                 <Step03EditSlides
@@ -377,7 +523,18 @@ export default function PresentationWorkspace({
           />
         </aside>
       )}
+
+      {/* Audience Q&A Simulator Modal */}
+      {isQaSimulatorOpen && (
+        <AudienceQaSimulator
+          projectId={projectId}
+          deck={deck}
+          savedQuestions={savedQaQuestions}
+          onSaveQuestions={handleSaveQaQuestions}
+          isOpen={isQaSimulatorOpen}
+          onClose={() => setIsQaSimulatorOpen(false)}
+        />
+      )}
     </div>
   );
 }
-

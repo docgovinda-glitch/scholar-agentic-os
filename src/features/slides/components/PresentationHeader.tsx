@@ -21,14 +21,16 @@ export interface PresentationHeaderProps {
   onTitleChange: (newTitle: string) => void;
   currentStep: PresentationStudioStep;
   onStepChange: (step: PresentationStudioStep) => void;
-  autosaveStatus: 'saved' | 'saving' | 'idle';
+  autosaveStatus: 'saved' | 'saving' | 'idle' | 'error';
   lastSavedTime?: string | null;
+  projectVersion?: number;
   isAskScholarOpen: boolean;
   onToggleAskScholar: () => void;
   onStartPresentation?: () => void;
   onNavigateBack?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
+  onOpenQaSimulator?: () => void;
   className?: string;
 }
 
@@ -39,12 +41,14 @@ export default function PresentationHeader({
   onStepChange,
   autosaveStatus,
   lastSavedTime,
+  projectVersion,
   isAskScholarOpen,
   onToggleAskScholar,
   onStartPresentation,
   onNavigateBack,
   isSidebarCollapsed,
   onToggleSidebar,
+  onOpenQaSimulator,
   className = '',
 }: PresentationHeaderProps) {
   const handleBack = () => {
@@ -105,16 +109,37 @@ export default function PresentationHeader({
               <span
                 className={`text-xs flex items-center gap-1.5 whitespace-nowrap ${
                   autosaveStatus === 'saving'
-                    ? 'text-amber-500'
-                    : 'text-neutral-500 dark:text-neutral-400'
+                    ? 'text-amber-700 dark:text-amber-300'
+                    : autosaveStatus === 'error'
+                    ? 'text-rose-700 dark:text-rose-300'
+                    : 'text-neutral-600 dark:text-neutral-400'
                 }`}
                 data-testid="autosave-status"
               >
-                <span className={autosaveStatus === 'saving' ? 'text-amber-500' : 'text-emerald-500'}>
+                <span
+                  className={
+                    autosaveStatus === 'saving'
+                      ? 'text-amber-600'
+                      : autosaveStatus === 'error'
+                      ? 'text-rose-600'
+                      : 'text-emerald-600 dark:text-emerald-400'
+                  }
+                >
                   {autosaveStatus === 'saving' ? '◌' : '●'}
                 </span>
-                <span>{autosaveStatus === 'saving' ? 'Saving changes...' : 'Saved'}</span>
+                <span>
+                  {autosaveStatus === 'saving'
+                    ? 'Saving changes...'
+                    : autosaveStatus === 'error'
+                    ? 'Offline Backup'
+                    : 'All changes saved'}
+                </span>
                 {lastSavedTime && <span className="opacity-70">({lastSavedTime})</span>}
+                {projectVersion !== undefined && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-neutral-200/80 dark:bg-white/10 font-mono text-neutral-700 dark:text-neutral-300">
+                    v{projectVersion}
+                  </span>
+                )}
               </span>
             </div>
 
@@ -188,6 +213,21 @@ export default function PresentationHeader({
           <span>Conversational Academic</span>
           <span className="text-[10px] font-mono text-neutral-400">· 6x6 Density</span>
         </div>
+
+        {/* Audience Q&A Simulator Button */}
+        {onOpenQaSimulator && (
+          <button
+            type="button"
+            onClick={onOpenQaSimulator}
+            data-testid="open-qa-simulator-btn"
+            className="rounded-full px-3 py-1.5 text-xs font-semibold border border-purple-500/30 bg-purple-50 hover:bg-purple-100 dark:border-purple-500/20 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 text-purple-900 dark:text-purple-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            title="Simulate Audience Q&A & Defense Questions"
+            aria-label="Simulate Audience Q&A"
+          >
+            <span>🛡️</span>
+            <span className="hidden md:inline">Audience Q&amp;A</span>
+          </button>
+        )}
 
         {/* Ask Scholar Drawer Toggle Pill */}
         <button

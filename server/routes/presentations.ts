@@ -147,9 +147,9 @@ const router = Router();
 router.use(requireAuth);
 
 // In-memory deck store fallback for local development and offline environments
-const memoryDecks = new Map<string, PresentationDeckRow>();
+export const memoryDecks = new Map<string, PresentationDeckRow>();
 
-function getDecksTable(): SupabaseTable<PresentationDeckRow> | null {
+export function getDecksTable(): SupabaseTable<PresentationDeckRow> | null {
   const config = getSupabaseRestConfig();
   if (!config) return null;
   return new SupabaseTable<PresentationDeckRow>(config, "presentation_decks");

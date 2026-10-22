@@ -80,9 +80,9 @@ This document establishes the authoritative completion baseline for **Scholar Co
 | :--- | :--- | :---: | :--- | :--- |
 | **Coursework Engine** | `OT-01`, `OT-02` | **92%** | Real (`AssignmentContext`) | Hydrates from `getProject()`, saves via `saveIntakeAnswers()`, streams via SSE, offline PEEL fallback |
 | **Journal Article** | `OT-10` | **85%** | Real (`ResearchContext`) | 25 stages defined; Stages 1–19 live with real endpoints; Stages 20–25 use backend stubs |
-| **Research Proposal** | `OT-19` | **25%** | Hardcoded Mock State | Mounts with static state; no hydration from DB; calls stubbed study section endpoint |
-| **Thesis & Dissertation**| `OT-09`, `OT-07` | **25%** | Hardcoded Mock State | Mounts with static state; no hydration from DB; calls stubbed viva simulation endpoint |
-| **Presentation Studio** | `OT-22` | **40%** | Ephemeral State | Interactive canvas works, but state is not tied to `projectId`; saves to unscoped API |
+| **Research Proposal** | `OT-19` | **90%** | Real Scoped State | Hydrates from `getProject()`, debounced autosave, AI study section simulator & structural aims audit |
+| **Thesis & Dissertation**| `OT-09`, `OT-07` | **90%** | Real Scoped State | Hydrates from `getProject()`, debounced autosave, AI viva simulator & chapter audit |
+| **Presentation Studio** | `OT-22` | **90%** | Real Scoped State | Hydrates from `getProject(projectId)`, debounced autosave with versioning, live AI deck generator & Audience Q&A simulator |
 | **Knowledge Vault** | `/vault` | **90%** | Real Dual Engine | Supabase `user_vault_items` with RLS + encrypted IndexedDB fallback |
 | **AI Access Control** | `/ai-access` | **95%** | Real State | Fully wired to `/api/ai-access` and `/api/admin/ai`; BYOK keys kept client-side |
 
@@ -108,10 +108,12 @@ This document establishes the authoritative completion baseline for **Scholar Co
 - [x] Connect `POST /api/projects/:id/thesis/viva-simulate` to AI Gateway viva simulator with examiner personas, rigor scores, adversarial questions, and suggested rebuttal structures.
 - [x] Connect `POST /api/projects/:id/thesis/chapter-audit` to cross-chapter consistency, research question propagation, and doctoral alignment analysis.
 
-### Phase 3: Presentation Studio Project Binding & Unification
-- [ ] Bind `PresentationWorkspace.tsx` to `projectId`, loading and storing decks within project state (`answers.presentation_deck` or scoped table).
-- [ ] Connect `POST /api/projects/:id/presentation/generate-deck` to use `extractSlidesFromAcademicText` or the AI gateway rather than static slides.
-- [ ] Connect `POST /api/projects/:id/presentation/qa-simulate` to an interactive audience Q&A model.
+### Phase 3: Presentation Studio Project Binding & Live AI Deck/Q&A Engine (Completed)
+- [x] Unify `/api/projects/:id/presentation` and `/api/presentations` with strict IDOR verification (`requireAuth` + project ownership validation) and version tracking.
+- [x] Connect `POST /api/projects/:id/presentation/generate-deck` to AI Gateway (`completeWithFailover`) + `scholarlyVoiceGuard.ts` synthesizing actual project title, research questions, outline/chapters, empirical findings, and verified Knowledge Vault citations into structured 16:9 slides with speaker scripts, visual layout metadata, and deterministic fallback.
+- [x] Connect `POST /api/projects/:id/presentation/qa-simulate` to dynamic conference/defense audience question generator (with questioner persona, difficulty level, targeted slide reference, and structured model rebuttal points) with deterministic heuristic fallback.
+- [x] Bind `PresentationWorkspace.tsx` (OT-22) to `projectId` and project state, hydrating saved slides, theme/typography settings, and Q&A history from `getProject()`, with debounced optimistic autosave and live UI save-status badge matching `ProposalWorkspace` and `ThesisWorkspace`.
+- [x] Implement interactive `AudienceQaSimulator.tsx` modal supporting referee persona selection, live referee simulation, rehearsal timer, and collapsible model rebuttals.
 
 ### Phase 4: Journal Article Pipeline Completion (Stages 20–25)
 - [ ] Wire Stage 23 (`final_editor`) to the active tone and paraphrasing engine.

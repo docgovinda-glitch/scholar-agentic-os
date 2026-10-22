@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
@@ -11,6 +11,10 @@ describe("PresentationWorkspace", () => {
       ok: true,
       json: async () => ({ success: true, mutatedSlide: null }),
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("renders 4-step guided studio workflow with 01 Understand, 02 Design, 03 Edit Slides, and 04 Present with clean auto-save and zero developer jargon", () => {
@@ -341,6 +345,96 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
     expect(badge).toHaveTextContent("OT-22 Style:");
     expect(badge).toHaveTextContent("Conversational Academic");
     expect(badge).toHaveTextContent("6x6 Density");
+  });
+
+  it("hydrates presentation deck and version tracking from getProject and displays version badge", async () => {
+    const mockDeck = {
+      id: "deck-hydrated-42",
+      title: "Neural Synthesizer Architecture",
+      topic: "Neural Synthesizer Architecture",
+      sourceModule: "presentation-studio",
+      framework: "Standard-Narrative",
+      slides: [
+        {
+          id: "slide-h-1",
+          order: 1,
+          actionHeadline: "Empirical Lift: 4.2x Faster Synthesis",
+          summary: "Core analytical takeaway",
+          layoutType: "metric-focus",
+          blocks: [
+            {
+              type: "action-header",
+              headline: "Empirical Lift: 4.2x Faster Synthesis",
+            },
+            {
+              type: "metric-callout",
+              value: "4.2x",
+              metric: "4.2x",
+              label: "Speedup",
+            },
+          ],
+          speakerNotes: "Speaker rehearsal notes",
+        },
+      ],
+      activeSlideIndex: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/presentation/deck")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ success: true, deck: mockDeck, version: 4 }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          projectId: "proj-hydrated-1",
+          version: 4,
+          title: "Neural Synthesizer Architecture",
+          answers: {
+            presentationDeck: mockDeck,
+          },
+        }),
+      });
+    });
+
+    render(<PresentationWorkspace projectId="proj-hydrated-1" initialStep="studio" />);
+
+    expect(await screen.findByDisplayValue("Neural Synthesizer Architecture")).toBeInTheDocument();
+    expect(screen.getByText("v4")).toBeInTheDocument();
+    expect(screen.getAllByText(/Empirical Lift: 4\.2x Faster Synthesis/i).length).toBeGreaterThan(0);
+  });
+
+  it("opens Audience Q&A Simulator modal, renders referee questions, and reveals model defense arguments", async () => {
+    render(<PresentationWorkspace projectId="proj-qa-test" initialStep="studio" />);
+
+    // Open Q&A Simulator
+    const qaBtn = screen.getByTestId("open-qa-simulator-btn");
+    fireEvent.click(qaBtn);
+
+    expect(screen.getByTestId("audience-qa-simulator-modal")).toBeInTheDocument();
+    expect(screen.getByText(/Audience Q&A & Defense Simulator/i)).toBeInTheDocument();
+    expect(screen.getByText(/Referee Rigor/i)).toBeInTheDocument();
+
+    // Verify initial referee question is displayed
+    expect(screen.getByText(/Methodological Referee/i)).toBeInTheDocument();
+    expect(screen.getByTestId("qa-question-card-0")).toBeInTheDocument();
+
+    // Reveal model rebuttal arguments
+    const revealBtn = screen.getAllByRole("button", { name: /Reveal Model Defense & Rebuttal Points/i })[0];
+    fireEvent.click(revealBtn);
+
+    expect(screen.getByText(/Candidate Model Response:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Key Grounded Evidence Points:/i)).toBeInTheDocument();
+
+    // Close the simulator
+    const doneBtn = screen.getByRole("button", { name: /Done Rehearsing/i });
+    fireEvent.click(doneBtn);
+
+    expect(screen.queryByTestId("audience-qa-simulator-modal")).not.toBeInTheDocument();
   });
 });
 
