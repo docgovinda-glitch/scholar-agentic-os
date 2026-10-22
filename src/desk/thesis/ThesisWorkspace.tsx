@@ -1,8 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import type { ThesisStage, ThesisProjectData } from "./types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
-import { authedJsonFetch } from "../api";
+import { authedJsonFetch, getProject, saveIntakeAnswers } from "../api";
 import VivaVoceSimulator from "./components/VivaVoceSimulator";
+import type {
+  VivaSimulationResponse,
+  VivaQuestion,
+  ChapterAuditResult,
+  CrossChapterCheck,
+} from "../../../server/routes/project/thesis";
 
 const THESIS_STAGES: Array<{ id: ThesisStage; label: string; icon: string; desc: string }> = [
   { id: "proposal_framing", label: "1. Proposal & Framing", icon: "🏛️", desc: "Theoretical framework & research questions" },
@@ -14,19 +20,21 @@ const THESIS_STAGES: Array<{ id: ThesisStage; label: string; icon: string; desc:
   { id: "viva_defense", label: "7. Viva / Defense Simulator", icon: "🎓", desc: "External examiner simulation & defense prep" },
 ];
 
+export interface ThesisWorkspaceProps {
+  projectId: string;
+  onClose?: () => void;
+  onOpenAccountSettings?: () => void;
+  onOpenVault?: () => void;
+  onOpenAiAccess?: () => void;
+}
+
 export default function ThesisWorkspace({
   projectId,
   onClose,
   onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
-}: {
-  projectId: string;
-  onClose?: () => void;
-  onOpenAccountSettings?: () => void;
-  onOpenVault?: () => void;
-  onOpenAiAccess?: () => void;
-}) {
+}: ThesisWorkspaceProps) {
   const [currentStage, setCurrentStage] = useState<ThesisStage>("proposal_framing");
   const [thesisData, setThesisData] = useState<ThesisProjectData>({
     projectId,
@@ -52,33 +60,157 @@ export default function ThesisWorkspace({
     ],
   });
 
+  // Hydration & Autosave State
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [projectVersion, setProjectVersion] = useState<number>(1);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Viva Simulator State
   const [vivaLoading, setVivaLoading] = useState(false);
-  const [vivaResults, setVivaResults] = useState<any>(null);
+  const [vivaResults, setVivaResults] = useState<VivaSimulationResponse | null>(null);
+
+  // Chapter audit state
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [chapterAuditResults, setChapterAuditResults] = useState<ChapterAuditResult | null>(null);
+
+  // Hydrate from getProject(projectId) on mount
+  useEffect(() => {
+    let mounted = true;
+
+    async function hydrate() {
+      try {
+        const project = await getProject(projectId);
+        if (!mounted || !project) return;
+
+        setProjectVersion(project.version ?? 1);
+        const a = project.answers || {};
+
+        let parsedRQs: string[] = [
+          "How do non-Markovian memory models alter autonomous error-correction latency?",
+          "To what extent does epistemic uncertainty calibration reduce synthetic hallucination?",
+        ];
+        if (a["researchQuestions"]) {
+          try {
+            const raw = a["researchQuestions"];
+            if (Array.isArray(raw)) parsedRQs = raw;
+            else if (typeof raw === "string") parsedRQs = JSON.parse(raw);
+          } catch {
+            // retain fallback
+          }
+        }
+
+        let parsedChapters = thesisData.chapters;
+        if (a["chapters"]) {
+          try {
+            const raw = a["chapters"];
+            if (Array.isArray(raw) && raw.length > 0) parsedChapters = raw;
+            else if (typeof raw === "string") parsedChapters = JSON.parse(raw);
+          } catch {
+            // retain fallback
+          }
+        }
+
+        const computedCurrentWords = parsedChapters.reduce((acc, c) => acc + (c.wordCount || 0), 0);
+
+        setThesisData((prev) => ({
+          ...prev,
+          title: a["title"] || project.title || prev.title,
+          degreeLevel: (a["degreeLevel"] as ThesisProjectData["degreeLevel"]) || prev.degreeLevel,
+          fieldOfStudy: a["fieldOfStudy"] || prev.fieldOfStudy,
+          targetWordCount: Number(a["targetWordCount"]) || prev.targetWordCount,
+          currentWordCount: computedCurrentWords || prev.currentWordCount,
+          theoreticalFramework: a["theoreticalFramework"] || prev.theoreticalFramework,
+          researchQuestions: parsedRQs,
+          methodologicalDesign: a["methodologicalDesign"] || prev.methodologicalDesign,
+          supervisorNotes: a["supervisorNotes"] || prev.supervisorNotes,
+          chapters: parsedChapters,
+        }));
+      } catch (err) {
+        console.warn("[ThesisWorkspace] Hydration fallback to initial state:", err);
+      } finally {
+        if (mounted) setIsHydrated(true);
+      }
+    }
+
+    hydrate();
+    return () => {
+      mounted = false;
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [projectId]);
+
+  // Debounced auto-save to project record
+  const triggerDebouncedAutosave = useCallback(
+    (updated: ThesisProjectData) => {
+      setSaveStatus("saving");
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      debounceTimerRef.current = setTimeout(async () => {
+        try {
+          const payload = {
+            title: updated.title,
+            degreeLevel: updated.degreeLevel,
+            fieldOfStudy: updated.fieldOfStudy,
+            targetWordCount: String(updated.targetWordCount),
+            currentWordCount: String(updated.currentWordCount),
+            theoreticalFramework: updated.theoreticalFramework,
+            researchQuestions: JSON.stringify(updated.researchQuestions),
+            methodologicalDesign: updated.methodologicalDesign,
+            supervisorNotes: updated.supervisorNotes,
+            chapters: JSON.stringify(updated.chapters),
+          };
+
+          const res = await saveIntakeAnswers(projectId, payload);
+          if (res && res.version) {
+            setProjectVersion(res.version);
+          }
+          setSaveStatus("saved");
+          setLastSavedTime(
+            new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+          );
+        } catch (err) {
+          console.warn("[ThesisWorkspace] Autosave error, holding offline backup:", err);
+          setSaveStatus("error");
+        }
+      }, 500);
+    },
+    [projectId]
+  );
+
+  const updateThesisField = <K extends keyof ThesisProjectData>(field: K, value: ThesisProjectData[K]) => {
+    setThesisData((prev) => {
+      const updated = { ...prev, [field]: value };
+      if (field === "chapters") {
+        const total = (value as ThesisProjectData["chapters"]).reduce((acc, c) => acc + (c.wordCount || 0), 0);
+        updated.currentWordCount = total;
+      }
+      triggerDebouncedAutosave(updated);
+      return updated;
+    });
+  };
 
   async function handleSimulateViva() {
     setVivaLoading(true);
     try {
       const res = await authedJsonFetch(`/api/projects/${projectId}/thesis/viva-simulate`, "POST", {
         title: thesisData.title,
+        degreeLevel: thesisData.degreeLevel,
         researchQuestions: thesisData.researchQuestions,
         theoreticalFramework: thesisData.theoreticalFramework,
         methodology: thesisData.methodologicalDesign,
       });
-      const data = await res.json();
+      const data: VivaSimulationResponse = await res.json();
       setVivaResults(data);
     } catch (e) {
-      console.error(e);
+      console.error("[ThesisWorkspace] Viva simulation failure:", e);
     } finally {
       setVivaLoading(false);
     }
   }
-
-  const progressPercent = Math.round((thesisData.currentWordCount / thesisData.targetWordCount) * 100);
-
-  // Chapter audit state
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [chapterAuditResults, setChapterAuditResults] = useState<any>(null);
 
   async function handleRunChapterAudit() {
     setAuditLoading(true);
@@ -86,16 +218,21 @@ export default function ThesisWorkspace({
       const res = await authedJsonFetch(`/api/projects/${projectId}/thesis/chapter-audit`, "POST", {
         chapters: thesisData.chapters,
       });
-      const data = await res.json();
+      const data: { success: boolean; audit?: ChapterAuditResult } = await res.json();
       if (data.audit) {
         setChapterAuditResults(data.audit);
       }
     } catch (e) {
-      console.error(e);
+      console.error("[ThesisWorkspace] Chapter audit failure:", e);
     } finally {
       setAuditLoading(false);
     }
   }
+
+  const progressPercent = Math.min(
+    100,
+    Math.round((thesisData.currentWordCount / (thesisData.targetWordCount || 1)) * 100)
+  );
 
   return (
     <div className="min-h-screen bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] font-sans flex flex-col selection:bg-[color:var(--accent-subtle)]">
@@ -139,9 +276,26 @@ export default function ThesisWorkspace({
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] font-bold shrink-0">
                 {thesisData.degreeLevel}
               </span>
+              {/* Save Status Badge */}
+              <span
+                data-testid="autosave-status"
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
+                  saveStatus === "saving"
+                    ? "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
+                    : saveStatus === "error"
+                    ? "bg-red-100 text-red-900 dark:bg-red-950/60 dark:text-red-200"
+                    : "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200"
+                }`}
+              >
+                {saveStatus === "saving"
+                  ? "Saving changes…"
+                  : saveStatus === "error"
+                  ? "Offline Backup"
+                  : `All changes saved${lastSavedTime ? ` · ${lastSavedTime}` : ""}`}
+              </span>
             </div>
             <p className="text-[10px] text-[color:var(--text-muted)]">
-              {thesisData.fieldOfStudy} · Milestone Progression
+              {thesisData.fieldOfStudy} · Milestone Progression · v{projectVersion}
             </p>
           </div>
         </div>
@@ -229,7 +383,7 @@ export default function ThesisWorkspace({
                   <input
                     type="text"
                     value={thesisData.title}
-                    onChange={(e) => setThesisData({ ...thesisData, title: e.target.value })}
+                    onChange={(e) => updateThesisField("title", e.target.value)}
                     className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
                   />
                 </div>
@@ -241,24 +395,57 @@ export default function ThesisWorkspace({
                   <input
                     type="text"
                     value={thesisData.theoreticalFramework}
-                    onChange={(e) => setThesisData({ ...thesisData, theoreticalFramework: e.target.value })}
+                    onChange={(e) => updateThesisField("theoreticalFramework", e.target.value)}
+                    className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                  />
+                </div>
+
+                <div className="p-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
+                    Degree Level
+                  </label>
+                  <select
+                    value={thesisData.degreeLevel}
+                    onChange={(e) => updateThesisField("degreeLevel", e.target.value as ThesisProjectData["degreeLevel"])}
+                    className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                  >
+                    <option value="Undergraduate Capstone">Undergraduate Capstone</option>
+                    <option value="Master's Thesis">Master's Thesis</option>
+                    <option value="PhD Dissertation">PhD Dissertation</option>
+                  </select>
+                </div>
+
+                <div className="p-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
+                    Target Word Budget
+                  </label>
+                  <input
+                    type="number"
+                    value={thesisData.targetWordCount}
+                    onChange={(e) => updateThesisField("targetWordCount", parseInt(e.target.value, 10) || 0)}
                     className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
                   />
                 </div>
               </div>
 
+              {/* Multi-Chapter Progress Matrix with interactive status */}
               <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[color:var(--accent)] mb-3">
-                  Multi-Chapter Progress Matrix
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[color:var(--accent)]">
+                    Multi-Chapter Progress Matrix
+                  </h3>
+                  <span className="text-[10px] font-semibold text-[color:var(--text-muted)]">
+                    {thesisData.chapters.length} Chapters Planned
+                  </span>
+                </div>
                 <div className="space-y-3">
-                  {thesisData.chapters.map((ch) => (
+                  {thesisData.chapters.map((ch, idx) => (
                     <div
                       key={ch.chapterNumber}
-                      className="flex items-center justify-between p-3 rounded-xl bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)]"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] gap-2"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="w-6 h-6 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] font-bold text-xs flex items-center justify-center">
+                        <span className="w-6 h-6 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] font-bold text-xs flex items-center justify-center shrink-0">
                           {ch.chapterNumber}
                         </span>
                         <div>
@@ -268,15 +455,30 @@ export default function ThesisWorkspace({
                           </p>
                         </div>
                       </div>
-                      <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase ${
-                        ch.status === "reviewed"
-                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                          : ch.status === "drafting"
-                          ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                          : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                      }`}>
-                        {ch.status.replace("_", " ")}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={ch.status}
+                          onChange={(e) => {
+                            const next = [...thesisData.chapters];
+                            next[idx] = { ...ch, status: e.target.value as any };
+                            updateThesisField("chapters", next);
+                          }}
+                          className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase border border-[color:var(--border-subtle)] cursor-pointer ${
+                            ch.status === "reviewed"
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                              : ch.status === "drafting"
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                              : ch.status === "completed"
+                              ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
+                              : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                          }`}
+                        >
+                          <option value="not_started">Not Started</option>
+                          <option value="drafting">Drafting</option>
+                          <option value="reviewed">Reviewed</option>
+                          <option value="completed">Completed</option>
+                        </select>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -348,44 +550,35 @@ export default function ThesisWorkspace({
             <div className="flex flex-col gap-6">
               <div>
                 <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
-                  Chapter 3: Methodology & Epistemological Rigor
+                  Chapter 3: Methodology & Epistemological Design
                 </h2>
                 <p className="text-xs text-[color:var(--text-secondary)] mt-1">
-                  Epistemological framing, sampling strategy, instrument validity, and ethics/IRB clearance.
+                  Specify research instruments, sampling protocols, and IRB ethical clearance boundaries.
                 </p>
               </div>
 
-              <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] space-y-4">
-                <div>
-                  <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
-                    Epistemological & Methodological Design
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={thesisData.methodologicalDesign}
-                    onChange={(e) => setThesisData({ ...thesisData, methodologicalDesign: e.target.value })}
-                    className="w-full p-3 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
-                  />
-                </div>
+              <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
+                  Methodological Architecture
+                </label>
+                <textarea
+                  rows={3}
+                  value={thesisData.methodologicalDesign}
+                  onChange={(e) => updateThesisField("methodologicalDesign", e.target.value)}
+                  className="w-full p-3 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                />
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                  <div className="p-3 bg-[color:var(--surface-sunken)] rounded-xl border border-[color:var(--border-subtle)]">
-                    <span className="text-xs font-bold text-[color:var(--text-primary)] block">
-                      Quantitative Phase: Empirical Benchmarks
-                    </span>
-                    <p className="text-[11px] text-[color:var(--text-muted)] mt-1">
-                      Controlled ablation experiments across 10,000 synthetic reasoning traces with Bayesian ANOVA.
-                    </p>
-                  </div>
-                  <div className="p-3 bg-[color:var(--surface-sunken)] rounded-xl border border-[color:var(--border-subtle)]">
-                    <span className="text-xs font-bold text-[color:var(--text-primary)] block">
-                      Qualitative Phase: Thematic Trace Coding
-                    </span>
-                    <p className="text-[11px] text-[color:var(--text-muted)] mt-1">
-                      Double-blind inter-rater reliability analysis (Cohen's Kappa &gt; 0.85) on epistemic drift logs.
-                    </p>
-                  </div>
-                </div>
+              <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
+                  Supervisory Directives & Milestone Notes
+                </label>
+                <textarea
+                  rows={3}
+                  value={thesisData.supervisorNotes}
+                  onChange={(e) => updateThesisField("supervisorNotes", e.target.value)}
+                  className="w-full p-3 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                />
               </div>
             </div>
           )}
@@ -412,7 +605,7 @@ export default function ThesisWorkspace({
               </div>
 
               {chapterAuditResults && (
-                <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] space-y-4">
+                <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] space-y-4 animate-fadeIn">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--accent)]">
@@ -425,9 +618,19 @@ export default function ThesisWorkspace({
                   </div>
 
                   <div className="space-y-2">
-                    {chapterAuditResults.crossChapterChecks.map((chk: any, idx: number) => (
+                    {chapterAuditResults.crossChapterChecks.map((chk, idx) => (
                       <div key={idx} className="flex items-start gap-2.5 p-3 rounded-xl bg-[color:var(--surface-sunken)] text-xs">
-                        <span className="text-emerald-500 font-bold mt-0.5">✓</span>
+                        <span
+                          className={`font-bold mt-0.5 ${
+                            chk.status === "passed"
+                              ? "text-emerald-500"
+                              : chk.status === "warn"
+                              ? "text-amber-500"
+                              : "text-red-500"
+                          }`}
+                        >
+                          {chk.status === "passed" ? "✓" : chk.status === "warn" ? "!" : "✕"}
+                        </span>
                         <div>
                           <strong className="text-[color:var(--text-primary)]">{chk.check}: </strong>
                           <span className="text-[color:var(--text-secondary)]">{chk.details}</span>
@@ -478,7 +681,7 @@ export default function ThesisWorkspace({
                   </div>
 
                   <div className="space-y-4">
-                    {vivaResults.questions.map((q: any) => (
+                    {vivaResults.questions.map((q) => (
                       <div
                         key={q.id}
                         className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]"
@@ -499,7 +702,7 @@ export default function ThesisWorkspace({
                             Recommended Defense Strategy:
                           </span>
                           <ul className="list-disc list-inside text-xs text-[color:var(--text-secondary)] space-y-1">
-                            {q.suggestedRebuttalStructure.map((pt: string, idx: number) => (
+                            {q.suggestedRebuttalStructure.map((pt, idx) => (
                               <li key={idx}>{pt}</li>
                             ))}
                           </ul>
@@ -529,17 +732,15 @@ export default function ThesisWorkspace({
 
                 <div className="p-6 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
                   <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed mb-4">
-                    This chapter is grounded in your Knowledge Vault references and structured according to your departmental dissertation guidelines.
+                    Milestone tracking and synthesis matrix for {thesisData.degreeLevel} progress.
                   </p>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStage("viva_defense")}
-                      className="px-4 py-2 bg-[color:var(--accent-solid)] text-white text-xs font-bold rounded-xl hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs"
-                    >
-                      Proceed to Defense Prep →
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStage("viva_defense")}
+                    className="px-4 py-2 bg-[color:var(--accent-solid)] text-white text-xs font-bold rounded-xl hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs"
+                  >
+                    Proceed to Viva Defense Simulator →
+                  </button>
                 </div>
               </div>
             )}

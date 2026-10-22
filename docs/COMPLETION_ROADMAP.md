@@ -99,13 +99,14 @@ This document establishes the authoritative completion baseline for **Scholar Co
 - [x] Remove dead `server/middleware/authRateLimiter.ts` (superseded by `server/src/middleware/rateLimit.ts`) and verified orphaned components in `src/desk/journal/` (`ReferenceReviewQueue.tsx` deleted).
 - [x] Verify clean `npm run lint` (0 TypeScript errors, 82/82 WCAG contrast pairs passing, CSP hash matching) and `npm test` across all suites.
 
-### Phase 2: Proposal & Thesis Workspace Hydration & Live Engines
-- [ ] Refactor `ProposalWorkspace.tsx` to hydrate from `getProject(projectId)` and persist changes via `saveIntakeAnswers()`.
-- [ ] Connect `POST /api/projects/:id/proposal/study-section-simulate` to the real AI Gateway (`callLLM` / `generateContent`) using NIH/NSF evaluation prompts.
-- [ ] Connect `POST /api/projects/:id/proposal/aims-audit` to a real structural aims parser.
-- [ ] Refactor `ThesisWorkspace.tsx` to hydrate from `getProject(projectId)` and persist chapter structure.
-- [ ] Connect `POST /api/projects/:id/thesis/viva-simulate` to an AI-driven oral defense simulator with dynamic external examiner personas.
-- [ ] Connect `POST /api/projects/:id/thesis/chapter-audit` to cross-chapter consistency analysis.
+### Phase 2: Proposal & Thesis Workspace Hydration & Live Engines (Completed)
+- [x] Shared discourse-level scholarly voice engine (`server/src/utils/scholarlyVoiceGuard.ts`) suppressing LLM cliché tokens, enforcing syntactic burstiness/epistemic hedging, British/Oxford orthographic standardization, and diacritic-preserving Unicode NFC normalization.
+- [x] Refactor `ProposalWorkspace.tsx` to hydrate from `getProject(projectId)`, persist updates via debounced `saveIntakeAnswers()`, show live autosave status badges, and track project schema versions.
+- [x] Connect `POST /api/projects/:id/proposal/study-section-simulate` to AI Gateway (`completeWithFailover`) with NIH/NSF evaluation prompts (1.0–9.0 scale, panel consensus, percentile ranking, actionable critiques) and deterministic heuristic fallback.
+- [x] Connect `POST /api/projects/:id/proposal/aims-audit` to structural aims auditor with hypothesis clarity, aim independence checks, and heuristic fallback.
+- [x] Refactor `ThesisWorkspace.tsx` to hydrate from `getProject(projectId)`, persist chapter milestones/word counts via debounced `saveIntakeAnswers()`, show live autosave status badges, and track project schema versions.
+- [x] Connect `POST /api/projects/:id/thesis/viva-simulate` to AI Gateway viva simulator with examiner personas, rigor scores, adversarial questions, and suggested rebuttal structures.
+- [x] Connect `POST /api/projects/:id/thesis/chapter-audit` to cross-chapter consistency, research question propagation, and doctoral alignment analysis.
 
 ### Phase 3: Presentation Studio Project Binding & Unification
 - [ ] Bind `PresentationWorkspace.tsx` to `projectId`, loading and storing decks within project state (`answers.presentation_deck` or scoped table).

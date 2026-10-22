@@ -960,6 +960,7 @@ export function projectView(record: ProjectRecord | undefined) {
   return {
     projectId: record.projectId,
     outputTypeId: record.outputTypeId,
+    version: record.version,
     title: record.answers?.["title"] || record.answers?.["assignment_title"] || "",
     answers: record.answers,
     authors: record.authors || [],

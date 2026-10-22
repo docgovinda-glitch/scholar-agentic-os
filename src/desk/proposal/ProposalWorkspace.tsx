@@ -1,8 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import type { ProposalStage, ProposalProjectData } from "./types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
-import { authedJsonFetch } from "../api";
+import { authedJsonFetch, getProject, saveIntakeAnswers } from "../api";
 import StudySectionScorer from "./components/StudySectionScorer";
+import type {
+  StudySectionSimulationResult,
+  AimsAuditCheck,
+  ProposalCriterionResult,
+} from "../../../server/routes/project/proposal";
 
 const PROPOSAL_STAGES: Array<{ id: ProposalStage; label: string; icon: string; desc: string }> = [
   { id: "agency_rubric", label: "1. Agency & Rubric", icon: "🏛️", desc: "Funding mechanism, budget ceiling & guidelines" },
@@ -14,19 +19,21 @@ const PROPOSAL_STAGES: Array<{ id: ProposalStage; label: string; icon: string; d
   { id: "study_section_review", label: "7. Study Section Review", icon: "⚖️", desc: "Multi-reviewer scoring panel (NIH/NSF criteria)" },
 ];
 
+export interface ProposalWorkspaceProps {
+  projectId: string;
+  onClose?: () => void;
+  onOpenAccountSettings?: () => void;
+  onOpenVault?: () => void;
+  onOpenAiAccess?: () => void;
+}
+
 export default function ProposalWorkspace({
   projectId,
   onClose,
   onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
-}: {
-  projectId: string;
-  onClose?: () => void;
-  onOpenAccountSettings?: () => void;
-  onOpenVault?: () => void;
-  onOpenAiAccess?: () => void;
-}) {
+}: ProposalWorkspaceProps) {
   const [currentStage, setCurrentStage] = useState<ProposalStage>("specific_aims");
   const [proposalData, setProposalData] = useState<ProposalProjectData>({
     projectId,
@@ -45,13 +52,121 @@ export default function ProposalWorkspace({
     innovationStatement: "First architecture to integrate real-time cryptographic vault indexing with non-Markovian agentic debate.",
   });
 
+  // Hydration & Autosave State
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [projectVersion, setProjectVersion] = useState<number>(1);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Study section simulation state
   const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewResults, setReviewResults] = useState<any>(null);
+  const [reviewResults, setReviewResults] = useState<StudySectionSimulationResult | null>(null);
 
   // Aims audit state
   const [auditLoading, setAuditLoading] = useState(false);
-  const [aimsAuditChecks, setAimsAuditChecks] = useState<any[] | null>(null);
+  const [aimsAuditChecks, setAimsAuditChecks] = useState<AimsAuditCheck[] | null>(null);
+
+  // Hydrate from getProject(projectId) on mount
+  useEffect(() => {
+    let mounted = true;
+
+    async function hydrate() {
+      try {
+        const project = await getProject(projectId);
+        if (!mounted || !project) return;
+
+        setProjectVersion(project.version ?? 1);
+        const a = project.answers || {};
+
+        let parsedAims: string[] = [
+          "Aim 1: Construct a deterministic zero-hallucination citation verification engine with sub-second latency.",
+          "Aim 2: Develop multi-agent peer review simulation pipelines modeling 5 distinct epistemic reviewer lenses.",
+          "Aim 3: Conduct double-blind empirical trials across 1,000 biomedical review manuscripts.",
+        ];
+
+        if (a["specificAims"]) {
+          try {
+            const raw = a["specificAims"];
+            if (Array.isArray(raw)) parsedAims = raw;
+            else if (typeof raw === "string") parsedAims = JSON.parse(raw);
+          } catch {
+            // retain fallback
+          }
+        }
+
+        setProposalData((prev) => ({
+          ...prev,
+          title: a["title"] || project.title || prev.title,
+          fundingAgency: a["fundingAgency"] || prev.fundingAgency,
+          mechanism: a["mechanism"] || prev.mechanism,
+          targetBudgetUSD: Number(a["targetBudgetUSD"]) || prev.targetBudgetUSD,
+          durationMonths: Number(a["durationMonths"]) || prev.durationMonths,
+          overarchingHypothesis: a["overarchingHypothesis"] || prev.overarchingHypothesis,
+          specificAims: parsedAims,
+          significanceStatement: a["significanceStatement"] || prev.significanceStatement,
+          innovationStatement: a["innovationStatement"] || prev.innovationStatement,
+        }));
+      } catch (err) {
+        console.warn("[ProposalWorkspace] Hydration fallback to initial state:", err);
+      } finally {
+        if (mounted) setIsHydrated(true);
+      }
+    }
+
+    hydrate();
+    return () => {
+      mounted = false;
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [projectId]);
+
+  // Debounced auto-save to project record
+  const triggerDebouncedAutosave = useCallback(
+    (updated: ProposalProjectData) => {
+      setSaveStatus("saving");
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      debounceTimerRef.current = setTimeout(async () => {
+        try {
+          const payload = {
+            title: updated.title,
+            fundingAgency: updated.fundingAgency,
+            mechanism: updated.mechanism,
+            targetBudgetUSD: String(updated.targetBudgetUSD),
+            durationMonths: String(updated.durationMonths),
+            overarchingHypothesis: updated.overarchingHypothesis,
+            specificAims: JSON.stringify(updated.specificAims),
+            significanceStatement: updated.significanceStatement,
+            innovationStatement: updated.innovationStatement,
+          };
+
+          const res = await saveIntakeAnswers(projectId, payload);
+          if (res && res.version) {
+            setProjectVersion(res.version);
+          }
+          setSaveStatus("saved");
+          setLastSavedTime(
+            new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+          );
+        } catch (err) {
+          console.warn("[ProposalWorkspace] Autosave error, holding offline backup:", err);
+          setSaveStatus("error");
+        }
+      }, 500);
+    },
+    [projectId]
+  );
+
+  const updateProposalField = <K extends keyof ProposalProjectData>(field: K, value: ProposalProjectData[K]) => {
+    setProposalData((prev) => {
+      const updated = { ...prev, [field]: value };
+      triggerDebouncedAutosave(updated);
+      return updated;
+    });
+  };
 
   async function handleSimulateStudySection() {
     setReviewLoading(true);
@@ -61,11 +176,12 @@ export default function ProposalWorkspace({
         specificAims: proposalData.specificAims,
         significance: proposalData.significanceStatement,
         agency: proposalData.fundingAgency,
+        mechanism: proposalData.mechanism,
       });
-      const data = await res.json();
+      const data: StudySectionSimulationResult = await res.json();
       setReviewResults(data);
     } catch (e) {
-      console.error(e);
+      console.error("[ProposalWorkspace] Simulation failure:", e);
     } finally {
       setReviewLoading(false);
     }
@@ -77,12 +193,12 @@ export default function ProposalWorkspace({
       const res = await authedJsonFetch(`/api/projects/${projectId}/proposal/aims-audit`, "POST", {
         aimsText: proposalData.specificAims.join("\n"),
       });
-      const data = await res.json();
+      const data: { success: boolean; checks?: AimsAuditCheck[] } = await res.json();
       if (data.checks) {
         setAimsAuditChecks(data.checks);
       }
     } catch (e) {
-      console.error(e);
+      console.error("[ProposalWorkspace] Aims audit failure:", e);
     } finally {
       setAuditLoading(false);
     }
@@ -130,9 +246,26 @@ export default function ProposalWorkspace({
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] font-bold shrink-0">
                 {proposalData.mechanism}
               </span>
+              {/* Save Status Badge */}
+              <span
+                data-testid="autosave-status"
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
+                  saveStatus === "saving"
+                    ? "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
+                    : saveStatus === "error"
+                    ? "bg-red-100 text-red-900 dark:bg-red-950/60 dark:text-red-200"
+                    : "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200"
+                }`}
+              >
+                {saveStatus === "saving"
+                  ? "Saving changes…"
+                  : saveStatus === "error"
+                  ? "Offline Backup"
+                  : `All changes saved${lastSavedTime ? ` · ${lastSavedTime}` : ""}`}
+              </span>
             </div>
             <p className="text-[10px] text-[color:var(--text-muted)]">
-              {proposalData.fundingAgency} · ${proposalData.targetBudgetUSD.toLocaleString()} Ceiling ({proposalData.durationMonths} Mo)
+              {proposalData.fundingAgency} · ${proposalData.targetBudgetUSD.toLocaleString()} Ceiling ({proposalData.durationMonths} Mo) · v{projectVersion}
             </p>
           </div>
         </div>
@@ -188,13 +321,13 @@ export default function ProposalWorkspace({
           })}
         </aside>
 
-        {/* Center Stage Content */}
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-5xl">
+        {/* Center Canvas */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 max-w-4xl mx-auto w-full">
           {currentStage === "agency_rubric" && (
             <div className="flex flex-col gap-6">
               <div>
                 <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
-                  Funding Agency & Grant Rubric
+                  1. Funding Agency & Rubric Alignment
                 </h2>
                 <p className="text-xs text-[color:var(--text-secondary)] mt-1">
                   Calibrate grant mechanism constraints, total direct cost ceilings, and review panel expectations.
@@ -209,7 +342,7 @@ export default function ProposalWorkspace({
                   <input
                     type="text"
                     value={proposalData.fundingAgency}
-                    onChange={(e) => setProposalData({ ...proposalData, fundingAgency: e.target.value })}
+                    onChange={(e) => updateProposalField("fundingAgency", e.target.value)}
                     className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
                   />
                 </div>
@@ -221,7 +354,7 @@ export default function ProposalWorkspace({
                   <input
                     type="text"
                     value={proposalData.mechanism}
-                    onChange={(e) => setProposalData({ ...proposalData, mechanism: e.target.value })}
+                    onChange={(e) => updateProposalField("mechanism", e.target.value)}
                     className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
                   />
                 </div>
@@ -233,7 +366,7 @@ export default function ProposalWorkspace({
                   <input
                     type="number"
                     value={proposalData.targetBudgetUSD}
-                    onChange={(e) => setProposalData({ ...proposalData, targetBudgetUSD: parseInt(e.target.value, 10) || 0 })}
+                    onChange={(e) => updateProposalField("targetBudgetUSD", parseInt(e.target.value, 10) || 0)}
                     className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
                   />
                 </div>
@@ -245,7 +378,7 @@ export default function ProposalWorkspace({
                   <input
                     type="number"
                     value={proposalData.durationMonths}
-                    onChange={(e) => setProposalData({ ...proposalData, durationMonths: parseInt(e.target.value, 10) || 0 })}
+                    onChange={(e) => updateProposalField("durationMonths", parseInt(e.target.value, 10) || 0)}
                     className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
                   />
                 </div>
@@ -275,14 +408,24 @@ export default function ProposalWorkspace({
               </div>
 
               {aimsAuditChecks && (
-                <div className="p-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] space-y-2">
+                <div className="p-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] space-y-2 animate-fadeIn">
                   <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--accent)] block mb-1">
                     Specific Aims Compliance Check
                   </span>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {aimsAuditChecks.map((chk: any, idx: number) => (
+                    {aimsAuditChecks.map((chk, idx) => (
                       <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-[color:var(--surface-sunken)] text-xs">
-                        <span className="text-emerald-500 font-bold">✓</span>
+                        <span
+                          className={`font-bold ${
+                            chk.status === "passed"
+                              ? "text-emerald-500"
+                              : chk.status === "warn"
+                              ? "text-amber-500"
+                              : "text-red-500"
+                          }`}
+                        >
+                          {chk.status === "passed" ? "✓" : chk.status === "warn" ? "!" : "✕"}
+                        </span>
                         <div>
                           <strong className="text-[color:var(--text-primary)]">{chk.name}: </strong>
                           <span className="text-[color:var(--text-secondary)]">{chk.detail}</span>
@@ -300,7 +443,7 @@ export default function ProposalWorkspace({
                 <textarea
                   rows={2}
                   value={proposalData.overarchingHypothesis}
-                  onChange={(e) => setProposalData({ ...proposalData, overarchingHypothesis: e.target.value })}
+                  onChange={(e) => updateProposalField("overarchingHypothesis", e.target.value)}
                   className="w-full p-3 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
                 />
               </div>
@@ -326,7 +469,7 @@ export default function ProposalWorkspace({
                       onChange={(e) => {
                         const next = [...proposalData.specificAims];
                         next[idx] = e.target.value;
-                        setProposalData({ ...proposalData, specificAims: next });
+                        updateProposalField("specificAims", next);
                       }}
                       className="flex-1 px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
                     />
@@ -354,7 +497,7 @@ export default function ProposalWorkspace({
                 <textarea
                   rows={3}
                   value={proposalData.significanceStatement}
-                  onChange={(e) => setProposalData({ ...proposalData, significanceStatement: e.target.value })}
+                  onChange={(e) => updateProposalField("significanceStatement", e.target.value)}
                   className="w-full p-3 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
                 />
               </div>
@@ -366,7 +509,7 @@ export default function ProposalWorkspace({
                 <textarea
                   rows={3}
                   value={proposalData.innovationStatement}
-                  onChange={(e) => setProposalData({ ...proposalData, innovationStatement: e.target.value })}
+                  onChange={(e) => updateProposalField("innovationStatement", e.target.value)}
                   className="w-full p-3 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
                 />
               </div>
@@ -468,7 +611,7 @@ export default function ProposalWorkspace({
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {reviewResults.criteria.map((c: any, idx: number) => (
+                    {reviewResults.criteria.map((c: ProposalCriterionResult, idx: number) => (
                       <div
                         key={idx}
                         className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]"
