@@ -1,6 +1,15 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import express from "express";
+
+export const TEST_USER_ID = "11111111-1111-4111-8111-111111111111";
+vi.mock("../../src/middleware/auth", () => ({
+  requireAuth: (req: any, _res: any, next: any) => {
+    req.user = { id: TEST_USER_ID, email: "test@example.com" };
+    next();
+  },
+}));
+
 import { registerPresentationRoutes } from "../presentations";
 
 describe("Presentation Studio REST API Routes (/api/presentations)", () => {

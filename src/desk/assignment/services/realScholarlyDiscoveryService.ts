@@ -19,7 +19,7 @@ import {
 // Types for server response
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface ServerDiscoveredDraft {
+export interface ServerDiscoveredDraft {
   title: string;
   authors: string[];
   url?: string;
@@ -31,7 +31,7 @@ interface ServerDiscoveredDraft {
   authorityTier: string;
 }
 
-type DiscoveredSourceDraft = ServerDiscoveredDraft;
+export type DiscoveredSourceDraft = ServerDiscoveredDraft;
 
 interface MultiPortalResponse {
   success: boolean;

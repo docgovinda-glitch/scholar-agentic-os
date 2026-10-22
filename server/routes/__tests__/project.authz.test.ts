@@ -144,6 +144,9 @@ describe("project API — authentication", () => {
     ["get", "/api/projects/proj-anything/claims"],
     ["post", "/api/projects/proj-anything/gates/G0/signoff"],
     ["post", "/api/projects/proj-anything/export"],
+    ["post", "/api/drafting/section"],
+    ["get", "/api/presentations"],
+    ["post", "/api/presentations"],
   ];
 
   it.each(ROUTES)("401s on %s %s without a token", async (method, path) => {
@@ -255,6 +258,39 @@ describe("project API — ownership", () => {
       .post(`/api/projects/${aliceProject}/submissions`)
       .set(asBob())
       .send({ journalName: "Bob's Journal", submittedAt: "2026-01-01", status: "draft" });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("refuses to draft a section on another user's project", async () => {
+    const aliceProject = await createProjectAs(asAlice());
+
+    const res = await request(app)
+      .post("/api/drafting/section")
+      .set(asBob())
+      .send({
+        projectId: aliceProject,
+        sectionTitle: "Introduction",
+        sectionDescription: "Overview",
+        keyThemes: ["Background"],
+      });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("refuses to read another user's presentation deck", async () => {
+    const createRes = await request(app)
+      .post("/api/presentations")
+      .set(asAlice())
+      .send({
+        id: "alice-deck-authz",
+        title: "Alice Deck",
+      });
+    expect(createRes.status).toBe(201);
+
+    const res = await request(app)
+      .get("/api/presentations/alice-deck-authz")
+      .set(asBob());
 
     expect(res.status).toBe(404);
   });

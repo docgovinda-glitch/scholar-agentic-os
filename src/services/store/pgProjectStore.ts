@@ -74,7 +74,7 @@ function rowToRecord(row: Record<string, unknown>): ProjectRecord {
     version: (row.version as number) ?? 1,
     ownerId: row.owner_id as string,
     outputTypeId: row.output_type_id as string,
-    answers: ((row.answers as Record<string, any>) || {}) as ProjectRecord["answers"],
+    answers: ((row.answers as Record<string, any> | null) ?? {}) as ProjectRecord["answers"],
     authors: (row.authors as ProjectRecord["authors"] | null) ?? [],
     gates: row.gates as ProjectRecord["gates"],
     document: (row.document as ProjectRecord["document"] | null) ?? undefined,
@@ -95,15 +95,17 @@ function rowToRecord(row: Record<string, unknown>): ProjectRecord {
   };
 
   // Rehydrate normalized state
-  const r = row as Record<string, any>;
-  if (r._sources && Array.isArray(r._sources) && r._sources.length > 0) {
-    record.answers.assignment_sources = r._sources;
+  const rawSources = (row as { _sources?: unknown })._sources;
+  if (Array.isArray(rawSources) && rawSources.length > 0) {
+    record.answers.assignment_sources = rawSources;
   }
-  if (r._uploaded_sources && Array.isArray(r._uploaded_sources) && r._uploaded_sources.length > 0) {
-    record.answers.assignment_user_uploaded_sources = r._uploaded_sources;
+  const rawUploadedSources = (row as { _uploaded_sources?: unknown })._uploaded_sources;
+  if (Array.isArray(rawUploadedSources) && rawUploadedSources.length > 0) {
+    record.answers.assignment_user_uploaded_sources = rawUploadedSources;
   }
-  if (r._evidence && Array.isArray(r._evidence) && r._evidence.length > 0) {
-    record.answers.assignment_evidence_items = r._evidence;
+  const rawEvidence = (row as { _evidence?: unknown })._evidence;
+  if (Array.isArray(rawEvidence) && rawEvidence.length > 0) {
+    record.answers.assignment_evidence_items = rawEvidence;
   }
 
   return record;

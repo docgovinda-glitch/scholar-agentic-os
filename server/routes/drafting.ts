@@ -2,8 +2,10 @@ import express from "express";
 import { callOpenRouterText } from "../utils/llm.ts";
 import { generateSectionDraft } from "../../src/features/drafting/services/sectionDraftingEngine.ts";
 import { getProjectStore } from "../../src/services/store/projectStore.ts";
+import { requireAuth } from "../src/middleware/auth.ts";
 
 const router = express.Router();
+router.use(requireAuth);
 
 export interface DraftSectionRequest {
   projectId?: string;
@@ -27,6 +29,7 @@ export interface DraftSectionRequest {
  * is provided to the generation model along with PEEL structure guidelines.
  */
 router.post("/section", async (req: express.Request, res: express.Response) => {
+  const userId = (req as express.Request & { user?: { id: string } }).user?.id;
   const {
     projectId,
     sectionTitle,
@@ -47,20 +50,31 @@ router.post("/section", async (req: express.Request, res: express.Response) => {
     return res.status(400).json({ error: "sectionTitle is required." });
   }
 
-  // Attempt to recover full assignment question from project answers if not passed directly
+  // Attempt to recover full assignment question from project answers if not passed directly,
+  // verifying project ownership against the authenticated user.
   let effectiveQuestion = assignmentQuestion;
-  if (!effectiveQuestion && projectId) {
+  if (projectId) {
     try {
       const project = await getProjectStore().get(projectId);
-      if (project?.answers) {
+      if (!project || (userId && project.ownerId !== userId)) {
+        return res.status(404).json({ error: `No project "${projectId}".` });
+      }
+      if (!effectiveQuestion && project.answers) {
         effectiveQuestion =
           project.answers["assignment_question"] ||
           project.answers["research_topic"] ||
           project.answers["instructions"] ||
           "";
       }
-    } catch {
-      // Continue with provided fields
+    } catch (err: unknown) {
+      const status = (err as any)?.status;
+      if (status === 404) {
+        return res.status(404).json({ error: `No project "${projectId}".` });
+      }
+      // If store lookup fails unexpectedly, log and continue if assignmentQuestion was passed
+      if (!effectiveQuestion) {
+        return res.status(500).json({ error: "Failed to load project context." });
+      }
     }
   }
 

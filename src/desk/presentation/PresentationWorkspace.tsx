@@ -117,9 +117,22 @@ export default function PresentationWorkspace({
           source_module: deckToSave.sourceModule || 'presentation-studio',
         };
 
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            const authKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+            if (authKey) {
+              const parsed = JSON.parse(localStorage.getItem(authKey) || '{}');
+              if (parsed?.access_token) {
+                headers['Authorization'] = `Bearer ${parsed.access_token}`;
+              }
+            }
+          }
+        } catch {}
+
         const res = await fetch(`/api/presentations/${deckToSave.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(payload),
         });
 

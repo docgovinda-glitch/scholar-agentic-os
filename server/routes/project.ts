@@ -2501,12 +2501,4 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
   app.post("/api/projects/:id/export", projectLimit, exportHandler);
   app.post("/api/projects/:id/export/:format", projectLimit, exportHandler);
-
-
-  // Mount the specialized agentic pipeline routers
-  app.use("/api/projects/:id/agent", agenticRouter);
-  app.use("/api/projects/:id/assignment", assignmentRouter);
-  app.use("/api/projects/:id/thesis", thesisRouter);
-  app.use("/api/projects/:id/proposal", proposalRouter);
-  app.use("/api/projects/:id/presentation", presentationRouter);
 }

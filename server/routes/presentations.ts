@@ -12,6 +12,7 @@ import * as pdfParseModule from "pdf-parse";
 import mammoth from "mammoth";
 import JSZip from "jszip";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
+import { requireAuth } from "../src/middleware/auth.ts";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -128,6 +129,8 @@ function extractHtmlPresentationData(htmlString: string): {
 
 export interface PresentationDeckRow extends Record<string, unknown> {
   id: string;
+  user_id?: string;
+  project_id?: string | null;
   title: string;
   topic?: string | null;
   framework?: string;
@@ -141,6 +144,7 @@ export interface PresentationDeckRow extends Record<string, unknown> {
 }
 
 const router = Router();
+router.use(requireAuth);
 
 // In-memory deck store fallback for local development and offline environments
 const memoryDecks = new Map<string, PresentationDeckRow>();
@@ -153,22 +157,23 @@ function getDecksTable(): SupabaseTable<PresentationDeckRow> | null {
 
 /**
  * GET /api/presentations
- * Returns list of all presentations.
+ * Returns list of presentations owned by the authenticated user.
  */
 router.get("/", async (req: Request, res: Response) => {
+  const userId = (req as Request & { user?: { id: string } }).user?.id;
   try {
     const table = getDecksTable();
-    if (table) {
+    if (table && userId) {
       try {
-        const rows = await table.select("order=updated_at.desc");
+        const rows = await table.select(`user_id=eq.${encodeURIComponent(userId)}&order=updated_at.desc`);
         return res.json({ success: true, decks: rows });
       } catch (err: any) {
         console.warn("[presentations.ts] Supabase fetch failed, falling back to memory store:", err.message);
       }
     }
-    const decks = Array.from(memoryDecks.values()).sort(
-      (a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime()
-    );
+    const decks = Array.from(memoryDecks.values())
+      .filter((d) => !userId || !d.user_id || d.user_id === userId)
+      .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime());
     res.json({ success: true, decks });
   } catch (err: any) {
     res.status(500).json({ error: `Failed to fetch presentations: ${err.message}` });
@@ -177,22 +182,31 @@ router.get("/", async (req: Request, res: Response) => {
 
 /**
  * GET /api/presentations/:id
- * Returns a single deck by ID.
+ * Returns a single deck by ID, verifying owner authorization.
  */
 router.get("/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
+  const userId = (req as Request & { user?: { id: string } }).user?.id;
   try {
     const table = getDecksTable();
     if (table) {
       try {
         const row = await table.selectOne(`id=eq.${encodeURIComponent(id)}`);
-        if (row) return res.json({ success: true, deck: row });
+        if (row) {
+          if (row.user_id && userId && row.user_id !== userId) {
+            return res.status(404).json({ error: `Presentation deck ${id} not found` });
+          }
+          return res.json({ success: true, deck: row });
+        }
       } catch (err: any) {
         console.warn(`[presentations.ts] Supabase select failed for ${id}:`, err.message);
       }
     }
     const memDeck = memoryDecks.get(id);
     if (memDeck) {
+      if (memDeck.user_id && userId && memDeck.user_id !== userId) {
+        return res.status(404).json({ error: `Presentation deck ${id} not found` });
+      }
       return res.json({ success: true, deck: memDeck });
     }
     res.status(404).json({ error: `Presentation deck ${id} not found` });
@@ -322,9 +336,10 @@ router.post("/parse-document", upload.single("file"), async (req: Request, res: 
 
 /**
  * POST /api/presentations
- * Creates a new presentation deck.
+ * Creates a new presentation deck owned by the authenticated user.
  */
 router.post("/", async (req: Request, res: Response) => {
+  const userId = (req as Request & { user?: { id: string } }).user?.id;
   try {
     const {
       id = randomUUID(),
@@ -335,11 +350,14 @@ router.post("/", async (req: Request, res: Response) => {
       custom_theme = null,
       slides = [],
       source_module = "presentation-studio",
+      project_id = null,
     } = req.body;
 
     const now = new Date().toISOString();
     const newDeck: PresentationDeckRow = {
       id,
+      user_id: userId,
+      project_id,
       title,
       topic,
       framework,
@@ -370,13 +388,32 @@ router.post("/", async (req: Request, res: Response) => {
 
 /**
  * PUT /api/presentations/:id
- * Debounced autosave endpoint updating title, theme, slides, etc.
+ * Debounced autosave endpoint updating title, theme, slides, etc. for user's deck.
  */
 router.put("/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
+  const userId = (req as Request & { user?: { id: string } }).user?.id;
   try {
-    const existing = memoryDecks.get(id) || {
+    const existing = memoryDecks.get(id);
+    if (existing && existing.user_id && userId && existing.user_id !== userId) {
+      return res.status(404).json({ error: `Presentation deck ${id} not found` });
+    }
+
+    const table = getDecksTable();
+    if (table) {
+      try {
+        const dbRow = await table.selectOne(`id=eq.${encodeURIComponent(id)}`);
+        if (dbRow && dbRow.user_id && userId && dbRow.user_id !== userId) {
+          return res.status(404).json({ error: `Presentation deck ${id} not found` });
+        }
+      } catch (err: any) {
+        // Table check failed, fall back
+      }
+    }
+
+    const baseDeck = existing || {
       id,
+      user_id: userId,
       title: req.body.title || "Untitled Presentation",
       slides: [],
       created_at: new Date().toISOString(),
@@ -384,15 +421,15 @@ router.put("/:id", async (req: Request, res: Response) => {
 
     const now = new Date().toISOString();
     const updatedDeck: PresentationDeckRow = {
-      ...existing,
+      ...baseDeck,
       ...req.body,
       id,
+      user_id: baseDeck.user_id || userId,
       updated_at: now,
     };
 
     memoryDecks.set(id, updatedDeck);
 
-    const table = getDecksTable();
     if (table) {
       try {
         await table.upsert(updatedDeck);
@@ -412,16 +449,27 @@ router.put("/:id", async (req: Request, res: Response) => {
  */
 router.delete("/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
+  const userId = (req as Request & { user?: { id: string } }).user?.id;
   try {
-    memoryDecks.delete(id);
+    const existing = memoryDecks.get(id);
+    if (existing && existing.user_id && userId && existing.user_id !== userId) {
+      return res.status(404).json({ error: `Presentation deck ${id} not found` });
+    }
+
     const table = getDecksTable();
     if (table) {
       try {
+        const dbRow = await table.selectOne(`id=eq.${encodeURIComponent(id)}`);
+        if (dbRow && dbRow.user_id && userId && dbRow.user_id !== userId) {
+          return res.status(404).json({ error: `Presentation deck ${id} not found` });
+        }
         await table.delete(`id=eq.${encodeURIComponent(id)}`);
       } catch (err: any) {
         console.warn(`[presentations.ts] Supabase delete failed for ${id}:`, err.message);
       }
     }
+
+    memoryDecks.delete(id);
     res.json({ success: true, message: `Deck ${id} deleted` });
   } catch (err: any) {
     res.status(500).json({ error: `Failed to delete presentation: ${err.message}` });
@@ -435,6 +483,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
  */
 router.post("/:id/copilot", async (req: Request, res: Response) => {
   const { id } = req.params;
+  const userId = (req as Request & { user?: { id: string } }).user?.id;
   const { prompt, slideIndex = 0, currentSlide, referenceImage } = req.body;
 
   if (!prompt || typeof prompt !== "string") {
@@ -443,6 +492,9 @@ router.post("/:id/copilot", async (req: Request, res: Response) => {
 
   try {
     const deck = memoryDecks.get(id);
+    if (deck && deck.user_id && userId && deck.user_id !== userId) {
+      return res.status(404).json({ error: "Presentation deck not found" });
+    }
     const targetSlide = currentSlide || (deck && deck.slides && deck.slides[slideIndex]);
 
     if (!targetSlide) {

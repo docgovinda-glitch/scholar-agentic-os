@@ -103,6 +103,7 @@ function rowToRecord(row: ProjectRow): ProjectRecord {
 function recordToRow(record: ProjectRecord): ProjectRow {
   return {
     project_id: record.projectId,
+    version: record.version ?? 1,
     owner_id: record.ownerId,
     output_type_id: record.outputTypeId,
     answers: record.answers,
