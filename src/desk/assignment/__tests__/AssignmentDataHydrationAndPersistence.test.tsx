@@ -221,10 +221,10 @@ describe("Assignment Data Hydration and Persistence Guarantee", () => {
 
     fireEvent.change(fileInput, { target: { files: [testFile] } });
 
-    // Verify textarea updates with extracted text
+    // Verify auto-transition to Part 2: Understand with extracted brief text
     await waitFor(() => {
       expect(
-        screen.getByDisplayValue(/Syllabus Brief: Analyze cybersecurity vulnerabilities in industrial SCADA systems/i)
+        screen.getByText(/Syllabus Brief: Analyze cybersecurity vulnerabilities in industrial SCADA systems/i)
       ).toBeInTheDocument();
     });
 

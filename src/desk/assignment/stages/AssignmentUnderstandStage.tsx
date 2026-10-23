@@ -1323,7 +1323,7 @@ export default function AssignmentUnderstandStage() {
         setLocalCitation(data.detectedCitation);
       }
 
-      const dynamicStruct = generateDynamicAssignmentStructure({
+      let dynamicStruct = generateDynamicAssignmentStructure({
         question: cleanPrompt,
         assignmentType: localType,
         academicLevel: nextLevel,
@@ -1331,8 +1331,44 @@ export default function AssignmentUnderstandStage() {
         writingTone: localTone,
         citationStyle: nextCitation,
       });
+
+      let serverAnalysis: AssignmentAnalysis | null = null;
+      try {
+        const analyzeRes = await authedJsonFetch(
+          `/api/projects/${targetProjectId}/assignment/analyze`,
+          "POST",
+          {
+            question: cleanPrompt,
+            assignmentType: localType,
+            academicLevel: nextLevel,
+            targetWordCount: newWordCount,
+            citationStyle: nextCitation,
+            writingTone: localTone,
+            writing_tone: localTone,
+            briefText: cleanPrompt,
+          }
+        );
+        if (analyzeRes && analyzeRes.ok) {
+          const analyzeData = await analyzeRes.json();
+          const incomingAnalysis: AssignmentAnalysis = analyzeData.analysis || analyzeData;
+          if (analyzeData.structure && analyzeData.structure.headings?.length > 0) {
+            dynamicStruct = analyzeData.structure;
+          }
+          if (incomingAnalysis && (incomingAnalysis.commandVerbs || incomingAnalysis.briefLedger || incomingAnalysis.summary)) {
+            serverAnalysis = incomingAnalysis;
+          }
+        }
+      } catch (analyzeErr) {
+        console.warn("Auto-analyze brief error:", analyzeErr);
+      }
+
       setLocalStructure(dynamicStruct);
+      setStructure(dynamicStruct);
       setHasGeneratedStructure(true);
+      if (serverAnalysis) {
+        setAnalysis(serverAnalysis);
+      }
+      setUnderstandStep("outline_review");
 
       const budgets = structureToSectionBudgets(dynamicStruct);
       const internalSecs = structureToInternalSections(dynamicStruct);
@@ -1367,6 +1403,10 @@ export default function AssignmentUnderstandStage() {
         writing_tone: localTone,
         writingTone: localTone,
       };
+
+      if (serverAnalysis) {
+        updates["assignment_analysis"] = serverAnalysis;
+      }
 
       if (data.updatedTitle) {
         updates.title = data.updatedTitle;
@@ -1423,19 +1463,23 @@ export default function AssignmentUnderstandStage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-              Phase 1: Extract
+              {understandStep === "outline_review" ? "Phase 1 · Part 2: Understand" : "Phase 1 · Part 1: Extract"}
             </span>
             <span className="text-xs text-neutral-400 font-medium hidden sm:inline-block">· Coursework & Essay</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-            <span>Extract Your Brief</span>
+            {understandStep === "outline_review" ? (
+              <span>Understand Your Assignment</span>
+            ) : (
+              <span>Extract Your Brief</span>
+            )}
             <span className="sr-only">Understand Your Brief</span>
             <span className="sr-only">Phase 1: Understand the Assignment Brief</span>
           </h1>
           <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5 leading-relaxed">
             {understandStep === "outline_review"
-              ? "Calibrate word targets and outline structure before gathering evidence."
-              : "Extract assignment questions, syllabus criteria, parameters, and analytical structure."}
+              ? "Understand your core working thesis, theoretical frameworks, word targets, and outline structure."
+              : "Upload your assignment brief or paste prompts to extract parameters, questions, and grading criteria."}
           </p>
         </div>
 
@@ -2102,9 +2146,12 @@ export default function AssignmentUnderstandStage() {
 
             {/* Prompt Excerpt */}
             <div className="text-xs text-neutral-800 dark:text-neutral-200 bg-neutral-50/70 dark:bg-white/[0.02] p-2.5 sm:p-3 rounded-lg border border-neutral-200/60 dark:border-white/5 font-medium leading-relaxed">
-              <span className="font-semibold text-neutral-400 dark:text-neutral-500 mr-1.5">Prompt:</span>
-              {localQuestion}
+              <span className="font-semibold text-neutral-400 dark:text-neutral-500 block mb-1">
+                Extracted Brief Question / Prompt:
+              </span>
+              <p className="font-mono text-neutral-900 dark:text-white leading-relaxed">{localQuestion}</p>
             </div>
+
 
             {/* Parameter Badges */}
             <div className="flex flex-wrap items-center gap-1.5 text-[11px]">

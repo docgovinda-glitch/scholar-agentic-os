@@ -170,14 +170,19 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
       },
     });
 
-    authedFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        success: true,
-        text: "Advanced Institutional Policy Review 2026",
-        detectedWordCount: 5000,
-        detectedLevel: "postgraduate",
-      }),
+    authedFetch.mockImplementation(async (url: string) => {
+      if (typeof url === "string" && url.includes("/assignment/parse-brief")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            text: "Advanced Institutional Policy Review 2026",
+            detectedWordCount: 5000,
+            detectedLevel: "postgraduate",
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
     });
 
     render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="understand" />);
@@ -190,6 +195,10 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
       name: /Upload Brief Document/i,
     });
     fireEvent.click(uploadTabButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Unlimited size · Admin/i)).toBeInTheDocument();
+    });
 
     // Large file exceeding standard free limits (e.g. 15MB)
     const largeFile = new File([new ArrayBuffer(15 * 1024 * 1024)], "Institutional_Audit.pdf", {
@@ -210,8 +219,8 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
       expect(
         screen.getByText(/Advanced Institutional Policy Review 2026/i)
       ).toBeInTheDocument();
-    });
-  });
+    }, { timeout: 10000 });
+  }, 15000);
 
   it("Free User Paywall Verification: Free user exceeding 5MB limit receives the styled Upgrade Modal", async () => {
     getProfile.mockResolvedValue({
@@ -285,11 +294,15 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
       },
     });
 
-    // Server returns 500 error for corrupted file
-    authedFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      json: async () => ({ error: "Corrupted PDF stream" }),
+    authedFetch.mockImplementation(async (url: string) => {
+      if (typeof url === "string" && url.includes("/assignment/parse-brief")) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ error: "Corrupted PDF stream" }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
     });
 
     render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="understand" />);

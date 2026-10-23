@@ -248,16 +248,10 @@ describe("Scholar Core Assignment Workspace", () => {
     });
     fireEvent.change(fileInput, { target: { files: [dummyFile] } });
 
-    // 2. Verify text populates textarea and metadata detected
+    // 2. Verify auto-transition to Part 2: Understand with extracted prompt and citations
     await waitFor(() => {
-      const textarea = screen.getByPlaceholderText(/Paste your assignment prompt/i) as HTMLTextAreaElement;
-      expect(textarea.value).toContain("[L012-L015] Penalty Warning");
+      expect(screen.getByText(/\[L012-L015\] Penalty Warning/i)).toBeInTheDocument();
     });
-
-    // 3. Click "Analyze Assignment Brief"
-    const analyzeBtn = screen.getByRole("button", { name: /Analyze Assignment Brief/i });
-    expect(analyzeBtn).toBeInTheDocument();
-    fireEvent.click(analyzeBtn);
 
     // 4. Verify existing analysis breakdown renders with exact line citations
     expect(await screen.findByText(/Assignment Analysis Breakdown/i)).toBeInTheDocument();
