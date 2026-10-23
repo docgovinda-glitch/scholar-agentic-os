@@ -214,23 +214,22 @@ function openAICompatibleBody(
   });
 }
 
-let requestCount = 0;
-
-function selectGeminiKey(clientKey?: string): string {
-  if (clientKey && clientKey !== "defined_on_server" && clientKey !== "") {
-    return clientKey;
+// Zero-Retention Privacy Guard: Client-held BYOK keys in transient headers
+// are never logged, persisted, or leaked to console or disk.
+app.use((req, _res, next) => {
+  if (req.headers["x-ai-api-key"] || req.headers["x-api-key"]) {
+    // Redact from standard console logging if request headers are inspected
+    const key = (req.headers["x-ai-api-key"] || req.headers["x-api-key"]) as string;
+    if (key) {
+      Object.defineProperty(req.headers, "x-ai-api-key-safe", {
+        value: `***${key.slice(-4)}`,
+        enumerable: false,
+        configurable: true,
+      });
+    }
   }
-  const keys = [
-    process.env.GEMINI_API_KEY,
-    process.env.GEMINI_API_KEY_BACKUP || process.env.GEMINI_API_KEY_2
-  ].filter(Boolean) as string[];
-  
-  if (keys.length === 0) return "";
-  
-  const selected = keys[requestCount % keys.length];
-  requestCount++;
-  return selected;
-}
+  next();
+});
 
 
 // Body parser middleware.

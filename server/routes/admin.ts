@@ -513,7 +513,7 @@ export function registerAdminRoutes(app: express.Express): void {
     const { query } = req.body as { query: string };
     if (!query || query.trim().length < 3) return res.status(400).json({ error: "A research query is required." });
     try {
-      const count = await runOpportunityResearch(query.trim());
+      const count = await runOpportunityResearch(query.trim(), req);
       await writeAuditLog(actor(req), "run_opportunity_research", "opportunity_research", null, { query, foundCount: count });
       res.json({ success: true, foundCount: count });
     } catch (err) {

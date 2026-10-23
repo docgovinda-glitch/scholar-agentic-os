@@ -6,61 +6,51 @@ This document specifies the current AI gateway, candidate resolution routing, mu
 
 ## 1. AI System Overview
 
-Scholar Core does not bind to a single artificial intelligence model. Instead, it employs a multi-tiered, client-routed architecture that seamlessly coordinates cloud foundation models, user-supplied keys, and on-device local engines.
+Scholar Core enforces a **Strict Client-Owned BYOK / Local AI Architecture**. The platform does NOT provide server-owned, platform-paid, or free-tier server AI quotas. All AI inference executes strictly using the user's own credentials (BYOK API keys stored client-side in encrypted IndexedDB / local device storage, or Local AI runners on `http://localhost:*` such as Ollama, LM Studio, vLLM, and LocalAI).
 
 ```mermaid
 graph TD
     UserReq["User AI Request (Drafting / Copilot / Discovery)"]
     
-    subgraph ClientRouting ["Client-Side AI Router (src/services/clientRouter.ts)"]
-        PolicyCheck["Policy & Scope Check"]
-        CandidateSelection["Candidate Resolution & Tier Prioritization"]
-        FailoverEngine["Provider Failover Controller (providerFailover.ts)"]
+    subgraph ClientLayer ["Client-Side AI Layer (src/services/useAiConfig.ts)"]
+        ActiveConfig["Active BYOK Key / Local Runner Discovery"]
+        HeaderInjection["Transient Header Injection (x-ai-*)"]
+        ClientFallback["Client-Side Heuristic Fallback"]
     end
     
-    subgraph ExecutionTiers ["Execution Tiers"]
-        LocalTier["Tier 1: Local AI (Ollama, LM Studio on localhost)"]
-        BYOKTier["Tier 2: BYOK (User Keys: Anthropic, OpenAI, Gemini...)"]
-        GatewayTier["Tier 3: Smart Gateway (Managed Cloud Endpoints)"]
-        FreeTier["Tier 4: Free Tier Fallback"]
+    subgraph ExecutionModes ["Execution Targets"]
+        LocalEngine["Local AI Runners (http://localhost:11434, 1234, 8000)"]
+        CloudBYOK["User BYOK Cloud APIs (Anthropic, OpenAI, Gemini, OpenRouter)"]
+        ServerOrchestration["Server Workflows (Warden Guardrails / Retrieval Grounding)"]
     end
     
-    UserReq --> PolicyCheck
-    PolicyCheck --> CandidateSelection
-    CandidateSelection --> FailoverEngine
-    FailoverEngine -->|Selected Route| LocalTier
-    FailoverEngine -->|Selected Route| BYOKTier
-    FailoverEngine -->|Selected Route| GatewayTier
-    FailoverEngine -->|Selected Route| FreeTier
-    
-    FailoverEngine -.->|On 429 Rate Limit / 5xx Outage| CandidateSelection
+    UserReq --> ActiveConfig
+    ActiveConfig -->|Direct Browser Execution| LocalEngine
+    ActiveConfig -->|Direct Browser Execution| CloudBYOK
+    ActiveConfig -->|authedFetch with x-ai-* headers| ServerOrchestration
+    ServerOrchestration -.->|Transient Request-Scoped Key| CloudBYOK
+    ActiveConfig -.->|No Key Configured| ClientFallback
 ```
 
 ---
 
-## 2. The 5 Operational AI Modes
+## 2. Operational AI Modes & Architecture Principles
 
-Users configure their AI operating mode in `/ai-access`:
+Users configure their AI connection in `/ai-access`:
 
-1. **Smart Gateway (Default)**:
-   - Intelligent cloud routing that automatically selects the highest-performing available model for each specific academic task (e.g. Anthropic Claude for long-form synthesis, Google Gemini for wide-context literature analysis, Groq for instantaneous Copilot queries).
-2. **Bring Your Own Key (BYOK)**:
-   - Users provide their personal API keys. Calls utilize the user's quota directly. Supported providers:
-     - OpenAI (`gpt-4o`, `o1`, `gpt-4o-mini`)
-     - Anthropic (`claude-3-5-sonnet`, `claude-3-opus`, `claude-3-haiku`)
-     - Google Gemini (`gemini-2.0-flash`, `gemini-1.5-pro`)
-     - Groq (`llama-3.3-70b-versatile`, `mixtral-8x7b-32768`)
-     - Mistral AI (`mistral-large`, `mistral-small`)
-     - Cohere (`command-r-plus`, `command-r`)
-     - xAI (`grok-2`, `grok-beta`)
-     - OpenRouter & Together AI
-3. **Free Tier**:
-   - Access to standard model endpoints provided out of the box without requiring personal credentials.
-4. **Local AI**:
-   - Routes inference entirely to locally running engines on the user's machine (Ollama, LM Studio, vLLM, LocalAI) listening on standard loopback ports (`127.0.0.1:11434`, `127.0.0.1:1234`).
-   - Ensures zero data egress for sensitive institutional research.
-5. **Offline Mode**:
-   - Hard network egress lock. All cloud API calls are disabled; only local offline engines and deterministic algorithms operate.
+1. **Bring Your Own Key (BYOK)**:
+   - Users supply their personal API keys stored exclusively on their device.
+   - Transient request-scoped headers (`x-ai-provider`, `x-ai-api-key`, `x-ai-model`, `x-ai-base-url`) are attached client-side for orchestrating server workflow calls.
+   - Keys are **never** persisted in PostgreSQL/Supabase and are scrubbed/redacted from all server logs.
+   - Live dynamic model discovery queries provider `/models` endpoints with zero hardcoded model lock-in.
+2. **Local AI (Zero Egress)**:
+   - Routes inference directly to locally running engines on the user's machine (Ollama, LM Studio, vLLM, LocalAI) on loopback ports (`127.0.0.1:11434`, `127.0.0.1:1234`, `127.0.0.1:8000`).
+   - Private Network Access (PNA) and CORS guidance are handled transparently.
+   - Complete privacy guarantee for sensitive institutional research.
+3. **Offline Heuristic Mode**:
+   - Hard network egress lock when no credentials are configured.
+   - Employs deterministic academic heuristic synthesizers, rule-based audits, and offline templates.
+   - The workspace header presents: `"Offline Heuristic Mode — Connect API Key in AI Access"` with a direct 1-click link to configuration.
 
 ---
 
@@ -162,15 +152,16 @@ All AI requests flow through structured endpoints:
 
 ---
 
-## 8. Server AI Token Isolation & Entitlement Gate (`server/utils/llm.ts`)
+## 8. Zero Server-Sponsored AI Credentials & Zero-Retention BYOK Architecture (`server/utils/llm.ts`)
 
-To protect platform-funded API credentials (`OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`) from unauthorized drainage:
-- **Fail-Closed Entitlement Enforcement**:
-  - `isServerAiAuthorized(req)` queries the user's active entitlement in `public.user_entitlements`.
-  - Non-premium and unauthenticated requests are strictly rejected with HTTP `426 Upgrade Required` (`{ requireFrontendLLM: true }`).
-  - The client application intercepts HTTP 426 and smoothly routes the execution through the user's client-held BYOK or local runner without interrupting the research workflow.
-- **Client-Side Key Confidentiality**:
-  - BYOK API keys are strictly client-held. The backend rejects client-supplied API keys with HTTP `400 Bad Request` to guarantee user secrets are never logged or stored in server memory.
+To enforce strict user privacy and eliminate server-side platform key dependencies:
+- **Zero Server Keys**:
+  - The server holds zero platform-sponsored AI keys. `getCandidates(req)` strictly resolves candidates from transient request headers (`x-ai-provider`, `x-ai-api-key`, `x-ai-model`, `x-ai-base-url`) and never reads or falls back to server-side `process.env` AI keys.
+  - If a user sends a request without their own credentials, `isServerAiAuthorized(req)` evaluates to `false` and server endpoints fall back to deterministic academic heuristics or return HTTP 426 requiring client-side execution.
+- **Client-Side Key Confidentiality & Zero Persistence**:
+  - BYOK API keys are strictly client-held in encrypted IndexedDB / local device storage.
+  - Body-injected keys (`req.body.apiKey`) are rejected with HTTP 400 (`rejectClientCredentials.ts`), preventing accidental database persistence.
+  - Transient request headers are scrubbed and redacted by request privacy middleware in `server.ts` before any server logging.
 
 ---
 

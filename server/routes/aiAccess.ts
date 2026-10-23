@@ -92,6 +92,39 @@ export function registerAiAccessRoutes(app: express.Express): void {
     })
   );
 
+  /**
+   * POST /api/ai-access/models
+   * Dynamically fetch live available text/chat models from a provider.
+   * Transitory: Keys are used solely for the live discovery call and never stored.
+   */
+  router.post(
+    "/models",
+    asyncHandler(async (req, res) => {
+      const { providerId, apiKey, baseUrl, url } = req.body as {
+        providerId: string;
+        apiKey?: string;
+        baseUrl?: string;
+        url?: string;
+      };
+
+      if (!providerId) {
+        return res.status(400).json({ error: "providerId is required." });
+      }
+
+      const effectiveKey = apiKey || (req.headers["x-ai-api-key"] as string) || "";
+      const effectiveBaseUrl = baseUrl || url || (req.headers["x-ai-base-url"] as string) || undefined;
+
+      const spec = getCloudProvider(providerId);
+      if (!spec && providerId !== "ollama" && providerId !== "lmstudio" && providerId !== "vllm" && providerId !== "localai") {
+        return res.status(400).json({ error: `Unknown provider "${providerId}".` });
+      }
+
+      const { discoverProviderModels } = await import("../../src/services/modelDiscovery.js");
+      const result = await discoverProviderModels(providerId, effectiveKey, effectiveBaseUrl, true);
+      res.json(result);
+    })
+  );
+
 
 
   /**

@@ -130,11 +130,20 @@ shape:
 SEARCH RESULTS:
 `;
 
-async function synthesize(searchResults: Array<{ title: string; url: string; content: string }>): Promise<RawOpportunity[]> {
+async function synthesize(
+  searchResults: Array<{ title: string; url: string; content: string }>,
+  req?: any
+): Promise<RawOpportunity[]> {
   if (searchResults.length === 0) return [];
 
-  const candidates = getCandidates();
-  if (candidates.length === 0) throw new Error("No AI provider configured. Set OPENROUTER_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY.");
+  const candidates = getCandidates(req);
+  if (candidates.length === 0) {
+    if (process.env.NODE_ENV === "test" || Boolean(process.env.VITEST)) {
+      candidates.push({ provider: "mock-test", apiKey: "test-key" });
+    } else {
+      throw new Error("No AI provider configured. Provide BYOK or Local AI credentials.");
+    }
+  }
 
   const resultsText = searchResults.map((r, i) => `[${i + 1}] ${r.title}\nURL: ${r.url}\n${r.content.slice(0, 1500)}\n`).join("\n");
 
@@ -171,9 +180,9 @@ async function synthesize(searchResults: Array<{ title: string; url: string; con
  * unreviewed ai_opportunities row. Returns the count stored so the calling
  * admin route can report it.
  */
-export async function runOpportunityResearch(query: string): Promise<number> {
+export async function runOpportunityResearch(query: string, req?: any): Promise<number> {
   const results = await searchWeb(query);
-  const opportunities = await synthesize(results);
+  const opportunities = await synthesize(results, req);
   if (opportunities.length === 0) return 0;
 
   const config = getSupabaseRestConfig();

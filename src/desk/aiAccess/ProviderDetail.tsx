@@ -6,6 +6,7 @@ import type { ConnectionTier, ProviderView } from "./useAiAccess";
 import { discoverProviderModels, getCachedDiscoveredModels, type DiscoveredModel } from "../../services/modelDiscovery";
 import { runProviderDiagnostics, type DiagnosticReport } from "../../services/aiDiagnostics";
 import { readProviderKey } from "../../services/userAiSettings";
+import { invalidateClientAiRuntimeConfig } from "../../services/useAiConfig";
 
 /**
  * The configuration surface for ONE cloud provider.
@@ -191,6 +192,7 @@ export default function ProviderDetail({
         setError(outcome.error ?? "Could not connect.");
         return;
       }
+      invalidateClientAiRuntimeConfig();
       setApiKey("");
       setResult(
         outcome.modelsDetected != null
@@ -202,6 +204,21 @@ export default function ProviderDetail({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleSaveModel() {
+    await onSetModel(model.trim());
+    invalidateClientAiRuntimeConfig();
+  }
+
+  async function handleMakeDefault() {
+    await onMakeDefault();
+    invalidateClientAiRuntimeConfig();
+  }
+
+  async function handleDisconnect() {
+    await onDisconnect();
+    invalidateClientAiRuntimeConfig();
   }
 
   return (
@@ -295,6 +312,11 @@ export default function ProviderDetail({
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
+            onBlur={() => {
+              if (apiKey.trim() && discoveredModels.length === 0) {
+                void handleRefreshModels();
+              }
+            }}
             placeholder={view.hasKeyOnDevice ? "A key is already saved — paste a new one to replace it" : "Paste your key"}
             autoComplete="off"
             spellCheck={false}
@@ -349,7 +371,7 @@ export default function ProviderDetail({
           {view.connected && (
             <button
               type="button"
-              onClick={() => void onSetModel(model.trim())}
+              onClick={() => void handleSaveModel()}
               className="mt-2 rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
             >
               Save model
@@ -464,7 +486,7 @@ export default function ProviderDetail({
           {!view.isDefault && (
             <button
               type="button"
-              onClick={() => void onMakeDefault()}
+              onClick={() => void handleMakeDefault()}
               className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
             >
               Make default
@@ -480,7 +502,7 @@ export default function ProviderDetail({
           </button>
           <button
             type="button"
-            onClick={() => void onDisconnect()}
+            onClick={() => void handleDisconnect()}
             className="rounded-[var(--radius-sm)] border border-[color:var(--state-danger)] px-3 py-1.5 text-xs font-medium text-[color:var(--state-danger)] hover:bg-[color:var(--state-danger-subtle)]"
           >
             Disconnect and forget key

@@ -220,7 +220,7 @@ router.post(
       methodology,
     };
 
-    const candidates = getCandidates();
+    const candidates = getCandidates(req);
     const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
     if (candidates.length > 0 && !isTest) {
@@ -318,7 +318,7 @@ router.post(
           { chapterNumber: 6, title: "Conclusion", wordCount: 0, targetWordCount: 4000, status: "not_started" },
         ];
 
-    const candidates = getCandidates();
+    const candidates = getCandidates(req);
     const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
     if (chapters.length > 0 && candidates.length > 0 && !isTest) {

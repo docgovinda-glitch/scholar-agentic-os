@@ -1,5 +1,5 @@
 import express, { Request, Response } from "express";
-import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic, handleFrontendLLMOverride } from "../utils/llm.ts";
+import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic, handleFrontendLLMOverride, resolveRequestAiConfig } from "../utils/llm.ts";
 import { executeWebSearch, formatSearchResultsForPrompt } from "../src/research/webSearchEngine.ts";
 import { executeDeepResearch } from "../src/research/deepResearchEngine.ts";
 import { validateAndRefineCitations } from "../src/research/citationValidator.ts";
@@ -132,10 +132,11 @@ export function registerAIRoutes(
    * GET /api/ai/status
    * Unified, single source of truth for AI operational status.
    */
-  router.get("/status", async (_req: Request, res: Response) => {
+  router.get("/status", async (req: Request, res: Response) => {
     try {
-      const candidates = getCandidates();
-      const policy = getPremiumAiPolicy();
+      const aiConfig = resolveRequestAiConfig(req);
+      const candidates = aiConfig.candidates;
+      const policy = getPremiumAiPolicy(req);
       const operational = candidates.length > 0 && policy.status === "active";
 
       const providers = candidates.map((c) => ({
@@ -145,11 +146,11 @@ export function registerAIRoutes(
             ? "Google Gemini"
             : c.provider === "openrouter"
             ? "OpenRouter"
-            : c.provider === "anthropic"
+            : c.provider === "anthropic" || c.provider === "claude"
             ? "Anthropic Claude"
             : c.provider,
-        model: c.model || (c.provider === "gemini" ? "gemini-3.1-flash-lite" : "default"),
-        tier: "server",
+        model: c.model || aiConfig.model || "dynamic",
+        tier: "byok",
         capabilities:
           c.provider === "gemini"
             ? ["text", "vision", "reasoning", "multimodal"]
@@ -162,8 +163,12 @@ export function registerAIRoutes(
         connected: operational,
         operational,
         serverAvailable: operational,
+        tier: "byok",
+        configured: operational,
+        serverSponsoredAi: false,
         providers,
         activeRoute: candidates[0]?.provider || null,
+        activeModel: aiConfig.model || null,
         capabilities: {
           text: operational,
           vision: operational && candidates.some((c) => c.provider === "gemini" || c.provider === "openrouter"),
@@ -211,9 +216,9 @@ export function registerAIRoutes(
         return res.status(400).json({ error: "Missing required topic string" });
       }
 
-      const candidates = getCandidates();
+      const candidates = getCandidates(req);
       if (candidates.length === 0) {
-        return res.status(503).json({ error: "No operational AI providers configured for deep research." });
+        return res.status(503).json({ error: "No client-owned AI provider configured for deep research. Please configure in AI Access." });
       }
 
       const normalizedImages = (images || []).map((img: any) => {
@@ -262,7 +267,8 @@ export function registerAIRoutes(
       }
 
       const incomingLlmResult = handleFrontendLLMOverride(req);
-      const candidates = getCandidates();
+      const aiConfig = resolveRequestAiConfig(req);
+      const candidates = getCandidates(req);
 
       // Normalize images so dataUrl and base64 data are reliably present
       const normalizedImages = (images || []).map((img: any) => {
@@ -335,8 +341,8 @@ export function registerAIRoutes(
             text: locked.text,
             plan: research.plan,
             citations: research.allCitations,
-            provider: "gemini",
-            model: "gemini-3.1-flash-lite",
+            provider: candidates[0]?.provider || "byok",
+            model: candidates[0]?.model || aiConfig.model || "client-selected",
             citationStyle,
             wordCount: locked.wordCount,
             verifiedSourcesCount: (research.allCitations || []).length,
@@ -490,7 +496,7 @@ Formatting & Academic Citation Rules:
             images: normalizedImages && normalizedImages.length > 0 ? normalizedImages : undefined,
             taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
             candidates,
-          });
+          }, req);
         } catch (execErr: unknown) {
           console.warn("Server multimodal agent execution failed, requesting frontend LLM fallback:", execErr);
           return res.status(426).json({

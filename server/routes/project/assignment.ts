@@ -320,7 +320,7 @@ export function deriveHeuristicTitle(rawText: string): string {
  */
 export async function deriveSemanticAcademicTitle(
   briefText: string,
-  _req?: express.Request
+  req?: express.Request
 ): Promise<string> {
   const heuristic = deriveHeuristicTitle(briefText);
   if (!briefText || briefText.trim().length < 15) {
@@ -328,7 +328,7 @@ export async function deriveSemanticAcademicTitle(
   }
 
   try {
-    const candidates = getCandidates();
+    const candidates = getCandidates(req);
     if (candidates.length > 0 && process.env.NODE_ENV !== "test" && !process.env.VITEST) {
       const prompt = `Generate a concise, academic title (3 to 7 words, e.g. "Quantum Computing Cryptographic Architectures", "Algorithmic Bias in Healthcare") based on this assignment brief. Output ONLY the plain text title, with NO punctuation, NO quotes, NO explanation:\n\n${briefText.slice(0, 1500)}`;
       const response = await completeWithFailover(
@@ -782,7 +782,7 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       ...(updatedTitle ? { title: updatedTitle, assignment_title: updatedTitle } : {}),
     };
 
-    const candidates = getCandidates();
+    const candidates = getCandidates(req);
     const structure = await generateAiEnhancedOutline({
       question,
       assignmentType: assignmentType as any,
@@ -3455,7 +3455,7 @@ Explain predicted marks, highlight priority fixes needed to step up to the next 
   userPrompt += `CURRENT STUDENT QUERY / ACTION:\n"${message}"\n\nRespond as ${personaName} (${personaRole}). Provide concise, highly actionable, academically rigorous markdown advice.`;
 
   // Attempt live LLM candidate invocation if configured
-  const candidates = getCandidates();
+  const candidates = getCandidates(req);
   if (candidates.length > 0) {
     try {
       const scholarlyDirectives = buildScholarlyVoiceSystemPrompt({

@@ -9,6 +9,7 @@ import {
 import { checkLocalRuntimeConnectivity } from "../../services/localRuntimeConnectivity";
 import { Chip } from "./ProviderDetail";
 import type { ProviderView } from "./useAiAccess";
+import { invalidateClientAiRuntimeConfig } from "../../services/useAiConfig";
 
 /**
  * The configuration and diagnostics surface for ONE local runner (Ollama, LM Studio, etc.).
@@ -129,10 +130,26 @@ export default function LocalRunnerDetail({
         setProbeError(outcome.error ?? "Could not save this runner.");
         return;
       }
+      invalidateClientAiRuntimeConfig();
       setSaved("Saved. Scholar can now use this runner.");
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleSaveModel() {
+    await onSetModel(model.trim());
+    invalidateClientAiRuntimeConfig();
+  }
+
+  async function handleMakeDefault() {
+    await onMakeDefault();
+    invalidateClientAiRuntimeConfig();
+  }
+
+  async function handleDisconnect() {
+    await onDisconnect();
+    invalidateClientAiRuntimeConfig();
   }
 
   function handleCopyCommand(cmd: string) {
@@ -420,7 +437,7 @@ export default function LocalRunnerDetail({
           {view.connected && model && (
             <button
               type="button"
-              onClick={() => void onSetModel(model.trim())}
+              onClick={() => void handleSaveModel()}
               className="mt-2 ml-2 rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
             >
               Save model only
@@ -476,7 +493,7 @@ export default function LocalRunnerDetail({
           {!view.isDefault && (
             <button
               type="button"
-              onClick={() => void onMakeDefault()}
+              onClick={() => void handleMakeDefault()}
               className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
             >
               Make default
@@ -484,7 +501,7 @@ export default function LocalRunnerDetail({
           )}
           <button
             type="button"
-            onClick={() => void onDisconnect()}
+            onClick={() => void handleDisconnect()}
             className="rounded-[var(--radius-sm)] border border-[color:var(--state-danger)] px-3 py-1.5 text-xs font-medium text-[color:var(--state-danger)] hover:bg-[color:var(--state-danger-subtle)]"
           >
             Disconnect

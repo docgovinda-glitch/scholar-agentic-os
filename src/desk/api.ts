@@ -159,6 +159,8 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+import { getClientAiRuntimeConfig } from "../services/useAiConfig";
+
 /** GET/DELETE with credentials attached. Uses localized indicators at call sites without blocking the viewport. */
 export async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
   // If endpoint targets an uncommitted ephemeral project, commit it first before hitting server
@@ -178,7 +180,20 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
     }
   }
 
-  const headers = { ...(init.headers as Record<string, string> | undefined), ...(await authHeaders()) };
+  const aiConfig = await getClientAiRuntimeConfig().catch(() => null);
+  const transientAiHeaders: Record<string, string> = {};
+  if (aiConfig && aiConfig.isConfigured) {
+    if (aiConfig.provider) transientAiHeaders["x-ai-provider"] = aiConfig.provider;
+    if (aiConfig.modelId) transientAiHeaders["x-ai-model"] = aiConfig.modelId;
+    if (aiConfig.apiKey) transientAiHeaders["x-ai-api-key"] = aiConfig.apiKey;
+    if (aiConfig.baseUrl) transientAiHeaders["x-ai-base-url"] = aiConfig.baseUrl;
+  }
+
+  const headers = {
+    ...transientAiHeaders,
+    ...(init.headers as Record<string, string> | undefined),
+    ...(await authHeaders()),
+  };
   return await originalFetch(input, { ...init, headers });
 }
 
@@ -492,33 +507,9 @@ export async function executeAgenticLLM(
   }
 
   if (candidates.length === 0) {
-    // Graceful fallback: Delegate to server-side AI execution route
-    try {
-      const serverRes = await authedJsonFetch(
-        "/api/ai/agent",
-        "POST",
-        {
-          prompt: userPrompt,
-          systemPrompt,
-          taskType,
-        },
-        { skipLlmFallback: true }
-      );
-      if (serverRes.ok) {
-        const data = await serverRes.json();
-        if (data && data.ok && data.text) {
-          onChunk?.(data.text);
-          return data.text;
-        }
-      }
-    } catch (serverErr) {
-      console.warn("Server AI fallback execution failed:", serverErr);
-    }
-
     throw new Error(
       clientDecision?.reasoning ||
-      "No AI providers are currently available on this device or server satisfying task requirements. " +
-      "Connect a provider in AI Access settings or configure server credentials."
+      "No active AI credentials or local runners are configured on this device. Please connect an API key or local runner in AI Access."
     );
   }
 

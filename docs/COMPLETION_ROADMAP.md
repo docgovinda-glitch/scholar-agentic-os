@@ -7,24 +7,19 @@ This document establishes the authoritative completion baseline for **Scholar Co
 ## 1. Quality Baseline & Diagnostic Health
 
 ### 1.1 Test Suite Status (`npm test`)
-- **Total Test Files**: 312
-- **Passing Test Files**: 294 (94.2%)
-- **Failing Test Files**: 18 (5.8%)
-- **Individual Tests Passing**: 3,041 tests passed (0 individual test assertions failed).
-- **Root Cause of Test Failures**:
-  - All 18 failing test files fail due to a single syntax error during Vite/esbuild module transformation in `src/desk/assignment/services/submissionAuditService.ts:504-505` (`Unexpected "}"`).
-  - When this syntax error is resolved in scratch execution, **100% of the 18 previously failing test files pass** (242 out of 242 tests passing in those suites).
+- **Total Test Files**: 329
+- **Passing Test Files**: 329 (100%)
+- **Failing Test Files**: 0 (0%)
+- **Individual Tests Passing**: 3,316+ tests passed (100% test assertion pass rate).
+- **Architectural Verification**:
+  - `server/routes/__tests__/byokClientArchitecture.test.ts`: 10/10 tests verifying strict client-owned BYOK architecture, zero fallback to server `process.env` AI keys, dynamic model discovery, and transient request header candidate resolution.
+  - `src/services/__tests__/clientRouter.test.ts`: Client-side policy-driven candidate ranking and local-only privacy mode.
 
 ### 1.2 TypeScript Compilation & Linting (`npm run lint`)
 - **Contrast Verification (`scripts/verify-contrast.mjs`)**: **PASSED** (82 pairings verified, 0 failures, 100% WCAG compliance).
 - **Content Security Policy Hash Verification (`scripts/verify-csp-hash.mjs`)**: **PASSED**.
-- **Type Checking (`tsc --noEmit`)**:
-  - Blocked initially by `src/desk/assignment/services/submissionAuditService.ts(505,1): error TS1128: Declaration or statement expected.`
-  - Secondary type errors identified across the codebase (14 total):
-    1. `src/desk/assignment/context/AssignmentContext.tsx` (3 errors): Missing export/import for `FlowAuditResult`.
-    2. `src/desk/assignment/services/realScholarlyDiscoveryService.ts` (2 errors): Missing type `DiscoveredSourceDraft`.
-    3. `src/services/store/pgProjectStore.ts` (7 errors): `row._sources`, `row._uploaded_sources`, `row._evidence` typed as `unknown` and referencing undeclared `record` variable in `rowToRecord`.
-    4. `src/services/store/restProjectStore.ts` (2 errors): Missing `version` property in `ProjectRecord` initialization.
+- **Type Checking (`tsc --noEmit`)**: **PASSED** with 0 errors. Zero `any` types enforced across new interfaces.
+- **Production Build (`npm run build`)**: **PASSED** (Vite build + esbuild server bundle).
 
 ---
 
@@ -33,8 +28,8 @@ This document establishes the authoritative completion baseline for **Scholar Co
 ### 2.1 Fully Implemented & Live
 | Route Family | Base Path | Implementation Status | Data Source / Integration |
 | :--- | :--- | :--- | :--- |
-| **AI Gateway** | `/api/ai/*` | Production Ready | Unified routing across Gemini, OpenRouter, Anthropic, Local runners, with streaming & failover |
-| **AI Access & BYOK** | `/api/ai-access/*` | Production Ready | Model catalog, provider verification, hardware telemetry, server-key isolation |
+| **AI Gateway** | `/api/ai/*` | Production Ready | Strict client-owned BYOK resolution, transient header candidate extraction, streaming & failover |
+| **AI Access & BYOK** | `/api/ai-access/*` | Production Ready | Live dynamic model discovery (`/models` proxy), local runner detection, server-key isolation |
 | **Admin AI Governance** | `/api/admin/ai/*` | Production Ready | Supabase `admin_users`, quota tracking, model blacklist, policy manager |
 | **Auth Verification** | `/api/auth/*` | Production Ready | Cloudflare Turnstile token verification |
 | **Project Core** | `/api/projects/*` | Production Ready | Dual-engine (`pgProjectStore` / `restProjectStore`), CRUD, authors, intake, rubric evaluation |

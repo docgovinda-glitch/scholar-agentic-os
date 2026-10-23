@@ -352,7 +352,7 @@ router.post(
     let generatedSlides: SlidePresentationItem[] | null = null;
     let generatedBy: "ai-gateway" | "heuristic-fallback" = "heuristic-fallback";
 
-    const candidates = getCandidates();
+    const candidates = getCandidates(req);
     const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
     if (candidates.length > 0 && !isTest) {
@@ -531,7 +531,7 @@ router.post(
     let qaScenarios: AudienceQuestion[] | null = null;
     let generatedBy: "ai-gateway" | "heuristic-fallback" = "heuristic-fallback";
 
-    const candidates = getCandidates();
+    const candidates = getCandidates(req);
     const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
     if (candidates.length > 0 && !isTest) {

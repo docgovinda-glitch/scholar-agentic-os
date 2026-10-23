@@ -15,6 +15,7 @@ import {
   buildAuthHeaders,
   type CloudProviderSpec,
 } from "../config/providerCatalog";
+import { LOCAL_RUNNERS } from "../config/localRunnerCatalog";
 
 export type NormalizedCapability =
   | "reasoning"
@@ -601,6 +602,7 @@ export function getCachedDiscoveredModels(
   apiKey?: string
 ): DiscoveredModel[] | null {
   try {
+    if (typeof localStorage === "undefined") return null;
     const key = `${DISCOVERY_CACHE_PREFIX}${providerId.toLowerCase()}`;
     const raw = localStorage.getItem(key);
     if (!raw) return null;
@@ -637,6 +639,7 @@ export function setCachedDiscoveredModels(
   source: "live_discovery" | "compatibility_fallback" = "live_discovery"
 ): void {
   try {
+    if (typeof localStorage === "undefined") return;
     const key = `${DISCOVERY_CACHE_PREFIX}${providerId.toLowerCase()}`;
     const mapped = models.map((m) => ({
       ...m,
@@ -680,7 +683,8 @@ export async function discoverProviderModels(
   }
 
   const spec = getCloudProvider(providerId);
-  if (!spec) {
+  const localRunner = !spec ? LOCAL_RUNNERS.find((r) => r.id === providerId) : undefined;
+  if (!spec && !localRunner) {
     return { ok: false, models: [], source: "compatibility_fallback", error: `Unknown provider "${providerId}".` };
   }
 
@@ -699,20 +703,24 @@ export async function discoverProviderModels(
   }
 
   const executionPromise = (async () => {
-    const url = discoverModelsUrl(spec, baseUrlOverride);
+    const url = spec
+      ? discoverModelsUrl(spec, baseUrlOverride)
+      : (baseUrlOverride?.includes("/api/") || baseUrlOverride?.includes("/v1/")
+          ? baseUrlOverride
+          : `${baseUrlOverride || localRunner!.defaultEndpoint}${localRunner!.healthPath}`);
     if (!url) {
       // Provider does not publish discovery endpoint (e.g. Cloudflare custom or local runner)
-      const fallback = getCompatibilityFallbacks(spec);
+      const fallback = spec ? getCompatibilityFallbacks(spec) : [];
       return { ok: true, models: fallback, source: "compatibility_fallback" as const };
     }
 
-    const fullUrl = spec.apiStyle === "gemini" ? `${url}?key=${encodeURIComponent(apiKey)}` : url;
-    const headers = spec.apiStyle === "gemini" ? {} : buildAuthHeaders(spec, apiKey);
+    const fullUrl = spec?.apiStyle === "gemini" ? `${url}?key=${encodeURIComponent(apiKey)}` : url;
+    const headers = spec?.apiStyle === "gemini" ? {} : spec ? buildAuthHeaders(spec, apiKey) : {};
 
     // Guard against unmocked outbound network requests with synthetic test keys
     const isFetchMocked = Boolean((globalThis.fetch as any)?.mock);
     if (!isFetchMocked && (apiKey.includes("mock") || apiKey.includes("test") || apiKey.includes("dummy"))) {
-      const fallback = getCompatibilityFallbacks(spec);
+      const fallback = spec ? getCompatibilityFallbacks(spec) : [];
       return { ok: true, models: fallback, source: "compatibility_fallback" as const };
     }
 
@@ -738,7 +746,7 @@ export async function discoverProviderModels(
         }
         // Non-auth error: return compatibility fallback safely
         recordProviderFailure(providerId, `http_${response.status}`);
-        const fallback = getCompatibilityFallbacks(spec);
+        const fallback = spec ? getCompatibilityFallbacks(spec) : [];
         return { ok: true, models: fallback, source: "compatibility_fallback" as const };
       }
 
@@ -746,7 +754,7 @@ export async function discoverProviderModels(
       const discoveredList: DiscoveredModel[] = [];
       const verifiedAt = new Date().toISOString();
 
-      if (spec.apiStyle === "gemini") {
+      if (spec?.apiStyle === "gemini") {
         const rawList = Array.isArray(data?.models) ? data.models : [];
         for (const item of rawList) {
           const name = (item?.name || "").replace(/^models\//, "");
@@ -768,10 +776,10 @@ export async function discoverProviderModels(
           });
         }
       } else {
-        // OpenAI-compatible & Anthropic standard format
+        // OpenAI-compatible, Anthropic standard format, and Ollama tags
         const rawList = Array.isArray(data?.data) ? data.data : Array.isArray(data?.models) ? data.models : [];
         for (const item of rawList) {
-          const id = typeof item === "string" ? item : item?.id;
+          const id = typeof item === "string" ? item : (item?.id || item?.name || item?.model);
           if (!id || typeof id !== "string") continue;
           if (!isGenerativeChatModel(providerId, id, item)) continue;
 
@@ -779,7 +787,7 @@ export async function discoverProviderModels(
           discoveredList.push({
             id,
             providerId,
-            displayName: item?.name || id,
+            displayName: item?.displayName || item?.name || id,
             capabilities,
             contextWindow,
             source: "live_discovery",
@@ -799,12 +807,33 @@ export async function discoverProviderModels(
       }
 
       // No models parsed -> fallback
-      const fallback = getCompatibilityFallbacks(spec);
+      const fallback = spec ? getCompatibilityFallbacks(spec) : [];
       return { ok: true, models: fallback, source: "compatibility_fallback" as const };
     } catch (err) {
+      // If direct browser request failed (e.g. CORS on third-party API) and not a localhost runner, try server proxy
+      if (typeof window !== "undefined" && !fullUrl.startsWith("http://localhost") && !fullUrl.startsWith("http://127.0.0.1")) {
+        try {
+          const proxyRes = await fetch("/api/ai-access/models", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ providerId, apiKey, baseUrl: baseUrlOverride }),
+          });
+          if (proxyRes.ok) {
+            const proxyData = await proxyRes.json();
+            if (proxyData && proxyData.ok && Array.isArray(proxyData.models) && proxyData.models.length > 0) {
+              setCachedDiscoveredModels(providerId, apiKey, proxyData.models, "live_discovery");
+              recordProviderSuccess(providerId);
+              return proxyData;
+            }
+          }
+        } catch {
+          // Ignore and continue to fallback
+        }
+      }
+
       const isAbort = err instanceof Error && err.name === "AbortError";
       recordProviderFailure(providerId, isAbort ? "timeout" : "network_or_cors");
-      const fallback = getCompatibilityFallbacks(spec);
+      const fallback = spec ? getCompatibilityFallbacks(spec) : [];
       return { ok: true, models: fallback, source: "compatibility_fallback" as const };
     } finally {
       clearTimeout(timer);

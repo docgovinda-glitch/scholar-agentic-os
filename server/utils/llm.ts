@@ -23,33 +23,60 @@ export function buildAuthorizedPolicy(candidates: CandidateProvider[]): EgressPo
   return policy;
 }
 
-export function getCandidates(): CandidateProvider[] {
+export interface RequestAiConfig {
+  provider?: string;
+  model?: string;
+  apiKey?: string;
+  baseUrl?: string;
+  candidates: CandidateProvider[];
+}
+
+/**
+ * Resolves client-owned transient AI configuration from request headers.
+ * Never persists keys on the server and never falls back to server env keys.
+ */
+export function resolveRequestAiConfig(req?: any): RequestAiConfig {
+  if (!req || !req.headers) {
+    return { candidates: [] };
+  }
+  const headers = req.headers;
+  const provider = (headers["x-ai-provider"] as string) || (headers["x-provider"] as string) || undefined;
+  const model = (headers["x-ai-model"] as string) || (headers["x-model"] as string) || undefined;
+  const apiKey = (headers["x-ai-api-key"] as string) || (headers["x-api-key"] as string) || undefined;
+  const baseUrl = (headers["x-ai-base-url"] as string) || (headers["x-base-url"] as string) || undefined;
+
   const candidates: CandidateProvider[] = [];
-  
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  if (openRouterKey && !openRouterKey.includes("your_openrouter_api_key") && openRouterKey.trim().length > 10) {
-    candidates.push({ provider: "openrouter", apiKey: openRouterKey });
+
+  if (provider && (apiKey || baseUrl || provider === "ollama" || provider === "lmstudio" || provider === "localai" || provider === "vllm")) {
+    candidates.push({
+      provider: provider as any,
+      model: model || undefined,
+      apiKey: apiKey || "local-no-credential-required",
+      baseUrl: baseUrl || undefined,
+    });
   }
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey && !anthropicKey.includes("your_anthropic_api_key") && anthropicKey.trim().length > 10) {
-    candidates.push({ provider: "anthropic", apiKey: anthropicKey });
+
+  return {
+    provider,
+    model,
+    apiKey,
+    baseUrl,
+    candidates,
+  };
+}
+
+/**
+ * Returns active candidate AI providers strictly from the caller's transient request headers.
+ * Platform-paid or server-sponsored AI keys (process.env.GEMINI_API_KEY, etc.) are strictly disallowed.
+ */
+export function getCandidates(req?: any): CandidateProvider[] {
+  if (req) {
+    const config = resolveRequestAiConfig(req);
+    if (config.candidates.length > 0) {
+      return config.candidates;
+    }
   }
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (
-    geminiKey &&
-    !geminiKey.includes("your_gemini_api_key") &&
-    geminiKey.trim().length > 10 &&
-    !geminiKey.startsWith("AQ.") &&
-    !geminiKey.startsWith("ya29.")
-  ) {
-    // Verified working models with high/active quota in Google Generative AI API:
-    candidates.push({ provider: "gemini", apiKey: geminiKey, model: "gemini-3.1-flash-lite" });
-    candidates.push({ provider: "gemini", apiKey: geminiKey, model: "gemini-3.5-flash-lite" });
-    candidates.push({ provider: "gemini", apiKey: geminiKey, model: "gemini-3-flash-preview" });
-    candidates.push({ provider: "gemini", apiKey: geminiKey, model: "gemini-2.5-flash" });
-  }
-  
-  return candidates;
+  return [];
 }
 
 export interface PremiumAiPolicy {
@@ -58,16 +85,16 @@ export interface PremiumAiPolicy {
   reason?: string;
 }
 
-export function getPremiumAiPolicy(): PremiumAiPolicy {
+export function getPremiumAiPolicy(req?: any): PremiumAiPolicy {
   const isExplicitlyDisabled = process.env.ENABLE_SERVER_AI === "false";
-  const candidates = getCandidates();
+  const candidates = getCandidates(req);
   const hasCredentials = candidates.length > 0;
 
   if (isExplicitlyDisabled) {
     return {
       status: "suspended",
       isServerAiAuthorized: false,
-      reason: "Server AI is explicitly disabled by environment configuration.",
+      reason: "Server AI execution is disabled by configuration.",
     };
   }
 
@@ -75,7 +102,7 @@ export function getPremiumAiPolicy(): PremiumAiPolicy {
     return {
       status: "not_configured",
       isServerAiAuthorized: false,
-      reason: "No server-side AI provider API keys (OPENROUTER_API_KEY, GEMINI_API_KEY, etc.) are configured.",
+      reason: "No client-owned BYOK API key or local AI runner header was supplied for this request.",
     };
   }
 
@@ -86,24 +113,8 @@ export function getPremiumAiPolicy(): PremiumAiPolicy {
 }
 
 export async function isServerAiAuthorized(req: any): Promise<boolean> {
-  const policy = getPremiumAiPolicy();
-  if (!policy.isServerAiAuthorized) return false;
-
-  const userId = req?.user?.id;
-  if (!userId) return false;
-
-  // Synthetic premium user support for testing & environments
-  if (userId === "user-premium") return true;
-
-  try {
-    const entitlement = await getEntitlement(userId);
-    if (entitlement && isEntitlementActive(entitlement)) return true;
-  } catch (_) {
-    // If Supabase is unreachable, fail closed to prevent unauthorized token drainage
-    return false;
-  }
-
-  return false;
+  const policy = getPremiumAiPolicy(req);
+  return policy.isServerAiAuthorized;
 }
 
 export function handleFrontendLLMOverride(req: any): string | null {
@@ -167,8 +178,13 @@ export async function callOpenRouterJSON(req: any, res: any, systemPrompt: strin
   const override = handleFrontendLLMOverrideJSON(req);
   if (override) return override;
 
+  const aiConfig = resolveRequestAiConfig(req);
   const serverAuthorized = await isServerAiAuthorized(req);
-  const candidates = serverAuthorized ? getCandidates() : [];
+  const rawCandidates = serverAuthorized ? aiConfig.candidates : [];
+  const candidates = rawCandidates.map((c) => ({
+    ...c,
+    model: c.model || (model && model !== "openrouter/auto" ? model : undefined),
+  }));
 
   if (candidates.length === 0) {
     if (!res.headersSent) {
@@ -208,8 +224,13 @@ export async function callOpenRouterText(req: any, res: any, systemPrompt: strin
   const override = handleFrontendLLMOverride(req);
   if (override) return override;
 
+  const aiConfig = resolveRequestAiConfig(req);
   const serverAuthorized = await isServerAiAuthorized(req);
-  const candidates = serverAuthorized ? getCandidates() : [];
+  const rawCandidates = serverAuthorized ? aiConfig.candidates : [];
+  const candidates = rawCandidates.map((c) => ({
+    ...c,
+    model: c.model || (model && model !== "openrouter/auto" ? model : undefined),
+  }));
 
   if (candidates.length === 0) {
     if (!res.headersSent) {
@@ -245,8 +266,13 @@ export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: str
   const override = handleFrontendLLMOverrideJSON(req);
   if (override) return override;
 
+  const aiConfig = resolveRequestAiConfig(req);
   const serverAuthorized = await isServerAiAuthorized(req);
-  const candidates = serverAuthorized ? getCandidates() : [];
+  const rawCandidates = serverAuthorized ? aiConfig.candidates : [];
+  const candidates = rawCandidates.map((c) => ({
+    ...c,
+    model: c.model || (model && model !== "openrouter/auto" ? model : undefined),
+  }));
 
   if (candidates.length === 0) {
     if (!res.headersSent) {
@@ -307,8 +333,13 @@ export async function streamOpenRouterText(req: any, res: any, systemPrompt: str
   const override = handleFrontendLLMOverride(req);
   if (override) return override;
 
+  const aiConfig = resolveRequestAiConfig(req);
   const serverAuthorized = await isServerAiAuthorized(req);
-  const candidates = serverAuthorized ? getCandidates() : [];
+  const rawCandidates = serverAuthorized ? aiConfig.candidates : [];
+  const candidates = rawCandidates.map((c) => ({
+    ...c,
+    model: c.model || (model && model !== "openrouter/auto" ? model : undefined),
+  }));
 
   if (candidates.length === 0) {
     if (!res.headersSent) {
@@ -373,10 +404,10 @@ export interface MultimodalAgenticOptions {
   onChunk?: (chunk: string) => void;
 }
 
-export async function executeMultimodalAgentic(options: MultimodalAgenticOptions): Promise<{ text: string; provider: string; model: string }> {
-  const candidates = options.candidates && options.candidates.length > 0 ? options.candidates : getCandidates();
+export async function executeMultimodalAgentic(options: MultimodalAgenticOptions, req?: any): Promise<{ text: string; provider: string; model: string }> {
+  const candidates = options.candidates && options.candidates.length > 0 ? options.candidates : getCandidates(req);
   if (candidates.length === 0) {
-    throw new Error("No operational AI providers are configured on this server. Please set GEMINI_API_KEY or OPENROUTER_API_KEY.");
+    throw new Error("No client-owned BYOK API key or local AI runner was supplied for this request. Please configure your credentials in AI Access.");
   }
 
   let orderedCandidates = [...candidates];
@@ -443,11 +474,12 @@ export async function executeMultimodalAgentic(options: MultimodalAgenticOptions
   }
 }
 
-export async function generateGeminiEmbedding(text: string): Promise<number[]> {
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey) throw new Error("GEMINI_API_KEY is required for embeddings");
+export async function generateGeminiEmbedding(text: string, apiKey?: string): Promise<number[]> {
+  if (!apiKey) {
+    throw new Error("Client BYOK Gemini API key is required for embeddings.");
+  }
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${geminiKey}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${encodeURIComponent(apiKey)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

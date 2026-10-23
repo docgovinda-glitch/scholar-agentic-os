@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import GlobalSearchModal from "./GlobalSearchModal";
 import UserAccountMenu from "../components/UserAccountMenu";
+import { useAiConfig } from "../../services/useAiConfig";
 
 /**
  * Region A (docs 22 §2).
@@ -37,6 +38,7 @@ export default function Header({
   onRenameProject?: (newTitle: string) => Promise<void> | void;
   userEmail?: string | null;
 }) {
+  const { config: aiConfig } = useAiConfig();
   const current = project.gates?.find((g) => g.status !== "signed_off") ?? project.gates?.[project.gates.length - 1];
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -116,15 +118,29 @@ export default function Header({
             Vault
           </button>
         )}
-        {onOpenAiAccess && (
+        {aiConfig.isConfigured ? (
           <button
             type="button"
             onClick={onOpenAiAccess}
-            className="flex items-center gap-1.5 rounded-[var(--radius-sm)] px-2 py-0.5 transition-colors duration-[var(--motion-fast)] border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer"
-            title="AI Access configuration"
+            className="flex items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 py-1 transition-colors duration-[var(--motion-fast)] border border-emerald-600/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20 cursor-pointer font-medium text-xs max-w-[280px]"
+            title={`Active AI: ${aiConfig.providerName} (${aiConfig.modelId}) — Click to configure`}
+            aria-label={`Active AI: ${aiConfig.providerName} · ${aiConfig.modelId}`}
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>AI Access</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" aria-hidden="true" />
+            <span className="truncate">
+              {aiConfig.providerName} · {aiConfig.modelId}
+            </span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpenAiAccess}
+            className="flex items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 py-1 transition-colors duration-[var(--motion-fast)] border border-amber-600/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 hover:bg-amber-500/20 cursor-pointer text-xs"
+            title="Offline Heuristic Mode — Click to connect an API Key or Local Runner in AI Access"
+            aria-label="Offline Heuristic Mode — Connect API Key in AI Access"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" aria-hidden="true" />
+            <span className="truncate">Offline Heuristic Mode — Connect API Key in AI Access</span>
           </button>
         )}
         {onOpenAccountSettings ? (

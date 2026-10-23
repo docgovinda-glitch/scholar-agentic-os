@@ -218,7 +218,7 @@ router.post(
       mechanism,
     };
 
-    const candidates = getCandidates();
+    const candidates = getCandidates(req);
     const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
     if (candidates.length > 0 && !isTest) {
@@ -317,7 +317,7 @@ router.post(
         : ""
     );
 
-    const candidates = getCandidates();
+    const candidates = getCandidates(req);
     const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
     if (aimsText && aimsText.trim().length > 30 && candidates.length > 0 && !isTest) {

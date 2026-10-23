@@ -1335,7 +1335,7 @@ router.post("/rebuttal-matrix", async (req: express.Request<{ id: string }>, res
     }
 
     // If live AI is available and not in test mode, enrich author responses and diffs
-    const candidates = getCandidates();
+    const candidates = getCandidates(req);
     const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
     if (candidates.length > 0 && !isTest) {
@@ -1594,7 +1594,7 @@ Threats to Validity & Boundary Conditions: While our proofs hold under bounded B
   const bannedBefore = detectBannedTokens(textToPolish);
 
   // 2. Term-Locked Humanization via AI Gateway or deterministic fallback
-  const candidates = getCandidates();
+  const candidates = getCandidates(req);
   const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
   let polished = "";

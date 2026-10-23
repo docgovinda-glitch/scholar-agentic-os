@@ -86,4 +86,5 @@ export interface CandidateProvider {
   provider: string;
   apiKey: string;
   model?: string;
+  baseUrl?: string;
 }
