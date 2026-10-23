@@ -4,6 +4,15 @@ import { STAGE_MAP } from "./types";
 import { useOptionalResearchWorkspace } from "./ResearchContext";
 import { sendCopilotMessage } from "../api";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
+import {
+  getLiveSearchGroundingEnabled,
+  setLiveSearchGroundingEnabled,
+  onLiveSearchGroundingChange,
+  executeLiveSearch,
+  injectLiveGrounding,
+  type LiveSearchResult,
+} from "../../services/liveSearchService";
+import LiveSourcesDrawer from "../components/LiveSourcesDrawer";
 
 export interface AgentInfo {
   name: string;
@@ -236,7 +245,15 @@ export default function ContextPanel({
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [dynamicActions, setDynamicActions] = useState<string[] | null>(null);
+  const [liveGrounding, setLiveGrounding] = useState<boolean>(() => getLiveSearchGroundingEnabled());
+  const [liveSourcesByMessageId, setLiveSourcesByMessageId] = useState<Record<number, LiveSearchResult[]>>({});
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    return onLiveSearchGroundingChange((enabled) => {
+      setLiveGrounding(enabled);
+    });
+  }, []);
 
   useEffect(() => {
     if (typeof endOfMessagesRef.current?.scrollIntoView === "function") {
@@ -253,24 +270,46 @@ export default function ContextPanel({
     setHistory(newHistory);
     setIsTyping(true);
 
+    let liveSources: LiveSearchResult[] = [];
+    if (liveGrounding) {
+      try {
+        liveSources = await executeLiveSearch(text, { limit: 4 });
+      } catch {
+        // Non-blocking failover
+      }
+    }
+
+    const outgoingText =
+      liveSources.length > 0 ? injectLiveGrounding(text, liveSources).promptWithContext : text;
+
     try {
       if (onSendMessage) {
-        const res = await onSendMessage(text, history);
+        const res = await onSendMessage(outgoingText, history);
         if (res.ok) {
+          const assistantIndex = newHistory.length;
+          if (liveSources.length > 0) {
+            setLiveSourcesByMessageId((prev) => ({ ...prev, [assistantIndex]: liveSources }));
+          }
           setHistory([...newHistory, { role: "assistant", content: res.response }]);
         } else {
           throw new Error(res.error || "Received an error response from the AI provider.");
         }
       } else {
-        const res = await sendCopilotMessage(effectiveProjectId, effectiveStage as ResearchStage, text, history);
+        const res = await sendCopilotMessage(effectiveProjectId, effectiveStage as ResearchStage, outgoingText, history);
         if (res.ok) {
+          const assistantIndex = newHistory.length;
+          if (liveSources.length > 0) {
+            setLiveSourcesByMessageId((prev) => ({ ...prev, [assistantIndex]: liveSources }));
+          }
           setHistory([...newHistory, { role: "assistant", content: res.response }]);
         } else {
-          throw new Error((res as any).error || "Received an error response from the AI provider.");
+          const errorMsg = (res as { error?: string }).error || "Received an error response from the AI provider.";
+          throw new Error(errorMsg);
         }
       }
-    } catch (err: any) {
-      setHistory([...newHistory, { role: "assistant", content: `**Error**: ${err.message || "Failed to connect to Assistant."}` }]);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : "Failed to connect to Assistant.";
+      setHistory([...newHistory, { role: "assistant", content: `**Error**: ${errMsg}` }]);
     } finally {
       setIsTyping(false);
     }
@@ -407,6 +446,9 @@ export default function ContextPanel({
                       : "bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-tl-none text-[color:var(--text-primary)]"
                   }`}>
                     {msg.content}
+                    {msg.role === "assistant" && liveSourcesByMessageId[idx] && (
+                      <LiveSourcesDrawer sources={liveSourcesByMessageId[idx]} />
+                    )}
                   </div>
                 </div>
               ))}
@@ -446,6 +488,35 @@ export default function ContextPanel({
             ))}
           </div>
         )}
+
+        {/* Live Web Search Grounding Toggle Bar */}
+        <div className="px-4 py-2 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] flex items-center justify-between shrink-0">
+          <label
+            htmlFor="context-panel-live-search-toggle"
+            className="flex items-center gap-2 cursor-pointer select-none text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
+          >
+            <input
+              id="context-panel-live-search-toggle"
+              type="checkbox"
+              checked={liveGrounding}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setLiveGrounding(next);
+                setLiveSearchGroundingEnabled(next);
+              }}
+              className="rounded border-[color:var(--border-control)] text-sky-600 focus:ring-sky-500 cursor-pointer"
+            />
+            <span className="flex items-center gap-1.5">
+              <span>🌐</span>
+              <span>Live Web Search Grounding</span>
+            </span>
+          </label>
+          {liveGrounding && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium">
+              Active
+            </span>
+          )}
+        </div>
 
         {/* Chat Input */}
         <div className="p-4 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] shrink-0">

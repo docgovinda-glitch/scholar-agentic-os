@@ -23,6 +23,11 @@ import {
   type OfferedPlan,
   type MyPremiumRequest,
 } from "./aiAccessApi";
+import {
+  getLiveSearchGroundingEnabled,
+  setLiveSearchGroundingEnabled,
+  onLiveSearchGroundingChange,
+} from "../../services/liveSearchService";
 
 /**
  * AI Access — the single source of truth for a user's AI provider and model configuration.
@@ -995,6 +1000,13 @@ function PreferencesSection({
   const fallback = access.settings.preferences.fallbackProvider ?? "";
   const privacy = access.settings.preferences.privacyPreference ?? "any";
   const [showPrivacyTooltip, setShowPrivacyTooltip] = useState(false);
+  const [liveGrounding, setLiveGrounding] = useState<boolean>(() => getLiveSearchGroundingEnabled());
+
+  useEffect(() => {
+    return onLiveSearchGroundingChange((enabled) => {
+      setLiveGrounding(enabled);
+    });
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -1203,6 +1215,44 @@ function PreferencesSection({
             <span className="font-medium text-[color:var(--text-primary)]">Local AI only</span> — Never send my writing to a cloud provider.
             <span className="mt-0.5 block text-xs text-[color:var(--text-muted)]">
               With this on, tasks that cannot run locally are refused rather than forwarded to cloud providers.
+            </span>
+          </span>
+        </label>
+      </section>
+
+      {/* 4. Live Web & Scholarly Search Grounding Section */}
+      <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold tracking-tight text-[color:var(--text-primary)]">
+              🌐 Live Web Search Grounding
+            </h3>
+            <p className="mt-0.5 text-xs text-[color:var(--text-muted)]">
+              Automatically retrieve up-to-date open scholarly papers and web sources before generating responses.
+            </p>
+          </div>
+          <span className="text-[11px] font-mono text-sky-600 dark:text-sky-400 border border-sky-300 dark:border-sky-800/60 px-2 py-0.5 rounded-full bg-sky-50 dark:bg-sky-950/40">
+            Real-Time Citations
+          </span>
+        </div>
+
+        <label className="flex items-start gap-2.5 text-sm text-[color:var(--text-secondary)] cursor-pointer pt-1">
+          <input
+            type="checkbox"
+            checked={liveGrounding}
+            onChange={(e) => {
+              const next = e.target.checked;
+              setLiveGrounding(next);
+              setLiveSearchGroundingEnabled(next);
+            }}
+            className="mt-0.5 rounded border-[color:var(--border-control)] text-sky-600 focus:ring-sky-500 cursor-pointer"
+          />
+          <span>
+            <span className="font-medium text-[color:var(--text-primary)]">
+              Enable real-time web & open scholarly search grounding by default
+            </span>
+            <span className="mt-0.5 block text-xs text-[color:var(--text-muted)] leading-relaxed">
+              When active, prompt execution automatically queries OpenAlex, Crossref, and authoritative web indices, injecting fresh evidence snippets into the model's context for verifiable, hallucination-resistant answers.
             </span>
           </span>
         </label>

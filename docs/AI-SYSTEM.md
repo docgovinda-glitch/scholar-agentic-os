@@ -176,3 +176,59 @@ To enforce strict user privacy and eliminate server-side platform key dependenci
     `"AI generation is temporarily unavailable. Your research data is safe. Retry when a provider becomes available."`
   - Raw upstream provider stack traces and error payloads are shielded from the user interface while persisting into the audit log.
 
+---
+
+## 10. Live Web & Scholarly Search Grounding Tool-Calling Engine (`liveSearchService.ts` & `liveSearch.ts`)
+
+To ground client-owned BYOK and local models in fresh academic literature and contemporary web data without requiring provider-specific tool calling support:
+
+```mermaid
+graph TD
+    UserQuery["User Prompt (AskScholar / Coursework / Journal)"]
+    ToggleCheck{"Live Search Enabled?<br/>(UI Toggle or Global Pref)"}
+    PreSearch["Execute Live Search Orchestrator<br/>(OpenAlex, Crossref, Wikipedia)"]
+    ContextInject["Format & Inject Grounding Context<br/>[Live Web Grounding Context (Retrieved: Date)]"]
+    ModelInference["Client-Owned AI Model<br/>(Gemini, OpenAI, Anthropic, Ollama)"]
+    DrawerRender["Render LiveSourcesDrawer<br/>(Collapsible Verified Sources, Authors, URLs)"]
+
+    UserQuery --> ToggleCheck
+    ToggleCheck -->|No| ModelInference
+    ToggleCheck -->|Yes| PreSearch
+    PreSearch -->|Success| ContextInject
+    PreSearch -->|Failover to Browser Direct| ContextInject
+    ContextInject --> ModelInference
+    ContextInject --> DrawerRender
+```
+
+### 10.1 Dual Execution Architecture
+1. **Server-Side Aggregator (`server/src/discovery/liveSearch.ts` mounted at `/api/search/live`)**:
+   - Concurrently queries OpenAlex (`api.openalex.org`), Crossref (`api.crossref.org`), Wikipedia REST API (`en.wikipedia.org/w/api.php`), and Supabase Edge Function `search-proxy`.
+   - Reconstructs abstracts from OpenAlex inverted indices, strips HTML markup, normalizes publication dates and author lists, and deduplicates records by normalized title and URL.
+2. **Direct Browser CORS Failover (`executeBrowserDirectLiveSearch`)**:
+   - If the backend server is unreachable or offline, the client seamlessly fails over to direct browser queries against OpenAlex, Crossref, and Wikipedia with graceful timeout guards (8s).
+
+### 10.2 Context Injection Loop & Anti-Hallucination Prompting
+- Before dispatching a generation prompt to `executeAgenticLLM` or `/api/ai/*`, the search service queries live endpoints and formats the results into an authoritative block:
+  ```text
+  [Live Web Grounding Context (Retrieved: YYYY-MM-DD HH:mm:ss UTC)]:
+  The following real-time web and scholarly sources were retrieved for the user's query:
+
+  [Source 1]: Title
+  URL: https://...
+  Authors: Author Name
+  Published: YYYY-MM-DD
+  Snippet: ...
+
+  Instructions for Model:
+  1. Incorporate verified findings, dates, authors, and data points from the sources above when answering.
+  2. Ground all factual assertions in these retrieved sources where relevant.
+  3. If information requested is absent from the sources, state this clearly rather than fabricating facts.
+  4. Always cite specific titles, authors, and URLs when quoting or paraphrasing.
+  ```
+- **Double-Grounding Prevention**: Checks if the prompt already contains `[Live Web Grounding Context` prior to executing queries, preventing duplicate roundtrips and token waste when components pre-search to capture drawer items.
+
+### 10.3 UI Controls & Source Drawer
+- **Global & Scoped Toggles**: Configurable in `/ai-access` (`AiAccessPage.tsx`) under user preferences, and toggled on-the-fly in AskScholar (`ProjectListScreen.tsx`) and Copilot panels (`ContextPanel.tsx` for `OT-01` and `OT-10`).
+- **Live Sources Drawer (`LiveSourcesDrawer.tsx`)**: WCAG AAA/AA compliant collapsible drawer rendering real-time links, full snippets, publication venues, and copyable citations with complete keyboard accessibility.
+
+

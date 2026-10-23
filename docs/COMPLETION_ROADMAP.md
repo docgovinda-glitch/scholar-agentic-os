@@ -159,3 +159,26 @@ This document establishes the authoritative completion baseline for **Scholar Co
   - Verified `src/desk/__tests__/ProjectListScreen.test.tsx`, `ProjectListScreenEnhancements.test.tsx`, and `AskScholarCitationEngine.test.tsx`.
   - Zero `any` types introduced, 82/82 WCAG contrast pairs pass, 100% test pass rate (328/328 files, 3,306 tests), and production build verified.
 
+### Phase 7: Live Web & Scholarly Search Tool-Calling for Client-Owned AI Models (Completed)
+- [x] **Client-Side & Proxied Search Service (`src/services/liveSearchService.ts` & `server/src/discovery/liveSearch.ts`)**:
+  - Built `executeLiveSearch` orchestrating server proxy `/api/search/live` (`POST` and `GET`) querying OpenAlex (`api.openalex.org`), Crossref (`api.crossref.org`), Wikipedia REST API, and Supabase Edge Function `search-proxy`.
+  - Implemented automatic inverted-index abstract reconstruction for OpenAlex records, HTML tag stripping, and author list normalization.
+  - Implemented client-side CORS direct fallback (`executeBrowserDirectLiveSearch`) ensuring live web grounding operates even if the backend proxy is offline or unreachable.
+  - Enforced deduplication by normalized URL and title across all sources.
+- [x] **Context Injection Loop & Strict Prompting (`executeAgenticLLM`)**:
+  - Added live search context formatting: `[Live Web Grounding Context (Retrieved: YYYY-MM-DD HH:mm:ss UTC)]:\n...`.
+  - Updated `executeAgenticLLM` in `src/desk/api.ts` to automatically check user's live search preference and inject the retrieved evidence block into system prompts.
+  - Added double-grounding guards preventing duplicate network roundtrips if calling components pre-executed search for UI drawer rendering.
+- [x] **Accessible UI Controls & Collapsible Source Drawer (`LiveSourcesDrawer.tsx`)**:
+  - Created WCAG AAA/AA compliant collapsible `LiveSourcesDrawer.tsx` rendering active source links, authors, publication dates, and snippets with full keyboard navigation and high-contrast styling.
+  - Integrated live search toggle and drawer in AskScholar prompt bar and message stream (`src/desk/ProjectListScreen.tsx`).
+  - Integrated live search toggle and drawer in Coursework (`OT-01`) and Journal (`OT-10`) Copilot panels (`src/desk/workspace/ContextPanel.tsx`).
+  - Added global live search preference control in `/ai-access` (`src/desk/aiAccess/AiAccessPage.tsx`).
+- [x] **Strict Quality & Test Verification**:
+  - Unit tests for search service (`src/services/__tests__/liveSearchService.test.ts`, 15/15 passing).
+  - Unit tests for source drawer component (`src/desk/components/__tests__/LiveSourcesDrawer.test.tsx`, 4/4 passing).
+  - Zero `any` types across all new and modified TypeScript files.
+  - Passed `npm run lint` (0 TypeScript errors, 82/82 WCAG contrast pairs pass, CSP hash matches).
+  - Clean production build (`npm run build`).
+
+

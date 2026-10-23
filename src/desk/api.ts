@@ -457,14 +457,37 @@ function routingTaskTypeToTaskClass(taskType: RoutingTaskType): "drafting" | "re
 import { resolveClientCandidates } from "../services/clientRouter";
 import { getCloudProvider } from "../config/providerCatalog";
 import { startExecutionScope, updateExecutionScope, endExecutionScope } from "../services/executionState";
+import type { FailoverEvent } from "../services/providerFailover";
+import {
+  getLiveSearchGroundingEnabled,
+  executeLiveSearch,
+  injectLiveGroundingToSystemPrompt,
+} from "../services/liveSearchService";
 
 export async function executeAgenticLLM(
   systemPrompt: string,
   userPrompt: string,
   taskType: RoutingTaskType = "reasoning",
   onChunk?: (chunk: string) => void,
-  onFailoverEvent?: (event: any) => void
+  onFailoverEvent?: (event: FailoverEvent) => void
 ) {
+  // If Live Web Search Grounding is enabled, inject fresh live snippets unless already present
+  let effectiveSystemPrompt = systemPrompt;
+  if (
+    getLiveSearchGroundingEnabled() &&
+    !systemPrompt.includes("[Live Web Grounding Context") &&
+    !userPrompt.includes("[Live Web Grounding Context")
+  ) {
+    try {
+      const searchResults = await executeLiveSearch(userPrompt, { limit: 5 });
+      if (searchResults.length > 0) {
+        effectiveSystemPrompt = injectLiveGroundingToSystemPrompt(systemPrompt, searchResults);
+      }
+    } catch {
+      // Non-blocking failover to standard generation
+    }
+  }
+
   // 1. Resolve candidates client-side first using policy-driven client router
   const clientDecision = await resolveClientCandidates(taskType, {
     manualOverride: activeManualModelOverride,
@@ -524,7 +547,7 @@ export async function executeAgenticLLM(
     initialCandidate.model
   );
 
-  const handleFailoverEvent = (event: any) => {
+  const handleFailoverEvent = (event: FailoverEvent) => {
     if (event.type === "switch") {
       const rawId = event.providerId || "";
       const [provId, modId] = rawId.split("::");
@@ -558,7 +581,7 @@ export async function executeAgenticLLM(
 
   // Use completeWithFailover from the gateway
   const req = {
-    systemPrompt,
+    systemPrompt: effectiveSystemPrompt,
     userPrompt,
     taskClass,
     local: candidates[0].apiKey === "local-no-credential-required",
@@ -1417,6 +1440,8 @@ export interface AgenticQueryResponse {
     isPrimary?: boolean;
     sourceType?: "official" | "scholarly" | "media" | "web" | "vault";
   }>;
+  citationStyle?: string;
+  followUps?: string[];
   error?: string;
   wordCount?: number;
   verifiedSourcesCount?: number;

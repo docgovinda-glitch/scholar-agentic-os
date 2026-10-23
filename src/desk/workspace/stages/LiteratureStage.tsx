@@ -305,7 +305,7 @@ export default function LiteratureStage({
                 id: Date.now().toString() + Math.random(),
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                 level: failoverEvt.type === "success" ? "success" : "warning",
-                message: failoverEvt.type === "success" ? failoverEvt.userMessage : `⚠️ ${failoverEvt.userMessage}`,
+                message: failoverEvt.type === "success" ? (failoverEvt.userMessage || "Success") : `⚠️ ${failoverEvt.userMessage || "Failover"}`,
               },
             ]);
           }

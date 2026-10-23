@@ -11,6 +11,7 @@ import {
   getAiOperationalStatus,
   parseFileForAgent,
   type AiOperationalStatus,
+  type AgenticQueryResponse,
 } from "./api";
 import {
   isDuplicateProjectTitle,
@@ -81,6 +82,15 @@ import {
   stripRawReferencesSection,
   type AskCitationStyleId,
 } from "./scholarCitationEngine";
+import {
+  getLiveSearchGroundingEnabled,
+  setLiveSearchGroundingEnabled,
+  onLiveSearchGroundingChange,
+  executeLiveSearch,
+  injectLiveGroundingToSystemPrompt,
+  type LiveSearchResult,
+} from "../services/liveSearchService";
+import LiveSourcesDrawer from "./components/LiveSourcesDrawer";
 
 export interface Attachment {
   file: File;
@@ -217,6 +227,7 @@ export interface WebsiteAssistantMessage {
     isPrimary?: boolean;
     sourceType?: "official" | "scholarly" | "media" | "web" | "vault";
   }>;
+  liveSources?: LiveSearchResult[];
   attachments?: Array<{ name: string; isImage: boolean; previewUrl?: string }>;
   error?: boolean;
   wordCount?: number;
@@ -1447,6 +1458,13 @@ export default function ProjectListScreen({
   });
   const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([]);
   const [isGuideThinking, setIsGuideThinking] = useState(false);
+  const [liveSearchGrounding, setLiveSearchGrounding] = useState<boolean>(() => getLiveSearchGroundingEnabled());
+
+  useEffect(() => {
+    return onLiveSearchGroundingChange((enabled) => {
+      setLiveSearchGrounding(enabled);
+    });
+  }, []);
   const isLandingPage = activeView === "projects" && !choosing;
   const hasStartedChatting = guideMessages.some((m) => m.sender === "user") || isGuideThinking;
   const [expandedPlanIds, setExpandedPlanIds] = useState<Record<string, boolean>>({});
@@ -1688,9 +1706,22 @@ export default function ProjectListScreen({
             content: m.text,
           }));
 
-        let agentResponse: any;
+        let agentResponse: (AgenticQueryResponse & { ok?: boolean }) | undefined;
         const styleInfo = getCitationStyleInfo(askCitationStyle);
         const systemPrompt = `You are Scholar Core Research Copilot, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers. Prioritize recently published (2020-2026), peer-reviewed, and credible sources. Format citations and references strictly according to ${styleInfo.name}. Ground all assertions in verified literature without fabricating sources or DOIs.`;
+
+        let liveRetrievedSources: LiveSearchResult[] = [];
+        if (liveSearchGrounding || targetMode === "search" || targetMode === "deep-research") {
+          try {
+            liveRetrievedSources = await executeLiveSearch(query, { limit: 5 });
+          } catch {
+            // Non-blocking failover
+          }
+        }
+
+        const effectiveSystemPrompt = liveRetrievedSources.length > 0
+          ? injectLiveGroundingToSystemPrompt(systemPrompt, liveRetrievedSources)
+          : systemPrompt;
 
         const isAcademicOrDeliverable =
           targetMode !== "normal" ||
@@ -1701,13 +1732,13 @@ export default function ProjectListScreen({
         if (currentAttachments.length === 0 && targetMode === "normal" && !isAcademicOrDeliverable) {
           // Standard text generation — calls executeAgenticLLM first (compatible with unit tests and client router)
           try {
-            const txt = await executeAgenticLLM(systemPrompt, query, "simple");
+            const txt = await executeAgenticLLM(effectiveSystemPrompt, query, "simple");
             agentResponse = { ok: true, text: txt, mode: "chat", citationStyle: askCitationStyle };
-          } catch (llmErr) {
+          } catch {
             // Server fallback
             agentResponse = await executeAgenticQuery({
               prompt: query,
-              systemPrompt,
+              systemPrompt: effectiveSystemPrompt,
               mode: targetMode,
               citationStyle: askCitationStyle,
               history,
@@ -1718,7 +1749,7 @@ export default function ProjectListScreen({
           try {
             agentResponse = await executeAgenticQuery({
               prompt: query,
-              systemPrompt,
+              systemPrompt: effectiveSystemPrompt,
               mode: targetMode,
               citationStyle: askCitationStyle,
               files: currentAttachments.filter((a) => a.fileData).map((a) => a.fileData!),
@@ -1728,7 +1759,7 @@ export default function ProjectListScreen({
           } catch (serverErr) {
             // Direct client-side failover using configured BYOK keys in AI Access if server execution fails
             try {
-              const clientTxt = await executeAgenticLLM(systemPrompt, query, "reasoning");
+              const clientTxt = await executeAgenticLLM(effectiveSystemPrompt, query, "reasoning");
               agentResponse = {
                 ok: true,
                 text: clientTxt,
@@ -1747,12 +1778,13 @@ export default function ProjectListScreen({
             sender: "assistant",
             text: agentResponse.text.trim(),
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            mode: agentResponse.mode,
+            mode: (agentResponse.mode as WebsiteAssistantMessage["mode"]) || (targetMode === "deep-research" ? "deep-research" : "chat"),
             provider: agentResponse.provider,
             model: agentResponse.model,
             plan: agentResponse.plan,
             citationStyle: agentResponse.citationStyle || askCitationStyle,
             citations: agentResponse.citations,
+            liveSources: liveRetrievedSources.length > 0 ? liveRetrievedSources : undefined,
             wordCount: agentResponse.wordCount,
             verifiedSourcesCount: agentResponse.verifiedSourcesCount,
             burstinessMetrics: agentResponse.burstinessMetrics,
@@ -1776,9 +1808,9 @@ export default function ProjectListScreen({
           throw new Error(agentResponse?.error || "AI generation completed with an empty response.");
         }
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Website Assistant error:", e);
-      const errorMessage = e?.message || "An unexpected error occurred while communicating with the AI service.";
+      const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred while communicating with the AI service.";
       const assistantMsg: WebsiteAssistantMessage = {
         id: `assistant-${Date.now()}`,
         sender: "assistant",
@@ -3033,6 +3065,26 @@ export default function ProjectListScreen({
                   </select>
                 </div>
 
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !liveSearchGrounding;
+                    setLiveSearchGrounding(next);
+                    setLiveSearchGroundingEnabled(next);
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer select-none ${
+                    liveSearchGrounding
+                      ? "bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-800/60 shadow-2xs"
+                      : "bg-neutral-100 dark:bg-white/[0.06] text-neutral-600 dark:text-neutral-400 border-neutral-200/80 dark:border-white/10 hover:text-neutral-900 dark:hover:text-white"
+                  }`}
+                  title="Toggle Live Web & Scholarly Search Grounding for real-time sources"
+                  aria-pressed={liveSearchGrounding}
+                  data-testid="ask-scholar-live-grounding-toggle"
+                >
+                  <span aria-hidden="true">🌐</span>
+                  <span className="hidden sm:inline">Live Grounding</span>
+                </button>
+
                 {hasStartedChatting && (
                   <button
                     type="button"
@@ -3303,6 +3355,11 @@ export default function ProjectListScreen({
                           </div>
                         )}
                       </div>
+                    )}
+
+                    {/* Retrieved Live Sources Drawer */}
+                    {msg.liveSources && msg.liveSources.length > 0 && (
+                      <LiveSourcesDrawer sources={msg.liveSources} />
                     )}
 
                     {/* Citation Engine References & Bibliography */}
@@ -3787,11 +3844,31 @@ export default function ProjectListScreen({
                 </div>
 
                 <div className="flex items-center justify-between pt-1.5 mt-1 border-t border-neutral-200/50 dark:border-white/5">
-                  <PromptBarActionMenu
-                    currentMode={sidebarAiMode}
-                    onSelectMode={setSidebarAiMode}
-                    onAttachFiles={handleSidebarFileSelect}
-                  />
+                  <div className="flex items-center gap-2">
+                    <PromptBarActionMenu
+                      currentMode={sidebarAiMode}
+                      onSelectMode={setSidebarAiMode}
+                      onAttachFiles={handleSidebarFileSelect}
+                    />
+                    <label
+                      htmlFor="ask-scholar-input-live-toggle"
+                      className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white cursor-pointer select-none transition-colors border border-neutral-200/60 dark:border-white/10 bg-neutral-50 dark:bg-white/5"
+                      title="Ground responses in fresh web & scholarly data"
+                    >
+                      <input
+                        id="ask-scholar-input-live-toggle"
+                        type="checkbox"
+                        checked={liveSearchGrounding}
+                        onChange={(e) => {
+                          const next = e.target.checked;
+                          setLiveSearchGrounding(next);
+                          setLiveSearchGroundingEnabled(next);
+                        }}
+                        className="rounded border-neutral-300 dark:border-neutral-700 text-sky-600 focus:ring-sky-500 cursor-pointer w-3.5 h-3.5"
+                      />
+                      <span>🌐 Live Grounding</span>
+                    </label>
+                  </div>
 
                   <div className="relative group">
                     <button
