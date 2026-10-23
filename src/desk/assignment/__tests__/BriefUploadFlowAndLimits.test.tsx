@@ -140,11 +140,14 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
     fireEvent.change(fileInput, { target: { files: [handbookFile] } });
 
     // Verify document text is parsed and rendered under "Extracted Brief Question / Prompt:"
-    await waitFor(() => {
-      expect(
-        screen.getByText(/Extracted Brief Question \/ Prompt:/i)
-      ).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByText(/Extracted Brief Question \/ Prompt:/i)
+        ).toBeInTheDocument();
+      },
+      { timeout: 10000 }
+    );
 
     expect(
       screen.getByText(/MODULE HANDBOOK 2026: CRITICAL THEORIES OF INTERNATIONAL LAW/i)

@@ -9,6 +9,7 @@ import { ASSIGNMENT_AGENT_CONFIGS, ASSIGNMENT_PHASES } from "./types";
 import { sendAssignmentCopilotMessage } from "./services/assignmentCopilotService";
 
 // Aggressive code-splitting with React.lazy
+const AssignmentExtractStage = React.lazy(() => import("./stages/AssignmentExtractStage"));
 const AssignmentUnderstandStage = React.lazy(() => import("./stages/AssignmentUnderstandStage"));
 const AssignmentSourcesStage = React.lazy(() => import("./stages/AssignmentSourcesStage"));
 const AssignmentDraftingStage = React.lazy(() => import("./stages/AssignmentDraftingStage"));
@@ -533,7 +534,11 @@ function AssignmentWorkspaceInner({
   const renderActivePhase = () => {
     switch (currentPhase) {
       case "understand":
-        return <AssignmentUnderstandStage />;
+        return (
+          <AssignmentUnderstandStage
+            onProceed={() => setPhase("sources")}
+          />
+        );
       case "sources":
         return (
           <AssignmentSourcesStage
@@ -551,7 +556,11 @@ function AssignmentWorkspaceInner({
       case "submission":
         return <AssignmentSubmissionStage onBack={() => setPhase("drafting")} />;
       default:
-        return <AssignmentUnderstandStage />;
+        return (
+          <AssignmentUnderstandStage
+            onProceed={() => setPhase("sources")}
+          />
+        );
     }
   };
 

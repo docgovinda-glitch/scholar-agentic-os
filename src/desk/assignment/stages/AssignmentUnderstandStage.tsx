@@ -144,7 +144,15 @@ export const AGENTIC_THINKING_STAGES = [
   "Preparing your outline",
 ];
 
-export default function AssignmentUnderstandStage() {
+export interface AssignmentUnderstandStageProps {
+  onBack?: () => void;
+  onProceed?: () => void;
+}
+
+export default function AssignmentUnderstandStage({
+  onBack,
+  onProceed,
+}: AssignmentUnderstandStageProps = {}) {
   const {
     projectId,
     project,
@@ -612,7 +620,7 @@ export default function AssignmentUnderstandStage() {
     const currentInstructions = cleanAnswerString(question);
     setLocalQuestion((prev) => {
       const cleanCur = currentInstructions || "";
-      if (!prev || prev.trim().toLowerCase() === "provisional") {
+      if (!prev || prev.trim().toLowerCase() === "provisional" || (cleanCur && prev !== cleanCur)) {
         return cleanCur;
       }
       return prev;
@@ -988,7 +996,9 @@ export default function AssignmentUnderstandStage() {
       console.warn("Auto-persist before advancing to Phase II:", persistErr);
     }
 
-    if (advancePhase) {
+    if (onProceed) {
+      onProceed();
+    } else if (advancePhase) {
       advancePhase("sources");
     } else if (setPhase) {
       setPhase("sources");
@@ -1487,7 +1497,10 @@ export default function AssignmentUnderstandStage() {
         <div className="inline-flex items-center p-1 rounded-xl bg-neutral-100 dark:bg-white/10 border border-neutral-200/60 dark:border-white/5 text-xs shrink-0 self-start sm:self-center">
           <button
             type="button"
-            onClick={() => setUnderstandStep("brief_input")}
+            onClick={() => {
+              if (onBack) onBack();
+              else setUnderstandStep("brief_input");
+            }}
             className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
               understandStep === "brief_input"
                 ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
@@ -2154,7 +2167,10 @@ export default function AssignmentUnderstandStage() {
 
               <button
                 type="button"
-                onClick={() => setUnderstandStep("brief_input")}
+                onClick={() => {
+                  if (onBack) onBack();
+                  else setUnderstandStep("brief_input");
+                }}
                 aria-label="Edit Brief"
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer w-fit"
               >
