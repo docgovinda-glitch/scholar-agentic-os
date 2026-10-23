@@ -102,7 +102,7 @@ export default function AssignmentStageNavigation({
                   onSelectPhase?.(phase.id);
                   onSelectStage?.();
                 }}
-                aria-label={`Phase ${phase.number}: ${phase.shortLabel}`}
+                aria-label={`Phase ${phase.number}: ${phase.id === "understand" ? "Understand · Extract" : phase.shortLabel}`}
                 aria-current={isActive ? "step" : undefined}
                 className={`group flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer ${
                   isActive

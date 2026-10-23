@@ -176,7 +176,7 @@ export function AssignmentSourcesPlaceholder() {
             onClick={() => setPhase("understand")}
             className="px-4 py-2 rounded-xl text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
           >
-            ← Back to Phase 1: Understand
+            ← Back to Phase 1: Extract
           </button>
           <button
             type="button"
@@ -386,7 +386,7 @@ export function AssignmentSubmissionPlaceholder() {
             onClick={() => setPhase("understand")}
             className="px-4 py-2 rounded-xl text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
           >
-            Return to Phase 1: Understand
+            Return to Phase 1: Extract
           </button>
         </div>
       </div>

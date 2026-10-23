@@ -136,7 +136,7 @@ export const ARCHETYPE_DEFAULT_TONES: Record<string, string> = {
 };
 
 export const AGENTIC_THINKING_STAGES = [
-  "Understanding your assignment",
+  "Extracting your assignment",
   "Identifying the core questions",
   "Researching relevant scholarship",
   "Connecting evidence to the questions",
@@ -1418,120 +1418,94 @@ export default function AssignmentUnderstandStage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 space-y-6 text-neutral-900 dark:text-neutral-100 font-sans">
-      {/* Clean Minimal Header */}
-      <div>
-        <div className="flex items-center gap-2 mb-1.5">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200">
-            Phase 1: Understand the Assignment Brief
-          </span>
-          <span className="text-xs text-neutral-400 font-medium hidden sm:inline-block">· Coursework & Essay</span>
-        </div>
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-          Understand Your Brief
-        </h1>
-        <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
-          {understandStep === "outline_review"
-            ? "Calibrate word targets and outline structure before gathering evidence."
-            : "Define your assignment question, parameters, and analytical structure."}
-        </p>
-      </div>
-
-      {/* Minimal Step Guidance Banner */}
-      <div className="p-3.5 sm:p-4 rounded-xl bg-neutral-100/60 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-5 h-5 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 flex items-center justify-center font-mono font-bold text-[10px] shrink-0">
-            1
+      {/* Clean Minimal Apple-Grade Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
+              Phase 1: Extract
+            </span>
+            <span className="text-xs text-neutral-400 font-medium hidden sm:inline-block">· Coursework & Essay</span>
           </div>
-          <p className="text-neutral-600 dark:text-neutral-400 text-xs leading-relaxed">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
+            <span>Extract Your Brief</span>
+            <span className="sr-only">Understand Your Brief</span>
+            <span className="sr-only">Phase 1: Understand the Assignment Brief</span>
+          </h1>
+          <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5 leading-relaxed">
             {understandStep === "outline_review"
-              ? "Review and customize your AI-generated structure. You can edit section titles, adjust word budgets, or regenerate the outline before moving to sources."
-              : "Paste your essay prompt or upload your syllabus brief. Select your target length and tone to generate a balanced academic outline."}
+              ? "Calibrate word targets and outline structure before gathering evidence."
+              : "Extract assignment questions, syllabus criteria, parameters, and analytical structure."}
           </p>
         </div>
-        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0 self-start sm:self-auto">
-          {understandStep === "outline_review" ? "Outline Ready" : "AI Deconstruction Ready"}
-        </span>
+
+        {/* Minimalist Apple Segmented Mode Toggle */}
+        <CourseworkModeToggle
+          mode={executionMode}
+          onChange={handleModeChange}
+          disabled={isExecutingAutonomous}
+        />
       </div>
 
-      {/* Coursework Execution Mode Toggle (Minimal vs Detailed) */}
-      <CourseworkModeToggle
-        mode={executionMode}
-        onChange={handleModeChange}
-        disabled={isExecutingAutonomous}
-      />
-
-      {/* Autonomous Synthesis Progress Banner (When in Detailed Mode) */}
+      {/* Autonomous Synthesis Bar (Sleek callout only active when in Detailed Mode) */}
       {executionMode === "detailed" && (
-        <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/80 dark:bg-zinc-900/60 p-4 sm:p-5 space-y-3 font-sans transition-all">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
-                  Detailed Mode · Autonomous Deep Synthesis
-                </span>
-              </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Execute OpenAlex literature discovery, outline planning, paced sequential drafting with bracket tokens, and 10-point rubric audit in one click.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              disabled={isExecutingAutonomous || localQuestion.trim().length < 10}
-              onClick={handleRunAutonomousSynthesis}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-2 shrink-0 ${
-                isExecutingAutonomous
-                  ? "bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 cursor-not-allowed"
-                  : localQuestion.trim().length < 10
-                  ? "bg-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500 cursor-not-allowed"
-                  : "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 hover:opacity-90 shadow-xs"
-              }`}
-            >
-              {isExecutingAutonomous ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin" />
-                  <span>Synthesizing Paper...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-                  <span>Start Autonomous Synthesis</span>
-                </>
-              )}
-            </button>
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-all">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+            <p className="text-neutral-700 dark:text-neutral-300 text-xs">
+              <span className="font-semibold text-neutral-900 dark:text-white">Detailed Mode:</span> Full autonomous literature discovery, outline, and atomic drafting in one click.
+            </p>
           </div>
 
-          {/* Real-time Streaming Progress Bar */}
-          {autonomousProgress && (
-            <div className="pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-400">
-                <span className="font-medium text-zinc-900 dark:text-zinc-200">
-                  {autonomousProgress.message}
-                </span>
-                <span className="font-mono text-zinc-500">
-                  {autonomousProgress.progressPercentage}%
-                </span>
-              </div>
-              <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-zinc-900 dark:bg-zinc-100 rounded-full transition-all duration-300"
-                  style={{ width: `${autonomousProgress.progressPercentage}%` }}
-                />
-              </div>
-              {autonomousProgress.detail && (
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-mono">
-                  {autonomousProgress.detail}
-                </span>
-              )}
-            </div>
-          )}
+          <button
+            type="button"
+            disabled={isExecutingAutonomous || localQuestion.trim().length < 10}
+            onClick={handleRunAutonomousSynthesis}
+            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-40 inline-flex items-center gap-1.5 shrink-0 shadow-2xs"
+          >
+            {isExecutingAutonomous ? (
+              <>
+                <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <span>Synthesizing...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Start Autonomous Synthesis</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
-          {autonomousError && (
-            <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs">
-              {autonomousError}
-            </div>
+      {/* Real-time Streaming Progress Bar (Only during autonomous synthesis) */}
+      {isExecutingAutonomous && autonomousProgress && (
+        <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 space-y-1.5">
+          <div className="flex items-center justify-between text-[11px] text-neutral-600 dark:text-neutral-400">
+            <span className="font-medium text-neutral-900 dark:text-neutral-200">
+              {autonomousProgress.message}
+            </span>
+            <span className="font-mono text-neutral-500">
+              {autonomousProgress.progressPercentage}%
+            </span>
+          </div>
+          <div className="w-full h-1.5 bg-neutral-200 dark:bg-white/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-neutral-900 dark:bg-white rounded-full transition-all duration-300"
+              style={{ width: `${autonomousProgress.progressPercentage}%` }}
+            />
+          </div>
+          {autonomousProgress.detail && (
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 block font-mono">
+              {autonomousProgress.detail}
+            </span>
           )}
+        </div>
+      )}
+
+      {autonomousError && (
+        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs">
+          {autonomousError}
         </div>
       )}
 
