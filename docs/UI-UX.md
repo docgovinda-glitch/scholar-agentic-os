@@ -109,25 +109,23 @@ Phase 4: Submission & Verification Audit
 
 ### 4.1 Stage Header & Navigation Stepper
 - Located at the top of `AssignmentWorkspace.tsx`.
-- Displays 4 step pills:
-  1. `01 Extract & Understand` (Part 1: Extract · Part 2: Understand)
-  2. `02 Sources`
-  3. `03 Drafting`
-  4. `04 Submission`
-- Stepper shows completion checks (`✓`), active pulse indicators, and allows free non-destructive traversal back and forth between unlocked phases.
+- Displays 5 canonical step pills:
+  1. `01 Extract` (`AssignmentExtractStage.tsx`): Brief ingestion, file parsing, word count stepper, parameters.
+  2. `02 Understand` (`AssignmentUnderstandStage.tsx`): Working thesis, theoretical framework, dynamic outline tree, section budgets.
+  3. `03 Sources` (`AssignmentSourcesStage.tsx`): Scholarly discovery, Knowledge Vault, lecture slides, evidence ledger.
+  4. `04 Drafting` (`AssignmentDraftingStage.tsx`): Structured PEEL drafting, word budgets, AI polish.
+  5. `05 Submission` (`AssignmentSubmissionStage.tsx`): 10-point rubric audit, citation reconciliation, export.
+- Stepper shows completion checks (`✓`), active pulse indicators, progress percentages, and allows free non-destructive traversal back and forth between unlocked phases.
 
 ---
 
-### 4.2 Phase 1 · Extract & Understand (`AssignmentExtractStage.tsx` & `AssignmentUnderstandStage.tsx`, DB: `current_phase = 'understand'`)
+### 4.2 Phase 1 · Extract Brief (`AssignmentExtractStage.tsx`, phase ID `extract`)
+- **Purpose**: Unified brief intake (Paste Prompt or Upload Brief Document), target word count stepper (100–50,000w), academic level, assignment type, tone, and citation style.
+- **Proceed Action**: Advances smoothly to Phase 2 Understand.
 
-#### Sub-Phase Switcher (Part 1 vs Part 2)
-The stage header provides an Apple-grade segmented switcher:
-- **`[ Part 1: Extract | Part 2: Understand ]`**:
-  - **Part 1 (Extract Brief - `AssignmentExtractStage.tsx`)**: Unified brief intake (Paste Prompt or Upload Brief Document), target word count stepper, academic level, assignment type, and citation style.
-  - **Part 2 (Understand Assignment - `AssignmentUnderstandStage.tsx`)**: Core working thesis formulation, theoretical frameworks, bespoke analytical outline (`DynamicStructurePlanner.tsx`), section word budgets, and rule-indexed rubric criteria.
-
-#### Purpose
-Captures assignment parameters in a single unified workspace, decomposes the question, dynamically generates question-specific analytical headings and subheadings with calibrated word allocations (without generic Intro/Body/Conclusion templates), and establishes the canonical structure for all subsequent phases.
+### 4.3 Phase 2 · Understand Assignment (`AssignmentUnderstandStage.tsx`, phase ID `understand`)
+- **Purpose**: Core working thesis formulation, theoretical frameworks, bespoke analytical outline (`DynamicStructurePlanner.tsx`), section word budgets, and rule-indexed rubric criteria.
+- **Back / Proceed Actions**: Allows returning back to Edit Brief (Phase 1) and advancing forward to Sources (Phase 3).
 
 #### Layout
 1. **Unified Assignment Setup Workspace**:

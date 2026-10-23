@@ -567,7 +567,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-              Phase 1 · Part 1: Extract
+              Phase 1 · Extract
             </span>
             <span className="text-xs text-neutral-400 font-medium hidden sm:inline-block">· Coursework &amp; Essay</span>
           </div>
@@ -587,7 +587,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
             onClick={onProceed}
             className="self-start sm:self-center px-3 py-1.5 rounded-xl border border-neutral-200/80 dark:border-white/10 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
           >
-            <span>Skip to Part 2: Understand</span>
+            <span>Proceed to Phase 2: Understand</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         )}

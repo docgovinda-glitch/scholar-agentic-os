@@ -1473,7 +1473,7 @@ export default function AssignmentUnderstandStage({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-              {understandStep === "outline_review" ? "Phase 1 · Part 2: Understand" : "Phase 1 · Part 1: Extract"}
+              {understandStep === "outline_review" ? "Phase 2 · Understand" : "Phase 1 · Extract"}
             </span>
             <span className="text-xs text-neutral-400 font-medium hidden sm:inline-block">· Coursework & Essay</span>
           </div>

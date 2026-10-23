@@ -1426,14 +1426,16 @@ export function AssignmentProvider({
     [outline, updateSectionDraft]
   );
 
-  // Compute 4-phase status
+  // Compute 5-phase status
   const phaseStatuses: Record<AssignmentPhaseId, "active" | "completed" | "upcoming"> = useMemo(() => {
-    const hasUnderstand = Boolean(question && targetWordCount > 0 && citationStyle && analysis?.approvedByUser);
+    const hasExtract = Boolean(question && targetWordCount > 0 && citationStyle);
+    const hasUnderstand = Boolean(structure?.isConfirmed || (hasExtract && analysis?.approvedByUser));
     const hasSources = sources.filter((s) => s.status === "kept").length >= 2;
     const hasDrafting = currentWordCount >= Math.min(200, targetWordCount * 0.3);
     const hasSubmission = Boolean(submissionReport);
 
     return {
+      extract: currentPhase === "extract" ? "active" : hasExtract ? "completed" : "upcoming",
       understand: currentPhase === "understand" ? "active" : hasUnderstand ? "completed" : "upcoming",
       sources: currentPhase === "sources" ? "active" : hasSources ? "completed" : "upcoming",
       drafting: currentPhase === "drafting" ? "active" : hasDrafting ? "completed" : "upcoming",
@@ -1443,6 +1445,7 @@ export function AssignmentProvider({
     question,
     targetWordCount,
     citationStyle,
+    structure,
     analysis,
     sources,
     currentWordCount,
@@ -1452,7 +1455,8 @@ export function AssignmentProvider({
 
   // Compute status for all stages (including legacy aliases)
   const stageStatuses: Record<AssignmentStage, StageStatus> = useMemo(() => {
-    const hasUnderstand = Boolean(question && targetWordCount > 0 && citationStyle);
+    const hasExtract = Boolean(question && targetWordCount > 0 && citationStyle);
+    const hasUnderstand = Boolean(structure?.isConfirmed || (hasExtract && analysis?.approvedByUser));
     const hasAnalysis = Boolean(analysis && analysis.approvedByUser);
     const hasPlan = Boolean(researchPlan && researchPlan.approvedByUser);
     const hasSources = sources.filter((s) => s.status === "kept").length >= 2;
@@ -1463,7 +1467,8 @@ export function AssignmentProvider({
     const hasReport = Boolean(submissionReport);
 
     return {
-      // 4 phases
+      // 5 phases
+      extract: hasExtract ? "completed" : currentPhase === "extract" ? "active" : "needs_review",
       understand: hasUnderstand && hasAnalysis ? "completed" : currentPhase === "understand" ? "active" : "needs_review",
       sources: hasSources ? "completed" : currentPhase === "sources" ? "active" : hasUnderstand ? "available" : "locked",
       drafting: hasDraft ? "completed" : currentPhase === "drafting" ? "active" : hasSources ? "available" : "locked",

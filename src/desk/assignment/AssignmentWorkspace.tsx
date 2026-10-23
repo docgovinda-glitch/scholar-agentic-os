@@ -8,9 +8,10 @@ import ContextPanel from "../workspace/ContextPanel";
 import { ASSIGNMENT_AGENT_CONFIGS, ASSIGNMENT_PHASES } from "./types";
 import { sendAssignmentCopilotMessage } from "./services/assignmentCopilotService";
 
-// Aggressive code-splitting with React.lazy
-const AssignmentExtractStage = React.lazy(() => import("./stages/AssignmentExtractStage"));
-const AssignmentUnderstandStage = React.lazy(() => import("./stages/AssignmentUnderstandStage"));
+import AssignmentExtractStage from "./stages/AssignmentExtractStage";
+import AssignmentUnderstandStage from "./stages/AssignmentUnderstandStage";
+
+// Code-splitting downstream stages with React.lazy
 const AssignmentSourcesStage = React.lazy(() => import("./stages/AssignmentSourcesStage"));
 const AssignmentDraftingStage = React.lazy(() => import("./stages/AssignmentDraftingStage"));
 const AssignmentSubmissionStage = React.lazy(() => import("./stages/AssignmentSubmissionStage"));
@@ -533,9 +534,16 @@ function AssignmentWorkspaceInner({
 
   const renderActivePhase = () => {
     switch (currentPhase) {
+      case "extract":
+        return (
+          <AssignmentExtractStage
+            onProceed={() => setPhase("understand")}
+          />
+        );
       case "understand":
         return (
           <AssignmentUnderstandStage
+            onBack={() => setPhase("extract")}
             onProceed={() => setPhase("sources")}
           />
         );
@@ -557,8 +565,8 @@ function AssignmentWorkspaceInner({
         return <AssignmentSubmissionStage onBack={() => setPhase("drafting")} />;
       default:
         return (
-          <AssignmentUnderstandStage
-            onProceed={() => setPhase("sources")}
+          <AssignmentExtractStage
+            onProceed={() => setPhase("understand")}
           />
         );
     }

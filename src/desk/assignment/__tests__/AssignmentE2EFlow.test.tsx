@@ -379,13 +379,14 @@ describe("Full Pipeline: Phase 1 → 4 state progression", () => {
     expect(state.drafting.overallWordCount).toBeGreaterThan(1000);
   });
 
-  it("4 canonical phase IDs are accessible and in correct order", () => {
+  it("canonical phase IDs are accessible and in correct order", () => {
     const phaseIds = ASSIGNMENT_PHASES.map((p) => p.id);
-    expect(phaseIds).toEqual(["understand", "sources", "drafting", "submission"]);
+    expect(phaseIds).toEqual(["extract", "understand", "sources", "drafting", "submission"]);
   });
 
-  it("normalizeAssignmentPhase handles all legacy → 4-phase transitions safely", () => {
+  it("normalizeAssignmentPhase handles all legacy → canonical transitions safely", () => {
     const legacyMappings: [string, AssignmentPhaseId][] = [
+      ["extract", "extract"],
       ["understand", "understand"],
       ["plan", "understand"],
       ["research", "sources"],
@@ -400,8 +401,8 @@ describe("Full Pipeline: Phase 1 → 4 state progression", () => {
     }
   });
 
-  it("all 4 phases have complete agent configs with non-empty descriptions and quickActions", () => {
-    const phases: AssignmentPhaseId[] = ["understand", "sources", "drafting", "submission"];
+  it("all phases have complete agent configs with non-empty descriptions and quickActions", () => {
+    const phases: AssignmentPhaseId[] = ["extract", "understand", "sources", "drafting", "submission"];
     for (const phase of phases) {
       const config = ASSIGNMENT_AGENT_CONFIGS[phase];
       expect(config).toBeDefined();

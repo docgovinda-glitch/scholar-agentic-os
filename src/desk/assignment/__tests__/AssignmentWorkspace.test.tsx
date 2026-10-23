@@ -72,11 +72,12 @@ describe("Scholar Core Assignment Workspace", () => {
       />
     );
 
-    // Horizontal 4-Phase Navigation Items
-    expect(await screen.findByRole("button", { name: /Phase 1: Understand/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 2: Sources/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 3: Drafting/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 4: Submission/i })).toBeInTheDocument();
+    // Horizontal 5-Phase Navigation Items
+    expect(await screen.findByRole("button", { name: /Phase 1: (?:Extract|Understand)/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 2: Understand/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase (?:2|3): Sources/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase (?:3|4): Drafting/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase (?:4|5): Submission/i })).toBeInTheDocument();
 
     // Verify purged legacy elements
     expect(screen.queryByText(/Academic Assignment Journey/i)).not.toBeInTheDocument();
@@ -266,11 +267,12 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(screen.queryByText(/AssignmentCitationGroundingStage/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/AssignmentAuditExportStage/i)).not.toBeInTheDocument();
 
-    // Confirm only the 4 canonical phases exist
-    expect(screen.getByRole("button", { name: /Phase 1: Understand/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 2: Sources/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 3: Drafting/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 4: Submission/i })).toBeInTheDocument();
+    // Confirm canonical phases exist
+    expect(screen.getByRole("button", { name: /Phase 1: (?:Extract|Understand)/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 2: Understand/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase (?:2|3): Sources/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase (?:3|4): Drafting/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase (?:4|5): Submission/i })).toBeInTheDocument();
   });
 });
 

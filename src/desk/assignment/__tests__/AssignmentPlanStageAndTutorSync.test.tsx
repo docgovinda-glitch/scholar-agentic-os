@@ -14,8 +14,8 @@ import { describe, it, expect } from "vitest";
 import { ASSIGNMENT_AGENT_CONFIGS, ASSIGNMENT_PHASES, type AssignmentPhaseId } from "../types";
 
 describe("ContextPanel Phase-Scoped Persona Configs", () => {
-  it("defines a persona config for each of the 4 canonical phases", () => {
-    const phases: AssignmentPhaseId[] = ["understand", "sources", "drafting", "submission"];
+  it("defines a persona config for each of the canonical phases", () => {
+    const phases: AssignmentPhaseId[] = ["extract", "understand", "sources", "drafting", "submission"];
     for (const phase of phases) {
       const config = ASSIGNMENT_AGENT_CONFIGS[phase];
       expect(config, `Missing config for phase "${phase}"`).toBeDefined();
@@ -59,7 +59,7 @@ describe("ContextPanel Phase-Scoped Persona Configs", () => {
   });
 
   it("phase metadata aligns with ASSIGNMENT_PHASES definitions", () => {
-    expect(ASSIGNMENT_PHASES).toHaveLength(4);
+    expect(ASSIGNMENT_PHASES).toHaveLength(5);
     for (const phase of ASSIGNMENT_PHASES) {
       const config = ASSIGNMENT_AGENT_CONFIGS[phase.id];
       expect(config).toBeDefined();

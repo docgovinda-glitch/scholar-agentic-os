@@ -191,24 +191,26 @@ describe("Assignment Stages & Domain Taxonomy", () => {
     });
   });
 
-  describe("Approved 4-Phase Architecture (understand -> sources -> drafting -> submission)", () => {
-    it("defines exactly 4 canonical phases with metadata and Lucide icon keys", () => {
-      expect(ASSIGNMENT_PHASES).toHaveLength(4);
+  describe("Approved 5-Phase Architecture (extract -> understand -> sources -> drafting -> submission)", () => {
+    it("defines exactly 5 canonical phases with metadata and Lucide icon keys", () => {
+      expect(ASSIGNMENT_PHASES).toHaveLength(5);
 
       const phaseIds: AssignmentPhaseId[] = ASSIGNMENT_PHASES.map((p) => p.id);
-      expect(phaseIds).toEqual(["understand", "sources", "drafting", "submission"]);
+      expect(phaseIds).toEqual(["extract", "understand", "sources", "drafting", "submission"]);
 
-      // Verify numbering 1..4
+      // Verify numbering 1..5
       expect(ASSIGNMENT_PHASES[0].number).toBe(1);
       expect(ASSIGNMENT_PHASES[1].number).toBe(2);
       expect(ASSIGNMENT_PHASES[2].number).toBe(3);
       expect(ASSIGNMENT_PHASES[3].number).toBe(4);
+      expect(ASSIGNMENT_PHASES[4].number).toBe(5);
 
       // Verify Lucide icon keys
       expect(ASSIGNMENT_PHASES[0].iconKey).toBe("FileText");
-      expect(ASSIGNMENT_PHASES[1].iconKey).toBe("Library");
-      expect(ASSIGNMENT_PHASES[2].iconKey).toBe("PenTool");
-      expect(ASSIGNMENT_PHASES[3].iconKey).toBe("CheckCircle2");
+      expect(ASSIGNMENT_PHASES[1].iconKey).toBe("Brain");
+      expect(ASSIGNMENT_PHASES[2].iconKey).toBe("Library");
+      expect(ASSIGNMENT_PHASES[3].iconKey).toBe("PenTool");
+      expect(ASSIGNMENT_PHASES[4].iconKey).toBe("CheckCircle2");
 
       // Verify descriptions and labels
       for (const phase of ASSIGNMENT_PHASES) {
@@ -218,8 +220,9 @@ describe("Assignment Stages & Domain Taxonomy", () => {
       }
     });
 
-    it("safely maps legacy stages to the 4 phases without crashing", () => {
+    it("safely maps legacy stages to the 5 phases without crashing", () => {
       // 8 Legacy Stages
+      expect(normalizeAssignmentPhase("extract")).toBe("extract");
       expect(normalizeAssignmentPhase("understand")).toBe("understand");
       expect(normalizeAssignmentPhase("plan")).toBe("understand");
       expect(normalizeAssignmentPhase("research")).toBe("sources");
@@ -235,9 +238,9 @@ describe("Assignment Stages & Domain Taxonomy", () => {
       expect(normalizeAssignmentPhase("submission")).toBe("submission");
 
       // Fallbacks on null, undefined, or unknown
-      expect(normalizeAssignmentPhase(null)).toBe("understand");
-      expect(normalizeAssignmentPhase(undefined)).toBe("understand");
-      expect(normalizeAssignmentPhase("unknown_stage")).toBe("understand");
+      expect(normalizeAssignmentPhase(null)).toBe("extract");
+      expect(normalizeAssignmentPhase(undefined)).toBe("extract");
+      expect(normalizeAssignmentPhase("unknown_stage")).toBe("extract");
     });
 
     it("validates unified AssignmentProjectState schema model (Section 4.2)", () => {
