@@ -174,12 +174,22 @@ erDiagram
 
 *(Note: The monolithic `answers` and `state` JSONB columns are currently being migrated to granular, normalized tables including `project_answers`, `project_sources`, `project_uploaded_sources`, and `project_evidence` to resolve monolithic state serialization and network limits.)*
 
-#### `public.assignment_projects`
-- `project_id` (uuid, primary key, references `public.projects(id)` on delete cascade)
-- `state` (jsonb, not null)
+#### `public.assignment_projects` (Coursework & Essay Engine)
+- `project_id` (text, primary key, references `public.projects(project_id)` on delete cascade)
+- `current_phase` (text, not null, default `'understand'`, check constraint: `current_phase in ('understand', 'sources', 'drafting', 'submission')`)
+  - `'understand'`: **Phase 1: Extract & Understand**
+    - **Part 1 (Extract)**: Document parsing, brief prompt extraction, academic level, assignment type, citation style, and target word count.
+    - **Part 2 (Understand)**: Core working thesis calibration, theoretical framework tags, substantive analytical outline decomposition (`AssignmentStructure`), and rule-indexed rubric analysis.
+  - `'sources'`: **Phase 2: Sources** (Literature discovery, lecture slide processing, evidence ledger).
+  - `'drafting'`: **Phase 3: Drafting** (PEEL paragraph synthesis, real-time word budgeting).
+  - `'submission'`: **Phase 4: Submission** (10-point rubric assessment, citation reconciliation, PDF/DOCX export).
+- `brief` (jsonb, not null, default `'{}'::jsonb`) — Stores Phase 1 `AssignmentBrief` state.
+- `sources` (jsonb, not null, default `'[]'::jsonb`) — Stores Phase 2 evidence items and curated sources.
+- `drafting` (jsonb, not null, default `'{}'::jsonb`) — Stores Phase 3 structured drafted sections.
+- `submission` (jsonb, not null, default `'{}'::jsonb`) — Stores Phase 4 rubric assessment and audit reports.
 - `created_at` (timestamptz, default `now()`)
 - `updated_at` (timestamptz, default `now()`)
-- *RLS*: Enabled via project join (`projects.user_id = auth.uid()`).
+- *RLS*: Enabled via project join (`projects.owner_id = auth.uid()`).
 
 #### `public.universal_vault_items`
 - `id` (uuid, primary key, default `gen_random_uuid()`)

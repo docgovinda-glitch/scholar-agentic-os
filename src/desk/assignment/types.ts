@@ -23,9 +23,9 @@ export const ASSIGNMENT_PHASES: AssignmentPhaseDefinition[] = [
   {
     id: "understand",
     number: 1,
-    label: "Phase 1: Extract",
-    shortLabel: "Extract",
-    description: "Question, word count, citation style, level, & syllabus extraction",
+    label: "Phase 1: Extract & Understand",
+    shortLabel: "Extract & Understand",
+    description: "Part 1: Extract brief · Part 2: Understand thesis & outline",
     iconKey: "FileText",
   },
   {

@@ -105,7 +105,16 @@ The application operates on a single `BrowserRouter` hierarchy:
 - Workspace state is managed through React Context (`AssignmentContext.tsx`, `ResearchContext.tsx`) coupled with atomic synchronization refs (`projectRef`) to prevent state loss during rapid edits.
 - State is continuously debounced and synchronized with backend endpoints (`PUT /api/projects/:id/assignment`) which persist the canonical state into `public.assignment_projects` in Supabase.
 
-### 3.3 Server Routes Layer (`server/routes/index.ts`)
+### 3.3 Coursework & Essay Engine: 4-Phase Pipeline & Database Mapping
+The Coursework & Essay workspace (`OT-01`) is organized into four canonical sequential phases, backed by PostgreSQL tables and Supabase RLS:
+1. **Phase 1: Extract & Understand** (`current_phase = 'understand'` in `public.assignment_projects`):
+   - **Part 1 (Extract)**: Ingestion of assignment brief document (`.pdf`, `.docx`) or pasted prompts, extracting core question, academic level, assignment genre, citation style, and target word counts.
+   - **Part 2 (Understand)**: Calibration of core working thesis, identification of required theoretical frameworks, hierarchical outline decomposition (`AssignmentStructure`), section-by-section word allocation, and rule-indexed rubric criteria extraction (`project_answers.assignment_analysis`).
+2. **Phase 2: Sources** (`current_phase = 'sources'`): Scholarly literature discovery via OpenAlex, lecture slide concept indexing, and evidence ledger grounding (`public.project_sources`, `public.project_evidence`).
+3. **Phase 3: Drafting** (`current_phase = 'drafting'`): Sequential PEEL paragraph synthesis, real-time word budgeting, and supervised ML style adherence.
+4. **Phase 4: Submission** (`current_phase = 'submission'`): 10-point academic rubric audit, citation reconciliation, and camera-ready PDF/DOCX export.
+
+### 3.4 Server Routes Layer (`server/routes/index.ts`)
 The Express server modularizes routes across domain boundaries:
 - `registerHealthRoutes`: `/health`, `/healthz`, `/api/health` probes.
 - `registerAuthRoutes`: `/api/auth/verify-signup` with Turnstile token validation.

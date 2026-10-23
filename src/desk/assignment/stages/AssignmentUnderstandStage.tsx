@@ -1483,12 +1483,31 @@ export default function AssignmentUnderstandStage() {
           </p>
         </div>
 
-        {/* Minimalist Apple Segmented Mode Toggle */}
-        <CourseworkModeToggle
-          mode={executionMode}
-          onChange={handleModeChange}
-          disabled={isExecutingAutonomous}
-        />
+        {/* Phase 1 Part 1 (Extract) vs Part 2 (Understand) Apple Segmented Control */}
+        <div className="inline-flex items-center p-1 rounded-xl bg-neutral-100 dark:bg-white/10 border border-neutral-200/60 dark:border-white/5 text-xs shrink-0 self-start sm:self-center">
+          <button
+            type="button"
+            onClick={() => setUnderstandStep("brief_input")}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+              understandStep === "brief_input"
+                ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+            }`}
+          >
+            Part 1: Extract
+          </button>
+          <button
+            type="button"
+            onClick={() => setUnderstandStep("outline_review")}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+              understandStep === "outline_review"
+                ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+            }`}
+          >
+            Part 2: Understand
+          </button>
+        </div>
       </div>
 
       {/* Autonomous Synthesis Bar (Sleek callout only active when in Detailed Mode) */}
