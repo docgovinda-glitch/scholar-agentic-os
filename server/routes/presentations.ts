@@ -8,9 +8,8 @@
 import express, { Router, Request, Response } from "express";
 import { randomUUID } from "node:crypto";
 import multer from "multer";
-import * as pdfParseModule from "pdf-parse";
-import mammoth from "mammoth";
 import JSZip from "jszip";
+import { parseDocument, normalizeUnicodeNFC } from "../../src/document_intelligence/index.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 import { requireAuth } from "../src/middleware/auth.ts";
 
@@ -18,24 +17,6 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
 });
-
-async function extractTextFromPdf(buffer: Buffer): Promise<{ text: string }> {
-  try {
-    if (typeof (pdfParseModule as any).PDFParse === "function") {
-      const parser = new (pdfParseModule as any).PDFParse({ data: buffer });
-      const res = await parser.getText();
-      return { text: res.text || "" };
-    }
-    const fn = (pdfParseModule as any).default || pdfParseModule;
-    if (typeof fn === "function") {
-      const res = await fn(buffer);
-      return { text: res.text || "" };
-    }
-  } catch (err) {
-    console.warn("[presentations.ts] PDF parse fallback error:", err);
-  }
-  return { text: "" };
-}
 
 async function extractTextFromPptx(buffer: Buffer): Promise<{ text: string; themeColors?: { accent?: string; canvasBg?: string; cardBg?: string; textPrimary?: string } }> {
   try {
@@ -254,9 +235,6 @@ router.post("/parse-document", upload.single("file"), async (req: Request, res: 
         `Key quantitative drivers, comparative dynamics, and methodological validation.\n\n` +
         `## Strategic Takeaways & Conclusion\n` +
         `Actionable conclusions and rigorous forward-looking roadmap.`;
-    } else if (file.mimetype === "application/pdf" || lowerName.endsWith(".pdf")) {
-      const data = await extractTextFromPdf(file.buffer);
-      text = data.text;
     } else if (
       file.mimetype === "text/html" ||
       lowerName.endsWith(".html") ||
@@ -276,18 +254,16 @@ router.post("/parse-document", upload.single("file"), async (req: Request, res: 
       const pptxData = await extractTextFromPptx(file.buffer);
       text = pptxData.text;
       if (pptxData.themeColors) detectedTheme = pptxData.themeColors;
-    } else if (
-      file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      lowerName.endsWith(".docx") ||
-      lowerName.endsWith(".doc")
-    ) {
-      const result = await mammoth.extractRawText({ buffer: file.buffer });
-      text = result.value || "";
     } else {
-      text = file.buffer.toString("utf-8");
+      const parsed = await parseDocument({
+        data: file.buffer,
+        filename: file.originalname,
+        mimeType: file.mimetype,
+      });
+      text = parsed.ok ? parsed.data.text : file.buffer.toString("utf-8");
     }
 
-    text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    text = normalizeUnicodeNFC(text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim());
     if (!text) {
       return res.status(422).json({ error: "Could not extract readable text from document. Please verify file content." });
     }

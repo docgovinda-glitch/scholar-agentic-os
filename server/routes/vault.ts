@@ -1,9 +1,6 @@
 import express, { Router, Request, Response } from "express";
 import multer from "multer";
-import * as pdfParseModule from "pdf-parse";
-const pdfParse = (pdfParseModule as any).default || pdfParseModule;
-import mammoth from "mammoth";
-import * as XLSX from "xlsx";
+import { parseDocument, normalizeUnicodeNFC } from "../../src/document_intelligence/index.ts";
 import { requireAuth } from "../src/middleware/auth.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 import type { CanonicalReference } from "../../src/citation_compliance/model/reference.ts";
@@ -72,24 +69,6 @@ function extractCleanStringsFromBuffer(buffer: Buffer): string {
   return matches ? matches.join("\n").replace(/\n{3,}/g, "\n\n").trim() : content;
 }
 
-async function extractTextFromPdf(buffer: Buffer): Promise<{ text: string; numpages: number }> {
-  try {
-    if (typeof (pdfParseModule as any).PDFParse === "function") {
-      const parser = new (pdfParseModule as any).PDFParse({ data: buffer });
-      const res = await parser.getText();
-      return { text: res.text || "", numpages: res.total || 1 };
-    }
-    const fn = (pdfParseModule as any).default || pdfParseModule;
-    if (typeof fn === "function") {
-      const res = await fn(buffer);
-      return { text: res.text || "", numpages: res.numpages || 1 };
-    }
-  } catch (err) {
-    console.warn("PDF parser error:", err);
-  }
-  return { text: "", numpages: 1 };
-}
-
 /**
  * POST /api/vault/parse-file
  * Multi-format universal document parser for Vault (PDF, DOCX, XLSX, CSV, TXT, MD)
@@ -103,7 +82,7 @@ router.post("/parse-file", upload.single("file"), async (req: Request, res: Resp
   const filename = file.originalname || "document";
   const ext = filename.split(".").pop()?.toLowerCase() || "";
   let extractedText = "";
-  let metadata: Record<string, any> = { filename, mimeType: file.mimetype, size: file.size };
+  let metadata: Record<string, unknown> = { filename, mimeType: file.mimetype, size: file.size };
   let title = filename.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
   let canonicalReference: CanonicalReference | undefined;
   let citation: string | undefined;
@@ -112,19 +91,24 @@ router.post("/parse-file", upload.single("file"), async (req: Request, res: Resp
   let journal: string | undefined;
 
   try {
-    if (file.mimetype === "application/pdf" || ext === "pdf") {
-      try {
-        const pdfData = await extractTextFromPdf(file.buffer);
-        extractedText = pdfData.text || "";
-        metadata.pageCount = pdfData.numpages;
-        if (!extractedText.trim()) {
-          extractedText = extractCleanStringsFromBuffer(file.buffer);
-        }
-      } catch (pdfErr) {
-        console.warn("pdf-parse fallback triggered:", pdfErr);
-        extractedText = extractCleanStringsFromBuffer(file.buffer);
-      }
+    const parsed = await parseDocument({
+      data: file.buffer,
+      filename,
+      mimeType: file.mimetype,
+    });
 
+    if (parsed.ok) {
+      extractedText = parsed.data.text;
+      if (parsed.data.metadata) {
+        metadata = { ...metadata, ...parsed.data.metadata };
+      }
+    } else {
+      extractedText = extractCleanStringsFromBuffer(file.buffer);
+    }
+
+    extractedText = normalizeUnicodeNFC(extractedText);
+
+    if (file.mimetype === "application/pdf" || ext === "pdf") {
       const academicMeta = extractAcademicMetadata(extractedText, filename);
       if (academicMeta.title) title = academicMeta.title;
       if (academicMeta.year) year = academicMeta.year;
@@ -144,7 +128,7 @@ router.post("/parse-file", upload.single("file"), async (req: Request, res: Resp
           };
         }),
         year: year ? String(year) : undefined,
-        doi: metadata.doi,
+        doi: metadata.doi as string | undefined,
       };
 
       if (year) {
@@ -156,71 +140,10 @@ router.post("/parse-file", upload.single("file"), async (req: Request, res: Resp
       ext === "docx" ||
       ext === "doc"
     ) {
-      try {
-        const result = await mammoth.extractRawText({ buffer: file.buffer });
-        extractedText = result.value || "";
-      } catch (docErr) {
-        console.warn("mammoth docx fallback triggered:", docErr);
-        extractedText = extractCleanStringsFromBuffer(file.buffer);
-      }
       const lines = extractedText.split("\n").map((l) => l.trim()).filter(Boolean);
       if (lines.length > 0 && lines[0].length < 150) {
         title = lines[0];
       }
-    } else if (
-      file.mimetype === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-      file.mimetype === "application/vnd.ms-excel" ||
-      ext === "xlsx" ||
-      ext === "xls"
-    ) {
-      try {
-        const workbook = XLSX.read(file.buffer, { type: "buffer" });
-        const sheetNames = workbook.SheetNames;
-        metadata.sheets = sheetNames;
-
-        const textParts: string[] = [`Spreadsheet: ${filename}`, `Sheets: ${sheetNames.join(", ")}\n`];
-
-        for (const sheetName of sheetNames.slice(0, 5)) {
-          const worksheet = workbook.Sheets[sheetName];
-          const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
-          textParts.push(`--- Sheet: ${sheetName} (${rows.length} rows) ---`);
-          const previewRows = rows.slice(0, 20);
-          previewRows.forEach((r) => {
-            textParts.push(r.map((c) => String(c).trim()).filter(Boolean).join(" | "));
-          });
-          if (rows.length > 20) {
-            textParts.push(`... and ${rows.length - 20} more rows`);
-          }
-          textParts.push("\n");
-        }
-        extractedText = textParts.join("\n");
-      } catch (xlsxErr) {
-        console.warn("xlsx fallback triggered:", xlsxErr);
-        extractedText = extractCleanStringsFromBuffer(file.buffer);
-      }
-    } else if (file.mimetype === "text/csv" || ext === "csv") {
-      try {
-        const csvContent = file.buffer.toString("utf-8");
-        const workbook = XLSX.read(csvContent, { type: "string" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
-
-        const textParts: string[] = [`Dataset (CSV): ${filename} (${rows.length} rows)\n`];
-        rows.slice(0, 30).forEach((r) => {
-          textParts.push(r.map((c) => String(c).trim()).filter(Boolean).join(" | "));
-        });
-        if (rows.length > 30) {
-          textParts.push(`... and ${rows.length - 30} more rows`);
-        }
-        extractedText = textParts.join("\n");
-        metadata.rowCount = rows.length;
-      } catch {
-        extractedText = file.buffer.toString("utf-8");
-      }
-    } else {
-      // Plain text / markdown / fallback
-      extractedText = extractCleanStringsFromBuffer(file.buffer);
     }
 
     if (!extractedText || extractedText.trim().length === 0) {

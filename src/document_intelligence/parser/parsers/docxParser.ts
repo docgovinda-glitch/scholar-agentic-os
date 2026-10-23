@@ -52,17 +52,19 @@ export class DOCXParser implements Parser {
       const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
       const result = await mammoth.extractRawText({ buffer });
 
+      const normalizedText = (result.value || "").normalize("NFC");
+
       // Extract paragraphs with potential heading detection
-      const paragraphs = this.extractParagraphs(result.value);
+      const paragraphs = this.extractParagraphs(normalizedText);
 
       // Extract pages (DOCX doesn't have explicit pages, estimate from breaks)
-      const pages = this.extractPages(result.value);
+      const pages = this.extractPages(normalizedText).map((p) => ({ ...p, text: p.text.normalize("NFC") }));
 
       // Extract metadata
       const metadata = await this.extractMetadata(buffer);
 
       const parserResult: ParserResult = {
-        text: result.value,
+        text: normalizedText,
         metadata,
         pages,
         warnings: result.messages?.map((m: any) => m.message) || [],

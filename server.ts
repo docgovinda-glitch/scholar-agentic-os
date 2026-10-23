@@ -8,11 +8,8 @@ import dotenv from "dotenv";
 import "express-async-errors";
 import { rateLimit } from "./server/src/middleware/rateLimit.ts";
 import { errorHandler } from "./server/src/middleware/errorHandler.ts";
-import { PDFParser } from "./src/document_intelligence/parser/parsers/pdfParser.ts";
-import { DOCXParser } from "./src/document_intelligence/parser/parsers/docxParser.ts";
-import { TXTParser } from "./src/document_intelligence/parser/parsers/txtParser.ts";
-import { MarkdownParser } from "./src/document_intelligence/parser/parsers/markdownParser.ts";
-import { detectHeadings } from "./src/document_intelligence/parser/headingDetection.ts";
+import { registerDefaultParsers, detectHeadings } from "./src/document_intelligence/index.ts";
+import { registerBuiltinAgents } from "./src/app/mesh/agents/index.ts";
 import type { CanonicalReference, ReferenceAuthor, ReferenceKind } from "./src/citation_compliance/model/reference.ts";
 import { CitationStyleRegistry, CitationFormatterFactory } from "./src/citation_compliance/formattingEngine.ts";
 import { APA7Formatter } from "./src/citation_compliance/formatters/apa7.ts";
@@ -305,6 +302,10 @@ const projectLimit = rateLimit({
 // ==========================================
 // ROUTE REGISTRATION
 // ==========================================
+
+// Initialize Document Intelligence Engine & Multi-Agent Mesh
+registerDefaultParsers();
+registerBuiltinAgents();
 
 // Citation Style Registry (Scholar Core OS) - registered once at startup
 const citationStyleRegistry = CitationStyleRegistry.getInstance();

@@ -70,8 +70,8 @@ export class MarkdownParser implements Parser {
     const { data } = input;
 
     try {
-      // Decode text
-      const rawText = this.decodeText(data);
+      // Decode text and normalize Unicode NFC
+      const rawText = this.decodeText(data).normalize("NFC");
 
       // Extract YAML front matter (--- ... ---) if present, before block parsing
       const { frontMatter, body: text } = this.extractFrontMatter(rawText);

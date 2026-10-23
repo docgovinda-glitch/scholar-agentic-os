@@ -15,9 +15,9 @@ export function stripCircularReferences<T>(input: T): T {
     return input;
   }
 
-  const seen = new WeakSet();
+  const seen = new WeakSet<object>();
 
-  function sanitize(val: any, depth = 0): any {
+  function sanitize(val: unknown, depth = 0): unknown {
     if (depth > 64) {
       return undefined;
     }
@@ -54,17 +54,17 @@ export function stripCircularReferences<T>(input: T): T {
       };
     }
 
-    if (seen.has(val)) {
+    if (seen.has(val as object)) {
       return "[Circular]";
     }
-    seen.add(val);
+    seen.add(val as object);
 
-    let result: any;
+    let result: unknown;
     if (Array.isArray(val)) {
       result = val.map((item) => sanitize(item, depth + 1)).filter((item) => item !== undefined);
     } else {
-      const cleanObj: Record<string, any> = {};
-      for (const [key, item] of Object.entries(val)) {
+      const cleanObj: Record<string, unknown> = {};
+      for (const [key, item] of Object.entries(val as Record<string, unknown>)) {
         // Omit DOM/React internal attributes like _reactFiber, _reactEvents
         if (key.startsWith("_react") || key === "nativeEvent") {
           continue;
@@ -77,11 +77,11 @@ export function stripCircularReferences<T>(input: T): T {
       result = cleanObj;
     }
 
-    seen.delete(val);
+    seen.delete(val as object);
     return result;
   }
 
-  return sanitize(input, 0);
+  return sanitize(input, 0) as T;
 }
 
 /**
@@ -93,7 +93,7 @@ export function safeFormatLabel(val: unknown): string {
   if (val === null || val === undefined) return "";
   if (typeof val === "string") return val.replace(/_/g, " ");
   if (typeof val === "object") {
-    const obj = val as Record<string, any>;
+    const obj = val as Record<string, unknown>;
     const extracted = obj.preset ?? obj.label ?? obj.title ?? obj.id ?? "";
     return typeof extracted === "string" ? extracted.replace(/_/g, " ") : String(extracted);
   }
@@ -104,7 +104,7 @@ export function safeFormatLabel(val: unknown): string {
  * Deep equality comparator for state guards.
  * Prevents unnecessary re-render cycles and cascading updates.
  */
-export function isDeepEqual(a: any, b: any, seenA = new WeakSet(), depth = 0): boolean {
+export function isDeepEqual(a: unknown, b: unknown, seenA = new WeakSet<object>(), depth = 0): boolean {
   if (a === b) return true;
   if (depth > 64) return true;
   if (a === null || b === null || typeof a !== "object" || typeof b !== "object") {
@@ -124,13 +124,15 @@ export function isDeepEqual(a: any, b: any, seenA = new WeakSet(), depth = 0): b
 
   if (Array.isArray(b)) return false;
 
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
+  const objA = a as Record<string, unknown>;
+  const objB = b as Record<string, unknown>;
+  const keysA = Object.keys(objA);
+  const keysB = Object.keys(objB);
   if (keysA.length !== keysB.length) return false;
 
   for (const key of keysA) {
-    if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
-    if (!isDeepEqual(a[key], b[key], seenA, depth + 1)) return false;
+    if (!Object.prototype.hasOwnProperty.call(objB, key)) return false;
+    if (!isDeepEqual(objA[key], objB[key], seenA, depth + 1)) return false;
   }
 
   return true;

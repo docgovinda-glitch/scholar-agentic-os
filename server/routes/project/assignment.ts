@@ -1,8 +1,11 @@
 import express from "express";
 import multer from "multer";
-import * as pdfParseModule from "pdf-parse";
-import mammoth from "mammoth";
-import JSZip from "jszip";
+import { parseDocument } from "../../../src/document_intelligence/index.ts";
+import {
+  buildScholarlyVoiceSystemPrompt,
+  sanitizeScholarlyText,
+  normalizeUnicodeNFC,
+} from "../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
 import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy } from "../../utils/llm.ts";
 import { completeWithFailover } from "../../../src/platform/gateway/gateway.ts";
@@ -402,57 +405,8 @@ const upload = multer({
   },
 });
 
-async function extractTextFromPdf(buffer: Buffer): Promise<{ text: string }> {
-  try {
-    if (typeof (pdfParseModule as any).PDFParse === "function") {
-      const parser = new (pdfParseModule as any).PDFParse({ data: buffer });
-      const res = await parser.getText();
-      return { text: res.text || "" };
-    }
-    const fn = (pdfParseModule as any).default || pdfParseModule;
-    if (typeof fn === "function") {
-      const res = await fn(buffer);
-      return { text: res.text || "" };
-    }
-  } catch (err) {
-    console.warn("PDF parser error in assignment router:", err);
-  }
-  return { text: "" };
-}
-
-async function extractTextFromPptx(buffer: Buffer): Promise<string> {
-  try {
-    const zip = await JSZip.loadAsync(buffer);
-    const slideFiles = Object.keys(zip.files).filter((name) =>
-      /^ppt\/slides\/slide\d+\.xml$/.test(name)
-    );
-    slideFiles.sort((a, b) => {
-      const numA = parseInt(a.match(/slide(\d+)\.xml/)?.[1] || "0", 10);
-      const numB = parseInt(b.match(/slide(\d+)\.xml/)?.[1] || "0", 10);
-      return numA - numB;
-    });
-
-    const slideTexts: string[] = [];
-    for (const slidePath of slideFiles) {
-      const xml = await zip.files[slidePath].async("text");
-      const matches = xml.match(/<a:t[^>]*>([^<]+)<\/a:t>/g) || [];
-      const extracted = matches
-        .map((m) => m.replace(/<[^>]+>/g, "").trim())
-        .filter(Boolean)
-        .join(" ");
-      if (extracted) {
-        slideTexts.push(extracted);
-      }
-    }
-    return slideTexts.join("\n\n");
-  } catch (err) {
-    console.warn("PPTX parser error in assignment router:", err);
-    return buffer.toString("utf-8").replace(/[^\x20-\x7E\n]/g, " ").trim();
-  }
-}
-
-async function getProjectSafe(req: express.Request<any>, res: express.Response) {
-  const projectId = req.params.id;
+async function getProjectSafe(req: express.Request<unknown>, res: express.Response) {
+  const projectId = (req.params as Record<string, string>).id;
   if (!projectId) {
     res.status(400).json({ error: "Missing project ID" });
     return null;
@@ -480,30 +434,15 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
 
   let text = "";
   try {
-    const lowerName = file.originalname.toLowerCase();
-    if (file.mimetype === "application/pdf" || lowerName.endsWith(".pdf")) {
-      const data = await extractTextFromPdf(file.buffer);
-      text = data.text;
-    } else if (
-      file.mimetype === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
-      file.mimetype === "application/vnd.ms-powerpoint" ||
-      lowerName.endsWith(".pptx") ||
-      lowerName.endsWith(".ppt")
-    ) {
-      text = await extractTextFromPptx(file.buffer);
-    } else if (
-      file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      lowerName.endsWith(".docx") ||
-      lowerName.endsWith(".doc")
-    ) {
-      const result = await mammoth.extractRawText({ buffer: file.buffer });
-      text = result.value || "";
-    } else {
-      text = file.buffer.toString("utf-8");
-    }
+    const parsed = await parseDocument({
+      data: file.buffer,
+      filename: file.originalname,
+      mimeType: file.mimetype,
+    });
+    text = parsed.ok ? parsed.data.text : file.buffer.toString("utf-8");
 
-    // Clean whitespace and normalize line breaks
-    text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    // Clean whitespace, normalize line breaks and apply NFC
+    text = normalizeUnicodeNFC(text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim());
 
     // Strip slide artifacts and pedagogical noise
     text = stripSlideArtifacts(text);
@@ -1935,10 +1874,16 @@ ${evidenceContext}
 
 ${tutorialOrPeelRules}`;
 
+    const scholarlyDirectives = buildScholarlyVoiceSystemPrompt({
+      discipline: "Academic Coursework",
+      dialect: "en-GB",
+      requireVaultEvidence: true,
+    });
+
     const draft = await callOpenRouterText(
       req,
       res,
-      "You are the Scholar Core Grounded Academic Drafting Agent.",
+      `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`,
       prompt,
       "openrouter/auto",
       "drafting"
@@ -1969,6 +1914,19 @@ ${tutorialOrPeelRules}`;
       mappedCitationItems,
       citationStyle
     );
+
+    // Apply Discourse-Level Scholarly Voice Guardrails (cliché suppression, British English, NFC Unicode preservation)
+    effectiveDraft = sanitizeScholarlyText(effectiveDraft, { dialect: "en-GB", stripCliches: true });
+    effectiveDraft = normalizeUnicodeNFC(effectiveDraft);
+
+    if (mappedCitationItems.length === 0 && !effectiveDraft.includes("[Unverified Claim — Vault Citation Required]")) {
+      if (/\b(studies show|research indicates|data demonstrates|proven that|empirically established)\b/i.test(effectiveDraft)) {
+        effectiveDraft = effectiveDraft.replace(
+          /\b(studies show|research indicates|data demonstrates|proven that|empirically established)\b/gi,
+          (m) => `${m} [Unverified Claim — Vault Citation Required]`
+        );
+      }
+    }
 
     res.json({ draft: effectiveDraft });
   } catch (err: any) {
@@ -2103,10 +2061,16 @@ ${frameworkGuidelines}
 
 Output ONLY the section text in clean academic Markdown prose.`;
 
+    const scholarlyDirectives = buildScholarlyVoiceSystemPrompt({
+      discipline: "Academic Coursework",
+      dialect: "en-GB",
+      requireVaultEvidence: true,
+    });
+
     const draft = await callOpenRouterText(
       req,
       res,
-      "You are the Scholar Core Grounded Academic Drafting Agent.",
+      `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`,
       prompt,
       "openrouter/auto",
       "drafting"
@@ -2137,6 +2101,19 @@ Output ONLY the section text in clean academic Markdown prose.`;
       mappedSources,
       citationStyle
     );
+
+    // Apply Discourse-Level Scholarly Voice Guardrails (cliché suppression, British English, NFC Unicode preservation)
+    effectiveDraft = sanitizeScholarlyText(effectiveDraft, { dialect: "en-GB", stripCliches: true });
+    effectiveDraft = normalizeUnicodeNFC(effectiveDraft);
+
+    if (mappedSources.length === 0 && !effectiveDraft.includes("[Unverified Claim — Vault Citation Required]")) {
+      if (/\b(studies show|research indicates|data demonstrates|proven that|empirically established)\b/i.test(effectiveDraft)) {
+        effectiveDraft = effectiveDraft.replace(
+          /\b(studies show|research indicates|data demonstrates|proven that|empirically established)\b/gi,
+          (m) => `${m} [Unverified Claim — Vault Citation Required]`
+        );
+      }
+    }
 
     const words = effectiveDraft.split(" ");
     for (let i = 0; i < words.length; i += 5) {
@@ -3481,10 +3458,15 @@ Explain predicted marks, highlight priority fixes needed to step up to the next 
   const candidates = getCandidates();
   if (candidates.length > 0) {
     try {
+      const scholarlyDirectives = buildScholarlyVoiceSystemPrompt({
+        discipline: "Academic Guidance",
+        dialect: "en-GB",
+      });
+
       const result = await completeWithFailover(
         {
           taskClass: "chat",
-          systemPrompt,
+          systemPrompt: `${scholarlyDirectives}\n\n${systemPrompt}`,
           userPrompt,
           segments: [{ label: "Input", text: userPrompt }],
         },
@@ -3492,9 +3474,12 @@ Explain predicted marks, highlight priority fixes needed to step up to the next 
         buildAuthorizedPolicy(candidates)
       );
       if (result.ok && result.value?.text) {
+        const sanitized = normalizeUnicodeNFC(
+          sanitizeScholarlyText(result.value.text, { dialect: "en-GB", stripCliches: true })
+        );
         return res.json({
           ok: true,
-          response: result.value.text,
+          response: sanitized,
           persona: { name: personaName, role: personaRole },
         });
       }
@@ -3523,9 +3508,13 @@ Explain predicted marks, highlight priority fixes needed to step up to the next 
     }
   );
 
+  const sanitizedFallback = normalizeUnicodeNFC(
+    sanitizeScholarlyText(fallbackResponse, { dialect: "en-GB", stripCliches: true })
+  );
+
   return res.json({
     ok: true,
-    response: fallbackResponse,
+    response: sanitizedFallback,
     persona: { name: personaName, role: personaRole },
   });
 });

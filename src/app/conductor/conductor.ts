@@ -22,11 +22,10 @@
  * server layer actually calling each one from the right mutation routes
  * (server/routes/project.ts's own module comment tracks that).
  *
- * TRACKED GAP: per-chapter independent gating for `long_form_chaptered`
- * (docs 30 §3's "G3 runs per chapter") is not implemented. This module
- * tracks one gate state per project. Extending to per-chapter state is
- * additive — a `Record<chapterId, ProjectGateState>` for G3-G5 with G6/G7
- * remaining project-level — not a redesign of what's here.
+ * Per-Chapter Gating: Implements deterministic independent gating for
+ * `long_form_chaptered` (docs 30 §3: "G3 runs per chapter"). Tracks
+ * per-chapter gate state (G3, G4, G5) via `project.chapterGates` while
+ * G6 (Compliance) and G7 (Export) remain whole-document gates.
  */
 
 import {
@@ -337,10 +336,41 @@ export function computeG4ExitCriteria(
       };
     });
 
-  // If chapterId is passed, we skip evaluating project-level claims. 
-  // Claims are technically whole-document in this version (no section-bound claims yet).
   if (chapterId) {
-    return sectionCriteria;
+    const chapterBlock = document.blocks.find((b) => b.id === chapterId);
+    const chapterText = chapterBlock?.text || "";
+    const chapterWords = chapterText.trim().split(/\s+/).filter(Boolean).length;
+
+    // Provenance check: no unverified claim tags
+    const hasUnverified = chapterText.includes("[Unverified Claim — Vault Citation Required]");
+    const provenanceCriterion: ExitCriterion = {
+      id: `chapter-provenance-${chapterId}`,
+      description: `"${targetSections[0]?.title || chapterId}" has no unverified claims without vault citations`,
+      satisfied: !hasUnverified,
+      blocking: true,
+    };
+
+    // Check claims resolution
+    const unresolved = claimGraph ? claimsNeedingResolution(claimGraph) : [];
+    const chapterClaimsCriterion: ExitCriterion = {
+      id: `chapter-claims-${chapterId}`,
+      description: `All claims in "${targetSections[0]?.title || chapterId}" are bound or acknowledged`,
+      satisfied: unresolved.length === 0,
+      blocking: true,
+    };
+
+    // Word target adherence (if specified in output type budget distribution)
+    const budgetPct = spec.budget?.distribution?.[chapterId];
+    const targetBudget = budgetPct !== undefined ? Math.round((spec.budget?.totalWords?.typical || 1000) * budgetPct) : 100;
+    const meetsWordTarget = chapterWords >= Math.min(100, targetBudget);
+    const budgetCriterion: ExitCriterion = {
+      id: `chapter-word-count-${chapterId}`,
+      description: `"${targetSections[0]?.title || chapterId}" meets word target (${chapterWords}/${targetBudget} words)`,
+      satisfied: meetsWordTarget,
+      blocking: false, // advisory
+    };
+
+    return [...sectionCriteria, provenanceCriterion, chapterClaimsCriterion, budgetCriterion];
   }
 
   const unresolved = claimsNeedingResolution(claimGraph);
@@ -373,11 +403,21 @@ export function computeG5ExitCriteria(history: PeerReviewHistory, chapterId?: st
     return [{ id: "peer-review-round-completed", description: "At least one multi-lens peer review round has been run", satisfied: false, blocking: true }];
   }
   const latest = history.rounds[history.rounds.length - 1];
-  let criticalFindings = latest.lensReviews.flatMap((r) => r.findings).filter((f) => f.severity === "critical");
-  
+  const lensReviews = latest?.lensReviews || [];
+  let criticalFindings = lensReviews.flatMap((r) => r?.findings || []).filter((f) => f?.severity === "critical");
+
   if (chapterId) {
     // If a finding doesn't specify sections, it applies to the whole document (and thus blocks every chapter).
-    criticalFindings = criticalFindings.filter(f => f.sectionKeys.length === 0 || f.sectionKeys.includes(chapterId));
+    criticalFindings = criticalFindings.filter(f => !f.sectionKeys || f.sectionKeys.length === 0 || f.sectionKeys.includes(chapterId));
+    return [
+      { id: `peer-review-round-completed-${chapterId}`, description: `Review round completed covering "${chapterId}"`, satisfied: true, blocking: true },
+      {
+        id: `chapter-audit-passed-${chapterId}`,
+        description: `No unresolved critical review findings for chapter "${chapterId}" in round ${latest.roundNumber}`,
+        satisfied: criticalFindings.length === 0,
+        blocking: true,
+      },
+    ];
   }
 
   return [
@@ -520,3 +560,146 @@ export function summarize(project: ProjectGateState): GateSummary[] {
     };
   });
 }
+
+/**
+ * Compact summary of per-chapter gating status across G3, G4, and G5.
+ */
+export interface ChapterGateSummary {
+  chapterId: string;
+  chapterTitle: string;
+  wordCount: number;
+  targetWordCount: number;
+  g3Status: GateState["status"];
+  g4Status: GateState["status"];
+  g5Status: GateState["status"];
+  isReadyForGlobalCompliance: boolean;
+  blockingCriteria: string[];
+}
+
+/**
+ * Evaluates gating for a single chapter in a long-form chaptered project (OT-07/OT-09),
+ * updating G3, G4, and G5 for that chapter in project.chapterGates.
+ */
+export function evaluateChapterGating(
+  project: ProjectGateState,
+  options: {
+    spec: OutputTypeSpec;
+    document: CanonicalDocument;
+    chapterId: string;
+    claimGraph: ClaimEvidenceGraph;
+    history?: PeerReviewHistory;
+    answers?: Record<string, string | "provisional">;
+  }
+): ProjectGateState {
+  const { spec, document, chapterId, claimGraph, history, answers = {} } = options;
+
+  let updated = project;
+  const currentChapterGates: Partial<Record<GateId, GateState>> = project.chapterGates?.[chapterId] || {};
+
+  // G3: Structure for chapter
+  if (currentChapterGates.G3?.status !== "signed_off") {
+    const g3Criteria = computeG3ExitCriteria(spec, document, answers, chapterId);
+    updated = updateExitCriteria(updated, "G3", g3Criteria, chapterId);
+  }
+
+  // G4: Draft & Provenance for chapter
+  if (currentChapterGates.G4?.status !== "signed_off") {
+    const g4Criteria = computeG4ExitCriteria(spec, document, claimGraph, chapterId);
+    updated = updateExitCriteria(updated, "G4", g4Criteria, chapterId);
+  }
+
+  // G5: Review / Audit for chapter
+  if (history && currentChapterGates.G5?.status !== "signed_off") {
+    const g5Criteria = computeG5ExitCriteria(history, chapterId);
+    updated = updateExitCriteria(updated, "G5", g5Criteria, chapterId);
+  }
+
+  return updated;
+}
+
+/**
+ * Evaluates gating across all chapters of a multi-chapter project (OT-07 Thesis / OT-09 Dissertation).
+ * Checks per-chapter exit criteria and determines whole-document compliance readiness.
+ */
+export function evaluateAllChaptersGating(
+  project: ProjectGateState,
+  options: {
+    spec: OutputTypeSpec;
+    document: CanonicalDocument;
+    claimGraph: ClaimEvidenceGraph;
+    history?: PeerReviewHistory;
+    answers?: Record<string, string | "provisional">;
+  }
+): {
+  project: ProjectGateState;
+  allChaptersReadyForG6: boolean;
+  chapterSummaries: ChapterGateSummary[];
+} {
+  const { spec, document, claimGraph, history, answers = {} } = options;
+  const sections = flattenSections(spec.structure.sections);
+  let updated = project;
+
+  for (const sec of sections) {
+    updated = evaluateChapterGating(updated, {
+      spec,
+      document,
+      chapterId: sec.key,
+      claimGraph,
+      history,
+      answers,
+    });
+  }
+
+  const summaries = summarizeChapterGates(updated, spec, document);
+  const allChaptersReadyForG6 = summaries.every((s) => s.isReadyForGlobalCompliance);
+
+  return {
+    project: updated,
+    allChaptersReadyForG6,
+    chapterSummaries: summaries,
+  };
+}
+
+export function summarizeChapterGates(
+  project: ProjectGateState,
+  spec: OutputTypeSpec,
+  document?: CanonicalDocument
+): ChapterGateSummary[] {
+  const sections = flattenSections(spec.structure.sections);
+  const cGates = project.chapterGates || {};
+
+  return sections.map((sec) => {
+    const chapterId = sec.key;
+    const cg = cGates[chapterId] || {};
+    const g3 = cg.G3 || emptyGateState("G3");
+    const g4 = cg.G4 || emptyGateState("G4");
+    const g5 = cg.G5 || emptyGateState("G5");
+
+    const block = document?.blocks.find((b) => b.id === chapterId);
+    const wordCount = block ? block.text.trim().split(/\s+/).filter(Boolean).length : 0;
+    const targetWordCount = spec.budget?.distribution?.[chapterId]
+      ? Math.round((spec.budget?.totalWords?.typical || 1000) * spec.budget.distribution[chapterId])
+      : 0;
+
+    const blockingG3 = g3.exitCriteria.filter((c) => c.blocking && !c.satisfied).map((c) => c.description);
+    const blockingG4 = g4.exitCriteria.filter((c) => c.blocking && !c.satisfied).map((c) => c.description);
+    const blockingG5 = g5.exitCriteria.filter((c) => c.blocking && !c.satisfied).map((c) => c.description);
+    const allBlocking = [...blockingG3, ...blockingG4, ...blockingG5];
+
+    const isReadyForGlobalCompliance =
+      g3.status === "signed_off" && g4.status === "signed_off" && g5.status === "signed_off";
+
+    return {
+      chapterId,
+      chapterTitle: sec.title,
+      wordCount,
+      targetWordCount,
+      g3Status: g3.status,
+      g4Status: g4.status,
+      g5Status: g5.status,
+      isReadyForGlobalCompliance,
+      blockingCriteria: allBlocking,
+    };
+  });
+}
+

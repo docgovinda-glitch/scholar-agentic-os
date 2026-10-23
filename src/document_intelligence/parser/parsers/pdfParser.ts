@@ -57,29 +57,50 @@ export class PDFParser implements Parser {
 
     try {
       // Use pdf-parse for extraction
-      // Import dynamically to handle optional dependency gracefully
-      const { PDFParse } = await import("pdf-parse");
-      
+      const pdfParseModule = await import("pdf-parse");
       const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
-      const parser = new PDFParse({ data: buffer });
-      const result = await parser.getText();
-      const infoResult = await parser.getInfo();
+      let extractedText = "";
+      let pages: Array<{ text: string; pageNumber: number }> = [];
+      let metadata: Record<string, unknown> = {};
 
-      // Extract pages with text
-      const pages = this.extractPages(result);
+      if (typeof (pdfParseModule as any).PDFParse === "function") {
+        const parser = new (pdfParseModule as any).PDFParse({ data: buffer });
+        const result = await parser.getText();
+        extractedText = result?.text || "";
+        try {
+          const infoResult = await parser.getInfo();
+          metadata = this.extractMetadata(result, infoResult);
+        } catch {
+          metadata = {};
+        }
+        pages = this.extractPages(result);
+      } else {
+        const fn = (pdfParseModule as any).default || pdfParseModule;
+        if (typeof fn === "function") {
+          const res = await fn(buffer);
+          extractedText = res?.text || "";
+          metadata = {
+            pageCount: res?.numpages,
+            info: res?.info,
+          };
+          if (res?.numpages) {
+            pages = [{ text: extractedText, pageNumber: 1 }];
+          }
+        }
+      }
 
-      // Extract metadata
-      const metadata = this.extractMetadata(result, infoResult);
+      extractedText = extractedText.normalize("NFC");
+      pages = pages.map((p) => ({ ...p, text: p.text.normalize("NFC") }));
 
       const parserResult: ParserResult = {
-        text: result.text,
+        text: extractedText,
         metadata,
         pages,
         warnings: [],
       };
 
       // Check for potential issues
-      if (!result.text || result.text.trim().length === 0) {
+      if (!extractedText || extractedText.trim().length === 0) {
         parserResult.warnings?.push("No text content extracted - document may be image-only");
       }
 

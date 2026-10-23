@@ -49,8 +49,8 @@ export class TXTParser implements Parser {
       // Decode text
       const text = this.decodeText(data, encoding);
 
-      // Normalize line endings
-      const normalizedText = this.normalizeLineEndings(text);
+      // Normalize line endings and normalize Unicode NFC
+      const normalizedText = this.normalizeLineEndings(text).normalize("NFC");
 
       // Extract structure
       const paragraphs = this.extractParagraphs(normalizedText);

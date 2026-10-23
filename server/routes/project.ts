@@ -72,6 +72,7 @@ import { journalComplianceRouter } from "./project/journal_compliance";
 import parseRouter from "./project/parse";
 import { activityRouter } from "./project/activity";
 import { filesRouter } from "./project/files";
+import { meshRouter } from "./project/mesh";
 import { registerSubmissionsRoutes } from "./project/submissions";
 import { deleteSourceFromRelational } from "../src/syncRelational";
 
@@ -1090,6 +1091,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   router.use("/:id/presentation", presentationRouter);
   router.use("/:id/parse-file", parseRouter);
   router.use("/:id/compliance", journalComplianceRouter(projectLimit));
+  router.use("/:id/mesh", meshRouter);
 
   router.get("/:id/sources/:sourceId/claims", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
