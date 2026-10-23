@@ -195,7 +195,7 @@ export interface WebsiteAssistantMessage {
   timestamp: string;
   action?: AssistantAction;
   followUps?: string[];
-  mode?: "chat" | "search" | "deep-research";
+  mode?: "chat" | "search" | "deep-research" | "deliverable";
   provider?: string;
   model?: string;
   plan?: string[];
@@ -215,11 +215,36 @@ export interface WebsiteAssistantMessage {
     authors?: string[];
     doi?: string;
     isPrimary?: boolean;
-    sourceType?: "official" | "scholarly" | "media" | "web";
+    sourceType?: "official" | "scholarly" | "media" | "web" | "vault";
   }>;
   attachments?: Array<{ name: string; isImage: boolean; previewUrl?: string }>;
   error?: boolean;
+  wordCount?: number;
+  verifiedSourcesCount?: number;
+  burstinessMetrics?: {
+    averageLength: number;
+    variance: number;
+    burstinessScore: number;
+    isSufficientlyBurst: boolean;
+  };
+  recommendedWorkspaceHandoff?: {
+    targetFormatId: "OT-01" | "OT-10" | "OT-19" | "OT-09" | "OT-22";
+    formatLabel: string;
+    topic: string;
+    suggestedTitle: string;
+    wordCountTarget?: number;
+    citationStyle: string;
+    retrievedSources: Array<{
+      title: string;
+      authors: string[];
+      year?: number | string;
+      doi?: string;
+      url?: string;
+      venue?: string;
+    }>;
+  };
 }
+
 
 export function getAssistantActionAndFollowUps(query: string): {
   action?: AssistantAction;
@@ -227,13 +252,9 @@ export function getAssistantActionAndFollowUps(query: string): {
 } {
   const q = query.toLowerCase();
   if (
-    q.includes("write an essay") ||
-    q.includes("write me") ||
-    q.includes("rewrite") ||
-    q.includes("paraphrase") ||
-    q.includes("draft a") ||
     q.includes("generate code") ||
-    q.includes("write code")
+    q.includes("write code") ||
+    q.includes("write a script")
   ) {
     return {
       action: { type: "workspaces", label: "Browse Academic Workspaces ↑" },
@@ -839,15 +860,11 @@ export function isPlatformQuery(query: string): boolean {
     return true;
   }
 
-  // Refusal guardrails: general drafting, essay writing, coding in navigation chat
+  // Non-academic raw code generation requests in support chat
   if (
-    q.includes("write an essay") ||
-    q.includes("write me") ||
-    q.includes("rewrite") ||
-    q.includes("paraphrase") ||
-    q.includes("draft a") ||
     q.includes("generate code") ||
-    q.includes("write code")
+    q.includes("write code") ||
+    q.includes("write a script")
   ) {
     return true;
   }
@@ -889,26 +906,17 @@ export function isPlatformQuery(query: string): boolean {
 export function answerWebsiteQuestion(query: string): string {
   const q = query.toLowerCase();
 
-  // Guardrail: Decline out-of-scope general writing/coding tasks
+  // Guardrail: Decline non-academic raw code generation in navigation chat
   if (
-    q.includes("write an essay") ||
-    q.includes("write me") ||
-    q.includes("rewrite") ||
-    q.includes("paraphrase") ||
-    q.includes("draft a") ||
     q.includes("generate code") ||
-    q.includes("write code")
+    q.includes("write code") ||
+    q.includes("write a script")
   ) {
     return `I am the Scholar Core Website Assistant, designed strictly to help you understand and navigate the Scholar Core platform, its workflows, and features.
 
-I cannot perform general research, writing, coding, or document generation here in the support chat.
-
-👉 To research and draft academic papers:
-1. Choose one of the Academic Workspaces above (Assignment, Journal Article, Research Proposal, or Presentation).
-2. Upload and verify reference literature in the Knowledge Vault.
-3. Configure your models under AI Access.
-4. Your workspace will launch with dedicated AI agent stages, evidentiary matrices, and grounded drafting!`;
+I cannot perform raw software programming or script generation in this navigation guide. To research, outline, and draft academic papers and scholarly projects, submit your inquiry directly to Ask Scholar.`;
   }
+
 
   if (q.includes("engine") || q.includes("scholar ai engine")) {
     return `The Scholar AI Engine is the platform's multi-tier orchestration intelligence:
@@ -1684,7 +1692,13 @@ export default function ProjectListScreen({
         const styleInfo = getCitationStyleInfo(askCitationStyle);
         const systemPrompt = `You are Scholar Core Research Copilot, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers. Prioritize recently published (2020-2026), peer-reviewed, and credible sources. Format citations and references strictly according to ${styleInfo.name}. Ground all assertions in verified literature without fabricating sources or DOIs.`;
 
-        if (currentAttachments.length === 0 && targetMode === "normal" && !query.toLowerCase().includes("deep research") && !query.toLowerCase().includes("search the web")) {
+        const isAcademicOrDeliverable =
+          targetMode !== "normal" ||
+          query.toLowerCase().includes("deep research") ||
+          query.toLowerCase().includes("search the web") ||
+          /\b(?:essay|paper|coursework|thesis|dissertation|proposal|review|analysis|history|nepal|congress|study|clinical)\b/i.test(query);
+
+        if (currentAttachments.length === 0 && targetMode === "normal" && !isAcademicOrDeliverable) {
           // Standard text generation — calls executeAgenticLLM first (compatible with unit tests and client router)
           try {
             const txt = await executeAgenticLLM(systemPrompt, query, "simple");
@@ -1700,7 +1714,7 @@ export default function ProjectListScreen({
             });
           }
         } else {
-          // Multimodal, document, vision, search, or deep research query
+          // Substantive scholarly retrieval query or multimodal
           agentResponse = await executeAgenticQuery({
             prompt: query,
             systemPrompt,
@@ -1724,6 +1738,10 @@ export default function ProjectListScreen({
             plan: agentResponse.plan,
             citationStyle: agentResponse.citationStyle || askCitationStyle,
             citations: agentResponse.citations,
+            wordCount: agentResponse.wordCount,
+            verifiedSourcesCount: agentResponse.verifiedSourcesCount,
+            burstinessMetrics: agentResponse.burstinessMetrics,
+            recommendedWorkspaceHandoff: agentResponse.recommendedWorkspaceHandoff,
             followUps:
               agentResponse.followUps ||
               (targetMode === "deep-research" || targetMode === "search" || (agentResponse.citations && agentResponse.citations.length > 0)
@@ -1764,14 +1782,17 @@ export default function ProjectListScreen({
   // Boot project workspace directly from assistant research findings
   const handleBootProjectFromResearch = useCallback(
     async (researchMessage: WebsiteAssistantMessage) => {
+      const handoff = researchMessage.recommendedWorkspaceHandoff;
+      const targetFormatId = handoff?.targetFormatId || "OT-10";
+
       if (!userEmail) {
-        openAuth("signup", "Sign in or create an account to initialize a research workspace from these findings.", "OT-10");
+        openAuth("signup", `Sign in or create an account to initialize ${handoff?.formatLabel || "an academic workspace"} from these findings.`, targetFormatId);
         return;
       }
       if (creating) return;
 
       setCreating(true);
-      setCreatingFormatId("OT-10");
+      setCreatingFormatId(targetFormatId);
       setError(null);
 
       try {
@@ -1782,19 +1803,23 @@ export default function ProjectListScreen({
             : undefined;
 
         const topic =
+          handoff?.topic ||
           priorUserMsg?.text ||
           researchMessage.text.split("\n")[0].replace(/^#+\s*/, "").slice(0, 80) ||
           "Synthesized Research Project";
-        const cleanTitle = topic.length > 60 ? `${topic.slice(0, 57)}...` : topic;
+        const cleanTitle =
+          handoff?.suggestedTitle ||
+          (topic.length > 60 ? `${topic.slice(0, 57)}...` : topic);
 
-        const project = await createProject("OT-10");
+        const project = await createProject(targetFormatId);
 
+        const sourcesToAttach = handoff?.retrievedSources || researchMessage.citations || [];
         const citationNotes =
-          researchMessage.citations && researchMessage.citations.length > 0
-            ? researchMessage.citations
+          sourcesToAttach.length > 0
+            ? sourcesToAttach
                 .map(
                   (c, i) =>
-                    `[${i + 1}] ${c.title || c.url || "Source"} (${c.publisher || c.domain || ""})\n${c.snippet || ""}\nURL: ${c.url || "N/A"}`
+                    `[${i + 1}] ${c.title || "Scholarly Source"}${c.venue ? ` (${c.venue})` : ""}\nAuthors: ${Array.isArray(c.authors) ? c.authors.join(", ") : ""}\nDOI: ${c.doi || "N/A"}\nURL: ${c.url || "N/A"}`
                 )
                 .join("\n\n")
             : "";
@@ -1802,7 +1827,8 @@ export default function ProjectListScreen({
         const intake = {
           title: cleanTitle,
           researchQuestion: topic,
-          backgroundNotes: `Synthesized Research Notes (Scholar Core Research Copilot):\n\n${researchMessage.text}`,
+          targetWordCount: handoff?.wordCountTarget || 1500,
+          backgroundNotes: `Executive Scholarly Synthesis & Verified Literature Brief:\n\n${researchMessage.text}`,
           preliminaryEvidence: citationNotes,
         };
 
@@ -3160,15 +3186,27 @@ export default function ProjectListScreen({
                           </span>
                         )}
                         {msg.citations && msg.citations.length > 0 && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium">
-                            ✓ {msg.citations.length} {msg.citations.length === 1 ? "Source" : "Sources"}
+                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-medium">
+                            ✓ {msg.citations.length} Verified {msg.citations.length === 1 ? "Source" : "Sources"}
+                          </span>
+                        )}
+                        <span className="px-1.5 py-0.5 rounded text-[9px] bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 font-mono font-medium">
+                          ⚡ {msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words
+                        </span>
+                        {msg.burstinessMetrics && (
+                          <span
+                            title={`Syntactic burstiness: mean=${msg.burstinessMetrics.averageLength.toFixed(1)} words/sent, variance=${msg.burstinessMetrics.variance.toFixed(1)}`}
+                            className="hidden sm:inline-flex px-1.5 py-0.5 rounded text-[9px] bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 font-mono font-medium"
+                          >
+                            Burstiness: σ={Math.sqrt(msg.burstinessMetrics.variance).toFixed(1)}
                           </span>
                         )}
                         {msg.provider && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-blue-500/10 text-blue-600 dark:text-blue-300 font-medium">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-neutral-500/10 text-neutral-700 dark:text-neutral-300 font-medium">
                             ⚡ {msg.provider}
                           </span>
                         )}
+
                       </>
                     ) : (
                       <span>You</span>
@@ -3414,6 +3452,38 @@ export default function ProjectListScreen({
                         </div>
                       );
                     })()}
+
+                    {/* 1-Click Workspace Handoff Banner */}
+                    {msg.sender === "assistant" && msg.recommendedWorkspaceHandoff && (
+                      <div className="mt-3.5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 shrink-0">
+                            <FolderPlus className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5 flex-wrap">
+                              <span>Launch in {msg.recommendedWorkspaceHandoff.formatLabel} ({msg.recommendedWorkspaceHandoff.targetFormatId})</span>
+                              {msg.recommendedWorkspaceHandoff.retrievedSources.length > 0 && (
+                                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 font-medium">
+                                  {msg.recommendedWorkspaceHandoff.retrievedSources.length} Verified Sources Attached
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-neutral-600 dark:text-neutral-400 mt-0.5 line-clamp-2">
+                              Transition this executive brief into a full-length, structured {msg.recommendedWorkspaceHandoff.formatLabel} with evidentiary matrices and quality gates.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleBootProjectFromResearch(msg)}
+                          className="w-full sm:w-auto px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer whitespace-nowrap shrink-0"
+                        >
+                          <span>Launch in 4-Phase Essay Engine ({msg.recommendedWorkspaceHandoff.targetFormatId}) with Verified Sources</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
 
                     {/* Response Utility Action Bar */}
                     {msg.sender === "assistant" && !msg.error && (

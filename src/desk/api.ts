@@ -1405,8 +1405,48 @@ export interface AgenticQueryResponse {
   provider?: string;
   model?: string;
   plan?: string[];
-  citations?: Array<{ title?: string; url?: string; snippet?: string; source?: string; venue?: string; year?: number | string; doi?: string; authorityBadge?: string }>;
+  citations?: Array<{
+    title?: string;
+    url?: string;
+    snippet?: string;
+    source?: string;
+    venue?: string;
+    year?: number | string;
+    doi?: string;
+    authorityBadge?: string;
+    authorityTier?: string;
+    domain?: string;
+    publisher?: string;
+    author?: string;
+    authors?: string[];
+    isPrimary?: boolean;
+    sourceType?: "official" | "scholarly" | "media" | "web" | "vault";
+  }>;
   error?: string;
+  wordCount?: number;
+  verifiedSourcesCount?: number;
+  burstinessMetrics?: {
+    averageLength: number;
+    variance: number;
+    burstinessScore: number;
+    isSufficientlyBurst: boolean;
+  };
+  recommendedWorkspaceHandoff?: {
+    targetFormatId: "OT-01" | "OT-10" | "OT-19" | "OT-09" | "OT-22";
+    formatLabel: string;
+    topic: string;
+    suggestedTitle: string;
+    wordCountTarget?: number;
+    citationStyle: string;
+    retrievedSources: Array<{
+      title: string;
+      authors: string[];
+      year?: number | string;
+      doi?: string;
+      url?: string;
+      venue?: string;
+    }>;
+  };
 }
 
 export async function executeAgenticQuery(

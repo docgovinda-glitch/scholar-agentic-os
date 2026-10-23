@@ -66,6 +66,18 @@ export const BRITISH_SPELLING_MAP: Readonly<Record<string, string>> = {
   flavor: "flavour",
   neighbor: "neighbour",
   neighbors: "neighbours",
+  colorful: "colourful",
+  organize: "organise",
+  organized: "organised",
+  organizing: "organising",
+  organization: "organisation",
+  organizations: "organisations",
+  prioritize: "prioritise",
+  prioritized: "prioritised",
+  prioritizing: "prioritising",
+  recognize: "recognise",
+  recognized: "recognised",
+  recognizing: "recognising",
 };
 
 /**
@@ -219,6 +231,7 @@ export function sanitizeScholarlyText(
       .replace(/\bpivotal\b/gi, "central")
       .replace(/\bbeacon of\b/gi, "model of")
       .replace(/\bgame-changer\b/gi, "significant advance")
+      .replace(/\bat the end of the day\b/gi, "ultimately")
       .replace(/\bin conclusion, it is clear\b/gi, "in summary,");
   }
 

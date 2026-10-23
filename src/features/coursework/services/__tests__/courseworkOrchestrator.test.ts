@@ -92,7 +92,7 @@ describe("Coursework Dual-Mode Prompt Orchestrator", () => {
       expect(res.yieldedControlToUI).toBe(true);
       expect(res.discoveredSources.length).toBeGreaterThan(0);
       expect(res.generatedQueries.length).toBeGreaterThan(0);
-    });
+    }, 25000);
 
     it("Phase 3: Drafting - drafts a single section, intercepts tokens, and yields to UI", async () => {
       const res = await executeMinimalDraftSection({

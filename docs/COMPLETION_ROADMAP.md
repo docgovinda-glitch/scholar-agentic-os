@@ -143,3 +143,24 @@ This document establishes the authoritative completion baseline for **Scholar Co
 - [x] **Comprehensive Testing & Production Build Verification**:
   - Created Vitest integration suites for Document Intelligence (`documentIntelligenceIntegration.test.ts`), Agent Mesh Runtime (`meshRuntimeIntegration.test.ts`), and Per-Chapter Gating (`chapterGating.test.ts`).
   - Passed `npm run lint` (0 TypeScript errors, 82/82 WCAG contrast pairs pass, CSP hash verified), `npm test` across all suites, and `npm run build` (both Vite client bundle and Node server bundle compile with 0 errors).
+
+### Phase 6: AskScholar Retrieval-Grounded Architecture, Anti-Hallucination Citation Lock & Workspace Routing Handoff (Completed)
+- [x] **Retrieval-First Grounding & Canonical Evidence Ingestion (`server/src/research/scholarlyRetrievalPipeline.ts` & `server/routes/ai.ts`)**:
+  - Implemented `retrieveCanonicalSourcesForPrompt` concurrently querying OpenAlex, Crossref, DOAJ, arXiv, and local Knowledge Vault items to extract canonical metadata (DOIs, titles, authors, venues, publication years).
+  - Built `buildGroundedAskScholarSystemPrompt` injecting retrieved works as the **Exclusive Citation Ledger** into the system prompt.
+  - Implemented `isSubstantiveAcademicQuery` and `detectDeliverableIntent` distinguishing substantive research inquiries and deliverable requests from platform guidance FAQs.
+- [x] **Strict Anti-Hallucination Citation Lock & Telemetry Calculation**:
+  - Implemented `sanitizeAndLockScholarResponse` systematically scanning LLM responses and purging fabricated `(Author, Year)` parenthetical citations not found in the Exclusive Citation Ledger, replacing unverified claims with `[Unverified Claim — Vault Citation Required]`.
+  - Prohibited pseudo word-count headers (e.g., `Word count: ≈1,600`) and replaced them with exact, server-calculated deterministic word counts and syntactic burstiness telemetry (`burstinessMetrics` sentence length variance and standard deviation).
+  - Automatically appended a formatted **Verified References & Literature Base** section via `CitationFormatterFactory.formatBibliography` (defaulting to APA 7) with valid DOIs/URLs.
+- [x] **Scholarly Voice Guard Integration**:
+  - Wired `scholarlyVoiceGuard.ts` into the AskScholar generation pipeline enforcing British/Oxford English orthography (`-ise`, `-our`, `-re`), NFC-normalized Unicode diacritics, and cliché suppression.
+- [x] **Intent Detection & 1-Click Workspace Routing Handoff**:
+  - Added structured `recommendedWorkspaceHandoff` payload for long-form deliverable requests (`OT-01` Coursework Essay, `OT-10` Journal Article, `OT-19` Research Proposal, `OT-09` Thesis/Dissertation, `OT-22` Presentation).
+  - Enhanced `src/desk/ProjectListScreen.tsx` to render live **Verified Source Badges** (`✓ N Verified Sources`) and an **Actual Word Count Badge** (`⚡ N words`) on AskScholar messages.
+  - Added a prominent, WCAG-compliant 1-click **"Launch in 4-Phase Essay Engine (OT-01) with Verified Sources"** action banner in `ProjectListScreen.tsx` that boots the project pre-populated with user prompt, synthesis notes, and retrieved canonical citations.
+- [x] **Testing & Verification**:
+  - Created unit and integration test suite `server/routes/__tests__/askScholarGrounding.test.ts` verifying intent detection, citation ledger grounding, phantom citation purge, and British English enforcement.
+  - Verified `src/desk/__tests__/ProjectListScreen.test.tsx`, `ProjectListScreenEnhancements.test.tsx`, and `AskScholarCitationEngine.test.tsx`.
+  - Zero `any` types introduced, 82/82 WCAG contrast pairs pass, 100% test pass rate (328/328 files, 3,306 tests), and production build verified.
+

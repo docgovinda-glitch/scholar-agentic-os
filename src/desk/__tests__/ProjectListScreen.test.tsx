@@ -755,7 +755,7 @@ describe("minimal website assistant", () => {
     expect(screen.getByText(/Bring Your Own Key/i)).toBeInTheDocument();
   });
 
-  it("refuses general writing/coding tasks and directs user to academic workspaces", async () => {
+  it("refuses raw coding tasks and directs user to academic workspaces", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
@@ -763,13 +763,62 @@ describe("minimal website assistant", () => {
     fireEvent.click(toggleBtn);
 
     const input = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i);
-    fireEvent.change(input, { target: { value: "write an essay about biology" } });
+    fireEvent.change(input, { target: { value: "generate code for a python script" } });
 
     const sendBtn = screen.getByRole("button", { name: "Send question" });
     expect(sendBtn).toBeEnabled();
     fireEvent.click(sendBtn);
 
-    expect(await screen.findByText(/I cannot perform general research, writing, coding/i, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(await screen.findByText(/I cannot perform raw software programming or script generation/i, {}, { timeout: 2000 })).toBeInTheDocument();
+  });
+
+  it("routes essay requests to retrieval-grounded synthesis with 1-click workspace handoff", async () => {
+    const onOpen = vi.fn();
+    listProjects.mockResolvedValue({ items: [] });
+    createProject.mockResolvedValue({ projectId: "proj-essay-01" });
+    executeAgenticQuery.mockResolvedValueOnce({
+      ok: true,
+      text: "Executive Scholarly Synthesis & Verified Literature Brief on Biology",
+      wordCount: 1540,
+      verifiedSourcesCount: 2,
+      citations: [
+        { title: "Molecular Biology of the Cell", authors: ["Alberts, B."], year: 2022, doi: "10.1000/182" },
+      ],
+      recommendedWorkspaceHandoff: {
+        targetFormatId: "OT-01",
+        formatLabel: "4-Phase Coursework Engine",
+        topic: "Biology",
+        suggestedTitle: "An Academic Analysis of Biology",
+        wordCountTarget: 1500,
+        citationStyle: "apa",
+        retrievedSources: [
+          { title: "Molecular Biology of the Cell", authors: ["Alberts, B."], year: 2022, doi: "10.1000/182" },
+        ],
+      },
+    });
+
+    renderScreen(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
+
+    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    fireEvent.click(toggleBtn);
+
+    const input = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i);
+    fireEvent.change(input, { target: { value: "write an essay on biology" } });
+
+    const sendBtn = screen.getByRole("button", { name: "Send question" });
+    fireEvent.click(sendBtn);
+
+    expect(await screen.findByText(/Executive Scholarly Synthesis & Verified Literature Brief on Biology/i, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(screen.getByText(/1540 words/i)).toBeInTheDocument();
+
+    const handoffBtn = screen.getByRole("button", { name: /Launch in 4-Phase Essay Engine \(OT-01\) with Verified Sources/i });
+    expect(handoffBtn).toBeInTheDocument();
+    fireEvent.click(handoffBtn);
+
+    await waitFor(() => {
+      expect(createProject).toHaveBeenCalledWith("OT-01");
+      expect(onOpen).toHaveBeenCalledWith("proj-essay-01");
+    });
   });
 
   it("resets conversation when Reset Chat button is clicked", async () => {

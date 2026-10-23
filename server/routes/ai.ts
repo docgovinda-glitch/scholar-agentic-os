@@ -4,6 +4,14 @@ import { executeWebSearch, formatSearchResultsForPrompt } from "../src/research/
 import { executeDeepResearch } from "../src/research/deepResearchEngine.ts";
 import { validateAndRefineCitations } from "../src/research/citationValidator.ts";
 import type { CitationStyleRegistry } from "../../src/citation_compliance/formattingEngine.ts";
+import {
+  detectDeliverableIntent,
+  isSubstantiveAcademicQuery,
+  retrieveCanonicalSourcesForPrompt,
+  buildGroundedAskScholarSystemPrompt,
+  sanitizeAndLockScholarResponse,
+  type GroundedScholarSource,
+} from "../src/research/scholarlyRetrievalPipeline.ts";
 
 /**
  * Intelligent Capability Determination:
@@ -289,24 +297,47 @@ export function registerAIRoutes(
           : "Analyze and summarize the attached document.")
       ).trim();
 
+      const deliverableIntent = detectDeliverableIntent(effectivePrompt);
+      const isSubstantive = isSubstantiveAcademicQuery(effectivePrompt) || deliverableIntent !== null;
       const mode = determineExecutionMode(effectivePrompt, requestedMode, files.length > 0, normalizedImages.length > 0);
 
       // ── Workflow: Deep Research Mode ──
       if (mode === "deep-research") {
         const research = await executeDeepResearch(effectivePrompt, candidates, undefined, files, normalizedImages);
+        const locked = sanitizeAndLockScholarResponse(research.synthesizedReport, [], citationStyle, deliverableIntent);
         return res.json({
           ok: true,
           mode: "deep-research",
-          text: research.synthesizedReport,
+          text: locked.text,
           plan: research.plan,
           citations: research.allCitations,
           provider: "gemini",
           model: "gemini-3.1-flash-lite",
           citationStyle,
+          wordCount: locked.wordCount,
+          verifiedSourcesCount: (research.allCitations || []).length,
+          burstinessMetrics: locked.burstinessMetrics,
+          recommendedWorkspaceHandoff: locked.recommendedWorkspaceHandoff,
         });
       }
 
-      // ── Context Assembly: Files, Images & Web Search ──
+      const cleanStyle = (citationStyle || "apa").toLowerCase();
+
+      // ── Canonical Scholarly Ingestion (OpenAlex, Crossref, Vault) ──
+      let canonicalSources: GroundedScholarSource[] = [];
+      if (isSubstantive || mode === "search") {
+        try {
+          canonicalSources = await retrieveCanonicalSourcesForPrompt(effectivePrompt, {
+            maxResults: 8,
+            citationStyle: cleanStyle,
+          });
+        } catch (err) {
+          console.warn("Scholarly canonical retrieval warning:", err);
+          canonicalSources = [];
+        }
+      }
+
+      // ── Context Assembly: Files, Images, Canonical Ledger & Web Search ──
       let contextBlocks: string[] = [];
 
       // 1. Process Uploaded Documents
@@ -329,16 +360,30 @@ export function registerAIRoutes(
         contextBlocks.push(`=== VISUAL MEDIA ATTACHMENTS ===\nThe user has attached ${normalizedImages.length} image(s): ${imgDetails}.\nThe image payload is delivered directly to your vision pipeline for detailed visual inspection.\n=== END OF VISUAL MEDIA ATTACHMENTS ===`);
       }
 
+      // 2. Canonical Citation Ledger Context Block
+      if (canonicalSources.length > 0) {
+        contextBlocks.push(
+          `=== RETRIEVED CANONICAL SCHOLARLY SOURCES (EXCLUSIVE CITATION LEDGER) ===\n` +
+          canonicalSources
+            .map(
+              (s, idx) =>
+                `[Source ${idx + 1}] (${s.id}) In-Text Citation: ${s.inTextCitation}\nTitle: "${s.title}"\nAuthors: ${s.authors.join(", ") || "Unknown Author"}\nYear: ${s.year || "n.d."}\nDOI: ${s.doi || "None"}\nVenue/Publisher: ${s.venue || "Academic Publication"}\nURL: ${s.url || "N/A"}`
+            )
+            .join("\n\n") +
+          `\n=== END OF EXCLUSIVE CITATION LEDGER ===`
+        );
+      }
+
       let citations: any[] = [];
 
-      // 2. Process Web Search if required
-      if (mode === "search") {
+      // 3. Process Web Search if required
+      if (mode === "search" && canonicalSources.length < 3) {
         const searchResponse = await executeWebSearch(effectivePrompt, { maxResults: 6, fetchFullContent: true });
         citations = searchResponse.results;
         contextBlocks.push(`=== LIVE SCHOLARLY & WEB SEARCH RESULTS ===\n${formatSearchResultsForPrompt(searchResponse.results)}\n=== END OF SEARCH RESULTS ===`);
       }
 
-      // 3. Assemble Conversation History
+      // 4. Assemble Conversation History
       let conversationHistoryText = "";
       if (history && history.length > 0) {
         conversationHistoryText = "Prior Conversation Context:\n";
@@ -348,7 +393,12 @@ export function registerAIRoutes(
         conversationHistoryText += "\n";
       }
 
-      // 4. Build Final User Instruction Prompt with Citation Engine Guidelines
+      // 5. Build Final Grounded System Prompt
+      let effectiveSystemPrompt = systemPrompt;
+      if (isSubstantive || canonicalSources.length > 0) {
+        effectiveSystemPrompt = buildGroundedAskScholarSystemPrompt(canonicalSources, deliverableIntent, cleanStyle);
+      }
+
       const styleNameMap: Record<string, string> = {
         apa: "APA 7th Edition (Author-Date format, e.g., (Author, Year))",
         mla: "MLA 9th Edition (Author format, e.g., (Author))",
@@ -357,7 +407,6 @@ export function registerAIRoutes(
         ieee: "IEEE Numbered Style (e.g., [1])",
         vancouver: "Vancouver Numbered Style (e.g., [1])",
       };
-      const cleanStyle = (citationStyle || "apa").toLowerCase();
       const styleDescription = styleNameMap[cleanStyle] || styleNameMap.apa;
 
       let assembledUserPrompt = "";
@@ -376,6 +425,8 @@ export function registerAIRoutes(
         assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nNote: You have access to both the user's uploaded document(s) and live verified web search findings. Clearly distinguish facts derived from the uploaded file from facts obtained via web sources. Ground external facts in the retrieved sources and cite with proper in-text citations (${styleDescription}).`;
       } else if (files.length > 0) {
         assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nAnalyze the uploaded document above and directly answer the user's inquiry based on the document text.`;
+      } else if (isSubstantive || canonicalSources.length > 0) {
+        assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nDeliver an authoritative, research-grounded synthesis. Strict requirements:\n1. Only cite sources from the Exclusive Citation Ledger above.\n2. Do NOT fabricate authors, years, or citations not in the ledger.\n3. Any empirical statistic lacking a verified source must be tagged: [Unverified Claim — Vault Citation Required].\n4. Do NOT output fake word count declarations.`;
       } else if (mode === "search") {
         assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nSynthesize an authoritative, research-grade answer using the live verified web search findings provided above.
 
@@ -389,22 +440,58 @@ Formatting & Academic Citation Rules:
         assembledUserPrompt += effectivePrompt;
       }
 
-      // 5. Execute Agent with Multimodal & Model Failover Support
+      // 6. Execute Agent with Multimodal & Model Failover Support
       const result = await executeMultimodalAgentic({
-        systemPrompt,
+        systemPrompt: effectiveSystemPrompt,
         userPrompt: assembledUserPrompt,
         images: normalizedImages && normalizedImages.length > 0 ? normalizedImages : undefined,
         taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
         candidates,
       });
 
-      // 6. Post-Generation Quality-Control & Citation Validation
+      // 7. Post-Generation Anti-Hallucination Lock & Quality-Control
+      if (isSubstantive || canonicalSources.length > 0) {
+        const locked = sanitizeAndLockScholarResponse(
+          result.text,
+          canonicalSources,
+          cleanStyle,
+          deliverableIntent
+        );
+
+        return res.json({
+          ok: true,
+          text: locked.text,
+          provider: result.provider,
+          model: result.model,
+          mode: deliverableIntent ? "deliverable" : mode,
+          citations: locked.citations.map((s) => ({
+            title: s.title,
+            url: s.url,
+            doi: s.doi,
+            snippet: s.title,
+            venue: s.venue,
+            year: s.year,
+            authors: s.authors,
+            authorityBadge: s.sourceType === "scholarly" ? "Peer-Reviewed / Canonical" : "Knowledge Vault",
+            isPrimary: true,
+            sourceType: s.sourceType,
+          })),
+          citationStyle: cleanStyle,
+          wordCount: locked.wordCount,
+          verifiedSourcesCount: locked.verifiedSourcesCount,
+          burstinessMetrics: locked.burstinessMetrics,
+          recommendedWorkspaceHandoff: locked.recommendedWorkspaceHandoff,
+        });
+      }
+
       const validated = validateAndRefineCitations(result.text, citations, {
         files,
         images: normalizedImages,
         requireSourcesSection: mode === "search",
         citationStyle: cleanStyle,
       });
+
+      const fallbackWordCount = validated.text.trim().split(/\s+/).filter(Boolean).length;
 
       res.json({
         ok: true,
@@ -414,6 +501,8 @@ Formatting & Academic Citation Rules:
         mode,
         citations: validated.citations,
         citationStyle: cleanStyle,
+        wordCount: fallbackWordCount,
+        verifiedSourcesCount: (validated.citations || []).length,
       });
     } catch (err) {
       console.error("Agent execution error:", err);
@@ -425,6 +514,7 @@ Formatting & Academic Citation Rules:
       });
     }
   });
+
 
   app.use("/api/ai", router);
 }

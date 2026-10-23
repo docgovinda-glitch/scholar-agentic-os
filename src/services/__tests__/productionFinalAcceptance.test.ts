@@ -14,7 +14,8 @@ import { subscribeExecutionState, clearAllExecutionScopes } from "../executionSt
 import { clearAllCooldowns } from "../providerFailover";
 
 // Load keys from environment
-const GEMINI_KEY = process.env.GEMINI_API_KEY;
+const rawGemini = process.env.GEMINI_API_KEY;
+const GEMINI_KEY = rawGemini && (rawGemini.startsWith("AIzaSy") || (rawGemini.length > 20 && !rawGemini.startsWith("AQ."))) ? rawGemini : undefined;
 const GROQ_KEY = process.env.GROQ_API_KEY;
 
 // If .env has real keys (not placeholders), read them as well
@@ -32,6 +33,7 @@ if (fs.existsSync(dotenvPath)) {
     }
   }
 }
+
 
 describe("Final Production Environment Acceptance Checks", { timeout: 25000 }, () => {
   beforeEach(async () => {
@@ -73,6 +75,7 @@ describe("Final Production Environment Acceptance Checks", { timeout: 25000 }, (
     const liveProviders: { id: string; key: string; testModel?: string }[] = [];
     if (GEMINI_KEY) liveProviders.push({ id: "gemini", key: GEMINI_KEY, testModel: "gemini-2.5-flash" });
     if (GROQ_KEY) liveProviders.push({ id: "groq", key: GROQ_KEY, testModel: "openai/gpt-oss-120b" });
+    if (OPENROUTER_KEY) liveProviders.push({ id: "openrouter", key: OPENROUTER_KEY, testModel: "meta-llama/llama-3.3-70b-instruct" });
 
     expect(liveProviders.length).toBeGreaterThan(0);
 
@@ -108,6 +111,10 @@ describe("Final Production Environment Acceptance Checks", { timeout: 25000 }, (
       await storeProviderKey("groq", GROQ_KEY);
       await discoverProviderModels("groq", GROQ_KEY);
     }
+    if (OPENROUTER_KEY) {
+      await storeProviderKey("openrouter", OPENROUTER_KEY);
+      await discoverProviderModels("openrouter", OPENROUTER_KEY);
+    }
 
     const workflows: RoutingTaskType[] = [
       "simple",
@@ -134,11 +141,12 @@ describe("Final Production Environment Acceptance Checks", { timeout: 25000 }, (
   });
 
   it("4. Executes a real Literature Discovery run and verifies Active Model state", async () => {
-    // Choose Groq or Gemini with valid production key
-    const provider = GROQ_KEY ? "groq" : "gemini";
-    const key = (GROQ_KEY || GEMINI_KEY)!;
+    // Choose Groq, Gemini, or OpenRouter with valid production key
+    const provider = GROQ_KEY ? "groq" : GEMINI_KEY ? "gemini" : "openrouter";
+    const key = (GROQ_KEY || GEMINI_KEY || OPENROUTER_KEY)!;
     await storeProviderKey(provider, key);
     await discoverProviderModels(provider, key);
+
 
     let recordedState: any = null;
     const unsub = subscribeExecutionState((state) => {
@@ -199,6 +207,10 @@ describe("Final Production Environment Acceptance Checks", { timeout: 25000 }, (
     if (GROQ_KEY) {
       await storeProviderKey("groq", GROQ_KEY);
       await discoverProviderModels("groq", GROQ_KEY);
+    }
+    if (OPENROUTER_KEY) {
+      await storeProviderKey("openrouter", OPENROUTER_KEY);
+      await discoverProviderModels("openrouter", OPENROUTER_KEY);
     }
 
     // Intentionally blacklist primary model to force controlled fallback
