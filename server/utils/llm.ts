@@ -35,7 +35,13 @@ export function getCandidates(): CandidateProvider[] {
     candidates.push({ provider: "anthropic", apiKey: anthropicKey });
   }
   const geminiKey = process.env.GEMINI_API_KEY;
-  if (geminiKey && !geminiKey.includes("your_gemini_api_key") && geminiKey.trim().length > 10) {
+  if (
+    geminiKey &&
+    !geminiKey.includes("your_gemini_api_key") &&
+    geminiKey.trim().length > 10 &&
+    !geminiKey.startsWith("AQ.") &&
+    !geminiKey.startsWith("ya29.")
+  ) {
     // Verified working models with high/active quota in Google Generative AI API:
     candidates.push({ provider: "gemini", apiKey: geminiKey, model: "gemini-3.1-flash-lite" });
     candidates.push({ provider: "gemini", apiKey: geminiKey, model: "gemini-3.5-flash-lite" });
@@ -100,13 +106,13 @@ export async function isServerAiAuthorized(req: any): Promise<boolean> {
   return false;
 }
 
-function handleFrontendLLMOverride(req: any) {
-  if (req.body && req.body.llmResult) {
+export function handleFrontendLLMOverride(req: any): string | null {
+  if (req?.body && req.body.llmResult) {
     let content = req.body.llmResult;
     if (typeof content === "object" && typeof content.text === "string") {
       content = content.text;
     }
-    return content;
+    return typeof content === "string" ? content : JSON.stringify(content);
   }
   return null;
 }

@@ -1,5 +1,5 @@
 import express, { Request, Response } from "express";
-import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic } from "../utils/llm.ts";
+import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic, handleFrontendLLMOverride } from "../utils/llm.ts";
 import { executeWebSearch, formatSearchResultsForPrompt } from "../src/research/webSearchEngine.ts";
 import { executeDeepResearch } from "../src/research/deepResearchEngine.ts";
 import { validateAndRefineCitations } from "../src/research/citationValidator.ts";
@@ -261,14 +261,8 @@ export function registerAIRoutes(
         return res.status(400).json({ error: "Empty prompt or query supplied." });
       }
 
+      const incomingLlmResult = handleFrontendLLMOverride(req);
       const candidates = getCandidates();
-      if (candidates.length === 0) {
-        return res.status(503).json({
-          ok: false,
-          error: "No AI provider is currently operational. Please configure GEMINI_API_KEY or OPENROUTER_API_KEY on the server or connect a provider in AI Access.",
-          code: "PROVIDER_UNAVAILABLE",
-        });
-      }
 
       // Normalize images so dataUrl and base64 data are reliably present
       const normalizedImages = (images || []).map((img: any) => {
@@ -300,32 +294,13 @@ export function registerAIRoutes(
       const deliverableIntent = detectDeliverableIntent(effectivePrompt);
       const isSubstantive = isSubstantiveAcademicQuery(effectivePrompt) || deliverableIntent !== null;
       const mode = determineExecutionMode(effectivePrompt, requestedMode, files.length > 0, normalizedImages.length > 0);
-
-      // ── Workflow: Deep Research Mode ──
-      if (mode === "deep-research") {
-        const research = await executeDeepResearch(effectivePrompt, candidates, undefined, files, normalizedImages);
-        const locked = sanitizeAndLockScholarResponse(research.synthesizedReport, [], citationStyle, deliverableIntent);
-        return res.json({
-          ok: true,
-          mode: "deep-research",
-          text: locked.text,
-          plan: research.plan,
-          citations: research.allCitations,
-          provider: "gemini",
-          model: "gemini-3.1-flash-lite",
-          citationStyle,
-          wordCount: locked.wordCount,
-          verifiedSourcesCount: (research.allCitations || []).length,
-          burstinessMetrics: locked.burstinessMetrics,
-          recommendedWorkspaceHandoff: locked.recommendedWorkspaceHandoff,
-        });
-      }
-
       const cleanStyle = (citationStyle || "apa").toLowerCase();
 
       // ── Canonical Scholarly Ingestion (OpenAlex, Crossref, Vault) ──
       let canonicalSources: GroundedScholarSource[] = [];
-      if (isSubstantive || mode === "search") {
+      if (req.body?.canonicalSources && Array.isArray(req.body.canonicalSources) && req.body.canonicalSources.length > 0) {
+        canonicalSources = req.body.canonicalSources;
+      } else if (isSubstantive || mode === "search") {
         try {
           canonicalSources = await retrieveCanonicalSourcesForPrompt(effectivePrompt, {
             maxResults: 8,
@@ -334,6 +309,52 @@ export function registerAIRoutes(
         } catch (err) {
           console.warn("Scholarly canonical retrieval warning:", err);
           canonicalSources = [];
+        }
+      }
+
+      // ── Workflow: Deep Research Mode ──
+      if (mode === "deep-research" && !incomingLlmResult) {
+        if (candidates.length === 0) {
+          return res.status(426).json({
+            requireFrontendLLM: true,
+            systemPrompt: "You are Scholar Core Deep Research Agent. Provide an exhaustive, deeply researched academic synthesis with verified citations and structured sections.",
+            userPrompt: effectivePrompt,
+            taskType: "reasoning",
+            mode: "deep-research",
+            canonicalSources,
+            deliverableIntent,
+            citationStyle: cleanStyle,
+          });
+        }
+        try {
+          const research = await executeDeepResearch(effectivePrompt, candidates, undefined, files, normalizedImages);
+          const locked = sanitizeAndLockScholarResponse(research.synthesizedReport, [], citationStyle, deliverableIntent);
+          return res.json({
+            ok: true,
+            mode: "deep-research",
+            text: locked.text,
+            plan: research.plan,
+            citations: research.allCitations,
+            provider: "gemini",
+            model: "gemini-3.1-flash-lite",
+            citationStyle,
+            wordCount: locked.wordCount,
+            verifiedSourcesCount: (research.allCitations || []).length,
+            burstinessMetrics: locked.burstinessMetrics,
+            recommendedWorkspaceHandoff: locked.recommendedWorkspaceHandoff,
+          });
+        } catch (deepErr: unknown) {
+          console.warn("Server deep research execution failed, falling back to frontend LLM:", deepErr);
+          return res.status(426).json({
+            requireFrontendLLM: true,
+            systemPrompt: "You are Scholar Core Deep Research Agent. Provide an exhaustive, deeply researched academic synthesis with verified citations and structured sections.",
+            userPrompt: effectivePrompt,
+            taskType: "reasoning",
+            mode: "deep-research",
+            canonicalSources,
+            deliverableIntent,
+            citationStyle: cleanStyle,
+          });
         }
       }
 
@@ -441,13 +462,49 @@ Formatting & Academic Citation Rules:
       }
 
       // 6. Execute Agent with Multimodal & Model Failover Support
-      const result = await executeMultimodalAgentic({
-        systemPrompt: effectiveSystemPrompt,
-        userPrompt: assembledUserPrompt,
-        images: normalizedImages && normalizedImages.length > 0 ? normalizedImages : undefined,
-        taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
-        candidates,
-      });
+      if (!incomingLlmResult && candidates.length === 0) {
+        return res.status(426).json({
+          requireFrontendLLM: true,
+          systemPrompt: effectiveSystemPrompt,
+          userPrompt: assembledUserPrompt,
+          taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
+          mode,
+          canonicalSources,
+          deliverableIntent,
+          citationStyle: cleanStyle,
+        });
+      }
+
+      let result: { text: string; provider: string; model: string };
+      if (incomingLlmResult) {
+        result = {
+          text: incomingLlmResult,
+          provider: "byok",
+          model: "client-router",
+        };
+      } else {
+        try {
+          result = await executeMultimodalAgentic({
+            systemPrompt: effectiveSystemPrompt,
+            userPrompt: assembledUserPrompt,
+            images: normalizedImages && normalizedImages.length > 0 ? normalizedImages : undefined,
+            taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
+            candidates,
+          });
+        } catch (execErr: unknown) {
+          console.warn("Server multimodal agent execution failed, requesting frontend LLM fallback:", execErr);
+          return res.status(426).json({
+            requireFrontendLLM: true,
+            systemPrompt: effectiveSystemPrompt,
+            userPrompt: assembledUserPrompt,
+            taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
+            mode,
+            canonicalSources,
+            deliverableIntent,
+            citationStyle: cleanStyle,
+          });
+        }
+      }
 
       // 7. Post-Generation Anti-Hallucination Lock & Quality-Control
       if (isSubstantive || canonicalSources.length > 0) {

@@ -194,14 +194,18 @@ export async function authedJsonFetch(
     body: JSON.stringify(body),
   });
 
-  if (res.status === 426 && !options?.skipLlmFallback && !input.includes("/api/ai/")) {
+  if (res.status === 426 && !options?.skipLlmFallback) {
     const data = await res.json().catch(() => null);
     if (data && data.requireFrontendLLM) {
       const llmResult = await executeAgenticLLM(data.systemPrompt, data.userPrompt, data.taskType || "reasoning");
       res = await authedFetch(input, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...((body as any) || {}), llmResult }),
+        body: JSON.stringify({
+          ...((body as any) || {}),
+          llmResult,
+          canonicalSources: data.canonicalSources,
+        }),
       });
     } else {
       // Re-create the response since we consumed it

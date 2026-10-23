@@ -1715,15 +1715,30 @@ export default function ProjectListScreen({
           }
         } else {
           // Substantive scholarly retrieval query or multimodal
-          agentResponse = await executeAgenticQuery({
-            prompt: query,
-            systemPrompt,
-            mode: targetMode,
-            citationStyle: askCitationStyle,
-            files: currentAttachments.filter((a) => a.fileData).map((a) => a.fileData!),
-            images: currentAttachments.filter((a) => a.imageData).map((a) => a.imageData!),
-            history,
-          });
+          try {
+            agentResponse = await executeAgenticQuery({
+              prompt: query,
+              systemPrompt,
+              mode: targetMode,
+              citationStyle: askCitationStyle,
+              files: currentAttachments.filter((a) => a.fileData).map((a) => a.fileData!),
+              images: currentAttachments.filter((a) => a.imageData).map((a) => a.imageData!),
+              history,
+            });
+          } catch (serverErr) {
+            // Direct client-side failover using configured BYOK keys in AI Access if server execution fails
+            try {
+              const clientTxt = await executeAgenticLLM(systemPrompt, query, "reasoning");
+              agentResponse = {
+                ok: true,
+                text: clientTxt,
+                mode: targetMode === "deep-research" ? "deep-research" : "chat",
+                citationStyle: askCitationStyle,
+              };
+            } catch {
+              throw serverErr;
+            }
+          }
         }
 
         if (agentResponse && agentResponse.ok && agentResponse.text) {
