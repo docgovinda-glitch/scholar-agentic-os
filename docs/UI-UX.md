@@ -98,7 +98,7 @@ The design system avoids arbitrary hex codes in component styles, relying instea
 The Coursework & Essay workspace provides a dedicated 4-phase linear workflow.
 
 ```text
-Phase 1: Understand & Structure
+Phase 1: Extract & Understand
              ↓
 Phase 2: Sources & Literature Discovery
              ↓
@@ -110,15 +110,21 @@ Phase 4: Submission & Verification Audit
 ### 4.1 Stage Header & Navigation Stepper
 - Located at the top of `AssignmentWorkspace.tsx`.
 - Displays 4 step pills:
-  1. `1. Understand & Structure`
-  2. `2. Sources & Discovery`
-  3. `3. Drafting`
-  4. `4. Submission`
+  1. `01 Extract & Understand` (Part 1: Extract · Part 2: Understand)
+  2. `02 Sources`
+  3. `03 Drafting`
+  4. `04 Submission`
 - Stepper shows completion checks (`✓`), active pulse indicators, and allows free non-destructive traversal back and forth between unlocked phases.
 
 ---
 
-### 4.2 Phase 1 · Understand & Structure (`AssignmentUnderstandStage.tsx`)
+### 4.2 Phase 1 · Extract & Understand (`AssignmentUnderstandStage.tsx`, DB: `current_phase = 'understand'`)
+
+#### Sub-Phase Switcher (Part 1 vs Part 2)
+The stage header provides an Apple-grade segmented switcher:
+- **`[ Part 1: Extract | Part 2: Understand ]`**:
+  - **Part 1 (Extract)**: Unified brief intake (Paste Prompt or Upload Brief Document), target word count stepper, academic level, assignment type, and citation style.
+  - **Part 2 (Understand)**: Core working thesis formulation, theoretical frameworks, bespoke analytical outline (`DynamicStructurePlanner.tsx`), section word budgets, and rule-indexed rubric criteria.
 
 #### Purpose
 Captures assignment parameters in a single unified workspace, decomposes the question, dynamically generates question-specific analytical headings and subheadings with calibrated word allocations (without generic Intro/Body/Conclusion templates), and establishes the canonical structure for all subsequent phases.

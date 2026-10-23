@@ -80,7 +80,7 @@ Redirect to Dedicated Workspace (/projects/:projectId)
 The Coursework & Essay module guides students through 4 interconnected phases:
 
 ```text
-Phase 1: Understand & Structure
+Phase 1: Extract & Understand (Database: understand)
              ↓
 Phase 2: Sources & Literature Discovery
              ↓
@@ -91,7 +91,10 @@ Phase 4: Submission & Verification Audit
 
 ---
 
-### 3.1 Phase 1: Understand & Structure
+### 3.1 Phase 1: Extract & Understand (`current_phase = 'understand'`)
+Phase 1 is divided into two sequential, bidirectional sub-parts:
+- **Part 1 (Extract)**: Ingestion of brief prompt, document upload (`.pdf`, `.docx`), target word count stepper, and parameter calibration (level, type, citation style).
+- **Part 2 (Understand)**: Calibration of core working thesis, identification of required theoretical frameworks, bespoke analytical outline generation (`AssignmentStructure`), and rule-indexed rubric criteria extraction.
  
 1. **Unified Setup & Question Input**:
    - **User Action**: Pastes the assignment question/prompt (or uploads brief document `.pdf`, `.docx`), sets target word count via interactive stepper (`−`/`+`) or numeric input, and selects Academic Level, Assignment Type, Citation Style, and Writing Tone within the unified setup box.
