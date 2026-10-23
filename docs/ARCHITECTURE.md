@@ -108,8 +108,8 @@ The application operates on a single `BrowserRouter` hierarchy:
 ### 3.3 Coursework & Essay Engine: 4-Phase Pipeline & Database Mapping
 The Coursework & Essay workspace (`OT-01`) is organized into four canonical sequential phases, backed by PostgreSQL tables and Supabase RLS:
 1. **Phase 1: Extract & Understand** (`current_phase = 'understand'` in `public.assignment_projects`):
-   - **Part 1 (Extract)**: Ingestion of assignment brief document (`.pdf`, `.docx`) or pasted prompts, extracting core question, academic level, assignment genre, citation style, and target word counts.
-   - **Part 2 (Understand)**: Calibration of core working thesis, identification of required theoretical frameworks, hierarchical outline decomposition (`AssignmentStructure`), section-by-section word allocation, and rule-indexed rubric criteria extraction (`project_answers.assignment_analysis`).
+   - **Part 1 (Extract Brief)** (`AssignmentExtractStage.tsx`): Ingestion of assignment brief document (`.pdf`, `.docx`, `.txt`) or pasted prompts, extracting core question, academic level, assignment genre, citation style, and dynamic target word counts (100–50,000w stepper).
+   - **Part 2 (Understand Assignment)** (`AssignmentUnderstandStage.tsx`): Calibration of core working thesis, identification of required theoretical frameworks, bespoke hierarchical outline tree decomposition (`DynamicStructurePlanner.tsx`), section-by-section word allocation, and rule-indexed rubric criteria extraction (`project_answers.assignment_analysis`). De-coupled into distinct modular stages with seamless state synchronization and zero flicker.
 2. **Phase 2: Sources** (`current_phase = 'sources'`): Scholarly literature discovery via OpenAlex, lecture slide concept indexing, and evidence ledger grounding (`public.project_sources`, `public.project_evidence`).
 3. **Phase 3: Drafting** (`current_phase = 'drafting'`): Sequential PEEL paragraph synthesis, real-time word budgeting, and supervised ML style adherence.
 4. **Phase 4: Submission** (`current_phase = 'submission'`): 10-point academic rubric audit, citation reconciliation, and camera-ready PDF/DOCX export.

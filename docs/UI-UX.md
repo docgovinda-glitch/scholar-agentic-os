@@ -118,13 +118,13 @@ Phase 4: Submission & Verification Audit
 
 ---
 
-### 4.2 Phase 1 · Extract & Understand (`AssignmentUnderstandStage.tsx`, DB: `current_phase = 'understand'`)
+### 4.2 Phase 1 · Extract & Understand (`AssignmentExtractStage.tsx` & `AssignmentUnderstandStage.tsx`, DB: `current_phase = 'understand'`)
 
 #### Sub-Phase Switcher (Part 1 vs Part 2)
 The stage header provides an Apple-grade segmented switcher:
 - **`[ Part 1: Extract | Part 2: Understand ]`**:
-  - **Part 1 (Extract)**: Unified brief intake (Paste Prompt or Upload Brief Document), target word count stepper, academic level, assignment type, and citation style.
-  - **Part 2 (Understand)**: Core working thesis formulation, theoretical frameworks, bespoke analytical outline (`DynamicStructurePlanner.tsx`), section word budgets, and rule-indexed rubric criteria.
+  - **Part 1 (Extract Brief - `AssignmentExtractStage.tsx`)**: Unified brief intake (Paste Prompt or Upload Brief Document), target word count stepper, academic level, assignment type, and citation style.
+  - **Part 2 (Understand Assignment - `AssignmentUnderstandStage.tsx`)**: Core working thesis formulation, theoretical frameworks, bespoke analytical outline (`DynamicStructurePlanner.tsx`), section word budgets, and rule-indexed rubric criteria.
 
 #### Purpose
 Captures assignment parameters in a single unified workspace, decomposes the question, dynamically generates question-specific analytical headings and subheadings with calibrated word allocations (without generic Intro/Body/Conclusion templates), and establishes the canonical structure for all subsequent phases.
