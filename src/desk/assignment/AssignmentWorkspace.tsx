@@ -537,7 +537,7 @@ function AssignmentWorkspaceInner({
       case "extract":
         return (
           <AssignmentExtractStage
-            onProceed={() => setPhase("understand")}
+            onProceed={() => setPhase(executionMode === "minimal" ? "sources" : "understand")}
           />
         );
       case "understand":
@@ -551,7 +551,7 @@ function AssignmentWorkspaceInner({
         return (
           <AssignmentSourcesStage
             onProceed={() => setPhase("drafting")}
-            onBack={() => setPhase("understand")}
+            onBack={() => setPhase(executionMode === "minimal" ? "extract" : "understand")}
           />
         );
       case "drafting":
@@ -566,7 +566,7 @@ function AssignmentWorkspaceInner({
       default:
         return (
           <AssignmentExtractStage
-            onProceed={() => setPhase("understand")}
+            onProceed={() => setPhase(executionMode === "minimal" ? "sources" : "understand")}
           />
         );
     }
@@ -639,7 +639,7 @@ function AssignmentWorkspaceInner({
                     ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
-                title="Minimal Mode: Streamlined, distraction-free view focused on core drafting and final output"
+                title="Minimal (Quick Flow): 4 steps (01 Extract → 02 Sources → 03 Drafting → 04 Submission) — AI automatically structures your outline and word budgets"
               >
                 <span>Minimal</span>
               </button>
@@ -653,7 +653,7 @@ function AssignmentWorkspaceInner({
                     ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
-                title="Detailed Mode: Full atomic lifecycle granularity, live evidence telemetry, citation tokens & section uniqueness validation"
+                title="Detailed (Guided Architect): 5 steps (01 Extract → 02 Understand → 03 Sources → 04 Drafting → 05 Submission) — Review thesis angles, narrative roadmap, and fine-tune section headings before finding sources"
               >
                 <span>Detailed</span>
               </button>

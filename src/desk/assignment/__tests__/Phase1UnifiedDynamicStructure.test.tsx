@@ -136,8 +136,8 @@ describe("Phase 1 — Unified Assignment Setup Box & Question-Specific Dynamic S
     });
 
     // Verify dynamic word count status conforms to user requirement #11
-    expect(screen.getByText(/Target:\s*3,000\s*words/i)).toBeInTheDocument();
-    expect(screen.getByText(/Allocated:\s*3,000\s*words/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Target:\s*3,000\s*words/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Allocated:\s*3,000\s*words/i)[0]).toBeInTheDocument();
 
     // Verify no unwanted AI conversation prose is rendered
     expect(screen.queryByText(/I've carefully analysed your assignment/i)).not.toBeInTheDocument();

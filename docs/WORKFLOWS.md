@@ -91,27 +91,28 @@ Phase 4: Submission & Verification Audit
 
 ---
 
-### 3.1 Phase 1: Extract & Understand (`current_phase = 'understand'`)
-Phase 1 is divided into two sequential, bidirectional sub-parts:
-- **Part 1 (Extract)**: Ingestion of brief prompt, document upload (`.pdf`, `.docx`), target word count stepper, and parameter calibration (level, type, citation style).
-- **Part 2 (Understand)**: Calibration of core working thesis, identification of required theoretical frameworks, bespoke analytical outline generation (`AssignmentStructure`), and rule-indexed rubric criteria extraction.
- 
-1. **Unified Setup & Question Input**:
-   - **User Action**: Pastes the assignment question/prompt (or uploads brief document `.pdf`, `.docx`), sets target word count via interactive stepper (`−`/`+`) or numeric input, and selects Academic Level, Assignment Type, Citation Style, and Writing Tone within the unified setup box.
-   - **Result**: Context parameters and prompt are staged cleanly in a single workspace component without rigid 2000-word limits, dynamically driving downstream section budgets and drafting compliance gates.
+### 3.1 Phase 1: Extract & Understand (`current_phase = 'extract'` / `'understand'`)
+Phase 1 supports dual execution modes configured via the persistent `Minimal Mode | Detailed Mode` toggle:
+- **Minimal Mode (Quick Flow)**: 4-stage pipeline (01 Extract → 02 Sources → 03 Drafting → 04 Submission). The engine automatically structures your outline and word budget so students can proceed straight to sources.
+- **Detailed Mode (Guided Architect)**: 5-stage pipeline (01 Extract → 02 Understand → 03 Sources → 04 Drafting → 05 Submission). Calibrate custom thesis stances, research questions, and fine-tune section roadmaps in Phase 2 before finding sources.
+
+1. **Unified Setup & Question Input (01 Extract)**:
+   - **User Action**: Pastes the assignment question/prompt (or uploads brief document `.pdf`, `.docx`), sets target word count via interactive stepper (`−`/`+`) or clean single-line numeric pill (`2,000 words`), and selects Academic Level, Assignment Type, Citation Style, and Writing Tone.
+   - **Dynamic Tone Calibration**: Selecting an Assignment Type automatically synchronizes the optimal academic tone (e.g., Essay/Research Paper → *Formal Academic*, Literature Review/Critical Essay → *Critical*, Case Study/Policy Analysis → *Analytical*, Report → *Objective*, Argumentative Essay → *Persuasive*).
+   - **Result**: Context parameters and prompt are staged cleanly in a single workspace component without rigid word limit barriers, dynamically driving downstream section budgets and drafting compliance gates.
 2. **Brief-Specific Structure Generation**:
-   - **User Action**: Clicks `Save & Build`.
+   - **User Action**: Clicks `Save & Build` or `Proceed to Phase 2`.
    - **System Processing**: Client and server outline services display an animated loading state (*"Analyzing Brief & Generating Tailored Assignment Structure..."*). The engine extracts inquiry directives, sentence questions ending in `?`, domain acronyms, and technical terms directly from the brief text (`extractBriefInquiriesAndConcepts`, `buildBriefSpecificSpecs`). Bespoke H1/H2/H3 structures are generated that substantively mirror the assignment brief's requirements without generic Introduction/Body/Conclusion placeholders.
    - **Result**: The tailored structure displays immediately in the unified workspace via `DynamicStructurePlanner`.
 3. **Structure Customization & Word Count Allocation (CRUD)**:
    - **User Action**: User edits heading/subheading titles inline with visual edit affordances, adds/deletes headings and nested subheadings without restrictive length barriers, reorders sections with Up/Down buttons, and calibrates word allocations using section-level (`-50`/`+50`), subheading-level (`-50`/`+50`), or direct numeric inputs.
    - **Dynamic Word Status & Auto-Balancing**: Live status bar tracks `Target: X words · Allocated: Y words · Remaining: Z words (or Over: W words / Balanced)`. 1-click `Auto-Balance` proportionally synchronizes all section allocations to match the user's target word count.
 4. **Voice & Tone Selection**:
-   - **User Action**: Selects an academic style (e.g. *Analytical*, *Argumentative*, *Critical*, *Natural & Engaging*, or *Match My Writing*).
+   - **User Action**: Selects an academic style (e.g. *Formal Academic*, *Analytical*, *Argumentative*, *Critical*, *Objective*, or *Persuasive*).
 5. **Phase Progression & Canonical Persistence**:
-   - **User Action**: Clicks `Proceed` (formerly "Confirm Structure & Proceed to Sources").
-   - **System Processing**: The confirmed structure with stable internal IDs is saved into canonical project keys (`assignment_structure`, `structure`, `sectionBudgets`, `assignment_internal_sections`, `targetWordCount`, `word_count`, `word_limit`).
-   - **Result**: Phase 1 is completed; Phase 2 unlocks using the exact confirmed structure.
+   - **User Action**: In Detailed Mode, clicks `Proceed to Phase 2: Understand`; in Minimal Mode, clicks `Proceed to Phase 2: Sources`.
+   - **System Processing**: The confirmed structure with stable internal IDs is saved into canonical project keys (`assignment_structure`, `structure`, `sectionBudgets`, `assignment_internal_sections`, `targetWordCount`, `word_count`, `word_limit`, `execution_mode`).
+   - **Result**: Phase 1 is completed; subsequent phase unlocks using the exact confirmed parameters.
 
 ---
 

@@ -114,7 +114,7 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
       }),
     });
 
-    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="understand" />);
+    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="extract" />);
 
     // Wait for stage to load
     await waitFor(() => {
@@ -188,7 +188,7 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
       return { ok: true, json: async () => ({}) };
     });
 
-    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="understand" />);
+    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="extract" />);
 
     await waitFor(() => {
       expect(screen.getByText("Understand Your Brief")).toBeInTheDocument();
@@ -241,7 +241,7 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
       },
     });
 
-    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="understand" />);
+    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="extract" />);
 
     await waitFor(() => {
       expect(screen.getByText("Understand Your Brief")).toBeInTheDocument();
@@ -308,7 +308,7 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
       return { ok: true, json: async () => ({}) };
     });
 
-    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="understand" />);
+    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="extract" />);
 
     await waitFor(() => {
       expect(screen.getByText("Understand Your Brief")).toBeInTheDocument();

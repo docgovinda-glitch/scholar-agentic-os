@@ -128,6 +128,22 @@ export const ASSIGNMENT_AGENT_CONFIGS: Record<AssignmentPhaseId, AssignmentAgent
   },
 };
 
+export const ARCHETYPE_DEFAULT_TONES: Record<string, string> = {
+  essay: "formal_academic",
+  literature_review: "critical",
+  research_paper: "formal_academic",
+  case_study: "analytical",
+  report: "objective",
+  critical_essay: "critical",
+  argumentative_essay: "persuasive",
+  policy_analysis: "analytical",
+  business_assignment: "analytical",
+  analytical_essay: "analytical",
+  annotated_bibliography: "critical",
+  coursework: "formal_academic",
+  other: "formal_academic",
+};
+
 export const LEGACY_STAGE_TO_PHASE_MAP: Record<string, AssignmentPhaseId> = {
   extract: "extract",
   understand: "understand",

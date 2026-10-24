@@ -130,8 +130,8 @@ describe("Assignment Data Hydration and Persistence Guarantee", () => {
     expect(textarea).toBeInTheDocument();
 
     // Verify Postgraduate is active
-    const postgradBtn = screen.getByRole("button", { name: /Postgraduate \/ Masters/i });
-    expect(postgradBtn.className).toContain("bg-white");
+    const levelSelect = screen.getByLabelText(/Academic Level/i) as HTMLSelectElement;
+    expect(levelSelect.value).toBe("postgraduate");
 
     // Verify word count is 3500
     const wordCountInput = screen.getByDisplayValue("3500") as HTMLInputElement;
@@ -173,8 +173,8 @@ describe("Assignment Data Hydration and Persistence Guarantee", () => {
     );
 
     // Change academic level to Postgraduate
-    const postgradBtn = screen.getByRole("button", { name: /Postgraduate \/ Masters/i });
-    fireEvent.click(postgradBtn);
+    const levelSelect = screen.getByLabelText(/Academic Level/i) as HTMLSelectElement;
+    fireEvent.change(levelSelect, { target: { value: "postgraduate" } });
 
     expect(saveIntakeAnswers).toHaveBeenCalledWith(
       "proj-edit-test",
@@ -224,7 +224,7 @@ describe("Assignment Data Hydration and Persistence Guarantee", () => {
     // Verify auto-transition to Part 2: Understand with extracted brief text
     await waitFor(() => {
       expect(
-        screen.getByText(/Syllabus Brief: Analyze cybersecurity vulnerabilities in industrial SCADA systems/i)
+        screen.getAllByText(/Syllabus Brief: Analyze cybersecurity vulnerabilities in industrial SCADA systems/i)[0]
       ).toBeInTheDocument();
     });
 

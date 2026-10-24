@@ -39,6 +39,26 @@ import {
   AGENTIC_THINKING_STAGES,
 } from "./AssignmentUnderstandStage";
 
+export const ASSIGNMENT_TYPE_TONE_MAP: Record<string, string> = {
+  essay: 'formal',
+  literature_review: 'critical',
+  research_paper: 'formal',
+  case_study: 'analytical',
+  report: 'objective',
+  critical_essay: 'critical',
+  argumentative_essay: 'persuasive',
+  policy_analysis: 'analytical',
+  business_assignment: 'analytical',
+};
+
+export const resolveMappedTone = (type: string): string => {
+  const desired = ASSIGNMENT_TYPE_TONE_MAP[type] || 'formal';
+  const found = WRITING_TONE_OPTIONS.find(
+    (o) => o.id === desired || o.id.toLowerCase().startsWith(desired.toLowerCase())
+  );
+  return found ? found.id : desired;
+};
+
 class DropzoneErrorBoundary extends React.Component<
   { children: React.ReactNode; onError?: (error: Error) => void },
   { hasError: boolean }
@@ -96,7 +116,9 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     setAnalysis,
     ensurePersisted,
     isLoading,
-  } = useAssignmentWorkspace();
+    executionMode,
+    setExecutionMode,
+  } = useAssignmentWorkspace() as any;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -132,21 +154,51 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   );
 
   const [localTone, setLocalTone] = useState<string>(() => {
-    const raw = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone;
-    if (typeof raw === "string") return raw;
+    const raw = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || project?.answers?.["academicTone"] || writingTone;
+    const curType = assignmentType || (project?.answers?.["assignment_type"] as AssignmentType) || "essay";
+    if (typeof raw === "string" && raw && raw !== "analytical") return raw;
     if (raw && typeof raw === "object") {
       const obj = raw as any;
-      return obj.preset || obj.id || "analytical";
+      const t = obj.preset || obj.id;
+      if (t && t !== "analytical") return t;
     }
-    if (writingStyle?.preset) return writingStyle.preset;
-    return "analytical";
+    if (writingStyle?.preset && writingStyle.preset !== "analytical") return writingStyle.preset;
+    return resolveMappedTone(curType);
   });
 
+  const [isWordCountFocused, setIsWordCountFocused] = useState<boolean>(false);
   const [isGeneratingStructure, setIsGeneratingStructure] = useState<boolean>(false);
   const [structureError, setStructureError] = useState<string | null>(null);
   const [agenticStageIndex, setAgenticStageIndex] = useState(0);
   const [uploadingBrief, setUploadingBrief] = useState<boolean>(false);
   const [showCourseDetails, setShowCourseDetails] = useState<boolean>(false);
+
+  const handleModeChange = useCallback((mode: "minimal" | "detailed") => {
+    if (typeof setExecutionMode === "function") {
+      setExecutionMode(mode);
+    }
+    saveAnswers({
+      execution_mode: mode,
+      executionMode: mode,
+    });
+  }, [setExecutionMode, saveAnswers]);
+
+  // Auto-Update Writing Tone on initial load if essay with default analytical tone
+  useEffect(() => {
+    const curType = assignmentType || localType || "essay";
+    const rawTone = project?.answers?.["writing_tone"] || project?.answers?.["writingTone"] || writingTone || localTone;
+    const toneStr = (typeof rawTone === "string" ? rawTone : (rawTone as any)?.preset || (rawTone as any)?.id || "").toLowerCase();
+    if (curType === "essay" && (toneStr === "analytical" || !toneStr || toneStr === "default")) {
+      const targetTone = resolveMappedTone("essay");
+      setLocalTone(targetTone);
+      saveAnswers({
+        writing_tone: targetTone,
+        writingTone: targetTone,
+        academicTone: targetTone,
+        academic_tone: targetTone,
+      });
+    }
+  }, []);
 
   // Synchronize state on project updates
   useEffect(() => {
@@ -540,8 +592,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
       const safeUpdates = stripCircularReferences(updates);
       await saveAnswers(safeUpdates);
 
-      // Advance to Understand stage
-      onProceed?.();
+      // Save answers without auto-advancing so user can review extracted brief parameters
     } catch (err: any) {
       console.warn("Brief parsing error caught safely:", err);
       setParseNotice("Could not parse this document. Please verify the file format or paste the brief text manually.");
@@ -581,16 +632,66 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           </p>
         </div>
 
-        {onProceed && (
-          <button
-            type="button"
-            onClick={onProceed}
-            className="self-start sm:self-center px-3 py-1.5 rounded-xl border border-neutral-200/80 dark:border-white/10 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
-          >
-            <span>Proceed to Phase 2: Understand</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        )}
+        {/* Minimal Mode | Detailed Mode Toggle & Action */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="flex flex-col items-start sm:items-end gap-1">
+            <div className="flex items-center p-0.5 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-xs font-medium select-none">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={executionMode === "minimal"}
+                onClick={() => handleModeChange("minimal")}
+                className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer flex items-center gap-1.5 ${
+                  executionMode === "minimal"
+                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                }`}
+                title="Minimal (Quick Flow): Auto-Outline"
+              >
+                <span>Minimal Mode</span>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={executionMode === "detailed"}
+                onClick={() => handleModeChange("detailed")}
+                className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer flex items-center gap-1.5 ${
+                  executionMode === "detailed"
+                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                }`}
+                title="Detailed (Guided Architect): Custom Thesis & Roadmap"
+              >
+                <span>Detailed Mode</span>
+              </button>
+            </div>
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
+              {executionMode === "minimal" ? "Minimal = Auto-Outline" : "Detailed = Custom Thesis & Roadmap"}
+            </span>
+          </div>
+
+          {onProceed && executionMode === "detailed" && (
+            <button
+              type="button"
+              onClick={onProceed}
+              className="px-3.5 py-1.5 rounded-xl border border-neutral-200/80 dark:border-white/10 text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <span>Proceed to Phase 2: Understand</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {onProceed && executionMode === "minimal" && (
+            <button
+              type="button"
+              onClick={onProceed}
+              className="px-3 py-1.5 rounded-xl border border-neutral-200/80 dark:border-white/10 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <span>Proceed to Phase 2: Sources</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Unified Assignment Setup Box (Step 1: Brief Input) */}
@@ -778,7 +879,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
         </div>
 
         {/* Academic Parameters: Academic Level, Assignment Type, Citation Style, Writing Tone & Target Words */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1.35fr] gap-3.5 pt-1">
           {/* Academic Level */}
           <div className="space-y-1">
             <label htmlFor="academic_level" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
@@ -849,7 +950,16 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                 onChange={(e) => {
                   const val = e.target.value as AssignmentType;
                   setLocalType(val);
-                  saveAnswers({ assignment_type: val, assignmentType: val });
+                  const matchedTone = resolveMappedTone(val);
+                  setLocalTone(matchedTone);
+                  saveAnswers({
+                    assignment_type: val,
+                    assignmentType: val,
+                    writing_tone: matchedTone,
+                    writingTone: matchedTone,
+                    academicTone: matchedTone,
+                    academic_tone: matchedTone,
+                  });
                 }}
                 className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
               >
@@ -928,19 +1038,14 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           </div>
 
           {/* Target Words Stepper / Input */}
-          <div className="space-y-1">
-            <label htmlFor="target_word_count" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center justify-between">
+          <div className="space-y-1 min-w-[130px]">
+            <label htmlFor="target_word_count" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center justify-between whitespace-nowrap">
               <span className="flex items-center gap-1">
                 <span>Target Word Count</span>
                 <span className="text-rose-500 text-xs">*</span>
               </span>
-              {localWordCount > 0 && (
-                <span className="text-[10px] text-neutral-400 font-normal">
-                  {localWordCount.toLocaleString()} words
-                </span>
-              )}
             </label>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 w-full min-w-[130px]">
               <button
                 type="button"
                 onClick={() => {
@@ -950,20 +1055,22 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   saveAnswers({ word_count: next, word_limit: next, targetWordCount: next });
                 }}
                 aria-label="Decrease target word count"
-                className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+                className="h-8 w-7.5 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
                 title="Decrease by 250 words"
               >
                 −
               </button>
-              <div className="relative flex-1 flex items-center min-w-0">
+              <div className="relative flex-1 min-w-[115px]">
                 <input
                   id="target_word_count"
                   name="target_word_count"
-                  type="number"
-                  min={100}
-                  max={50000}
-                  step={50}
-                  value={localWordCount > 0 ? localWordCount : ""}
+                  type="text"
+                  value={
+                    isWordCountFocused
+                      ? (localWordCount > 0 ? String(localWordCount) : "")
+                      : `${(Number(localWordCount) || 2000).toLocaleString()} words`
+                  }
+                  onFocus={() => setIsWordCountFocused(true)}
                   onChange={(e) => {
                     const raw = e.target.value.replace(/[^0-9]/g, "");
                     if (!raw) {
@@ -978,18 +1085,16 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                     }
                   }}
                   onBlur={() => {
+                    setIsWordCountFocused(false);
                     const cur = Number(localWordCount);
                     const sanitized = !cur || isNaN(cur) || cur < 100 ? 2000 : cur > 50000 ? 50000 : cur;
                     setLocalWordCount(sanitized);
                     saveAnswers({ word_count: sanitized, word_limit: sanitized, targetWordCount: sanitized });
                   }}
                   aria-label="Target Word Count"
-                  placeholder="2000"
-                  className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg pl-2 pr-12 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all font-semibold shadow-2xs text-right tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="2,000 words"
+                  className="w-full min-w-[115px] whitespace-nowrap h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all font-semibold shadow-2xs text-center tabular-nums"
                 />
-                <span className="pointer-events-none absolute right-2.5 text-[11px] font-medium text-neutral-400 select-none">
-                  words
-                </span>
               </div>
               <button
                 type="button"
@@ -1000,7 +1105,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   saveAnswers({ word_count: next, word_limit: next, targetWordCount: next });
                 }}
                 aria-label="Increase target word count"
-                className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+                className="h-8 w-7.5 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
                 title="Increase by 250 words"
               >
                 +

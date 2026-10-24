@@ -72,12 +72,21 @@ describe("Scholar Core Assignment Workspace", () => {
       />
     );
 
-    // Horizontal 5-Phase Navigation Items
-    expect(await screen.findByRole("button", { name: /Phase 1: (?:Extract|Understand)/i })).toBeInTheDocument();
+    // In Minimal mode (default 4-phase flow)
+    expect(await screen.findByRole("button", { name: /Phase 1: Extract/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 2: Sources/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 3: Drafting/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 4: Submission/i })).toBeInTheDocument();
+
+    // Toggle to Detailed mode (5-phase guided architect flow)
+    const detailedRadio = screen.getByRole("radio", { name: /Detailed/i });
+    fireEvent.click(detailedRadio);
+
+    expect(screen.getByRole("button", { name: /Phase 1: Extract/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Phase 2: Understand/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase (?:2|3): Sources/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase (?:3|4): Drafting/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase (?:4|5): Submission/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 3: Sources/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 4: Drafting/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Phase 5: Submission/i })).toBeInTheDocument();
 
     // Verify purged legacy elements
     expect(screen.queryByText(/Academic Assignment Journey/i)).not.toBeInTheDocument();
@@ -236,6 +245,11 @@ describe("Scholar Core Assignment Workspace", () => {
 
     // 1. Wait for lazy-loaded Phase 1 and locate file input
     expect(await screen.findByText(/Phase 1: Understand the Assignment/i)).toBeInTheDocument();
+
+    // Switch to Detailed mode to inspect 5-phase workflow and Understand stage cards
+    const detailedRadio = screen.getByRole("radio", { name: /Detailed/i });
+    fireEvent.click(detailedRadio);
+
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeInTheDocument();
 
@@ -249,15 +263,16 @@ describe("Scholar Core Assignment Workspace", () => {
     });
     fireEvent.change(fileInput, { target: { files: [dummyFile] } });
 
-    // 2. Verify auto-transition to Part 2: Understand with extracted prompt and citations
+    // 2. Verify auto-transition to Understand stage with clean, human-centered cards
     await waitFor(() => {
-      expect(screen.getByText(/\[L012-L015\] Penalty Warning/i)).toBeInTheDocument();
+      expect(screen.getByText(/Assignment Brief Summary/i)).toBeInTheDocument();
     });
 
-    // 4. Verify existing analysis breakdown renders with exact line citations
-    expect(await screen.findByText(/Assignment Analysis Breakdown/i)).toBeInTheDocument();
-    expect(screen.getByText(/✓ Analysis Ready · 1 Rules Indexed/i)).toBeInTheDocument();
-    expect(screen.getByText(/\[L012-L015\] Late submissions incur an automatic 5% per day penalty deduction/i)).toBeInTheDocument();
+    // 4. Verify 4 Human-Centered Cards and clean tags (stripped [L012-L015])
+    expect(screen.getByText(/Plain-English Assignment Deconstruction/i)).toBeInTheDocument();
+    expect(screen.getByText(/Thesis & Stance Selector/i)).toBeInTheDocument();
+    expect(screen.getByText(/Visual Storyline Roadmap/i)).toBeInTheDocument();
+    expect(screen.getByText(/Clean Grading Checklist/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Do not write about general history before 2000/i).length).toBeGreaterThanOrEqual(1);
 
     // 5. Confirm no visual regressions or unwanted stage tabs exist
@@ -267,12 +282,13 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(screen.queryByText(/AssignmentCitationGroundingStage/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/AssignmentAuditExportStage/i)).not.toBeInTheDocument();
 
-    // Confirm canonical phases exist
-    expect(screen.getByRole("button", { name: /Phase 1: (?:Extract|Understand)/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 2: Understand/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase (?:2|3): Sources/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase (?:3|4): Drafting/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase (?:4|5): Submission/i })).toBeInTheDocument();
+    // Confirm canonical phases exist in navigation
+    const nav = screen.getByRole("navigation", { name: /Assignment Workflow Phases/i });
+    expect(within(nav).getByRole("button", { name: /Phase 1: Extract/i })).toBeInTheDocument();
+    expect(within(nav).getByRole("button", { name: /Phase 2: Understand/i })).toBeInTheDocument();
+    expect(within(nav).getByRole("button", { name: /Phase 3: Sources/i })).toBeInTheDocument();
+    expect(within(nav).getByRole("button", { name: /Phase 4: Drafting/i })).toBeInTheDocument();
+    expect(within(nav).getByRole("button", { name: /Phase 5: Submission/i })).toBeInTheDocument();
   });
 });
 
