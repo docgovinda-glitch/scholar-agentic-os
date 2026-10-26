@@ -7,6 +7,7 @@ import type { TaskClass } from "../../src/platform/warden/types.js";
 import type { CandidateProvider } from "../../src/platform/gateway/types.js";
 import { getEntitlement, isEntitlementActive } from "../src/aiEngine/entitlements.js";
 import { scholarBrain } from "./scholarBrain.js";
+import { parseAndRepairLLMJson } from "../../src/shared/llmJsonParser.js";
 
 dotenv.config();
 
@@ -315,40 +316,7 @@ export interface LLMJsonResponse {
 
 export function parseJsonFromLlm<T = LLMJsonResponse>(content: unknown): T {
   if (!content) return null as T;
-  if (typeof content !== "string") return content as T;
-  const raw = content.trim();
-
-  // 1. Try direct parse
-  try {
-    return JSON.parse(raw) as T;
-  } catch (_) {}
-
-  // 2. Try stripping markdown code fences: ```json ... ``` or ``` ... ```
-  const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (fenceMatch && fenceMatch[1]) {
-    try {
-      return JSON.parse(fenceMatch[1].trim()) as T;
-    } catch (_) {}
-  }
-
-  // 3. Try finding outer brackets / braces: {...} or [...]
-  const firstBrace = raw.indexOf('{');
-  const lastBrace = raw.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    try {
-      return JSON.parse(raw.slice(firstBrace, lastBrace + 1)) as T;
-    } catch (_) {}
-  }
-
-  const firstBracket = raw.indexOf('[');
-  const lastBracket = raw.lastIndexOf(']');
-  if (firstBracket !== -1 && lastBracket > firstBracket) {
-    try {
-      return JSON.parse(raw.slice(firstBracket, lastBracket + 1)) as T;
-    } catch (_) {}
-  }
-
-  throw new Error("Invalid JSON returned by LLM: " + raw.slice(0, 120));
+  return parseAndRepairLLMJson<T>(content);
 }
 
 export function handleFrontendLLMOverrideJSON<T = LLMJsonResponse>(

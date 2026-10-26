@@ -2,7 +2,6 @@ import express from "express";
 import helmet from "helmet";
 import path from "path";
 import { fileURLToPath } from "url";
-import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
 import "express-async-errors";

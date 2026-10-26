@@ -19,17 +19,8 @@ export type EgressClass =
   | "user_content"
   | "restricted";
 
-/** The task an outbound call serves. Drives routing and default policy. */
-export type TaskClass =
-  | "drafting"
-  | "refinement"
-  | "chat"
-  | "summarisation"
-  | "verification"
-  | "rule_extraction"
-  | "discovery"
-  | "embedding"
-  | "classification";
+import type { TaskClass } from "../../shared/aiTypes.js";
+export type { TaskClass };
 
 export type PolicyDecision = "allow" | "deny" | "redact" | "ask";
 

@@ -19,7 +19,8 @@
 
 export type Tier = "local" | "free" | "byok" | "premium";
 export type HealthStatus = "healthy" | "degraded" | "down" | "unknown";
-export type TaskType = "simple" | "multimodal" | "reasoning" | "coding" | "long-context";
+import type { TaskType } from "../../../src/shared/aiTypes.js";
+export type { TaskType };
 
 export interface RoutingCandidate {
   tier: Tier;
@@ -63,6 +64,7 @@ const TIER_ORDER: Record<TaskType, Tier[]> = {
   reasoning: ["free", "byok", "premium", "local"],
   multimodal: ["free", "byok", "premium", "local"],
   "long-context": ["free", "byok", "premium", "local"],
+  literatureDiscovery: ["free", "byok", "premium", "local"],
 };
 
 const HEALTH_RANK: Record<HealthStatus, number> = { healthy: 0, degraded: 1, unknown: 2, down: 3 };

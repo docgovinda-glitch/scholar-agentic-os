@@ -1,11 +1,12 @@
 /**
- * Every built-in agent manifest, and a helper to register them all.
+ * Built-in Mesh Agent Manifests & Registration Pipeline
  *
- * Nothing calls `registerBuiltinAgents()` yet — no HTTP route or
- * `app/conductor` integration reaches into `app/mesh`'s registry today
- * (see executor.ts's module comment). This module exists so that whenever
- * such a caller does exist, populating the registry is one call rather
- * than four separate imports scattered across the codebase.
+ * AG-14 Citation Manager, AG-18 Readability Analyst, AG-25 Privacy Guard,
+ * and AG-26 Workflow Coordinator are actively integrated into the
+ * centralized `scholarBrain` execution pipeline (see `server/src/services/scholarBrain.ts`).
+ *
+ * `registerBuiltinAgents()` populates the Mesh registry so any orchestrator,
+ * conductor, or dynamic router can invoke them by canonical ID.
  */
 
 import { registerAgent } from "../registry";

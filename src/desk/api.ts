@@ -374,9 +374,10 @@ export async function authedStreamFetch(
             }
           }
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         try {
-          await Promise.resolve(onEvent("error", { message: err.message }));
+          const message = err instanceof Error ? err.message : String(err);
+          await Promise.resolve(onEvent("error", { message }));
         } catch (_) {}
         throw err;
       }
@@ -494,6 +495,7 @@ import {
   executeLiveSearch,
   injectLiveGroundingToSystemPrompt,
 } from "../services/liveSearchService";
+import { scholarGuardrails } from "../shared/scholarGuardrails";
 
 export async function executeAgenticLLM(
   systemPrompt: string,
@@ -646,12 +648,14 @@ export async function executeAgenticLLM(
         policy
       );
       if (!result.ok) {
-        const errMsg = (result as any).error?.message || "AI generation is temporarily unavailable.";
+        const errObj = "error" in result ? (result as { error?: { message?: string } }).error : undefined;
+        const errMsg = errObj?.message || "AI generation is temporarily unavailable.";
         endExecutionScope(executionId, "error", errMsg);
         throw new Error(errMsg);
       }
       endExecutionScope(executionId, "success");
-      return full;
+      const normalizedFull = scholarGuardrails.enforceScholarlyVoice(full);
+      return scholarGuardrails.scrubAndFormatCitations(normalizedFull);
     } else {
       const result = await completeWithFailover(
         req,
@@ -664,12 +668,15 @@ export async function executeAgenticLLM(
         policy
       );
       if (!result.ok) {
-        const errMsg = (result as any).error?.message || "AI generation is temporarily unavailable.";
+        const errObj = "error" in result ? (result as { error?: { message?: string } }).error : undefined;
+        const errMsg = errObj?.message || "AI generation is temporarily unavailable.";
         endExecutionScope(executionId, "error", errMsg);
         throw new Error(errMsg);
       }
       endExecutionScope(executionId, "success");
-      return typeof result.value === "string" ? result.value : result.value.text;
+      const rawText = typeof result.value === "string" ? result.value : result.value.text;
+      const normalizedText = scholarGuardrails.enforceScholarlyVoice(rawText);
+      return scholarGuardrails.scrubAndFormatCitations(normalizedText);
     }
   } catch (err) {
     endExecutionScope(executionId, "error", (err as Error).message);

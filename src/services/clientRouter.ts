@@ -72,7 +72,8 @@ export function setUserAiPreferences(prefs: Partial<UserAiPreferences>): void {
   }
 }
 
-export type RoutingTaskType = "simple" | "multimodal" | "reasoning" | "coding" | "long-context" | "literatureDiscovery";
+import type { RoutingTaskType } from "../shared/aiTypes";
+export type { RoutingTaskType };
 
 export interface TaskRequirement {
   taskType: RoutingTaskType;

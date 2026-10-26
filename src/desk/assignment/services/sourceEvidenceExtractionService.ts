@@ -11,6 +11,8 @@
 
 import { executeAgenticLLM } from "../../api";
 import type { UploadedSourceDocument, EvidenceItem, ExtractedSourceEvidence } from "../types";
+import { parseAndRepairLLMJson } from "../../../shared/llmJsonParser";
+import { scholarGuardrails } from "../../../shared/scholarGuardrails";
 
 export interface SourceExtractionOptions {
   projectId: string;
@@ -27,7 +29,22 @@ export interface ParsedSourcePayload {
   url?: string;
   author?: string;
   year?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
+}
+
+interface RawExcerptItem {
+  excerpt?: string;
+  context?: string;
+  sourceLocation?: string;
+  claim?: string;
+}
+
+interface ParsedEvidenceResponse {
+  title?: string;
+  author?: string;
+  year?: string | number;
+  mainFinding?: string;
+  excerpts?: RawExcerptItem[];
 }
 
 /** Stop words for relevance scoring */
@@ -233,24 +250,23 @@ Relevant Source Passages:
 ${candidateSegments.map((s) => `[Location: ${s.location}]\n${s.text}`).join("\n\n---\n\n")}`;
 
       const aiResponse = await executeAgenticLLM(systemPrompt, userPrompt, "reasoning");
-      const cleanedJson = aiResponse.replace(/```json\n?|\n?```/g, "").trim();
-      const parsedData = JSON.parse(cleanedJson);
+      const parsedData = parseAndRepairLLMJson<ParsedEvidenceResponse | RawExcerptItem[]>(aiResponse);
 
-      let excerptItems: any[] = [];
+      let excerptItems: RawExcerptItem[] = [];
       if (Array.isArray(parsedData)) {
         excerptItems = parsedData;
       } else if (parsedData && typeof parsedData === "object") {
         if (parsedData.title && typeof parsedData.title === "string" && parsedData.title.trim().length > 3) {
-          aiTitle = parsedData.title.trim();
+          aiTitle = scholarGuardrails.normalizeUnicodeNFC(parsedData.title.trim());
         }
         if (parsedData.author && typeof parsedData.author === "string" && parsedData.author.trim()) {
-          aiAuthor = parsedData.author.trim();
+          aiAuthor = scholarGuardrails.normalizeUnicodeNFC(parsedData.author.trim());
         }
         if (parsedData.year && (typeof parsedData.year === "string" || typeof parsedData.year === "number")) {
           aiYear = String(parsedData.year).trim();
         }
         if (parsedData.mainFinding && typeof parsedData.mainFinding === "string" && parsedData.mainFinding.trim()) {
-          aiMainFinding = parsedData.mainFinding.trim();
+          aiMainFinding = scholarGuardrails.enforceScholarlyVoice(parsedData.mainFinding.trim());
         }
         if (Array.isArray(parsedData.excerpts)) {
           excerptItems = parsedData.excerpts;
@@ -258,15 +274,15 @@ ${candidateSegments.map((s) => `[Location: ${s.location}]\n${s.text}`).join("\n\
       }
 
       if (excerptItems.length > 0) {
-        excerptItems.slice(0, 4).forEach((item: any, idx: number) => {
+        excerptItems.slice(0, 4).forEach((item: RawExcerptItem, idx: number) => {
           if (item.excerpt) {
             const evId = `ev-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`;
             const evidenceEntry: ExtractedSourceEvidence = {
               id: evId,
-              excerpt: String(item.excerpt).trim(),
-              context: item.context ? String(item.context).trim() : undefined,
+              excerpt: scholarGuardrails.enforceScholarlyVoice(String(item.excerpt).trim()),
+              context: item.context ? scholarGuardrails.enforceScholarlyVoice(String(item.context).trim()) : undefined,
               sourceLocation: item.sourceLocation || candidateSegments[idx % candidateSegments.length]?.location || "Source Text",
-              claim: item.claim ? String(item.claim).trim() : undefined,
+              claim: item.claim ? scholarGuardrails.enforceScholarlyVoice(String(item.claim).trim()) : undefined,
             };
             extractedEvidences.push(evidenceEntry);
 
@@ -344,7 +360,8 @@ ${candidateSegments.map((s) => `[Location: ${s.location}]\n${s.text}`).join("\n\
   // Construct structured data summary for spreadsheets / tabular data
   let structuredDataSummary: string | undefined;
   if (payload.sourceType === "spreadsheet") {
-    structuredDataSummary = payload.metadata?.summary || `Structured tabular dataset analyzed against ${assignmentQuestion}`;
+    const metaSummary = typeof payload.metadata?.summary === "string" ? payload.metadata.summary : undefined;
+    structuredDataSummary = metaSummary || `Structured tabular dataset analyzed against ${assignmentQuestion}`;
   }
 
   // Derive methodology categorization
@@ -425,7 +442,7 @@ ${candidateSegments.map((s) => `[Location: ${s.location}]\n${s.text}`).join("\n\
     sourceType: payload.sourceType,
     fileSize: payload.fileSize,
     uploadedAt: new Date().toISOString(),
-    mimeType: payload.metadata?.mimeType,
+    mimeType: typeof payload.metadata?.mimeType === "string" ? payload.metadata.mimeType : undefined,
     url: payload.url,
     author: effectiveAuthor,
     publicationDate: effectiveYear,
