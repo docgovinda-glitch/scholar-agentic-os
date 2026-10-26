@@ -163,8 +163,6 @@ export default function Step01Understand({
       const isZappos =
         topicToUse.toLowerCase().includes('zappos') ||
         topicToUse.toLowerCase().includes('schein') ||
-        topicToUse.toLowerCase().includes('culture') ||
-        topicToUse.toLowerCase().includes('leadership') ||
         topicToUse.toLowerCase().includes('mn6094ni');
 
       const zapposCards = [

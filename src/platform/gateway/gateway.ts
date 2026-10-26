@@ -28,17 +28,41 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+interface ResolvedPrompts {
+  effectiveUserPrompt: string;
+  effectiveSystemPrompt?: string;
+}
+
 /**
- * Warden-evaluate a request and resolve the prompt actually sent downstream.
- * Shared by complete() and stream() so the two never drift on policy
- * handling. Throws GatewayDenied on "deny"/"ask" — see complete()'s doc
- * comment for what callers are responsible for.
+ * Warden-evaluate a request and resolve the prompt(s) actually sent downstream.
+ * Evaluates req.systemPrompt AND req.userPrompt in addition to req.segments,
+ * applying Warden redactions to both before passing to model adapters.
+ * Shared by complete() and stream() so the two never drift on policy handling.
  */
-function evaluateAndResolvePrompt(req: CompletionRequest, policy: EgressPolicy): string {
-  const segments =
-    req.segments && req.segments.length > 0
-      ? req.segments
-      : [{ label: "userPrompt", text: req.userPrompt }];
+function evaluateAndResolvePrompts(
+  req: CompletionRequest,
+  policy: EgressPolicy
+): ResolvedPrompts {
+  const segments: { label: string; text: string; redact?: boolean }[] = [];
+
+  // Always evaluate req.systemPrompt AND req.userPrompt in addition to req.segments
+  if (req.systemPrompt !== undefined && req.systemPrompt !== null) {
+    segments.push({ label: "systemPrompt", text: req.systemPrompt });
+  }
+
+  segments.push({ label: "userPrompt", text: req.userPrompt });
+
+  if (req.segments && req.segments.length > 0) {
+    for (const seg of req.segments) {
+      const alreadyPresent = segments.some(
+        (s) => s.label === seg.label && s.text === seg.text
+      );
+      if (!alreadyPresent) {
+        segments.push(seg);
+      }
+    }
+  }
+
   const evaluation = evaluate(
     {
       provider: req.provider,
@@ -56,12 +80,31 @@ function evaluateAndResolvePrompt(req: CompletionRequest, policy: EgressPolicy):
   if (evaluation.decision === "ask") {
     throw new GatewayDenied(evaluation.reason, true);
   }
-  // "allow" or "redact" both proceed; redact already minimised evaluation.preview,
-  // so the outbound prompt is rebuilt from the (possibly redacted) preview segments,
-  // never from req.segments directly — this is what makes redaction real rather than cosmetic.
-  return evaluation.decision === "redact"
-    ? evaluation.preview.map((s) => `${s.label}: ${s.text}`).join("\n\n")
-    : req.userPrompt;
+
+  if (evaluation.decision === "redact") {
+    const sysSeg = evaluation.preview.find((s) => s.label === "systemPrompt");
+    const userSeg = evaluation.preview.find((s) => s.label === "userPrompt");
+
+    const nonSysSegments = evaluation.preview.filter((s) => s.label !== "systemPrompt");
+    const effectiveUserPrompt =
+      req.segments && req.segments.length > 0
+        ? nonSysSegments.map((s) => `${s.label}: ${s.text}`).join("\n\n")
+        : (userSeg ? userSeg.text : req.userPrompt);
+
+    const effectiveSystemPrompt = sysSeg
+      ? sysSeg.text
+      : (req.systemPrompt !== undefined ? "[redacted by privacy policy]" : undefined);
+
+    return {
+      effectiveUserPrompt,
+      effectiveSystemPrompt,
+    };
+  }
+
+  return {
+    effectiveUserPrompt: req.userPrompt,
+    effectiveSystemPrompt: req.systemPrompt,
+  };
 }
 
 function resolveAdapter(providerId: string) {
@@ -85,18 +128,23 @@ export async function complete(
   req: CompletionRequest,
   policy: EgressPolicy = defaultPolicy()
 ): Promise<CompletionResult> {
-  const effectiveUserPrompt = evaluateAndResolvePrompt(req, policy);
+  const { effectiveUserPrompt, effectiveSystemPrompt } = evaluateAndResolvePrompts(req, policy);
   const adapter = resolveAdapter(req.provider);
 
   const start = Date.now();
-  const { text, model } = await adapter.complete({ ...req, userPrompt: effectiveUserPrompt });
+  const resolvedReq = {
+    ...req,
+    userPrompt: effectiveUserPrompt,
+    systemPrompt: effectiveSystemPrompt,
+  };
+  const { text, model } = await adapter.complete(resolvedReq);
   const latencyMs = Date.now() - start;
 
   return {
     text,
     provider: req.provider,
     model,
-    inputTokensEstimate: estimateTokens(effectiveUserPrompt + (req.systemPrompt ?? "")),
+    inputTokensEstimate: estimateTokens(effectiveUserPrompt + (effectiveSystemPrompt ?? "")),
     outputTokensEstimate: estimateTokens(text),
     latencyMs,
   };
@@ -114,9 +162,13 @@ export async function stream(
   onChunk: (delta: string) => void,
   policy: EgressPolicy = defaultPolicy()
 ): Promise<CompletionResult> {
-  const effectiveUserPrompt = evaluateAndResolvePrompt(req, policy);
+  const { effectiveUserPrompt, effectiveSystemPrompt } = evaluateAndResolvePrompts(req, policy);
   const adapter = resolveAdapter(req.provider);
-  const resolvedReq = { ...req, userPrompt: effectiveUserPrompt };
+  const resolvedReq = {
+    ...req,
+    userPrompt: effectiveUserPrompt,
+    systemPrompt: effectiveSystemPrompt,
+  };
 
   const start = Date.now();
   const { text, model } = adapter.stream
@@ -131,7 +183,7 @@ export async function stream(
     text,
     provider: req.provider,
     model,
-    inputTokensEstimate: estimateTokens(effectiveUserPrompt + (req.systemPrompt ?? "")),
+    inputTokensEstimate: estimateTokens(effectiveUserPrompt + (effectiveSystemPrompt ?? "")),
     outputTokensEstimate: estimateTokens(text),
     latencyMs,
   };

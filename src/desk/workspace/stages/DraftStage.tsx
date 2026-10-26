@@ -352,7 +352,7 @@ export default function DraftStage({
             ]);
           } else if (event === "done") {
             clearTimer();
-            const rawData = data.data || [];
+            const rawData = Array.isArray(data.data) ? data.data : [];
             const parsedList: ManuscriptSection[] = rawData.map((item: any, idx: number) => ({
               id: item.id || `sec-${idx + 1}`,
               section: item.section || item.section_name || `Section ${idx + 1}`,

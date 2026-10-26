@@ -25,6 +25,7 @@ export interface ExtractedThemeResult {
   textMuted: string;
   fontFamily: 'sans' | 'serif' | 'mono';
   previewKpis?: Array<{ value: string; label: string; sub?: string }>;
+  backdropUrl?: string;
 }
 
 const STORAGE_KEY = 'scholar_os_custom_slide_themes';
@@ -252,6 +253,11 @@ export async function extractThemeFromImage(fileOrDataUrl: File | string): Promi
         const textSecondary = isDark ? '#D4D4D8' : '#334155';
         const textMuted = isDark ? '#A1A1AA' : '#64748B';
 
+        let backdropUrl: string | undefined = typeof fileOrDataUrl === 'string' ? fileOrDataUrl : undefined;
+        if (!backdropUrl && img.src && img.src.startsWith('data:')) {
+          backdropUrl = img.src;
+        }
+
         resolve({
           name,
           tagline: `Extracted from screenshot · ${isDark ? 'Dark Mode' : 'Light Mode'} · Motif: ${motif}`,
@@ -267,6 +273,7 @@ export async function extractThemeFromImage(fileOrDataUrl: File | string): Promi
           textSecondary,
           textMuted,
           fontFamily,
+          backdropUrl,
           previewKpis:
             archetype === 'data-ledger'
               ? [
@@ -639,5 +646,6 @@ export function compileSlideTheme(result: ExtractedThemeResult, id?: string): Sl
     quoteBorder: result.accent,
     bottomSummaryBar: result.layoutArchetype === 'swiss-editorial',
     secondaryAccent: result.layoutArchetype === 'swiss-editorial' ? '#2563EB' : undefined,
+    backdropUrl: result.backdropUrl,
   };
 }

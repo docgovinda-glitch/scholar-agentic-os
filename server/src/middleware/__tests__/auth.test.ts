@@ -21,11 +21,18 @@ const SERVICE_ROLE = "sb_secret_test";
 process.env.VITE_SUPABASE_URL = SUPABASE_URL;
 process.env.SUPABASE_SERVICE_ROLE_KEY = SERVICE_ROLE;
 
-const { requireAuth, verifyAccessToken } = await import("../auth");
+const { requireAuth, verifyAccessToken, clearAuthTokenCache } = await import("../auth");
 
 const originalFetch = global.fetch;
+beforeEach(() => {
+  clearAuthTokenCache();
+  delete process.env.SUPABASE_JWT_SECRET;
+});
+
 afterEach(() => {
   global.fetch = originalFetch;
+  clearAuthTokenCache();
+  delete process.env.SUPABASE_JWT_SECRET;
   vi.restoreAllMocks();
 });
 

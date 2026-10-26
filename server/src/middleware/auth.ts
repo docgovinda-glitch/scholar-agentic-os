@@ -33,6 +33,7 @@
  * and allocates nothing per request.
  */
 
+import crypto from "node:crypto";
 import type { Request, Response, NextFunction } from "express";
 import { getSupabaseRestConfig, SupabaseTable } from "../supabaseRest";
 
@@ -54,13 +55,175 @@ export interface VerifyResult {
   reason?: "unconfigured" | "invalid" | "unavailable";
 }
 
+// ─────────────────────────────────────────────────────────
+// TIER 1: LOCAL CRYPTOGRAPHIC JWT VERIFICATION (<0.5ms)
+// ─────────────────────────────────────────────────────────
+
+function verifyJwtLocally(token: string, secret: string): VerifyResult {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) {
+      return { ok: false, reason: "invalid" };
+    }
+    const [headerB64, payloadB64, sigB64] = parts;
+    const header = JSON.parse(Buffer.from(headerB64, "base64url").toString("utf8")) as { alg?: string; typ?: string };
+    if (header.alg !== "HS256") {
+      return { ok: false, reason: "invalid" };
+    }
+
+    const expectedSig = crypto
+      .createHmac("sha256", secret)
+      .update(`${headerB64}.${payloadB64}`)
+      .digest("base64url");
+
+    const sigBuf = Buffer.from(sigB64);
+    const expectedSigBuf = Buffer.from(expectedSig);
+    if (sigBuf.length !== expectedSigBuf.length || !crypto.timingSafeEqual(sigBuf, expectedSigBuf)) {
+      return { ok: false, reason: "invalid" };
+    }
+
+    const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as {
+      sub?: string;
+      email?: string | null;
+      role?: string;
+      aud?: string | string[];
+      exp?: number;
+    };
+
+    const nowSec = Math.floor(Date.now() / 1000);
+
+    // Verify expiration
+    if (typeof payload.exp === "number" && nowSec >= payload.exp) {
+      return { ok: false, reason: "invalid" };
+    }
+
+    // Verify subject (user ID)
+    if (!payload.sub || typeof payload.sub !== "string") {
+      return { ok: false, reason: "invalid" };
+    }
+
+    // Verify audience
+    if (payload.aud) {
+      if (Array.isArray(payload.aud)) {
+        if (!payload.aud.includes("authenticated")) {
+          return { ok: false, reason: "invalid" };
+        }
+      } else if (typeof payload.aud === "string") {
+        if (payload.aud !== "authenticated") {
+          return { ok: false, reason: "invalid" };
+        }
+      }
+    }
+
+    return {
+      ok: true,
+      user: {
+        id: payload.sub,
+        email: payload.email ?? null,
+      },
+    };
+  } catch {
+    return { ok: false, reason: "invalid" };
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// TIER 2: BOUNDED TTL IN-MEMORY LRU TOKEN CACHE
+// ─────────────────────────────────────────────────────────
+
+export interface CachedAuthEntry {
+  userId: string;
+  email: string | null;
+  role: string;
+  expiresAt: number;
+}
+
+const MAX_AUTH_LRU_ENTRIES = 1000;
+const AUTH_CACHE_TTL_MS = 60 * 1000;
+
+const authTokenCache = new Map<string, CachedAuthEntry>();
+
 /**
- * Exchange an access token for its user via GoTrue.
+ * Clears cached verified auth tokens. Clears all entries if no token provided.
+ */
+export function clearAuthTokenCache(token?: string): void {
+  if (token) {
+    const key = crypto.createHash("sha256").update(token).digest("hex");
+    authTokenCache.delete(key);
+  } else {
+    authTokenCache.clear();
+  }
+}
+
+export function getAuthCacheSize(): number {
+  return authTokenCache.size;
+}
+
+function getCachedAuth(token: string): AuthenticatedUser | null {
+  const key = crypto.createHash("sha256").update(token).digest("hex");
+  const entry = authTokenCache.get(key);
+  if (!entry) return null;
+
+  if (Date.now() > entry.expiresAt) {
+    authTokenCache.delete(key);
+    return null;
+  }
+
+  // Refresh position in LRU Map
+  authTokenCache.delete(key);
+  authTokenCache.set(key, entry);
+
+  return { id: entry.userId, email: entry.email };
+}
+
+function setCachedAuth(token: string, user: AuthenticatedUser, tokenExpSec?: number, role: string = "authenticated"): void {
+  const key = crypto.createHash("sha256").update(token).digest("hex");
+  const now = Date.now();
+  let expiresAt = now + AUTH_CACHE_TTL_MS;
+
+  if (tokenExpSec && typeof tokenExpSec === "number") {
+    const tokenExpMs = tokenExpSec * 1000;
+    if (tokenExpMs < expiresAt) {
+      expiresAt = tokenExpMs;
+    }
+  }
+
+  if (expiresAt <= now) return;
+
+  if (authTokenCache.size >= MAX_AUTH_LRU_ENTRIES) {
+    const oldestKey = authTokenCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      authTokenCache.delete(oldestKey);
+    }
+  }
+
+  authTokenCache.set(key, {
+    userId: user.id,
+    email: user.email,
+    role,
+    expiresAt,
+  });
+}
+
+/**
+ * Exchange an access token for its user via local JWT validation or GoTrue with LRU caching.
  *
  * Exported for testing: it carries the whole security decision, and that
  * should be assertable without standing up Express.
  */
 export async function verifyAccessToken(token: string): Promise<VerifyResult> {
+  // Tier 1: Local Cryptographic JWT Verification (if secret is configured)
+  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  if (jwtSecret) {
+    return verifyJwtLocally(token, jwtSecret);
+  }
+
+  // Tier 2: Check bounded TTL LRU cache before remote network fetch
+  const cachedUser = getCachedAuth(token);
+  if (cachedUser) {
+    return { ok: true, user: cachedUser };
+  }
+
   const supabaseUrl = getSupabaseUrl();
   const supabaseServiceRole = getSupabaseServiceRole();
 
@@ -89,10 +252,28 @@ export async function verifyAccessToken(token: string): Promise<VerifyResult> {
     // again during an outage they cannot do anything about.
     if (!res.ok) return { ok: false, reason: "unavailable" };
 
-    const body = (await res.json()) as { id?: string; email?: string | null };
+    const body = (await res.json()) as { id?: string; email?: string | null; role?: string; exp?: number };
     if (!body?.id) return { ok: false, reason: "invalid" };
 
-    return { ok: true, user: { id: body.id, email: body.email ?? null } };
+    const user: AuthenticatedUser = { id: body.id, email: body.email ?? null };
+
+    // Bounded by token exp if available
+    let tokenExpSec: number | undefined = body.exp;
+    if (!tokenExpSec) {
+      try {
+        const parts = token.split(".");
+        if (parts[1]) {
+          const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as { exp?: number };
+          tokenExpSec = payload.exp;
+        }
+      } catch {
+        // Ignore unverified parse error
+      }
+    }
+
+    setCachedAuth(token, user, tokenExpSec, body.role || "authenticated");
+
+    return { ok: true, user };
   } catch {
     // Network failure, DNS failure, or the abort above.
     return { ok: false, reason: "unavailable" };

@@ -11,6 +11,7 @@ import {
   EditorialMetricsSlide,
   EditorialCategoriesSlide,
 } from './SwissEditorialTemplates';
+import CanvaGammaLayoutRenderer from './CanvaGammaLayoutRenderer';
 
 export interface SlideCanvasProps {
   deck?: SlideDeck | null;
@@ -186,7 +187,7 @@ export default function SlideCanvas({
             Ingest or paste academic markdown to synthesize structured, action-oriented presentation cards.
           </p>
         </div>
-      ) : activeSlide.layoutType === 'cover' || (theme?.layoutArchetype === 'swiss-editorial' && currentSlideIndex === 0) ? (
+      ) : (theme?.layoutArchetype === 'swiss-editorial' && (activeSlide.layoutType === 'cover' || currentSlideIndex === 0)) ? (
         <main
           className="max-w-5xl w-full aspect-[16/9] min-h-[520px] transition-all duration-300 relative overflow-hidden"
           data-testid="slide-card-active"
@@ -198,7 +199,7 @@ export default function SlideCanvas({
             theme={theme}
           />
         </main>
-      ) : activeSlide.layoutType === 'metrics' || (theme?.layoutArchetype === 'swiss-editorial' && currentSlideIndex === 1) ? (
+      ) : (theme?.layoutArchetype === 'swiss-editorial' && (activeSlide.layoutType === 'metrics' || currentSlideIndex === 1)) ? (
         <main
           className="max-w-5xl w-full aspect-[16/9] min-h-[520px] transition-all duration-300 relative overflow-hidden"
           data-testid="slide-card-active"
@@ -210,7 +211,7 @@ export default function SlideCanvas({
             theme={theme}
           />
         </main>
-      ) : activeSlide.layoutType === 'categories' || (theme?.layoutArchetype === 'swiss-editorial' && currentSlideIndex === 2) ? (
+      ) : (theme?.layoutArchetype === 'swiss-editorial' && (activeSlide.layoutType === 'categories' || currentSlideIndex === 2)) ? (
         <main
           className="max-w-5xl w-full aspect-[16/9] min-h-[520px] transition-all duration-300 relative overflow-hidden"
           data-testid="slide-card-active"
@@ -260,7 +261,9 @@ export default function SlideCanvas({
 
           {/* Card Body: Dynamic Semantic Blocks with Archetype Layout */}
           <div className="relative z-10 my-auto py-4 overflow-y-auto max-h-[440px] pr-1">
-            {theme?.layoutArchetype === 'split-hero' ? (
+            {activeSlide.layoutType && ['cover', 'two-column', 'framework', 'metric-focus', 'categories'].includes(activeSlide.layoutType) ? (
+              <CanvaGammaLayoutRenderer slide={activeSlide} theme={theme} deckTitle={deck?.title} />
+            ) : theme?.layoutArchetype === 'split-hero' ? (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
                 <div className="lg:col-span-8">
                   {activeSlide.blocks.map((block, idx) => (

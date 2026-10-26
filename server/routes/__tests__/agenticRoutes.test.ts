@@ -12,6 +12,7 @@ import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
+import { createLLMChallengeToken } from "../../utils/llm.ts";
 
 process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
@@ -60,9 +61,15 @@ describe("Agentic Routes & Relational Table Persistence", () => {
       return new Response(JSON.stringify([]), { status: 200 });
     });
 
+    const challengeToken = createLLMChallengeToken({
+      user: { id: TEST_USER_ID },
+      params: { id: projectId },
+    });
+
     const res = await request(app)
       .post(`/api/projects/${projectId}/agent/vault-sources`)
       .send({
+        challengeToken,
         llmResult: JSON.stringify({
           data: [
             {
@@ -106,9 +113,15 @@ describe("Agentic Routes & Relational Table Persistence", () => {
       return new Response(JSON.stringify([]), { status: 200 });
     });
 
+    const challengeToken = createLLMChallengeToken({
+      user: { id: TEST_USER_ID },
+      params: { id: projectId },
+    });
+
     const res = await request(app)
       .post(`/api/projects/${projectId}/agent/evidence-extraction`)
       .send({
+        challengeToken,
         llmResult: JSON.stringify({
           data: [
             {
@@ -150,9 +163,15 @@ describe("Agentic Routes & Relational Table Persistence", () => {
       return new Response(JSON.stringify([]), { status: 200 });
     });
 
+    const challengeToken = createLLMChallengeToken({
+      user: { id: TEST_USER_ID },
+      params: { id: projectId },
+    });
+
     const res = await request(app)
       .post(`/api/projects/${projectId}/agent/draft`)
       .send({
+        challengeToken,
         llmResult: JSON.stringify({
           data: [
             {
@@ -188,9 +207,15 @@ describe("Agentic Routes & Relational Table Persistence", () => {
       return new Response(JSON.stringify([]), { status: 200 });
     });
 
+    const challengeToken = createLLMChallengeToken({
+      user: { id: TEST_USER_ID },
+      params: { id: projectId },
+    });
+
     const res = await request(app)
       .post(`/api/projects/${projectId}/agent/peer-review`)
       .send({
+        challengeToken,
         llmResult: JSON.stringify({
           data: [
             {
@@ -221,7 +246,7 @@ describe("Agentic Routes & Relational Table Persistence", () => {
     // Item 1: standard lens
     expect(critiqueInserts[0].body).toMatchObject({
       project_id: projectId,
-      lens: "Methodological Rigor",
+      lens: "Methodological Rigour",
       feedback: "Sample size for decoherence tests needs expansion.",
       severity: "Moderate",
     });

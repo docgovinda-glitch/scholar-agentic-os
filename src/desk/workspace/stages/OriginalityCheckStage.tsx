@@ -253,8 +253,9 @@ export default function OriginalityCheckStage({
             const resData = data?.data;
 
             if (resData && typeof resData === "object") {
-              const score = typeof resData.score === "number" ? resData.score : 95;
-              const rawFlags = Array.isArray(resData.flags) ? resData.flags : [];
+              const resObj = resData as { score?: unknown; flags?: unknown };
+              const score = typeof resObj.score === "number" ? resObj.score : 95;
+              const rawFlags = Array.isArray(resObj.flags) ? resObj.flags : [];
               const parsedFlags: OriginalityFlag[] = rawFlags.map((f: any, idx: number) => ({
                 id: f.id || `flag-${idx + 1}`,
                 section: f.section || "Introduction",

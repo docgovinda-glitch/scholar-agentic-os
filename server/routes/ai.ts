@@ -1,5 +1,5 @@
 import express, { Request, Response } from "express";
-import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic, handleFrontendLLMOverride, resolveRequestAiConfig } from "../utils/llm.ts";
+import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic, handleFrontendLLMOverride, createLLMChallengeToken, resolveRequestAiConfig } from "../utils/llm.ts";
 import { executeWebSearch, formatSearchResultsForPrompt } from "../src/research/webSearchEngine.ts";
 import { executeDeepResearch } from "../src/research/deepResearchEngine.ts";
 import { validateAndRefineCitations } from "../src/research/citationValidator.ts";
@@ -266,7 +266,15 @@ export function registerAIRoutes(
         return res.status(400).json({ error: "Empty prompt or query supplied." });
       }
 
-      const incomingLlmResult = handleFrontendLLMOverride(req);
+      let incomingLlmResult: string | null = null;
+      try {
+        incomingLlmResult = handleFrontendLLMOverride(req, res);
+      } catch (overrideErr: unknown) {
+        if ((overrideErr as { status?: number })?.status === 403) {
+          return;
+        }
+        throw overrideErr;
+      }
       const aiConfig = resolveRequestAiConfig(req);
       const candidates = getCandidates(req);
 
@@ -320,10 +328,13 @@ export function registerAIRoutes(
 
       // ── Workflow: Deep Research Mode ──
       if (mode === "deep-research" && !incomingLlmResult) {
+        const deepSystemPrompt = "You are Scholar Core Deep Research Agent. Provide an exhaustive, deeply researched academic synthesis with verified citations and structured sections.";
         if (candidates.length === 0) {
+          const challengeToken = createLLMChallengeToken(req, deepSystemPrompt, effectivePrompt);
           return res.status(426).json({
             requireFrontendLLM: true,
-            systemPrompt: "You are Scholar Core Deep Research Agent. Provide an exhaustive, deeply researched academic synthesis with verified citations and structured sections.",
+            challengeToken,
+            systemPrompt: deepSystemPrompt,
             userPrompt: effectivePrompt,
             taskType: "reasoning",
             mode: "deep-research",
@@ -351,9 +362,11 @@ export function registerAIRoutes(
           });
         } catch (deepErr: unknown) {
           console.warn("Server deep research execution failed, falling back to frontend LLM:", deepErr);
+          const challengeToken = createLLMChallengeToken(req, deepSystemPrompt, effectivePrompt);
           return res.status(426).json({
             requireFrontendLLM: true,
-            systemPrompt: "You are Scholar Core Deep Research Agent. Provide an exhaustive, deeply researched academic synthesis with verified citations and structured sections.",
+            challengeToken,
+            systemPrompt: deepSystemPrompt,
             userPrompt: effectivePrompt,
             taskType: "reasoning",
             mode: "deep-research",
@@ -469,8 +482,10 @@ Formatting & Academic Citation Rules:
 
       // 6. Execute Agent with Multimodal & Model Failover Support
       if (!incomingLlmResult && candidates.length === 0) {
+        const challengeToken = createLLMChallengeToken(req, effectiveSystemPrompt, assembledUserPrompt);
         return res.status(426).json({
           requireFrontendLLM: true,
+          challengeToken,
           systemPrompt: effectiveSystemPrompt,
           userPrompt: assembledUserPrompt,
           taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
@@ -499,8 +514,10 @@ Formatting & Academic Citation Rules:
           }, req);
         } catch (execErr: unknown) {
           console.warn("Server multimodal agent execution failed, requesting frontend LLM fallback:", execErr);
+          const challengeToken = createLLMChallengeToken(req, effectiveSystemPrompt, assembledUserPrompt);
           return res.status(426).json({
             requireFrontendLLM: true,
+            challengeToken,
             systemPrompt: effectiveSystemPrompt,
             userPrompt: assembledUserPrompt,
             taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",

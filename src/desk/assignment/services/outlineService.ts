@@ -34,6 +34,7 @@ import {
   isTutorialOrShortQABrief,
   extractSubstantiveBriefQuestions,
 } from "../../../utils/briefExtractor";
+import { stripLineTags } from "../../../features/understand/services/scopeClassifier";
 
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
@@ -542,11 +543,13 @@ export interface DynamicStructureOptions {
 interface HeadingSpec {
   title: string;
   notes?: string;
+  targetWords?: number;
   subheadings: {
     title: string;
     ratio: number;
     guidance: string;
     keyPoints: string[];
+    targetWords?: number;
   }[];
 }
 
@@ -749,7 +752,6 @@ export function extractTargetFrameworks(
     [/\b(liberal\s*institutionalism|keohane|neoliberalism)\b/i, "Liberal Institutionalism (Keohane)"],
     [/\b(constructivism|wendt)\b/i, "Social Constructivism (Wendt)"],
     [/\bweaponized\s*interdependence\b/i, "Weaponized Interdependence (Farrell & Newman)"],
-    [/\bcommercial\s*peace\b/i, "Liberal Commercial Peace Theory"],
     [/\bsecurity\s*dilemma\b/i, "Security Dilemma (Jervis)"],
     [/\binterdependence\b/i, "Complex Interdependence (Keohane & Nye)"],
     [/\bcar[- ]t\b|\bcellular\s*therapy\b|\badoptive\s*cell\b/i, "Adoptive Cellular Transfer (ACT) Mechanics"],
@@ -787,7 +789,6 @@ export function extractTargetFrameworks(
       (combined.includes("trade") && (combined.includes("conflict") || combined.includes("peace") || combined.includes("friction") || combined.includes("war") || combined.includes("interstate"))) ||
       (combined.includes("interdependence") && (combined.includes("conflict") || combined.includes("trade") || combined.includes("peace")))
     ) {
-      addIfNotPresent(frameworks, "Liberal Commercial Peace Theory");
       addIfNotPresent(frameworks, "Realist Strategic Vulnerability");
       addIfNotPresent(frameworks, "Weaponized Interdependence (Farrell & Newman)");
     } else if (combined.includes("nepal") || (combined.includes("foreign policy") && combined.includes("india"))) {
@@ -1570,25 +1571,48 @@ export function buildBriefSpecificSpecs(
 
   // If the brief provided 2 or more explicit tasks or questions, mirror them directly!
   if (directTasks.length >= 2) {
+    const parseTaskMarks = (t: string | { text?: string; marks?: number }): number => {
+      if (typeof t === "object" && t !== null && typeof t.marks === "number" && t.marks > 0) {
+        return t.marks;
+      }
+      const text = typeof t === "string" ? t : (t?.text || "");
+      const match = text.match(/(?:\[|\()(\d+)\s*(?:marks?|pts?|points?|%)(?:\]|\))/i) ||
+                    text.match(/\b(\d+)\s*(?:marks?|pts?|points?)\b/i);
+      if (match) {
+        const val = parseInt(match[1], 10);
+        if (!isNaN(val) && val > 0) return val;
+      }
+      return 1;
+    };
+
+    const getTaskText = (t: string | { text?: string; marks?: number }): string => {
+      return typeof t === "string" ? t : (t?.text || "");
+    };
+
     if (isTutorialOrShort) {
-      const perTaskRatio = Number((1 / Math.min(directTasks.length, 5)).toFixed(2));
-      return directTasks.slice(0, 5).map((task, tIdx) => {
+      const perTaskRatio = Number((1 / Math.max(directTasks.length, 1)).toFixed(2));
+      return directTasks.map((taskItem, tIdx) => {
+        const rawTask = getTaskText(taskItem);
+        const cleanTask = stripLineTags(rawTask);
         const cleanTaskTitle = formatAcademicTopicTitle(
-          task
+          cleanTask
+            .replace(/^(?:question\s*\d+[:\-]?|task\s*\d+[:\-]?|part\s*[\da-zA-Z]+[:\-]?)\s*/i, "")
+            .replace(/\[\d+\s*(?:marks?|pts?|points?|%)\]/gi, "")
+            .replace(/\(\d+\s*(?:marks?|pts?|points?|%)\)/gi, "")
             .replace(/^(?:critically\s+evaluate|evaluate|critically\s+analyze|analyze|critically\s+assess|assess|examine|investigate|discuss|explore|propose|detail)\s+/i, "")
             .replace(/[?:.]+$/, "")
             .trim()
         );
         return {
           title: `${tIdx + 1}.0 ${cleanTaskTitle}`,
-          notes: `Directly address: "${task}".`,
+          notes: `Directly address: "${cleanTask}".`,
           subheadings: [
             {
               title: `${tIdx + 1}.1 ${cleanTaskTitle}`,
               ratio: perTaskRatio,
-              guidance: `Focus: Provide a direct, evidence-based, conversational answer addressing: "${task}".`,
+              guidance: `Focus: Provide a direct, evidence-based answer addressing: "${cleanTask}".`,
               keyPoints: [
-                `Direct response to directive: ${task.slice(0, 80)}`,
+                `Direct response to directive: ${cleanTask.slice(0, 80)}`,
                 `Grounding in core concepts (${primaryFramework})`,
                 `Concrete operational or practical evaluation`,
               ],
@@ -1598,42 +1622,57 @@ export function buildBriefSpecificSpecs(
       });
     }
 
-    const taskSpecs: HeadingSpec[] = directTasks.slice(0, 4).map((task, tIdx) => {
+    const totalMarks = directTasks.reduce((sum, t) => sum + ((t as any).marks || parseTaskMarks(t) || 1), 0);
+
+    const taskSpecs: HeadingSpec[] = directTasks.map((taskItem, tIdx) => {
+      const rawTask = getTaskText(taskItem);
+      const sanitizedTask = stripLineTags(rawTask);
+      const taskMarks = (taskItem as any).marks || parseTaskMarks(taskItem) || 1;
+      const taskWeight = (taskMarks || 1) / Math.max(totalMarks, 1);
+      const allocatedWords = targetWordCount ? Math.round(targetWordCount * taskWeight) : undefined;
+      const markLabel = taskMarks > 1 ? ` [${taskMarks} Marks]` : "";
+
       const cleanTaskTitle = formatAcademicTopicTitle(
-        task
+        sanitizedTask
+          .replace(/^(?:question\s*\d+[:\-]?|task\s*\d+[:\-]?|part\s*[\da-zA-Z]+[:\-]?)\s*/i, "")
+          .replace(/\[\d+\s*(?:marks?|pts?|points?|%)\]/gi, "")
+          .replace(/\(\d+\s*(?:marks?|pts?|points?|%)\)/gi, "")
           .replace(/^(?:critically\s+evaluate|evaluate|critically\s+analyze|analyze|critically\s+assess|assess|examine|investigate|discuss|explore|propose|detail)\s+/i, "")
           .replace(/[?:.]+$/, "")
           .trim()
       );
 
-      const taskConcept = concepts[tIdx] || primaryTopic;
-      const relatedConcept = concepts[(tIdx + 1) % (concepts.length || 1)] || secondaryTopic || "Operational Dynamics";
+      const sub1Words = allocatedWords ? Math.round(allocatedWords * 0.5) : undefined;
+      const sub2Words = allocatedWords ? Math.max(50, allocatedWords - (sub1Words || 0)) : undefined;
 
-      const sub1Title = `${tIdx + 1}.1 Conceptual Framing and Analysis of ${cleanTaskTitle}`;
-      const sub2Title = `${tIdx + 1}.2 Empirical Evidence and Strategic Evaluation of ${cleanTaskTitle}`;
+      const sub1Title = `${tIdx + 1}.1 Conceptual Framing and Analysis: ${cleanTaskTitle}`;
+      const sub2Title = `${tIdx + 1}.2 Empirical Evidence and Evaluation: ${cleanTaskTitle}`;
 
       return {
-        title: `${tIdx + 1}.0 ${cleanTaskTitle}`,
-        notes: `Directly address and substantiate: "${task}".`,
+        title: `${tIdx + 1}.0 ${cleanTaskTitle}${markLabel}`,
+        notes: `Directly address and substantiate: "${sanitizedTask}". Allocated weight: ${(taskWeight * 100).toFixed(1)}%${allocatedWords ? ` (~${allocatedWords} words)` : ""}.`,
+        targetWords: allocatedWords,
         subheadings: [
           {
             title: sub1Title,
-            ratio: tIdx === 0 ? 0.16 : 0.18,
-            guidance: `Focus: Analyze core conceptual mechanisms, theoretical grounding (${primaryFramework}), and analytical dimensions for: "${task}".`,
+            ratio: taskWeight * 0.5,
+            targetWords: sub1Words,
+            guidance: `Focus: Analyze core conceptual mechanisms, theoretical grounding (${primaryFramework}), and analytical dimensions for: "${sanitizedTask}".`,
             keyPoints: [
-              `Direct answer to directive: ${task.slice(0, 80)}`,
+              `Direct answer to directive: ${sanitizedTask.slice(0, 90)}${markLabel}`,
               `Analytical parameters and theoretical grounding (${primaryFramework})`,
-              `Core conceptual mechanisms concerning ${taskConcept}`,
+              `Rigorous conceptual deconstruction and module criteria: ${cleanTaskTitle}`,
             ],
           },
           {
             title: sub2Title,
-            ratio: tIdx === 0 ? 0.18 : 0.16,
-            guidance: `Focus: Examine empirical case evidence, diagnostic indicators, and critical evaluation regarding: "${task}".`,
+            ratio: taskWeight * 0.5,
+            targetWords: sub2Words,
+            guidance: `Focus: Examine empirical case evidence, diagnostic indicators, and critical evaluation regarding: "${sanitizedTask}".`,
             keyPoints: [
-              `Empirical data and case evidence addressing ${relatedConcept}`,
+              `Empirical data, methodology, and evidence addressing ${cleanTaskTitle}`,
               `Critical friction points, vulnerabilities, and counterarguments`,
-              `Substantiated conclusions and analytical synthesis`,
+              `Substantiated conclusions and mark-weighted synthesis`,
             ],
           },
         ],

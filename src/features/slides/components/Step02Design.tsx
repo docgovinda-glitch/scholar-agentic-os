@@ -477,7 +477,9 @@ export default function Step02Design({
                         fontFamily: fullTheme.fontFamily,
                         visualMotif: fullTheme.visualMotif,
                         layoutArchetype: fullTheme.layoutArchetype,
+                        backdropUrl: isSelected ? deck.customTheme?.backdropUrl : undefined,
                       }}
+                      backdropUrl={isSelected ? deck.customTheme?.backdropUrl : undefined}
                       deckTitle={headlinePreviewText}
                       initialSlide={0}
                       showControls={true}
@@ -494,10 +496,10 @@ export default function Step02Design({
                         e.stopPropagation();
                         handleApply5SlideProgression(preset.id);
                       }}
-                      className="w-full py-2 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-900/40 text-[11px] font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full py-2.5 px-4 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white text-xs font-semibold shadow-[0_6px_20px_rgba(37,99,235,0.35)] hover:shadow-[0_8px_25px_rgba(37,99,235,0.5)] transition-all flex items-center justify-center gap-2 cursor-pointer"
                       title="Format your deck with Cover, Synthesis, 2D Sketch, Metrics, and Roadmap"
                     >
-                      <Sparkles className="w-3 h-3 text-amber-500" />
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                       <span>Apply 5-Slide Progression</span>
                     </button>
                   </div>

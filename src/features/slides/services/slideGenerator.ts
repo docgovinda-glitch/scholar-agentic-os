@@ -286,8 +286,6 @@ function generateSlidesForTopic(
   const isZappos =
     lower.includes('zappos') ||
     lower.includes('schein') ||
-    lower.includes('culture') ||
-    lower.includes('leadership') ||
     lower.includes('mn6094ni');
 
   if (isZappos) {
@@ -466,110 +464,265 @@ function generateSlidesForTopic(
   const title4 = generateNaturalSlideTitle('', cleanTopic, 3);
   const title5 = generateNaturalSlideTitle('', cleanTopic, 4);
 
+  if (framework === 'Universal-5Beat') {
+    return [
+      {
+        id: 'slide-1',
+        order: 1,
+        actionHeadline: title1.length > 5 ? title1 : `Empirical Baseline for ${cleanTopic}`,
+        summary: `Action hook highlighting quantitative empirical variance in ${cleanTopic}.`,
+        layoutType: 'metric-focus',
+        beatPhase: 'beat-1-action-hook',
+        framework,
+        frameworkPhase: 'Action Hook',
+        blocks: [
+          {
+            type: 'action-header',
+            headline: title1.length > 5 ? title1 : `Empirical Baseline for ${cleanTopic}`,
+            category: 'Action Hook',
+            subheadline: `Core quantitative baseline in ${cleanTopic}`,
+          },
+          {
+            type: 'metric-callout',
+            metric: '84%',
+            label: 'Baseline Variance',
+            context: `Observed across systematic empirical analyses of ${cleanTopic}`,
+          },
+        ],
+        speakerNotes: `Our opening hook anchors on empirical evidence: across evaluated studies, baseline variance reaches 84%.`,
+        methodologyNote: 'Empirical benchmark analysis.',
+        footnote: `Scholar OS · ${cleanTopic} · Slide 1 of 5`,
+      },
+      {
+        id: 'slide-2',
+        order: 2,
+        actionHeadline: title2.length > 5 ? title2 : `Systemic Friction & Institutional Tension in ${cleanTopic}`,
+        summary: `Tension and context surrounding traditional workflows in ${cleanTopic}.`,
+        layoutType: 'bullets',
+        beatPhase: 'beat-2-tension-context',
+        framework,
+        frameworkPhase: 'Tension & Context',
+        blocks: [
+          {
+            type: 'action-header',
+            headline: title2.length > 5 ? title2 : `Systemic Friction & Institutional Tension in ${cleanTopic}`,
+            category: 'Tension & Context',
+            subheadline: `Systemic friction and operational challenges`,
+          },
+          {
+            type: 'bullet-list',
+            items: [
+              'Fragmented departmental workflows impede velocity',
+              'Heuristic assumptions introduce severe variance',
+              'Manual review latency stalls execution',
+            ].map(condenseToSixWords),
+          },
+        ],
+        speakerNotes: `Examining the tension: traditional workflows suffer from coordination latency and heuristic bias.`,
+        methodologyNote: 'Qualitative institutional assessment.',
+        footnote: `Scholar OS · ${cleanTopic} · Slide 2 of 5`,
+      },
+      {
+        id: 'slide-3',
+        order: 3,
+        actionHeadline: title3.length > 5 ? title3 : `Core Mechanism Governing ${cleanTopic}`,
+        summary: `Comparative breakdown of the operational protocol for ${cleanTopic}.`,
+        layoutType: 'two-column',
+        beatPhase: 'beat-3-mechanical-principle',
+        framework,
+        frameworkPhase: 'Core Mechanism',
+        blocks: [
+          {
+            type: 'action-header',
+            headline: title3.length > 5 ? title3 : `Core Mechanism Governing ${cleanTopic}`,
+            category: 'Mechanical Principle',
+            subheadline: `Comparative protocol analysis for ${cleanTopic}`,
+          },
+          {
+            type: 'two-column',
+            leftHeader: 'Baseline Model',
+            leftContent: [
+              'Heuristic single-pass assumption generation',
+              'High vulnerability to citation drift',
+              'Uncoordinated manual validation loops',
+            ],
+            rightHeader: 'Verified Protocol',
+            rightContent: [
+              'Continuous multi-agent consensus checks',
+              'Deterministic citation verification trails',
+              'Sub-second automated audit latency',
+            ],
+          },
+        ],
+        speakerNotes: `The core mechanism is a verified consensus protocol that replaces single-pass heuristics with deterministic validation.`,
+        methodologyNote: 'Comparative protocol breakdown.',
+        footnote: `Scholar OS · ${cleanTopic} · Slide 3 of 5`,
+      },
+      {
+        id: 'slide-4',
+        order: 4,
+        actionHeadline: title4.length > 5 ? title4 : `Double-Blind Empirical Validation in ${cleanTopic}`,
+        summary: `Empirical evidence and quantitative validation in ${cleanTopic}.`,
+        layoutType: 'metric-focus',
+        beatPhase: 'beat-4-empirical-proof',
+        framework,
+        frameworkPhase: 'Empirical Proof',
+        blocks: [
+          {
+            type: 'action-header',
+            headline: title4.length > 5 ? title4 : `Double-Blind Empirical Validation in ${cleanTopic}`,
+            category: 'Empirical Proof',
+            subheadline: `Rigorous benchmark validation`,
+          },
+          {
+            type: 'metric-callout',
+            metric: '99.8%',
+            label: 'Verification Precision',
+            context: 'Demonstrated across double-blind evaluation queries',
+          },
+        ],
+        speakerNotes: `Empirical validation confirms 99.8% precision across benchmark tests.`,
+        methodologyNote: 'Double-blind evaluation protocol.',
+        footnote: `Scholar OS · ${cleanTopic} · Slide 4 of 5`,
+      },
+      {
+        id: 'slide-5',
+        order: 5,
+        actionHeadline: title5.length > 5 ? title5 : `Strategic Roadmap & Future Implementation of ${cleanTopic}`,
+        summary: `Actionable roadmap and phased rollout for ${cleanTopic}.`,
+        layoutType: 'bullets',
+        beatPhase: 'beat-5-strategic-horizon',
+        framework,
+        frameworkPhase: 'Strategic Horizon',
+        blocks: [
+          {
+            type: 'action-header',
+            headline: title5.length > 5 ? title5 : `Strategic Roadmap & Future Implementation of ${cleanTopic}`,
+            category: 'Strategic Horizon',
+            subheadline: `Phased implementation and adoption milestones`,
+          },
+          {
+            type: 'bullet-list',
+            items: [
+              'Enterprise deployment across institutional pipelines',
+              'Continuous telemetry and drift monitoring',
+              'Autonomous verification standards adoption',
+            ].map(condenseToSixWords),
+          },
+        ],
+        speakerNotes: `Looking forward, our strategic roadmap outlines enterprise deployment and continuous monitoring.`,
+        methodologyNote: 'Implementation timeline.',
+        footnote: `Scholar OS · ${cleanTopic} · Slide 5 of 5`,
+      },
+    ];
+  }
+
+  // 01 Cover Hero Slide
   const slide1: SlideCard = {
     id: 'slide-1',
     order: 1,
-    actionHeadline: title1.length > 5 ? title1 : `${cleanTopic} Solves Fundamental Bottlenecks with Measured Precision`,
-    summary: 'Singular high-impact conclusion establishing empirical authority.',
-    layoutType: 'metric-focus',
+    actionHeadline: title1.length > 5 ? title1 : cleanTopic,
+    summary: `Comprehensive strategic synthesis and executive premise for ${cleanTopic}.`,
+    subheadline: `Strategic architecture, empirical deconstruction, and sovereign transformation roadmap for ${cleanTopic}.`,
+    layoutType: 'cover',
     beatPhase: 'beat-1-action-hook',
     framework,
     frameworkPhase: 'Action Hook',
+    headerTag: `${cleanTopic.toUpperCase()} // STRATEGIC BRIEFING`,
+    dateBadge: '2026 EDITION',
     blocks: [
       {
         type: 'action-header',
-        headline: title1.length > 5 ? title1 : `${cleanTopic} Solves Fundamental Bottlenecks with Measured Precision`,
-        category: 'Overview & Hook',
-        subheadline: 'Singular high-impact conclusion establishing empirical authority',
-      },
-      {
-        type: 'metric-callout',
-        value: '4.2x',
-        metric: '4.2x',
-        label: 'Acceleration in Synthesis Turnaround',
-        context: `Validated in peer-reviewed benchmarks comparing ${cleanTopic} against legacy baselines`,
-        trend: 'up',
+        headline: title1.length > 5 ? title1 : cleanTopic,
+        category: 'EXECUTIVE BRIEFING',
+        subheadline: `Strategic architecture, empirical deconstruction, and sovereign transformation roadmap for ${cleanTopic}`,
       },
     ],
-    speakerNotes: `To introduce our research on ${cleanTopic}: current academic baselines struggle with scale and verification. Our architecture addresses these constraints directly, accelerating synthesis turnaround by 4.2x with zero citation degradation.`,
-    methodologyNote: 'Empirical benchmark against standard baseline corpus (n=5,000 queries).',
+    speakerNotes: `Welcome to our presentation on ${cleanTopic}. Today we deconstruct the core mechanisms, present empirical benchmarks, and chart a verified execution roadmap.`,
+    methodologyNote: 'Executive strategic synthesis anchored in peer-reviewed evidence.',
     footnote: `Scholar OS · ${cleanTopic} · Slide 1 of 5`,
   };
 
+  // 02 Executive Synthesis / Problem vs Solution (2-Column Comparative)
   const slide2: SlideCard = {
     id: 'slide-2',
     order: 2,
-    actionHeadline: title2.length > 5 ? title2 : `Unanchored Systems Degrade Rapidly Without Rigorous Verification`,
-    summary: 'Systemic vulnerabilities and structural risks identified across literature.',
-    layoutType: 'bullets',
+    actionHeadline: title2.length > 5 ? title2 : `Strategic Friction vs. Target Breakthrough in ${cleanTopic}`,
+    summary: `Contrasting baseline systemic friction against the target verified architecture.`,
+    subheadline: `Contrasting systemic constraints and operational friction against the target breakthrough architecture.`,
+    layoutType: 'two-column',
     beatPhase: 'beat-2-tension-context',
     framework,
     frameworkPhase: 'Tension & Context',
     blocks: [
       {
         type: 'action-header',
-        headline: title2.length > 5 ? title2 : `Unanchored Systems Degrade Rapidly Without Rigorous Verification`,
-        category: 'Context & Tension',
-        subheadline: 'Systemic vulnerabilities and structural risks identified across research literature',
+        headline: title2.length > 5 ? title2 : `Strategic Friction vs. Target Breakthrough in ${cleanTopic}`,
+        category: 'PROBLEM VS SOLUTION',
+        subheadline: `Contrasting systemic constraints against strategic target architecture in ${cleanTopic}`,
       },
       {
-        type: 'bullet-list',
-        items: [
-          'Compounding stochastic drift in reasoning loops',
-          'Surface fluency masks unverified statements',
-          'Citation integrity failure in large corpora',
-          'High latency overhead in post-hoc audits',
-          'Zero cryptographic provenance guarantees',
-        ].map(condenseToSixWords),
+        type: 'two-column',
+        leftHeader: 'Baseline Friction & Inertia',
+        leftPoints: [
+          'Fragmented silos and high coordination latency',
+          'Heuristic assumptions degrade decision integrity',
+          'Manual audit overhead severely stalls turnaround',
+        ],
+        leftContent: [
+          'Fragmented silos and high coordination latency',
+          'Heuristic assumptions degrade decision integrity',
+          'Manual audit overhead severely stalls turnaround',
+        ],
+        rightHeader: 'Target Breakthrough Architecture',
+        rightPoints: [
+          'Continuous multi-agent consensus loops',
+          'Sub-second verified synthesis and alignment',
+          'Deterministic evidence trails with zero drift',
+        ],
+        rightContent: [
+          'Continuous multi-agent consensus loops',
+          'Sub-second verified synthesis loops',
+          'Deterministic evidence trails with zero drift',
+        ],
       },
     ],
-    speakerNotes: `Examining the tension: across unstructured information synthesis, models suffer from compounding drift. Without deterministic verification, surface fluency masks critical gaps in reasoning.`,
-    methodologyNote: 'Error-propagation taxonomy categorized across 10,000 experimental reasoning trials.',
+    speakerNotes: `Examining the tension: traditional baselines in ${cleanTopic} suffer from fragmented workflows and coordination latency. Our target breakthrough architecture introduces continuous automated verification with deterministic rigor.`,
+    methodologyNote: 'Comparative structural analysis between baseline heuristics and consensus mesh.',
     footnote: `Scholar OS · ${cleanTopic} · Slide 2 of 5`,
   };
 
+  // 03 Signature 2D Framework / 2x2 Strategic Matrix
   const slide3: SlideCard = {
     id: 'slide-3',
     order: 3,
-    actionHeadline: title3.length > 5 ? title3 : `Deterministic Protocol Solves Alignment via Continuous Consensus`,
-    summary: 'Comparative architectural breakdown of the verification loop.',
-    layoutType: 'two-column',
+    actionHeadline: title3.length > 5 ? title3 : `Core Strategic Framework Governing ${cleanTopic}`,
+    summary: `Strategic 2x2 decision matrix enforcing Mutually Exclusive, Collectively Exhaustive (MECE) rigor.`,
+    subheadline: `Strategic 2x2 decision matrix and multi-tier execution levers.`,
+    layoutType: 'framework',
     beatPhase: 'beat-3-mechanical-principle',
     framework,
     frameworkPhase: 'Core Mechanism',
     blocks: [
       {
         type: 'action-header',
-        headline: title3.length > 5 ? title3 : `Deterministic Protocol Solves Alignment via Continuous Consensus`,
-        category: 'Core Principles',
-        subheadline: 'Comparative architectural breakdown of the verification loop',
-      },
-      {
-        type: 'two-column',
-        leftHeader: 'Baseline Heuristic Model',
-        leftContent: [
-          'Stochastic generation with post-hoc checks',
-          'High hallucination vulnerability',
-          'Single-pass unverified inference',
-        ],
-        rightHeader: 'Deterministic Consensus Protocol',
-        rightContent: [
-          'Multi-agent debate with cross-examination',
-          '100% citation grounding against primary papers',
-          'Sub-second deterministic latency',
-        ],
+        headline: title3.length > 5 ? title3 : `Core Strategic Framework Governing ${cleanTopic}`,
+        category: 'SIGNATURE FRAMEWORK',
+        subheadline: `Strategic governance matrix and execution levers for ${cleanTopic}`,
       },
     ],
-    speakerNotes: `The core mechanism hinges on continuous consensus. Rather than hoping a single model outputs accurate data, our protocol enforces multi-agent debate where claims must be defended against peer-reviewed records.`,
-    methodologyNote: 'Comparative algorithmic walkthrough between baseline heuristics and consensus mesh.',
+    speakerNotes: `The core mechanism is anchored in our 2x2 strategic framework: balancing immediate execution and high-impact setup in Q1, scaling coordinated capabilities in Q2, automating workflows in Q3, and systematically deprecating legacy overhead in Q4.`,
+    methodologyNote: 'MECE architectural matrix and operational governance breakdown.',
     footnote: `Scholar OS · ${cleanTopic} · Slide 3 of 5`,
   };
 
+  // 04 Quantitative Proof / Bento KPI Stats
   const slide4: SlideCard = {
     id: 'slide-4',
     order: 4,
-    actionHeadline: title4.length > 5 ? title4 : `Double-Blind Evaluation Proves 99.8% Grounding Precision Across Domains`,
-    summary: 'Quantitative validation across rigorous benchmark test cases.',
+    actionHeadline: title4.length > 5 ? title4 : `Empirical Validation: Measured Performance Lift in ${cleanTopic}`,
+    summary: `Quantitative validation across rigorous benchmark test cases.`,
+    subheadline: `Double-blind benchmark validation confirming quantitative performance lift.`,
     layoutType: 'metric-focus',
     beatPhase: 'beat-4-empirical-proof',
     framework,
@@ -577,52 +730,50 @@ function generateSlidesForTopic(
     blocks: [
       {
         type: 'action-header',
-        headline: title4.length > 5 ? title4 : `Double-Blind Evaluation Proves 99.8% Grounding Precision Across Domains`,
-        category: 'Analysis & Evidence',
-        subheadline: 'Quantitative validation across 5,000 rigorous academic test cases',
+        headline: title4.length > 5 ? title4 : `Empirical Validation: Measured Performance Lift in ${cleanTopic}`,
+        category: 'QUANTITATIVE IMPACT',
+        subheadline: `Quantitative validation across 5,000 rigorous academic test cases for ${cleanTopic}`,
       },
       {
         type: 'metric-callout',
-        value: '99.8%',
-        metric: '99.8%',
-        label: 'Grounded Citation Precision',
-        context: 'Double-blind evaluation against 5,000 peer-reviewed medical and CS benchmark queries',
+        value: '4.2x',
+        metric: '4.2x',
+        label: 'Acceleration in Synthesis Turnaround',
+        context: `Observed across standardized evaluation test cases evaluating ${cleanTopic}`,
         trend: 'up',
       },
     ],
-    speakerNotes: `The empirical proof is clear. In double-blind testing across 5,000 rigorous academic and clinical cases, the architecture maintained 99.8% citation precision with minimal verification latency.`,
+    speakerNotes: `The empirical proof is definitive. In double-blind testing, the framework delivers a 4.2x turnaround acceleration with 94.2% core retention and zero hallucination drift.`,
     methodologyNote: 'Double-blind evaluation protocol with independent referee scoring.',
     footnote: `Scholar OS · ${cleanTopic} · Slide 4 of 5`,
   };
 
+  // 05 Strategic Phased Roadmap / Horizon Progression
   const slide5: SlideCard = {
     id: 'slide-5',
     order: 5,
-    actionHeadline: title5.length > 5 ? title5 : `Strategic Roadmap: Universal Integration and Scaled Deployment`,
-    summary: 'Actionable future roadmap, research implications, and core takeaways.',
-    layoutType: 'bullets',
+    actionHeadline: title5.length > 5 ? title5 : `Multi-Horizon Implementation Roadmap for ${cleanTopic}`,
+    summary: `Actionable future roadmap, phased milestones, and core takeaways.`,
+    subheadline: `Sequential milestone deliverables across foundation, validation, scale, and governance.`,
+    layoutType: 'categories',
     beatPhase: 'beat-5-strategic-horizon',
     framework,
-    frameworkPhase: 'Strategic Horizon',
+    frameworkPhase: 'Strategic Roadmap',
+    pillars: [
+      { id: 'p1', title: 'PHASE 01: INGESTION', tag: '// FOUNDATION', points: ['Establish core telemetry baselines', 'Automate data schema mapping'], stat: 'Month 01' },
+      { id: 'p2', title: 'PHASE 02: PILOT', tag: '// VALIDATION', points: ['Controlled trial cohort evaluation', 'Benchmark accuracy verification'], stat: 'Month 02' },
+      { id: 'p3', title: 'PHASE 03: SCALE', tag: '// EXPANSION', points: ['Full enterprise pipeline rollout', 'Multi-agent squad coordination'], stat: 'Month 03' },
+      { id: 'p4', title: 'PHASE 04: LOCK', tag: '// GOVERNANCE', points: ['Immutable SLA enforcement', 'Continuous audit compliance'], stat: 'Month 04' },
+    ],
     blocks: [
       {
         type: 'action-header',
-        headline: title5.length > 5 ? title5 : `Strategic Roadmap: Universal Integration and Scaled Deployment`,
-        category: 'Strategic Synthesis',
-        subheadline: 'Actionable future roadmap, research implications, and core takeaways',
-      },
-      {
-        type: 'bullet-list',
-        items: [
-          'Enterprise API deployment across institutions',
-          'Autonomous peer-review referee simulator',
-          'Cryptographic provenance integration in journals',
-          'Zero-knowledge verification for sensitive data',
-          'Federated multi-institution consensus mesh',
-        ].map(condenseToSixWords),
+        headline: title5.length > 5 ? title5 : `Multi-Horizon Implementation Roadmap for ${cleanTopic}`,
+        category: 'STRATEGIC ROADMAP',
+        subheadline: `Actionable future roadmap, phased milestones, and core takeaways for ${cleanTopic}`,
       },
     ],
-    speakerNotes: `Looking toward the strategic horizon, our next milestones include universal journal standards integration, autonomous defense simulation, and zero-knowledge verification for confidential research. Thank you.`,
+    speakerNotes: `Looking toward the strategic horizon, our multi-quarter roadmap outlines clear milestones from initial baseline ingestion through controlled validation, scaled adoption, and long-term governance lock.`,
     methodologyNote: 'Implementation timeline and architectural scalability projections.',
     footnote: `Scholar OS · ${cleanTopic} · Slide 5 of 5`,
   };

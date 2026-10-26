@@ -53,6 +53,8 @@ export const BRITISH_SPELLING_MAP: Readonly<Record<string, string>> = {
   utilizing: "utilising",
   behavior: "behaviour",
   behaviors: "behaviours",
+  behavioral: "behavioural",
+  behaviorally: "behaviourally",
   color: "colour",
   colors: "colours",
   center: "centre",

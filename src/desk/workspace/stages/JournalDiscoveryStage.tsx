@@ -324,7 +324,7 @@ export default function JournalDiscoveryStage({
               },
             ]);
           } else if (event === "done") {
-            const rawData = data.data || [];
+            const rawData = Array.isArray(data.data) ? data.data : [];
             const parsedList: JournalCandidate[] = rawData.map((item: any, idx: number) => ({
               id: item.id || `j-disc-${Date.now()}-${idx}`,
               title: item.title,

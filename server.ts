@@ -333,10 +333,136 @@ registerPresentationRoutes(app);
 app.use(errorHandler);
 
 // ==========================================
+// STATIC STANDARDS & SPA ROUTING HARDENING
+// ==========================================
+
+export const STATIC_FILE_EXTENSION_REGEX = /\.(js|mjs|cjs|css|png|jpg|jpeg|gif|svg|ico|json|txt|xml|map|woff|woff2|ttf|eot|webp|avif|wasm)$/i;
+
+export function registerStaticStandardsRoutes(targetApp: express.Express): void {
+  targetApp.get("/robots.txt", (req, res) => {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send("User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: /sitemap.xml\n");
+  });
+
+  targetApp.get("/llms.txt", (req, res) => {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(`# Scholar AI Agentic OS
+> An agentic operating system for academic research, literature synthesis, and peer review.
+
+## Core Capabilities
+- Academic Literature Harvester: Multi-portal retrieval via OpenAlex, Crossref, and arXiv.
+- Manuscript Synthesis: Structured academic drafting with verified Knowledge Vault citations.
+- Peer Review & Rubrics: Comprehensive rubric evaluations and study section simulations.
+- Citation Compliance: Deterministic formatting for APA 7, MLA 9, IEEE, Harvard, and Chicago.
+
+## APIs
+- /api/ai/agent: Unified scholarly research agent.
+- /ai-catalog.json: Discovery catalog of models and agent capabilities.
+`);
+  });
+
+  targetApp.get("/ai-catalog.json", (req, res) => {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.json({
+      name: "Scholar AI Agentic OS",
+      version: "1.0.0",
+      description: "Agentic AI Operating System for academic research and scholarly drafting",
+      capabilities: [
+        "literature_synthesis",
+        "citation_compliance",
+        "peer_review_evaluation",
+        "slide_generation"
+      ],
+      supportedOutputTypes: [
+        "OT-01", "OT-02", "OT-03", "OT-04", "OT-05", "OT-06", "OT-07", "OT-08", "OT-09", "OT-10",
+        "OT-11", "OT-12", "OT-13", "OT-14", "OT-15", "OT-16", "OT-17", "OT-18", "OT-19", "OT-20",
+        "OT-21", "OT-22", "OT-23", "OT-24", "OT-25"
+      ]
+    });
+  });
+}
+
+export function configureStaticAndSpaRoutes(
+  targetApp: express.Express,
+  distPath: string = path.join(process.cwd(), "dist")
+): void {
+  // 1. Explicit standards routes
+  registerStaticStandardsRoutes(targetApp);
+
+  // 2. Force-unregister any lingering Service Workers and prevent client asset freezing
+  targetApp.get(["/sw.js", "/registerSW.js"], (req, res) => {
+    res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.send(`
+      self.addEventListener('install', () => { self.skipWaiting(); });
+      self.addEventListener('activate', (e) => {
+        e.waitUntil(
+          Promise.all([
+            self.registration.unregister(),
+            caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))),
+            self.clients.claim()
+          ]).then(() => {
+            return self.clients.matchAll({ type: 'window' });
+          }).then((clients) => {
+            clients.forEach((c) => { if ('navigate' in c) c.navigate(c.url); });
+          })
+        );
+      });
+    `);
+  });
+
+  // 3. Static asset serving from dist directory
+  targetApp.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".html") || filePath.endsWith("sw.js") || filePath.endsWith("registerSW.js")) {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+      } else if (filePath.includes("/assets/")) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    }
+  }));
+
+  // 4. Static extension guard: return explicit 404 for missing static assets or unhandled API calls
+  targetApp.use((req, res, next) => {
+    if (req.path.startsWith("/api/")) {
+      res.status(404).json({ error: "API endpoint not found" });
+      return;
+    }
+    if (STATIC_FILE_EXTENSION_REGEX.test(req.path)) {
+      res.status(404).type("text/plain").send("404 Not Found");
+      return;
+    }
+    next();
+  });
+
+  // 5. Single page application support with strict no-cache to guarantee fresh deployments
+  targetApp.get("*", (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+}
+
+// In production or test environments, wire static standards and hardened SPA routes directly onto app
+if (process.env.NODE_ENV !== "development") {
+  configureStaticAndSpaRoutes(app);
+}
+
+// ==========================================
 // VITE MIDDLEWARE SETUP
 // ==========================================
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV === "development") {
+    registerStaticStandardsRoutes(app);
+
     // Imported lazily, not at module top level. Vite is a dev-only concern —
     // this branch is the only thing that touches it — but a top-level import
     // becomes an unconditional require() in the esbuild CJS bundle, which
@@ -349,53 +475,6 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
-    // Serve production build files
-    const distPath = path.join(process.cwd(), "dist");
-
-    // Force-unregister any lingering Service Workers and prevent client asset freezing
-    app.get(["/sw.js", "/registerSW.js"], (req, res) => {
-      res.setHeader("Content-Type", "application/javascript");
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-      res.send(`
-        self.addEventListener('install', () => { self.skipWaiting(); });
-        self.addEventListener('activate', (e) => {
-          e.waitUntil(
-            Promise.all([
-              self.registration.unregister(),
-              caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))),
-              self.clients.claim()
-            ]).then(() => {
-              return self.clients.matchAll({ type: 'window' });
-            }).then((clients) => {
-              clients.forEach((c) => { if ('navigate' in c) c.navigate(c.url); });
-            })
-          );
-        });
-      `);
-    });
-
-    app.use(express.static(distPath, {
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith(".html") || filePath.endsWith("sw.js") || filePath.endsWith("registerSW.js")) {
-          res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-          res.setHeader("Pragma", "no-cache");
-          res.setHeader("Expires", "0");
-        } else if (filePath.includes("/assets/")) {
-          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-        }
-      }
-    }));
-
-    // Single page application support with strict no-cache to guarantee fresh deployments
-    app.get("*", (req, res) => {
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-      res.sendFile(path.join(distPath, "index.html"));
-    });
   }
 
   // Last-resort process guards.

@@ -21,6 +21,7 @@ export interface DeckPreviewModalProps {
     fontFamily?: 'sans' | 'serif' | 'mono';
     visualMotif?: string;
     layoutArchetype?: string;
+    backdropUrl?: string;
   } | null;
   deckTitle?: string;
   onApplyTheme: (themeId: SlideThemeId, design?: BestSlideDesign) => void;
@@ -127,6 +128,7 @@ export default function DeckPreviewModal({
                 </div>
                 <MultiSlideDeckPreview
                   theme={theme}
+                  backdropUrl={theme.backdropUrl}
                   deckTitle={deckTitle}
                   initialSlide={slideIndex}
                   showControls={false}

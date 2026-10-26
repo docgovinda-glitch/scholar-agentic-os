@@ -90,6 +90,7 @@ export interface CustomTheme {
   swatch?: [string, string, string] | [string, string, string, string];
   source?: 'preset' | 'cloned' | 'custom';
   clonedFromImage?: string;
+  backdropUrl?: string;
 }
 
 export interface SlideTheme {
@@ -126,6 +127,7 @@ export interface SlideTheme {
   quoteBorder: string;
   secondaryAccent?: string;
   bottomSummaryBar?: boolean;
+  backdropUrl?: string;
 }
 
 /**

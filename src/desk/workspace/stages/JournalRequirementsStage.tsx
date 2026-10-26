@@ -294,7 +294,7 @@ export default function JournalRequirementsStage({
               },
             ]);
           } else if (event === "done") {
-            const rawData = data.data || {};
+            const rawData = (typeof data.data === "object" && data.data !== null ? data.data : {}) as Partial<JournalConstraints>;
             const parsedConstraints: JournalConstraints = {
               max_words: rawData.max_words || 8000,
               abstract_limit_words: rawData.abstract_limit_words || 250,

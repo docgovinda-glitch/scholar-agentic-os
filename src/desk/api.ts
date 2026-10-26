@@ -210,15 +210,24 @@ export async function authedJsonFetch(
   });
 
   if (res.status === 426 && !options?.skipLlmFallback) {
-    const data = await res.json().catch(() => null);
+    const data = (await res.json().catch(() => null)) as {
+      requireFrontendLLM?: boolean;
+      challengeToken?: string;
+      systemPrompt: string;
+      userPrompt: string;
+      taskType?: RoutingTaskType;
+      canonicalSources?: unknown;
+    } | null;
     if (data && data.requireFrontendLLM) {
       const llmResult = await executeAgenticLLM(data.systemPrompt, data.userPrompt, data.taskType || "reasoning");
+      const baseBody = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
       res = await authedFetch(input, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...((body as any) || {}),
+          ...baseBody,
           llmResult,
+          challengeToken: data.challengeToken,
           canonicalSources: data.canonicalSources,
         }),
       });
@@ -234,7 +243,22 @@ export async function authedJsonFetch(
  * authedStreamFetch expects the backend to stream Server-Sent Events (SSE). 
  * If it gets a 426, it simulates SSE chunks via the local LLM engine.
  */
-export async function authedStreamFetch(input: string, method: string, body: unknown, onEvent: (event: string, data: any) => void): Promise<void> {
+export interface StreamEventData {
+  message?: string;
+  chunk?: string;
+  token?: string;
+  data?: unknown;
+  status?: string;
+  ok?: boolean;
+  [key: string]: unknown;
+}
+
+export async function authedStreamFetch(
+  input: string,
+  method: string,
+  body: unknown,
+  onEvent: (event: string, data: StreamEventData) => void
+): Promise<void> {
   const res = await authedFetch(input, {
     method,
     headers: { "Content-Type": "application/json" },
@@ -242,7 +266,13 @@ export async function authedStreamFetch(input: string, method: string, body: unk
   });
 
   if (res.status === 426) {
-    const data = await res.json().catch(() => null);
+    const data = (await res.json().catch(() => null)) as {
+      requireFrontendLLM?: boolean;
+      challengeToken?: string;
+      systemPrompt: string;
+      userPrompt: string;
+      taskType?: RoutingTaskType;
+    } | null;
     if (data && data.requireFrontendLLM) {
       onEvent("log", { message: "> Initiating local frontend agentic stream..." });
       try {
@@ -261,7 +291,7 @@ export async function authedStreamFetch(input: string, method: string, body: unk
             }
           }
         );
-        let parsed;
+        let parsed: unknown;
         const textResult = typeof finalResult === "string" ? finalResult : JSON.stringify(finalResult);
         try {
           parsed = JSON.parse(textResult);
@@ -289,10 +319,11 @@ export async function authedStreamFetch(input: string, method: string, body: unk
           }
         }
         // Then we POST it back to let the backend do its DB updates
+        const baseBody = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
         const postRes = await authedFetch(input, {
           method,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...((body as any) || {}), llmResult: parsed }),
+          body: JSON.stringify({ ...baseBody, llmResult: parsed, challengeToken: data.challengeToken }),
         });
         
         // Wait, wait... wait, if it posts it back, the backend doesn't stream, it returns the final JSON, which would be SSE!

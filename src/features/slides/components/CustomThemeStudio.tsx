@@ -143,6 +143,7 @@ export default function CustomThemeStudio({
   const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'mono'>('sans');
   const [visualMotif, setVisualMotif] = useState<VisualMotif>('minimal-frame');
   const [category, setCategory] = useState('executive');
+  const [backdropUrl, setBackdropUrl] = useState<string | undefined>(deck.customTheme?.backdropUrl);
 
   // Deck Recreator & Blank Sheet States
   const [isUploadingDeck, setIsUploadingDeck] = useState(false);
@@ -204,6 +205,7 @@ export default function CustomThemeStudio({
       fontFamily,
       bulletColor: accent,
       quoteBorder: accent,
+      backdropUrl,
     };
   };
 
@@ -227,6 +229,7 @@ export default function CustomThemeStudio({
         mode: theme.mode,
         swatch: [theme.canvasBg, theme.cardBg, theme.accent],
         source: 'custom',
+        backdropUrl: theme.backdropUrl || backdropUrl,
       },
     };
     onUpdateDeck(updated);
@@ -254,6 +257,9 @@ export default function CustomThemeStudio({
       const result = await recreateDeckFromFile(file, deck);
       setRecreatedResult(result);
 
+      const extractedBackdrop = result.recreatedTheme.backdropUrl;
+      setBackdropUrl(extractedBackdrop);
+
       // Populate form state from recreated theme so live preview syncs immediately
       setThemeName(result.recreatedTheme.name);
       setCanvasBg(result.recreatedTheme.canvasBg);
@@ -264,6 +270,9 @@ export default function CustomThemeStudio({
       setMode(result.recreatedTheme.mode);
       setFontFamily(result.recreatedTheme.fontFamily || 'sans');
       setVisualMotif(result.recreatedTheme.visualMotif || 'minimal-frame');
+
+      // Hydrate deck immediately so 5-slide preview reflects extracted content and theme!
+      onUpdateDeck(result.deck);
 
       showToast(`✓ Extracted content and recreated design theme from "${file.name}"!`);
     } catch (err: any) {
@@ -301,6 +310,26 @@ export default function CustomThemeStudio({
       setFontFamily(result.fontFamily);
       setVisualMotif(result.visualMotif);
       setCategory(result.category);
+      setBackdropUrl(undefined);
+
+      const customThemeData: CustomTheme = {
+        name: result.name,
+        accentColor: result.accent,
+        fontPairing: result.fontFamily === 'serif' ? 'Newsreader Serif' : result.fontFamily === 'mono' ? 'Noto Sans' : 'Inter',
+        surfaceTreatment: 'elevated',
+        contrastRatio: calculateContrastRatio(result.accent, result.cardBg),
+        isValidWcagAA: isWcagAA(calculateContrastRatio(result.accent, result.cardBg)),
+        visualMotif: result.visualMotif,
+        canvasBg: result.canvasBg,
+        cardBg: result.cardBg,
+        textPrimary: result.textPrimary,
+        textSecondary: result.textSecondary,
+        mode: result.mode,
+        swatch: [result.canvasBg, result.cardBg, result.accent],
+        source: 'custom',
+        backdropUrl: undefined,
+      };
+      onUpdateDeck({ ...deck, customTheme: customThemeData });
       showToast(`✓ AI generated "${result.name}" aesthetic!`);
     } catch (err) {
       console.error(err);
@@ -391,6 +420,26 @@ export default function CustomThemeStudio({
     setMode(preset.mode);
     setFontFamily(preset.fontFamily);
     setVisualMotif(preset.motif);
+    setBackdropUrl(undefined);
+
+    const customThemeData: CustomTheme = {
+      name: preset.name,
+      accentColor: preset.accent,
+      fontPairing: preset.fontFamily === 'serif' ? 'Newsreader Serif' : preset.fontFamily === 'mono' ? 'Noto Sans' : 'Inter',
+      surfaceTreatment: 'elevated',
+      contrastRatio: calculateContrastRatio(preset.accent, preset.cardBg),
+      isValidWcagAA: isWcagAA(calculateContrastRatio(preset.accent, preset.cardBg)),
+      visualMotif: preset.motif,
+      canvasBg: preset.canvasBg,
+      cardBg: preset.cardBg,
+      textPrimary: preset.textPrimary,
+      textSecondary: preset.textSecondary,
+      mode: preset.mode,
+      swatch: [preset.canvasBg, preset.cardBg, preset.accent],
+      source: 'preset',
+      backdropUrl: undefined,
+    };
+    onUpdateDeck({ ...deck, customTheme: customThemeData });
     showToast(`Loaded preset "${preset.name}".`);
   };
 
@@ -528,7 +577,7 @@ export default function CustomThemeStudio({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pptx,.ppt,.pdf,.html,.htm,.png,.jpg,.jpeg,.webp,.docx,.txt,.md"
+            accept=".pptx,.ppt,.pdf,.html,.htm,.json,.png,.jpg,.jpeg,.webp,.docx,.txt,.md"
             onChange={handleFileUpload}
             className="hidden"
           />
@@ -914,6 +963,7 @@ export default function CustomThemeStudio({
                   mode: theme.mode,
                   swatch: [theme.canvasBg, theme.cardBg, theme.accent],
                   source: 'custom',
+                  backdropUrl,
                 };
                 const updatedDeck = apply5SlideDeckProgression(
                   { ...deck, customTheme: customThemeData },
@@ -924,7 +974,7 @@ export default function CustomThemeStudio({
                 if (onApplyTheme) onApplyTheme(theme);
                 showToast('Applied 5-slide progression (Cover, Synthesis, 2D Framework, Metrics, Roadmap)!');
               }}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs sm:text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+              className="w-full py-2.5 px-4 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white font-semibold text-xs sm:text-sm shadow-[0_6px_20px_rgba(37,99,235,0.35)] hover:shadow-[0_8px_25px_rgba(37,99,235,0.5)] transition-all cursor-pointer flex items-center justify-center gap-2"
             >
               <Sparkles className="w-4 h-4 text-amber-300" />
               Apply 5-Slide Progression with Custom Theme
@@ -966,7 +1016,9 @@ export default function CustomThemeStudio({
                 textSecondary,
                 fontFamily,
                 visualMotif,
+                backdropUrl,
               }}
+              backdropUrl={backdropUrl}
               deckTitle={deck.title || 'Strategic Architecture & Transformation'}
               showControls={true}
               showExpandButton={false}

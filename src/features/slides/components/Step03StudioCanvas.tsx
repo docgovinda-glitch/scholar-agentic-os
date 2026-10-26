@@ -324,51 +324,39 @@ export default function Step03StudioCanvas({
           citation: 'doi:10.1016/j.jac.2026.04.012',
         });
       } else if (newLayout === 'cover') {
+        const coverTitle = slide.actionHeadline || deck.title || 'Strategic Architecture & Transformation';
+        const coverSub = slide.subheadline || 'Governing institutional conviction, high-conviction evidence, and operational roadmap';
         return {
           ...slide,
           layoutType: 'cover',
-          angledBanner: slide.angledBanner || 'MIGRATORY BIRD SEASON',
-          subheadline:
-            slide.subheadline ||
-            'This winter, join the week when the city draws closest to 120,000 passing migratory birds. Walk the tidal flats for seven days and meet the neighbors who share our coast.',
-          headerTag: slide.headerTag || 'Qingdao Nature Society | Qingdao Coastal Wetland Park',
-          dateBadge: slide.dateBadge || '11.07—11.13',
-          calloutRibbon: slide.calloutRibbon || 'Migratory birds arrive, and the city makes room.',
-          summaryBar:
-            slide.summaryBar ||
-            'Strategic Mandate: 120,000 migratory birds protected via 66 certified observation corridors.',
+          actionHeadline: coverTitle,
+          subheadline: coverSub,
+          headerTag: slide.headerTag || `${(activeTheme.category || 'Executive').toUpperCase()} BRIEFING`,
+          dateBadge: slide.dateBadge || '2026 EDITION',
           blocks: [
-            headerBlock,
             {
-              type: 'metric-callout',
-              metric: '120,000',
-              label: 'migratory birds',
-              context: 'Seasonal census tracking across coastal wetland reserve',
+              type: 'action-header',
+              headline: coverTitle,
+              category: (activeTheme.category || 'Executive').toUpperCase(),
+              subheadline: coverSub,
             },
           ],
         };
       } else if (newLayout === 'metrics') {
         return {
           ...slide,
-          layoutType: 'metrics',
+          layoutType: 'metric-focus',
           summaryBar:
             slide.summaryBar ||
-            'Takeaway: 74.2% habitat concentration confirms tidal mudflats as irreplaceable ecological nodes.',
-          ratioComparison: slide.ratioComparison || {
-            labelA: 'Core Protected Tidal Habitat',
-            percentA: 74.2,
-            labelB: 'Urban Coastal Buffer Zone',
-            percentB: 25.8,
-            ratio: '2.88 : 1',
-            insight: 'Overwintering shorebirds concentrate heavily along the seaward tidal margins.',
-          },
+            'Empirical Validation: High-significance lift confirmed across randomized trial cohorts.',
           blocks: [
             headerBlock,
             {
               type: 'metric-callout',
-              metric: '120,000',
-              label: 'ANNUAL CENSUS',
-              context: '+18.4% YoY surge across all observation stations',
+              metric: '4.2x',
+              value: '4.2x',
+              label: 'Performance Acceleration Gain',
+              context: 'Observed across 5,000 double-blind empirical test cases',
             },
           ],
         };
@@ -378,43 +366,43 @@ export default function Step03StudioCanvas({
           layoutType: 'categories',
           summaryBar:
             slide.summaryBar ||
-            'Strategic Alignment: Tri-pillar architecture guarantees zero ecological disruption through 2030.',
-          pillars: slide.pillars || [
+            'Execution Strategy: Phased milestone delivery across 4 sequential horizons.',
+          pillars: [
             {
               id: 'p1',
-              title: 'HABITAT SANCTUARY',
-              tag: '// PILLAR 01',
-              accentColor: 'red',
+              title: 'ARCHITECTURAL ALIGNMENT',
+              tag: '// PHASE 01',
+              accentColor: 'blue',
               points: [
-                '14.8 km² tidal mudflat protection',
-                'Zero-construction perimeter',
-                'Seasonal access quotas',
+                'Ingestion & schema mapping',
+                'Baseline consensus agreement',
+                'Verification boundary established',
               ],
-              stat: '14,800 Hectares',
+              stat: 'Phase 01',
             },
             {
               id: 'p2',
-              title: 'AUTONOMOUS SENSING',
-              tag: '// PILLAR 02',
+              title: 'PILOT VALIDATION',
+              tag: '// PHASE 02',
               accentColor: 'blue',
               points: [
-                'Acoustic bird tracking stations',
-                'LiDAR drone telemetry',
-                'Salinity and flux monitors',
+                'Real-time telemetry calibration',
+                'Cohort benchmark testing',
+                'Adversarial stress evaluations',
               ],
-              stat: '99.4% Uptime',
+              stat: 'Phase 02',
             },
             {
               id: 'p3',
-              title: 'COMMUNITY GUARDIANS',
-              tag: '// PILLAR 03',
+              title: 'PRODUCTION SCALE',
+              tag: '// PHASE 03',
               accentColor: 'black',
               points: [
-                '66 certified ranger patrol paths',
-                'Public scientific workshops',
-                'Rapid wildlife response unit',
+                'Autonomous multi-agent rollout',
+                'Enterprise-grade audit pipelines',
+                'Zero-hallucination SLA lock',
               ],
-              stat: '66 Patrol Paths',
+              stat: 'Phase 03',
             },
           ],
           blocks: [headerBlock],
@@ -686,300 +674,430 @@ export default function Step03StudioCanvas({
             }}
           />
 
-          {/* Slide Card Container */}
+          {/* 1-Click Smart Layout Morph Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-md rounded-2xl border border-neutral-200/80 dark:border-white/10 shadow-xs">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="font-mono text-[10px] uppercase font-bold text-neutral-400 pl-1 mr-1">
+                Morph Layout:
+              </span>
+              {[
+                { id: 'cover' as const, label: 'Hero Cover', icon: '🚩' },
+                { id: 'two-column' as const, label: '3-Card Bento', icon: '📊' },
+                { id: 'framework' as const, label: '2x2 Matrix', icon: '📐' },
+                { id: 'metric-focus' as const, label: 'KPI Stats', icon: '📈' },
+                { id: 'categories' as const, label: 'Roadmap', icon: '🗺️' },
+                { id: 'image-split' as const, label: 'Split Media', icon: '🖼️' },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => handleLayoutSwitch(m.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeSlide.layoutType === m.id
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300'
+                  }`}
+                >
+                  <span>{m.icon}</span>
+                  <span>{m.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pr-1 text-[11px] font-mono text-neutral-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Canva &amp; Gamma Grade</span>
+            </div>
+          </div>
+
+          {/* Slide Card Container (16:9 Elevated Canvas) */}
           <div
-            className={`w-full min-h-[460px] p-6 sm:p-10 rounded-3xl border transition-all relative flex flex-col justify-between overflow-hidden ${
-              deck.customTheme?.surfaceTreatment === 'hairline'
-                ? 'border-neutral-200/80 dark:border-white/10'
-                : 'shadow-2xl shadow-neutral-900/5'
-            } ${activeTheme.cardClass}`}
+            className={`w-full aspect-[16/9] min-h-[520px] p-6 sm:p-10 rounded-2xl border transition-all relative flex flex-col justify-between overflow-hidden shadow-[0_20px_50px_-12px_rgba(15,23,42,0.28)] ring-1 ring-black/5 dark:ring-white/10 ${activeTheme.cardClass}`}
+            style={{
+              backgroundColor: activeTheme.canvasBg,
+              backgroundImage: deck.customTheme?.backdropUrl
+                ? `linear-gradient(to bottom, ${activeTheme.mode === 'dark' ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.85)'}, ${activeTheme.mode === 'dark' ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)'}), url(${deck.customTheme.backdropUrl})`
+                : `radial-gradient(circle at 85% 15%, ${activeTheme.accent}18 0%, transparent 50%), radial-gradient(circle at 15% 85%, ${activeTheme.accent}12 0%, transparent 50%)`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              borderColor: activeTheme.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+            }}
             data-testid="wysiwyg-slide-card"
           >
+            {/* Soft Glowing Ambient Orbs for Gamma Atmosphere */}
+            <div
+              className="absolute -top-12 -right-12 w-64 h-64 rounded-full blur-3xl opacity-25 pointer-events-none transition-all"
+              style={{ backgroundColor: activeTheme.accent }}
+            />
+            <div
+              className="absolute -bottom-12 -left-12 w-64 h-64 rounded-full blur-3xl opacity-20 pointer-events-none transition-all"
+              style={{ backgroundColor: activeTheme.accent }}
+            />
+
+            {/* Top 10% Accent Line */}
+            <div
+              className="absolute top-0 left-0 right-0 h-1 z-20 pointer-events-none shadow-[0_2px_10px_rgba(0,0,0,0.15)]"
+              style={{ backgroundColor: activeTheme.accent }}
+            />
+
             {/* Background Graphic Motif */}
             <SlideMotifGraphic motif={activeTheme.visualMotif} theme={activeTheme} />
 
-            <div className="space-y-6 relative z-10">
-              {/* Category Tag (Click to Edit) + Header Stamp */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={
-                      (activeSlide.blocks.find((b) => b.type === 'action-header') as ActionHeaderBlock)
-                        ?.category || 'ACADEMIC SYNTHESIS'
-                    }
-                    onChange={(e) => handleCategoryChange(e.target.value)}
-                    className={`text-xs md:text-sm font-extrabold uppercase tracking-wider bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-blue-500 focus:outline-none ${activeTheme.accentBadgeText}`}
-                    placeholder="SLIDE THEME / CATEGORY"
-                  />
-                  {activeTheme.headerStamp && (
-                    <span className="hidden sm:inline font-mono text-[9px] uppercase tracking-widest opacity-60 ml-2" style={{ color: activeTheme.accent }}>
-                      // {activeTheme.headerStamp}
-                    </span>
-                  )}
-                </div>
-                <span className="text-[11px] font-mono text-neutral-400">
-                  Click text to edit inline
-                </span>
-              </div>
-
-              {/* Action Headline (Click to Edit ≥ 30-40pt scale) */}
+            <div className="space-y-4 relative z-10 flex-1 flex flex-col justify-between">
               <div>
-                <textarea
-                  rows={2}
-                  value={activeSlide.actionHeadline}
-                  onChange={(e) => handleHeadlineChange(e.target.value)}
-                  className={`w-full text-2xl md:text-4xl font-extrabold tracking-tight leading-tight bg-transparent resize-none border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-blue-500 focus:outline-none ${activeTheme.textPrimary}`}
-                  placeholder="Action Headline asserting singular conclusion..."
-                />
+                {/* Category Tag (Click to Edit) + Header Stamp */}
+                <div className="flex items-center justify-between pb-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-xs font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full font-mono shadow-2xs"
+                      style={{
+                        backgroundColor: `${activeTheme.accent}20`,
+                        color: activeTheme.accent,
+                        border: `1px solid ${activeTheme.accent}40`,
+                      }}
+                    >
+                      {activeSlide.layoutType === 'cover' ? '01 COVER' : activeSlide.layoutType === 'two-column' ? '02 SYNTHESIS' : activeSlide.layoutType === 'framework' ? '03 FRAMEWORK' : activeSlide.layoutType === 'metric-focus' ? '04 METRICS' : activeSlide.layoutType === 'categories' ? '05 ROADMAP' : 'SLIDE'}
+                    </span>
+                    <input
+                      type="text"
+                      value={
+                        (activeSlide.blocks.find((b) => b.type === 'action-header') as ActionHeaderBlock)
+                          ?.category || 'ACADEMIC SYNTHESIS'
+                      }
+                      onChange={(e) => handleCategoryChange(e.target.value)}
+                      className={`text-xs md:text-sm font-extrabold uppercase tracking-wider bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-blue-500 focus:outline-none ${activeTheme.accentBadgeText}`}
+                      placeholder="SLIDE THEME / CATEGORY"
+                    />
+                    {activeTheme.headerStamp && (
+                      <span className="hidden sm:inline font-mono text-[9px] uppercase tracking-widest opacity-60 ml-2" style={{ color: activeTheme.accent }}>
+                        // {activeTheme.headerStamp}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full border border-black/20" style={{ backgroundColor: activeTheme.canvasBg }} />
+                      <span className="w-2 h-2 rounded-full border border-black/20" style={{ backgroundColor: activeTheme.cardBg }} />
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: activeTheme.accent }} />
+                    </div>
+                    <span className="text-[11px] font-mono text-neutral-400">
+                      Slide {activeSlideIndex + 1} of {deck.slides.length}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Action Headline (Click to Edit) */}
+                <div>
+                  <textarea
+                    rows={2}
+                    value={activeSlide.actionHeadline}
+                    onChange={(e) => handleHeadlineChange(e.target.value)}
+                    className={`w-full text-2xl md:text-4xl font-extrabold tracking-tight leading-tight bg-transparent resize-none border-b border-transparent hover:border-neutral-300 dark:hover:border-white/20 focus:border-blue-500 focus:outline-none ${activeTheme.textPrimary}`}
+                    placeholder="Action Headline asserting singular conclusion..."
+                  />
+                </div>
               </div>
 
-              {/* Swiss Retro-Poster Cover Dedicated Inline Editor */}
+              {/* 01 Cover Hero Dedicated Visual Layout */}
               {activeSlide.layoutType === 'cover' && (
-                <div className="space-y-4 pt-1 border-t border-neutral-200/60 dark:border-white/10 mt-3" data-testid="cover-inline-editor">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <input
-                      type="text"
-                      value={activeSlide.headerTag || 'Qingdao Nature Society | Qingdao Coastal Wetland Park'}
-                      onChange={(e) => updateActiveSlide((s) => ({ ...s, headerTag: e.target.value }))}
-                      placeholder="Header Tag"
-                      className="text-xs font-semibold px-2 py-1 rounded bg-black/5 dark:bg-white/5 border border-transparent focus:border-blue-500 focus:outline-none"
-                    />
-                    <input
-                      type="text"
-                      value={activeSlide.dateBadge || '11.07—11.13'}
-                      onChange={(e) => updateActiveSlide((s) => ({ ...s, dateBadge: e.target.value }))}
-                      placeholder="Date Badge"
-                      className="text-xs font-mono font-bold px-2 py-1 rounded bg-[#BEF264] text-[#365314] border border-transparent focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] font-mono uppercase text-neutral-400 block mb-1">
-                      Angled Banner (-3° Tomato Red):
-                    </span>
-                    <div className="inline-block transform -rotate-3 origin-left shadow-lg bg-[#EB4424] px-4 py-1.5 rounded-xs">
-                      <input
-                        type="text"
-                        value={activeSlide.angledBanner || 'MIGRATORY BIRD SEASON'}
-                        onChange={(e) => updateActiveSlide((s) => ({ ...s, angledBanner: e.target.value }))}
-                        className="font-sans font-black text-xl sm:text-2xl tracking-tight text-neutral-950 uppercase bg-transparent border-none focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] font-mono uppercase text-neutral-400 block mb-1">
-                      Subheadline Narrative:
+                <div className="space-y-4 pt-1" data-testid="cover-inline-editor">
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-mono uppercase text-neutral-400 font-bold block">
+                      Narrative Thesis / Subheadline:
                     </span>
                     <textarea
                       rows={2}
-                      value={activeSlide.subheadline || ''}
-                      onChange={(e) => updateActiveSlide((s) => ({ ...s, subheadline: e.target.value }))}
-                      placeholder="Narrative subheadline..."
-                      className="w-full text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed bg-black/5 dark:bg-white/5 p-2.5 rounded-xl border border-transparent hover:border-neutral-300 focus:border-blue-500 focus:outline-none resize-none"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-mono uppercase text-neutral-400">Callout Ribbon:</span>
-                    <input
-                      type="text"
-                      value={activeSlide.calloutRibbon || 'Migratory birds arrive, and the city makes room.'}
-                      onChange={(e) => updateActiveSlide((s) => ({ ...s, calloutRibbon: e.target.value }))}
-                      className="flex-1 text-xs font-bold text-white bg-[#2563EB] px-3 py-1.5 rounded shadow-sm focus:outline-none"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Swiss Retro-Poster Metrics Dedicated Inline Editor */}
-              {activeSlide.layoutType === 'metrics' && (
-                <div className="space-y-4 pt-1 border-t border-neutral-200/60 dark:border-white/10 mt-3" data-testid="metrics-inline-editor">
-                  <div className="p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-neutral-300/80 dark:border-white/10 space-y-3">
-                    <div className="flex items-center justify-between text-xs font-bold">
-                      <span>High-Contrast Ratio Comparison Bar</span>
-                      <span className="font-mono text-[10px] text-neutral-400">Ratio Segment Visual</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-mono text-neutral-400 uppercase">Segment A (Tomato Red %):</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={activeSlide.ratioComparison?.labelA || 'Core Protected Tidal Habitat'}
-                            onChange={(e) =>
-                              updateActiveSlide((s) => ({
-                                ...s,
-                                ratioComparison: {
-                                  ...(s.ratioComparison || { percentA: 74.2, labelB: 'Buffer', percentB: 25.8 }),
-                                  labelA: e.target.value,
-                                },
-                              }))
-                            }
-                            className="flex-1 px-2.5 py-1 text-xs rounded bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10"
-                            placeholder="Label A"
-                          />
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={activeSlide.ratioComparison?.percentA ?? 74.2}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value) || 0;
-                              updateActiveSlide((s) => ({
-                                ...s,
-                                ratioComparison: {
-                                  ...(s.ratioComparison || { labelA: 'Core', labelB: 'Buffer', percentB: 25.8 }),
-                                  percentA: val,
-                                  percentB: Math.round((100 - val) * 10) / 10,
-                                },
-                              }));
-                            }}
-                            className="w-16 px-2 py-1 text-xs font-bold font-mono rounded bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-mono text-neutral-400 uppercase">Segment B (Cobalt Blue %):</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={activeSlide.ratioComparison?.labelB || 'Urban Coastal Buffer Zone'}
-                            onChange={(e) =>
-                              updateActiveSlide((s) => ({
-                                ...s,
-                                ratioComparison: {
-                                  ...(s.ratioComparison || { percentA: 74.2, labelA: 'Core', percentB: 25.8 }),
-                                  labelB: e.target.value,
-                                },
-                              }))
-                            }
-                            className="flex-1 px-2.5 py-1 text-xs rounded bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10"
-                            placeholder="Label B"
-                          />
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={activeSlide.ratioComparison?.percentB ?? 25.8}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value) || 0;
-                              updateActiveSlide((s) => ({
-                                ...s,
-                                ratioComparison: {
-                                  ...(s.ratioComparison || { labelA: 'Core', labelB: 'Buffer', percentA: 74.2 }),
-                                  percentB: val,
-                                  percentA: Math.round((100 - val) * 10) / 10,
-                                },
-                              }));
-                            }}
-                            className="w-16 px-2 py-1 text-xs font-bold font-mono rounded bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-mono text-neutral-400 uppercase">Ratio Insight Text:</label>
-                      <input
-                        type="text"
-                        value={
-                          activeSlide.ratioComparison?.insight ||
-                          'Overwintering shorebirds concentrate heavily along the seaward tidal margins.'
-                        }
-                        onChange={(e) =>
-                          updateActiveSlide((s) => ({
-                            ...s,
-                            ratioComparison: {
-                              ...(s.ratioComparison || { labelA: 'Core', percentA: 74.2, labelB: 'Buffer', percentB: 25.8 }),
-                              insight: e.target.value,
-                            },
-                          }))
-                        }
-                        className="w-full mt-1 px-2.5 py-1.5 text-xs rounded bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Swiss Retro-Poster Categories Dedicated Inline Editor */}
-              {activeSlide.layoutType === 'categories' && (
-                <div className="space-y-3 pt-1 border-t border-neutral-200/60 dark:border-white/10 mt-3" data-testid="categories-inline-editor">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold uppercase tracking-wider text-neutral-500">
-                      Color-Blocked Pillars (3-4 Columns)
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const pillars = activeSlide.pillars || [];
-                        if (pillars.length < 4) {
-                          const newPillar = {
-                            id: `p${pillars.length + 1}`,
-                            title: `NEW PILLAR 0${pillars.length + 1}`,
-                            tag: `// PILLAR 0${pillars.length + 1}`,
-                            accentColor: pillars.length === 3 ? ('slate' as const) : ('black' as const),
-                            points: ['Action point one', 'Action point two'],
-                            stat: 'Benchmark Target',
-                          };
-                          updateActiveSlide((s) => ({ ...s, pillars: [...(s.pillars || []), newPillar] }));
-                        }
+                      value={activeSlide.subheadline || ((activeSlide.blocks.find((b) => b.type === 'action-header') as any)?.subheadline) || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        updateActiveSlide((s) => ({
+                          ...s,
+                          subheadline: val,
+                          blocks: s.blocks.map((b) => (b.type === 'action-header' ? { ...b, subheadline: val } : b)),
+                        }));
                       }}
-                      className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      + Add Column
-                    </button>
+                      placeholder="Enter executive thesis or narrative context..."
+                      className="w-full text-sm sm:text-base text-neutral-700 dark:text-neutral-300 leading-relaxed bg-black/5 dark:bg-white/5 p-3 rounded-xl border border-transparent hover:border-neutral-300 focus:border-blue-500 focus:outline-none resize-none"
+                    />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {(
-                      activeSlide.pillars || [
-                        { id: 'p1', title: 'HABITAT SANCTUARY', tag: '// PILLAR 01', accentColor: 'red' as const, points: ['14.8 km² tidal mudflat', 'Zero-construction'], stat: '14,800 Ha' },
-                        { id: 'p2', title: 'AUTONOMOUS SENSING', tag: '// PILLAR 02', accentColor: 'blue' as const, points: ['Acoustic stations', 'LiDAR drones'], stat: '99.4% Uptime' },
-                        { id: 'p3', title: 'COMMUNITY GUARDIANS', tag: '// PILLAR 03', accentColor: 'black' as const, points: ['66 ranger paths', 'Public workshops'], stat: '66 Paths' },
-                      ]
-                    ).map((p, pIdx) => (
-                      <div
-                        key={p.id || pIdx}
-                        className={`p-3.5 rounded-xl border space-y-2 ${
-                          p.accentColor === 'red'
-                            ? 'bg-[#EB4424] text-white'
-                            : p.accentColor === 'blue'
-                            ? 'bg-[#2563EB] text-white'
-                            : 'bg-[#18181B] text-white'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-[10px] font-mono opacity-80">
-                          <span>{p.tag}</span>
-                          <span className="uppercase">{p.accentColor}</span>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-neutral-200/80 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
+                      SCHOLAR OS · 2026
+                    </span>
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-neutral-200/80 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
+                      16:9 ULTRA-HD
+                    </span>
+                    <span
+                      className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold"
+                      style={{
+                        backgroundColor: `${activeTheme.accent}15`,
+                        color: activeTheme.accent,
+                        border: `1px solid ${activeTheme.accent}30`,
+                      }}
+                    >
+                      PEER-REVIEWED
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* 02 Executive Synthesis Layout with DOI Badge */}
+              {activeSlide.layoutType === 'two-column' && (
+                <div className="space-y-3 pt-1">
+                  <div className="flex items-center justify-between text-xs pb-1">
+                    <span className="font-bold text-neutral-500 uppercase tracking-wider">
+                      Strategic Friction vs. Accelerated Unlock
+                    </span>
+                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                      <span>✓ Verified DOI Sources</span>
+                      <span className="text-neutral-400">[1] (Farrell &amp; Newman, 2024)</span>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const twoColBlock = activeSlide.blocks.find((b) => b.type === 'two-column') as any;
+                    const leftHeader = twoColBlock?.leftHeader || twoColBlock?.leftTitle || 'Baseline Heuristic Model';
+                    const leftPoints = twoColBlock?.leftPoints || (Array.isArray(twoColBlock?.leftContent) ? twoColBlock.leftContent : ['Quadratic computational complexity', 'Unchecked probabilistic hallucination']);
+                    const rightHeader = twoColBlock?.rightHeader || twoColBlock?.rightTitle || 'Grounded Sovereign Model';
+                    const rightPoints = twoColBlock?.rightPoints || (Array.isArray(twoColBlock?.rightContent) ? twoColBlock.rightContent : ['Sub-exponential operational speedup', 'Deterministic multi-agent verification']);
+
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 rounded-xl border border-neutral-200/80 dark:border-white/10 space-y-2 bg-black/5 dark:bg-white/5">
+                          <input
+                            type="text"
+                            value={leftHeader}
+                            onChange={(e) => handleTwoColumnChange(e.target.value, leftPoints, rightHeader, rightPoints)}
+                            className="text-xs font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 bg-transparent w-full focus:outline-none"
+                          />
+                          <ul className="space-y-1.5 text-xs text-neutral-700 dark:text-neutral-300">
+                            {leftPoints.map((pt: string, pIdx: number) => (
+                              <li key={pIdx} className="flex items-start gap-2">
+                                <span className="text-red-500 font-bold shrink-0">✕</span>
+                                <input
+                                  type="text"
+                                  value={pt}
+                                  onChange={(e) => {
+                                    const updated = [...leftPoints];
+                                    updated[pIdx] = e.target.value;
+                                    handleTwoColumnChange(leftHeader, updated, rightHeader, rightPoints);
+                                  }}
+                                  className="w-full bg-transparent border-b border-transparent hover:border-neutral-300 focus:outline-none text-xs"
+                                />
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                        <input
-                          type="text"
-                          value={p.title}
-                          onChange={(e) => {
-                            const updatedPillars = [...(activeSlide.pillars || [])];
-                            if (updatedPillars[pIdx]) {
-                              updatedPillars[pIdx] = { ...updatedPillars[pIdx], title: e.target.value };
-                              updateActiveSlide((s) => ({ ...s, pillars: updatedPillars }));
-                            }
+
+                        <div className="p-4 rounded-xl border border-blue-500/20 space-y-2 bg-blue-500/5">
+                          <input
+                            type="text"
+                            value={rightHeader}
+                            onChange={(e) => handleTwoColumnChange(leftHeader, leftPoints, e.target.value, rightPoints)}
+                            className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-transparent w-full focus:outline-none"
+                          />
+                          <ul className="space-y-1.5 text-xs text-neutral-800 dark:text-neutral-200">
+                            {rightPoints.map((pt: string, pIdx: number) => (
+                              <li key={pIdx} className="flex items-start gap-2">
+                                <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                                <input
+                                  type="text"
+                                  value={pt}
+                                  onChange={(e) => {
+                                    const updated = [...rightPoints];
+                                    updated[pIdx] = e.target.value;
+                                    handleTwoColumnChange(leftHeader, leftPoints, rightHeader, updated);
+                                  }}
+                                  className="w-full bg-transparent border-b border-transparent hover:border-blue-300 focus:outline-none text-xs font-medium"
+                                />
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* 03 Signature 2D Framework / 2x2 Strategic Matrix */}
+              {activeSlide.layoutType === 'framework' && (
+                <div className="space-y-3 pt-1">
+                  <div className="flex items-center justify-between text-xs pb-1">
+                    <span className="font-bold text-neutral-500 uppercase tracking-wider">
+                      Strategic Matrix &amp; Governing Thought
+                    </span>
+                    <span
+                      className="px-2 py-0.5 rounded font-mono text-[10px] font-bold"
+                      style={{
+                        backgroundColor: `${activeTheme.accent}20`,
+                        color: activeTheme.accent,
+                      }}
+                    >
+                      GOVERNING THOUGHT
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div
+                      className="p-3.5 rounded-xl border space-y-1 transition-all"
+                      style={{
+                        backgroundColor: `${activeTheme.accent}12`,
+                        borderColor: `${activeTheme.accent}40`,
+                      }}
+                    >
+                      <div className="flex items-center justify-between text-[11px] font-bold" style={{ color: activeTheme.accent }}>
+                        <span>Q1: Immediate Execution</span>
+                        <span className="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded bg-black/10 dark:bg-white/10">Priority</span>
+                      </div>
+                      <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
+                        Immediate unlock with zero friction; proven baseline integration across core workflows.
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-black/5 dark:bg-white/5 space-y-1">
+                      <div className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">
+                        Q2: Strategic Scale
+                      </div>
+                      <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-snug">
+                        Multi-agent cluster scaling and continuous verification protocol.
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-black/5 dark:bg-white/5 space-y-1">
+                      <div className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">
+                        Q3: Automated Workflows
+                      </div>
+                      <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-snug">
+                        Decentralized consensus loops and deterministic reference validation.
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-black/5 dark:bg-white/5 space-y-1">
+                      <div className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">
+                        Q4: Legacy Overhead
+                      </div>
+                      <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-snug">
+                        Systemic friction phases out via structured automated deprecation.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 04 Quantitative Proof / 3-Card Bento KPI Layout */}
+              {activeSlide.layoutType === 'metric-focus' && (
+                <div className="space-y-3 pt-1" data-testid="metrics-inline-editor">
+                  {(() => {
+                    const metricBlock = (activeSlide.blocks.find((b) => b.type === 'metric-callout') as any) || {
+                      metric: '4.2x',
+                      label: 'Performance Acceleration Gain',
+                      context: 'Observed across 5,000 double-blind empirical test cases',
+                    };
+
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div
+                          className="p-4 rounded-xl border space-y-1.5 transition-all"
+                          style={{
+                            backgroundColor: `${activeTheme.accent}12`,
+                            borderColor: `${activeTheme.accent}40`,
                           }}
-                          className="w-full font-bold uppercase text-xs bg-transparent border-b border-white/20 focus:outline-none"
-                        />
-                        <input
-                          type="text"
-                          value={p.stat || ''}
-                          onChange={(e) => {
-                            const updatedPillars = [...(activeSlide.pillars || [])];
-                            if (updatedPillars[pIdx]) {
-                              updatedPillars[pIdx] = { ...updatedPillars[pIdx], stat: e.target.value };
-                              updateActiveSlide((s) => ({ ...s, pillars: updatedPillars }));
-                            }
-                          }}
-                          placeholder="Stat Benchmark"
-                          className="w-full text-[11px] font-mono bg-transparent border-b border-white/20 focus:outline-none opacity-90"
-                        />
+                        >
+                          <span
+                            className="text-[9px] font-mono uppercase font-bold px-1.5 py-0.2 rounded inline-block"
+                            style={{
+                              backgroundColor: `${activeTheme.accent}20`,
+                              color: activeTheme.accent,
+                            }}
+                          >
+                            +18.4% YoY
+                          </span>
+                          <input
+                            type="text"
+                            value={metricBlock.metric || metricBlock.value || '4.2x'}
+                            onChange={(e) => handleMetricChange(e.target.value, metricBlock.label, metricBlock.context)}
+                            className="text-3xl sm:text-4xl font-black font-sans bg-transparent w-full border-b border-transparent hover:border-neutral-300 focus:outline-none"
+                            style={{ color: activeTheme.accent }}
+                          />
+                          <input
+                            type="text"
+                            value={metricBlock.label || 'Performance Acceleration Gain'}
+                            onChange={(e) => handleMetricChange(metricBlock.metric || '4.2x', e.target.value, metricBlock.context)}
+                            className="text-xs font-bold text-neutral-800 dark:text-neutral-200 bg-transparent w-full border-b border-transparent focus:outline-none"
+                          />
+                          <div className="w-full bg-neutral-200 dark:bg-neutral-800 h-1.5 rounded-full overflow-hidden mt-2">
+                            <div className="h-full rounded-full transition-all" style={{ width: '84%', backgroundColor: activeTheme.accent }} />
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-black/5 dark:bg-white/5 space-y-1.5">
+                          <span className="text-[9px] font-mono uppercase font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 inline-block">
+                            2.8x Baseline
+                          </span>
+                          <div className="text-3xl sm:text-4xl font-black font-sans text-neutral-900 dark:text-white">
+                            3.4x
+                          </div>
+                          <div className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                            Synthesis Velocity
+                          </div>
+                          <div className="w-full bg-neutral-200 dark:bg-neutral-800 h-1.5 rounded-full overflow-hidden mt-2">
+                            <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: '74%' }} />
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-black/5 dark:bg-white/5 space-y-1.5">
+                          <span className="text-[9px] font-mono uppercase font-bold px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-block">
+                            -42% Variance
+                          </span>
+                          <div className="text-3xl sm:text-4xl font-black font-sans text-neutral-900 dark:text-white">
+                            94.2%
+                          </div>
+                          <div className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                            Core Retention
+                          </div>
+                          <div className="w-full bg-neutral-200 dark:bg-neutral-800 h-1.5 rounded-full overflow-hidden mt-2">
+                            <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: '94%' }} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* 05 Strategic Phased Roadmap */}
+              {activeSlide.layoutType === 'categories' && (
+                <div className="space-y-3 pt-1" data-testid="categories-inline-editor">
+                  <div className="text-xs font-bold uppercase tracking-wider text-neutral-500 pb-1">
+                    Connected Phase Progression
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 relative">
+                    {[
+                      { step: '01', title: 'Phase 1: Alignment', desc: 'Architecture & schema consensus' },
+                      { step: '02', title: 'Phase 2: Validation', desc: 'Real-time telemetry calibration' },
+                      { step: '03', title: 'Phase 3: Scale', desc: 'Autonomous multi-agent rollout' },
+                      { step: '04', title: 'Phase 4: Governance', desc: 'Citation audit & enterprise SLA' },
+                    ].map((p, pIdx) => (
+                      <div
+                        key={pIdx}
+                        className="p-3 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-black/5 dark:bg-white/5 space-y-1 relative"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold text-white shadow-xs"
+                            style={{ backgroundColor: activeTheme.accent }}
+                          >
+                            {p.step}
+                          </span>
+                          <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100 truncate">
+                            {p.title}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-tight">
+                          {p.desc}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -1168,7 +1286,7 @@ export default function Step03StudioCanvas({
               )}
 
               {/* Dynamic Block-level Content Renderer with Direct Editing */}
-              {activeSlide.layoutType !== 'image-split' && activeSlide.blocks.map((block, bIdx) => {
+              {!['image-split', 'two-column', 'metric-focus', 'cover', 'framework', 'categories'].includes(activeSlide.layoutType || '') && activeSlide.blocks.map((block, bIdx) => {
                 if (block.type === 'bullet-list') {
                   return (
                     <div key={bIdx} className="space-y-3 pt-2">
@@ -1410,14 +1528,14 @@ export default function Step03StudioCanvas({
                     <span className="text-[10px] font-mono uppercase text-neutral-400 shrink-0">Summary Bar:</span>
                     <input
                       type="text"
-                      value={activeSlide.summaryBar || 'Strategic Mandate: 120,000 migratory birds protected via 66 certified observation corridors.'}
+                      value={activeSlide.summaryBar || 'Strategic Mandate: Grounded in peer-reviewed evidence with verified citations.'}
                       onChange={(e) => updateActiveSlide((s) => ({ ...s, summaryBar: e.target.value }))}
                       className="w-full text-xs font-semibold text-neutral-100 bg-transparent border-b border-white/20 focus:border-red-400 focus:outline-none truncate"
                       placeholder="Persistent dark bottom summary bar text..."
                     />
                   </div>
                   <span className="font-mono text-[9px] uppercase tracking-widest text-neutral-400 shrink-0 hidden sm:block">
-                    SWISS ANCHOR
+                    PROVENANCE ANCHOR
                   </span>
                 </div>
               )}

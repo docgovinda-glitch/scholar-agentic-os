@@ -316,7 +316,7 @@ export default function DraftPreviewStage({
             ]);
           } else if (event === "done") {
             clearTimer();
-            const previewData = data.data || data;
+            const previewData = (data.data || data) as { content: string; pages: number; status: string } | null;
             setResults(previewData);
             setLogs((prev) => [
               ...prev,

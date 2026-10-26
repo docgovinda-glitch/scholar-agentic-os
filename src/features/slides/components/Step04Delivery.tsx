@@ -3,6 +3,7 @@ import type { SlideDeck, SlideViewMode } from '../types/slides';
 import { SLIDE_THEMES, type SlideThemeId, resolveSlideTheme } from '../types/themes';
 import SlideCardBlock from './SlideCardBlock';
 import SlideMotifGraphic from './SlideMotifGraphic';
+import CanvaGammaLayoutRenderer from './CanvaGammaLayoutRenderer';
 import { usePresentationShortcuts } from '../hooks/usePresentationShortcuts';
 
 export interface Step04DeliveryProps {
@@ -233,14 +234,18 @@ export default function Step04Delivery({ deck, onPrevStep, onClose }: Step04Deli
                   <span>{String(currentSlideIndex + 1).padStart(2, '0')} / {String(totalSlides).padStart(2, '0')}</span>
                 </div>
               )}
-              {activeSlide.blocks.map((block, idx) => (
-                <SlideCardBlock
-                  key={idx}
-                  block={block}
-                  viewMode={viewMode}
-                  theme={activeTheme}
-                />
-              ))}
+              {activeSlide.layoutType && ['cover', 'two-column', 'framework', 'metric-focus', 'categories'].includes(activeSlide.layoutType) ? (
+                <CanvaGammaLayoutRenderer slide={activeSlide} theme={activeTheme} deckTitle={deck.title} />
+              ) : (
+                activeSlide.blocks.map((block, idx) => (
+                  <SlideCardBlock
+                    key={idx}
+                    block={block}
+                    viewMode={viewMode}
+                    theme={activeTheme}
+                  />
+                ))
+              )}
             </div>
 
             {/* Leave-Behind Provenance View Footer */}

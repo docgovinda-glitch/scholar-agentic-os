@@ -158,24 +158,6 @@ export default function SlideMotifGraphic({
               </pattern>
             </defs>
             <rect width="100%" height="100%" fill={`url(#bp-grid-${isMini ? 'm' : 'f'})`} />
-            
-            {/* Precision Crosshairs (+) */}
-            <g stroke={accentColor} strokeWidth="1.2">
-              <path d="M 680 50 L 700 50 M 690 40 L 690 60" />
-              <path d="M 100 420 L 120 420 M 110 410 L 110 430" />
-              <path d="M 680 420 L 700 420 M 690 410 L 690 430" />
-            </g>
-
-            {!isMini && (
-              <>
-                <text x="695" y="75" fill={accentColor} fontSize="8" fontFamily="monospace" opacity="0.7">
-                  AXIS::42.8N
-                </text>
-                <text x="30" y="480" fill={accentColor} fontSize="8" fontFamily="monospace" opacity="0.6">
-                  SCALE 1:1.618 // BLUEPRINT SCHEMATIC
-                </text>
-              </>
-            )}
           </svg>
         </div>
       );
