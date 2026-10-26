@@ -7,8 +7,9 @@ import {
   normalizeUnicodeNFC,
 } from "../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy } from "../../utils/llm.ts";
+import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig } from "../../utils/llm.ts";
 import { completeWithFailover } from "../../../src/platform/gateway/gateway.ts";
+import { scholarBrain } from "../../src/services/scholarBrain.ts";
 import { rejectClientCredentials } from "../../src/middleware/rejectClientCredentials.ts";
 import {
   auditDocumentLineByLine,
@@ -460,10 +461,10 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
     const searchSlice = cleanedText.slice(0, 50000);
     let detectedWordCount: number | undefined;
     const wordMatch =
-      searchSlice.match(/(?:word\s*count|target|limit|length)\s*(?:is|of|:)?\s*([1-9]\d{2,4})/i) ||
-      searchSlice.match(/\b([1-9]\d{2,4})\s*words\b/i);
+      searchSlice.match(/(?:word\s*count|target|limit|length)\s*(?:is|of|:)?\s*([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})/i) ||
+      searchSlice.match(/(?:^|[^\d,])([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})\s*words\b/i);
     if (wordMatch) {
-      const parsed = parseInt(wordMatch[1], 10);
+      const parsed = parseInt((wordMatch[1] || "").replace(/,/g, ""), 10);
       if (parsed >= 200 && parsed <= 50000) {
         detectedWordCount = parsed;
       }
@@ -501,6 +502,12 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
     if (extractedQuestions.length > 0) {
       project.answers["extracted_questions"] = JSON.stringify(extractedQuestions);
     }
+    const markAllocation = scholarBrain.allocateWordsByMarks(
+      extractedQuestions.length > 0 ? extractedQuestions : [cleanedText],
+      detectedWordCount || 2000
+    );
+    project.answers["mark_allocation"] = JSON.stringify(markAllocation);
+
     if (detectedWordCount) {
       project.answers["targetWordCount"] = String(detectedWordCount);
       project.answers["target_word_count"] = String(detectedWordCount);
@@ -524,6 +531,7 @@ router.post("/parse-brief", upload.single("file"), async (req: express.Request<{
       success: true,
       text: cleanedText,
       extractedQuestions,
+      markAllocation,
       omittedPedagogicalNoise: sanitizedResult.omittedPedagogicalNoise,
       repairedLineWrapsCount: sanitizedResult.repairedLineWrapsCount,
       lineCount: lines.length,
@@ -686,7 +694,7 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     }`;
 
     // 5. Concepts, Expected Response Type, Evidence Requirements, Summary
-    const isQuantum = /quantum|qubit|superconducting|trapped-ion|shor|grover|qec|surface code|nisq|post-quantum|qkd|qnt-4020/i.test(combinedContent);
+    const isQuantum = /quantum|qubit|superconducting|trapped-ion|shor|grover|qec|surface code|nisq|post-quantum|qkd/i.test(combinedContent);
     const isExamOrQuestionnaire = /examination|questionnaire|question\s*1|part\s*1|marks\b/i.test(combinedContent);
 
     const keyConcepts = isQuantum
@@ -861,7 +869,7 @@ function buildDeterministicResearchPlan(
     parsedAnalysis = {};
   }
 
-  const isQuantum = /quantum|qubit|superconducting|trapped-ion|shor|grover|qec|surface code|nisq|post-quantum|qkd|qnt-4020/i.test(qClean);
+  const isQuantum = /quantum|qubit|superconducting|trapped-ion|shor|grover|qec|surface code|nisq|post-quantum|qkd/i.test(qClean);
 
   const concepts = parsedAnalysis.keyConcepts?.length > 0 
     ? parsedAnalysis.keyConcepts 
@@ -1317,8 +1325,8 @@ Return ONLY valid JSON matching:
   }
 });
 
-// 5. POST /api/projects/:id/assignment/structure
-router.post("/structure", async (req: express.Request<{ id: string }>, res) => {
+// 5. POST /api/projects/:id/assignment/structure & /generate-outline
+const handleStructure = async (req: express.Request<{ id: string }>, res: express.Response) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
 
@@ -1602,6 +1610,14 @@ Return ONLY valid JSON matching:
       }
       await getProjectStore().save(project);
 
+      const storedMarkAlloc = project.answers["mark_allocation"];
+      const markAllocation = storedMarkAlloc
+        ? safeParseObject(storedMarkAlloc)
+        : scholarBrain.allocateWordsByMarks(
+            [question],
+            Number(targetWordCount) || 2000
+          );
+
       const tree = assignmentStructureToOutlineTree(finalStructure);
       return res.json({
         structure: finalStructure,
@@ -1611,6 +1627,7 @@ Return ONLY valid JSON matching:
         thesis_statement: finalStructure.thesisStatement,
         research_blueprint: finalStructure.researchBlueprintOverview,
         question_mapping: finalStructure.questionMappingMatrix,
+        mark_allocation: markAllocation,
       });
     }
 
@@ -1633,6 +1650,14 @@ Return ONLY valid JSON matching:
     }
     await getProjectStore().save(project);
 
+    const storedMarkAlloc = project.answers["mark_allocation"];
+    const markAllocation = storedMarkAlloc
+      ? safeParseObject(storedMarkAlloc)
+      : scholarBrain.allocateWordsByMarks(
+          [question],
+          computedTargetWords
+        );
+
     const fallbackTree = assignmentStructureToOutlineTree(fallbackStructure);
     return res.json({
       structure: fallbackStructure,
@@ -1642,6 +1667,7 @@ Return ONLY valid JSON matching:
       thesis_statement: fallbackStructure.thesisStatement,
       research_blueprint: fallbackStructure.researchBlueprintOverview,
       question_mapping: fallbackStructure.questionMappingMatrix,
+      mark_allocation: markAllocation,
     });
   } catch (err: any) {
     const briefText = cleanAnswerString(project.answers["assignment_brief_text"]) || question;
@@ -1655,15 +1681,16 @@ Return ONLY valid JSON matching:
       briefText,
     });
     const fallbackTree = assignmentStructureToOutlineTree(fallbackStructure);
+    const storedMarkAlloc = project.answers["mark_allocation"];
+    const markAllocation = storedMarkAlloc
+      ? safeParseObject(storedMarkAlloc)
+      : scholarBrain.allocateWordsByMarks(
+          [question],
+          computedTargetWords
+        );
 
-    if (err?.message === "RequireFrontendLLMException") {
-      return res.json({
-        structure: fallbackStructure,
-        outline: structureToInternalSections(fallbackStructure),
-        sections: fallbackTree.sections,
-        target_frameworks: fallbackStructure.targetFrameworks || [],
-        thesis_statement: fallbackStructure.thesisStatement,
-      });
+    if (err?.message === "RequireFrontendLLMException" || res.headersSent) {
+      return;
     }
     console.error("Structure generation error:", err);
     if (!res.headersSent) {
@@ -1673,10 +1700,14 @@ Return ONLY valid JSON matching:
         sections: fallbackTree.sections,
         target_frameworks: fallbackStructure.targetFrameworks || [],
         thesis_statement: fallbackStructure.thesisStatement,
+        mark_allocation: markAllocation,
       });
     }
   }
-});
+};
+
+router.post("/structure", handleStructure);
+router.post("/generate-outline", handleStructure);
 
 // 5b. GET /api/projects/:id/assignment/structure
 router.get("/structure", async (req: express.Request<{ id: string }>, res) => {
@@ -1880,18 +1911,41 @@ ${tutorialOrPeelRules}`;
       requireVaultEvidence: true,
     });
 
-    const draft = await callOpenRouterText(
-      req,
-      res,
-      `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`,
-      prompt,
-      "openrouter/auto",
-      "drafting"
-    );
+    let effectiveDraft = "";
+    const aiConfig = resolveRequestAiConfig(req);
+    if (aiConfig.candidates.length > 0) {
+      try {
+        const brainResult = await scholarBrain.complete({
+          req,
+          systemPrompt: `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`,
+          userPrompt: prompt,
+          taskClass: "drafting",
+          dialect: "en-GB",
+          stripCliches: true,
+        });
+        if (brainResult.text) {
+          effectiveDraft = brainResult.text;
+        }
+      } catch (brainErr: any) {
+        if (brainErr?.message === "RequireFrontendLLMException") throw brainErr;
+        console.warn("scholarBrain.complete error in draft-section, falling back to callOpenRouterText:", brainErr?.message);
+      }
+    }
 
-    let effectiveDraft = draft?.trim()
-      ? draft.trim()
-      : generateSectionDraft({
+    if (!effectiveDraft) {
+      const draft = await callOpenRouterText(
+        req,
+        res,
+        `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`,
+        prompt,
+        "openrouter/auto",
+        "drafting"
+      );
+      effectiveDraft = draft?.trim() ? draft.trim() : "";
+    }
+
+    if (!effectiveDraft) {
+      effectiveDraft = generateSectionDraft({
           sectionTitle,
           assignmentQuestion: project.answers["assignment_question"] || "",
           academicFunction: sectionGuidance,
@@ -1907,6 +1961,7 @@ ${tutorialOrPeelRules}`;
             year: typeof e.year === "number" ? String(e.year) : e.year,
           })),
         });
+    }
 
     // Deterministic Token Interceptor: strictly strips hallucinated references and compiles citations in project style
     effectiveDraft = replaceBracketTokensWithDeterministicCitations(
@@ -3458,33 +3513,23 @@ Explain predicted marks, highlight priority fixes needed to step up to the next 
   const candidates = getCandidates(req);
   if (candidates.length > 0) {
     try {
-      const scholarlyDirectives = buildScholarlyVoiceSystemPrompt({
-        discipline: "Academic Guidance",
+      const brainResult = await scholarBrain.complete({
+        req,
+        systemPrompt,
+        userPrompt,
+        taskClass: "chat",
         dialect: "en-GB",
+        stripCliches: true,
       });
-
-      const result = await completeWithFailover(
-        {
-          taskClass: "chat",
-          systemPrompt: `${scholarlyDirectives}\n\n${systemPrompt}`,
-          userPrompt,
-          segments: [{ label: "Input", text: userPrompt }],
-        },
-        { candidates },
-        buildAuthorizedPolicy(candidates)
-      );
-      if (result.ok && result.value?.text) {
-        const sanitized = normalizeUnicodeNFC(
-          sanitizeScholarlyText(result.value.text, { dialect: "en-GB", stripCliches: true })
-        );
+      if (brainResult.text) {
         return res.json({
           ok: true,
-          response: sanitized,
+          response: brainResult.text,
           persona: { name: personaName, role: personaRole },
         });
       }
     } catch (llmErr: any) {
-      console.warn("LLM copilot chat failed, falling back to deterministic grounding:", llmErr?.message);
+      console.warn("scholarBrain copilot chat failed, falling back to deterministic grounding:", llmErr?.message);
     }
   }
 

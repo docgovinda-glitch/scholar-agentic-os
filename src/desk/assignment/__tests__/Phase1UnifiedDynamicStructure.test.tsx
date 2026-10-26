@@ -132,7 +132,7 @@ describe("Phase 1 — Unified Assignment Setup Box & Question-Specific Dynamic S
     // 6. Verify Question A generates specific analytical sections, NOT generic Intro/Body/Conclusion
     await waitFor(() => {
       expect(screen.getByText(/Theoretical Foundations of Economic Interdependence and Interstate Conflict/i)).toBeInTheDocument();
-      expect(screen.getByText(/Relevant Theoretical Perspectives: Liberal Commercialism vs. Realist Vulnerability/i)).toBeInTheDocument();
+      expect(screen.getByText(/Relevant Theoretical Perspectives: Economic Interdependence vs\. Realist Vulnerability/i)).toBeInTheDocument();
     });
 
     // Verify dynamic word count status conforms to user requirement #11

@@ -456,5 +456,278 @@ export function expandDeterministicDraft(
   return bestDraft;
 }
 
+export interface BriefQuestionInput {
+  id?: string;
+  title: string;
+  prompt?: string;
+  rawText?: string;
+  marks?: number;
+}
+
+export interface QuestionWordBudget {
+  id: string;
+  questionIndex: number;
+  title: string;
+  rawText?: string;
+  marks?: number;
+  weightPercentage: number;
+  percentageWeight: number;
+  targetWords: number;
+  allocatedWords: number;
+  subChunks?: Array<{
+    id: string;
+    subIndex: number;
+    title: string;
+    targetWords: number;
+  }>;
+  chunks: Array<{
+    id: string;
+    subIndex: number;
+    title: string;
+    targetWords: number;
+  }>;
+}
+
+export interface MarkAllocationResult {
+  totalWordBudget: number;
+  targetTotalWords: number;
+  allocatedWordBudget: number;
+  allocatedTotalWords: number;
+  totalMarksParsed: number;
+  hasExplicitMarks: boolean;
+  questions: QuestionWordBudget[];
+}
+
+/**
+ * Parses point/mark/percentage weights from a question title, prompt, or raw text.
+ * Handles forms like:
+ * - "[30 marks]" / "(25 pts)" / "40%" / "Weight: 15"
+ * - Sub-part arithmetic: "(a) [10 marks] + (b) [15 marks] = 25 marks"
+ * - Multiple sub-part mark tags: "(a) [10 marks] ... (b) [15 marks]" -> 25
+ */
+export function parseQuestionMarks(text: string): number | undefined {
+  if (!text || !text.trim()) return undefined;
+  const clean = text.trim();
+
+  // 1. Explicit sum equation e.g. "10 + 15 = 25 marks" or "[10 + 15 = 25 marks]"
+  const sumEqMatch = clean.match(/(?:\[|\()?\s*\d+\s*(?:\+\s*\d+\s*)+=\s*(\d+(?:\.\d+)?)\s*(?:marks?|pts?|points?)/i);
+  if (sumEqMatch) {
+    return parseFloat(sumEqMatch[1]);
+  }
+
+  // 2. Sum multiple bracketed subpart marks like "(a) [10 marks] ... (b) [15 marks]"
+  const bracketMatches = Array.from(clean.matchAll(/(?:\[|\()\s*(\d+(?:\.\d+)?)\s*(?:marks?|pts?|points?)\s*(?:\]|\))/gi));
+  if (bracketMatches.length > 1) {
+    return bracketMatches.reduce((acc, m) => acc + parseFloat(m[1]), 0);
+  } else if (bracketMatches.length === 1) {
+    return parseFloat(bracketMatches[0][1]);
+  }
+
+  // 3. Percentage weights e.g. "[20%]", "(20%)", "Weight: 20%", "20% weight"
+  const pctMatch = clean.match(/(?:\[|\()\s*(\d+(?:\.\d+)?)\s*%\s*(?:\]|\))|(?:weight(?:ing)?|worth|value)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*%/i);
+  if (pctMatch) {
+    return parseFloat(pctMatch[1] || pctMatch[2]);
+  }
+
+  // 4. "Marks: 25", "Weight: 15", "Points: 30"
+  const labelMatch = clean.match(/\b(?:marks?|points?|pts?|weight(?:ing)?)\s*[:=]\s*(\d+(?:\.\d+)?)/i);
+  if (labelMatch) {
+    return parseFloat(labelMatch[1]);
+  }
+
+  // 5. Standalone "[30]" at end of question or "30 marks"
+  const standaloneWordMatch = clean.match(/\b(\d+(?:\.\d+)?)\s*(?:marks?|pts?|points?)\b/i);
+  if (standaloneWordMatch) {
+    return parseFloat(standaloneWordMatch[1]);
+  }
+
+  // 6. Trailing [XX] where XX is 1-100
+  const trailingBracketNumber = clean.match(/\[\s*(\d{1,3})\s*\]$/);
+  if (trailingBracketNumber) {
+    const val = parseInt(trailingBracketNumber[1], 10);
+    if (val > 0 && val <= 100) return val;
+  }
+
+  return undefined;
+}
+
+/**
+ * Deterministically partitions a total word budget across brief questions/tasks
+ * according to explicit mark/percentage weights.
+ *
+ * Guarantees:
+ * 1. Question Target Words = round(Total Word Budget * (Question Marks / Sum All Question Marks))
+ * 2. Exact sum of Question Target Words equals Total Word Budget (via largest remainder distribution).
+ * 3. Supports partial mark specifications (allocates remainder evenly to unmarked items).
+ * 4. Subdivides large questions (>500 words) into 350–500 word sub-chunks.
+ */
+export function allocateWordsByMarks(
+  questions: Array<BriefQuestionInput | string>,
+  totalWordBudget: number
+): MarkAllocationResult {
+  const budget = Math.max(100, Math.round(totalWordBudget));
+  if (!questions || questions.length === 0) {
+    return {
+      totalWordBudget: budget,
+      targetTotalWords: budget,
+      allocatedWordBudget: 0,
+      allocatedTotalWords: 0,
+      totalMarksParsed: 0,
+      hasExplicitMarks: false,
+      questions: [],
+    };
+  }
+
+  // Normalize inputs
+  interface NormalizedItem {
+    id: string;
+    title: string;
+    rawText: string;
+    explicitMarks?: number;
+    subpartCount: number;
+  }
+
+  const normalized: NormalizedItem[] = questions.map((q, idx) => {
+    if (typeof q === "string") {
+      const marks = parseQuestionMarks(q);
+      const subparts = (q.match(/\([a-z]\)|\b[a-z]\)/gi) || []).length;
+      return {
+        id: `q-${idx + 1}`,
+        title: q,
+        rawText: q,
+        explicitMarks: marks,
+        subpartCount: subparts,
+      };
+    } else {
+      const text = `${q.title || ""} ${q.prompt || ""} ${q.rawText || ""}`.trim();
+      const parsedMarks = typeof q.marks === "number" && q.marks > 0 ? q.marks : parseQuestionMarks(text);
+      const subparts = (text.match(/\([a-z]\)|\b[a-z]\)/gi) || []).length;
+      return {
+        id: q.id || `q-${idx + 1}`,
+        title: q.title || `Question ${idx + 1}`,
+        rawText: text,
+        explicitMarks: parsedMarks,
+        subpartCount: subparts,
+      };
+    }
+  });
+
+  const markedCount = normalized.filter((n) => typeof n.explicitMarks === "number" && n.explicitMarks > 0).length;
+  const hasExplicitMarks = markedCount > 0;
+
+  // Compute effective mark weights
+  let effectiveWeights: number[];
+  let totalMarksParsed = 0;
+
+  if (markedCount === normalized.length) {
+    // All have explicit marks
+    effectiveWeights = normalized.map((n) => n.explicitMarks!);
+    totalMarksParsed = effectiveWeights.reduce((acc, m) => acc + m, 0);
+  } else if (markedCount > 0) {
+    // Mixed: some have marks, some do not
+    const sumKnownMarks = normalized.reduce((acc, n) => acc + (n.explicitMarks || 0), 0);
+    totalMarksParsed = sumKnownMarks;
+    const avgMark = sumKnownMarks / markedCount;
+    effectiveWeights = normalized.map((n) => (typeof n.explicitMarks === "number" && n.explicitMarks > 0 ? n.explicitMarks : avgMark));
+  } else {
+    // No explicit marks: weight by complexity (1 + 0.25 * subparts)
+    effectiveWeights = normalized.map((n) => 1 + 0.25 * Math.min(n.subpartCount, 4));
+  }
+
+  const sumWeights = effectiveWeights.reduce((acc, w) => acc + w, 0);
+
+  // Allocate exact integer words using Largest Remainder Method
+  const exactShares = effectiveWeights.map((w) => (w / sumWeights) * budget);
+  const floorShares = exactShares.map((s) => Math.max(1, Math.floor(s)));
+  let assignedWords = floorShares.reduce((acc, w) => acc + w, 0);
+  let deficit = budget - assignedWords;
+
+  const remainders = exactShares.map((s, idx) => ({
+    idx,
+    rem: s - floorShares[idx],
+  }));
+  remainders.sort((a, b) => b.rem - a.rem);
+
+  let rIdx = 0;
+  while (deficit > 0) {
+    floorShares[remainders[rIdx % remainders.length].idx] += 1;
+    deficit -= 1;
+    rIdx += 1;
+  }
+  while (deficit < 0) {
+    const reducible = remainders.slice().reverse().find((item) => floorShares[item.idx] > 1);
+    if (reducible) {
+      floorShares[reducible.idx] -= 1;
+      deficit += 1;
+    } else {
+      break;
+    }
+  }
+
+  // Construct final allocated questions with subchunks for >500 words
+  const resultQuestions: QuestionWordBudget[] = normalized.map((n, idx) => {
+    const targetWords = floorShares[idx];
+    const weightPercentage = Number(((effectiveWeights[idx] / sumWeights) * 100).toFixed(2));
+
+    let subChunks: Array<{ id: string; subIndex: number; title: string; targetWords: number }> | undefined = undefined;
+
+    if (targetWords > 500) {
+      // Subdivide into 350-500 word sub-chunks
+      const numChunks = Math.max(2, Math.round(targetWords / 420));
+      const baseChunkWords = Math.floor(targetWords / numChunks);
+      let chunkRemainder = targetWords % numChunks;
+
+      subChunks = [];
+      const defaultSubThemes = [
+        "Theoretical Foundations & Conceptual Framing",
+        "Empirical Evidence & Comparative Analysis",
+        "Critical Evaluation & Strategic Synthesis",
+        "Methodological Implications & Robustness",
+        "Actionable Recommendations & Policy Horizons",
+      ];
+
+      for (let cIdx = 0; cIdx < numChunks; cIdx++) {
+        const cTarget = baseChunkWords + (chunkRemainder > 0 ? 1 : 0);
+        if (chunkRemainder > 0) chunkRemainder -= 1;
+
+        const subTitle = `${n.title} — Part ${cIdx + 1}: ${defaultSubThemes[cIdx % defaultSubThemes.length]}`;
+        subChunks.push({
+          id: `${n.id}-sub-${cIdx + 1}`,
+          subIndex: cIdx + 1,
+          title: subTitle,
+          targetWords: cTarget,
+        });
+      }
+    }
+
+    const chunks = subChunks || [];
+    return {
+      id: n.id,
+      questionIndex: idx + 1,
+      title: n.title,
+      rawText: n.rawText,
+      marks: n.explicitMarks,
+      weightPercentage,
+      percentageWeight: weightPercentage,
+      targetWords,
+      allocatedWords: targetWords,
+      subChunks,
+      chunks,
+    };
+  });
+
+  const allocatedTotal = resultQuestions.reduce((acc, q) => acc + q.targetWords, 0);
+
+  return {
+    totalWordBudget: budget,
+    targetTotalWords: budget,
+    allocatedWordBudget: allocatedTotal,
+    allocatedTotalWords: allocatedTotal,
+    totalMarksParsed,
+    hasExplicitMarks,
+    questions: resultQuestions,
+  };
+}
+
 
 

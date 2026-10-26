@@ -709,8 +709,8 @@ export function extractBriefInquiriesAndConcepts(
   return {
     subQuestions,
     keyConcepts: keyConcepts.slice(0, 10),
-    extractedTasks: extractedTasks.slice(0, 6),
-    coreThemes: coreThemes.slice(0, 6),
+    extractedTasks,
+    coreThemes: coreThemes.slice(0, 10),
   };
 }
 
@@ -749,7 +749,7 @@ export function extractTargetFrameworks(
     [/\b(liberal\s*institutionalism|keohane|neoliberalism)\b/i, "Liberal Institutionalism (Keohane)"],
     [/\b(constructivism|wendt)\b/i, "Social Constructivism (Wendt)"],
     [/\bweaponized\s*interdependence\b/i, "Weaponized Interdependence (Farrell & Newman)"],
-    [/\bcommercial\s*peace\b/i, "Liberal Commercial Peace Theory"],
+    [/\bcommercial\s*peace\b/i, "Bilateral Economic Interdependence Model"],
     [/\bsecurity\s*dilemma\b/i, "Security Dilemma (Jervis)"],
     [/\binterdependence\b/i, "Complex Interdependence (Keohane & Nye)"],
     [/\bcar[- ]t\b|\bcellular\s*therapy\b|\badoptive\s*cell\b/i, "Adoptive Cellular Transfer (ACT) Mechanics"],
@@ -787,7 +787,7 @@ export function extractTargetFrameworks(
       (combined.includes("trade") && (combined.includes("conflict") || combined.includes("peace") || combined.includes("friction") || combined.includes("war") || combined.includes("interstate"))) ||
       (combined.includes("interdependence") && (combined.includes("conflict") || combined.includes("trade") || combined.includes("peace")))
     ) {
-      addIfNotPresent(frameworks, "Liberal Commercial Peace Theory");
+      addIfNotPresent(frameworks, "Bilateral Economic Interdependence Model");
       addIfNotPresent(frameworks, "Realist Strategic Vulnerability");
       addIfNotPresent(frameworks, "Weaponized Interdependence (Farrell & Newman)");
     } else if (combined.includes("nepal") || (combined.includes("foreign policy") && combined.includes("india"))) {
@@ -1290,7 +1290,7 @@ export function generateThesisStatement(
     if (toneLower.includes("persuasive") || toneLower.includes("argumentative")) {
       return "This paper contends that while economic interdependence substantially raises the direct costs of interstate military conflict, asymmetric network vulnerabilities create powerful incentives for weaponized economic coercion.";
     } else if (toneLower.includes("critical")) {
-      return "This analysis critically questions the liberal commercial peace hypothesis, demonstrating that strategic chokepoints and asymmetric trade dependencies exacerbate rather than mitigate bilateral conflict.";
+      return "This analysis critically questions the commercial interdependence hypothesis, demonstrating that strategic chokepoints and asymmetric trade dependencies exacerbate rather than mitigate bilateral conflict.";
     } else {
       return "This study examines the dual mechanisms of economic interdependence, evaluating how bilateral trade density and institutional constraints conditionally moderate interstate conflict risk.";
     }
@@ -1571,8 +1571,8 @@ export function buildBriefSpecificSpecs(
   // If the brief provided 2 or more explicit tasks or questions, mirror them directly!
   if (directTasks.length >= 2) {
     if (isTutorialOrShort) {
-      const perTaskRatio = Number((1 / Math.min(directTasks.length, 5)).toFixed(2));
-      return directTasks.slice(0, 5).map((task, tIdx) => {
+      const perTaskRatio = Number((1 / Math.max(1, directTasks.length)).toFixed(4));
+      return directTasks.map((task, tIdx) => {
         const cleanTaskTitle = formatAcademicTopicTitle(
           task
             .replace(/^(?:critically\s+evaluate|evaluate|critically\s+analyze|analyze|critically\s+assess|assess|examine|investigate|discuss|explore|propose|detail)\s+/i, "")
@@ -1598,7 +1598,7 @@ export function buildBriefSpecificSpecs(
       });
     }
 
-    const taskSpecs: HeadingSpec[] = directTasks.slice(0, 4).map((task, tIdx) => {
+    const taskSpecs: HeadingSpec[] = directTasks.map((task, tIdx) => {
       const cleanTaskTitle = formatAcademicTopicTitle(
         task
           .replace(/^(?:critically\s+evaluate|evaluate|critically\s+analyze|analyze|critically\s+assess|assess|examine|investigate|discuss|explore|propose|detail)\s+/i, "")
@@ -2108,10 +2108,7 @@ export function generateDynamicAssignmentStructure(
 
   const hasExplicitBriefDirectives =
     Boolean(briefText && briefText.trim().length > 20) &&
-    (briefInquiries.extractedTasks.length >= 2 || briefInquiries.subQuestions.length >= 2) &&
-    !isEconomicInterdependence &&
-    !isNepalIndia &&
-    !isCellTherapyCancer;
+    (briefInquiries.extractedTasks.length >= 2 || briefInquiries.subQuestions.length >= 2);
 
   const isChinaAIOrTech =
     (qLower.includes("china") || qLower.includes("chinese")) &&
@@ -2224,7 +2221,7 @@ export function generateDynamicAssignmentStructure(
     specs = [
       {
         title: "Theoretical Foundations of Economic Interdependence and Interstate Conflict",
-        notes: "Analyze classical liberal and realist paradigms regarding commercial peace and conflict mitigation.",
+        notes: "Analyze theoretical and empirical paradigms regarding economic interdependence and conflict mitigation.",
         subheadings: [
           {
             title: "Conceptualising Economic Interdependence and Trade Asymmetry",
@@ -2233,10 +2230,10 @@ export function generateDynamicAssignmentStructure(
             keyPoints: ["Conceptual definitions", "Trade asymmetry & density", "Disciplinary grounding in IPE"],
           },
           {
-            title: "Relevant Theoretical Perspectives: Liberal Commercialism vs. Realist Vulnerability",
+            title: "Relevant Theoretical Perspectives: Economic Interdependence vs. Realist Vulnerability",
             ratio: 0.18,
-            guidance: "Contrast the liberal commercial peace proposition against structural realist theories of strategic vulnerability.",
-            keyPoints: ["Liberal commercial peace", "Realist vulnerability theory", "Competing explanatory assumptions"],
+            guidance: "Contrast the economic interdependence model against structural realist theories of strategic vulnerability.",
+            keyPoints: ["Economic interdependence model", "Realist vulnerability theory", "Competing explanatory assumptions"],
           },
           {
             title: "Analytical Mechanisms Linking Interdependence to Conflict Reduction",
@@ -2251,7 +2248,7 @@ export function generateDynamicAssignmentStructure(
         notes: "Examine empirical evidence and comparative cases linking trade networks to conflict outcomes.",
         subheadings: [
           {
-            title: "Historical and Contemporary Empirical Cases of Commercial Peace",
+            title: "Historical and Contemporary Empirical Cases of Commercial Interdependence",
             ratio: 0.20,
             guidance: "Evaluate empirical datasets and bilateral case studies demonstrating the pacifying effect of high economic integration.",
             keyPoints: ["Comparative bilateral cases", "Empirical conflict incidence data", "Systemic conflict mitigation"],

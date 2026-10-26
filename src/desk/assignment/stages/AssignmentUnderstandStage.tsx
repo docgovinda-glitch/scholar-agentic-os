@@ -45,7 +45,7 @@ import {
 } from "../services/outlineService";
 import { useSubscriptionLimits } from "../../../hooks/useSubscriptionLimits";
 import { UpgradeModal } from "../../../components/modals/UpgradeModal";
-import { isDeepEqual, safeFormatLabel } from "../../../utils/briefExtractor";
+import { isDeepEqual, safeFormatLabel, allocateWordsByMarks } from "../../../utils/briefExtractor";
 import { validateBriefFile } from "../../../services/documentParser";
 import { classifyScopeBoundaries, stripLineTags } from "../../../features/understand/services/scopeClassifier";
 import type { CourseworkExecutionMode, CourseworkProgressEvent } from "../../../features/coursework/types/orchestrator";
@@ -332,8 +332,8 @@ function generateSubQuestions(question: string, briefText?: string): string[] {
   const found = [...(extracted.subQuestions || []), ...(extracted.extractedTasks || [])].filter(
     (q) => q && q.trim().length > 15
   );
-  if (found.length >= 3) {
-    return found.slice(0, 4);
+  if (found.length >= 2) {
+    return found;
   }
 
   const topic = cleanTopic(question);
@@ -1066,6 +1066,10 @@ export default function AssignmentUnderstandStage({
     return generateSubQuestions(localQuestion, localBrief);
   }, [localQuestion, localBrief]);
 
+  const markBudgets = useMemo(() => {
+    return allocateWordsByMarks(subQuestions, localWordCount);
+  }, [subQuestions, localWordCount]);
+
   const decodedVerb = useMemo(() => {
     return decodeCommandVerb(localQuestion);
   }, [localQuestion]);
@@ -1762,13 +1766,10 @@ export default function AssignmentUnderstandStage({
                   <input
                     id="target_word_count"
                     name="target_word_count"
-                    type="text"
-                    value={
-                      isWordCountFocused
-                        ? (localWordCount > 0 ? String(localWordCount) : "")
-                        : `${(Number(localWordCount) || 2000).toLocaleString()} words`
-                    }
-                    onFocus={() => setIsWordCountFocused(true)}
+                    type="number"
+                    role="spinbutton"
+                    aria-valuenow={localWordCount > 0 ? localWordCount : 2000}
+                    value={localWordCount > 0 ? localWordCount : 2000}
                     onChange={(e) => {
                       const raw = e.target.value.replace(/[^0-9]/g, "");
                       if (!raw) {
@@ -1783,14 +1784,13 @@ export default function AssignmentUnderstandStage({
                       }
                     }}
                     onBlur={() => {
-                      setIsWordCountFocused(false);
                       if (!localWordCount || localWordCount < 100) {
                         handleTargetWordCountChange(2000);
                       }
                     }}
                     aria-label="Target Word Count"
-                    placeholder="2,000 words"
-                    className="w-full min-w-[115px] whitespace-nowrap h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2 text-center text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums shadow-2xs"
+                    placeholder="2000"
+                    className="w-full min-w-[115px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none whitespace-nowrap h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2 text-center text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums shadow-2xs"
                   />
                 </div>
                 <button
@@ -1974,17 +1974,44 @@ export default function AssignmentUnderstandStage({
                 Key Sub-Questions Your Essay Must Answer
               </span>
               <div className="space-y-2">
-                {subQuestions.map((sq, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start gap-2.5 p-3 rounded-xl bg-neutral-50/60 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/5 text-xs text-neutral-800 dark:text-neutral-200"
-                  >
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-neutral-200/70 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 shrink-0 mt-0.5">
-                      Q{idx + 1}
-                    </span>
-                    <span className="leading-relaxed font-medium">{sq}</span>
-                  </div>
-                ))}
+                {subQuestions.map((sq, idx) => {
+                  const qBudget = markBudgets.questions[idx];
+                  return (
+                    <div
+                      key={idx}
+                      className="p-3.5 rounded-xl bg-neutral-50/60 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/5 space-y-2 text-xs text-neutral-800 dark:text-neutral-200"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-neutral-200/70 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 shrink-0 mt-0.5">
+                          Q{idx + 1}
+                        </span>
+                        <span className="leading-relaxed font-medium">{sq}</span>
+                      </div>
+
+                      {qBudget && (
+                        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-neutral-200/40 dark:border-white/5 text-[11px]">
+                          {typeof qBudget.marks === "number" && qBudget.marks > 0 ? (
+                            <span className="px-2 py-0.5 rounded-md font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                              {qBudget.marks} Marks ({qBudget.weightPercentage}%)
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md font-semibold bg-neutral-200/50 dark:bg-white/5 text-neutral-600 dark:text-neutral-400">
+                              Weight: {qBudget.weightPercentage}%
+                            </span>
+                          )}
+                          <span className="px-2 py-0.5 rounded-md font-mono font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                            Target: ~{qBudget.targetWords.toLocaleString()} words
+                          </span>
+                          {qBudget.subChunks && qBudget.subChunks.length > 1 && (
+                            <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                              ({qBudget.subChunks.length} analytical sub-parts)
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

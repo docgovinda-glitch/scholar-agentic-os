@@ -3971,7 +3971,7 @@ export function conductAskScholarResearchForOutline(
   const secondaryTheory = deconstruction.theories[1] || "Institutional Framework";
   const geoOrCase = deconstruction.cases[0] || deconstruction.geographicScope[0] || "Contemporary Context";
 
-  let subQuestions = rawSubQuestions.slice(0, 4);
+  let subQuestions = [...rawSubQuestions];
 
   if (subQuestions.length < 2) {
     switch (inquiryType) {
