@@ -22,6 +22,7 @@ import {
 } from "../../src/utils/scholarlyVoiceGuard.ts";
 import { computeG7ExitCriteria } from "../../../src/app/conductor/conductor.ts";
 import { exportDocument } from "../../../src/app/export/export.ts";
+import { renderRefereeResponseLetterDocx } from "../../../src/app/export/docxWriter.ts";
 import type { ExportFormat } from "../../../src/app/export/types.ts";
 import type { AcademicTemplate } from "../../../src/app/export/academicPdfCompiler.ts";
 import type { CanonicalDocument, Block } from "../../../src/desk/types.ts";
@@ -2783,11 +2784,86 @@ The empirical results confirm that bounded multi-agent consensus achieves provab
       docxUrl: `/api/projects/${project.projectId}/export/docx?template=${template}`,
       latexUrl: `/api/projects/${project.projectId}/export/latex?template=${template}`,
       typstUrl: `/api/projects/${project.projectId}/export/typst?template=${template}`,
-      formatsAvailable: ["pdf", "docx", "latex", "typst", "markdown"],
+      rebuttalLetterUrl: `/api/projects/${project.projectId}/export/rebuttal-letter`,
+      formatsAvailable: ["pdf", "docx", "latex", "typst", "markdown", "rebuttal-letter"],
       hasRebuttalAppendix: Boolean(includeRebuttalAppendix),
       generatedAt: updatedAnswers.export_timestamp,
     },
   });
+});
+
+// GET /api/projects/:id/agent/export/rebuttal-letter
+router.get("/export/rebuttal-letter", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+
+  let rebuttalMatrix: Array<{ referee: string; lens?: string; section?: string; severity?: string; critique: string; authorResponse: string; revisionAction?: string }> | undefined = undefined;
+  if (project.answers?.["rebuttal_matrix"]) {
+    try {
+      const parsed = JSON.parse(project.answers["rebuttal_matrix"]);
+      if (Array.isArray(parsed)) rebuttalMatrix = parsed;
+    } catch {}
+  }
+
+  const buffer = await renderRefereeResponseLetterDocx(
+    {
+      title: project.answers?.["working_title"] || (project as { title?: string }).title || "Academic Manuscript",
+      author: project.authors?.[0]
+        ? `${project.authors[0].firstName} ${project.authors[0].surname}`
+        : "Lead Investigator",
+      created: new Date(),
+      modified: new Date(),
+    },
+    {
+      template: "nature",
+      rebuttalMatrix,
+    }
+  );
+
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  );
+  res.setHeader("Content-Disposition", 'attachment; filename="Referee_Response_Letter.docx"');
+  res.setHeader("Content-Length", buffer.length);
+  res.send(buffer);
+});
+
+// POST /api/projects/:id/agent/export/rebuttal-letter
+router.post("/export/rebuttal-letter", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+
+  let rebuttalMatrix: Array<{ referee: string; lens?: string; section?: string; severity?: string; critique: string; authorResponse: string; revisionAction?: string }> | undefined = req.body?.rebuttalMatrix;
+  if (!rebuttalMatrix && project.answers?.["rebuttal_matrix"]) {
+    try {
+      const parsed = JSON.parse(project.answers["rebuttal_matrix"]);
+      if (Array.isArray(parsed)) rebuttalMatrix = parsed;
+    } catch {}
+  }
+
+  const buffer = await renderRefereeResponseLetterDocx(
+    {
+      title: project.answers?.["working_title"] || (project as { title?: string }).title || "Academic Manuscript",
+      author: project.authors?.[0]
+        ? `${project.authors[0].firstName} ${project.authors[0].surname}`
+        : "Lead Investigator",
+      created: new Date(),
+      modified: new Date(),
+    },
+    {
+      template: "nature",
+      rebuttalMatrix,
+    }
+  );
+
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  );
+  res.setHeader("Content-Disposition", 'attachment; filename="Referee_Response_Letter.docx"');
+  res.setHeader("Content-Length", buffer.length);
+  res.send(buffer);
 });
 
 // POST /api/projects/:id/agent/copilot-chat

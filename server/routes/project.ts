@@ -2493,9 +2493,20 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       return res.status(400).json({ error: "Cannot export a project with no document submitted yet." });
     }
 
-    const rawFormat = req.params?.format || req.body?.format;
+    const rawFormat = req.params?.format || req.body?.format || req.query?.format;
     const format = typeof rawFormat === "string" ? rawFormat.toLowerCase() : "";
-    const validFormats = ["docx", "odt", "pdf", "latex", "typst", "camera_ready_pdf", "markdown", "md"];
+    const validFormats = [
+      "docx",
+      "odt",
+      "pdf",
+      "latex",
+      "typst",
+      "camera_ready_pdf",
+      "markdown",
+      "md",
+      "rebuttal_letter",
+      "rebuttal-letter",
+    ];
     if (!validFormats.includes(format)) {
       return res.status(400).json({ error: `Invalid export format. Must be one of: ${validFormats.join(", ")}` });
     }
@@ -2538,17 +2549,66 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
 
     try {
-      const template = req.body?.template;
+      const template = req.body?.template || req.query?.template;
       const targetFormat = (format === "pdf" && template) ? "camera_ready_pdf" : (format as ExportFormat);
+
+      let rebuttalMatrix: Array<{ referee: string; lens?: string; section?: string; severity?: string; critique: string; authorResponse: string; revisionAction?: string }> | undefined = undefined;
+      if (record.answers?.["rebuttal_matrix"]) {
+        try {
+          const parsed = JSON.parse(record.answers["rebuttal_matrix"]);
+          if (Array.isArray(parsed)) rebuttalMatrix = parsed;
+        } catch {}
+      }
+
       const result = await exportDocument({
         document: documentToExport,
         format: targetFormat,
         title: documentToExport.title,
         author: record.authors?.[0] ? `${record.authors[0].firstName} ${record.authors[0].surname}` : "Scholar OS",
-        academicOptions: template ? { template } : undefined,
+        academicOptions: {
+          template: (template as any) || "apa7",
+          runningHead: req.body?.runningHead || req.query?.runningHead || record.answers?.["running_head"],
+          authorAffiliation: req.body?.affiliation || req.query?.affiliation || record.authors?.[0]?.affiliation,
+          authorEmail: req.body?.email || req.query?.email || record.authors?.[0]?.email,
+          authorOrcid: req.body?.orcid || req.query?.orcid || record.answers?.["author_orcid"],
+          authors: record.authors && record.authors.length > 0
+            ? record.authors.map((a) => ({
+                name: `${a.firstName} ${a.surname}`.trim(),
+                affiliation: a.affiliation,
+                email: a.email,
+                isCorresponding: true,
+              }))
+            : undefined,
+          keywords: req.body?.keywords || (record.answers?.["keywords"] ? record.answers["keywords"].split(",").map((s: string) => s.trim()) : undefined),
+          abstractText: record.answers?.["abstract"] || record.answers?.["abstract_text"],
+          lineSpacing: req.body?.lineSpacing ? (Number(req.body.lineSpacing) as 1.15 | 1.5 | 2.0) : 2.0,
+          ethicalDeclarations: {
+            dataAvailability: record.answers?.["data_availability_statement"],
+            competingInterests: record.answers?.["competing_interests_statement"],
+            funding: record.answers?.["funding_statement"],
+            authorContributions: record.answers?.["credit_statement"],
+            aiDisclosure: record.answers?.["ai_disclosure_statement"],
+          },
+          rebuttalMatrix,
+          includeRebuttalAppendix: Boolean(req.body?.includeRebuttalAppendix ?? req.query?.includeRebuttalAppendix),
+        },
       });
 
-      res.setHeader("Content-Type", "application/octet-stream");
+      if (format === "pdf" || format === "camera_ready_pdf") {
+        res.setHeader("Content-Type", "application/pdf");
+      } else if (
+        format === "docx" ||
+        format === "rebuttal_letter" ||
+        format === "rebuttal-letter"
+      ) {
+        res.setHeader(
+          "Content-Type",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+      } else {
+        res.setHeader("Content-Type", "application/octet-stream");
+      }
+
       res.setHeader("Content-Disposition", `attachment; filename="${result.filename}"`);
       res.setHeader("Content-Length", result.byteSize);
       res.send(result.data);
@@ -2560,4 +2620,5 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
   app.post("/api/projects/:id/export", projectLimit, exportHandler);
   app.post("/api/projects/:id/export/:format", projectLimit, exportHandler);
+  app.get("/api/projects/:id/export/:format", projectLimit, exportHandler);
 }

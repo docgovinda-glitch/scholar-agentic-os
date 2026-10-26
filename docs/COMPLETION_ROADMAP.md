@@ -181,4 +181,37 @@ This document establishes the authoritative completion baseline for **Scholar Co
   - Passed `npm run lint` (0 TypeScript errors, 82/82 WCAG contrast pairs pass, CSP hash matches).
   - Clean production build (`npm run build`).
 
+### Phase 8: 5-Mode Executive Journal Studio Rebuild (OT-10) (Steps A, B, C, and D — 100% Completed)
+- [x] **Step A: 5-Mode Executive Architecture & Navigation Rebuild**:
+  - Rebuilt the Journal Article workspace (`src/desk/workspace/ResearchWorkspace.tsx`) from a fragmented 25-step wizard into an executive 5-Mode Studio:
+    - **Mode 1 (`protocol`)**: Protocol & Gap Blueprint (Target Journal, Section Word Budgets, Literature Gaps, Title Lock).
+    - **Mode 2 (`evidence`)**: Empirical Evidence & Claim Ledger (Knowledge Vault literature, Primary user datasets `[CITE:user_data_*]`, Grounded Claim Matrix).
+    - **Mode 3 (`drafting`)**: Grounded Manuscript Studio (3-Pane Split Layout, Sub-Section Word Budget tracking, Live Citations, Zen Focus).
+    - **Mode 4 (`rebuttal`)**: Unified 5-Referee Rebuttal Workbench (Simulated Peer Review, Point-by-Point Rebuttal Matrix, Direct Manuscript Revision Actions).
+    - **Mode 5 (`audit` / `audit_export`)**: Unified Pre-Flight Compliance Audit & Submission Studio (Conductor Gate G7 Scorecard, 2026 Publisher Ethical Declarations, Camera-Ready `.docx`, `.pdf`, and standalone `Referee_Response_Letter.docx` compiler).
+  - Integrated Conductor Gate progress pills (G0, G1/G2, G3/G4, G5/G6, G7) into the unified navigation header.
+- [x] **Step B: Mode 1 Protocol Blueprint & Mode 2 Empirical Evidence Matrix with Primary Data Ingestion**:
+  - Built `ProtocolBlueprintMode.tsx` with IMRaD section budget calculators, dynamic literature gap discovery via multi-portal search, and cryptographic Title Lock (`G1`).
+  - Built `EvidenceMatrixMode.tsx` with multi-format primary user data ingestion (CSV, JSON, TSV, XLSX, TXT) via memory buffer parsing, generating formal `[CITE:user_data_*]` citations.
+  - Integrated `server/routes/project/agentic.ts` (`/agentic/upload-user-data`) with strict client-owned AI routing.
+  - Verified with frontend Vitest suite (`journalStudioStepB.test.tsx`, 7/7 passing).
+- [x] **Step C: Mode 3 Grounded Manuscript Studio & Mode 4 Unified Referee Rebuttal Workbench**:
+  - Built `ManuscriptStudioMode.tsx` with synchronized 3-pane split layout (Section Navigator with Mode 1 Word Budgets, TipTap/Markdown Prosemirror Editor, Context & Copilot Panel) and Zen Focus mode.
+  - Built `RefereeRebuttalMode.tsx` simulating 5 specialized peer reviewers (Methodologist, Domain Expert, Statistician, Synthesizer, Skeptic) generating a structured Point-by-Point Rebuttal Matrix with automated 1-click revision application to the manuscript draft.
+  - Verified with frontend Vitest suite (`journalStudioStepC.test.tsx`, 8/8 passing).
+- [x] **Step D: Mode 5 Unified Pre-Flight Compliance Studio & Camera-Ready Compilers**:
+  - Built `AuditExportMode.tsx` unifying Conductor Gate G7 pre-submission certification and submission package export into a dual-panel studio:
+    - **Gate G7 Scorecard**: Real-time Word Count Budget compliance ($\pm 5\%$ tolerance badge), 100% Citation & Chronological Reconciliation (`[CITE:user_data_*]`, 0 uncited sources, 0 orphan citations, 0 anachronisms $Y_{\text{pub}} < Y_{\text{event}}$), Humanized Voice Telemetry (`scholarlyVoiceGuard` burstiness, 0 banned AI clichés, British English orthography), and 2026 Publisher Ethical Declarations (ICMJE/COPE/Elsevier/Wiley toggles with 1-click manuscript end-matter append).
+    - **Submission Package Exporter**: Configurable layout (1-Column Double-Spaced 2.0 vs. 2-Column Camera-Ready), APA 7/IEEE/Harvard/Chicago citation styles, Title Page metadata, and 1-click downloads for Journal Manuscript (`.docx`), Camera-Ready Manuscript (`.pdf`), Standalone Point-by-Point Referee Response Letter (`.docx`), and secondary exports (`.tex`, `.typ`, `.md`).
+  - Upgraded AST Word generator (`src/app/export/docxWriter.ts`) with dedicated Title Page, Abstract & Keywords page break, 2.0 double-spaced body, Markdown table conversion into native Word tables, NFC Unicode and IAST diacritics preservation (`ā, ī, ū, ṛ, ś, ṣ, ṇ`), and 0.5" (`720 twips`) APA 7 hanging-indent references.
+  - Upgraded `server/routes/project.ts` and `server/routes/project/agentic.ts` supporting `rebuttal-letter` routes with standardized openxmlformats MIME headers.
+  - Verified with Vitest suites:
+    - `src/desk/workspace/__tests__/journalStudioStepD.test.tsx` (5/5 passing).
+    - `server/routes/__tests__/journalStudioStepD.backend.test.ts` (10/10 passing).
+- [x] **Zero Quality Debt Enforced**:
+  - 100% TypeScript compilation clean (`tsc --noEmit`, 0 errors).
+  - 82/82 WCAG AA color contrast pairings passing (0 failures).
+  - 100% clean production build (`npm run build`, Vite client + esbuild server).
+
+
 

@@ -1780,4 +1780,101 @@ export async function generateProjectRebuttalMatrix(
   return res.json();
 }
 
+export async function runPreFlightComplianceAudit(projectId: string): Promise<{
+  ok: boolean;
+  data: import("./workspace/types").PreFlightGateScorecard;
+}> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agent/publication-readiness`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to execute pre-flight compliance audit");
+  }
+  return res.json();
+}
+
+export async function exportProjectManuscript(
+  projectId: string,
+  payload: {
+    format: string;
+    template?: string;
+    citationStyle?: string;
+    includeRebuttalAppendix?: boolean;
+    manuscript?: string;
+  }
+): Promise<{
+  ok: boolean;
+  data: {
+    success: boolean;
+    filename: string;
+    downloadUrl: string;
+    pdfUrl?: string;
+    docxUrl?: string;
+    rebuttalLetterUrl?: string;
+    latexUrl?: string;
+    typstUrl?: string;
+    byteSize: number;
+    formatsAvailable: string[];
+    generatedAt: string;
+  };
+}> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agent/export`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to compile export package");
+  }
+  return res.json();
+}
+
+export async function downloadProjectExportBlob(
+  projectId: string,
+  format: string,
+  options?: { template?: string; includeRebuttalAppendix?: boolean }
+): Promise<Blob> {
+  const url = `/api/projects/${encodeURIComponent(projectId)}/export/${encodeURIComponent(format)}`;
+  const res = await authedFetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept:
+        format === "docx"
+          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/octet-stream"
+          : format === "pdf"
+          ? "application/pdf, application/octet-stream"
+          : "*/*",
+    },
+    body: JSON.stringify(options || {}),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to download ${format} file: HTTP ${res.status}`);
+  }
+  return res.blob();
+}
+
+export async function downloadRefereeResponseLetterBlob(
+  projectId: string
+): Promise<Blob> {
+  const res = await authedFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/export/rebuttal-letter`,
+    {
+      method: "POST",
+      headers: {
+        Accept:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/octet-stream",
+      },
+    }
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to download Referee Response Letter: HTTP ${res.status}`);
+  }
+  return res.blob();
+}
+
 

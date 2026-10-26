@@ -5,8 +5,20 @@
  * Extracts text, headings, and metadata.
  */
 
-import { inflateRawSync } from "zlib";
 import type { Parser, ParserMetadata, DocumentInput, ParserOperationResult, ParserResult } from "../types";
+
+function safeInflateRaw(compressed: Buffer): string | undefined {
+  try {
+    // Dynamic import/require for Node environments without breaking browser bundling
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const req = typeof module !== "undefined" && typeof require === "function" ? require : null;
+    const zlib = req ? req("zlib") : null;
+    if (zlib?.inflateRawSync) {
+      return zlib.inflateRawSync(compressed).toString("utf-8");
+    }
+  } catch {}
+  return undefined;
+}
 
 // ============================================================================
 // DOCX Parser
@@ -268,7 +280,7 @@ export class DOCXParser implements Parser {
             return compressed.toString("utf-8");
           }
           if (compressionMethod === 8) {
-            return inflateRawSync(compressed).toString("utf-8");
+            return safeInflateRaw(compressed);
           }
           return undefined; // Unsupported compression method
         } catch {

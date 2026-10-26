@@ -8,7 +8,7 @@
  */
 
 import type { CanonicalDocument, Block } from "../../desk/types";
-import { renderDocx } from "./docxWriter";
+import { renderDocx, renderRefereeResponseLetterDocx } from "./docxWriter";
 import { renderOdt } from "./odtWriter";
 import { renderPdf } from "./pdfWriter";
 import {
@@ -79,7 +79,10 @@ async function render(
 ): Promise<Buffer> {
   switch (format) {
     case "docx":
-      return renderDocx(document, metadata);
+      return renderDocx(document, metadata, academicOptions);
+    case "rebuttal_letter":
+    case "rebuttal-letter":
+      return renderRefereeResponseLetterDocx(metadata, academicOptions);
     case "odt":
       return renderOdt(document, metadata);
     case "pdf":
@@ -152,10 +155,16 @@ export async function exportDocument(input: ExportInput): Promise<ExportResult> 
     docx: "docx",
     latex: "tex",
     typst: "typ",
+    rebuttal_letter: "docx",
+    "rebuttal-letter": "docx",
   };
 
   const extension = extensionMap[input.format] || "docx";
-  const filename = `${input.title.replace(/[^a-z0-9]/gi, "_")}.${extension}`;
+  const docTitle = input.title || input.document?.title || "manuscript";
+  const filename =
+    input.format === "rebuttal_letter" || input.format === "rebuttal-letter"
+      ? "Referee_Response_Letter.docx"
+      : `${docTitle.replace(/[^a-z0-9]/gi, "_")}.${extension}`;
 
   return {
     format: input.format,

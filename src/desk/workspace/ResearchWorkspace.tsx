@@ -15,6 +15,7 @@ import ProtocolBlueprintMode from "./ProtocolBlueprintMode";
 import EvidenceMatrixMode from "./EvidenceMatrixMode";
 import ManuscriptStudioMode from "./ManuscriptStudioMode";
 import RefereeRebuttalMode from "./RefereeRebuttalMode";
+import AuditExportMode from "./AuditExportMode";
 
 function ResearchWorkspaceInner({
   onClose,
@@ -667,6 +668,8 @@ function ResearchWorkspaceInner({
               <ManuscriptStudioMode />
             ) : currentMode === "referee" ? (
               <RefereeRebuttalMode />
+            ) : currentMode === "audit" || currentMode === "audit_export" ? (
+              <AuditExportMode />
             ) : (
               <ActiveStageComponent 
                 stage={currentStage} 

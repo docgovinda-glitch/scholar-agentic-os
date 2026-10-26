@@ -180,7 +180,8 @@ export type JournalStudioMode =
   | "evidence"
   | "studio"
   | "referee"
-  | "audit_export";
+  | "audit_export"
+  | "audit";
 
 export interface StudioModeDefinition {
   id: JournalStudioMode;
@@ -397,7 +398,55 @@ export interface BibliographyEntry {
   isUserData: boolean;
 }
 
+export interface PreFlightGateScorecard {
+  overallStatus: "CERTIFIED_READY" | "CONDITIONAL_APPROVAL" | "ACTION_REQUIRED";
+  score: number;
+  wordBudgetMatch: {
+    targetWords: number;
+    actualWords: number;
+    deltaPercent: number;
+    passed: boolean;
+    tolerancePercent: number;
+  };
+  citationReconciliation: {
+    totalInTextCitations: number;
+    reconciledCount: number;
+    orphanCitations: string[];
+    uncitedVaultSources: string[];
+    unverifiedClaimsCount: number;
+    anachronismsCount: number;
+    passed: boolean;
+  };
+  voiceTelemetry: {
+    burstinessScore: number;
+    sentenceStdDev: number;
+    bannedTokensFound: string[];
+    britishSpellingConsistency: number;
+    isHighBurstiness: boolean;
+  };
+  declarationsCompliance: {
+    hasDataAvailability: boolean;
+    hasCompetingInterests: boolean;
+    hasCreditStatement: boolean;
+    hasAiDisclosure: boolean;
+    passed: boolean;
+  };
+  certifiedAt: string;
+}
 
+export interface EthicalDeclarationsState {
+  dataAvailability: string;
+  competingInterests: string;
+  funding: string;
+  creditStatement: string;
+  aiDisclosure: string;
+  enabled: {
+    dataAvailability: boolean;
+    competingInterests: boolean;
+    creditStatement: boolean;
+    aiDisclosure: boolean;
+  };
+}
 
 /**
  * Streamlined 9-Milestone Academic Pipeline
