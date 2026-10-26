@@ -167,6 +167,187 @@ export function isResearchStage(value: string | undefined): value is ResearchSta
 }
 
 /**
+ * 5-Mode Journal Studio Architecture
+ *
+ * Mode 1: Protocol & Blueprint (Research Question, Literature Gap, Title Lock, Journal Rules, Word Budget Allocator)
+ * Mode 2: Literature & Data Matrix (Multi-Portal Scholarly Discovery, Primary User Data Upload, Smart Evidence Matrix)
+ * Mode 3: Manuscript Studio (Grounded TipTap 3 Split-Pane Section Drafting)
+ * Mode 4: Referee & Rebuttal (5-Referee Academic Peer Review & Patch Matrix)
+ * Mode 5: Audit & Submission Export (Gate G7 Pre-Flight Audit & Camera-Ready Exporter)
+ */
+export type JournalStudioMode =
+  | "protocol"
+  | "evidence"
+  | "studio"
+  | "referee"
+  | "audit_export";
+
+export interface StudioModeDefinition {
+  id: JournalStudioMode;
+  number: number;
+  label: string;
+  shortLabel: string;
+  description: string;
+  icon: string;
+  primaryStage: ResearchStage;
+  stages: ResearchStage[];
+}
+
+export const JOURNAL_STUDIO_MODES: StudioModeDefinition[] = [
+  {
+    id: "protocol",
+    number: 1,
+    label: "Mode 1 · Protocol & Blueprint",
+    shortLabel: "Protocol & Blueprint",
+    description: "Thesis, Gaps, Journal Rules & Word Budget Blueprint",
+    icon: ICONS.document,
+    primaryStage: "definition",
+    stages: [
+      "definition",
+      "literature",
+      "gap_identification",
+      "gap_selection",
+      "title_selection",
+      "title_lock",
+      "journal_discovery",
+      "journal_requirements",
+    ],
+  },
+  {
+    id: "evidence",
+    number: 2,
+    label: "Mode 2 · Literature & Data Matrix",
+    shortLabel: "Literature & Data Matrix",
+    description: "Live Scholarly Search, User Data Upload & Evidence Matrix",
+    icon: ICONS.database,
+    primaryStage: "vault_sources",
+    stages: [
+      "vault_sources",
+      "source_approval_vault",
+      "additional_data",
+      "evidence_extraction",
+      "external_research",
+      "source_approval_external",
+      "evidence_analysis",
+      "manual_review",
+    ],
+  },
+  {
+    id: "studio",
+    number: 3,
+    label: "Mode 3 · Manuscript Studio",
+    shortLabel: "Manuscript Studio",
+    description: "Grounded Section-by-Section TipTap Drafting Studio",
+    icon: ICONS.pen,
+    primaryStage: "draft",
+    stages: ["draft", "draft_preview"],
+  },
+  {
+    id: "referee",
+    number: 4,
+    label: "Mode 4 · Referee & Rebuttal",
+    shortLabel: "Referee & Rebuttal",
+    description: "5-Referee Peer Review & Interactive Patch Matrix",
+    icon: ICONS.review,
+    primaryStage: "peer_review",
+    stages: ["peer_review", "revision"],
+  },
+  {
+    id: "audit_export",
+    number: 5,
+    label: "Mode 5 · Audit & Submission Export",
+    shortLabel: "Audit & Submission Export",
+    description: "Gate G7 Pre-Flight Verification & Camera-Ready Exporter",
+    icon: ICONS.export,
+    primaryStage: "export",
+    stages: [
+      "citation_audit",
+      "originality_check",
+      "final_editor",
+      "publication_readiness",
+      "export",
+    ],
+  },
+];
+
+export function getStudioModeForStage(stage: ResearchStage): StudioModeDefinition {
+  return JOURNAL_STUDIO_MODES.find(m => m.stages.includes(stage)) || JOURNAL_STUDIO_MODES[0];
+}
+
+export function isStudioMode(value: string | undefined): value is JournalStudioMode {
+  return JOURNAL_STUDIO_MODES.some(m => m.id === value);
+}
+
+export interface UserDatasetItem {
+  id: string;
+  citationToken: string;
+  title: string;
+  author: string;
+  year: number;
+  badge: "Primary User Data / Upload";
+  sourceType: "quantitative_dataset" | "qualitative_document" | "field_notes" | "raw_text";
+  format: string;
+  summary: string;
+  extractedFindings: string;
+  keyMetrics?: string[];
+  assignedSectionId?: string;
+  epistemicRole: "Primary User Dataset" | "Supporting" | "Methodological Anchor" | "Contrasting / Critical";
+  rawContentSample?: string;
+  createdAt: string;
+}
+
+export interface SmartEvidenceRow {
+  id: string;
+  citationToken: string;
+  title: string;
+  authors: string[];
+  year: number;
+  doi?: string;
+  portal?: string;
+  badge: string;
+  isUserData: boolean;
+  epistemicRole: "Supporting" | "Contrasting / Critical" | "Methodological Anchor" | "Primary User Dataset";
+  extractedFindings: string;
+  assignedSectionId: string;
+}
+
+export type ManuscriptTemplate = "IMRaD" | "Theoretical" | "SystematicReview";
+
+export interface SubSectionBudget {
+  id: string;
+  sectionId: string;
+  title: string;
+  targetWords: number;
+  order: number;
+  assignedSourceIds: string[];
+  content?: string;
+  actualWords?: number;
+  draftedAt?: string;
+}
+
+export interface SectionBudget {
+  id: string;
+  sectionKey: string;
+  sectionName: string;
+  targetWords: number;
+  order: number;
+  subSections: SubSectionBudget[];
+}
+
+export interface WordBudgetBlueprint {
+  projectId: string;
+  template: ManuscriptTemplate;
+  targetTotalWords: number;
+  allocatedTotalWords: number;
+  sections: SectionBudget[];
+  totalSubSections: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+
+
+/**
  * Streamlined 9-Milestone Academic Pipeline
  *
  * Consolidates the 25 underlying execution stages into 9 cohesive,

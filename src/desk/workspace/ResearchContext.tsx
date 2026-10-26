@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../types";
-import type { ResearchStage, StageStatus } from "./types";
-import { isResearchStage } from "./types";
+import type { ResearchStage, StageStatus, JournalStudioMode } from "./types";
+import { isResearchStage, getStudioModeForStage, isStudioMode, JOURNAL_STUDIO_MODES } from "./types";
 import { getDocument, getOutputTypeSpec, getProject, getRubric, saveIntakeAnswers, setGlobalManualModelOverride, UnauthenticatedError } from "../api";
 import { computeStageStatuses } from "./utils";
 import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
@@ -13,9 +13,11 @@ interface ResearchContextValue {
   rubric: RubricReport | null;
   outputType: OutputTypeSpec | null;
   currentStage: ResearchStage;
+  currentMode: JournalStudioMode;
   stageStatuses: Record<ResearchStage, StageStatus>;
   setProject: (project: ProjectView) => void;
   setStage: (stage: ResearchStage, options?: { replace?: boolean }) => void;
+  setMode: (mode: JournalStudioMode) => void;
   advanceStage: (nextStage: ResearchStage) => void;
   error: string | null;
   isLoading: boolean;
@@ -65,11 +67,15 @@ export function ResearchProvider({
   const [fallbackToast, setFallbackToast] = useState<string | null>(null);
 
   const currentStage = initialStage ?? "definition";
+  const [currentMode, setCurrentModeState] = useState<JournalStudioMode>(() => {
+    return getStudioModeForStage(currentStage).id;
+  });
   const latestStageRef = React.useRef<ResearchStage | null>(initialStage);
 
   useEffect(() => {
     if (initialStage) {
       latestStageRef.current = initialStage;
+      setCurrentModeState(getStudioModeForStage(initialStage).id);
     }
   }, [initialStage]);
 
@@ -94,9 +100,17 @@ export function ResearchProvider({
       setRubric(rub);
       setOutputType(await getOutputTypeSpec(proj.outputTypeId).catch(() => null));
 
+      const persistedStage = proj.answers?.["current_stage"];
+      const targetStage: ResearchStage = (persistedStage && isResearchStage(persistedStage)) ? (persistedStage as ResearchStage) : "definition";
+
+      const persistedMode = proj.answers?.["current_mode"];
+      if (persistedMode && isStudioMode(persistedMode)) {
+        setCurrentModeState(persistedMode);
+      } else {
+        setCurrentModeState(getStudioModeForStage(targetStage).id);
+      }
+
       if (initialStage === null) {
-        const persistedStage = proj.answers?.["current_stage"];
-        const targetStage: ResearchStage = (persistedStage && isResearchStage(persistedStage)) ? (persistedStage as ResearchStage) : "definition";
         onStageChangeCallback(targetStage, { replace: true });
       }
     } catch (e) {
@@ -164,20 +178,52 @@ export function ResearchProvider({
 
     const previousStage = currentStage;
     const previousAnswers = project?.answers;
+    const targetMode = getStudioModeForStage(stage).id;
 
     latestStageRef.current = stage;
-    setProject((prev) => (prev ? { ...prev, answers: { ...prev.answers, current_stage: stage } } : prev));
+    setCurrentModeState(targetMode);
+    setProject((prev) => (prev ? {
+      ...prev,
+      answers: { ...prev.answers, current_stage: stage, current_mode: targetMode }
+    } : prev));
     onStageChangeCallback(stage, options);
 
     try {
-      const updated = await saveIntakeAnswers(projectId, { current_stage: stage });
+      const updated = await saveIntakeAnswers(projectId, { current_stage: stage, current_mode: targetMode });
       setProject(updated);
     } catch (err: unknown) {
       console.error("[ResearchNavigation] Failed to persist stage change, reconciling state:", err);
       latestStageRef.current = previousStage;
+      setCurrentModeState(getStudioModeForStage(previousStage).id);
       setProject((prev) => (prev ? { ...prev, answers: previousAnswers || prev.answers } : prev));
       onStageChangeCallback(previousStage);
       setError(`Failed to switch to stage "${stage}". Reverted to "${previousStage}".`);
+    }
+  }, [currentStage, onStageChangeCallback, project?.answers, projectId]);
+
+  const setMode = useCallback(async (mode: JournalStudioMode) => {
+    setCurrentModeState(mode);
+    const modeDef = JOURNAL_STUDIO_MODES.find((m) => m.id === mode);
+    const targetStage = modeDef?.primaryStage || "definition";
+    const previousStage = currentStage;
+    const previousAnswers = project?.answers;
+
+    latestStageRef.current = targetStage;
+    setProject((prev) => (prev ? {
+      ...prev,
+      answers: { ...prev.answers, current_mode: mode, current_stage: targetStage }
+    } : prev));
+    onStageChangeCallback(targetStage);
+
+    try {
+      const updated = await saveIntakeAnswers(projectId, { current_mode: mode, current_stage: targetStage });
+      setProject(updated);
+    } catch (err: unknown) {
+      console.warn("[ResearchNavigation] Failed to persist mode change:", err);
+      latestStageRef.current = previousStage;
+      setCurrentModeState(getStudioModeForStage(previousStage).id);
+      setProject((prev) => (prev ? { ...prev, answers: previousAnswers || prev.answers } : prev));
+      onStageChangeCallback(previousStage);
     }
   }, [currentStage, onStageChangeCallback, project?.answers, projectId]);
 
@@ -195,17 +241,23 @@ export function ResearchProvider({
 
     const previousStage = currentStage;
     const previousAnswers = project?.answers;
+    const targetMode = getStudioModeForStage(nextStage).id;
 
     latestStageRef.current = nextStage;
-    setProject((prev) => (prev ? { ...prev, answers: { ...prev.answers, current_stage: nextStage } } : prev));
+    setCurrentModeState(targetMode);
+    setProject((prev) => (prev ? {
+      ...prev,
+      answers: { ...prev.answers, current_stage: nextStage, current_mode: targetMode }
+    } : prev));
     onStageChangeCallback(nextStage);
 
     try {
-      const updated = await saveIntakeAnswers(projectId, { current_stage: nextStage });
+      const updated = await saveIntakeAnswers(projectId, { current_stage: nextStage, current_mode: targetMode });
       setProject(updated);
     } catch (err: unknown) {
       console.error("[ResearchNavigation] Failed to persist stage progression, reconciling state:", err);
       latestStageRef.current = previousStage;
+      setCurrentModeState(getStudioModeForStage(previousStage).id);
       setProject((prev) => (prev ? { ...prev, answers: previousAnswers || prev.answers } : prev));
       onStageChangeCallback(previousStage);
       setError(`Failed to advance to stage "${nextStage}". Reverted to "${previousStage}".`);
@@ -221,9 +273,11 @@ export function ResearchProvider({
     rubric,
     outputType,
     currentStage,
+    currentMode,
     stageStatuses,
     setProject,
     setStage,
+    setMode,
     advanceStage,
     error,
     isLoading,

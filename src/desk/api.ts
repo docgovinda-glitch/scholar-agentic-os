@@ -1584,3 +1584,55 @@ export async function parseFileForAgent(
   };
 }
 
+export async function allocateProjectWordBudget(
+  projectId: string,
+  targetTotalWords: number,
+  template: string = "IMRaD"
+): Promise<{ ok: boolean; blueprint: import("./workspace/types").WordBudgetBlueprint }> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agentic/allocate-budget`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ targetTotalWords, template }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to allocate word budget");
+  }
+  return res.json();
+}
+
+export async function uploadProjectUserData(
+  projectId: string,
+  payload: FormData | { rawText: string; title?: string; author?: string; format?: string; assignedSectionId?: string; epistemicRole?: string }
+): Promise<{ ok: boolean; dataset: import("./workspace/types").UserDatasetItem; totalDatasets: number }> {
+  const isFormData = payload instanceof FormData;
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agentic/upload-user-data`, {
+    method: "POST",
+    headers: isFormData ? undefined : { "Content-Type": "application/json" },
+    body: isFormData ? payload : JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to upload primary user data");
+  }
+  return res.json();
+}
+
+export async function updateProjectUserData(
+  projectId: string,
+  dataId: string,
+  updates: { assignedSectionId?: string; epistemicRole?: string; extractedFindings?: string }
+): Promise<{ ok: boolean; dataset: import("./workspace/types").UserDatasetItem }> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agentic/user-data/${encodeURIComponent(dataId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to update user dataset");
+  }
+  return res.json();
+}
+
+
