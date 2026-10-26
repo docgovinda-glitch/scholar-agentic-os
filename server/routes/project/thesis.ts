@@ -6,6 +6,7 @@ import {
   buildScholarlyVoiceSystemPrompt,
   sanitizeScholarlyText,
 } from "../../src/utils/scholarlyVoiceGuard.ts";
+import { parseAndRepairLLMJson } from "../../../src/shared/llmJsonParser.ts";
 
 const router = Router({ mergeParams: true });
 
@@ -264,24 +265,50 @@ ${researchQuestions.map((q, idx) => `${idx + 1}. ${q}`).join("\n")}`;
         );
 
         if (response.ok && response.value?.text) {
-          const raw = response.value.text.replace(/```json/g, "").replace(/```/g, "").trim();
-          const parsed = JSON.parse(raw);
+          const parsed = parseAndRepairLLMJson<{
+            examinerPersona?: string;
+            examinerRigorScore?: string;
+            questions?: Record<string, unknown>[];
+          }>(response.value.text);
+
           if (parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
-            return res.json({
+            const result: VivaSimulationResponse = {
               success: true,
               title,
               examinerPersona: sanitizeScholarlyText(parsed.examinerPersona || "External Examiner Panel"),
               examinerRigorScore: sanitizeScholarlyText(parsed.examinerRigorScore || "High (Viva Voce Standard)"),
-              questions: parsed.questions.map((q: any, idx: number) => ({
-                id: q.id || `q-${idx + 1}`,
-                category: sanitizeScholarlyText(q.category || "Defense Examination"),
-                examinerQuestion: sanitizeScholarlyText(q.examinerQuestion || ""),
-                assessmentFocus: sanitizeScholarlyText(q.assessmentFocus || ""),
+              questions: parsed.questions.map((q: Record<string, unknown>, idx: number) => ({
+                id: (q.id as string) || `q-${idx + 1}`,
+                category: sanitizeScholarlyText((q.category as string) || "Defense Examination"),
+                examinerQuestion: sanitizeScholarlyText((q.examinerQuestion as string) || ""),
+                assessmentFocus: sanitizeScholarlyText((q.assessmentFocus as string) || ""),
                 suggestedRebuttalStructure: Array.isArray(q.suggestedRebuttalStructure)
-                  ? q.suggestedRebuttalStructure.map((s: string) => sanitizeScholarlyText(s))
+                  ? q.suggestedRebuttalStructure.map((s: unknown) => sanitizeScholarlyText(String(s)))
                   : [],
               })),
-            });
+            };
+
+            const wantsStream = Boolean(
+              req.headers.accept?.includes("text/event-stream") ||
+              req.query.stream === "true" ||
+              req.body?.stream === true
+            );
+
+            if (wantsStream) {
+              res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+              res.setHeader("Cache-Control", "no-cache, no-transform");
+              res.setHeader("Connection", "keep-alive");
+              res.setHeader("X-Accel-Buffering", "no");
+              res.flushHeaders?.();
+
+              res.write(`event: phase\ndata: ${JSON.stringify({ phase: "Convening doctoral viva panel", progress: 0.3 })}\n\n`);
+              res.write(`event: delta\ndata: ${JSON.stringify({ examinerPersona: result.examinerPersona, questionCount: result.questions.length })}\n\n`);
+              res.write(`event: complete\ndata: ${JSON.stringify(result)}\n\n`);
+              res.end();
+              return;
+            }
+
+            return res.json(result);
           }
         }
       } catch (err) {
@@ -290,6 +317,26 @@ ${researchQuestions.map((q, idx) => `${idx + 1}. ${q}`).join("\n")}`;
     }
 
     const fallbackResult = computeHeuristicViva(thesisData);
+
+    const wantsStream = Boolean(
+      req.headers.accept?.includes("text/event-stream") ||
+      req.query.stream === "true" ||
+      req.body?.stream === true
+    );
+
+    if (wantsStream) {
+      res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders?.();
+
+      res.write(`event: phase\ndata: ${JSON.stringify({ phase: "Convening doctoral viva panel (heuristic fallback)", progress: 0.5 })}\n\n`);
+      res.write(`event: complete\ndata: ${JSON.stringify(fallbackResult)}\n\n`);
+      res.end();
+      return;
+    }
+
     return res.json(fallbackResult);
   })
 );
@@ -355,8 +402,13 @@ ${chapters.map((c) => `Ch ${c.chapterNumber}: "${c.title}" (${c.wordCount}/${c.t
         );
 
         if (response.ok && response.value?.text) {
-          const raw = response.value.text.replace(/```json/g, "").replace(/```/g, "").trim();
-          const parsed = JSON.parse(raw);
+          const parsed = parseAndRepairLLMJson<{
+            totalChapters?: number;
+            alignmentScore?: number;
+            coherenceStatus?: string;
+            crossChapterChecks?: Record<string, unknown>[];
+          }>(response.value.text);
+
           if (parsed && typeof parsed.alignmentScore === "number" && Array.isArray(parsed.crossChapterChecks)) {
             return res.json({
               success: true,
@@ -364,10 +416,10 @@ ${chapters.map((c) => `Ch ${c.chapterNumber}: "${c.title}" (${c.wordCount}/${c.t
                 totalChapters: parsed.totalChapters || chapters.length,
                 alignmentScore: parsed.alignmentScore,
                 coherenceStatus: sanitizeScholarlyText(parsed.coherenceStatus || "Verified Academic Flow"),
-                crossChapterChecks: parsed.crossChapterChecks.map((chk: any) => ({
-                  check: sanitizeScholarlyText(chk.check || "Cross-Chapter Check"),
-                  status: ["passed", "warn", "fail"].includes(chk.status) ? chk.status : "passed",
-                  details: sanitizeScholarlyText(chk.details || ""),
+                crossChapterChecks: parsed.crossChapterChecks.map((chk: Record<string, unknown>) => ({
+                  check: sanitizeScholarlyText((chk.check as string) || "Cross-Chapter Check"),
+                  status: (["passed", "warn", "fail"].includes(chk.status as string) ? chk.status : "passed") as CrossChapterCheck["status"],
+                  details: sanitizeScholarlyText((chk.details as string) || ""),
                 })),
               },
             });

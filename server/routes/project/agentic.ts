@@ -27,13 +27,14 @@ import type { AcademicTemplate } from "../../../src/app/export/academicPdfCompil
 import type { CanonicalDocument, Block } from "../../../src/desk/types.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../../src/supabaseRest.ts";
 import { rejectClientCredentials } from "../../src/middleware/rejectClientCredentials.ts";
+import { scholarBrain, buildBoundedRagContext, type AcademicDocumentInput } from "../../src/services/scholarBrain.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(rejectClientCredentials);
 
 // Helper to get project safely
-async function getProjectSafe(req: express.Request<any>, res: express.Response): Promise<ProjectRecord | null> {
-  const projectId = req.params.id;
+async function getProjectSafe(req: express.Request, res: express.Response): Promise<ProjectRecord | null> {
+  const projectId = (req.params as { id?: string }).id;
   if (!projectId) {
     res.status(400).json({ error: "Missing project ID" });
     return null;
@@ -554,15 +555,15 @@ CRITICAL INSTRUCTION: Generate exactly 15 highly relevant sources. Do not halluc
     if (result) {
       if (result.data && Array.isArray(result.data)) {
         const currentListStr = project.answers["discovered_literature"];
-        let existingItems: any[] = [];
+        let existingItems: Record<string, unknown>[] = [];
         if (currentListStr) {
           try { existingItems = JSON.parse(currentListStr); } catch (_) {}
         }
-        const existingDois = new Set(existingItems.map((i: any) => (i.doi || "").toLowerCase()).filter(Boolean));
-        const existingIds = new Set(existingItems.map((i: any) => i.id).filter(Boolean));
-        const newItems = result.data.filter((i: any) => {
-          if (i.doi && existingDois.has(i.doi.toLowerCase())) return false;
-          if (i.id && existingIds.has(i.id)) return false;
+        const existingDois = new Set(existingItems.map((i: Record<string, unknown>) => ((i.doi as string) || "").toLowerCase()).filter(Boolean));
+        const existingIds = new Set(existingItems.map((i: Record<string, unknown>) => i.id as string).filter(Boolean));
+        const newItems = (result.data as Record<string, unknown>[]).filter((i: Record<string, unknown>) => {
+          if (i.doi && existingDois.has(((i.doi as string) || "").toLowerCase())) return false;
+          if (i.id && existingIds.has(i.id as string)) return false;
           return true;
         });
         const combined = isBroadened ? [...existingItems, ...newItems] : (existingItems.length > 0 && req.body.isAppend ? [...existingItems, ...newItems] : result.data);
@@ -804,7 +805,7 @@ Return ONLY valid JSON in this exact format:
         if (response.ok) {
           const matches = await response.json();
           if (Array.isArray(matches) && matches.length > 0) {
-            ragContext = matches.map((m: any) => `Source: ${m.source || "Unknown"}\nQuote: ${m.quote}`).join("\n\n---\n\n");
+            ragContext = matches.map((m: { source?: string; quote?: string }) => `Source: ${m.source || "Unknown"}\nQuote: ${m.quote}`).join("\n\n---\n\n");
           }
         }
       }
@@ -1121,6 +1122,120 @@ Return ONLY valid JSON in this exact format:
   }
 });
 
+// POST /api/projects/:id/agentic/draft-subsection
+router.post("/draft-subsection", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+
+  const {
+    subsectionTitle = "Subsection Analysis",
+    sectionTitle = "Methodological Framework",
+    sectionQuery = "",
+    wordBudget = 400,
+    priorChapters = [],
+  } = req.body || {};
+
+  const answers = (project.answers || {}) as Record<string, unknown>;
+  const researchQuestion = (answers.workingTitle as string) || (answers.researchQuestion as string) || "";
+
+  // 1. Gather all documents for semantic RAG (vault sources, literature, evidence)
+  const vaultSources = Array.isArray(project.evidenceLedger?.sources)
+    ? project.evidenceLedger.sources
+    : Array.isArray(answers.vault_items)
+    ? (answers.vault_items as unknown[])
+    : [];
+
+  const ragDocs: AcademicDocumentInput[] = [];
+
+  if (Array.isArray(vaultSources)) {
+    for (let i = 0; i < vaultSources.length; i++) {
+      const vs = vaultSources[i] as Record<string, unknown>;
+      ragDocs.push({
+        id: (vs.id as string) || (vs.source_id as string) || `src-${i + 1}`,
+        title: (vs.title as string) || "Scholarly Source",
+        content: [
+          (vs.abstract as string) || "",
+          Array.isArray(vs.findings) ? (vs.findings as string[]).join(" ") : "",
+          (vs.excerpt as string) || "",
+        ].join(" "),
+        author: (vs.author as string) || undefined,
+        year: (vs.year as string | number) || undefined,
+        sourceType: "vault",
+      });
+    }
+  }
+
+  // 2. Build Bounded RAG Context with token budget
+  const boundedRag = buildBoundedRagContext(ragDocs, {
+    researchQuestion,
+    sectionQuery: `${sectionTitle} ${subsectionTitle} ${sectionQuery}`,
+    priorChapters: Array.isArray(priorChapters) ? priorChapters : undefined,
+  });
+
+  const systemPrompt = `${buildScholarlyVoiceSystemPrompt({ discipline: "Academic Manuscript" })}
+You are an expert academic research co-author drafting subsection: "${subsectionTitle}" under section: "${sectionTitle}".
+Target Word Budget: approximately ${wordBudget} words.
+Ground your claims in the retrieved evidence chunks below. Use [CITE:id] tokens matching the retrieved chunks.
+Do NOT fabricate sources.`;
+
+  const userPrompt = `Research Question: ${researchQuestion}
+Section: ${sectionTitle}
+Subsection: ${subsectionTitle}
+Section Objectives / Focus: ${sectionQuery || subsectionTitle}
+
+${boundedRag.formattedContext}
+
+Draft the complete subsection text now.`;
+
+  const wantsStream = Boolean(
+    req.headers.accept?.includes("text/event-stream") ||
+    req.query.stream === "true" ||
+    req.body?.stream === true
+  );
+
+  if (wantsStream) {
+    await scholarBrain.stream(req, {
+      res,
+      systemPrompt,
+      userPrompt,
+      taskType: "drafting",
+      vaultSources: ragDocs.map((d) => ({
+        id: d.id,
+        title: d.title,
+        author: d.author,
+        year: d.year,
+      })),
+    });
+    return;
+  }
+
+  // Standard JSON response
+  const streamResult = await scholarBrain.stream(req, {
+    systemPrompt,
+    userPrompt,
+    taskType: "drafting",
+    vaultSources: ragDocs.map((d) => ({
+      id: d.id,
+      title: d.title,
+      author: d.author,
+      year: d.year,
+    })),
+  });
+
+  res.json({
+    success: true,
+    subsectionTitle,
+    sectionTitle,
+    content: streamResult.cleanText,
+    wordCount: streamResult.cleanText.split(/\s+/).filter(Boolean).length,
+    ragSummary: {
+      chunkCount: boundedRag.chunkCount,
+      totalTokens: boundedRag.totalTokens,
+      stances: boundedRag.includedStances,
+    },
+  });
+});
+
 // POST /api/projects/:id/agent/peer-review
 router.post("/peer-review", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
@@ -1197,25 +1312,25 @@ Return ONLY valid JSON in this exact format:
         "Synthesizer",
         "Formal Editor",
       ];
-      critiquesData = result.data.map((crit: any, idx: number) => {
+      critiquesData = result.data.map((crit: Record<string, unknown>, idx: number) => {
         const refRole = (crit.referee || defaultReferees[idx % defaultReferees.length]) as RefereeRole;
         return {
-          id: crit.id || `crit-ref-0${idx + 1}`,
+          id: (crit.id as string) || `crit-ref-0${idx + 1}`,
           referee: refRole,
-          lens: (crit.lens || crit.category || "Methodological Rigor").trim(),
+          lens: ((crit.lens as string) || (crit.category as string) || "Methodological Rigor").trim(),
           section: (
-            crit.section ||
+            (crit.section as string) ||
             (idx === 0
               ? "Section 2: Methodology"
               : idx === 1
               ? "Section 1: Introduction"
               : "Section 3: Results")
           ).trim(),
-          severity: (["Critical", "Major", "Moderate", "Minor"].includes(crit.severity)
-            ? crit.severity
-            : "Moderate") as any,
-          feedback: (crit.feedback || "Detailed feedback pending reviewer expansion.").trim(),
-          revisionDirective: (crit.revisionDirective || "Revise manuscript section accordingly.").trim(),
+          severity: (["Critical", "Major", "Moderate", "Minor"].includes(crit.severity as string)
+            ? (crit.severity as "Critical" | "Major" | "Moderate" | "Minor")
+            : "Moderate"),
+          feedback: ((crit.feedback as string) || "Detailed feedback pending reviewer expansion.").trim(),
+          revisionDirective: ((crit.revisionDirective as string) || "Revise manuscript section accordingly.").trim(),
           waived: false,
         };
       });
@@ -1733,7 +1848,7 @@ router.post("/draft-preview", async (req: express.Request<{ id: string }>, res) 
         const table = new SupabaseTable(config, "manuscript_sections");
         const data = await table.request(`?project_id=eq.${project.projectId}`);
         if (Array.isArray(data) && data.length > 0) {
-          content = data.map((s: any) => `## ${s.section_name || s.section || "Untitled Section"}\n\n${s.content || ""}`).join("\n\n");
+          content = data.map((s: Record<string, unknown>) => `## ${(s.section_name as string) || (s.section as string) || "Untitled Section"}\n\n${(s.content as string) || ""}`).join("\n\n");
           pages = Math.ceil(content.split(/\s+/).length / 250);
         }
       } catch (e) {
@@ -1748,7 +1863,7 @@ router.post("/draft-preview", async (req: express.Request<{ id: string }>, res) 
         try {
           const parsed = typeof rawDraft === "string" ? JSON.parse(rawDraft) : rawDraft;
           if (Array.isArray(parsed) && parsed.length > 0) {
-            content = parsed.map((s: any) => `## ${s.section || s.section_name || "Untitled Section"}\n\n${s.content || ""}`).join("\n\n");
+            content = parsed.map((s: Record<string, unknown>) => `## ${(s.section as string) || (s.section_name as string) || "Untitled Section"}\n\n${(s.content as string) || ""}`).join("\n\n");
             pages = Math.ceil(content.split(/\s+/).length / 250);
           } else if (typeof rawDraft === "string" && rawDraft.trim().length > 0) {
             content = rawDraft;
@@ -2373,7 +2488,7 @@ router.put("/manuscript", async (req, res) => {
     }
 
     // 2. Always persist to local projectStore answers
-    const combinedContent = updates.map((s: any) => s.content || "").join("\n\n");
+    const combinedContent = (updates as Record<string, unknown>[]).map((s: Record<string, unknown>) => (s.content as string) || "").join("\n\n");
     const nextAnswers = {
       ...project.answers,
       manuscript_draft: JSON.stringify(updates),
@@ -2434,7 +2549,7 @@ router.put("/critiques/:critiqueId/waive", async (req, res) => {
       try {
         const critiques = JSON.parse(project.answers.peer_review_critique);
         if (Array.isArray(critiques)) {
-          const updated = critiques.map((c: any) => c.id === req.params.critiqueId ? { ...c, waived: true } : c);
+          const updated = critiques.map((c: Record<string, unknown>) => c.id === req.params.critiqueId ? { ...c, waived: true } : c);
           await getProjectStore().save({
             ...project,
             answers: { ...project.answers, peer_review_critique: JSON.stringify(updated) }
@@ -2460,7 +2575,7 @@ router.get("/manuscript", async (req, res) => {
   const config = getSupabaseRestConfig();
 
   try {
-    let data: any[] = [];
+    let data: Record<string, unknown>[] = [];
 
     // 1. Try Supabase if configured
     if (config) {
@@ -2468,7 +2583,7 @@ router.get("/manuscript", async (req, res) => {
         const table = new SupabaseTable(config, "manuscript_sections");
         const sections = await table.request(`?project_id=eq.${project.projectId}&order=id.asc`);
         if (Array.isArray(sections) && sections.length > 0) {
-          data = sections;
+          data = sections as Record<string, unknown>[];
         }
       } catch (e) {
         console.warn("Could not query Supabase manuscript_sections:", e);
@@ -2482,10 +2597,10 @@ router.get("/manuscript", async (req, res) => {
         try {
           const parsed = typeof rawDraft === "string" ? JSON.parse(rawDraft) : rawDraft;
           if (Array.isArray(parsed) && parsed.length > 0) {
-            data = parsed.map((s: any) => ({
-              section_name: s.section || s.section_name || "Section",
-              content: s.content || "",
-              status: s.status || "Drafted"
+            data = parsed.map((s: Record<string, unknown>) => ({
+              section_name: (s.section as string) || (s.section_name as string) || "Section",
+              content: (s.content as string) || "",
+              status: (s.status as string) || "Drafted"
             }));
           } else if (typeof rawDraft === "string" && rawDraft.trim().length > 0) {
             data = [{ section_name: "Full Manuscript", content: rawDraft, status: "Drafted" }];
@@ -2511,12 +2626,12 @@ router.get("/evidence", async (req, res) => {
   const config = getSupabaseRestConfig();
 
   try {
-    let data: any[] = [];
+    let data: Record<string, unknown>[] = [];
     if (config) {
       try {
         const table = new SupabaseTable(config, "project_evidence");
         const resData = await table.request(`?project_id=eq.${project.projectId}`);
-        if (Array.isArray(resData)) data = resData;
+        if (Array.isArray(resData)) data = resData as Record<string, unknown>[];
       } catch (e) {
         console.warn("Could not query Supabase project_evidence:", e);
       }
@@ -2524,7 +2639,7 @@ router.get("/evidence", async (req, res) => {
     if (data.length === 0 && project.answers?.extracted_evidence) {
       try {
         const parsed = JSON.parse(project.answers.extracted_evidence);
-        if (Array.isArray(parsed)) data = parsed;
+        if (Array.isArray(parsed)) data = parsed as Record<string, unknown>[];
       } catch (_) {}
     }
     res.json({ ok: true, data });
@@ -2540,12 +2655,12 @@ router.get("/critiques", async (req, res) => {
   const config = getSupabaseRestConfig();
 
   try {
-    let data: any[] = [];
+    let data: Record<string, unknown>[] = [];
     if (config) {
       try {
         const table = new SupabaseTable(config, "peer_review_critiques");
         const resData = await table.request(`?project_id=eq.${project.projectId}`);
-        if (Array.isArray(resData)) data = resData;
+        if (Array.isArray(resData)) data = resData as Record<string, unknown>[];
       } catch (e) {
         console.warn("Could not query Supabase peer_review_critiques:", e);
       }
@@ -2553,7 +2668,7 @@ router.get("/critiques", async (req, res) => {
     if (data.length === 0 && project.answers?.peer_review_critique) {
       try {
         const parsed = JSON.parse(project.answers.peer_review_critique);
-        if (Array.isArray(parsed)) data = parsed;
+        if (Array.isArray(parsed)) data = parsed as Record<string, unknown>[];
       } catch (_) {}
     }
     res.json({ ok: true, data });

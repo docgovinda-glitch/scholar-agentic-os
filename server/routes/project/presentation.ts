@@ -12,6 +12,7 @@ import {
   getDecksTable,
   PresentationDeckRow,
 } from "../presentations.ts";
+import { parseAndRepairLLMJson } from "../../../src/shared/llmJsonParser.ts";
 
 const router = Router({ mergeParams: true });
 
@@ -416,9 +417,8 @@ Verified Sources: ${JSON.stringify(sourcesSummary)}`;
         );
 
         if (response.ok && response.value?.text) {
-          const rawJson = response.value.text.replace(/```json/g, "").replace(/```/g, "").trim();
-          const parsed = JSON.parse(rawJson);
-          if (Array.isArray(parsed.slides) && parsed.slides.length >= 4) {
+          const parsed = parseAndRepairLLMJson<{ slides?: Record<string, unknown>[] }>(response.value.text);
+          if (parsed && Array.isArray(parsed.slides) && parsed.slides.length >= 4) {
             generatedSlides = parsed.slides.map((s: Record<string, unknown>, idx: number) => ({
               slideNumber: (s.slideNumber as number) || idx + 1,
               type: (s.type as SlidePresentationItem["type"]) || "framework_methodology",
@@ -501,6 +501,27 @@ Verified Sources: ${JSON.stringify(sourcesSummary)}`;
       generatedBy,
       deck: formattedDeck,
     };
+
+    const wantsStream = Boolean(
+      req.headers.accept?.includes("text/event-stream") ||
+      req.query.stream === "true" ||
+      req.body?.stream === true
+    );
+
+    if (wantsStream) {
+      res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders?.();
+
+      res.write(`event: phase\ndata: ${JSON.stringify({ phase: "Analyzing project narrative & outline", progress: 0.2 })}\n\n`);
+      res.write(`event: phase\ndata: ${JSON.stringify({ phase: "Synthesizing academic slide deck", progress: 0.7 })}\n\n`);
+      res.write(`event: delta\ndata: ${JSON.stringify({ deckTitle: projectTitle, slideCount: generatedSlides.length })}\n\n`);
+      res.write(`event: complete\ndata: ${JSON.stringify(response)}\n\n`);
+      res.end();
+      return;
+    }
 
     res.json(response);
   })

@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic, handleFrontendLLMOverride, createLLMChallengeToken, resolveRequestAiConfig } from "../utils/llm.ts";
-import { executeWebSearch, formatSearchResultsForPrompt } from "../src/research/webSearchEngine.ts";
+import { executeWebSearch, formatSearchResultsForPrompt, type SearchResultItem } from "../src/research/webSearchEngine.ts";
 import { executeDeepResearch } from "../src/research/deepResearchEngine.ts";
 import { validateAndRefineCitations } from "../src/research/citationValidator.ts";
 import type { CitationStyleRegistry } from "../../src/citation_compliance/formattingEngine.ts";
@@ -12,6 +12,7 @@ import {
   sanitizeAndLockScholarResponse,
   type GroundedScholarSource,
 } from "../src/research/scholarlyRetrievalPipeline.ts";
+import { scholarBrain, buildBoundedRagContext, type AcademicDocumentInput } from "../src/services/scholarBrain.ts";
 
 /**
  * Intelligent Capability Determination:
@@ -123,7 +124,7 @@ function determineExecutionMode(
 
 export function registerAIRoutes(
   app: express.Express,
-  _aiAbuseLimit?: any,
+  _aiAbuseLimit?: express.RequestHandler,
   _citationStyleRegistry?: CitationStyleRegistry
 ): void {
   const router = express.Router();
@@ -221,7 +222,7 @@ export function registerAIRoutes(
         return res.status(503).json({ error: "No client-owned AI provider configured for deep research. Please configure in AI Access." });
       }
 
-      const normalizedImages = (images || []).map((img: any) => {
+      const normalizedImages = (images || []).map((img: { name?: string; mimeType?: string; dataUrl?: string; data?: string }) => {
         const raw = img.dataUrl || img.data || "";
         const mimeType =
           img.mimeType ||
@@ -279,7 +280,7 @@ export function registerAIRoutes(
       const candidates = getCandidates(req);
 
       // Normalize images so dataUrl and base64 data are reliably present
-      const normalizedImages = (images || []).map((img: any) => {
+      const normalizedImages = (images || []).map((img: { name?: string; mimeType?: string; dataUrl?: string; data?: string }) => {
         const raw = img.dataUrl || img.data || "";
         const mimeType =
           img.mimeType ||
@@ -380,23 +381,31 @@ export function registerAIRoutes(
       // ── Context Assembly: Files, Images, Canonical Ledger & Web Search ──
       let contextBlocks: string[] = [];
 
-      // 1. Process Uploaded Documents
+      // 1. Process Uploaded Documents via Semantic RAG Engine
       if (files && files.length > 0) {
-        for (const file of files) {
-          const docText = (file.text || "").trim();
-          if (docText) {
-            // Cap document preview to 20,000 chars per file to stay within limits while preserving depth
-            const truncated = docText.length > 20000 ? docText.slice(0, 20000) + "\n\n... [Content continues in full document] ..." : docText;
-            contextBlocks.push(`=== UPLOADED DOCUMENT: ${file.name || "Document"} ===\n${truncated}\n=== END OF DOCUMENT: ${file.name || "Document"} ===`);
-          } else {
-            contextBlocks.push(`=== UPLOADED DOCUMENT: ${file.name || "Document"} (Empty content or binary format) ===`);
+        const docInputs: AcademicDocumentInput[] = (files as Array<{ name?: string; text?: string }>)
+          .filter((f) => Boolean(f.text && f.text.trim()))
+          .map((f, idx) => ({
+            id: `doc-${idx + 1}`,
+            title: f.name || `Uploaded Document ${idx + 1}`,
+            content: f.text || "",
+            sourceType: "upload",
+          }));
+
+        if (docInputs.length > 0) {
+          const ragResult = buildBoundedRagContext(docInputs, {
+            researchQuestion: effectivePrompt,
+            customTokenBudget: 3500,
+          });
+          if (ragResult.formattedContext) {
+            contextBlocks.push(`=== RETRIEVED SEMANTIC DOCUMENT EXCERPTS ===\n${ragResult.formattedContext}\n=== END OF DOCUMENT EXCERPTS ===`);
           }
         }
       }
 
       // 1.5 Process Uploaded Images Metadata
       if (normalizedImages && normalizedImages.length > 0) {
-        const imgDetails = normalizedImages.map((img: any, i: number) => `Attachment ${i + 1}: "${img.name}" (${img.mimeType})`).join(", ");
+        const imgDetails = normalizedImages.map((img: { name?: string; mimeType?: string }, i: number) => `Attachment ${i + 1}: "${img.name}" (${img.mimeType})`).join(", ");
         contextBlocks.push(`=== VISUAL MEDIA ATTACHMENTS ===\nThe user has attached ${normalizedImages.length} image(s): ${imgDetails}.\nThe image payload is delivered directly to your vision pipeline for detailed visual inspection.\n=== END OF VISUAL MEDIA ATTACHMENTS ===`);
       }
 
@@ -414,7 +423,7 @@ export function registerAIRoutes(
         );
       }
 
-      let citations: any[] = [];
+      let citations: SearchResultItem[] = [];
 
       // 3. Process Web Search if required
       if (mode === "search" && canonicalSources.length < 3) {
@@ -504,6 +513,31 @@ Formatting & Academic Citation Rules:
           model: "client-router",
         };
       } else {
+        const wantsStream = Boolean(
+          req.headers.accept?.includes("text/event-stream") ||
+          req.query.stream === "true" ||
+          req.body?.stream === true
+        );
+
+        if (wantsStream) {
+          await scholarBrain.stream(req, {
+            res,
+            systemPrompt: effectiveSystemPrompt,
+            userPrompt: assembledUserPrompt,
+            taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
+            candidates,
+            vaultSources: canonicalSources.map((s) => ({
+              id: s.id,
+              title: s.title,
+              authors: s.authors,
+              year: s.year,
+              doi: s.doi,
+              url: s.url,
+            })),
+          });
+          return;
+        }
+
         try {
           result = await executeMultimodalAgentic({
             systemPrompt: effectiveSystemPrompt,

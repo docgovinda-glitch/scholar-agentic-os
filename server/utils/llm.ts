@@ -28,7 +28,9 @@ export interface ResponseLike {
   json: (data: unknown) => void;
   headersSent?: boolean;
   writableEnded?: boolean;
+  setHeader?: (name: string, value: string) => ResponseLike | void;
   writeHead?: (status: number, headers: Record<string, string>) => void;
+  flushHeaders?: () => void;
   write?: (chunk: string) => boolean;
   end?: () => void;
 }
