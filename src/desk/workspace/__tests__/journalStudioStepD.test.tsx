@@ -222,14 +222,12 @@ These findings establish that multi-agent consensus can achieve provable stabili
 
     await waitFor(() => {
       expect(screen.getByText("Referencing Mode 2 Primary Data")).toBeInTheDocument();
+      const dataAvailArea = screen.getByRole("textbox", {
+        name: /Data Availability Statement/i,
+      }) as HTMLTextAreaElement;
+      expect(dataAvailArea.value).toContain("user_data_101");
+      expect(dataAvailArea.value).toContain("FPGA Latency Benchmark Data");
     });
-
-    // Check textarea contains the dataset token and name
-    const dataAvailArea = screen.getByRole("textbox", {
-      name: /Data Availability Statement/i,
-    }) as HTMLTextAreaElement;
-    expect(dataAvailArea.value).toContain("user_data_101");
-    expect(dataAvailArea.value).toContain("FPGA Latency Benchmark Data");
   });
 
   it("appends formatted 2026 declarations to manuscript end-matter and saves to project answers", async () => {

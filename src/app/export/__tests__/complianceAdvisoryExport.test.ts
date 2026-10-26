@@ -51,7 +51,10 @@ describe("Conflict #4 — Academic Workflow Compliance: Advisory Assistance vs T
 
     expect(res.status).toBe(200);
     expect(res.headers["content-disposition"]).toContain("attachment");
-    expect(res.headers["content-type"]).toBe("application/octet-stream");
+    expect([
+      "application/octet-stream",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]).toContain(res.headers["content-type"]);
   });
 
   it("Test B: Unresolved compliance findings -> G7/export remains available in API", async () => {

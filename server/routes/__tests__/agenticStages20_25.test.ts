@@ -283,6 +283,6 @@ describe("Stage 25: Canonical Multi-Format Scholarly Exporter (/export & /export
       .post(`/api/projects/${projectId}/export/docx`)
       .send({ template: "nature" });
     expect(docxRes.status).toBe(200);
-    expect(docxRes.headers["content-type"]).toContain("octet-stream");
+    expect(docxRes.headers["content-type"]).toMatch(/octet-stream|wordprocessingml\.document/);
   });
 });

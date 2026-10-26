@@ -4,6 +4,7 @@ import { executeWebSearch, formatSearchResultsForPrompt } from "../src/research/
 import { executeDeepResearch } from "../src/research/deepResearchEngine.ts";
 import { validateAndRefineCitations } from "../src/research/citationValidator.ts";
 import type { CitationStyleRegistry } from "../../src/citation_compliance/formattingEngine.ts";
+import type { CanonicalReference } from "../../src/citation_compliance/model/reference.ts";
 import {
   detectDeliverableIntent,
   isSubstantiveAcademicQuery,
@@ -12,6 +13,14 @@ import {
   sanitizeAndLockScholarResponse,
   type GroundedScholarSource,
 } from "../src/research/scholarlyRetrievalPipeline.ts";
+import {
+  scholarBrain,
+  type UnifiedEvidenceItem,
+  type CitationStyleKey,
+} from "../src/services/scholarBrain.ts";
+import type { VerifiedSourceItem } from "../src/utils/citationLockScrubber.ts";
+import { countExactWords } from "../src/utils/wordBudgetAllocator.ts";
+import { evaluateBurstiness } from "../src/utils/scholarlyVoiceGuard.ts";
 
 /**
  * Intelligent Capability Determination:
@@ -198,8 +207,11 @@ export function registerAIRoutes(
         return res.status(400).json({ error: "Missing required query string" });
       }
 
-      const results = await executeWebSearch(query, { maxResults: Number(maxResults) || 5, fetchFullContent: true });
-      res.json({ ok: true, ...results });
+      const [webResults, scholarEvidence] = await Promise.all([
+        executeWebSearch(query, { maxResults: Number(maxResults) || 5, fetchFullContent: true }),
+        scholarBrain.retrieveEvidence({ query, maxResults: Number(maxResults) || 5 }).catch(() => []),
+      ]);
+      res.json({ ok: true, ...webResults, evidence: scholarEvidence });
     } catch (err) {
       res.status(500).json({ error: `Web search failed: ${err instanceof Error ? err.message : String(err)}` });
     }
@@ -221,6 +233,11 @@ export function registerAIRoutes(
         return res.status(503).json({ error: "No client-owned AI provider configured for deep research. Please configure in AI Access." });
       }
 
+      const [evidence, webResults] = await Promise.all([
+        scholarBrain.retrieveEvidence({ query: topic, maxResults: 15 }).catch(() => []),
+        executeWebSearch(topic, { maxResults: 8, fetchFullContent: true }).catch(() => ({ results: [] })),
+      ]);
+
       const normalizedImages = (images || []).map((img: any) => {
         const raw = img.dataUrl || img.data || "";
         const mimeType =
@@ -239,7 +256,33 @@ export function registerAIRoutes(
       });
 
       const result = await executeDeepResearch(topic, candidates, undefined, files, normalizedImages);
-      res.json({ ok: true, ...result });
+
+      const verifiedSources: VerifiedSourceItem[] = evidence.map((e) => ({
+        id: e.id,
+        authors: e.authors,
+        year: e.year || "n.d.",
+        title: e.title,
+        doi: e.doi,
+        url: e.url,
+        journal: e.venue,
+      }));
+
+      const scrubbed = scholarBrain.scrubAndFormatCitations(
+        result.synthesizedReport,
+        verifiedSources,
+        "apa7",
+        "en-GB"
+      );
+
+      res.json({
+        ok: true,
+        ...result,
+        synthesizedReport: scrubbed.formattedText,
+        text: scrubbed.formattedText,
+        wordCount: countExactWords(scrubbed.formattedText),
+        verifiedSourcesCount: scrubbed.citedSources.length,
+        evidence,
+      });
     } catch (err) {
       res.status(500).json({ error: `Deep research failed: ${err instanceof Error ? err.message : String(err)}` });
     }
@@ -302,15 +345,58 @@ export function registerAIRoutes(
       const mode = determineExecutionMode(effectivePrompt, requestedMode, files.length > 0, normalizedImages.length > 0);
       const cleanStyle = (citationStyle || "apa").toLowerCase();
 
-      // ── Canonical Scholarly Ingestion (OpenAlex, Crossref, Vault) ──
+      // ── Canonical Scholarly Ingestion (OpenAlex, Crossref, Vault) via scholarBrain ──
       let canonicalSources: GroundedScholarSource[] = [];
+      let unifiedEvidence: UnifiedEvidenceItem[] = [];
       if (req.body?.canonicalSources && Array.isArray(req.body.canonicalSources) && req.body.canonicalSources.length > 0) {
         canonicalSources = req.body.canonicalSources;
       } else if (isSubstantive || mode === "search") {
         try {
-          canonicalSources = await retrieveCanonicalSourcesForPrompt(effectivePrompt, {
+          const vaultSources = Array.isArray(req.body?.vaultSources) ? req.body.vaultSources : [];
+          unifiedEvidence = await scholarBrain.retrieveEvidence({
+            query: effectivePrompt,
             maxResults: 8,
-            citationStyle: cleanStyle,
+            vaultSources,
+          });
+
+          canonicalSources = unifiedEvidence.map((e) => {
+            const authorKeys = e.authors
+              .map((a) => {
+                const parts = a.trim().split(" ");
+                return (parts[parts.length - 1] || a).toLowerCase().replace(/[^a-z]/g, "");
+              })
+              .filter(Boolean);
+
+            const canonicalRef: CanonicalReference = {
+              kind: "JournalArticle",
+              title: e.title,
+              source: e.venue || "Academic Publication",
+              authors: e.authors.map((a, i) => {
+                const parts = a.trim().split(" ");
+                return {
+                  firstName: parts.slice(0, -1).join(" "),
+                  lastName: parts[parts.length - 1] || a,
+                  order: i + 1,
+                };
+              }),
+              publicationDate: e.year ? String(e.year) : undefined,
+              doi: e.doi,
+              url: e.url,
+            };
+
+            return {
+              id: e.id,
+              title: e.title,
+              authors: e.authors,
+              year: e.year,
+              doi: e.doi,
+              url: e.url,
+              venue: e.venue,
+              sourceType: e.sourceType === "vault" ? ("vault" as const) : ("scholarly" as const),
+              canonicalReference: canonicalRef,
+              inTextCitation: e.citationToken,
+              authorKeys,
+            };
           });
         } catch (err) {
           console.warn("Scholarly canonical retrieval warning:", err);
@@ -453,7 +539,7 @@ export function registerAIRoutes(
       } else if (files.length > 0) {
         assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nAnalyze the uploaded document above and directly answer the user's inquiry based on the document text.`;
       } else if (isSubstantive || canonicalSources.length > 0) {
-        assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nDeliver an authoritative, research-grounded synthesis. Strict requirements:\n1. Only cite sources from the Exclusive Citation Ledger above.\n2. Do NOT fabricate authors, years, or citations not in the ledger.\n3. Any empirical statistic lacking a verified source must be tagged: [Unverified Claim — Vault Citation Required].\n4. Do NOT output fake word count declarations.`;
+        assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nDeliver an authoritative, research-grounded synthesis. Strict requirements:\n1. Only cite sources from the Exclusive Citation Ledger above using verified [CITE:id] tokens.\n2. Do NOT fabricate authors, years, or citations not in the ledger.\n3. Any empirical statistic lacking a verified source must be tagged: [Unverified Claim — Vault Citation Required].\n4. Do NOT output fake word count declarations.`;
       } else if (mode === "search") {
         assembledUserPrompt += `User Inquiry: ${effectivePrompt}\n\nSynthesize an authoritative, research-grade answer using the live verified web search findings provided above.
 
@@ -490,13 +576,28 @@ Formatting & Academic Citation Rules:
         };
       } else {
         try {
-          result = await executeMultimodalAgentic({
-            systemPrompt: effectiveSystemPrompt,
-            userPrompt: assembledUserPrompt,
-            images: normalizedImages && normalizedImages.length > 0 ? normalizedImages : undefined,
-            taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
-            candidates,
-          }, req);
+          if (candidates.length > 0 && normalizedImages.length === 0) {
+            const brainRes = await scholarBrain.complete({
+              req,
+              systemPrompt: effectiveSystemPrompt,
+              userPrompt: assembledUserPrompt,
+              taskClass: "drafting",
+              responseFormat: "text",
+            });
+            result = {
+              text: brainRes.text,
+              provider: brainRes.provider,
+              model: brainRes.model,
+            };
+          } else {
+            result = await executeMultimodalAgentic({
+              systemPrompt: effectiveSystemPrompt,
+              userPrompt: assembledUserPrompt,
+              images: normalizedImages && normalizedImages.length > 0 ? normalizedImages : undefined,
+              taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
+              candidates,
+            }, req);
+          }
         } catch (execErr: unknown) {
           console.warn("Server multimodal agent execution failed, requesting frontend LLM fallback:", execErr);
           return res.status(426).json({
@@ -512,38 +613,93 @@ Formatting & Academic Citation Rules:
         }
       }
 
-      // 7. Post-Generation Anti-Hallucination Lock & Quality-Control
-      if (isSubstantive || canonicalSources.length > 0) {
-        const locked = sanitizeAndLockScholarResponse(
+      // 7. Post-Generation Anti-Hallucination Lock & Quality-Control via scholarBrain
+      if (isSubstantive || canonicalSources.length > 0 || unifiedEvidence.length > 0) {
+        const verifiedItems: VerifiedSourceItem[] = [
+          ...unifiedEvidence.map((e) => ({
+            id: e.id,
+            authors: e.authors,
+            year: e.year || "n.d.",
+            title: e.title,
+            doi: e.doi,
+            url: e.url,
+            journal: e.venue,
+          })),
+          ...canonicalSources.map((s) => ({
+            id: s.id,
+            authors: s.authors,
+            year: s.year || "n.d.",
+            title: s.title,
+            doi: s.doi,
+            url: s.url,
+            journal: s.venue,
+          })),
+        ];
+
+        const uniqueVerified = Array.from(new Map(verifiedItems.map((item) => [item.id, item])).values());
+
+        const normalizedStyleKey: CitationStyleKey =
+          cleanStyle === "apa" || cleanStyle === "apa7" ? "apa7" :
+          cleanStyle === "ieee" ? "ieee" :
+          cleanStyle === "harvard" ? "harvard" :
+          cleanStyle === "chicago" ? "chicago" :
+          cleanStyle === "mla" || cleanStyle === "mla9" ? "mla9" :
+          cleanStyle === "vancouver" ? "vancouver" : "apa7";
+
+        const scrubbed = scholarBrain.scrubAndFormatCitations(
           result.text,
-          canonicalSources,
-          cleanStyle,
-          deliverableIntent
+          uniqueVerified,
+          normalizedStyleKey,
+          "en-GB"
         );
+
+        let finalText = scrubbed.formattedText;
+        if (
+          scrubbed.citedSources.length > 0 &&
+          scrubbed.bibliographyMarkdown &&
+          !finalText.toLowerCase().includes("## references") &&
+          !finalText.toLowerCase().includes("## bibliography")
+        ) {
+          finalText += `\n\n## References\n\n${scrubbed.bibliographyMarkdown}`;
+        }
+
+        const exactWords = countExactWords(finalText);
+        const burstiness = evaluateBurstiness(finalText);
+
+        if (deliverableIntent && scrubbed.citedSources.length > 0) {
+          deliverableIntent.retrievedSources = scrubbed.citedSources.map((s) => ({
+            title: s.title,
+            authors: Array.isArray(s.authors) ? s.authors : [s.authors],
+            year: s.year,
+            doi: s.doi,
+            url: s.url,
+            venue: s.journal,
+          }));
+        }
 
         return res.json({
           ok: true,
-          text: locked.text,
+          text: finalText,
           provider: result.provider,
           model: result.model,
           mode: deliverableIntent ? "deliverable" : mode,
-          citations: locked.citations.map((s) => ({
+          citations: scrubbed.citedSources.map((s) => ({
             title: s.title,
             url: s.url,
             doi: s.doi,
             snippet: s.title,
-            venue: s.venue,
+            venue: s.journal,
             year: s.year,
-            authors: s.authors,
-            authorityBadge: s.sourceType === "scholarly" ? "Peer-Reviewed / Canonical" : "Knowledge Vault",
+            authors: Array.isArray(s.authors) ? s.authors : [s.authors],
+            authorityBadge: "Verified Source",
             isPrimary: true,
-            sourceType: s.sourceType,
+            sourceType: "scholarly",
           })),
           citationStyle: cleanStyle,
-          wordCount: locked.wordCount,
-          verifiedSourcesCount: locked.verifiedSourcesCount,
-          burstinessMetrics: locked.burstinessMetrics,
-          recommendedWorkspaceHandoff: locked.recommendedWorkspaceHandoff,
+          wordCount: exactWords,
+          verifiedSourcesCount: scrubbed.citedSources.length,
+          burstinessMetrics: burstiness,
+          recommendedWorkspaceHandoff: deliverableIntent,
         });
       }
 

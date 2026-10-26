@@ -1828,9 +1828,12 @@ export default function ProjectListScreen({
 
   // Boot project workspace directly from assistant research findings
   const handleBootProjectFromResearch = useCallback(
-    async (researchMessage: WebsiteAssistantMessage) => {
+    async (
+      researchMessage: WebsiteAssistantMessage,
+      formatOverride?: "OT-01" | "OT-10" | "OT-19" | "OT-09" | "OT-22"
+    ) => {
       const handoff = researchMessage.recommendedWorkspaceHandoff;
-      const targetFormatId = handoff?.targetFormatId || "OT-10";
+      const targetFormatId = formatOverride || handoff?.targetFormatId || "OT-10";
 
       if (!userEmail) {
         openAuth("signup", `Sign in or create an account to initialize ${handoff?.formatLabel || "an academic workspace"} from these findings.`, targetFormatId);
@@ -3314,6 +3317,26 @@ export default function ProjectListScreen({
                       </div>
                     )}
 
+                    {msg.sender === "assistant" && !msg.error && (
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        {((msg.verifiedSourcesCount !== undefined && msg.verifiedSourcesCount > 0) || (msg.citations && msg.citations.length > 0)) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                            <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                            <span>{msg.verifiedSourcesCount ?? msg.citations?.length ?? 0} Verified Sources</span>
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
+                          <FileText className="w-3 h-3" />
+                          <span>{msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words</span>
+                        </span>
+                        {msg.model && (
+                          <span className="text-[10px] text-neutral-400 font-mono">
+                            {msg.model}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {msg.sender === "assistant" ? renderFormattedGuideText(
                       msg.citations && msg.citations.length > 0 ? stripRawReferencesSection(msg.text) : msg.text,
                       msg.citations,
@@ -3526,34 +3549,51 @@ export default function ProjectListScreen({
                     })()}
 
                     {/* 1-Click Workspace Handoff Banner */}
-                    {msg.sender === "assistant" && msg.recommendedWorkspaceHandoff && (
-                      <div className="mt-3.5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                    {msg.sender === "assistant" && (msg.recommendedWorkspaceHandoff || (msg.citations && msg.citations.length > 0)) && (
+                      <div className="mt-3.5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 shadow-2xs">
                         <div className="flex items-start gap-2.5 min-w-0">
                           <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 shrink-0">
                             <FolderPlus className="w-4 h-4" />
                           </div>
                           <div className="min-w-0">
                             <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5 flex-wrap">
-                              <span>Launch in {msg.recommendedWorkspaceHandoff.formatLabel} ({msg.recommendedWorkspaceHandoff.targetFormatId})</span>
-                              {msg.recommendedWorkspaceHandoff.retrievedSources.length > 0 && (
+                              <span>
+                                {msg.recommendedWorkspaceHandoff
+                                  ? `Launch in ${msg.recommendedWorkspaceHandoff.formatLabel}`
+                                  : "Scholarly Workspace Handoff"}
+                              </span>
+                              {(msg.verifiedSourcesCount || msg.citations?.length || 0) > 0 && (
                                 <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 font-medium">
-                                  {msg.recommendedWorkspaceHandoff.retrievedSources.length} Verified Sources Attached
+                                  {msg.verifiedSourcesCount || msg.citations?.length || 0} Verified Sources Attached
                                 </span>
                               )}
+                              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-500/10 text-sky-800 dark:text-sky-200 font-mono">
+                                {msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words
+                              </span>
                             </div>
-                            <p className="text-[11px] text-neutral-600 dark:text-neutral-400 mt-0.5 line-clamp-2">
-                              Transition this executive brief into a full-length, structured {msg.recommendedWorkspaceHandoff.formatLabel} with evidentiary matrices and quality gates.
+                            <p className="text-[11px] text-neutral-600 dark:text-neutral-300 mt-0.5 line-clamp-2">
+                              Transition this research synthesis into a structured coursework essay or formal journal manuscript with evidentiary matrices and quality gates.
                             </p>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleBootProjectFromResearch(msg)}
-                          className="w-full sm:w-auto px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer whitespace-nowrap shrink-0"
-                        >
-                          <span>Launch in 4-Phase Essay Engine ({msg.recommendedWorkspaceHandoff.targetFormatId}) with Verified Sources</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-2 w-full lg:w-auto flex-wrap lg:flex-nowrap shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleBootProjectFromResearch(msg, "OT-01")}
+                            className="flex-1 lg:flex-initial px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer whitespace-nowrap"
+                          >
+                            <span>Launch in 4-Phase Essay Engine (OT-01)</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleBootProjectFromResearch(msg, "OT-10")}
+                            className="flex-1 lg:flex-initial px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer whitespace-nowrap"
+                          >
+                            <span>Launch in Journal Studio (OT-10)</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     )}
 

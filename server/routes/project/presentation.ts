@@ -1,12 +1,11 @@
 import { Router, Request, Response } from "express";
 import { asyncRoute, loadOwnedProject, getSharedStore } from "../project.ts";
-import { getCandidates, buildAuthorizedPolicy } from "../../utils/llm.ts";
-import { completeWithFailover } from "../../../src/platform/gateway/gateway.ts";
+import { getCandidates } from "../../utils/llm.ts";
 import {
-  buildScholarlyVoiceSystemPrompt,
   sanitizeScholarlyText,
   normalizeUnicodeNFC,
 } from "../../src/utils/scholarlyVoiceGuard.ts";
+import { scholarBrain } from "../../src/services/scholarBrain.ts";
 import {
   memoryDecks,
   getDecksTable,
@@ -352,13 +351,23 @@ router.post(
     let generatedSlides: SlidePresentationItem[] | null = null;
     let generatedBy: "ai-gateway" | "heuristic-fallback" = "heuristic-fallback";
 
-    const candidates = getCandidates(req);
-    const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
+    // 1. Multi-Portal & Knowledge Vault Evidence Retrieval via scholarBrain
+    const rawVaultSources = Array.isArray(record.evidenceLedger?.sources) ? record.evidenceLedger.sources : [];
+    const vaultSources = rawVaultSources.map((s) => ({
+      ...s,
+      year: s.year ?? "n.d.",
+    }));
+    const evidence = await scholarBrain.retrieveEvidence({
+      query: `${projectTitle} ${researchQuestions.join(" ")}`,
+      maxResults: 6,
+      vaultSources,
+    }).catch(() => []);
 
-    if (candidates.length > 0 && !isTest) {
+    const candidates = getCandidates(req);
+
+    if (candidates.length > 0) {
       try {
-        const systemPrompt = `${buildScholarlyVoiceSystemPrompt({ discipline: "Academic Conference Presentation" })}
-You are an elite Academic Conference Slide Architect and Presentation Synthesizer.
+        const systemPrompt = `You are an elite Academic Conference Slide Architect and Presentation Synthesizer.
 Synthesize the provided academic research project into a high-impact, 16:9 presentation slide deck following the 6 standard academic presentation beats:
 1. Title: Project title, authors/affiliation, context, and duration.
 2. Problem & Literature Gap: Critical deficit in current literature, why existing paradigms fail under empirical scrutiny.
@@ -371,6 +380,7 @@ Rules:
 - Strictly suppress LLM clichés (e.g. "delve", "tapestry", "testament", "underscores", "pivotal").
 - Key points must strictly adhere to the 6x6 bullet rule (maximum 6 words per bullet, maximum 4 bullets per slide).
 - Speaker notes must be scholarly verbatim delivery scripts (60-150 words).
+- Preserve lossless NFC Unicode / IAST diacritics.
 - Output must be strict JSON matching this schema:
 {
   "deckTitle": "string",
@@ -394,6 +404,8 @@ Rules:
 }
 Output ONLY valid JSON. Zero markdown codeblocks, zero conversational filler.`;
 
+        const evidenceSummary = evidence.map((e) => `${e.citationToken}: ${e.title} (${e.year || "n.d."})`).join("; ");
+
         const userPrompt = `Project Title: ${projectTitle}
 Duration: ${durationMinutes} minutes
 Target Audience: ${targetAudience}
@@ -401,41 +413,36 @@ Narrative Framework: ${narrativeFramework}
 Research Questions: ${JSON.stringify(researchQuestions)}
 Methodology: ${methodologyText}
 Key Results: ${empiricalNotes}
-Verified Sources: ${JSON.stringify(sourcesSummary)}`;
+Verified Sources & Evidence: ${evidenceSummary || JSON.stringify(sourcesSummary)}`;
 
-        const response = await completeWithFailover(
-          {
-            taskClass: "verification",
-            systemPrompt,
-            userPrompt,
-            responseFormat: "json",
-            segments: [{ label: "PresentationDeck", text: userPrompt }],
-          },
-          { candidates },
-          buildAuthorizedPolicy(candidates)
-        );
+        const brainRes = await scholarBrain.complete({
+          req,
+          taskClass: "verification",
+          systemPrompt,
+          userPrompt,
+          responseFormat: "json",
+        });
 
-        if (response.ok && response.value?.text) {
-          const rawJson = response.value.text.replace(/```json/g, "").replace(/```/g, "").trim();
-          const parsed = JSON.parse(rawJson);
-          if (Array.isArray(parsed.slides) && parsed.slides.length >= 4) {
-            generatedSlides = parsed.slides.map((s: Record<string, unknown>, idx: number) => ({
-              slideNumber: (s.slideNumber as number) || idx + 1,
-              type: (s.type as SlidePresentationItem["type"]) || "framework_methodology",
-              title: sanitizeScholarlyText((s.title as string) || "Empirical Synthesis"),
-              subtitle: sanitizeScholarlyText((s.subtitle as string) || ""),
-              visualFocus: sanitizeScholarlyText((s.visualFocus as string) || ""),
-              keyPoints: Array.isArray(s.keyPoints)
-                ? s.keyPoints.map((k: unknown) => sanitizeScholarlyText(String(k)))
-                : [],
-              speakerNotes: sanitizeScholarlyText((s.speakerNotes as string) || ""),
-              targetDurationSeconds: (s.targetDurationSeconds as number) || 120,
-              layoutType: (s.layoutType as SlidePresentationItem["layoutType"]) || "bullets",
-              metricValue: (s.metricValue as string) || undefined,
-              metricLabel: (s.metricLabel as string) || undefined,
-            }));
-            generatedBy = "ai-gateway";
-          }
+        const rawJson = brainRes.parsedJson || (brainRes.text ? JSON.parse(brainRes.text.replace(/```json/g, "").replace(/```/g, "").trim()) : null);
+        const parsed = rawJson as { slides?: Array<Record<string, unknown>> } | null;
+
+        if (parsed && Array.isArray(parsed.slides) && parsed.slides.length >= 4) {
+          generatedSlides = parsed.slides.map((s, idx) => ({
+            slideNumber: (s.slideNumber as number) || idx + 1,
+            type: (s.type as SlidePresentationItem["type"]) || "framework_methodology",
+            title: normalizeUnicodeNFC(sanitizeScholarlyText((s.title as string) || "Empirical Synthesis")),
+            subtitle: normalizeUnicodeNFC(sanitizeScholarlyText((s.subtitle as string) || "")),
+            visualFocus: normalizeUnicodeNFC(sanitizeScholarlyText((s.visualFocus as string) || "")),
+            keyPoints: Array.isArray(s.keyPoints)
+              ? s.keyPoints.map((k: unknown) => normalizeUnicodeNFC(sanitizeScholarlyText(String(k))))
+              : [],
+            speakerNotes: normalizeUnicodeNFC(sanitizeScholarlyText((s.speakerNotes as string) || "")),
+            targetDurationSeconds: (s.targetDurationSeconds as number) || 120,
+            layoutType: (s.layoutType as SlidePresentationItem["layoutType"]) || "bullets",
+            metricValue: (s.metricValue as string) || undefined,
+            metricLabel: (s.metricLabel as string) || undefined,
+          }));
+          generatedBy = "ai-gateway";
         }
       } catch (aiErr) {
         console.warn("[project/presentation.ts] AI deck generation fallback:", aiErr);
@@ -532,12 +539,21 @@ router.post(
     let generatedBy: "ai-gateway" | "heuristic-fallback" = "heuristic-fallback";
 
     const candidates = getCandidates(req);
-    const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
-    if (candidates.length > 0 && !isTest) {
+    if (candidates.length > 0) {
       try {
-        const systemPrompt = `${buildScholarlyVoiceSystemPrompt({ discipline: "Academic Conference Referee Q&A" })}
-You are a distinguished Academic Conference Committee and Peer-Review Q&A Simulator.
+        const rawQaSources = Array.isArray(record.evidenceLedger?.sources) ? record.evidenceLedger.sources : [];
+        const qaVaultSources = rawQaSources.map((s) => ({
+          ...s,
+          year: s.year ?? "n.d.",
+        }));
+        const evidence = await scholarBrain.retrieveEvidence({
+          query: `${projectTitle} ${researchQuestions.join(" ")}`,
+          maxResults: 4,
+          vaultSources: qaVaultSources,
+        }).catch(() => []);
+
+        const systemPrompt = `You are a distinguished Academic Conference Committee and Peer-Review Q&A Simulator.
 Generate 3-4 rigorous, challenging questions from diverse referee/audience personas based on the provided academic project.
 Personas:
 - "Senior Conference Referee & Methodologist" (Difficulty: "adversarial", probes threats to validity, confounders, non-Markovian assumptions)
@@ -578,43 +594,39 @@ Output ONLY valid JSON. Zero markdown codeblocks, zero conversational filler.`;
         const userPrompt = `Project Title: ${projectTitle}
 Research Questions: ${JSON.stringify(researchQuestions)}
 Audience Focus: ${req.body?.audienceFocus || "Academic Conference Reviewers"}
-Slides: ${JSON.stringify(req.body?.slides || [])}`;
+Slides: ${JSON.stringify(req.body?.slides || [])}
+Grounded Evidence: ${JSON.stringify(evidence.map((e) => ({ title: e.title, token: e.citationToken })))}`;
 
-        const response = await completeWithFailover(
-          {
-            taskClass: "verification",
-            systemPrompt,
-            userPrompt,
-            responseFormat: "json",
-            segments: [{ label: "PresentationQA", text: userPrompt }],
-          },
-          { candidates },
-          buildAuthorizedPolicy(candidates)
-        );
+        const brainRes = await scholarBrain.complete({
+          req,
+          taskClass: "verification",
+          systemPrompt,
+          userPrompt,
+          responseFormat: "json",
+        });
 
-        if (response.ok && response.value?.text) {
-          const rawJson = response.value.text.replace(/```json/g, "").replace(/```/g, "").trim();
-          const parsed = JSON.parse(rawJson);
-          if (Array.isArray(parsed.qaScenarios) && parsed.qaScenarios.length > 0) {
-            qaScenarios = parsed.qaScenarios.map((q: Record<string, unknown>, idx: number) => ({
-              questionId: (q.questionId as string) || `qa-${idx + 1}`,
-              audienceType: sanitizeScholarlyText((q.audienceType as string) || "Conference Referee"),
-              difficultyLevel: (q.difficultyLevel as AudienceQuestion["difficultyLevel"]) || "rigorous",
-              targetedSlideNumber: (q.targetedSlideNumber as number) || idx + 1,
-              targetedTopic: sanitizeScholarlyText((q.targetedTopic as string) || "Methodological Rigor"),
-              questionText: sanitizeScholarlyText((q.questionText as string) || ""),
-              probingIntent: sanitizeScholarlyText((q.probingIntent as string) || ""),
-              suggestedAnswer: sanitizeScholarlyText((q.suggestedAnswer as string) || ""),
-              modelRebuttalStructure: Array.isArray(q.modelRebuttalStructure)
-                ? q.modelRebuttalStructure.map((r: unknown) => sanitizeScholarlyText(String(r)))
-                : [
-                    "Acknowledge the premise directly",
-                    "Cite empirical findings and statistical significance",
-                    "Highlight boundary conditions and reproducible verification",
-                  ],
-            }));
-            generatedBy = "ai-gateway";
-          }
+        const rawJson = brainRes.parsedJson || (brainRes.text ? JSON.parse(brainRes.text.replace(/```json/g, "").replace(/```/g, "").trim()) : null);
+        const parsed = rawJson as { qaScenarios?: Array<Record<string, unknown>> } | null;
+
+        if (parsed && Array.isArray(parsed.qaScenarios) && parsed.qaScenarios.length > 0) {
+          qaScenarios = parsed.qaScenarios.map((q, idx) => ({
+            questionId: (q.questionId as string) || `qa-${idx + 1}`,
+            audienceType: normalizeUnicodeNFC(sanitizeScholarlyText((q.audienceType as string) || "Conference Referee")),
+            difficultyLevel: (q.difficultyLevel as AudienceQuestion["difficultyLevel"]) || "rigorous",
+            targetedSlideNumber: (q.targetedSlideNumber as number) || idx + 1,
+            targetedTopic: normalizeUnicodeNFC(sanitizeScholarlyText((q.targetedTopic as string) || "Methodological Rigor")),
+            questionText: normalizeUnicodeNFC(sanitizeScholarlyText((q.questionText as string) || "")),
+            probingIntent: normalizeUnicodeNFC(sanitizeScholarlyText((q.probingIntent as string) || "")),
+            suggestedAnswer: normalizeUnicodeNFC(sanitizeScholarlyText((q.suggestedAnswer as string) || "")),
+            modelRebuttalStructure: Array.isArray(q.modelRebuttalStructure)
+              ? q.modelRebuttalStructure.map((r: unknown) => normalizeUnicodeNFC(sanitizeScholarlyText(String(r))))
+              : [
+                  "Acknowledge the premise directly",
+                  "Cite empirical findings and statistical significance",
+                  "Highlight boundary conditions and reproducible verification",
+                ],
+          }));
+          generatedBy = "ai-gateway";
         }
       } catch (aiErr) {
         console.warn("[project/presentation.ts] AI Q&A simulation fallback:", aiErr);

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import AudienceQaSimulator from '../AudienceQaSimulator';
@@ -102,13 +102,15 @@ describe('AudienceQaSimulator', () => {
     const runBtn = screen.getByTestId('run-qa-simulation-btn');
     fireEvent.click(runBtn);
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/projects/proj-qa-1/presentation/qa-simulate'),
-      expect.objectContaining({
-        method: 'POST',
-        body: expect.stringContaining('"difficulty":"adversarial"'),
-      })
-    );
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/projects/proj-qa-1/presentation/qa-simulate'),
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"difficulty":"adversarial"'),
+        })
+      );
+    });
 
     // Question from API should appear
     expect(

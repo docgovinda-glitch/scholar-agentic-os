@@ -21,6 +21,7 @@ import {
 import { generateNaturalSlideTitle } from '../services/slideTitleGenerator';
 import { classifyPresentationScope } from '../services/presentationScopeClassifier';
 import SlideOutlinePillCard from './SlideOutlinePillCard';
+import { authedJsonFetch } from '../../../../src/desk/api';
 
 export interface Step01UnderstandProps {
   projectId?: string;
@@ -245,30 +246,17 @@ export default function Step01Understand({
     setIsDecomposing(true);
     try {
       const topicToUse = topicInput || deck.topic || deck.title;
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      try {
-        if (typeof window !== 'undefined' && window.localStorage) {
-          const authKey = Object.keys(localStorage).find((k) => k.startsWith('sb-') && k.endsWith('-auth-token'));
-          if (authKey) {
-            const parsed = JSON.parse(localStorage.getItem(authKey) || '{}');
-            if (parsed?.access_token) {
-              headers['Authorization'] = `Bearer ${parsed.access_token}`;
-            }
-          }
-        }
-      } catch {}
-
-      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/presentation/generate-deck`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      const res = await authedJsonFetch(
+        `/api/projects/${encodeURIComponent(projectId)}/presentation/generate-deck`,
+        'POST',
+        {
           topic: topicToUse,
           framework: selectedFramework,
           slideCount: Number(slideCount),
           audienceLevel,
           rawText: rawTextInput || undefined,
-        }),
-      });
+        }
+      );
 
       if (res.ok) {
         const data = await res.json();
