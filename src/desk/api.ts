@@ -1635,4 +1635,149 @@ export async function updateProjectUserData(
   return res.json();
 }
 
+export async function draftProjectSubSection(
+  projectId: string,
+  payload: {
+    sectionId: string;
+    subSectionId: string;
+    subSectionTitle: string;
+    targetWords?: number;
+    dialect?: "en-GB" | "en-US";
+    contextPrompt?: string;
+    assignedSources?: Array<{
+      id: string;
+      authors: string[] | string;
+      year: number | string;
+      title: string;
+      doi?: string;
+      url?: string;
+      stance?: "Supporting" | "Contrasting" | "Methodological";
+      keyFindings?: string;
+    }>;
+  }
+): Promise<{
+  ok: boolean;
+  subSectionId: string;
+  content: string;
+  actualWords: number;
+  warnings?: Array<{ sentence: string; eventYear: number; pubYear: number; sourceId: string; warning: string }>;
+  unverifiedClaimsCount?: number;
+  resolvedCitationsCount?: number;
+  citedSources?: Array<{ id: string; title: string }>;
+}> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agentic/draft-subsection`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to draft sub-section");
+  }
+  return res.json();
+}
+
+export async function polishProjectManuscript(
+  projectId: string,
+  payload: { text: string; dialect?: "en-GB" | "en-US" }
+): Promise<{
+  ok: boolean;
+  polishedText: string;
+  burstinessBefore?: { burstinessScore: number; isSufficientlyBurst: boolean };
+  burstinessAfter?: { burstinessScore: number; isSufficientlyBurst: boolean };
+  burstinessDelta?: number;
+  styleCorrections?: string[];
+  telemetry?: {
+    wordCountBefore: number;
+    wordCountAfter: number;
+    fleschKincaidGrade: number;
+    readingTimeMinutes: number;
+  };
+}> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agentic/final-editor`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to polish manuscript");
+  }
+  return res.json();
+}
+
+export async function simulateFiveRefereeReview(
+  projectId: string
+): Promise<{
+  ok?: boolean;
+  data: Array<{
+    id: string;
+    referee: "Methodologist" | "Domain Specialist" | "Biostatistician" | "Synthesizer" | "Formal Editor";
+    lens: string;
+    section: string;
+    severity: "Major" | "Moderate" | "Minor";
+    feedback: string;
+    revisionDirective: string;
+  }>;
+}> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agentic/peer-review`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to simulate peer review");
+  }
+  return res.json();
+}
+
+export async function generateProjectRebuttalMatrix(
+  projectId: string,
+  critiques?: Array<{
+    id: string;
+    referee: string;
+    lens: string;
+    section: string;
+    severity: string;
+    feedback: string;
+    revisionDirective: string;
+  }>
+): Promise<{
+  ok?: boolean;
+  matrix: Array<{
+    id: string;
+    referee: "Methodologist" | "Domain Specialist" | "Biostatistician" | "Synthesizer" | "Formal Editor";
+    lens: string;
+    section: string;
+    critique: string;
+    severity: "Major" | "Moderate" | "Minor";
+    authorResponse: string;
+    revisionAction: string;
+    diff?: { find: string; replace: string };
+    status: "addressed" | "Accepted & Revised" | "Rebutted with Evidence" | "Clarified in Text";
+  }>;
+  patches?: Array<{
+    id: string;
+    section: string;
+    critiqueLens?: string;
+    severity?: string;
+    find: string;
+    replace: string;
+    explanation: string;
+    accepted: boolean;
+  }>;
+}> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/agentic/rebuttal-matrix`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ critiques }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to generate rebuttal matrix");
+  }
+  return res.json();
+}
+
 

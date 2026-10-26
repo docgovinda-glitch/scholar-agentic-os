@@ -345,6 +345,58 @@ export interface WordBudgetBlueprint {
   updatedAt: string;
 }
 
+export type RefereeRole = "Methodologist" | "Domain Specialist" | "Biostatistician" | "Synthesizer" | "Formal Editor";
+
+export interface RefereeCritique {
+  id: string;
+  referee: RefereeRole;
+  lens: string;
+  section: string;
+  severity: "Major" | "Moderate" | "Minor";
+  feedback: string;
+  revisionDirective: string;
+  verdict?: "Accept" | "Minor Revision" | "Major Revision" | "Reject";
+  score?: number;
+}
+
+export interface RebuttalMatrixItem {
+  id: string;
+  referee: RefereeRole;
+  lens: string;
+  section: string;
+  critique: string;
+  severity: "Major" | "Moderate" | "Minor";
+  authorResponse: string;
+  revisionAction: string;
+  diff?: {
+    find: string;
+    replace: string;
+  };
+  status: "addressed" | "Accepted & Revised" | "Rebutted with Evidence" | "Clarified in Text";
+}
+
+export interface ManuscriptPatch {
+  id: string;
+  section: string;
+  critiqueLens?: string;
+  severity?: string;
+  find: string;
+  replace: string;
+  explanation: string;
+  accepted: boolean;
+  appliedAt?: string;
+}
+
+export interface BibliographyEntry {
+  id: string;
+  token: string;
+  author: string;
+  year: number | string;
+  title: string;
+  formattedCitation: string;
+  isUserData: boolean;
+}
+
 
 
 /**

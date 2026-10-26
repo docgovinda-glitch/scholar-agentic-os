@@ -13,6 +13,8 @@ import { subscribeExecutionState, type ExecutionScope } from "../../services/exe
 
 import ProtocolBlueprintMode from "./ProtocolBlueprintMode";
 import EvidenceMatrixMode from "./EvidenceMatrixMode";
+import ManuscriptStudioMode from "./ManuscriptStudioMode";
+import RefereeRebuttalMode from "./RefereeRebuttalMode";
 
 function ResearchWorkspaceInner({
   onClose,
@@ -661,6 +663,10 @@ function ResearchWorkspaceInner({
               <ProtocolBlueprintMode />
             ) : currentMode === "evidence" ? (
               <EvidenceMatrixMode />
+            ) : currentMode === "studio" ? (
+              <ManuscriptStudioMode />
+            ) : currentMode === "referee" ? (
+              <RefereeRebuttalMode />
             ) : (
               <ActiveStageComponent 
                 stage={currentStage} 
