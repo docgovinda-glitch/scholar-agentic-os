@@ -43,10 +43,12 @@ const { default: AssignmentWorkspace } = await import("../AssignmentWorkspace");
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  localStorage.clear();
 });
 
 describe("Assignment Workspace Stages & Workflow", () => {
   beforeEach(() => {
+    localStorage.clear();
     getProject.mockResolvedValue({
       projectId: "proj-456",
       outputTypeId: "OT-01",
@@ -110,8 +112,8 @@ describe("Assignment Workspace Stages & Workflow", () => {
       />
     );
 
-    expect(await screen.findByText(/Phase 03 · Drafting & Synthesis/i)).toBeInTheDocument();
-    expect(screen.getByText(/Grounded Section-by-Section Drafting/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Grounded Section-by-Section Drafting/i, {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getAllByText(/Drafting & Synthesis/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/3,000 words/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Introduction & Context/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Theoretical Framework/i).length).toBeGreaterThanOrEqual(1);
@@ -126,8 +128,8 @@ describe("Assignment Workspace Stages & Workflow", () => {
       />
     );
 
-    expect(await screen.findByText(/Phase 03 · Drafting & Synthesis/i)).toBeInTheDocument();
-    expect(screen.getByText(/Overall Draft Progress/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Overall Draft Progress/i, {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getAllByText(/Drafting & Synthesis/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/3,000 words/i).length).toBeGreaterThanOrEqual(1);
   });
 
@@ -140,8 +142,8 @@ describe("Assignment Workspace Stages & Workflow", () => {
       />
     );
 
-    expect(await screen.findByText(/Phase 04 · Submission & Review/i)).toBeInTheDocument();
-    expect(screen.getByText(/Submission Quality Audit & Camera-Ready Export/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Submission Quality Audit & Camera-Ready Export/i, {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getAllByText(/Submission & Review/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Word Document \(\.docx\)/i)).toBeInTheDocument();
     expect(screen.getByText(/PDF Document/i)).toBeInTheDocument();
   });

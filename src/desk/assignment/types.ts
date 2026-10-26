@@ -8,7 +8,7 @@ import type { CitationStyleType } from "../../services/vault/citationService";
 import type { CanonicalDocument } from "../../domain/document/model";
 import type { EvidenceLedger } from "../../domain/evidence/types";
 
-export type AssignmentPhaseId = "understand" | "sources" | "drafting" | "submission";
+export type AssignmentPhaseId = "extract" | "understand" | "sources" | "drafting" | "submission";
 
 export interface AssignmentPhaseDefinition {
   id: AssignmentPhaseId;
@@ -16,38 +16,46 @@ export interface AssignmentPhaseDefinition {
   label: string;
   shortLabel: string;
   description: string;
-  iconKey: "FileText" | "Library" | "PenTool" | "CheckCircle2" | string;
+  iconKey: "FileText" | "Brain" | "Library" | "PenTool" | "CheckCircle2" | string;
 }
 
 export const ASSIGNMENT_PHASES: AssignmentPhaseDefinition[] = [
   {
-    id: "understand",
+    id: "extract",
     number: 1,
-    label: "Phase 1: Extract & Understand",
-    shortLabel: "Extract & Understand",
-    description: "Part 1: Extract brief · Part 2: Understand thesis & outline",
+    label: "Phase 1: Extract",
+    shortLabel: "Extract",
+    description: "Brief document parsing, prompts & target word count budget",
     iconKey: "FileText",
   },
   {
-    id: "sources",
+    id: "understand",
     number: 2,
-    label: "Phase 2: Sources",
+    label: "Phase 2: Understand",
+    shortLabel: "Understand",
+    description: "Core working thesis, theoretical frameworks & dynamic outline",
+    iconKey: "Brain",
+  },
+  {
+    id: "sources",
+    number: 3,
+    label: "Phase 3: Sources",
     shortLabel: "Sources",
     description: "Scholarly discovery, Knowledge Vault integration, & evidence ledger",
     iconKey: "Library",
   },
   {
     id: "drafting",
-    number: 3,
-    label: "Phase 3: Drafting",
+    number: 4,
+    label: "Phase 4: Drafting",
     shortLabel: "Drafting",
     description: "Structured section drafting, real-time word budgets, & AI polish",
     iconKey: "PenTool",
   },
   {
     id: "submission",
-    number: 4,
-    label: "Phase 4: Submission",
+    number: 5,
+    label: "Phase 5: Submission",
     shortLabel: "Submission",
     description: "10-point rubric assessment, citation audit, & camera-ready export",
     iconKey: "CheckCircle2",
@@ -63,6 +71,17 @@ export interface AssignmentAgentInfo {
 }
 
 export const ASSIGNMENT_AGENT_CONFIGS: Record<AssignmentPhaseId, AssignmentAgentInfo> = {
+  extract: {
+    name: "Architect",
+    role: "Brief Extraction & Scope Configuration",
+    description: "I'll extract key requirements from your assignment brief document, calibrate parameters, and set target word count budgets.",
+    iconPath: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+    quickActions: [
+      "Extract brief requirements",
+      "Calibrate target word count",
+      "Configure academic tone",
+    ],
+  },
   understand: {
     name: "Advisor",
     role: "Assignment Brief & Rubric Guidance",
@@ -109,7 +128,24 @@ export const ASSIGNMENT_AGENT_CONFIGS: Record<AssignmentPhaseId, AssignmentAgent
   },
 };
 
+export const ARCHETYPE_DEFAULT_TONES: Record<string, string> = {
+  essay: "formal_academic",
+  literature_review: "critical",
+  research_paper: "formal_academic",
+  case_study: "analytical",
+  report: "objective",
+  critical_essay: "critical",
+  argumentative_essay: "persuasive",
+  policy_analysis: "analytical",
+  business_assignment: "analytical",
+  analytical_essay: "analytical",
+  annotated_bibliography: "critical",
+  coursework: "formal_academic",
+  other: "formal_academic",
+};
+
 export const LEGACY_STAGE_TO_PHASE_MAP: Record<string, AssignmentPhaseId> = {
+  extract: "extract",
   understand: "understand",
   plan: "understand",
   research: "sources",
@@ -124,9 +160,10 @@ export const LEGACY_STAGE_TO_PHASE_MAP: Record<string, AssignmentPhaseId> = {
 };
 
 export function normalizeAssignmentPhase(phaseOrStage?: string | null): AssignmentPhaseId {
-  if (!phaseOrStage) return "understand";
+  if (!phaseOrStage) return "extract";
   const normalized = phaseOrStage.toLowerCase().trim();
   if (
+    normalized === "extract" ||
     normalized === "understand" ||
     normalized === "sources" ||
     normalized === "drafting" ||
@@ -137,7 +174,7 @@ export function normalizeAssignmentPhase(phaseOrStage?: string | null): Assignme
   if (normalized in LEGACY_STAGE_TO_PHASE_MAP) {
     return LEGACY_STAGE_TO_PHASE_MAP[normalized];
   }
-  return "understand";
+  return "extract";
 }
 
 export type LegacyAssignmentStage =

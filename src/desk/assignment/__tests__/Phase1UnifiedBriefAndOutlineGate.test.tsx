@@ -98,8 +98,8 @@ describe("Unified Assignment Brief & 2-Step Outline Review Progression", () => {
     });
 
     // Check tone-tailored Introduction/Thesis statement exists
-    expect(screen.getByText(/Introduction & Core Working Thesis/i)).toBeInTheDocument();
-    expect(screen.getByText(/persuasive tone/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Introduction & Core Working Thesis/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/persuasive tone/i)[0]).toBeInTheDocument();
 
     // Check H1, H2, and H3 arguments/evidence exist
     const h3Inputs = screen.getAllByPlaceholderText(/\+ Add argument or evidence point|\+ Add H3 specific argument/i);

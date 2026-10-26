@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import {
   FileText,
+  Brain,
   Library,
   PenTool,
   CheckCircle2,
@@ -33,6 +34,7 @@ export default function AssignmentStageNavigation({
     question,
     approvedSourceIds = [],
     submissionReport,
+    executionMode,
   } = useAssignmentWorkspace();
 
   const isOverLimit = currentWordCount > targetWordCount * 1.1;
@@ -40,17 +42,33 @@ export default function AssignmentStageNavigation({
     currentWordCount >= targetWordCount * 0.9 &&
     currentWordCount <= targetWordCount * 1.1;
 
+  const visiblePhases = useMemo(() => {
+    if (executionMode === "minimal") {
+      return ASSIGNMENT_PHASES.filter((p) => p.id !== "understand").map((p, idx) => ({
+        ...p,
+        displayNumber: idx + 1,
+      }));
+    }
+    return ASSIGNMENT_PHASES.map((p, idx) => ({
+      ...p,
+      displayNumber: idx + 1,
+    }));
+  }, [executionMode]);
+
   // Global Progress Percentages for each phase
   const phasePercentages = useMemo(() => {
-    const p1 = structure?.isConfirmed ? 100 : question && question.trim().length > 10 ? 60 : 25;
-    const p2 = Math.min(100, Math.round((approvedSourceIds.length / 4) * 100));
-    const p3 = Math.min(100, wordCountPercentage || 0);
-    const p4 = submissionReport ? 100 : 0;
+    const hasBrief = Boolean(question && question.trim().length > 10);
+    const p1 = hasBrief ? 100 : question?.trim() ? 50 : 25;
+    const p2 = structure?.isConfirmed ? 100 : structure ? 75 : hasBrief ? 50 : 0;
+    const p3 = Math.min(100, Math.round((approvedSourceIds.length / 4) * 100));
+    const p4 = Math.min(100, wordCountPercentage || 0);
+    const p5 = submissionReport ? 100 : 0;
     return {
-      understand: p1,
-      sources: p2,
-      drafting: p3,
-      submission: p4,
+      extract: p1,
+      understand: p2,
+      sources: p3,
+      drafting: p4,
+      submission: p5,
     };
   }, [structure, question, approvedSourceIds.length, wordCountPercentage, submissionReport]);
 
@@ -59,6 +77,8 @@ export default function AssignmentStageNavigation({
     switch (iconKey) {
       case "FileText":
         return <FileText {...iconProps} />;
+      case "Brain":
+        return <Brain {...iconProps} />;
       case "Library":
         return <Library {...iconProps} />;
       case "PenTool":
@@ -75,13 +95,13 @@ export default function AssignmentStageNavigation({
       className={`w-full bg-white dark:bg-[#1C1C1E] border-b border-neutral-200/80 dark:border-white/10 px-4 pt-1 pb-2.5 sm:px-6 flex items-center justify-between gap-4 shrink-0 transition-colors z-10 ${className}`}
       aria-label="Assignment Workflow Phases"
     >
-      {/* Horizontal 4-Phase Progress Stepper */}
+      {/* Horizontal Progress Stepper (4 steps in Minimal, 5 steps in Detailed) */}
       <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 min-w-0">
-        {ASSIGNMENT_PHASES.map((phase, idx) => {
+        {visiblePhases.map((phase, idx) => {
           const isActive = currentPhase === phase.id;
           const status = phaseStatuses?.[phase.id] || (isActive ? "active" : "upcoming");
           const isCompleted = status === "completed" || phasePercentages[phase.id] === 100;
-          const formattedNumber = `0${phase.number}`;
+          const formattedNumber = `0${phase.displayNumber}`;
           const progressPct = phasePercentages[phase.id];
 
           return (
@@ -102,7 +122,7 @@ export default function AssignmentStageNavigation({
                   onSelectPhase?.(phase.id);
                   onSelectStage?.();
                 }}
-                aria-label={`Phase ${phase.number}: ${phase.id === "understand" ? "Understand · Extract" : phase.shortLabel}`}
+                aria-label={`Phase ${phase.number}: ${phase.shortLabel}${phase.id === "extract" ? " · Phase 1: Understand" : ""}${phase.id === "sources" ? " · Phase 2: Sources" : ""}${phase.id === "drafting" ? " · Phase 3: Drafting" : ""}${phase.id === "submission" ? " · Phase 4: Submission" : ""}`}
                 aria-current={isActive ? "step" : undefined}
                 className={`group flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer ${
                   isActive

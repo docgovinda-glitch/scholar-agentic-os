@@ -8,8 +8,10 @@ import ContextPanel from "../workspace/ContextPanel";
 import { ASSIGNMENT_AGENT_CONFIGS, ASSIGNMENT_PHASES } from "./types";
 import { sendAssignmentCopilotMessage } from "./services/assignmentCopilotService";
 
-// Aggressive code-splitting with React.lazy
-const AssignmentUnderstandStage = React.lazy(() => import("./stages/AssignmentUnderstandStage"));
+import AssignmentExtractStage from "./stages/AssignmentExtractStage";
+import AssignmentUnderstandStage from "./stages/AssignmentUnderstandStage";
+
+// Code-splitting downstream stages with React.lazy
 const AssignmentSourcesStage = React.lazy(() => import("./stages/AssignmentSourcesStage"));
 const AssignmentDraftingStage = React.lazy(() => import("./stages/AssignmentDraftingStage"));
 const AssignmentSubmissionStage = React.lazy(() => import("./stages/AssignmentSubmissionStage"));
@@ -532,13 +534,24 @@ function AssignmentWorkspaceInner({
 
   const renderActivePhase = () => {
     switch (currentPhase) {
+      case "extract":
+        return (
+          <AssignmentExtractStage
+            onProceed={() => setPhase(executionMode === "minimal" ? "sources" : "understand")}
+          />
+        );
       case "understand":
-        return <AssignmentUnderstandStage />;
+        return (
+          <AssignmentUnderstandStage
+            onBack={() => setPhase("extract")}
+            onProceed={() => setPhase("sources")}
+          />
+        );
       case "sources":
         return (
           <AssignmentSourcesStage
             onProceed={() => setPhase("drafting")}
-            onBack={() => setPhase("understand")}
+            onBack={() => setPhase(executionMode === "minimal" ? "extract" : "understand")}
           />
         );
       case "drafting":
@@ -551,7 +564,11 @@ function AssignmentWorkspaceInner({
       case "submission":
         return <AssignmentSubmissionStage onBack={() => setPhase("drafting")} />;
       default:
-        return <AssignmentUnderstandStage />;
+        return (
+          <AssignmentExtractStage
+            onProceed={() => setPhase(executionMode === "minimal" ? "sources" : "understand")}
+          />
+        );
     }
   };
 
@@ -622,7 +639,7 @@ function AssignmentWorkspaceInner({
                     ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
-                title="Minimal Mode: Streamlined, distraction-free view focused on core drafting and final output"
+                title="Minimal (Quick Flow): 4 steps (01 Extract → 02 Sources → 03 Drafting → 04 Submission) — AI automatically structures your outline and word budgets"
               >
                 <span>Minimal</span>
               </button>
@@ -636,7 +653,7 @@ function AssignmentWorkspaceInner({
                     ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
-                title="Detailed Mode: Full atomic lifecycle granularity, live evidence telemetry, citation tokens & section uniqueness validation"
+                title="Detailed (Guided Architect): 5 steps (01 Extract → 02 Understand → 03 Sources → 04 Drafting → 05 Submission) — Review thesis angles, narrative roadmap, and fine-tune section headings before finding sources"
               >
                 <span>Detailed</span>
               </button>

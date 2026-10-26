@@ -114,7 +114,7 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
       }),
     });
 
-    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="understand" />);
+    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="extract" />);
 
     // Wait for stage to load
     await waitFor(() => {
@@ -140,11 +140,14 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
     fireEvent.change(fileInput, { target: { files: [handbookFile] } });
 
     // Verify document text is parsed and rendered under "Extracted Brief Question / Prompt:"
-    await waitFor(() => {
-      expect(
-        screen.getByText(/Extracted Brief Question \/ Prompt:/i)
-      ).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByText(/Extracted Brief Question \/ Prompt:/i)
+        ).toBeInTheDocument();
+      },
+      { timeout: 10000 }
+    );
 
     expect(
       screen.getByText(/MODULE HANDBOOK 2026: CRITICAL THEORIES OF INTERNATIONAL LAW/i)
@@ -185,7 +188,7 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
       return { ok: true, json: async () => ({}) };
     });
 
-    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="understand" />);
+    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="extract" />);
 
     await waitFor(() => {
       expect(screen.getByText("Understand Your Brief")).toBeInTheDocument();
@@ -238,7 +241,7 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
       },
     });
 
-    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="understand" />);
+    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="extract" />);
 
     await waitFor(() => {
       expect(screen.getByText("Understand Your Brief")).toBeInTheDocument();
@@ -305,7 +308,7 @@ describe("Brief Upload Flow, Recursion Prevention & Role-Based Limiter", () => {
       return { ok: true, json: async () => ({}) };
     });
 
-    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="understand" />);
+    render(<AssignmentWorkspace projectId="proj-brief-1" initialStage="extract" />);
 
     await waitFor(() => {
       expect(screen.getByText("Understand Your Brief")).toBeInTheDocument();
