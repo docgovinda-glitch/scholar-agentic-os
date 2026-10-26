@@ -2166,8 +2166,7 @@ export default function ProjectListScreen({
                 scrollToProjects();
               }}
               className="flex items-center gap-2.5 min-w-0 cursor-pointer transition-opacity duration-200 hover:opacity-70 text-left"
-              title="Scholar Core Home"
-              aria-label="Scholar Core Home"
+              title="Scholar Core Workspace"
             >
               <div className="w-9 h-9 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center flex-shrink-0 shadow-xs">
                 <ScholarCoreLogo size="md" className="text-white dark:text-neutral-900" />
@@ -2325,9 +2324,9 @@ export default function ProjectListScreen({
           {/* Projects Section: Render only when logged in and active projects exist */}
           {userEmail && projects && projects.length > 0 && (
             <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-              <h3 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase mt-8 mb-2 px-3 flex-shrink-0">
+              <h2 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase mt-8 mb-2 px-3 flex-shrink-0">
                 Projects
-              </h3>
+              </h2>
 
               {/* Search Projects Box directly below PROJECTS heading */}
               <div className="relative group cursor-text mb-2.5 w-full h-10 flex-shrink-0">
@@ -2689,7 +2688,7 @@ export default function ProjectListScreen({
                       <h1 className="text-2xl font-semibold text-neutral-900 dark:text-white tracking-tight">
                         Where will your research begin?
                       </h1>
-                      <p className="text-[13px] text-neutral-500 mt-1">
+                      <p className="text-[13px] text-neutral-500 dark:text-neutral-400 mt-1">
                         Select an academic deliverable or paste your assignment guidelines below.
                       </p>
                     </div>
@@ -2734,19 +2733,19 @@ export default function ProjectListScreen({
 
                               {/* Middle Content: Title & Actionable Workflow Guidance */}
                               <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-start">
-                                <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-white group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
+                                <h2 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-white group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
                                   {tile.label}
-                                </h3>
+                                </h2>
                                 <p className="text-[12px] leading-relaxed font-normal text-neutral-600 dark:text-neutral-400 mt-2 line-clamp-3">
                                   {tile.guidance}
                                 </p>
                               </div>
 
                               {/* Bottom Row: Divider & Actionable Deliverables Spec */}
-                              <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-500 font-sans leading-tight">
+                              <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
                                 {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
                                   <React.Fragment key={idx}>
-                                    {idx > 0 && <span className="text-neutral-400 dark:text-neutral-500 opacity-60 font-bold">·</span>}
+                                    {idx > 0 && <span className="text-neutral-400 dark:text-neutral-400 opacity-60 font-bold">·</span>}
                                     <span className="font-medium whitespace-nowrap">{part}</span>
                                   </React.Fragment>
                                 ))}
@@ -2907,6 +2906,9 @@ export default function ProjectListScreen({
                           addMainFiles(newFiles);
                         }
                       }}
+                      id="main-research-instruction-input"
+                      name="researchInstructions"
+                      aria-label="Research instructions or assignment guidelines"
                       placeholder="Paste text, drop files/images, or draft research instructions..."
                       style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
                       className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input max-h-28 overflow-y-auto scholar-scrollbar"
@@ -3205,19 +3207,19 @@ export default function ProjectListScreen({
 
                             {/* Middle Content: Title & Actionable Workflow Guidance */}
                             <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-start">
-                              <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-white group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
+                              <h2 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-white group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
                                 {tile.label}
-                              </h3>
+                              </h2>
                               <p className="text-[12px] leading-relaxed font-normal text-neutral-600 dark:text-neutral-400 mt-2 line-clamp-3">
                                 {tile.guidance}
                               </p>
                             </div>
 
                             {/* Bottom Row: Divider & Actionable Deliverables Spec */}
-                            <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-500 font-sans leading-tight">
+                            <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
                               {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
                                 <React.Fragment key={idx}>
-                                  {idx > 0 && <span className="text-neutral-400 dark:text-neutral-500 opacity-60 font-bold">·</span>}
+                                  {idx > 0 && <span className="text-neutral-400 dark:text-neutral-400 opacity-60 font-bold">·</span>}
                                   <span className="font-medium whitespace-nowrap">{part}</span>
                                 </React.Fragment>
                               ))}
