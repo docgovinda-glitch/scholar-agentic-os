@@ -10,6 +10,7 @@
  */
 
 import { executeAgenticLLM } from "../../api";
+import { parseAndRepairLLMJson } from "../../../shared/llmJsonParser";
 import type { UploadedSourceDocument, EvidenceItem, ExtractedSourceEvidence } from "../types";
 
 export interface SourceExtractionOptions {
@@ -233,8 +234,7 @@ Relevant Source Passages:
 ${candidateSegments.map((s) => `[Location: ${s.location}]\n${s.text}`).join("\n\n---\n\n")}`;
 
       const aiResponse = await executeAgenticLLM(systemPrompt, userPrompt, "reasoning");
-      const cleanedJson = aiResponse.replace(/```json\n?|\n?```/g, "").trim();
-      const parsedData = JSON.parse(cleanedJson);
+      const parsedData = parseAndRepairLLMJson<any>(aiResponse, {});
 
       let excerptItems: any[] = [];
       if (Array.isArray(parsedData)) {

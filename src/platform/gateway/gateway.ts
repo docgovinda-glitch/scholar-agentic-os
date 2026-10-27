@@ -34,17 +34,31 @@ function estimateTokens(text: string): number {
  * handling. Throws GatewayDenied on "deny"/"ask" — see complete()'s doc
  * comment for what callers are responsible for.
  */
-function evaluateAndResolvePrompt(req: CompletionRequest, policy: EgressPolicy): string {
-  const segments =
+function evaluateAndResolvePrompt(
+  req: CompletionRequest,
+  policy: EgressPolicy
+): { effectiveUserPrompt: string; effectiveSystemPrompt?: string } {
+  const rawSegments =
     req.segments && req.segments.length > 0
-      ? req.segments
+      ? [...req.segments]
       : [{ label: "userPrompt", text: req.userPrompt }];
+
+  // Ensure req.systemPrompt is ALWAYS included as a named segment in Warden evaluation
+  if (req.systemPrompt) {
+    const existingSysIdx = rawSegments.findIndex((s) => s.label === "systemPrompt");
+    if (existingSysIdx >= 0) {
+      rawSegments[existingSysIdx] = { label: "systemPrompt", text: req.systemPrompt };
+    } else {
+      rawSegments.unshift({ label: "systemPrompt", text: req.systemPrompt });
+    }
+  }
+
   const evaluation = evaluate(
     {
       provider: req.provider,
       taskClass: req.taskClass,
       scopeId: req.scopeId,
-      segments,
+      segments: rawSegments,
       local: req.local,
     },
     policy
@@ -59,9 +73,20 @@ function evaluateAndResolvePrompt(req: CompletionRequest, policy: EgressPolicy):
   // "allow" or "redact" both proceed; redact already minimised evaluation.preview,
   // so the outbound prompt is rebuilt from the (possibly redacted) preview segments,
   // never from req.segments directly — this is what makes redaction real rather than cosmetic.
-  return evaluation.decision === "redact"
-    ? evaluation.preview.map((s) => `${s.label}: ${s.text}`).join("\n\n")
-    : req.userPrompt;
+  if (evaluation.decision === "redact") {
+    const sysSeg = evaluation.preview.find((s) => s.label === "systemPrompt");
+    const nonSysSegs = evaluation.preview.filter((s) => s.label !== "systemPrompt");
+    const effectiveUserPrompt = nonSysSegs.map((s) => `${s.label}: ${s.text}`).join("\n\n");
+    return {
+      effectiveUserPrompt,
+      effectiveSystemPrompt: sysSeg ? sysSeg.text : req.systemPrompt,
+    };
+  }
+
+  return {
+    effectiveUserPrompt: req.userPrompt,
+    effectiveSystemPrompt: req.systemPrompt,
+  };
 }
 
 function resolveAdapter(providerId: string) {
@@ -85,18 +110,22 @@ export async function complete(
   req: CompletionRequest,
   policy: EgressPolicy = defaultPolicy()
 ): Promise<CompletionResult> {
-  const effectiveUserPrompt = evaluateAndResolvePrompt(req, policy);
+  const { effectiveUserPrompt, effectiveSystemPrompt } = evaluateAndResolvePrompt(req, policy);
   const adapter = resolveAdapter(req.provider);
 
   const start = Date.now();
-  const { text, model } = await adapter.complete({ ...req, userPrompt: effectiveUserPrompt });
+  const { text, model } = await adapter.complete({
+    ...req,
+    userPrompt: effectiveUserPrompt,
+    systemPrompt: effectiveSystemPrompt,
+  });
   const latencyMs = Date.now() - start;
 
   return {
     text,
     provider: req.provider,
     model,
-    inputTokensEstimate: estimateTokens(effectiveUserPrompt + (req.systemPrompt ?? "")),
+    inputTokensEstimate: estimateTokens(effectiveUserPrompt + (effectiveSystemPrompt ?? "")),
     outputTokensEstimate: estimateTokens(text),
     latencyMs,
   };
@@ -114,9 +143,13 @@ export async function stream(
   onChunk: (delta: string) => void,
   policy: EgressPolicy = defaultPolicy()
 ): Promise<CompletionResult> {
-  const effectiveUserPrompt = evaluateAndResolvePrompt(req, policy);
+  const { effectiveUserPrompt, effectiveSystemPrompt } = evaluateAndResolvePrompt(req, policy);
   const adapter = resolveAdapter(req.provider);
-  const resolvedReq = { ...req, userPrompt: effectiveUserPrompt };
+  const resolvedReq = {
+    ...req,
+    userPrompt: effectiveUserPrompt,
+    systemPrompt: effectiveSystemPrompt,
+  };
 
   const start = Date.now();
   const { text, model } = adapter.stream
@@ -131,7 +164,7 @@ export async function stream(
     text,
     provider: req.provider,
     model,
-    inputTokensEstimate: estimateTokens(effectiveUserPrompt + (req.systemPrompt ?? "")),
+    inputTokensEstimate: estimateTokens(effectiveUserPrompt + (effectiveSystemPrompt ?? "")),
     outputTokensEstimate: estimateTokens(text),
     latencyMs,
   };

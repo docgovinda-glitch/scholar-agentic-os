@@ -12,11 +12,21 @@ import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
+import { signLlmChallenge } from "../../utils/llm.ts";
 
 process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
 
 const originalFetch = global.fetch;
+
+function makeChallengeToken(): string {
+  return signLlmChallenge({
+    userId: TEST_USER_ID,
+    routeId: "test",
+    promptHash: "*",
+    expiresAt: Date.now() + 60000,
+  });
+}
 
 beforeEach(() => {
   __resetProjectStoreForTests();
@@ -50,6 +60,18 @@ async function createProject(): Promise<string> {
 }
 
 describe("Agentic Routes & Relational Table Persistence", () => {
+  it("rejects unsigned LLM override requests with HTTP 403", async () => {
+    const projectId = await createProject();
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/agent/vault-sources`)
+      .send({
+        llmResult: JSON.stringify({ data: [] }),
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ error: "Invalid or unsigned LLM challenge token" });
+  });
+
   it("POST /vault-sources inserts discovered sources into project_sources (NOT peer_review_critiques)", async () => {
     const projectId = await createProject();
 
@@ -63,6 +85,7 @@ describe("Agentic Routes & Relational Table Persistence", () => {
     const res = await request(app)
       .post(`/api/projects/${projectId}/agent/vault-sources`)
       .send({
+        challengeToken: makeChallengeToken(),
         llmResult: JSON.stringify({
           data: [
             {
@@ -109,6 +132,7 @@ describe("Agentic Routes & Relational Table Persistence", () => {
     const res = await request(app)
       .post(`/api/projects/${projectId}/agent/evidence-extraction`)
       .send({
+        challengeToken: makeChallengeToken(),
         llmResult: JSON.stringify({
           data: [
             {
@@ -153,6 +177,7 @@ describe("Agentic Routes & Relational Table Persistence", () => {
     const res = await request(app)
       .post(`/api/projects/${projectId}/agent/draft`)
       .send({
+        challengeToken: makeChallengeToken(),
         llmResult: JSON.stringify({
           data: [
             {
@@ -191,6 +216,7 @@ describe("Agentic Routes & Relational Table Persistence", () => {
     const res = await request(app)
       .post(`/api/projects/${projectId}/agent/peer-review`)
       .send({
+        challengeToken: makeChallengeToken(),
         llmResult: JSON.stringify({
           data: [
             {

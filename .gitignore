@@ -16,5 +16,6 @@ coverage/
 Doctoral-Research-and-Journal-Publication-Association/
 Doctoral-Research-and-Journal-Publishation-Assistant/
 users.json
+data/
 supabase/.temp/
 supabase/.branches/

@@ -219,6 +219,7 @@ export async function authedJsonFetch(
         body: JSON.stringify({
           ...((body as any) || {}),
           llmResult,
+          challengeToken: data.challengeToken,
           canonicalSources: data.canonicalSources,
         }),
       });
@@ -292,7 +293,11 @@ export async function authedStreamFetch(input: string, method: string, body: unk
         const postRes = await authedFetch(input, {
           method,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...((body as any) || {}), llmResult: parsed }),
+          body: JSON.stringify({
+            ...((body as any) || {}),
+            llmResult: parsed,
+            challengeToken: data.challengeToken,
+          }),
         });
         
         // Wait, wait... wait, if it posts it back, the backend doesn't stream, it returns the final JSON, which would be SSE!
@@ -463,6 +468,7 @@ import {
   executeLiveSearch,
   injectLiveGroundingToSystemPrompt,
 } from "../services/liveSearchService";
+import { applyScholarGuardrails } from "../shared/scholarGuardrails";
 
 export async function executeAgenticLLM(
   systemPrompt: string,
@@ -620,7 +626,8 @@ export async function executeAgenticLLM(
         throw new Error(errMsg);
       }
       endExecutionScope(executionId, "success");
-      return full;
+      const guarded = applyScholarGuardrails(full);
+      return guarded.text;
     } else {
       const result = await completeWithFailover(
         req,
@@ -638,7 +645,9 @@ export async function executeAgenticLLM(
         throw new Error(errMsg);
       }
       endExecutionScope(executionId, "success");
-      return typeof result.value === "string" ? result.value : result.value.text;
+      const rawText = typeof result.value === "string" ? result.value : result.value.text;
+      const guarded = applyScholarGuardrails(rawText);
+      return guarded.text;
     }
   } catch (err) {
     endExecutionScope(executionId, "error", (err as Error).message);

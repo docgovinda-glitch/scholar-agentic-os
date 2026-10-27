@@ -22,7 +22,6 @@ export function registerHealthRoutes(app: express.Express): void {
     res.json({
       status: "healthy",
       timestamp: new Date().toISOString(),
-      geminiKeySet: !!process.env.GEMINI_API_KEY,
       // P1-5: persistence backend visibility — "in-memory-EPHEMERAL" means
       // projects will be lost on restart. Production deployments MUST show
       // "supabase-rest" here; anything else is a misconfiguration alert.

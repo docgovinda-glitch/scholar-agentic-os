@@ -1,6 +1,7 @@
 import express from "express";
 import helmet from "helmet";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -388,6 +389,24 @@ async function startServer() {
         }
       }
     }));
+
+    // Static Route Guard (B5): Prevent missing assets and crawler files from falling through to index.html
+    const staticExtensionRegex = /\.(js|css|json|map|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot|webp|txt)$/i;
+    const knownRootFiles = new Set(["/robots.txt", "/llms.txt", "/ai-catalog.json", "/favicon.ico"]);
+
+    app.get("*", (req, res, next) => {
+      const cleanPath = req.path;
+      if (knownRootFiles.has(cleanPath)) {
+        const filePath = path.join(distPath, cleanPath);
+        if (!fs.existsSync(filePath)) {
+          return res.status(404).type("text/plain").send("Not Found");
+        }
+      }
+      if (staticExtensionRegex.test(cleanPath)) {
+        return res.status(404).type("text/plain").send("Not Found");
+      }
+      next();
+    });
 
     // Single page application support with strict no-cache to guarantee fresh deployments
     app.get("*", (req, res) => {

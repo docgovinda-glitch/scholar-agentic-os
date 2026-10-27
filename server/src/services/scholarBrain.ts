@@ -13,11 +13,22 @@
  * 5. Deterministic Mark-Weighted Word Allocator: Proportional allocation across assignment questions.
  */
 
-import { completeWithFailover } from "../../../src/platform/gateway/gateway.ts";
+import { completeWithFailover, streamWithFailover } from "../../../src/platform/gateway/gateway.ts";
 import type { CandidateProvider } from "../../../src/platform/gateway/types.ts";
 import { defaultPolicy } from "../../../src/platform/warden/policy.ts";
 import { recordConsent, type EgressPolicy } from "../../../src/platform/warden/warden.ts";
 import type { TaskClass } from "../../../src/platform/warden/types.ts";
+import { applyScholarGuardrails } from "../../../src/shared/scholarGuardrails.ts";
+import { parseAndRepairLLMJson } from "../../../src/shared/llmJsonParser.ts";
+import { chunkAndRerankEvidence } from "./semanticRagEngine.ts";
+import { runAgent } from "../../../src/app/mesh/executor.ts";
+import { ag14CitationManager } from "../../../src/app/mesh/agents/ag14CitationManager.ts";
+import { ag18ReadabilityAnalyst } from "../../../src/app/mesh/agents/ag18ReadabilityAnalyst.ts";
+import { ag25PrivacyGuard } from "../../../src/app/mesh/agents/ag25PrivacyGuard.ts";
+import { ag26WorkflowCoordinator } from "../../../src/app/mesh/agents/ag26WorkflowCoordinator.ts";
+import { issue, revoke } from "../../../src/services/capabilities/capabilities.ts";
+import { initialProjectGateState } from "../../../src/app/conductor/conductor.ts";
+import { getCandidates } from "../../utils/llm.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
   sanitizeScholarlyText,
@@ -72,6 +83,16 @@ export interface ScholarBrainCompleteOptions {
   responseFormat?: "text" | "json";
   temperature?: number;
   maxTokens?: number;
+}
+
+export interface StreamPromptConfig {
+  systemPrompt?: string;
+  userPrompt: string;
+  taskClass?: TaskClass;
+  dialect?: ScholarlyDialect;
+  temperature?: number;
+  maxTokens?: number;
+  onChunk?: (chunk: string) => void;
 }
 
 export interface ScholarBrainBurstinessMetrics {
@@ -326,33 +347,16 @@ export const scholarBrain = {
     }
 
     const rawText = gatewayResult.value.text;
-    const sanitizedText = sanitizeScholarlyText(rawText, {
-      dialect,
+    const guarded = applyScholarGuardrails(rawText, {
+      orthography: dialect === "en-US" ? "us" : "british",
       stripCliches: options.stripCliches ?? true,
     });
-    const normalizedText = normalizeUnicodeNFC(sanitizedText);
+    const normalizedText = guarded.text;
 
     let parsedJson: unknown = undefined;
     if (options.responseFormat === "json") {
-      try {
-        const firstBrace = normalizedText.indexOf("{");
-        const lastBrace = normalizedText.lastIndexOf("}");
-        if (firstBrace !== -1 && lastBrace > firstBrace) {
-          parsedJson = JSON.parse(normalizedText.slice(firstBrace, lastBrace + 1));
-        } else {
-          const firstBracket = normalizedText.indexOf("[");
-          const lastBracket = normalizedText.lastIndexOf("]");
-          if (firstBracket !== -1 && lastBracket > firstBracket) {
-            parsedJson = JSON.parse(normalizedText.slice(firstBracket, lastBracket + 1));
-          }
-        }
-      } catch {
-        // Fall back gracefully if json parsing fails
-      }
+      parsedJson = parseAndRepairLLMJson(normalizedText, undefined);
     }
-
-    const wordCount = countExactWords(normalizedText);
-    const burstinessMetrics = evaluateBurstiness(normalizedText);
 
     return {
       text: normalizedText,
@@ -360,9 +364,244 @@ export const scholarBrain = {
       parsedJson,
       provider: resolvedProvider || candidates[0]?.provider || "client-ai",
       model: resolvedModel || candidates[0]?.model || "client-model",
-      wordCount,
-      burstinessMetrics,
+      wordCount: guarded.wordCount,
+      burstinessMetrics: {
+        averageLength: guarded.averageSentenceLength,
+        variance: guarded.variance,
+        burstinessScore: guarded.burstinessScore,
+        isSufficientlyBurst: guarded.isSufficientlyBurst,
+      },
     };
+  },
+
+  /**
+   * 1b. SSE Streaming AI Execution
+   * Direct SSE endpoint wrapping streamWithFailover with real-time token emission and guardrails.
+   */
+  async stream(
+    req: any,
+    promptConfig: StreamPromptConfig,
+    res: any
+  ): Promise<{ text: string; fullText: string }> {
+    const {
+      systemPrompt = "You are an elite academic peer reviewer and scholarly researcher.",
+      userPrompt,
+      taskClass = "drafting",
+      dialect = "en-GB",
+      temperature = 0.5,
+      maxTokens = 4096,
+      onChunk,
+    } = promptConfig;
+
+    const effectiveUserPrompt = userPrompt || (promptConfig as any).prompt || "Empirical scholarly inquiry";
+    const effectiveSystemPrompt = systemPrompt || (promptConfig as any).systemInstruction || "You are an elite academic peer reviewer and scholarly researcher.";
+
+    if (!res.headersSent) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      res.setHeader("Connection", "keep-alive");
+      if (typeof res.flushHeaders === "function") {
+        res.flushHeaders();
+      }
+    }
+
+    const sendSSE = (event: string, data: any) => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    let candidates: CandidateProvider[] = [];
+    if (req) {
+      candidates = getCandidates(req);
+    }
+
+    let policy: EgressPolicy = defaultPolicy();
+    for (const c of candidates) {
+      if (c.apiKey) {
+        policy = recordConsent(policy, c.provider);
+      }
+    }
+
+    const fullSystemPrompt = buildScholarlyVoiceSystemPrompt({ dialect }) + "\n\n" + effectiveSystemPrompt;
+    let fullText = "";
+
+    try {
+      sendSSE("status", { message: "Generating scholarly draft via streaming..." });
+
+      if (candidates.length > 0) {
+        const streamResult = await streamWithFailover(
+          {
+            taskClass,
+            systemPrompt: fullSystemPrompt,
+            userPrompt: effectiveUserPrompt,
+            segments: [{ label: "Input", text: effectiveUserPrompt }],
+            temperature,
+            maxTokens,
+          },
+          (chunk: string) => {
+            fullText += chunk;
+            sendSSE("chunk", { token: chunk, accumulatedLength: fullText.length });
+            if (onChunk) onChunk(chunk);
+          },
+          { candidates },
+          policy
+        );
+
+        if (!streamResult.ok) {
+          throw new Error(streamResult.error?.message || "Stream failover failed");
+        }
+      } else {
+        // Fallback simulation chunking for offline/test environments
+        const fallbackWords = effectiveUserPrompt.split(/\s+/).slice(0, 50).join(" ");
+        const simulatedText = `[Simulated Academic Stream]: Synthetic draft exploring ${fallbackWords}. Rigorous empirical analysis corroborates the operational bounds.`;
+        for (const token of simulatedText.split(" ")) {
+          const chunk = token + " ";
+          fullText += chunk;
+          sendSSE("chunk", { token: chunk, accumulatedLength: fullText.length });
+          if (onChunk) onChunk(chunk);
+        }
+      }
+
+      const guardrails = applyScholarGuardrails(fullText, {
+        orthography: dialect === "en-US" ? "us" : "british",
+        stripCliches: true,
+      });
+
+      sendSSE("done", {
+        text: guardrails.text,
+        wordCount: guardrails.wordCount,
+        burstinessMetrics: {
+          averageLength: guardrails.averageSentenceLength,
+          variance: guardrails.variance,
+          burstinessScore: guardrails.burstinessScore,
+          isSufficientlyBurst: guardrails.isSufficientlyBurst,
+        },
+      });
+
+      res.end();
+      return { text: guardrails.text, fullText };
+    } catch (err: unknown) {
+      const errMsg = (err as Error)?.message || "Streaming failed";
+      sendSSE("error", { message: errMsg });
+      res.end();
+      throw err;
+    }
+  },
+
+  /**
+   * Pre-flight Mesh Agent Validation (AG-14, AG-18, AG-25, AG-26)
+   */
+  async validatePreflightMesh(
+    userIdOrOptions?: string | {
+      text?: string;
+      references?: CanonicalReference[];
+      project?: any;
+      egressRequest?: any;
+      userId?: string;
+    },
+    maybeOptions?: {
+      text?: string;
+      references?: CanonicalReference[];
+      project?: any;
+      egressRequest?: any;
+      userId?: string;
+    }
+  ): Promise<any> {
+    let options: {
+      text?: string;
+      references?: CanonicalReference[];
+      project?: any;
+      egressRequest?: any;
+      userId?: string;
+    };
+    let userId: string;
+
+    if (typeof userIdOrOptions === "string") {
+      userId = userIdOrOptions;
+      options = maybeOptions || {};
+    } else {
+      options = userIdOrOptions || {};
+      userId = options.userId || "conductor-preflight";
+    }
+
+    const textToAnalyze = options.text || "Empirical benchmarking of autonomous agent latency under stochastic conditions.";
+    const issuedTokens: string[] = [];
+
+    const runWithTokens = async (agent: any, input: any) => {
+      const tokens = agent.permissions.map((p: string) => issue(agent.id, p, userId));
+      tokens.forEach((t: any) => issuedTokens.push(t.id));
+      return runAgent(agent, input, {
+        subject: agent.id,
+        capabilityTokenIds: tokens.map((t: any) => t.id),
+      });
+    };
+
+    try {
+      // AG-25: Privacy Guard
+      const ag25Res = await runWithTokens(ag25PrivacyGuard, {
+        request: options.egressRequest || {
+          provider: "anthropic",
+          taskClass: "drafting",
+          segments: [{ label: "draft", text: textToAnalyze }],
+        },
+      });
+
+      // AG-18: Readability Analyst
+      const ag18Res = await runWithTokens(ag18ReadabilityAnalyst, {
+        text: textToAnalyze,
+      });
+
+      // AG-14: Citation Manager
+      const sampleRefs: CanonicalReference[] = options.references && options.references.length > 0
+        ? options.references
+        : [
+            {
+              kind: "JournalArticle",
+              title: "Attention Is All You Need",
+              source: "NeurIPS",
+              authors: [{ firstName: "Ashish", lastName: "Vaswani", order: 1 }],
+              publicationDate: "2017",
+            },
+          ];
+
+      const ag14Res = await runWithTokens(ag14CitationManager, {
+        style: "apa-7",
+        references: sampleRefs,
+        citedReferenceIndices: [0],
+      });
+
+      // AG-26: Workflow Coordinator
+      const projectState = options.project || initialProjectGateState("proj-preflight");
+      const ag26Res = await runWithTokens(ag26WorkflowCoordinator, {
+        project: projectState,
+      });
+
+      const allPassed =
+        ag25Res.status === "completed" &&
+        ag18Res.status === "completed" &&
+        ag14Res.status === "completed" &&
+        ag26Res.status === "completed";
+
+      const resultsArray: any = [
+        { agentId: "AG-14", ok: ag14Res.status === "completed", output: ag14Res.output },
+        { agentId: "AG-18", ok: ag18Res.status === "completed", output: ag18Res.output },
+        { agentId: "AG-25", ok: ag25Res.status === "completed", output: ag25Res.output },
+        { agentId: "AG-26", ok: ag26Res.status === "completed", output: ag26Res.output },
+      ];
+
+      resultsArray.ag14 = ag14Res.output;
+      resultsArray.ag18 = ag18Res.output;
+      resultsArray.ag25 = ag25Res.output;
+      resultsArray.ag26 = ag26Res.output;
+      resultsArray.allPassed = allPassed;
+
+      return resultsArray;
+    } finally {
+      for (const tid of issuedTokens) {
+        try {
+          revoke(tid);
+        } catch {}
+      }
+    }
   },
 
   /**

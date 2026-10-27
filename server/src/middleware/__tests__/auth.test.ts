@@ -21,9 +21,12 @@ const SERVICE_ROLE = "sb_secret_test";
 process.env.VITE_SUPABASE_URL = SUPABASE_URL;
 process.env.SUPABASE_SERVICE_ROLE_KEY = SERVICE_ROLE;
 
-const { requireAuth, verifyAccessToken } = await import("../auth");
+const { requireAuth, verifyAccessToken, __clearTokenCacheForTests } = await import("../auth");
 
 const originalFetch = global.fetch;
+beforeEach(() => {
+  __clearTokenCacheForTests();
+});
 afterEach(() => {
   global.fetch = originalFetch;
   vi.restoreAllMocks();
@@ -251,5 +254,81 @@ describe("requireAuth: account-status enforcement", () => {
     await requireAuth({ headers: { authorization: "Bearer good" } } as never, res as never, next as never);
 
     expect(next).toHaveBeenCalledOnce();
+  });
+});
+
+describe("verifyAccessToken — LRU Cache & Local JWT verification (B2)", () => {
+  it("serves subsequent token verifications from cache without calling fetch", async () => {
+    let fetchCount = 0;
+    mockFetch(() => {
+      fetchCount++;
+      return jsonResponse(200, { id: "user-cached", email: "cached@example.com" });
+    });
+
+    const first = await verifyAccessToken("token-to-cache");
+    expect(first.ok).toBe(true);
+    expect(first.user?.id).toBe("user-cached");
+    expect(fetchCount).toBe(1);
+
+    const second = await verifyAccessToken("token-to-cache");
+    expect(second.ok).toBe(true);
+    expect(second.user?.id).toBe("user-cached");
+    expect(fetchCount).toBe(1); // network fetch skipped due to cache hit
+  });
+
+  it("verifies JWT locally using SUPABASE_JWT_SECRET without calling fetch", async () => {
+    const crypto = await import("crypto");
+    const testSecret = "super-secret-jwt-test-key-32-chars!!";
+    process.env.SUPABASE_JWT_SECRET = testSecret;
+
+    let fetchCount = 0;
+    mockFetch(() => {
+      fetchCount++;
+      return jsonResponse(200, { id: "should-not-be-called" });
+    });
+
+    const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+    const payload = Buffer.from(JSON.stringify({
+      sub: "local-jwt-user",
+      email: "local@example.com",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })).toString("base64url");
+    const signature = crypto.createHmac("sha256", testSecret).update(`${header}.${payload}`).digest("base64url");
+    const token = `${header}.${payload}.${signature}`;
+
+    const result = await verifyAccessToken(token);
+    expect(result.ok).toBe(true);
+    expect(result.user).toEqual({ id: "local-jwt-user", email: "local@example.com" });
+    expect(fetchCount).toBe(0); // completely local, 0ms latency
+
+    delete process.env.SUPABASE_JWT_SECRET;
+  });
+
+  it("rejects an expired local JWT without calling fetch", async () => {
+    const crypto = await import("crypto");
+    const testSecret = "super-secret-jwt-test-key-32-chars!!";
+    process.env.SUPABASE_JWT_SECRET = testSecret;
+
+    let fetchCount = 0;
+    mockFetch(() => {
+      fetchCount++;
+      return jsonResponse(200, { id: "should-not-be-called" });
+    });
+
+    const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+    const payload = Buffer.from(JSON.stringify({
+      sub: "expired-user",
+      email: "expired@example.com",
+      exp: Math.floor(Date.now() / 1000) - 100, // expired 100s ago
+    })).toString("base64url");
+    const signature = crypto.createHmac("sha256", testSecret).update(`${header}.${payload}`).digest("base64url");
+    const token = `${header}.${payload}.${signature}`;
+
+    const result = await verifyAccessToken(token);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("invalid");
+    expect(fetchCount).toBe(0);
+
+    delete process.env.SUPABASE_JWT_SECRET;
   });
 });

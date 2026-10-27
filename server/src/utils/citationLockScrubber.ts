@@ -1,11 +1,16 @@
 /**
- * Citation Lock Scrubber & Chronological Checker
+ * Citation Lock Scrubber, Chronological Checker & Claim Entailment Scorer
  *
- * Implements strict [CITE:sourceId] anti-hallucination protocols:
+ * Implements strict anti-hallucination protocols:
  * 1. Exclusive Citation Ledger formatting for prompt injection.
  * 2. Post-generation conversion of [CITE:sourceId] tokens into verified APA 7 citations.
- * 3. Stripping of hallucinated (Author, Year) parenthetical strings not backed by Vault sources.
+ * 3. Detection and verification of:
+ *    - [CITE:id] tokens
+ *    - Parenthetical (Author, Year) and (Author & Author, Year)
+ *    - Narrative citations: Author (2021) or Author et al. (2022)
+ *    - Numeric bracket citations: [1], [2, 3] mapped to ledger indices
  * 4. Chronological anachronism detection (flagging papers published before referenced events).
+ * 5. NLI Claim Entailment scoring (flagging sentences with < 0.15 lexical support).
  */
 
 import { APA7Formatter } from "../../../src/citation_compliance/formatters/apa7.ts";
@@ -23,6 +28,8 @@ export interface VerifiedSourceItem {
   keyFindings?: string;
 }
 
+export type CitationSource = VerifiedSourceItem;
+
 export interface ChronologicalWarning {
   sentence: string;
   eventYear: number;
@@ -31,12 +38,21 @@ export interface ChronologicalWarning {
   warning: string;
 }
 
+export interface EntailmentWarning {
+  sentence: string;
+  sourceId: string;
+  score: number;
+  warning: string;
+}
+
 export interface ScrubResult {
   scrubbedText: string;
+  formattedText?: string;
   resolvedCitationsCount: number;
   unverifiedClaimsCount: number;
   strippedCitations: string[];
   chronologicalWarnings: ChronologicalWarning[];
+  entailmentWarnings?: EntailmentWarning[];
   citedSources: VerifiedSourceItem[];
 }
 
@@ -44,9 +60,62 @@ export interface ScrubberOptions {
   dialect?: "en-GB" | "en-US";
   style?: "apa-7";
   unverifiedPlaceholder?: string;
+  checkEntailment?: boolean;
 }
 
 const DEFAULT_UNVERIFIED_PLACEHOLDER = "[Unverified Claim — Link Vault Source]";
+
+const STOPWORDS = new Set([
+  "the", "is", "at", "which", "on", "and", "a", "an", "in", "of", "to", "for", "with", "by", "as",
+  "that", "this", "it", "from", "or", "are", "was", "were", "be", "been", "has", "have", "had",
+  "not", "but", "into", "their", "such", "than", "more", "can", "could", "would", "should", "also",
+  "these", "those", "under", "between", "over", "within", "during", "we", "our", "study", "analysis"
+]);
+
+/**
+ * Computes normalized content-word and entity overlap between a citing sentence
+ * and the source's title and key findings.
+ */
+export function scoreClaimEntailment(
+  sentence: string,
+  source: CitationSource
+): { score: number; supported: boolean } {
+  if (!sentence || !source) {
+    return { score: 0, supported: false };
+  }
+
+  const extractTokens = (t: string): Set<string> => {
+    return new Set(
+      t
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length >= 3 && !STOPWORDS.has(w))
+    );
+  };
+
+  const sentenceWords = extractTokens(sentence);
+  const s = source as unknown as Record<string, unknown>;
+  const sourceText = `${s.title || ""} ${s.keyFindings || ""} ${s.findingsSummary || ""} ${s.abstract || ""} ${s.snippet || ""} ${s.stance || ""}`;
+  const sourceWords = extractTokens(sourceText);
+
+  if (sentenceWords.size === 0 || sourceWords.size === 0) {
+    return { score: 0, supported: false };
+  }
+
+  let overlap = 0;
+  for (const word of sentenceWords) {
+    if (sourceWords.has(word)) {
+      overlap++;
+    }
+  }
+
+  // Normalized lexical overlap score
+  const score = Number((overlap / Math.max(1, Math.min(sentenceWords.size, 10))).toFixed(2));
+  const supported = score >= 0.15;
+
+  return { score, supported };
+}
 
 /**
  * Parses author strings into ReferenceAuthor objects with only lastName
@@ -78,7 +147,6 @@ function parseLastNameOnlyAuthors(authors: string[] | string): ReferenceAuthor[]
       };
     });
 }
-
 
 /**
  * Formats a list of verified sources into an authoritative prompt injection ledger
@@ -196,10 +264,12 @@ export function checkChronologicalAnachronism(
 }
 
 /**
- * Scans generated text to:
- * 1. Convert valid [CITE:source_id] tokens into formatted APA 7 citations.
- * 2. Strip any hallucinated raw (Author, Year) strings not backed by Vault sources.
- * 3. Detect chronological anachronisms where eventYear > pubYear.
+ * Upgraded Citation Scrubber:
+ * 1. Converts valid [CITE:source_id] tokens into formatted APA 7 citations.
+ * 2. Resolves parenthetical (Author, Year) and (Author & Author, Year) citations against the ledger.
+ * 3. Resolves narrative citations: e.g. Author (2021) or Author et al. (2022).
+ * 4. Resolves numeric bracket citations: e.g. [1], [2, 3] mapping to ledger indices.
+ * 5. Detects chronological anachronisms and scores claim entailment.
  */
 export function scrubCitations(
   text: string,
@@ -213,6 +283,7 @@ export function scrubCitations(
       unverifiedClaimsCount: 0,
       strippedCitations: [],
       chronologicalWarnings: [],
+      entailmentWarnings: [],
       citedSources: [],
     };
   }
@@ -243,11 +314,12 @@ export function scrubCitations(
   const strippedCitations: string[] = [];
   const citedSourcesSet = new Set<VerifiedSourceItem>();
   const chronologicalWarnings: ChronologicalWarning[] = [];
+  const entailmentWarnings: EntailmentWarning[] = [];
 
-  // Pass 1: Replace [CITE:source_id] tokens with protected markers
+  // Pass 1: Replace [CITE:source_id] tokens with formatted APA 7 in-text citations
   const resolvedTokens: string[] = [];
   const tokenRegex = /\[CITE:([^\]]+)\]/g;
-  let textWithResolvedTokens = text.replace(tokenRegex, (fullMatch, rawId: string) => {
+  let currentText = text.replace(tokenRegex, (fullMatch, rawId: string) => {
     const trimmedId = rawId.trim();
     const source = sourceMap.get(trimmedId) || sourceMap.get(trimmedId.toLowerCase());
 
@@ -268,21 +340,81 @@ export function scrubCitations(
       return `__RESOLVED_CITE_${resolvedTokens.length - 1}__`;
     }
 
-    // Token has an unknown source ID -> unverified claim
     unverifiedClaimsCount += 1;
     strippedCitations.push(fullMatch);
     return placeholder;
   });
 
-  // Pass 2: Detect and strip hallucinated raw (Author, Year) or (Author et al., Year) parentheticals
-  // Exclude non-citation patterns like (e.g., 2023), (see Table 1), (Figure 2), (p. 23)
-  const rawCitationRegex = /\(([A-Z][a-zA-Z\u00C0-\u024F\s&.,'-]+?),\s*([12]\d{3}[a-z]?)\)/g;
+  // Pass 2: Numeric bracket citations [1], [2, 3], [1-3]
+  // Only target brackets containing numbers, avoiding markdown links [text](url)
+  const numericBracketRegex = /\[(\d+(?:\s*[,–-]\s*\d+)*)\](?!\()/g;
+  currentText = currentText.replace(numericBracketRegex, (fullMatch, numbersPart: string) => {
+    // If the token is part of our resolved markers or placeholders, leave it untouched
+    if (fullMatch.includes("__RESOLVED_CITE_") || fullMatch.includes("Unverified Claim")) {
+      return fullMatch;
+    }
 
-  let scrubbedText = textWithResolvedTokens.replace(rawCitationRegex, (fullMatch, authorPart: string, yearPart: string) => {
+    const rawNums = numbersPart.split(/[,–-]/).map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
+    if (rawNums.length === 0) return fullMatch;
+
+    const formattedList: string[] = [];
+    for (const num of rawNums) {
+      if (num >= 1 && num <= sourceList.length) {
+        const source = sourceList[num - 1];
+        resolvedCitationsCount += 1;
+        citedSourcesSet.add(source);
+        const authors = parseLastNameOnlyAuthors(source.authors);
+        const formatted = formatter.formatInText({
+          kind: "JournalArticle",
+          title: source.title,
+          source: source.journal || source.title,
+          authors,
+          publicationDate: String(source.year),
+          doi: source.doi,
+          url: source.url,
+        });
+        formattedList.push(formatted);
+      } else {
+        unverifiedClaimsCount += 1;
+        strippedCitations.push(`[${num}]`);
+        if (options.unverifiedPlaceholder) {
+          formattedList.push(options.unverifiedPlaceholder);
+        }
+      }
+    }
+
+    return formattedList.filter(Boolean).join("; ");
+  });
+
+  // Pass 3: Narrative citations: Author (2021) or Author et al. (2022)
+  const narrativeCitationRegex = /\b([A-Z][a-zA-Z\u00C0-\u024F]+(?:\s+(?:et\s+al\.?|and|&)\s+[A-Z][a-zA-Z\u00C0-\u024F]+|\s+et\s+al\.?)?)\s*\(([12]\d{3}[a-z]?)\)/g;
+  currentText = currentText.replace(narrativeCitationRegex, (fullMatch, authorPart: string, yearPart: string) => {
     const cleanAuthor = authorPart.trim();
     const cleanYear = yearPart.trim();
 
-    // Skip known non-citation markers
+    if (/^(?:e\.g\.|i\.e\.|see|table|figure|eq\.|equation|section|chapter|appendix|note|n\s*=)\b/i.test(cleanAuthor)) {
+      return fullMatch;
+    }
+
+    const matchedSource = findMatchingVerifiedSource(cleanAuthor, cleanYear, sourceList);
+    if (matchedSource) {
+      resolvedCitationsCount += 1;
+      citedSourcesSet.add(matchedSource);
+      return fullMatch;
+    }
+
+    // Unverified narrative citation
+    unverifiedClaimsCount += 1;
+    strippedCitations.push(`${cleanAuthor} (${cleanYear})`);
+    return `${cleanAuthor} (${cleanYear} ${placeholder})`;
+  });
+
+  // Pass 4: Parenthetical citations: (Author, Year) or (Author & Author, Year)
+  const parentheticalCitationRegex = /\(([A-Z][a-zA-Z\u00C0-\u024F\s&.,'-]+?),\s*([12]\d{3}[a-z]?)\)/g;
+  currentText = currentText.replace(parentheticalCitationRegex, (fullMatch, authorPart: string, yearPart: string) => {
+    const cleanAuthor = authorPart.trim();
+    const cleanYear = yearPart.trim();
+
     if (/^(?:e\.g\.|i\.e\.|see|table|figure|eq\.|equation|section|chapter|appendix|note|n\s*=)\b/i.test(cleanAuthor)) {
       return fullMatch;
     }
@@ -301,13 +433,12 @@ export function scrubCitations(
   });
 
   // Restore resolved citation tokens from Pass 1
-  scrubbedText = scrubbedText.replace(/__RESOLVED_CITE_(\d+)__/g, (_, idxStr) => {
+  let scrubbedText = currentText.replace(/__RESOLVED_CITE_(\d+)__/g, (_, idxStr) => {
     const idx = parseInt(idxStr, 10);
     return resolvedTokens[idx] || "";
   });
 
-
-  // Pass 3: Chronological Anachronism Check across sentences
+  // Pass 5: Chronological Anachronisms & Claim Entailment Analysis
   const sentences = scrubbedText
     .split(/(?<=[.?!])\s+/)
     .map((s) => s.trim())
@@ -315,8 +446,7 @@ export function scrubCitations(
 
   const allCitedSources = Array.from(citedSourcesSet);
 
-  for (const sentence of sentences) {
-    // Find sources cited within this sentence
+  const processedSentences = sentences.map((sentence) => {
     const sourcesInSentence = allCitedSources.filter((src) => {
       const yearStr = String(src.year).slice(0, 4);
       if (!sentence.includes(yearStr)) return false;
@@ -330,17 +460,42 @@ export function scrubCitations(
     });
 
     if (sourcesInSentence.length > 0) {
-      const warnings = checkChronologicalAnachronism(sentence, sourcesInSentence);
-      chronologicalWarnings.push(...warnings);
+      // 1. Chronological checks
+      const anachronismWarnings = checkChronologicalAnachronism(sentence, sourcesInSentence);
+      chronologicalWarnings.push(...anachronismWarnings);
+
+      // 2. Claim Entailment Scoring
+      for (const src of sourcesInSentence) {
+        const entailment = scoreClaimEntailment(sentence, src);
+        if (!entailment.supported) {
+          entailmentWarnings.push({
+            sentence,
+            sourceId: src.id,
+            score: entailment.score,
+            warning: `Lexical Entailment Warning: Claim has low lexical overlap (${entailment.score} < 0.15) with source "${src.title}".`,
+          });
+          if (options.checkEntailment !== false) {
+            return `${sentence} [Citation Entailment Warning — Verify Claim Against Source]`;
+          }
+        }
+      }
     }
+
+    return sentence;
+  });
+
+  if (options.checkEntailment !== false) {
+    scrubbedText = processedSentences.join(" ");
   }
 
   return {
     scrubbedText,
+    formattedText: scrubbedText,
     resolvedCitationsCount,
     unverifiedClaimsCount,
     strippedCitations,
     chronologicalWarnings,
+    entailmentWarnings,
     citedSources: allCitedSources,
   };
 }

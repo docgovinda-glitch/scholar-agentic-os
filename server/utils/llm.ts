@@ -1,12 +1,72 @@
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import { completeWithFailover, streamWithFailover } from "../../src/platform/gateway/gateway.js";
 import { defaultPolicy } from "../../src/platform/warden/policy.js";
 import { recordConsent, type EgressPolicy } from "../../src/platform/warden/warden.js";
 import type { TaskClass } from "../../src/platform/warden/types.js";
 import type { CandidateProvider } from "../../src/platform/gateway/types.js";
 import { getEntitlement, isEntitlementActive } from "../src/aiEngine/entitlements.js";
+import { parseAndRepairLLMJson } from "../../src/shared/llmJsonParser.ts";
 
 dotenv.config();
+
+const LLM_CHALLENGE_SECRET =
+  process.env.LLM_CHALLENGE_SECRET ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_JWT_SECRET ||
+  "scholar-core-ephemeral-challenge-secret";
+
+export interface LlmChallengePayload {
+  userId: string;
+  routeId: string;
+  promptHash: string;
+  expiresAt: number;
+}
+
+export function computePromptHash(systemPrompt: string = "", userPrompt: string = ""): string {
+  return crypto.createHash("sha256").update(`${systemPrompt || ""}:::${userPrompt || ""}`).digest("hex");
+}
+
+export function signLlmChallenge(payload: { userId: string; routeId: string; promptHash: string; expiresAt: number }): string {
+  const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = crypto.createHmac("sha256", LLM_CHALLENGE_SECRET).update(data).digest("base64url");
+  return `${data}.${signature}`;
+}
+
+export function verifyLlmChallenge(token: string, expectedUserId: string, promptHash?: string): boolean {
+  if (!token || typeof token !== "string") return false;
+  const parts = token.split(".");
+  if (parts.length !== 2) return false;
+  const [data, signature] = parts;
+  const expectedSignature = crypto.createHmac("sha256", LLM_CHALLENGE_SECRET).update(data).digest("base64url");
+
+  const sigBuf = Buffer.from(signature);
+  const expBuf = Buffer.from(expectedSignature);
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+    return false;
+  }
+
+  try {
+    const payloadStr = Buffer.from(data, "base64url").toString("utf8");
+    const payload: LlmChallengePayload = JSON.parse(payloadStr);
+
+    if (!payload.expiresAt || typeof payload.expiresAt !== "number" || payload.expiresAt < Date.now()) {
+      return false;
+    }
+
+    if (promptHash && payload.promptHash && payload.promptHash !== "*" && payload.promptHash !== promptHash) {
+      return false;
+    }
+
+    if (expectedUserId && payload.userId && payload.userId !== "*" && payload.userId !== expectedUserId) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function mapTaskType(taskType: string): TaskClass {
   const valid: TaskClass[] = ["drafting", "refinement", "chat", "summarisation", "verification", "rule_extraction", "discovery", "embedding", "classification"];
@@ -117,78 +177,91 @@ export async function isServerAiAuthorized(req: any): Promise<boolean> {
   return policy.isServerAiAuthorized;
 }
 
-export function handleFrontendLLMOverride(req: any): string | null {
-  if (req?.body && req.body.llmResult) {
-    let content = req.body.llmResult;
-    if (typeof content === "object" && typeof content.text === "string") {
-      content = content.text;
-    }
-    return typeof content === "string" ? content : JSON.stringify(content);
+export function handleFrontendLLMOverride(
+  req: any,
+  res?: any,
+  systemPrompt?: string,
+  userPrompt?: string
+): string | null {
+  if (!req?.body || !req.body.llmResult) {
+    return null;
   }
-  return null;
+
+  const token = req.body.challengeToken;
+  const userId = req.user?.id || (req.headers && req.headers["x-user-id"]) || "anonymous";
+  const promptHash = (systemPrompt !== undefined || userPrompt !== undefined)
+    ? computePromptHash(systemPrompt, userPrompt)
+    : "";
+
+  const isValid = token && verifyLlmChallenge(token, String(userId), promptHash);
+  if (!isValid) {
+    const targetRes = res || req.res;
+    if (targetRes && !targetRes.headersSent) {
+      targetRes.status(403).json({ error: "Invalid or unsigned LLM challenge token" });
+    }
+    const err = new Error("Invalid or unsigned LLM challenge token");
+    (err as any).status = 403;
+    throw err;
+  }
+
+  let content = req.body.llmResult;
+  if (typeof content === "object" && typeof content.text === "string") {
+    content = content.text;
+  }
+  return typeof content === "string" ? content : JSON.stringify(content);
 }
 
 export function parseJsonFromLlm(content: any): any {
   if (!content) return null;
   if (typeof content !== "string") return content;
-  const raw = content.trim();
-
-  // 1. Try direct parse
-  try {
-    return JSON.parse(raw);
-  } catch (_) {}
-
-  // 2. Try stripping markdown code fences: ```json ... ``` or ``` ... ```
-  const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (fenceMatch && fenceMatch[1]) {
-    try {
-      return JSON.parse(fenceMatch[1].trim());
-    } catch (_) {}
-  }
-
-  // 3. Try finding outer brackets / braces: {...} or [...]
-  const firstBrace = raw.indexOf('{');
-  const lastBrace = raw.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    try {
-      return JSON.parse(raw.slice(firstBrace, lastBrace + 1));
-    } catch (_) {}
-  }
-
-  const firstBracket = raw.indexOf('[');
-  const lastBracket = raw.lastIndexOf(']');
-  if (firstBracket !== -1 && lastBracket > firstBracket) {
-    try {
-      return JSON.parse(raw.slice(firstBracket, lastBracket + 1));
-    } catch (_) {}
-  }
-
-  throw new Error("Invalid JSON returned by LLM: " + raw.slice(0, 120));
+  return parseAndRepairLLMJson(content);
 }
 
-function handleFrontendLLMOverrideJSON(req: any) {
-  const content = handleFrontendLLMOverride(req);
+function handleFrontendLLMOverrideJSON(req: any, res?: any, systemPrompt?: string, userPrompt?: string) {
+  const content = handleFrontendLLMOverride(req, res, systemPrompt, userPrompt);
   if (content) {
     return parseJsonFromLlm(content);
   }
   return null;
 }
 
-export async function callOpenRouterJSON(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning"): Promise<any> {
-  const override = handleFrontendLLMOverrideJSON(req);
+function createChallengeTokenForRequest(req: any, systemPrompt: string, userPrompt: string): string {
+  const promptHash = computePromptHash(systemPrompt, userPrompt);
+  const userId = req?.user?.id || (req?.headers && req.headers["x-user-id"]) || "anonymous";
+  const routeId = req?.originalUrl || req?.url || "llm-route";
+  return signLlmChallenge({
+    userId: String(userId),
+    routeId: String(routeId),
+    promptHash,
+    expiresAt: Date.now() + 15 * 60 * 1000,
+  });
+}
+
+export async function callOpenRouterJSON(
+  req: any,
+  res: any,
+  systemPrompt: string,
+  userPrompt: string,
+  model?: string,
+  taskType: string = "reasoning"
+): Promise<any> {
+  const override = handleFrontendLLMOverrideJSON(req, res, systemPrompt, userPrompt);
   if (override) return override;
 
   const aiConfig = resolveRequestAiConfig(req);
+  const targetModel = model || aiConfig.model;
   const serverAuthorized = await isServerAiAuthorized(req);
   const rawCandidates = serverAuthorized ? aiConfig.candidates : [];
   const candidates = rawCandidates.map((c) => ({
     ...c,
-    model: c.model || (model && model !== "openrouter/auto" ? model : undefined),
+    model: c.model || targetModel || undefined,
   }));
+
+  const challengeToken = createChallengeTokenForRequest(req, systemPrompt, userPrompt);
 
   if (candidates.length === 0) {
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
     }
     throw new Error("RequireFrontendLLMException");
   }
@@ -213,28 +286,41 @@ export async function callOpenRouterJSON(req: any, res: any, systemPrompt: strin
     const text = result.value.text;
     return parseJsonFromLlm(text);
   } catch (err: unknown) {
+    if ((err as any)?.status === 403 || (err as any)?.message?.includes("challenge token")) {
+      throw err;
+    }
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
     }
     throw new Error("RequireFrontendLLMException");
   }
 }
 
-export async function callOpenRouterText(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning"): Promise<string> {
-  const override = handleFrontendLLMOverride(req);
+export async function callOpenRouterText(
+  req: any,
+  res: any,
+  systemPrompt: string,
+  userPrompt: string,
+  model?: string,
+  taskType: string = "reasoning"
+): Promise<string> {
+  const override = handleFrontendLLMOverride(req, res, systemPrompt, userPrompt);
   if (override) return override;
 
   const aiConfig = resolveRequestAiConfig(req);
+  const targetModel = model || aiConfig.model;
   const serverAuthorized = await isServerAiAuthorized(req);
   const rawCandidates = serverAuthorized ? aiConfig.candidates : [];
   const candidates = rawCandidates.map((c) => ({
     ...c,
-    model: c.model || (model && model !== "openrouter/auto" ? model : undefined),
+    model: c.model || targetModel || undefined,
   }));
+
+  const challengeToken = createChallengeTokenForRequest(req, systemPrompt, userPrompt);
 
   if (candidates.length === 0) {
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
     }
     throw new Error("RequireFrontendLLMException");
   }
@@ -255,28 +341,41 @@ export async function callOpenRouterText(req: any, res: any, systemPrompt: strin
     }
     return result.value.text;
   } catch (err: unknown) {
+    if ((err as any)?.status === 403 || (err as any)?.message?.includes("challenge token")) {
+      throw err;
+    }
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
     }
     throw new Error("RequireFrontendLLMException");
   }
 }
 
-export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning") {
-  const override = handleFrontendLLMOverrideJSON(req);
+export async function streamOpenRouterJSON(
+  req: any,
+  res: any,
+  systemPrompt: string,
+  userPrompt: string,
+  model?: string,
+  taskType: string = "reasoning"
+) {
+  const override = handleFrontendLLMOverrideJSON(req, res, systemPrompt, userPrompt);
   if (override) return override;
 
   const aiConfig = resolveRequestAiConfig(req);
+  const targetModel = model || aiConfig.model;
   const serverAuthorized = await isServerAiAuthorized(req);
   const rawCandidates = serverAuthorized ? aiConfig.candidates : [];
   const candidates = rawCandidates.map((c) => ({
     ...c,
-    model: c.model || (model && model !== "openrouter/auto" ? model : undefined),
+    model: c.model || targetModel || undefined,
   }));
+
+  const challengeToken = createChallengeTokenForRequest(req, systemPrompt, userPrompt);
 
   if (candidates.length === 0) {
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
+      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType, stream: true });
     }
     return;
   }
@@ -321,29 +420,42 @@ export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: str
     sendEvent("log", { message: "> Parsing final JSON..." });
     return parseJsonFromLlm(fullContent);
   } catch (err: unknown) {
+    if ((err as any)?.status === 403 || (err as any)?.message?.includes("challenge token")) {
+      throw err;
+    }
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
+      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType, stream: true });
       return;
     }
     throw err;
   }
 }
 
-export async function streamOpenRouterText(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning") {
-  const override = handleFrontendLLMOverride(req);
+export async function streamOpenRouterText(
+  req: any,
+  res: any,
+  systemPrompt: string,
+  userPrompt: string,
+  model?: string,
+  taskType: string = "reasoning"
+) {
+  const override = handleFrontendLLMOverride(req, res, systemPrompt, userPrompt);
   if (override) return override;
 
   const aiConfig = resolveRequestAiConfig(req);
+  const targetModel = model || aiConfig.model;
   const serverAuthorized = await isServerAiAuthorized(req);
   const rawCandidates = serverAuthorized ? aiConfig.candidates : [];
   const candidates = rawCandidates.map((c) => ({
     ...c,
-    model: c.model || (model && model !== "openrouter/auto" ? model : undefined),
+    model: c.model || targetModel || undefined,
   }));
+
+  const challengeToken = createChallengeTokenForRequest(req, systemPrompt, userPrompt);
 
   if (candidates.length === 0) {
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
+      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType, stream: true });
     }
     return;
   }
@@ -385,8 +497,11 @@ export async function streamOpenRouterText(req: any, res: any, systemPrompt: str
 
     return fullContent;
   } catch (err: unknown) {
+    if ((err as any)?.status === 403 || (err as any)?.message?.includes("challenge token")) {
+      throw err;
+    }
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
+      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType, stream: true });
       return;
     }
     throw err;

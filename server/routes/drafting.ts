@@ -116,7 +116,7 @@ Output ONLY clean academic markdown prose.`;
       res,
       "You are the Scholar Core Grounded Academic Drafting Agent.",
       prompt,
-      "openrouter/auto",
+      undefined,
       "drafting"
     );
 

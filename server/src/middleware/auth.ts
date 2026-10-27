@@ -34,6 +34,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
+import crypto from "crypto";
 import { getSupabaseRestConfig, SupabaseTable } from "../supabaseRest";
 
 const getSupabaseUrl = () => process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -54,13 +55,111 @@ export interface VerifyResult {
   reason?: "unconfigured" | "invalid" | "unavailable";
 }
 
+// ─────────────────────────────────────────────────────────
+// Bounded LRU Token Cache (1000 items, 5-minute TTL)
+// ─────────────────────────────────────────────────────────
+const MAX_CACHE_SIZE = 1000;
+const TOKEN_TTL_MS = 300_000; // 5 minutes
+
+interface CachedTokenEntry {
+  user: AuthenticatedUser;
+  expiresAt: number;
+}
+
+const tokenCache = new Map<string, CachedTokenEntry>();
+
+export function __clearTokenCacheForTests(): void {
+  tokenCache.clear();
+}
+
+function getCachedUser(token: string): AuthenticatedUser | null {
+  const entry = tokenCache.get(token);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    tokenCache.delete(token);
+    return null;
+  }
+  // LRU touch: remove and re-insert to mark most recently used
+  tokenCache.delete(token);
+  tokenCache.set(token, entry);
+  return entry.user;
+}
+
+function setCachedUser(token: string, user: AuthenticatedUser, expSeconds?: number): void {
+  let expiresAt = Date.now() + TOKEN_TTL_MS;
+  if (expSeconds && typeof expSeconds === "number") {
+    const jwtExpMs = expSeconds * 1000;
+    expiresAt = Math.min(expiresAt, jwtExpMs);
+  }
+  if (tokenCache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = tokenCache.keys().next().value;
+    if (oldestKey) tokenCache.delete(oldestKey);
+  }
+  tokenCache.set(token, { user, expiresAt });
+}
+
+function verifyLocalJwt(token: string, secret: string): VerifyResult | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [headerB64, payloadB64, sigB64] = parts;
+
+  try {
+    const headerStr = Buffer.from(headerB64, "base64url").toString("utf8");
+    const header = JSON.parse(headerStr);
+    if (header.alg !== "HS256") return null;
+
+    const dataToSign = `${headerB64}.${payloadB64}`;
+    const expectedSig = crypto.createHmac("sha256", secret).update(dataToSign).digest("base64url");
+
+    const sigBuf = Buffer.from(sigB64);
+    const expBuf = Buffer.from(expectedSig);
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+      return { ok: false, reason: "invalid" };
+    }
+
+    const payloadStr = Buffer.from(payloadB64, "base64url").toString("utf8");
+    const payload = JSON.parse(payloadStr);
+
+    if (payload.exp && typeof payload.exp === "number" && payload.exp * 1000 <= Date.now()) {
+      return { ok: false, reason: "invalid" };
+    }
+
+    if (!payload.sub || typeof payload.sub !== "string") {
+      return { ok: false, reason: "invalid" };
+    }
+
+    const user: AuthenticatedUser = {
+      id: payload.sub,
+      email: typeof payload.email === "string" ? payload.email : null,
+    };
+
+    setCachedUser(token, user, payload.exp);
+    return { ok: true, user };
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Exchange an access token for its user via GoTrue.
+ * Exchange an access token for its user via GoTrue or local JWT verification.
  *
  * Exported for testing: it carries the whole security decision, and that
  * should be assertable without standing up Express.
  */
 export async function verifyAccessToken(token: string): Promise<VerifyResult> {
+  const cached = getCachedUser(token);
+  if (cached) {
+    return { ok: true, user: cached };
+  }
+
+  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  if (jwtSecret) {
+    const localResult = verifyLocalJwt(token, jwtSecret);
+    if (localResult) {
+      return localResult;
+    }
+  }
+
   const supabaseUrl = getSupabaseUrl();
   const supabaseServiceRole = getSupabaseServiceRole();
 
@@ -92,7 +191,9 @@ export async function verifyAccessToken(token: string): Promise<VerifyResult> {
     const body = (await res.json()) as { id?: string; email?: string | null };
     if (!body?.id) return { ok: false, reason: "invalid" };
 
-    return { ok: true, user: { id: body.id, email: body.email ?? null } };
+    const user = { id: body.id, email: body.email ?? null };
+    setCachedUser(token, user);
+    return { ok: true, user };
   } catch {
     // Network failure, DNS failure, or the abort above.
     return { ok: false, reason: "unavailable" };

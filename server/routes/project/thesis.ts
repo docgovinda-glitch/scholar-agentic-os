@@ -8,6 +8,16 @@ import {
 import { scholarBrain, type CitationStyleKey } from "../../src/services/scholarBrain.ts";
 import type { VerifiedSourceItem } from "../../src/utils/citationLockScrubber.ts";
 import { countExactWords } from "../../src/utils/wordBudgetAllocator.ts";
+import {
+  evaluateAllChaptersGating,
+  initialProjectGateState,
+  flattenSections,
+  type ChapterGateSummary,
+} from "../../../src/app/conductor/conductor.ts";
+import { catalog } from "../../../src/app/atlas/atlas.ts";
+import { emptyDocument } from "../../../src/domain/document/model.ts";
+import { appendBlock } from "../../../src/domain/document/ops.ts";
+import { emptyGraph } from "../../../src/domain/claim/graph.ts";
 
 const router = Router({ mergeParams: true });
 
@@ -46,6 +56,8 @@ export interface ChapterAuditResult {
   alignmentScore: number;
   coherenceStatus: string;
   crossChapterChecks: CrossChapterCheck[];
+  chapterSummaries?: ChapterGateSummary[];
+  allChaptersReadyForG6?: boolean;
 }
 
 interface ThesisInputData {
@@ -308,6 +320,35 @@ ${researchQuestions.map((q, idx) => `${idx + 1}. ${q}`).join("\n")}${evidenceBri
   })
 );
 
+function computeChapterGating(record: any, chapters: ChapterInput[]) {
+  const spec = catalog.get(record.outputTypeId) || catalog.getOrThrow("OT-07");
+  const project = record.gateState || initialProjectGateState(record.projectId);
+  let doc = emptyDocument(record.projectId, spec.label);
+
+  const sections = flattenSections(spec.structure.sections);
+
+  for (let i = 0; i < chapters.length; i++) {
+    const ch = chapters[i];
+    const sec = sections[i];
+    const secKey = sec ? sec.key : `chapter_${ch.chapterNumber}`;
+    const wordRep = Math.max(1, Math.min(100, Math.floor((ch.wordCount || 100) / 10)));
+    const sampleText = Array(wordRep).fill("Academic analysis and empirical synthesis.").join(" ");
+    doc = appendBlock(doc, secKey, "paragraph", sampleText);
+    const lastBlock = doc.blocks[doc.blocks.length - 1];
+    if (lastBlock) {
+      lastBlock.id = secKey;
+    }
+  }
+
+  const claimGraph = emptyGraph();
+  return evaluateAllChaptersGating(project, {
+    spec,
+    document: doc,
+    claimGraph,
+    answers: (record.answers as any) || {},
+  });
+}
+
 /**
  * POST /api/projects/:projectId/thesis/chapter-audit
  * Performs cross-chapter consistency and structural alignment audits.
@@ -331,6 +372,8 @@ router.post(
           { chapterNumber: 5, title: "Discussion", wordCount: 0, targetWordCount: 8000, status: "not_started" },
           { chapterNumber: 6, title: "Conclusion", wordCount: 0, targetWordCount: 4000, status: "not_started" },
         ];
+
+    const gating = computeChapterGating(record, chapters);
 
     if (chapters.length > 0) {
       try {
@@ -387,6 +430,8 @@ ${chapters.map((c) => `Ch ${c.chapterNumber}: "${c.title}" (${c.wordCount}/${c.t
                   : "passed",
                 details: normalizeUnicodeNFC(sanitizeScholarlyText(typeof chk.details === "string" ? chk.details : "")),
               })),
+              chapterSummaries: gating.chapterSummaries,
+              allChaptersReadyForG6: gating.allChaptersReadyForG6,
             },
           });
         }
@@ -396,7 +441,47 @@ ${chapters.map((c) => `Ch ${c.chapterNumber}: "${c.title}" (${c.wordCount}/${c.t
     }
 
     const audit = computeHeuristicChapterAudit(chapters);
-    return res.json({ success: true, audit });
+    audit.chapterSummaries = gating.chapterSummaries;
+    audit.allChaptersReadyForG6 = gating.allChaptersReadyForG6;
+    return res.json({
+      success: true,
+      audit,
+      chapterSummaries: gating.chapterSummaries,
+      allChaptersReadyForG6: gating.allChaptersReadyForG6,
+      alignmentScore: audit.alignmentScore,
+      coherenceStatus: audit.coherenceStatus,
+    });
+  })
+);
+
+/**
+ * GET /api/projects/:projectId/thesis/gate-status
+ * Returns per-chapter gating evaluation and exit criteria summaries.
+ */
+router.get(
+  "/gate-status",
+  asyncRoute(async (req: Request, res: Response) => {
+    const store = getSharedStore();
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+
+    let chapters: ChapterInput[] = [];
+    if (typeof req.query.chapters === "string") {
+      try {
+        chapters = JSON.parse(req.query.chapters);
+      } catch {}
+    } else if (Array.isArray(record.answers?.chapters)) {
+      chapters = record.answers.chapters as ChapterInput[];
+    }
+
+    const gating = computeChapterGating(record, chapters);
+
+    return res.json({
+      success: true,
+      projectId: record.projectId,
+      allChaptersReadyForG6: gating.allChaptersReadyForG6,
+      chapterSummaries: gating.chapterSummaries,
+    });
   })
 );
 

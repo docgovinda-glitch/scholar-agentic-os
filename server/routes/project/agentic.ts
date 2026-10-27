@@ -43,6 +43,8 @@ import {
   scrubCitations,
   type VerifiedSourceItem,
 } from "../../src/utils/citationLockScrubber.ts";
+import { chunkAndRerankEvidence } from "../../src/services/semanticRagEngine.ts";
+import { scholarBrain } from "../../src/services/scholarBrain.ts";
 
 const router = express.Router({ mergeParams: true });
 router.use(rejectClientCredentials);
@@ -580,7 +582,7 @@ Return ONLY valid JSON in this exact format:
 CRITICAL INSTRUCTION: Generate exactly 15 highly relevant sources. Do not hallucinate irrelevant topics.`;
 
     const userPrompt = `Working Title: ${workingTitle}\nResearch Area: ${researchArea}\nContext: ${context}${isBroadened ? "\nMode: Broadened & Interdisciplinary Discovery" : ""}`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "discovery");
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, userPrompt, undefined, "discovery");
     if (result) {
       if (result.data && Array.isArray(result.data)) {
         const currentListStr = project.answers["discovered_literature"];
@@ -603,6 +605,7 @@ CRITICAL INSTRUCTION: Generate exactly 15 highly relevant sources. Do not halluc
       res.end();
     }
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -640,7 +643,7 @@ Make sure every single gap explicitly mentions concepts from the working title.`
     const workingTitle = project.answers["working_title"] || "Untitled Research";
     const researchArea = project.answers["research_area"] || "the field";
     const userPrompt = `Working Title: ${workingTitle}\nResearch Area: ${researchArea}\nContext: ${context}`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "discovery");
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, userPrompt, undefined, "discovery");
     if (!result) return;
     
     if (result.data && Array.isArray(result.data)) {
@@ -651,6 +654,7 @@ Make sure every single gap explicitly mentions concepts from the working title.`
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -683,7 +687,7 @@ Return ONLY valid JSON in this exact format:
     }
   ]
 }`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "discovery");
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, undefined, "discovery");
     if (!result) return;
     
     if (result.data && Array.isArray(result.data)) {
@@ -694,6 +698,7 @@ Return ONLY valid JSON in this exact format:
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -766,6 +771,7 @@ Return ONLY valid JSON in this exact format:
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -873,6 +879,7 @@ Return ONLY valid JSON in this exact format:
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -943,6 +950,7 @@ Research Context: ${context}`;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -983,6 +991,7 @@ Return ONLY valid JSON in this exact format:
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -1014,6 +1023,7 @@ Return ONLY valid JSON in this exact format:
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -1043,11 +1053,12 @@ Return ONLY valid JSON in this exact format:
     "formatting_rules": ["Double spaced", "12pt Times New Roman"]
   }
 }`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "discovery");
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, undefined, "discovery");
     if (!result) return;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -1395,14 +1406,17 @@ router.post(
       } catch {}
     }
 
-    // 2. Format Citation Ledger
+    // 2. Format Citation Ledger & Rerank Evidence with Semantic BM25
     const { ledgerPrompt, sourceMap } = formatCitationLedger(assignedSources);
+    const ragResult = chunkAndRerankEvidence(subSectionTitle, assignedSources, 2500);
 
     // 3. Assemble System Prompt for Pass 1 (Grounded Draft)
     const voicePrompt = buildScholarlyVoiceSystemPrompt({ dialect: targetDialect });
     const systemPrompt = `${voicePrompt}
 
 ${ledgerPrompt}
+
+${ragResult.formattedContext}
 
 TASK SPECIFICATION:
 You are drafting academic sub-section "${subSectionTitle}".
@@ -1424,6 +1438,21 @@ Target Word Budget: ${targetWords} words.`;
 
     const candidates = getCandidates(req);
     const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
+
+    const wantsStream = req.headers.accept?.includes("text/event-stream") || req.query.stream === "true";
+    if (wantsStream) {
+      await scholarBrain.stream(
+        req,
+        {
+          systemPrompt,
+          userPrompt,
+          taskClass: "drafting",
+          dialect: targetDialect,
+        },
+        res
+      );
+      return;
+    }
 
     let draftText = "";
 
@@ -1597,7 +1626,7 @@ Return ONLY valid JSON in this exact format:
     { "section": "Conclusion", "status": "Drafted", "length": 800, "content": "..." }
   ]
 }`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}\nChapter ID to target: ${chapterId || "all"}`, "openrouter/auto", "long-context");
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}\nChapter ID to target: ${chapterId || "all"}`, undefined, "long-context");
     if (!result) return;
 
     // Update into Supabase manuscript_sections and version snapshots
@@ -1654,6 +1683,7 @@ Return ONLY valid JSON in this exact format:
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -1730,7 +1760,7 @@ Return ONLY valid JSON in this exact format:
     }
   ]
 }`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "long-context");
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, undefined, "long-context");
 
     let critiquesData: AcademicCritiqueItem[] = [];
     if (result && Array.isArray(result.data) && result.data.length > 0) {
@@ -1803,6 +1833,7 @@ Return ONLY valid JSON in this exact format:
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: critiquesData })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -1831,11 +1862,12 @@ Return ONLY valid JSON in this exact format:
     { "section": "Methodology", "find": "exact old sentence or paragraph to replace", "replace": "the new revised text" }
   ]
 }`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "reasoning");
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, undefined, "reasoning");
     if (!result) return;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -1965,6 +1997,7 @@ Return ONLY valid JSON matching this schema:
       },
     });
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
   }
@@ -2000,6 +2033,7 @@ router.get("/rebuttal-matrix", async (req: express.Request<{ id: string }>, res)
 
     res.json({ ok: true, data: matrix });
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
   }
@@ -2032,6 +2066,7 @@ Use 'verified' or 'flagged' for the status.`;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -2073,6 +2108,7 @@ Return ONLY valid JSON in this exact format:
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
@@ -2316,6 +2352,7 @@ router.post("/draft-preview", async (req: express.Request<{ id: string }>, res) 
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: { content, pages, status: "Ready" } })}\n\n`);
     res.end();
   } catch (err: unknown) {
+    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
     if (!res.headersSent) {
       res.status(500).json({ error: message });

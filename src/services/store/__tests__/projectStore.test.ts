@@ -155,3 +155,54 @@ describe("services/store: backend selection", () => {
     warn.mockRestore();
   });
 });
+
+describe("createDiskFallbackStore — atomic disk persistence (B3)", () => {
+  const fs = require("fs");
+  const path = require("path");
+  const testStorePath = path.join(process.cwd(), "data", ".test_scholar_store.json");
+
+  beforeEach(() => {
+    try {
+      if (fs.existsSync(testStorePath)) fs.unlinkSync(testStorePath);
+    } catch (_) {}
+  });
+
+  afterEach(() => {
+    try {
+      if (fs.existsSync(testStorePath)) fs.unlinkSync(testStorePath);
+    } catch (_) {}
+  });
+
+  it("atomically writes projects to disk and reloads them in a new store instance", async () => {
+    const { createDiskFallbackStore } = await import("../projectStore");
+
+    const store1 = createDiskFallbackStore(testStorePath);
+    const created = await store1.create("OT-07", "owner-123");
+    created.answers["topic"] = "Post-Quantum Cryptography";
+    await store1.save(created);
+
+    // Verify file exists on disk
+    expect(fs.existsSync(testStorePath)).toBe(true);
+
+    // Instantiate a new store instance pointing at the same file
+    const store2 = createDiskFallbackStore(testStorePath);
+    const loaded = await store2.get(created.projectId);
+    expect(loaded).toBeDefined();
+    expect(loaded?.projectId).toBe(created.projectId);
+    expect(loaded?.answers["topic"]).toBe("Post-Quantum Cryptography");
+
+    // Test listByOwner
+    const list = await store2.listByOwner("owner-123");
+    expect(list.length).toBe(1);
+    expect(list[0].projectId).toBe(created.projectId);
+
+    // Test delete
+    await store2.delete(created.projectId);
+    const afterDelete = await store2.get(created.projectId);
+    expect(afterDelete).toBeUndefined();
+
+    // Instantiate store3 to ensure deletion persisted to disk
+    const store3 = createDiskFallbackStore(testStorePath);
+    expect(await store3.get(created.projectId)).toBeUndefined();
+  });
+});

@@ -1108,7 +1108,7 @@ Return ONLY valid JSON matching:
         res,
         "You are the Scholar Core Assignment Research Planning Agent.",
         prompt,
-        "openrouter/auto",
+        undefined,
         "planning"
       );
     } catch (e: any) {
@@ -1311,7 +1311,7 @@ Return ONLY valid JSON matching:
       res,
       "You are the Scholar Core Academic Thinking & Critique Agent.",
       prompt,
-      "openrouter/auto",
+      undefined,
       "reasoning"
     );
     if (!data) return;
@@ -1509,7 +1509,7 @@ Return ONLY valid JSON matching:
       res,
       "You are the Scholar Core AskScholar Research Architect & Thesis Supervisor.",
       prompt,
-      "openrouter/auto",
+      undefined,
       "planning"
     );
     if (!data) return;
@@ -1938,7 +1938,7 @@ ${tutorialOrPeelRules}`;
         res,
         `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`,
         prompt,
-        "openrouter/auto",
+        undefined,
         "drafting"
       );
       effectiveDraft = draft?.trim() ? draft.trim() : "";
@@ -2127,7 +2127,7 @@ Output ONLY the section text in clean academic Markdown prose.`;
       res,
       `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`,
       prompt,
-      "openrouter/auto",
+      undefined,
       "drafting"
     );
 
@@ -2251,7 +2251,7 @@ Return ONLY valid JSON matching:
       res,
       "You are the Scholar Core Senior Academic Reviewer.",
       prompt,
-      "openrouter/auto",
+      undefined,
       "verification"
     );
     if (!report) return;
@@ -2552,7 +2552,7 @@ Return ONLY valid JSON matching:
         res,
         "You are the Scholar Core Pedagogical Academic Tutor.",
         prompt,
-        "openrouter/auto",
+        undefined,
         "chat"
       );
     } catch (e: any) {
@@ -2722,7 +2722,7 @@ Return ONLY valid JSON matching:
       res,
       "You are the Scholar Core Senior Examiner & Rubric Grading Estimator.",
       prompt,
-      "openrouter/auto",
+      undefined,
       "verification"
     );
     if (!data) return;
@@ -2874,7 +2874,7 @@ Return ONLY valid JSON matching:
       res,
       "You are the Scholar Core Thesis Formulation & Word Budgeting Agent.",
       prompt,
-      "openrouter/auto",
+      undefined,
       "reasoning"
     );
     if (!data) return;
@@ -2944,7 +2944,7 @@ Return ONLY valid JSON matching:
       res,
       "You are the Scholar Core PEEL Argument Matrix Agent.",
       prompt,
-      "openrouter/auto",
+      undefined,
       "drafting"
     );
     if (!data) return;
@@ -3087,7 +3087,7 @@ Return ONLY valid JSON matching:
       res,
       "You are the Scholar Core Academic Citation & Grounding Agent.",
       prompt,
-      "openrouter/auto",
+      undefined,
       "discovery"
     );
     if (!data) return;
@@ -3189,7 +3189,7 @@ Return ONLY valid JSON matching:
       res,
       "You are the Scholar Core Senior Examiner & Rubric Audit Agent.",
       prompt,
-      "openrouter/auto",
+      undefined,
       "verification"
     );
     if (!data) return;

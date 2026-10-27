@@ -1,5 +1,5 @@
 import express, { Request, Response } from "express";
-import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic, handleFrontendLLMOverride, resolveRequestAiConfig } from "../utils/llm.ts";
+import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic, handleFrontendLLMOverride, resolveRequestAiConfig, signLlmChallenge, computePromptHash } from "../utils/llm.ts";
 import { executeWebSearch, formatSearchResultsForPrompt } from "../src/research/webSearchEngine.ts";
 import { executeDeepResearch } from "../src/research/deepResearchEngine.ts";
 import { validateAndRefineCitations } from "../src/research/citationValidator.ts";
@@ -21,6 +21,7 @@ import {
 import type { VerifiedSourceItem } from "../src/utils/citationLockScrubber.ts";
 import { countExactWords } from "../src/utils/wordBudgetAllocator.ts";
 import { evaluateBurstiness } from "../src/utils/scholarlyVoiceGuard.ts";
+import { chunkAndRerankEvidence } from "../src/services/semanticRagEngine.ts";
 
 /**
  * Intelligent Capability Determination:
@@ -309,7 +310,18 @@ export function registerAIRoutes(
         return res.status(400).json({ error: "Empty prompt or query supplied." });
       }
 
-      const incomingLlmResult = handleFrontendLLMOverride(req);
+      const makeChallengeToken = (sysPrompt: string, uPrompt: string): string => {
+        const userId = (req as any)?.user?.id || (req.headers && req.headers["x-user-id"]) || "anonymous";
+        const routeId = req.originalUrl || req.url || "/api/ai/chat";
+        return signLlmChallenge({
+          userId: String(userId),
+          routeId: String(routeId),
+          promptHash: computePromptHash(sysPrompt, uPrompt),
+          expiresAt: Date.now() + 15 * 60 * 1000,
+        });
+      };
+
+      const incomingLlmResult = handleFrontendLLMOverride(req, res);
       const aiConfig = resolveRequestAiConfig(req);
       const candidates = getCandidates(req);
 
@@ -406,10 +418,12 @@ export function registerAIRoutes(
 
       // ── Workflow: Deep Research Mode ──
       if (mode === "deep-research" && !incomingLlmResult) {
+        const deepSysPrompt = "You are Scholar Core Deep Research Agent. Provide an exhaustive, deeply researched academic synthesis with verified citations and structured sections.";
         if (candidates.length === 0) {
           return res.status(426).json({
             requireFrontendLLM: true,
-            systemPrompt: "You are Scholar Core Deep Research Agent. Provide an exhaustive, deeply researched academic synthesis with verified citations and structured sections.",
+            challengeToken: makeChallengeToken(deepSysPrompt, effectivePrompt),
+            systemPrompt: deepSysPrompt,
             userPrompt: effectivePrompt,
             taskType: "reasoning",
             mode: "deep-research",
@@ -439,7 +453,8 @@ export function registerAIRoutes(
           console.warn("Server deep research execution failed, falling back to frontend LLM:", deepErr);
           return res.status(426).json({
             requireFrontendLLM: true,
-            systemPrompt: "You are Scholar Core Deep Research Agent. Provide an exhaustive, deeply researched academic synthesis with verified citations and structured sections.",
+            challengeToken: makeChallengeToken(deepSysPrompt, effectivePrompt),
+            systemPrompt: deepSysPrompt,
             userPrompt: effectivePrompt,
             taskType: "reasoning",
             mode: "deep-research",
@@ -453,17 +468,11 @@ export function registerAIRoutes(
       // ── Context Assembly: Files, Images, Canonical Ledger & Web Search ──
       let contextBlocks: string[] = [];
 
-      // 1. Process Uploaded Documents
+      // 1. Process Uploaded Documents with Semantic RAG Paragraph Chunking & BM25 Reranking
       if (files && files.length > 0) {
-        for (const file of files) {
-          const docText = (file.text || "").trim();
-          if (docText) {
-            // Cap document preview to 20,000 chars per file to stay within limits while preserving depth
-            const truncated = docText.length > 20000 ? docText.slice(0, 20000) + "\n\n... [Content continues in full document] ..." : docText;
-            contextBlocks.push(`=== UPLOADED DOCUMENT: ${file.name || "Document"} ===\n${truncated}\n=== END OF DOCUMENT: ${file.name || "Document"} ===`);
-          } else {
-            contextBlocks.push(`=== UPLOADED DOCUMENT: ${file.name || "Document"} (Empty content or binary format) ===`);
-          }
+        const ragResult = chunkAndRerankEvidence(effectivePrompt, files, 4000);
+        if (ragResult.chunks.length > 0) {
+          contextBlocks.push(ragResult.formattedContext);
         }
       }
 
@@ -557,6 +566,7 @@ Formatting & Academic Citation Rules:
       if (!incomingLlmResult && candidates.length === 0) {
         return res.status(426).json({
           requireFrontendLLM: true,
+          challengeToken: makeChallengeToken(effectiveSystemPrompt, assembledUserPrompt),
           systemPrompt: effectiveSystemPrompt,
           userPrompt: assembledUserPrompt,
           taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
@@ -565,6 +575,20 @@ Formatting & Academic Citation Rules:
           deliverableIntent,
           citationStyle: cleanStyle,
         });
+      }
+
+      const wantsStream = req.headers.accept?.includes("text/event-stream") || req.query.stream === "true";
+      if (wantsStream && (!normalizedImages || normalizedImages.length === 0)) {
+        await scholarBrain.stream(
+          req,
+          {
+            systemPrompt: effectiveSystemPrompt,
+            userPrompt: assembledUserPrompt,
+            taskClass: "drafting",
+          },
+          res
+        );
+        return;
       }
 
       let result: { text: string; provider: string; model: string };
@@ -602,6 +626,7 @@ Formatting & Academic Citation Rules:
           console.warn("Server multimodal agent execution failed, requesting frontend LLM fallback:", execErr);
           return res.status(426).json({
             requireFrontendLLM: true,
+            challengeToken: makeChallengeToken(effectiveSystemPrompt, assembledUserPrompt),
             systemPrompt: effectiveSystemPrompt,
             userPrompt: assembledUserPrompt,
             taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",

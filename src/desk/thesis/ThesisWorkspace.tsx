@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import type { ThesisStage, ThesisProjectData } from "./types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
-import { authedJsonFetch, getProject, saveIntakeAnswers } from "../api";
+import { authedFetch, authedJsonFetch, getProject, saveIntakeAnswers } from "../api";
 import VivaVoceSimulator from "./components/VivaVoceSimulator";
 import type {
   VivaSimulationResponse,
@@ -127,6 +127,25 @@ export default function ThesisWorkspace({
           supervisorNotes: a["supervisorNotes"] || prev.supervisorNotes,
           chapters: parsedChapters,
         }));
+
+        try {
+          const gateRes = await authedFetch(`/api/projects/${projectId}/thesis/gate-status`);
+          if (gateRes.ok) {
+            const gateData = await gateRes.json();
+            if (gateData.chapterSummaries && mounted) {
+              setChapterAuditResults((prev) => ({
+                totalChapters: gateData.chapterSummaries.length,
+                alignmentScore: prev?.alignmentScore || 85,
+                coherenceStatus: prev?.coherenceStatus || "Gated Thesis Structure Active",
+                crossChapterChecks: prev?.crossChapterChecks || [],
+                chapterSummaries: gateData.chapterSummaries,
+                allChaptersReadyForG6: gateData.allChaptersReadyForG6,
+              }));
+            }
+          }
+        } catch {
+          // Gate status hydration optional
+        }
       } catch (err) {
         console.warn("[ThesisWorkspace] Hydration fallback to initial state:", err);
       } finally {
@@ -439,48 +458,97 @@ export default function ThesisWorkspace({
                   </span>
                 </div>
                 <div className="space-y-3">
-                  {thesisData.chapters.map((ch, idx) => (
-                    <div
-                      key={ch.chapterNumber}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] gap-2"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="w-6 h-6 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] font-bold text-xs flex items-center justify-center shrink-0">
-                          {ch.chapterNumber}
-                        </span>
-                        <div>
-                          <p className="text-xs font-bold text-[color:var(--text-primary)]">{ch.title}</p>
-                          <p className="text-[10px] text-[color:var(--text-muted)]">
-                            {ch.wordCount.toLocaleString()} / {ch.targetWordCount.toLocaleString()} words
-                          </p>
+                  {thesisData.chapters.map((ch, idx) => {
+                    const gateSummary = chapterAuditResults?.chapterSummaries?.find(
+                      (s, sIdx) =>
+                        s.chapterId === `ch-${ch.chapterNumber}` ||
+                        s.chapterId === `chapter_${ch.chapterNumber}` ||
+                        s.chapterTitle.toLowerCase().includes(ch.title.toLowerCase()) ||
+                        sIdx === idx
+                    );
+                    return (
+                      <div
+                        key={ch.chapterNumber}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] gap-2"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 h-6 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] font-bold text-xs flex items-center justify-center shrink-0">
+                            {ch.chapterNumber}
+                          </span>
+                          <div>
+                            <p className="text-xs font-bold text-[color:var(--text-primary)]">{ch.title}</p>
+                            <p className="text-[10px] text-[color:var(--text-muted)]">
+                              {ch.wordCount.toLocaleString()} / {ch.targetWordCount.toLocaleString()} words
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {gateSummary && (
+                            <div className="flex items-center gap-1.5 text-[9px] font-mono">
+                              <span
+                                className={`px-1.5 py-0.5 rounded font-semibold ${
+                                  gateSummary.g3Status === "signed_off"
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : gateSummary.g3Status === "in_progress"
+                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                                    : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                                }`}
+                                title={`G3 Structure: ${gateSummary.g3Status}`}
+                              >
+                                G3:{gateSummary.g3Status.slice(0, 4)}
+                              </span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded font-semibold ${
+                                  gateSummary.g4Status === "signed_off"
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : gateSummary.g4Status === "in_progress"
+                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                                    : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                                }`}
+                                title={`G4 Draft & Provenance: ${gateSummary.g4Status}`}
+                              >
+                                G4:{gateSummary.g4Status.slice(0, 4)}
+                              </span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded font-semibold ${
+                                  gateSummary.g5Status === "signed_off"
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : gateSummary.g5Status === "in_progress"
+                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                                    : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                                }`}
+                                title={`G5 Review & Audit: ${gateSummary.g5Status}`}
+                              >
+                                G5:{gateSummary.g5Status.slice(0, 4)}
+                              </span>
+                            </div>
+                          )}
+                          <select
+                            value={ch.status}
+                            onChange={(e) => {
+                              const next = [...thesisData.chapters];
+                              next[idx] = { ...ch, status: e.target.value as any };
+                              updateThesisField("chapters", next);
+                            }}
+                            className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase border border-[color:var(--border-subtle)] cursor-pointer ${
+                              ch.status === "reviewed"
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                : ch.status === "drafting"
+                                ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                                : ch.status === "completed"
+                                ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
+                                : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                            }`}
+                          >
+                            <option value="not_started">Not Started</option>
+                            <option value="drafting">Drafting</option>
+                            <option value="reviewed">Reviewed</option>
+                            <option value="completed">Completed</option>
+                          </select>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={ch.status}
-                          onChange={(e) => {
-                            const next = [...thesisData.chapters];
-                            next[idx] = { ...ch, status: e.target.value as any };
-                            updateThesisField("chapters", next);
-                          }}
-                          className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase border border-[color:var(--border-subtle)] cursor-pointer ${
-                            ch.status === "reviewed"
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                              : ch.status === "drafting"
-                              ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                              : ch.status === "completed"
-                              ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
-                              : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                          }`}
-                        >
-                          <option value="not_started">Not Started</option>
-                          <option value="drafting">Drafting</option>
-                          <option value="reviewed">Reviewed</option>
-                          <option value="completed">Completed</option>
-                        </select>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

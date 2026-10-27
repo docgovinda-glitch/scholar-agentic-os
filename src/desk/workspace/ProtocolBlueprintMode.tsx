@@ -10,6 +10,7 @@ import { useResearchWorkspace } from "./ResearchContext";
 import { saveIntakeAnswers, allocateProjectWordBudget } from "../api";
 import { executeAgenticLLM } from "../api";
 import { normalizeUnicodeNFC } from "../../document_intelligence/index";
+import { parseAndRepairLLMJson } from "../../shared/llmJsonParser";
 
 export interface GapProposal {
   id: string;
@@ -156,14 +157,7 @@ Preliminary Context: ${preliminaryContext || "General peer-reviewed scholarly co
         "reasoning"
       );
 
-      // Extract JSON from markdown or raw text
-      let jsonText = responseText.trim();
-      const match = jsonText.match(/```json\s*([\s\S]*?)\s*```/) || jsonText.match(/```\s*([\s\S]*?)\s*```/);
-      if (match) {
-        jsonText = match[1];
-      }
-
-      const parsed = JSON.parse(jsonText);
+      const parsed = parseAndRepairLLMJson<{ gaps?: GapProposal[]; titles?: TitleProposal[] }>(responseText, {});
       const gaps: GapProposal[] = Array.isArray(parsed.gaps) ? parsed.gaps : [];
       const titles: TitleProposal[] = Array.isArray(parsed.titles) ? parsed.titles : [];
 

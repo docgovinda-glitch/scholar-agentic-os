@@ -5,6 +5,8 @@
  * or in-memory persistence for tests and unconfigured local development.
  */
 
+import fs from "fs";
+import path from "path";
 import * as inMemory from "../../app/conductor/projectStore";
 import { createPgProjectStore, createPool } from "./pgProjectStore";
 import { createRestProjectStore } from "./restProjectStore";
@@ -19,6 +21,80 @@ function inMemoryAsStore(): ProjectStore {
     delete: (projectId) => {
       inMemory.deleteProject(projectId);
       return Promise.resolve();
+    },
+  };
+}
+
+/**
+ * Creates an atomic disk-backed project store fallback for local environments.
+ * Uses atomic tmp-file write and renameSync to avoid file corruption on unexpected crashes.
+ */
+export function createDiskFallbackStore(filePath: string = "data/.scholar_local_store.json"): ProjectStore {
+  const absPath = path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
+  const dir = path.dirname(absPath);
+
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  } catch (err) {
+    console.warn("createDiskFallbackStore: could not create directory", dir, err);
+  }
+
+  const cache = new Map<string, ProjectRecord>();
+  if (fs.existsSync(absPath)) {
+    try {
+      const raw = fs.readFileSync(absPath, "utf-8");
+      const parsed: Record<string, ProjectRecord> = JSON.parse(raw);
+      for (const [id, record] of Object.entries(parsed)) {
+        cache.set(id, record);
+      }
+    } catch (err) {
+      console.warn("createDiskFallbackStore: could not read existing store file, starting fresh", err);
+    }
+  }
+
+  const flushToDisk = () => {
+    try {
+      const obj: Record<string, ProjectRecord> = {};
+      for (const [id, record] of cache.entries()) {
+        obj[id] = record;
+      }
+      const tmpPath = `${absPath}.tmp.${Date.now()}`;
+      fs.writeFileSync(tmpPath, JSON.stringify(obj, null, 2), "utf-8");
+      fs.renameSync(tmpPath, absPath);
+    } catch (err) {
+      console.error("createDiskFallbackStore: atomic flush to disk failed", err);
+    }
+  };
+
+  return {
+    create: async (outputTypeId, ownerId) => {
+      const record = inMemory.createProject(outputTypeId, ownerId);
+      cache.set(record.projectId, record);
+      flushToDisk();
+      return record;
+    },
+    get: async (projectId) => {
+      return cache.get(projectId);
+    },
+    save: async (record) => {
+      cache.set(record.projectId, record);
+      flushToDisk();
+      return record;
+    },
+    listByOwner: async (ownerId) => {
+      const results: ProjectRecord[] = [];
+      for (const r of cache.values()) {
+        if (!ownerId || r.ownerId === ownerId) {
+          results.push(r);
+        }
+      }
+      return results;
+    },
+    delete: async (projectId) => {
+      cache.delete(projectId);
+      flushToDisk();
     },
   };
 }
@@ -43,22 +119,14 @@ export function getProjectStore(): ProjectStore {
  *
  * 1. Data API (HTTPS) — preferred. Needs only the two values the server
  *    already requires to verify tokens, and reaches Supabase over the same
- *    hostname and protocol as everything else. It is ranked above the direct
- *    connection because that path failed in production four separate ways:
- *    an IPv6-only hostname on an IPv4-only network, a pooler needing the
- *    right region/port/tenant username, a certificate chain Node does not
- *    trust, and a database password distinct from every other credential.
+ *    hostname and protocol as everything else.
  *
  * 2. Direct Postgres — used when DATABASE_URL is set and the Data API is not
  *    configured. Retained deliberately rather than deleted: it supports SQL
- *    the Data API cannot express, and a future store needing real
- *    transactions will want it.
+ *    the Data API cannot express.
  *
- * 3. In-memory — the last resort, and the dangerous one, because it looks
- *    like it works. It does not survive a restart, so on a plan that idles
- *    out the container a user's projects vanish within the hour with nothing
- *    reported. It is therefore announced loudly at startup rather than
- *    entered quietly.
+ * 3. Disk store fallback — atomic disk file store (data/.scholar_local_store.json)
+ *    so projects survive restarts in unconfigured development.
  */
 function resolveStore(): ProjectStore {
   if (process.env.NODE_ENV === "test" && !process.env.USE_REAL_STORE_IN_TESTS) {
@@ -87,11 +155,9 @@ function resolveStore(): ProjectStore {
   }
 
   console.warn(
-    "services/store: NO durable backend configured — falling back to the in-memory store. " +
-      "Projects will be lost on every restart. Set VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY " +
-      "(preferred) or DATABASE_URL. See supabase/schema_store.sql."
+    "services/store: NO remote durable backend configured — falling back to atomic disk store (replacing ephemeral in-memory store) at data/.scholar_local_store.json."
   );
-  return inMemoryAsStore();
+  return createDiskFallbackStore();
 }
 
 export type { ProjectRecord, ProjectStore };
