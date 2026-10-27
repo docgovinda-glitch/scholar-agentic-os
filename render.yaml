@@ -24,6 +24,7 @@ services:
     name: scholar-agentic-os
     env: docker
     dockerfilePath: ./Dockerfile
+    autoDeploy: true
     # `free`, not `starter`. This file previously declared `starter`, which is
     # Render's PAID ($7/mo) always-on plan — it contradicted the stated
     # free-tier-only constraint, and a blueprint sync would have silently
