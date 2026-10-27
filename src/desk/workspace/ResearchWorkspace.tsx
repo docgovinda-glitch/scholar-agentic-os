@@ -14,6 +14,12 @@ import { WorkspaceAutosaveBadge } from "../../components/ui/WorkspaceAutosaveBad
 import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
 import { useToast, useAriaAnnounce } from "../../components/ui/FeedbackSystem";
 
+import ProtocolBlueprintMode from "./ProtocolBlueprintMode";
+import EvidenceMatrixMode from "./EvidenceMatrixMode";
+import ManuscriptStudioMode from "./ManuscriptStudioMode";
+import RefereeRebuttalMode from "./RefereeRebuttalMode";
+import AuditExportMode from "./AuditExportMode";
+
 function ResearchWorkspaceInner({
   onClose,
   onOpenAccountSettings,
@@ -30,9 +36,11 @@ function ResearchWorkspaceInner({
     project,
     outputType,
     currentStage,
+    currentMode,
     stageStatuses,
     setProject,
     setStage,
+    setMode,
     advanceStage,
     error,
     isLoading,
@@ -124,6 +132,62 @@ function ResearchWorkspaceInner({
   React.useEffect(() => {
     announce(`Stage changed to: ${currentStage}`, "polite");
   }, [currentStage, announce]);
+
+  // Live Header Telemetry Strip Metrics
+  const targetWords = React.useMemo(() => {
+    try {
+      const raw = project?.answers?.["word_budget_blueprint"];
+      if (raw) {
+        const bp = JSON.parse(raw);
+        if (bp?.targetTotalWords) return bp.targetTotalWords;
+      }
+    } catch {}
+    const rawCount = project?.answers?.["target_word_count"];
+    return rawCount ? parseInt(rawCount, 10) || 6000 : 6000;
+  }, [project?.answers]);
+
+  const actualWords = React.useMemo(() => {
+    const rawDraft = project?.answers?.["manuscript_draft"] || project?.answers?.["assembled_draft"];
+    if (rawDraft) {
+      try {
+        const parsed = JSON.parse(rawDraft);
+        if (Array.isArray(parsed)) {
+          return parsed.reduce((acc: number, sec: Record<string, unknown>) => {
+            const content = String(sec.content || "");
+            return acc + (content ? content.trim().split(/\s+/).filter(Boolean).length : 0);
+          }, 0);
+        }
+      } catch {
+        return String(rawDraft).trim().split(/\s+/).filter(Boolean).length;
+      }
+    }
+    return 0;
+  }, [project?.answers]);
+
+  const totalVerifiedSourcesAndData = React.useMemo(() => {
+    let count = 0;
+    try {
+      const u = project?.answers?.["user_datasets"];
+      if (u) {
+        const parsed = JSON.parse(u);
+        if (Array.isArray(parsed)) count += parsed.length;
+      }
+    } catch {}
+    try {
+      const v = project?.answers?.["approved_vault_sources"] || project?.answers?.["vault_sources"];
+      if (v) {
+        const parsed = JSON.parse(v);
+        if (Array.isArray(parsed)) count += parsed.length;
+      }
+    } catch {}
+    return count;
+  }, [project?.answers]);
+
+  const activeModelDisplay = manualModelOverride
+    ? (manualModelOverride.modelId || manualModelOverride.providerId)
+    : (defaultProvider?.selectedModel ? `${defaultProvider.name} - ${defaultProvider.selectedModel}` : (defaultProvider?.name || "Client AI: Auto"));
+
+  const autosaveVersion = project?.version || 1;
 
   if (error) {
     return (
@@ -261,6 +325,45 @@ function ResearchWorkspaceInner({
                   version={project.version || 1}
                   className="hidden lg:flex"
                 />
+              </div>
+            </div>
+
+            {/* Live Header Telemetry Strip */}
+            <div className="hidden lg:flex items-center gap-2.5 px-3.5 py-1 bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-full text-xs shadow-xs">
+              {/* Telemetry 1: Words */}
+              <div className="flex items-center gap-1 font-mono" title="Actual Words / Target Words">
+                <span className="text-[color:var(--text-muted)] text-[10px] uppercase font-bold tracking-wider">Words:</span>
+                <span className="font-bold text-[color:var(--text-primary)]">
+                  {actualWords.toLocaleString()} / {targetWords.toLocaleString()}
+                </span>
+              </div>
+
+              <span className="w-px h-3 bg-[color:var(--border-subtle)]" />
+
+              {/* Telemetry 2: Sources */}
+              <div className="flex items-center gap-1 font-mono" title="Verified Sources & User Datasets">
+                <span className="text-emerald-500 font-bold">✓</span>
+                <span className="font-bold text-[color:var(--text-primary)]">
+                  {totalVerifiedSourcesAndData} Sources & Data
+                </span>
+              </div>
+
+              <span className="w-px h-3 bg-[color:var(--border-subtle)]" />
+
+              {/* Telemetry 3: AI Model */}
+              <div className="flex items-center gap-1.5 max-w-[150px] truncate" title={`Active Client AI Model: ${activeModelDisplay}`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                <span className="font-semibold text-[color:var(--text-secondary)] truncate">
+                  {activeModelDisplay}
+                </span>
+              </div>
+
+              <span className="w-px h-3 bg-[color:var(--border-subtle)]" />
+
+              {/* Telemetry 4: Autosave */}
+              <div className="flex items-center gap-1 text-[10px] font-mono text-[color:var(--text-muted)]" title={`Autosave Status v${autosaveVersion}`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500/80 shrink-0" />
+                <span>Autosave v{autosaveVersion}</span>
               </div>
             </div>
 
@@ -574,9 +677,14 @@ function ResearchWorkspaceInner({
           `}>
             <StageNavigation
               currentStage={currentStage}
+              currentMode={currentMode}
               stageStatuses={stageStatuses}
               onStageChange={(stage) => {
                 setStage(stage);
+                setStageNavOpen(false); // Auto-close on mobile
+              }}
+              onModeChange={(mode) => {
+                setMode(mode);
                 setStageNavOpen(false); // Auto-close on mobile
               }}
               isCollapsed={sidebarCollapsed}
@@ -592,13 +700,25 @@ function ResearchWorkspaceInner({
               <div className="spinner" />
             </div>
           }>
-            <ActiveStageComponent 
-              stage={currentStage} 
-              projectId={projectId} 
-              project={project} 
-              onSaved={setProject} 
-              onAdvance={handleAdvance} 
-            />
+            {currentMode === "protocol" ? (
+              <ProtocolBlueprintMode />
+            ) : currentMode === "evidence" ? (
+              <EvidenceMatrixMode />
+            ) : currentMode === "studio" ? (
+              <ManuscriptStudioMode />
+            ) : currentMode === "referee" ? (
+              <RefereeRebuttalMode />
+            ) : currentMode === "audit" || currentMode === "audit_export" ? (
+              <AuditExportMode />
+            ) : (
+              <ActiveStageComponent 
+                stage={currentStage} 
+                projectId={projectId} 
+                project={project} 
+                onSaved={setProject} 
+                onAdvance={handleAdvance} 
+              />
+            )}
           </Suspense>
         </div>
 

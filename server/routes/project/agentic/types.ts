@@ -527,3 +527,21 @@ export async function executeScholarBrainJSON<T>(
   }
   return sanitized as T;
 }
+
+export interface UserDatasetRecord {
+  id: string;
+  citationToken: string;
+  title: string;
+  author: string;
+  year: number;
+  badge: string;
+  sourceType: "quantitative_dataset" | "qualitative_document" | "field_notes" | "raw_text";
+  format: string;
+  summary: string;
+  extractedFindings: string;
+  keyMetrics?: string[];
+  assignedSectionId?: string;
+  epistemicRole: "Primary User Dataset" | "Supporting" | "Methodological Anchor" | "Contrasting / Critical";
+  rawContentSample?: string;
+  createdAt: string;
+}

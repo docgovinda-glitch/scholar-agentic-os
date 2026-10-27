@@ -64,7 +64,6 @@ export default function Header({
         }}
         className="cursor-pointer transition-opacity duration-200 hover:opacity-70 flex items-center gap-2 rounded-[var(--radius-sm)] px-1.5 py-1 font-semibold text-[color:var(--text-primary)]"
         title="Scholar Core Home"
-        aria-label="Scholar Core Home"
       >
         <ScholarCoreLogo size="sm" className="text-[color:var(--text-primary)]" />
         <span className="hidden sm:inline font-semibold text-[color:var(--text-primary)] text-xs">SCHOLAR CORE</span>

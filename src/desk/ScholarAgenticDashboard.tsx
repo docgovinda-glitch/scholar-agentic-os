@@ -192,8 +192,7 @@ export default function ScholarAgenticDashboard() {
               to="/"
               onClick={() => setActiveView("projects")}
               className="flex items-center gap-2.5 min-w-0 cursor-pointer transition-opacity duration-200 hover:opacity-70 text-left"
-              title="Scholar Core Home"
-              aria-label="Scholar Core Home"
+              title="Scholar Core Workspace"
             >
               <div className="w-9 h-9 rounded-xl bg-white text-neutral-900 flex items-center justify-center flex-shrink-0 shadow-xs">
                 <ScholarCoreLogo size="md" className="text-neutral-900" />
@@ -418,8 +417,8 @@ export default function ScholarAgenticDashboard() {
               to="/"
               onClick={() => setActiveView("projects")}
               className="cursor-pointer transition-opacity duration-200 hover:opacity-70 inline-flex items-center"
-              title="Scholar Core Home"
-              aria-label="Scholar Core Home"
+              title="Scholar Core Workspace"
+              aria-label="Scholar Core Workspace"
             >
               <ScholarCoreLogo size="sm" withText={true} />
             </Link>

@@ -13,6 +13,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import type { SlideDeck } from '../types/slides';
+import { authedJsonFetch } from '../../../../src/desk/api';
 
 export interface AudienceQaQuestion {
   id: string;
@@ -112,37 +113,33 @@ export default function AudienceQaSimulator({
   const handleSimulate = async () => {
     setIsLoading(true);
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      try {
-        if (typeof window !== 'undefined' && window.localStorage) {
-          const authKey = Object.keys(localStorage).find(
-            (k) => k.startsWith('sb-') && k.endsWith('-auth-token')
-          );
-          if (authKey) {
-            const parsed = JSON.parse(localStorage.getItem(authKey) || '{}');
-            if (parsed?.access_token) {
-              headers['Authorization'] = `Bearer ${parsed.access_token}`;
-            }
-          }
-        }
-      } catch {}
-
-      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/presentation/qa-simulate`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      const res = await authedJsonFetch(
+        `/api/projects/${encodeURIComponent(projectId)}/presentation/qa-simulate`,
+        'POST',
+        {
           deck,
           difficulty,
           targetSlideNumber: selectedSlide > 0 ? selectedSlide : undefined,
           questionCount: 3,
-        }),
-      });
+        }
+      );
 
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.questions) && data.questions.length > 0) {
-          setQuestions(data.questions);
-          if (onSaveQuestions) onSaveQuestions(data.questions);
+        const rawList = data.qaScenarios || data.questions || [];
+        if (Array.isArray(rawList) && rawList.length > 0) {
+          const formatted: AudienceQaQuestion[] = rawList.map((q: any, i: number) => ({
+            id: q.id || q.questionId || `qa-${i + 1}`,
+            persona: q.persona || q.audienceType || 'Conference Referee',
+            difficulty: q.difficulty || q.difficultyLevel || 'rigorous',
+            targetSlideNumber: q.targetSlideNumber || q.targetedSlideNumber || 1,
+            question: q.question || q.questionText || '',
+            intent: q.intent || q.probingIntent || '',
+            suggestedAnswer: q.suggestedAnswer || '',
+            modelRebuttalPoints: q.modelRebuttalPoints || q.modelRebuttalStructure || [],
+          }));
+          setQuestions(formatted);
+          if (onSaveQuestions) onSaveQuestions(formatted);
           setIsLoading(false);
           return;
         }

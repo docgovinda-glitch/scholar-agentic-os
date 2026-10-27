@@ -13,6 +13,7 @@ vi.mock("../../utils/llm.ts", () => ({
   callOpenRouterText: vi.fn(),
   getCandidates: () => [],
   buildAuthorizedPolicy: () => ({}),
+  resolveRequestAiConfig: () => ({ candidates: [], isClientConfigured: false }),
 }));
 
 vi.mock("../../src/discovery/discovery.ts", () => ({

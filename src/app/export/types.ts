@@ -7,7 +7,7 @@ import type { CanonicalDocument } from "../../desk/types";
 
 import type { AcademicExportOptions } from "./academicPdfCompiler";
 
-export type ExportFormat = "docx" | "odt" | "pdf" | "latex" | "typst" | "camera_ready_pdf";
+export type ExportFormat = "docx" | "odt" | "pdf" | "latex" | "typst" | "camera_ready_pdf" | "rebuttal_letter" | "rebuttal-letter";
 
 export interface ExportInput {
   document: CanonicalDocument;

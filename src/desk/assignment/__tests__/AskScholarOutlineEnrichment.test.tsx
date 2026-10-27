@@ -32,6 +32,7 @@ describe("AskScholar Pattern Outline Enrichment", () => {
     it("infers domain theoretical models when not explicitly named", () => {
       const econ = extractTargetFrameworks("Does bilateral trade mitigate interstate military friction?", "essay");
       expect(econ).toContain("Weaponized Interdependence (Farrell & Newman)");
+      expect(econ).toContain("Bilateral Economic Interdependence Model");
       expect(econ).toContain("Realist Strategic Vulnerability");
 
       const oncology = extractTargetFrameworks("Cellular immunotherapy in refractory lymphoma", "essay");

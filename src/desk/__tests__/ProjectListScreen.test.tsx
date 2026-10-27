@@ -814,9 +814,9 @@ describe("minimal website assistant", () => {
     fireEvent.click(sendBtn);
 
     expect(await screen.findByText(/Executive Scholarly Synthesis & Verified Literature Brief on Biology/i, {}, { timeout: 2000 })).toBeInTheDocument();
-    expect(screen.getByText(/1540 words/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/1540 words/i)[0]).toBeInTheDocument();
 
-    const handoffBtn = screen.getByRole("button", { name: /Launch in 4-Phase Essay Engine \(OT-01\) with Verified Sources/i });
+    const handoffBtn = screen.getByRole("button", { name: /Launch in 4-Phase Essay Engine \(OT-01\)/i });
     expect(handoffBtn).toBeInTheDocument();
     fireEvent.click(handoffBtn);
 

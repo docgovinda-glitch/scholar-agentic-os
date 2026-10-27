@@ -15,12 +15,15 @@ interface ScholarCoreLogoProps {
   withText?: boolean;
   /** CSS class to apply to the container */
   className?: string;
+  /** Alt text for the logo image. Defaults to empty string (decorative) to prevent redundant screen reader speech and label mismatches. */
+  alt?: string;
 }
 
 export default function ScholarCoreLogo({
   size = 'md',
   withText = false,
   className = '',
+  alt = '',
 }: ScholarCoreLogoProps) {
   const sizes = {
     sm: { mark: 24, text: 12, gap: 8 },
@@ -39,7 +42,8 @@ export default function ScholarCoreLogo({
     >
       <img
         src="cognitive_authority_veena_logo_v7b_colored_details.png"
-        alt="Scholar Core Logo"
+        alt={alt}
+        aria-hidden={!alt ? true : undefined}
         width={mark}
         height={mark}
         className="ai-logo-spin object-contain select-none pointer-events-none rounded-full"

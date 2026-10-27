@@ -19,10 +19,39 @@ export type AcademicTemplate =
 export interface AcademicExportOptions {
   template: AcademicTemplate;
   columns?: 1 | 2;
+  runningHead?: string;
   authorAffiliation?: string;
   authorEmail?: string;
+  authorOrcid?: string;
+  authors?: Array<{
+    name: string;
+    affiliation?: string;
+    email?: string;
+    orcid?: string;
+    isCorresponding?: boolean;
+  }>;
   abstractText?: string;
   keywords?: string[];
+  lineSpacing?: 1.15 | 1.5 | 2.0;
+  ethicalDeclarations?: {
+    dataAvailability?: string;
+    funding?: string;
+    competingInterests?: string;
+    authorContributions?: string;
+    aiDisclosure?: string;
+  };
+  rebuttalMatrix?: Array<{
+    id?: string;
+    referee: string;
+    lens?: string;
+    section?: string;
+    severity?: string;
+    critique: string;
+    authorResponse: string;
+    revisionAction?: string;
+    diff?: { find: string; replace: string };
+  }>;
+  includeRebuttalAppendix?: boolean;
   references?: Array<{
     id: string;
     title: string;

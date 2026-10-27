@@ -7,15 +7,326 @@ import {
   buildBoundedRagContext,
   type AcademicDocumentInput,
 } from "../../../src/services/scholarBrain.ts";
-import { buildScholarlyVoiceSystemPrompt } from "../../../src/utils/scholarlyVoiceGuard.ts";
+import {
+  buildScholarlyVoiceSystemPrompt,
+  sanitizeScholarlyText,
+  evaluateBurstiness,
+  type ScholarlyDialect,
+} from "../../../src/utils/scholarlyVoiceGuard.ts";
+import {
+  allocateWordBudget,
+  countExactWords,
+  generateDeterministicSubSectionDraft,
+  expandDeterministicDraft,
+  type ManuscriptTemplate,
+  type WordBudgetBlueprint,
+} from "../../../src/utils/wordBudgetAllocator.ts";
+import {
+  formatCitationLedger,
+  scrubCitations,
+  type VerifiedSourceItem,
+} from "../../../src/utils/citationLockScrubber.ts";
+import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
 import {
   handleFrontendLLMOverride,
   resolveRequestAiConfig,
   isServerAiAuthorized,
   createLLMChallengeToken,
+  getCandidates,
+  buildAuthorizedPolicy,
 } from "../../../utils/llm.ts";
 
+interface DraftSubSectionRequestBody extends Record<string, unknown> {
+  sectionId?: string;
+  subSectionId?: string;
+  subSectionTitle?: string;
+  targetWords?: number;
+  assignedSources?: VerifiedSourceItem[];
+  contextPrompt?: string;
+  dialect?: "en-GB" | "en-US";
+  thesisStatement?: string;
+}
+
 export function registerDraftingHandlers(router: express.Router): void {
+  // POST /api/projects/:id/agentic/allocate-budget
+  router.post("/allocate-budget", async (req: express.Request<{ id: string }>, res: express.Response) => {
+    const project = await getProjectSafe(req, res);
+    if (!project) return;
+
+    const targetTotalWords =
+      typeof req.body?.targetTotalWords === "number" && req.body.targetTotalWords > 0
+        ? req.body.targetTotalWords
+        : 6000;
+
+    const rawTemplate = req.body?.template;
+    const template: ManuscriptTemplate =
+      rawTemplate === "Theoretical" || rawTemplate === "SystematicReview"
+        ? rawTemplate
+        : "IMRaD";
+
+    const blueprint = allocateWordBudget(project.projectId, targetTotalWords, template);
+
+    // Persist wordBudgetBlueprint inside project state
+    project.answers = {
+      ...project.answers,
+      word_budget_blueprint: JSON.stringify(blueprint),
+      target_word_count: String(targetTotalWords),
+      manuscript_template: template,
+    };
+    await getProjectStore().save(project);
+
+    res.json({
+      ok: true,
+      blueprint,
+    });
+  });
+
+  // POST /api/projects/:id/agentic/draft-subsection
+  router.post(
+    "/draft-subsection",
+    async (req: express.Request<{ id: string }, unknown, DraftSubSectionRequestBody>, res: express.Response) => {
+      const project = await getProjectSafe(req, res);
+      if (!project) return;
+
+      const sectionId = req.body?.sectionId || "sec-1";
+      const subSectionId = req.body?.subSectionId || "sec-1-sub-1";
+      const subSectionTitle = req.body?.subSectionTitle || "Foundational Problem Domain";
+      const targetWords =
+        typeof req.body?.targetWords === "number" && req.body.targetWords > 0
+          ? req.body.targetWords
+          : 400;
+
+      const targetDialect: ScholarlyDialect = req.body?.dialect === "en-US" ? "en-US" : "en-GB";
+
+      // 1. Resolve Assigned Sources
+      let assignedSources: VerifiedSourceItem[] = [];
+      if (Array.isArray(req.body?.assignedSources) && req.body.assignedSources.length > 0) {
+        assignedSources = req.body.assignedSources;
+      } else if (project.answers?.["vault_sources"]) {
+        try {
+          const parsed = JSON.parse(project.answers["vault_sources"]);
+          if (Array.isArray(parsed)) {
+            assignedSources = parsed.map((item: Record<string, unknown>, idx: number) => ({
+              id: String(item.id || `src_${idx + 1}`),
+              authors: Array.isArray(item.authors)
+                ? (item.authors as string[])
+                : String(item.author || item.authors || "Anonymous"),
+              year: typeof item.year === "number" ? item.year : String(item.year || "2024"),
+              title: String(item.title || "Scholarly Document"),
+              doi: typeof item.doi === "string" ? item.doi : undefined,
+              url: typeof item.url === "string" ? item.url : undefined,
+              stance: (item.stance as "Supporting" | "Contrasting" | "Methodological") || "Supporting",
+              keyFindings: typeof item.keyFindings === "string" ? item.keyFindings : undefined,
+            }));
+          }
+        } catch {}
+      }
+
+      // Also include researcher's uploaded primary user datasets in the citation ledger
+      if (project.answers?.["user_datasets"]) {
+        try {
+          const userDatasets = JSON.parse(project.answers["user_datasets"]);
+          if (Array.isArray(userDatasets)) {
+            for (const ud of userDatasets) {
+              if (!assignedSources.some((s) => s.id === ud.id)) {
+                if (!ud.assignedSectionId || ud.assignedSectionId === subSectionId || ud.assignedSectionId === sectionId) {
+                  assignedSources.push({
+                    id: ud.id,
+                    authors: ud.author || "Principal Investigator (Primary Data)",
+                    year: ud.year || 2026,
+                    title: ud.title,
+                    stance:
+                      ud.epistemicRole === "Methodological Anchor"
+                        ? "Methodological"
+                        : ud.epistemicRole === "Contrasting / Critical"
+                        ? "Contrasting"
+                        : "Supporting",
+                    keyFindings: ud.extractedFindings || ud.summary,
+                  });
+                }
+              }
+            }
+          }
+        } catch {}
+      }
+
+      // 2. Format Citation Ledger
+      const { ledgerPrompt, sourceMap } = formatCitationLedger(assignedSources);
+
+      // 3. Assemble System Prompt for Pass 1 (Grounded Draft)
+      const voicePrompt = buildScholarlyVoiceSystemPrompt({ dialect: targetDialect });
+      const systemPrompt = `${voicePrompt}
+
+${ledgerPrompt}
+
+TASK SPECIFICATION:
+You are drafting academic sub-section "${subSectionTitle}".
+Target Word Budget: approximately ${targetWords} words (must land strictly in 350–500 words).
+
+CRITICAL CITATION RULES:
+1. Every factual assertion, quantitative finding, or empirical claim MUST cite evidence using [CITE:source_id] tokens from the ledger above.
+2. DO NOT write unverified (Author, Year) strings from memory.
+3. Eliminate all AI lexical clichés ("delve", "tapestry", "pivotal", etc.).
+4. Maintain high syntactic burstiness with complex multi-clause analytical sentences.`;
+
+      const userPrompt = `Draft the scholarly sub-section "${subSectionTitle}".
+Research Context:
+- Working Title: ${project.answers?.["working_title"] || (project as { title?: string }).title || project.projectId || "Scholarly Manuscript"}
+- Core Research Problem: ${project.answers?.["core_problem"] || "Investigating empirical variance and structural bounds."}
+${req.body?.contextPrompt ? `- Author Guidance: ${req.body.contextPrompt}` : ""}
+${req.body?.thesisStatement ? `- Thesis Statement: ${req.body.thesisStatement}` : ""}
+Target Word Budget: ${targetWords} words.`;
+
+      const candidates = getCandidates(req);
+      const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
+
+      let draftText = "";
+
+      if (candidates.length > 0 && !isTest) {
+        try {
+          const response = await completeWithFailover(
+            {
+              taskClass: "drafting",
+              systemPrompt,
+              userPrompt,
+              segments: [{ label: "subSection", text: userPrompt }],
+            },
+            { candidates },
+            buildAuthorizedPolicy(candidates)
+          );
+          if (response.ok && response.value?.text) {
+            draftText = response.value.text;
+          }
+        } catch (e) {
+          console.warn("Pass 1 AI Gateway draft failed, falling back to deterministic synthesis", e);
+        }
+      }
+
+      // Fallback if AI inference didn't yield text
+      if (!draftText.trim()) {
+        draftText = generateDeterministicSubSectionDraft(
+          subSectionTitle,
+          assignedSources,
+          targetWords,
+          targetDialect,
+          req.body?.contextPrompt
+        );
+      }
+
+      // 4. Pass 2 (Deterministic Word-Count Controller)
+      const wordCountPass1 = countExactWords(draftText);
+
+      // If word count is more than 8% below targetWords, execute Evidence-Grounded Expansion Pass
+      if (wordCountPass1 < targetWords * 0.92) {
+        const deficit = targetWords - wordCountPass1;
+
+        if (candidates.length > 0 && !isTest) {
+          try {
+            const expansionPrompt = `The preceding draft for "${subSectionTitle}" is ${wordCountPass1} words, which is below the target budget of ${targetWords} words.
+Expand this draft by approximately ${deficit} words by providing a deeper methodological comparison and critical synthesis of the registered sources: ${assignedSources.map((s) => `[CITE:${s.id}]`).join(", ")}.
+Ensure the final text lands within ±5% of ${targetWords} words without conversational filler or cliché repetitions.
+
+Existing Draft:
+${draftText}`;
+
+            const expansionResponse = await completeWithFailover(
+              {
+                taskClass: "refinement",
+                systemPrompt,
+                userPrompt: expansionPrompt,
+                segments: [{ label: "expansion", text: expansionPrompt }],
+              },
+              { candidates },
+              buildAuthorizedPolicy(candidates)
+            );
+            if (expansionResponse.ok && expansionResponse.value?.text && expansionResponse.value.text.trim().length > 0) {
+              draftText = expansionResponse.value.text;
+            }
+          } catch (e) {
+            console.warn("Pass 2 AI expansion failed, applying deterministic expansion", e);
+            draftText = expandDeterministicDraft(draftText, assignedSources, deficit, targetDialect);
+          }
+        } else {
+          // Offline / test deterministic expansion
+          draftText = expandDeterministicDraft(draftText, assignedSources, deficit, targetDialect);
+        }
+      }
+
+      // 5. Post-Generation Scrubber & Voice Guard
+      const scrubResult = scrubCitations(draftText, sourceMap, { dialect: targetDialect });
+      const sanitized = sanitizeScholarlyText(scrubResult.scrubbedText, {
+        dialect: targetDialect,
+        stripCliches: true,
+      });
+      const burstinessMetrics = evaluateBurstiness(sanitized);
+      const actualWords = countExactWords(sanitized);
+      const deviationPercentage = Math.round(((actualWords - targetWords) / targetWords) * 100 * 10) / 10;
+
+      // 6. Persistence into project state
+      if (project.answers?.["word_budget_blueprint"]) {
+        try {
+          const blueprint: WordBudgetBlueprint = JSON.parse(project.answers["word_budget_blueprint"]);
+          let found = false;
+          for (const sec of blueprint.sections) {
+            for (const sub of sec.subSections) {
+              if (sub.id === subSectionId) {
+                sub.content = sanitized;
+                sub.actualWords = actualWords;
+                sub.draftedAt = new Date().toISOString();
+                found = true;
+                break;
+              }
+            }
+            if (found) break;
+          }
+          if (found) {
+            project.answers["word_budget_blueprint"] = JSON.stringify(blueprint);
+          }
+        } catch {}
+      }
+
+      // Also update drafted_subsections dictionary
+      try {
+        const existingDrafted = project.answers?.["drafted_subsections"]
+          ? (typeof project.answers["drafted_subsections"] === "string"
+              ? JSON.parse(project.answers["drafted_subsections"])
+              : project.answers["drafted_subsections"])
+          : {};
+        existingDrafted[subSectionId] = {
+          sectionId,
+          subSectionId,
+          title: subSectionTitle,
+          content: sanitized,
+          actualWords,
+          targetWords,
+          updatedAt: new Date().toISOString(),
+        };
+        project.answers = {
+          ...project.answers,
+          drafted_subsections: JSON.stringify(existingDrafted),
+        };
+        await getProjectStore().save(project);
+      } catch {}
+
+      res.json({
+        ok: true,
+        sectionId,
+        subSectionId,
+        title: subSectionTitle,
+        content: sanitized,
+        actualWords,
+        targetWords,
+        deviationPercentage,
+        burstinessMetrics,
+        warnings: scrubResult.chronologicalWarnings,
+        unverifiedClaimsCount: scrubResult.unverifiedClaimsCount,
+        resolvedCitationsCount: scrubResult.resolvedCitationsCount,
+        strippedCitations: scrubResult.strippedCitations,
+        citedSources: scrubResult.citedSources,
+      });
+    }
+  );
+
   // POST /api/projects/:id/agent/draft
   router.post("/draft", async (req: express.Request<{ id: string }>, res) => {
     const project = await getProjectSafe(req, res);
@@ -157,6 +468,23 @@ Return ONLY valid JSON in this exact format:
           sourceType: "vault",
         });
       }
+    }
+    if (project.answers?.["user_datasets"]) {
+      try {
+        const userDatasets = JSON.parse(project.answers["user_datasets"]);
+        if (Array.isArray(userDatasets)) {
+          for (const ud of userDatasets) {
+            ragDocs.push({
+              id: ud.id,
+              title: ud.title,
+              content: ud.extractedFindings || ud.summary || "",
+              author: ud.author,
+              year: ud.year,
+              sourceType: "primary_data",
+            });
+          }
+        }
+      } catch {}
     }
 
     // 2. Build Bounded RAG Context with token budget

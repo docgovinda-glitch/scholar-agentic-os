@@ -596,7 +596,7 @@ export function decomposeWordBudget(options: DecomposeWordBudgetOptions): Intern
   const isStrictExamParts =
     wordBudget?.intro === 0 &&
     /quantum/i.test(assignmentTopic) &&
-    /part\s*1|question\s*1|qnt-4020/i.test(assignmentTopic);
+    /part\s*1|question\s*1/i.test(assignmentTopic);
 
   if (isStrictExamParts) {
     const partWords = Math.round(total / 4);

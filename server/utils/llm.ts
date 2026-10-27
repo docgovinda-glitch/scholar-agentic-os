@@ -296,8 +296,9 @@ export function handleFrontendLLMOverride(
   const rawString = typeof content === "string" ? content : JSON.stringify(content);
 
   // Pass every verified llmResult through scholarBrain voice and citation sanitization
-  let sanitized = scholarBrain.enforceScholarlyVoice(rawString);
-  sanitized = scholarBrain.scrubAndFormatCitations(sanitized);
+  const voiced = scholarBrain.enforceScholarlyVoice(rawString);
+  const scrubbed = scholarBrain.scrubAndFormatCitations(voiced.text);
+  const sanitized = scrubbed.formattedText || scrubbed.scrubbedText || voiced.text;
 
   if (options?.schemaValidator) {
     options.schemaValidator(sanitized);
@@ -460,7 +461,7 @@ export async function callOpenRouterText(
       throw new Error(result.error.message || "AI Agent Generation Failed");
     }
     const sanitized = scholarBrain.enforceScholarlyVoice(result.value.text);
-    return scholarBrain.scrubAndFormatCitations(sanitized);
+    return scholarBrain.scrubAndFormatCitations(sanitized.text).formattedText;
   } catch (err: unknown) {
     if ((err as { status?: number })?.status === 403) {
       throw err;
@@ -635,7 +636,7 @@ export async function streamOpenRouterText(
     }
 
     const sanitized = scholarBrain.enforceScholarlyVoice(fullContent);
-    return scholarBrain.scrubAndFormatCitations(sanitized);
+    return scholarBrain.scrubAndFormatCitations(sanitized.text).formattedText;
   } catch (err: unknown) {
     if ((err as { status?: number })?.status === 403) {
       throw err;
