@@ -4,6 +4,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedStreamFetch, saveIntakeAnswers, executeAgenticLLM } from "../../api";
+import { useToast } from "../../../components/ui/FeedbackSystem";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 import {
   buildSectionDraftPrompts,
@@ -47,6 +48,7 @@ export default function DraftStage({
   onSaved: (updated: ProjectView) => void;
   onAdvance?: (stage: string) => void;
 }) {
+  const toast = useToast();
   const def = STAGE_MAP.get(stage);
 
   // Grounding state parsed from Phase I, II & III
@@ -536,7 +538,9 @@ export default function DraftStage({
 
   const handleDeleteSection = async (idxToDelete: number) => {
     if (sections.length <= 1) {
-      alert("A manuscript must retain at least one core section.");
+      toast.warning("A manuscript must retain at least one core section.", {
+        title: "Cannot Delete Section",
+      });
       return;
     }
     const updated = sections.filter((_, i) => i !== idxToDelete);

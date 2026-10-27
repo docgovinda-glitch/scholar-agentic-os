@@ -47,6 +47,7 @@ import SourceLibraryScreen from "./SourceLibraryScreen";
 import SettingsView from "./SettingsView";
 import { getConnectedCloudDrives, type CloudDriveAccount } from "../../services/vault/cloudDriveService";
 import { loadVault } from "../../services/userVault";
+import { useToast } from "../../components/ui/FeedbackSystem";
 
 export interface KnowledgeVaultProps {
   userId: string;
@@ -94,6 +95,7 @@ export default function KnowledgeVault({
   onLock,
   onResetVault,
 }: KnowledgeVaultProps) {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<"projects" | "sources" | "settings">(initialTab);
   const [projects, setProjects] = useState<ProjectView[] | null>(null);
   const [types, setTypes] = useState<OutputTypeSummary[] | null>(null);
@@ -236,7 +238,9 @@ export default function KnowledgeVault({
     } catch (err) {
       console.error("Failed to rename project:", err);
       setProjects(previousProjects);
-      alert("Failed to save project heading. Please try again.");
+      toast.error("Failed to save project heading. Please try again.", {
+        title: "Save Failed",
+      });
     }
   };
 
@@ -333,7 +337,9 @@ export default function KnowledgeVault({
       unmarkDeleted(targetProject.projectId);
       setProjects(previousProjects);
       const msg = err instanceof Error ? err.message : "Failed to delete project";
-      alert(`Could not delete project: ${msg}`);
+      toast.error(`Could not delete project: ${msg}`, {
+        title: "Delete Failed",
+      });
     }
   };
 

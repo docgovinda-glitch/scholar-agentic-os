@@ -6,21 +6,23 @@
  */
 
 import path from "node:path";
-import pdfMake from "pdfmake";
-import fonts from "pdfmake/fonts/Roboto.js";
 import type { Content } from "pdfmake/interfaces";
 import type { Block, CanonicalDocument } from "../../desk/types";
 import type { ExportMetadata } from "./types";
 
-pdfMake.setFonts(fonts);
-// Content is our own rendered document text, not user-supplied URLs or local
-// paths — deny network access entirely, and local access to everything
-// except the bundled font files pdfmake itself needs to read to render text.
-const fontsDir = path.dirname(fonts.Roboto.normal);
-pdfMake.setUrlAccessPolicy(() => false);
-pdfMake.setLocalAccessPolicy((filePath: string) => path.resolve(filePath).startsWith(fontsDir));
-
 export async function renderPdf(document: CanonicalDocument, metadata: ExportMetadata): Promise<Buffer> {
+  const [{ default: pdfMake }, { default: fonts }] = await Promise.all([
+    import("pdfmake"),
+    import("pdfmake/fonts/Roboto.js"),
+  ]);
+
+  pdfMake.setFonts(fonts);
+  // Content is our own rendered document text, not user-supplied URLs or local
+  // paths — deny network access entirely, and local access to everything
+  // except the bundled font files pdfmake itself needs to read to render text.
+  const fontsDir = path.dirname(fonts.Roboto.normal);
+  pdfMake.setUrlAccessPolicy(() => false);
+  pdfMake.setLocalAccessPolicy((filePath: string) => path.resolve(filePath).startsWith(fontsDir));
   const content: Content[] = [
     { text: document.title, style: "title" },
     { text: `By ${metadata.author || "Author"}`, style: "byline" },

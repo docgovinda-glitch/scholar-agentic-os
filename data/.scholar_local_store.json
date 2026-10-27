@@ -1,0 +1,334 @@
+[
+  {
+    "projectId": "proj-eb97845f-674b-4f4b-8405-2d73f5d49950",
+    "version": 1,
+    "ownerId": "11111111-1111-4111-8111-111111111111",
+    "outputTypeId": "OT-07",
+    "answers": {},
+    "authors": [],
+    "gates": {
+      "projectId": "proj-eb97845f-674b-4f4b-8405-2d73f5d49950",
+      "gates": {
+        "G0": {
+          "gate": "G0",
+          "status": "in_progress",
+          "entrySatisfied": true,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G1": {
+          "gate": "G1",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G2": {
+          "gate": "G2",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G3": {
+          "gate": "G3",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G4": {
+          "gate": "G4",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G5": {
+          "gate": "G5",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G6": {
+          "gate": "G6",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G7": {
+          "gate": "G7",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        }
+      },
+      "chapterGates": {}
+    },
+    "claimGraph": {
+      "claims": [],
+      "bindings": []
+    },
+    "waivers": {},
+    "submissions": [],
+    "evidenceLedger": {
+      "sources": [],
+      "items": []
+    },
+    "peerReviewHistory": {
+      "rounds": []
+    }
+  },
+  {
+    "projectId": "proj-9c4db58c-fcec-4cf6-bf5f-4a90a18f1ce1",
+    "version": 1,
+    "ownerId": "11111111-1111-4111-8111-111111111111",
+    "outputTypeId": "OT-07",
+    "answers": {},
+    "authors": [],
+    "gates": {
+      "projectId": "proj-9c4db58c-fcec-4cf6-bf5f-4a90a18f1ce1",
+      "gates": {
+        "G0": {
+          "gate": "G0",
+          "status": "in_progress",
+          "entrySatisfied": true,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G1": {
+          "gate": "G1",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G2": {
+          "gate": "G2",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G3": {
+          "gate": "G3",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G4": {
+          "gate": "G4",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G5": {
+          "gate": "G5",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G6": {
+          "gate": "G6",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G7": {
+          "gate": "G7",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        }
+      },
+      "chapterGates": {}
+    },
+    "claimGraph": {
+      "claims": [],
+      "bindings": []
+    },
+    "waivers": {},
+    "submissions": [],
+    "evidenceLedger": {
+      "sources": [],
+      "items": []
+    },
+    "peerReviewHistory": {
+      "rounds": []
+    }
+  },
+  {
+    "projectId": "proj-142778a0-2a7c-4d86-a582-1197afa382c0",
+    "version": 1,
+    "ownerId": "11111111-1111-4111-8111-111111111111",
+    "outputTypeId": "OT-07",
+    "answers": {},
+    "authors": [],
+    "gates": {
+      "projectId": "proj-142778a0-2a7c-4d86-a582-1197afa382c0",
+      "gates": {
+        "G0": {
+          "gate": "G0",
+          "status": "in_progress",
+          "entrySatisfied": true,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G1": {
+          "gate": "G1",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G2": {
+          "gate": "G2",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G3": {
+          "gate": "G3",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G4": {
+          "gate": "G4",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G5": {
+          "gate": "G5",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G6": {
+          "gate": "G6",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G7": {
+          "gate": "G7",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        }
+      },
+      "chapterGates": {}
+    },
+    "claimGraph": {
+      "claims": [],
+      "bindings": []
+    },
+    "waivers": {},
+    "submissions": [],
+    "evidenceLedger": {
+      "sources": [],
+      "items": []
+    },
+    "peerReviewHistory": {
+      "rounds": []
+    }
+  },
+  {
+    "projectId": "proj-8fc29030-0cad-4d00-9357-93c0e55594b3",
+    "version": 1,
+    "ownerId": "11111111-1111-4111-8111-111111111111",
+    "outputTypeId": "OT-07",
+    "answers": {},
+    "authors": [],
+    "gates": {
+      "projectId": "proj-8fc29030-0cad-4d00-9357-93c0e55594b3",
+      "gates": {
+        "G0": {
+          "gate": "G0",
+          "status": "in_progress",
+          "entrySatisfied": true,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G1": {
+          "gate": "G1",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G2": {
+          "gate": "G2",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G3": {
+          "gate": "G3",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G4": {
+          "gate": "G4",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G5": {
+          "gate": "G5",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G6": {
+          "gate": "G6",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        },
+        "G7": {
+          "gate": "G7",
+          "status": "not_started",
+          "entrySatisfied": false,
+          "exitCriteria": [],
+          "invalidatedBy": []
+        }
+      },
+      "chapterGates": {}
+    },
+    "claimGraph": {
+      "claims": [],
+      "bindings": []
+    },
+    "waivers": {},
+    "submissions": [],
+    "evidenceLedger": {
+      "sources": [],
+      "items": []
+    },
+    "peerReviewHistory": {
+      "rounds": []
+    }
+  }
+]

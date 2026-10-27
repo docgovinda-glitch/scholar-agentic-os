@@ -29,11 +29,12 @@ export default defineConfig(() => {
           chunkFileNames: 'assets/[name]-[hash].js',
           assetFileNames: 'assets/[name]-[hash].[ext]',
           manualChunks: {
-            react: ['react', 'react-dom', 'react-router-dom'],
-            tiptap: ['@tiptap/core', '@tiptap/react', '@tiptap/starter-kit', '@tiptap/extension-placeholder'],
-            supabase: ['@supabase/supabase-js'],
-            ui: ['lucide-react', 'motion'],
-            documents: ['docx', 'mammoth', 'pdf-parse', 'pdfmake', 'xlsx']
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-editor': ['@tiptap/core', '@tiptap/react', '@tiptap/starter-kit', '@tiptap/extension-placeholder'],
+            'vendor-supabase': ['@supabase/supabase-js'],
+            'vendor-ui': ['lucide-react', 'motion'],
+            'lazy-doc-export': ['docx', 'pdfmake'],
+            'lazy-doc-parsers': ['mammoth', 'pdf-parse', 'xlsx', 'jszip'],
           }
         }
       }

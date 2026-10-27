@@ -1322,7 +1322,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
   /** Create a project bound to an output type. Body: { outputTypeId }. */
   app.post("/api/projects", projectLimit, asyncRoute(async (req, res) => {
-    const { outputTypeId } = req.body ?? {};
+    const { outputTypeId, idempotencyKey: bodyIdempotencyKey, ephemeralId: bodyEphemeralId } = req.body ?? {};
     if (typeof outputTypeId !== "string" || outputTypeId.length === 0) {
       return res.status(400).json({ error: "Missing required field: outputTypeId" });
     }
@@ -1335,7 +1335,35 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       // not offered right now, a distinct condition from "doesn't exist".
       return res.status(403).json({ error: MAINTENANCE_MESSAGE });
     }
-    const created = await store.create(outputTypeId, currentUserId(req));
+
+    const userId = currentUserId(req);
+    const headerIdempotencyKey = typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"] : undefined;
+    const rawKey = bodyIdempotencyKey || bodyEphemeralId || headerIdempotencyKey;
+    const idempotencyKey = typeof rawKey === "string" && rawKey.trim().length > 0 ? rawKey.trim() : undefined;
+
+    // Idempotent retry guard: if this ephemeral project was already committed by this owner, return it with 200 OK
+    if (idempotencyKey) {
+      const existingProjects = await store.listByOwner(userId);
+      const matched = existingProjects.find(
+        (p) =>
+          p.answers?._idempotencyKey === idempotencyKey ||
+          p.answers?._ephemeralId === idempotencyKey ||
+          p.projectId === idempotencyKey
+      );
+      if (matched) {
+        return res.status(200).json(projectView(matched));
+      }
+    }
+
+    const created = await store.create(outputTypeId, userId);
+    if (idempotencyKey) {
+      created.answers._idempotencyKey = idempotencyKey;
+      created.answers._ephemeralId = idempotencyKey;
+    }
+    if (req.body?.answers && typeof req.body.answers === "object") {
+      Object.assign(created.answers, req.body.answers);
+    }
+
     [...spec.intakeSchema.required, ...spec.intakeSchema.recommended].forEach(f => {
       if (f.allowsProvisional && created.answers[f.key] === undefined) {
         created.answers[f.key] = "provisional";

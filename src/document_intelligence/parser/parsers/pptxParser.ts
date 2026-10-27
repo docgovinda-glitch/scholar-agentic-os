@@ -5,7 +5,6 @@
  * Extracts slide text, speaker notes, and slide count while enforcing NFC Unicode normalization.
  */
 
-import JSZip from "jszip";
 import type { Parser, ParserMetadata, DocumentInput, ParserOperationResult, ParserResult } from "../types";
 
 export class PPTXParser implements Parser {
@@ -31,6 +30,8 @@ export class PPTXParser implements Parser {
     const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
 
     try {
+      const JSZipModule = await import("jszip");
+      const JSZip = (JSZipModule.default || JSZipModule) as typeof import("jszip");
       const zip = await JSZip.loadAsync(buffer);
       const slideFiles = Object.keys(zip.files).filter((name) =>
         /^ppt\/slides\/slide\d+\.xml$/i.test(name)

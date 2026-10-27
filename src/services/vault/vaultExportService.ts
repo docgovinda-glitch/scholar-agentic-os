@@ -9,7 +9,6 @@
  * - README.md: Human-readable archive guide
  */
 
-import JSZip from "jszip";
 import type { VaultItem } from "../vaultContents";
 import { toBibTeX } from "./citationService";
 
@@ -20,6 +19,8 @@ export interface VaultExportResult {
 }
 
 export async function exportVaultAsZip(items: VaultItem[]): Promise<VaultExportResult> {
+  const JSZipModule = await import("jszip");
+  const JSZip = (JSZipModule.default || JSZipModule) as typeof import("jszip");
   const zip = new JSZip();
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const exportDir = `vault-export-${timestamp}`;

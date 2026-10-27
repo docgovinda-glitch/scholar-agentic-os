@@ -4,16 +4,9 @@
  */
 
 import path from "node:path";
-import pdfMake from "pdfmake";
-import fonts from "pdfmake/fonts/Roboto.js";
 import type { Content, TDocumentDefinitions } from "pdfmake/interfaces";
 import type { Block, CanonicalDocument } from "../../desk/types";
 import type { ExportMetadata } from "./types";
-
-pdfMake.setFonts(fonts);
-const fontsDir = path.dirname(fonts.Roboto.normal);
-pdfMake.setUrlAccessPolicy(() => false);
-pdfMake.setLocalAccessPolicy((filePath: string) => path.resolve(filePath).startsWith(fontsDir));
 
 export type AcademicTemplate =
   | "ieee"
@@ -592,6 +585,16 @@ export async function compileAcademicPdf(
       },
     },
   };
+
+  const [{ default: pdfMake }, { default: fonts }] = await Promise.all([
+    import("pdfmake"),
+    import("pdfmake/fonts/Roboto.js"),
+  ]);
+
+  pdfMake.setFonts(fonts);
+  const fontsDir = path.dirname(fonts.Roboto.normal);
+  pdfMake.setUrlAccessPolicy(() => false);
+  pdfMake.setLocalAccessPolicy((filePath: string) => path.resolve(filePath).startsWith(fontsDir));
 
   const pdfDoc = pdfMake.createPdf(docDefinition);
   return pdfDoc.getBuffer();

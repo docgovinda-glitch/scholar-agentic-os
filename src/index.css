@@ -757,9 +757,34 @@ button:disabled {
    a minimum hit area instead, which meets the 44px WCAG 2.5.5 target without
    dictating the control's painted size. */
 @media (max-width: 768px) {
-  button, [role="button"], a[href] {
+  button:not(.compact-btn):not([data-compact="true"]):not([role="toolbar"] *),
+  [role="button"]:not(.compact-btn):not([data-compact="true"]):not([role="toolbar"] *),
+  a[href]:not(.compact-btn):not([data-compact="true"]):not([role="toolbar"] *) {
     min-height: 44px;
     min-width: 44px;
+  }
+
+  /* Compact controls (rich-text toolbars, citation chips, table action buttons):
+     Preserve painted geometry while providing 44px hit-slop to satisfy WCAG 2.5.5 without wrapping */
+  .compact-btn,
+  [data-compact="true"],
+  [role="toolbar"] button {
+    position: relative;
+  }
+
+  .compact-btn::before,
+  [data-compact="true"]::before,
+  [role="toolbar"] button::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 44px;
+    min-height: 44px;
+    width: 100%;
+    height: 100%;
+    pointer-events: auto;
   }
 
   /* iOS zooms the viewport when a focused input's text is under 16px. */

@@ -11,6 +11,7 @@ import {
   UnauthenticatedError,
 } from "./api";
 import { isDuplicateProjectTitle } from "./projectNaming";
+import { useToast } from "../components/ui/FeedbackSystem";
 import { plainTextToDocument } from "./plainTextToDocument";
 import Header from "./regions/Header";
 
@@ -67,6 +68,7 @@ export default function DeskShell({
   onOpenAiAccess?: () => void;
 }) {
   const session = useDeskSession();
+  const toast = useToast();
   const [project, setProject] = useState<ProjectView | null>(null);
   const [document, setDocument] = useState<CanonicalDocument | null>(null);
   const [rubric, setRubric] = useState<RubricReport | null>(null);
@@ -172,7 +174,9 @@ export default function DeskShell({
     try {
       const { items } = await listProjects();
       if (isDuplicateProjectTitle(trimmed, project.projectId, items)) {
-        alert(`A project with the name "${trimmed}" already exists. Please choose a unique name.`);
+        toast.error(`A project with the name "${trimmed}" already exists. Please choose a unique name.`, {
+          title: "Duplicate Project Title",
+        });
         return;
       }
     } catch {
@@ -190,9 +194,11 @@ export default function DeskShell({
     } catch (err) {
       console.error("Failed to rename project from header:", err);
       setProject(previous);
-      alert((err as Error).message || "Failed to rename project.");
+      toast.error((err as Error).message || "Failed to rename project.", {
+        title: "Rename Failed",
+      });
     }
-  }, [project, projectId]);
+  }, [project, projectId, toast]);
 
   if (error) {
     return (

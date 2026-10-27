@@ -10,6 +10,9 @@ import { useAiAccess } from "../aiAccess/useAiAccess";
 import Tray from "../regions/Tray";
 import AiExhaustedModal from "./AiExhaustedModal";
 import { subscribeExecutionState, type ExecutionScope } from "../../services/executionState";
+import { WorkspaceAutosaveBadge } from "../../components/ui/WorkspaceAutosaveBadge";
+import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
+import { useToast, useAriaAnnounce } from "../../components/ui/FeedbackSystem";
 
 function ResearchWorkspaceInner({
   onClose,
@@ -42,6 +45,21 @@ function ResearchWorkspaceInner({
     fallbackToast,
     setFallbackToast,
   } = useResearchWorkspace();
+
+  const toast = useToast();
+  const { announce } = useAriaAnnounce();
+  const { guardedNavigate } = useUnsavedChangesGuard({
+    isDirty: false,
+    saveStatus: "saved",
+  });
+
+  // Consolidate floating status banner into unified toast system
+  React.useEffect(() => {
+    if (fallbackToast) {
+      toast.info(fallbackToast);
+      setFallbackToast(null);
+    }
+  }, [fallbackToast, toast, setFallbackToast]);
 
   const { connected, settings } = useAiAccess();
 
@@ -90,8 +108,22 @@ function ResearchWorkspaceInner({
   React.useEffect(() => {
     return subscribeExecutionState((scope) => {
       setLiveExecution(scope);
+      if (scope) {
+        const desc = scope.message || `${scope.providerName} processing`;
+        if (scope.status === "running") {
+          announce(`AI task running: ${desc}`, "polite");
+        } else if (scope.status === "error") {
+          announce(`AI task error: ${desc}`, "assertive");
+        } else if (scope.status === "completed" || scope.status === "success") {
+          announce(`AI task completed: ${desc}`, "polite");
+        }
+      }
     });
-  }, []);
+  }, [announce]);
+
+  React.useEffect(() => {
+    announce(`Stage changed to: ${currentStage}`, "polite");
+  }, [currentStage, announce]);
 
   if (error) {
     return (
@@ -105,7 +137,7 @@ function ResearchWorkspaceInner({
         {onClose && (
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => guardedNavigate(onClose)}
             className="rounded-full border border-[color:var(--border-control)] px-5 py-2.5 text-sm font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
           >
             Back to your projects
@@ -186,7 +218,7 @@ function ResearchWorkspaceInner({
               {onClose && (
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={() => guardedNavigate(onClose)}
                   title="Back to projects"
                   className="hidden md:flex shrink-0 rounded-[var(--radius-sm)] p-1.5 text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
                 >
@@ -197,8 +229,8 @@ function ResearchWorkspaceInner({
               )}
               <div
                 onClick={() => {
-                  if (onClose) onClose();
-                  else if (typeof window !== "undefined") window.location.href = "/";
+                  if (onClose) guardedNavigate(onClose);
+                  else if (typeof window !== "undefined") guardedNavigate(() => { window.location.href = "/"; });
                 }}
                 className="hidden md:flex cursor-pointer transition-opacity duration-200 hover:opacity-70"
                 title="Scholar Core Home"
@@ -207,21 +239,28 @@ function ResearchWorkspaceInner({
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    if (onClose) onClose();
-                    else if (typeof window !== "undefined") window.location.href = "/";
+                    if (onClose) guardedNavigate(onClose);
+                    else if (typeof window !== "undefined") guardedNavigate(() => { window.location.href = "/"; });
                   }
                 }}
               >
                 <ScholarCoreLogo size="sm" withText className="text-[color:var(--text-primary)]" />
               </div>
               <div className="hidden md:block w-px h-5 bg-[color:var(--border-subtle)] mx-0.5" />
-              <div className="min-w-0">
-                <h1 className="text-xs font-bold text-[color:var(--text-primary)] truncate">
-                  {project.answers?.["working_title"] || project.answers?.["title"] || outputType?.label || "Journal Article"}
-                </h1>
-                <p className="text-[10px] text-[color:var(--text-muted)] truncate">
-                  {outputType?.label ?? project.outputTypeId}
-                </p>
+              <div className="min-w-0 flex items-center gap-3">
+                <div className="min-w-0">
+                  <h1 className="text-xs font-bold text-[color:var(--text-primary)] truncate">
+                    {project.answers?.["working_title"] || project.answers?.["title"] || outputType?.label || "Journal Article"}
+                  </h1>
+                  <p className="text-[10px] text-[color:var(--text-muted)] truncate">
+                    {outputType?.label ?? project.outputTypeId}
+                  </p>
+                </div>
+                <WorkspaceAutosaveBadge
+                  status="saved"
+                  version={project.version || 1}
+                  className="hidden lg:flex"
+                />
               </div>
             </div>
 
@@ -356,6 +395,7 @@ function ResearchWorkspaceInner({
                 {/* Zen Focus Mode Button */}
                 <button
                   type="button"
+                  data-testid="zen-mode-toggle"
                   onClick={() => setIsZenMode(true)}
                   title="Enter Zen Focus Mode (Distraction-Free)"
                   className="shrink-0 rounded-lg p-1.5 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1 text-xs"
@@ -576,7 +616,7 @@ function ResearchWorkspaceInner({
             absolute md:relative inset-y-0 right-0 z-40
             transform transition-transform duration-300 ease-in-out
             ${contextPanelOpen ? 'translate-x-0' : 'translate-x-full md:hidden'}
-            border-l border-[color:var(--border-subtle)] flex flex-col w-80 md:w-80 shrink-0 bg-[color:var(--surface-canvas)]
+            border-l border-[color:var(--border-subtle)] flex flex-col w-80 md:w-72 xl:w-72 shrink-0 bg-[color:var(--surface-canvas)]
             h-full md:h-auto
           `}>
             <ContextPanel
@@ -589,23 +629,6 @@ function ResearchWorkspaceInner({
       </div>
 
       {trayOpen && <Tray projectId={projectId} onClose={() => setTrayOpen(false)} />}
-
-      {/* Visible Fallback / Switching Notification Toast */}
-      {fallbackToast && (
-        <div className="fixed bottom-12 right-6 z-50 max-w-md p-4 bg-[color:var(--surface-raised)] border border-[color:var(--accent)] text-[color:var(--text-primary)] rounded-xl shadow-xl flex items-center justify-between gap-3 animate-fade-in">
-          <div className="flex items-center gap-2.5 text-xs font-semibold">
-            <span className="w-2 h-2 rounded-full bg-[color:var(--accent)] animate-pulse shrink-0" />
-            <span>{fallbackToast}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setFallbackToast(null)}
-            className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] text-xs font-bold px-1.5 py-0.5 rounded cursor-pointer"
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
       {/* AI Exhaustion Modal */}
       <AiExhaustedModal

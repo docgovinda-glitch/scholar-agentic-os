@@ -11,7 +11,6 @@
  *   2. META-INF/manifest.xml must declare every other part.
  */
 
-import JSZip from "jszip";
 import type { Block, CanonicalDocument } from "../../desk/types";
 import type { ExportMetadata } from "./types";
 
@@ -92,6 +91,8 @@ function contentXml(document: CanonicalDocument, metadata: ExportMetadata): stri
 }
 
 export async function renderOdt(document: CanonicalDocument, metadata: ExportMetadata): Promise<Buffer> {
+  const JSZipModule = await import("jszip");
+  const JSZip = (JSZipModule.default || JSZipModule) as typeof import("jszip");
   const zip = new JSZip();
 
   // Order and compression matter: `mimetype` first, and stored rather than

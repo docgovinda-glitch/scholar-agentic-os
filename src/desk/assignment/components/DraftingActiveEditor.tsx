@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import type { AssignmentDraftingSection, DiscoveredSource } from "../types";
+import { useToast } from "../../../components/ui/FeedbackSystem";
 import {
   Sparkles,
   Edit3,
@@ -133,6 +134,7 @@ export function DraftingActiveEditor({
   hasNext = false,
   className = "",
 }: DraftingActiveEditorProps) {
+  const toast = useToast();
   const [isEditingManually, setIsEditingManually] = useState(false);
   const [manualText, setManualText] = useState(section?.draftContent || "");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -343,7 +345,7 @@ export function DraftingActiveEditor({
     const start = el.selectionStart;
     const end = el.selectionEnd;
     if (start === end) {
-      alert("Please select some text to elevate.");
+      toast.warning("Please select some text to elevate.", { title: "No Text Selected" });
       return;
     }
     const selectedText = manualText.substring(start, end);

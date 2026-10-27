@@ -8,22 +8,10 @@
  * - Formatted Bibliography: Auto-generated reference list formatted to citationStyle (Harvard, APA 7, IEEE, MHRA) with hanging indent
  */
 
-import {
+import type {
   Document,
-  Packer,
   Paragraph,
-  TextRun,
-  HeadingLevel,
-  AlignmentType,
-  Header,
-  Footer,
-  PageNumber,
-  PageBreak,
   Table,
-  TableRow,
-  TableCell,
-  WidthType,
-  BorderStyle,
 } from "docx";
 import type {
   AssignmentBriefState,
@@ -70,6 +58,7 @@ export function buildFormattedBibliography(sources: DiscoveredSource[], style: s
  * Packs a docx Document into a Blob reliably in both browser and Node/Vitest environments.
  */
 export async function packDocxToBlob(doc: Document): Promise<Blob> {
+  const { Packer } = await import("docx");
   if (typeof Packer.toBlob === "function") {
     try {
       return await Packer.toBlob(doc);
@@ -105,6 +94,24 @@ export function downloadBlob(blob: Blob, filename: string): void {
  * Generates an academic DOCX document compliant with university submission standards.
  */
 export async function generateAssignmentDocx(params: AssignmentExportParams): Promise<Blob> {
+  const {
+    Document,
+    Packer,
+    Paragraph,
+    TextRun,
+    HeadingLevel,
+    AlignmentType,
+    Header,
+    Footer,
+    PageNumber,
+    PageBreak,
+    Table,
+    TableRow,
+    TableCell,
+    WidthType,
+    BorderStyle,
+  } = await import("docx");
+
   const {
     title,
     studentName = "Candidate",

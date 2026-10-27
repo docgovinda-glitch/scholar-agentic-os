@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { authedJsonFetch, authedFetch } from "../api";
+import { useToast } from "../../components/ui/FeedbackSystem";
 
 interface ProjectFile {
   id: string;
@@ -9,6 +10,7 @@ interface ProjectFile {
 }
 
 export default function ProjectFilesPanel({ projectId }: { projectId: string }) {
+  const toast = useToast();
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -52,11 +54,11 @@ export default function ProjectFilesPanel({ projectId }: { projectId: string }) 
       } else {
         const err = await res.json();
         console.error("Upload failed", err);
-        alert(`Upload failed: ${err.error || "Unknown error"}`);
+        toast.error(`Upload failed: ${err.error || "Unknown error"}`, { title: "Upload Failed" });
       }
     } catch (error) {
       console.error("Upload error", error);
-      alert("Failed to upload file.");
+      toast.error("Failed to upload file.", { title: "Upload Error" });
     } finally {
       setUploading(false);
       if (fileInputRef.current) {

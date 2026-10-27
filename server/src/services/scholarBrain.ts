@@ -89,6 +89,7 @@ export interface ScholarBrainStreamOptions {
   onDelta?: (delta: string) => void;
   onTelemetry?: (telemetry: Record<string, unknown>) => void;
   onComplete?: (finalText: string) => void;
+  closeOnComplete?: boolean;
 }
 
 export interface ScholarBrainStreamResult {
@@ -311,7 +312,7 @@ export const scholarBrain: ScholarBrainPipeline = {
       success: true,
     });
 
-    if (res && !res.writableEnded) {
+    if (options.closeOnComplete !== false && res && !res.writableEnded) {
       res.end?.();
     }
 

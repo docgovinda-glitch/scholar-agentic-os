@@ -3,6 +3,8 @@ import type { ThesisStage, ThesisProjectData } from "./types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 import { authedJsonFetch, getProject, saveIntakeAnswers } from "../api";
 import VivaVoceSimulator from "./components/VivaVoceSimulator";
+import { WorkspaceAutosaveBadge } from "../../components/ui/WorkspaceAutosaveBadge";
+import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
 import type {
   VivaSimulationResponse,
   VivaQuestion,
@@ -66,6 +68,12 @@ export default function ThesisWorkspace({
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [projectVersion, setProjectVersion] = useState<number>(1);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isDirty = saveStatus === "saving";
+  const { guardedNavigate } = useUnsavedChangesGuard({
+    isDirty,
+    saveStatus,
+  });
 
   // Viva Simulator State
   const [vivaLoading, setVivaLoading] = useState(false);
@@ -242,7 +250,7 @@ export default function ThesisWorkspace({
           {onClose && (
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => guardedNavigate(onClose)}
               className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
               title="Back to Scholar Workspace"
             >
@@ -251,8 +259,8 @@ export default function ThesisWorkspace({
           )}
           <div
             onClick={() => {
-              if (onClose) onClose();
-              else if (typeof window !== "undefined") window.location.href = "/";
+              if (onClose) guardedNavigate(onClose);
+              else if (typeof window !== "undefined") guardedNavigate(() => { window.location.href = "/"; });
             }}
             className="w-8 h-8 rounded-lg bg-[color:var(--accent)] text-white flex items-center justify-center cursor-pointer transition-opacity duration-200 hover:opacity-70"
             title="Scholar Core Home"
@@ -261,8 +269,8 @@ export default function ThesisWorkspace({
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                if (onClose) onClose();
-                else if (typeof window !== "undefined") window.location.href = "/";
+                if (onClose) guardedNavigate(onClose);
+                else if (typeof window !== "undefined") guardedNavigate(() => { window.location.href = "/"; });
               }
             }}
           >
@@ -276,23 +284,11 @@ export default function ThesisWorkspace({
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] font-bold shrink-0">
                 {thesisData.degreeLevel}
               </span>
-              {/* Save Status Badge */}
-              <span
-                data-testid="autosave-status"
-                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
-                  saveStatus === "saving"
-                    ? "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
-                    : saveStatus === "error"
-                    ? "bg-red-100 text-red-900 dark:bg-red-950/60 dark:text-red-200"
-                    : "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200"
-                }`}
-              >
-                {saveStatus === "saving"
-                  ? "Saving changes…"
-                  : saveStatus === "error"
-                  ? "Offline Backup"
-                  : `All changes saved${lastSavedTime ? ` · ${lastSavedTime}` : ""}`}
-              </span>
+              <WorkspaceAutosaveBadge
+                status={saveStatus === "idle" ? "saved" : saveStatus}
+                version={projectVersion}
+                lastSavedTime={lastSavedTime}
+              />
             </div>
             <p className="text-[10px] text-[color:var(--text-muted)]">
               {thesisData.fieldOfStudy} · Milestone Progression · v{projectVersion}

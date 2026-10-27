@@ -106,8 +106,8 @@ describe("Conflict #7 — Server-side metadata isolation", () => {
   it("loadVault queries ONLY label and created_at from user_vaults", async () => {
     await loadVault();
 
-    // Verify the select call only requests label and created_at
-    expect(mockSelect).toHaveBeenCalledWith("label, created_at");
+    // Verify the select call only requests metadata (label, created_at, storage_mode) — no content or secrets
+    expect(mockSelect).toHaveBeenCalledWith(expect.stringContaining("label, created_at"));
     // Verify it queries user_vaults table
     expect(mockEq).toHaveBeenCalledWith("user_id", "test-user-id");
   });

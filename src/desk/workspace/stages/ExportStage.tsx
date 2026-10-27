@@ -3,6 +3,7 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import { authedJsonFetch, saveIntakeAnswers } from "../../api";
+import { useToast } from "../../../components/ui/FeedbackSystem";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 import {
   exportJournalToDocx,
@@ -135,6 +136,7 @@ export default function ExportStage({
   onSaved?: (updated: ProjectView) => void;
   onAdvance?: (stage: string) => void;
 }) {
+  const toast = useToast();
   const def = STAGE_MAP.get(stage);
 
   // Grounding anchors
@@ -440,7 +442,7 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      alert(`Export trigger: ${msg}`);
+      toast.error(`Export failed: ${msg}`, { title: "Export Error" });
     } finally {
       setTimeout(() => setDownloadingFormat(null), 600);
     }

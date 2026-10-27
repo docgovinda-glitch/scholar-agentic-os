@@ -8,24 +8,15 @@
  * 3. LaTeX (.tex) and BibTeX (.bib) source for STEM and computing submissions.
  */
 
-import {
+import type {
   Document,
-  Packer,
   Paragraph,
   TextRun,
-  HeadingLevel,
-  AlignmentType,
-  Header,
-  Footer,
-  PageNumber,
-  PageBreak,
   Table,
-  TableRow,
-  TableCell,
-  WidthType,
-  BorderStyle,
 } from "docx";
 import type { Author } from "../../types";
+
+type DocxModule = typeof import("docx");
 
 export type JournalExportAuthor =
   | Author
@@ -41,9 +32,9 @@ export type JournalExportAuthor =
       isCorresponding?: boolean;
     };
 
-export function getAuthorDisplayName(author: any): string {
+export function getAuthorDisplayName(author: JournalExportAuthor | null | undefined): string {
   if (!author) return "Lead Author";
-  if (author.name) return author.name;
+  if ("name" in author && author.name) return author.name;
   const parts = [author.title, author.firstName, author.middleName, author.surname].filter(Boolean);
   if (parts.length > 0) return parts.join(" ");
   return "Lead Author";
@@ -76,6 +67,7 @@ export interface JournalExportParams {
  * Packs a docx Document into a Blob reliably in browser and Vitest environments.
  */
 export async function packDocxToBlob(doc: Document): Promise<Blob> {
+  const { Packer } = await import("docx");
   if (typeof Packer.toBlob === "function") {
     try {
       return await Packer.toBlob(doc);
@@ -110,7 +102,8 @@ export function downloadBlob(blob: Blob, filename: string): void {
 /**
  * Parses markdown lines within a section into docx Paragraphs or Tables.
  */
-function parseMarkdownToDocx(content: string, fontName: string): (Paragraph | Table)[] {
+function parseMarkdownToDocx(docx: DocxModule, content: string, fontName: string): (Paragraph | Table)[] {
+  const { Paragraph, TextRun, HeadingLevel } = docx;
   const elements: (Paragraph | Table)[] = [];
   const lines = content.split("\n");
 
@@ -140,7 +133,7 @@ function parseMarkdownToDocx(content: string, fontName: string): (Paragraph | Ta
     } else if (inTable) {
       // Flush table
       if (tableRows.length > 0) {
-        elements.push(buildDocxTable(tableRows, fontName));
+        elements.push(buildDocxTable(docx, tableRows, fontName));
         tableRows = [];
       }
       inTable = false;
@@ -249,14 +242,14 @@ function parseMarkdownToDocx(content: string, fontName: string): (Paragraph | Ta
     elements.push(
       new Paragraph({
         spacing: { before: 100, after: 140, line: 360 }, // 1.5 line spacing (360 twips)
-        children: parseFormattedRuns(trimmed, fontName),
+        children: parseFormattedRuns(docx, trimmed, fontName),
       })
     );
   }
 
   // Final flush of any active table
   if (inTable && tableRows.length > 0) {
-    elements.push(buildDocxTable(tableRows, fontName));
+    elements.push(buildDocxTable(docx, tableRows, fontName));
   }
 
   return elements;
@@ -265,7 +258,8 @@ function parseMarkdownToDocx(content: string, fontName: string): (Paragraph | Ta
 /**
  * Builds a docx Table from rows.
  */
-function buildDocxTable(rows: string[][], fontName: string): Table {
+function buildDocxTable(docx: DocxModule, rows: string[][], fontName: string): Table {
+  const { Table, TableRow, TableCell, Paragraph, TextRun, WidthType, BorderStyle } = docx;
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: rows.map((row, rIdx) => {
@@ -304,7 +298,8 @@ function buildDocxTable(rows: string[][], fontName: string): Table {
 /**
  * Formats inline bold and italics in a string into TextRuns.
  */
-function parseFormattedRuns(text: string, fontName: string): TextRun[] {
+function parseFormattedRuns(docx: DocxModule, text: string, fontName: string): TextRun[] {
+  const { TextRun } = docx;
   const runs: TextRun[] = [];
   // Simple regex parser for **bold** and *italic*
   const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
@@ -347,7 +342,25 @@ function parseFormattedRuns(text: string, fontName: string): TextRun[] {
 /**
  * Builds the complete camera-ready Microsoft Word Document.
  */
-export function buildJournalDocxDocument(params: JournalExportParams): Document {
+export async function buildJournalDocxDocument(params: JournalExportParams): Promise<Document> {
+  const docx = await import("docx");
+  const {
+    Document,
+    Paragraph,
+    TextRun,
+    HeadingLevel,
+    AlignmentType,
+    Header,
+    Footer,
+    PageNumber,
+    PageBreak,
+    Table,
+    TableRow,
+    TableCell,
+    WidthType,
+    BorderStyle,
+  } = docx;
+
   const fontName = params.template === "ieee" || params.template === "acm" ? "Arial" : "Times New Roman";
   const authorList = params.authors && params.authors.length > 0
     ? params.authors
@@ -548,7 +561,7 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
     );
 
     // Section Content
-    const contentElements = parseMarkdownToDocx(sec.content, fontName);
+    const contentElements = parseMarkdownToDocx(docx, sec.content, fontName);
     children.push(...contentElements);
   });
 
@@ -688,7 +701,7 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
  * Executes one-click Word .docx export and triggers file download.
  */
 export async function exportJournalToDocx(params: JournalExportParams): Promise<void> {
-  const doc = buildJournalDocxDocument(params);
+  const doc = await buildJournalDocxDocument(params);
   const blob = await packDocxToBlob(doc);
   const cleanTitle = (params.title || "Journal_Manuscript")
     .replace(/[^a-zA-Z0-9_-]/g, "_")
@@ -705,8 +718,7 @@ export function printJournalManuscript(params: JournalExportParams): void {
 
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
-    alert("Popup blocked: please allow popups to open the camera-ready print preview.");
-    return;
+    throw new Error("Popup blocked: please allow popups to open the camera-ready print preview.");
   }
 
   const authorsHtml = (params.authors || [{ name: "Lead Author", affiliation: "University Department", email: "author@university.edu" }])

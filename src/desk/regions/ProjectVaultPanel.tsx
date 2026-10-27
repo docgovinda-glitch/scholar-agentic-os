@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { searchVaultItems, type VaultItem, isVaultUnlocked } from "../../services/vaultContents";
 import { getEvidenceLedger, addManualSource, extractEvidenceQuote } from "../api";
+import { useToast } from "../../components/ui/FeedbackSystem";
 
 export default function ProjectVaultPanel({
   projectId,
@@ -9,6 +10,7 @@ export default function ProjectVaultPanel({
   projectId: string;
   onJumpToBlock?: (id: string) => void;
 }) {
+  const toast = useToast();
   const [items, setItems] = useState<VaultItem[]>([]);
   const [query, setQuery] = useState("");
   const [unlocked, setUnlocked] = useState(isVaultUnlocked());
@@ -173,7 +175,7 @@ export default function ProjectVaultPanel({
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to upload and parse file.");
+      toast.error("Failed to upload and parse file.", { title: "Upload Failed" });
     } finally {
       setUploading(false);
       if (fileInputRef.current) {

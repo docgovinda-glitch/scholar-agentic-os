@@ -19,6 +19,7 @@ import {
   ArrowRight,
   ExternalLink,
 } from 'lucide-react';
+import { useToast } from '../../../components/ui/FeedbackSystem';
 import type { SlideDeck } from '../types/slides';
 import {
   type SlideTheme,
@@ -132,6 +133,7 @@ export default function CustomThemeStudio({
   onApplyTheme,
   onProceedToStudio,
 }: CustomThemeStudioProps) {
+  const toast = useToast();
   // Theme Builder State
   const [themeName, setThemeName] = useState('Custom Brand Architecture');
   const [mode, setMode] = useState<ThemeMode>('light');
@@ -172,6 +174,11 @@ export default function CustomThemeStudio({
   const showToast = (msg: string) => {
     setStatusNotification(msg);
     setTimeout(() => setStatusNotification(null), 3500);
+    if (msg.startsWith('✓')) {
+      toast.success(msg);
+    } else {
+      toast.info(msg);
+    }
   };
 
   // Compile active draft into SlideTheme
@@ -275,9 +282,10 @@ export default function CustomThemeStudio({
       onUpdateDeck(result.deck);
 
       showToast(`✓ Extracted content and recreated design theme from "${file.name}"!`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      alert(`Could not parse deck: ${err.message || 'Unknown error'}`);
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Could not parse deck: ${msg}`, { title: "Parse Error" });
     } finally {
       setIsUploadingDeck(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -405,8 +413,9 @@ export default function CustomThemeStudio({
       setShowJsonModal(false);
       setJsonInput('');
       showToast(`✓ Successfully imported "${data.name}"!`);
-    } catch (err: any) {
-      alert(`Import Failed: ${err.message || 'Invalid JSON format'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Invalid JSON format';
+      toast.error(`Import Failed: ${msg}`, { title: "Import Error" });
     }
   };
 

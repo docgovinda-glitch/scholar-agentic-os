@@ -1,4 +1,3 @@
-import JSZip from 'jszip';
 import type { SlideDeck, SlideCard } from '../types/slides';
 import type { SlideTheme, CustomTheme, SlideThemeId } from '../types/themes';
 import { calculateContrastRatio, isWcagAA } from '../types/themes';
@@ -80,6 +79,8 @@ export async function extractFromPptxArchive(file: File): Promise<{
   };
 }> {
   const arrayBuffer = await file.arrayBuffer();
+  const JSZipModule = await import('jszip');
+  const JSZip = (JSZipModule.default || JSZipModule) as typeof import('jszip');
   const zip = await JSZip.loadAsync(arrayBuffer);
 
   let detectedAccent: string | undefined;

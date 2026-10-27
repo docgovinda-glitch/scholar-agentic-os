@@ -7,6 +7,7 @@ import VaultSourcesStage from "../stages/VaultSourcesStage";
 import * as api from "../../api";
 import * as vaultContents from "../../../services/vaultContents";
 import type { ProjectView } from "../../types";
+import { FeedbackProvider } from "../../../components/ui/FeedbackSystem";
 
 vi.mock("../../api", () => ({
   saveIntakeAnswers: vi.fn(),
@@ -255,11 +256,13 @@ describe("Stage 7: Primary Source Vault (VaultSourcesStage)", () => {
     });
 
     render(
-      <VaultSourcesStage
-        stage="vault_sources"
-        projectId="proj-vault-701"
-        project={mockProject}
-      />
+      <FeedbackProvider>
+        <VaultSourcesStage
+          stage="vault_sources"
+          projectId="proj-vault-701"
+          project={mockProject}
+        />
+      </FeedbackProvider>
     );
 
     // Click + Ingest to Vault

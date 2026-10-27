@@ -25,7 +25,7 @@ export const ASSIGNMENT_PHASES: AssignmentPhaseDefinition[] = [
     number: 1,
     label: "Phase 1: Extract",
     shortLabel: "Extract",
-    description: "Brief document parsing, prompts & target word count budget",
+    description: "1. Scope & Blueprint · Brief document parsing, prompts & word budget",
     iconKey: "FileText",
   },
   {
@@ -33,7 +33,7 @@ export const ASSIGNMENT_PHASES: AssignmentPhaseDefinition[] = [
     number: 2,
     label: "Phase 2: Understand",
     shortLabel: "Understand",
-    description: "Core working thesis, theoretical frameworks & dynamic outline",
+    description: "2. Evidence & Sources · Core working thesis & dynamic outline",
     iconKey: "Brain",
   },
   {
@@ -41,7 +41,7 @@ export const ASSIGNMENT_PHASES: AssignmentPhaseDefinition[] = [
     number: 3,
     label: "Phase 3: Sources",
     shortLabel: "Sources",
-    description: "Scholarly discovery, Knowledge Vault integration, & evidence ledger",
+    description: "2. Evidence & Sources · Knowledge Vault integration & evidence ledger",
     iconKey: "Library",
   },
   {
@@ -49,7 +49,7 @@ export const ASSIGNMENT_PHASES: AssignmentPhaseDefinition[] = [
     number: 4,
     label: "Phase 4: Drafting",
     shortLabel: "Drafting",
-    description: "Structured section drafting, real-time word budgets, & AI polish",
+    description: "3. Studio Drafting · Structured section drafting & word budgets",
     iconKey: "PenTool",
   },
   {
@@ -57,7 +57,7 @@ export const ASSIGNMENT_PHASES: AssignmentPhaseDefinition[] = [
     number: 5,
     label: "Phase 5: Submission",
     shortLabel: "Submission",
-    description: "10-point rubric assessment, citation audit, & camera-ready export",
+    description: "5. Audit & Export · 10-point rubric assessment & camera-ready export",
     iconKey: "CheckCircle2",
   },
 ];

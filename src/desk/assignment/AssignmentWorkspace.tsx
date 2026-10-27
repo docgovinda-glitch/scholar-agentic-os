@@ -7,6 +7,9 @@ import { authedJsonFetch } from "../api";
 import ContextPanel from "../workspace/ContextPanel";
 import { ASSIGNMENT_AGENT_CONFIGS, ASSIGNMENT_PHASES } from "./types";
 import { sendAssignmentCopilotMessage } from "./services/assignmentCopilotService";
+import { WorkspaceAutosaveBadge } from "../../components/ui/WorkspaceAutosaveBadge";
+import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
+import { Maximize2, X } from "lucide-react";
 
 import AssignmentExtractStage from "./stages/AssignmentExtractStage";
 import AssignmentUnderstandStage from "./stages/AssignmentUnderstandStage";
@@ -421,6 +424,11 @@ function AssignmentWorkspaceInner({
 
   const currentPhaseDef = ASSIGNMENT_PHASES.find((p) => p.id === currentPhase);
   const [tutorPanelOpen, setTutorPanelOpen] = useState(true);
+  const [isZenMode, setIsZenMode] = useState(false);
+  const { guardedNavigate } = useUnsavedChangesGuard({
+    isDirty: false,
+    saveStatus: "saved",
+  });
 
   // Inline-editable title with auto-save on blur / Enter
   const initialTitle =
@@ -578,12 +586,14 @@ function AssignmentWorkspaceInner({
       <header className="bg-white dark:bg-[#1C1C1E] z-20 shrink-0">
         <div className="flex items-center justify-between px-4 sm:px-6 pt-2.5 pb-1 gap-4">
           <div className="flex items-center gap-2.5 min-w-0">
-            {/* Apple/Notion-Style Clean Back Button */}
+            {/* Apple/Notion-Style Clean Back Button with Unsaved Work Guard */}
             <button
               type="button"
               onClick={() => {
-                if (onClose) onClose();
-                else if (typeof window !== "undefined") window.location.href = "/";
+                guardedNavigate(() => {
+                  if (onClose) onClose();
+                  else if (typeof window !== "undefined") window.location.href = "/";
+                });
               }}
               title="Back"
               aria-label="Back"
@@ -621,8 +631,11 @@ function AssignmentWorkspaceInner({
             </div>
           </div>
 
-          {/* Right Section: Minimal vs Detailed Mode Toggle & Socratic Tutor Drawer Toggle */}
+          {/* Right Section: Autosave Badge, Mode Toggle, Zen Mode & AI Tutor Drawer Toggle */}
           <div className="flex items-center gap-2.5 shrink-0">
+            {/* Standardized Autosave Status Badge */}
+            <WorkspaceAutosaveBadge status="saved" version={project?.version || 1} className="hidden md:flex" />
+
             {/* Minimal vs Detailed Segmented Control (OT-10 Parity) */}
             <div
               role="radiogroup"
@@ -659,6 +672,22 @@ function AssignmentWorkspaceInner({
               </button>
             </div>
 
+            {/* 13"-14" Laptop Focus Mode / Zen Toggle */}
+            <button
+              type="button"
+              data-testid="zen-mode-toggle"
+              onClick={() => setIsZenMode(!isZenMode)}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center ${
+                isZenMode
+                  ? "text-neutral-900 dark:text-white bg-neutral-200/70 dark:bg-white/10 shadow-2xs"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/50 dark:hover:bg-white/5"
+              }`}
+              title={isZenMode ? "Exit Zen Focus Mode (Expand Panels)" : "Enter Zen Focus Mode (Collapse Panels)"}
+              aria-label="Toggle Zen Focus Mode"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+
             {/* Socratic Tutor Drawer Toggle Button */}
             <button
               type="button"
@@ -680,7 +709,7 @@ function AssignmentWorkspaceInner({
       </header>
 
       {/* Horizontal 4-Phase Progress Navigation Bar */}
-      <AssignmentStageNavigation />
+      {!isZenMode && <AssignmentStageNavigation />}
 
       {/* Workspace Body: Center Content & Collapsible Right Socratic Tutor Drawer */}
       <div className="flex-1 flex overflow-hidden relative bg-[#F8F9FA] dark:bg-[#171717]">
@@ -691,9 +720,33 @@ function AssignmentWorkspaceInner({
           </React.Suspense>
         </main>
 
-        {/* Right Column: Collapsible Context Panel Copilot Drawer */}
-        {tutorPanelOpen && (
-          <div className="w-80 lg:w-96 shrink-0 h-full overflow-hidden hidden sm:flex flex-col bg-[color:var(--surface-canvas)] border-l border-neutral-200/80 dark:border-white/10">
+        {/* Mobile Backdrop for AI Tutor Context Panel */}
+        {!isZenMode && tutorPanelOpen && (
+          <div
+            data-testid="ai-tutor-backdrop"
+            className="lg:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-xs transition-opacity"
+            onClick={() => setTutorPanelOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Right Column: Socratic Tutor Drawer (Desktop Docked or Mobile/Tablet Slide-over) */}
+        {!isZenMode && tutorPanelOpen && (
+          <div
+            data-testid="ai-tutor-drawer"
+            className="fixed lg:relative inset-y-0 right-0 z-40 w-80 lg:w-72 xl:w-80 max-w-[90vw] shrink-0 h-full overflow-hidden flex flex-col bg-[color:var(--surface-canvas)] border-l border-neutral-200/80 dark:border-white/10 shadow-2xl lg:shadow-none animate-in slide-in-from-right duration-200"
+          >
+            <div className="lg:hidden flex items-center justify-between px-3.5 py-2.5 border-b border-neutral-200/80 dark:border-white/10 bg-[color:var(--surface-raised)]">
+              <span className="text-xs font-semibold text-[color:var(--text-primary)]">Socratic AI Tutor</span>
+              <button
+                type="button"
+                onClick={() => setTutorPanelOpen(false)}
+                aria-label="Close AI Tutor"
+                className="compact-btn p-1 rounded-md text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
             <ContextPanel
               currentStage={currentPhase}
               stageName={currentPhaseDef?.label || currentPhase}

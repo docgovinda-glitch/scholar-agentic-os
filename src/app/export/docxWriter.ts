@@ -4,12 +4,12 @@
  * Spec: docs 33-EXPORT-ARCHITECTURE.md §3 stage 4 (render).
  */
 
-import { Document, Packer, Paragraph, HeadingLevel } from "docx";
 import type { Block, CanonicalDocument } from "../../desk/types";
 import type { ExportMetadata } from "./types";
 
 export async function renderDocx(document: CanonicalDocument, metadata: ExportMetadata): Promise<Buffer> {
-  const sections = document.blocks.map((block) => blockToParagraph(block));
+  const { Document, Packer, Paragraph, HeadingLevel } = await import("docx");
+  const sections = document.blocks.map((block) => blockToParagraph(block, Paragraph, HeadingLevel));
 
   const doc = new Document({
     sections: [
@@ -34,7 +34,11 @@ export async function renderDocx(document: CanonicalDocument, metadata: ExportMe
   return Buffer.from(await Packer.toBuffer(doc));
 }
 
-function blockToParagraph(block: Block): Paragraph {
+function blockToParagraph(
+  block: Block,
+  Paragraph: typeof import("docx").Paragraph,
+  HeadingLevel: typeof import("docx").HeadingLevel
+): import("docx").Paragraph {
   const text = block.text || "";
 
   switch (block.kind) {

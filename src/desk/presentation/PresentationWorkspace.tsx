@@ -28,6 +28,7 @@ import {
 import { getProject, saveIntakeAnswers } from '../api';
 import ScholarSidebar from '../../components/navigation/ScholarSidebar';
 import LiveSlidePlayer from './components/LiveSlidePlayer';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 
 export type { PresentationStudioStep } from '../../features/slides';
 
@@ -289,13 +290,21 @@ export default function PresentationWorkspace({
     [projectId]
   );
 
+  const isDirty = autosaveStatus === 'saving';
+  const { guardedNavigate } = useUnsavedChangesGuard({
+    isDirty,
+    saveStatus: autosaveStatus,
+  });
+
   const handleNavigateBack = useCallback(() => {
-    if (onClose) {
-      onClose();
-    } else if (typeof window !== 'undefined') {
-      window.location.href = '/projects';
-    }
-  }, [onClose]);
+    guardedNavigate(() => {
+      if (onClose) {
+        onClose();
+      } else if (typeof window !== 'undefined') {
+        window.location.href = '/projects';
+      }
+    });
+  }, [onClose, guardedNavigate]);
 
   // Convert empty coursework input
   const handleExtractFromDraft = () => {
@@ -419,11 +428,13 @@ export default function PresentationWorkspace({
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         activeItem="presentation"
         onNavigate={(route) => {
-          if (onClose && route === '/projects') {
-            onClose();
-          } else if (typeof window !== 'undefined') {
-            window.location.href = route;
-          }
+          guardedNavigate(() => {
+            if (onClose && route === '/projects') {
+              onClose();
+            } else if (typeof window !== 'undefined') {
+              window.location.href = route;
+            }
+          });
         }}
         onOpenSettings={onOpenAccountSettings}
         onOpenVault={onOpenVault}

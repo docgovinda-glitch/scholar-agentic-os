@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, within, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router-dom";
+import { FeedbackProvider } from "../../components/ui/FeedbackSystem";
 
 const createProject = vi.fn();
 const listOutputTypes = vi.fn();
@@ -46,7 +47,11 @@ vi.mock("../../services/supabaseClient", () => ({
 const { default: ProjectListScreen, renderFormattedGuideText } = await import("../ProjectListScreen");
 
 function renderScreen(ui: React.ReactElement) {
-  return render(<MemoryRouter>{ui}</MemoryRouter>);
+  return render(
+    <FeedbackProvider>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </FeedbackProvider>
+  );
 }
 
 const TYPES = [
@@ -1003,7 +1008,6 @@ describe("ghost project deletion & strict unique project naming", () => {
     const projectB = { ...SAMPLE_PROJECT, projectId: "p-2", answers: { title: "Quantum Simulation" } };
     listProjects.mockResolvedValue({ items: [projectA, projectB] });
 
-    const alertMock = vi.spyOn(window, "alert").mockImplementation(() => {});
     const promptMock = vi.spyOn(window, "prompt").mockReturnValue("  quantum simulation  ");
 
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
@@ -1016,12 +1020,11 @@ describe("ghost project deletion & strict unique project naming", () => {
     const renameBtn = screen.getByRole("button", { name: /^Rename$/i });
     fireEvent.click(renameBtn);
 
-    // Alert should have triggered warning of duplicate
-    expect(alertMock).toHaveBeenCalledWith(expect.stringContaining("already exists"));
+    // Toast should have triggered warning of duplicate
+    expect(await screen.findByText(/already exists/i)).toBeInTheDocument();
     // saveIntakeAnswers should NOT have been called with duplicate title
     expect(saveIntakeAnswers).not.toHaveBeenCalledWith("p-1", { title: "quantum simulation" });
 
-    alertMock.mockRestore();
     promptMock.mockRestore();
   });
 

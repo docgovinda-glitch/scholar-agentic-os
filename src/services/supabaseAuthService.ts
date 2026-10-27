@@ -30,6 +30,36 @@ export interface ServiceResult {
   error?: string;
 }
 
+interface SupabaseMaybeSingleQuery<T> {
+  maybeSingle?: () => Promise<{ data: T | null; error: Error | null }>;
+  single?: () => Promise<{ data: T | null; error: Error | null }>;
+}
+
+interface GooglePromptNotification {
+  isNotDisplayed?: () => boolean;
+  isSkippedMoment?: () => boolean;
+  isDismissedMoment?: () => boolean;
+}
+
+interface GoogleAccountsId {
+  initialize: (config: {
+    client_id: string;
+    callback: (response: { credential?: string }) => void;
+    auto_select?: boolean;
+    cancel_on_tap_outside?: boolean;
+    itp_support?: boolean;
+  }) => void;
+  prompt: (callback?: (notification?: GooglePromptNotification) => void) => void;
+}
+
+interface WindowWithGoogle extends Window {
+  google?: {
+    accounts?: {
+      id?: GoogleAccountsId;
+    };
+  };
+}
+
 /**
  * Bug fix (2026-07-30): for 5xx-class Supabase Auth failures, supabase-js
  * wraps the error as an AuthRetryableFetchError whose own `.message` is
@@ -276,9 +306,17 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
     .from("profiles")
     .select("full_name, phone, affiliation, account_status")
     .eq("id", signInData.user.id);
-  const { data: profile, error: profileError } = typeof (profileQuery as any).maybeSingle === "function"
-    ? await (profileQuery as any).maybeSingle()
-    : await (profileQuery as any).single();
+  const typedProfileQuery = profileQuery as unknown as SupabaseMaybeSingleQuery<{
+    full_name: string | null;
+    phone: string | null;
+    affiliation: string | null;
+    account_status: string | null;
+  }>;
+  const { data: profile, error: profileError } = typeof typedProfileQuery.maybeSingle === "function"
+    ? await typedProfileQuery.maybeSingle()
+    : typedProfileQuery.single
+    ? await typedProfileQuery.single()
+    : await (profileQuery as unknown as Promise<{ data: { full_name: string | null; phone: string | null; affiliation: string | null; account_status: string | null } | null; error: Error | null }>);
 
   let activeProfile = profile;
   if (!activeProfile && !profileError) {
@@ -315,10 +353,10 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
   return {
     success: true,
     profile: {
-      fullName: activeProfile.full_name,
+      fullName: activeProfile.full_name || "",
       email,
-      phone: activeProfile.phone,
-      affiliation: activeProfile.affiliation,
+      phone: activeProfile.phone || "",
+      affiliation: activeProfile.affiliation || "",
     },
   };
 }
@@ -454,13 +492,27 @@ export async function getProfile(): Promise<{ success: true; profile: ProfileFie
     return { success: false, error: "Not signed in." };
   }
 
+interface ProfileRow {
+  username?: string | null;
+  full_name?: string | null;
+  phone?: string | null;
+  phone_country_code?: string | null;
+  phone_e164?: string | null;
+  affiliation?: string | null;
+  user_type?: string | null;
+  education_level?: string | null;
+}
+
   const profileQuery = supabase
     .from("profiles")
     .select("username, full_name, phone, phone_country_code, phone_e164, affiliation, user_type, education_level")
     .eq("id", userData.user.id);
-  let { data, error } = typeof (profileQuery as any).maybeSingle === "function"
-    ? await (profileQuery as any).maybeSingle()
-    : await (profileQuery as any).single();
+  const typedProfileQuery = profileQuery as unknown as SupabaseMaybeSingleQuery<ProfileRow>;
+  let { data, error } = typeof typedProfileQuery.maybeSingle === "function"
+    ? await typedProfileQuery.maybeSingle()
+    : typedProfileQuery.single
+    ? await typedProfileQuery.single()
+    : await (profileQuery as unknown as Promise<{ data: ProfileRow | null; error: Error | null }>);
 
   if (!data && !error) {
     const defaultUsername = userData.user.email?.split("@")[0] || "researcher";
@@ -476,7 +528,7 @@ export async function getProfile(): Promise<{ success: true; profile: ProfileFie
       })
       .select("username, full_name, phone, phone_country_code, phone_e164, affiliation, user_type, education_level")
       .maybeSingle();
-    data = created;
+    data = created as ProfileRow | null;
   }
 
   if (error || !data) {
@@ -498,8 +550,8 @@ export async function getProfile(): Promise<{ success: true; profile: ProfileFie
   return {
     success: true,
     profile: {
-      username: data.username,
-      fullName: data.full_name,
+      username: data.username ?? (userData.user.email?.split("@")[0] || "researcher"),
+      fullName: data.full_name ?? "",
       email: userData.user.email ?? "",
       phone: data.phone ?? "",
       phoneCountryCode: data.phone_country_code ?? "",
@@ -751,7 +803,7 @@ let gisScriptLoading: Promise<void> | null = null;
 
 export function loadGoogleGsiScript(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
-  if ((window as any).google?.accounts?.id) return Promise.resolve();
+  if ((window as unknown as WindowWithGoogle).google?.accounts?.id) return Promise.resolve();
   if (gisScriptLoading) return gisScriptLoading;
 
   gisScriptLoading = new Promise((resolve, reject) => {
@@ -819,11 +871,12 @@ export async function signInWithGoogle(redirectPath: string = ""): Promise<Servi
   if (typeof window !== "undefined") {
     try {
       await loadGoogleGsiScript();
-      if ((window as any).google?.accounts?.id) {
+      const win = window as unknown as WindowWithGoogle;
+      if (win.google?.accounts?.id) {
         return await new Promise<ServiceResult>((resolve) => {
           let finished = false;
 
-          (window as any).google.accounts.id.initialize({
+          win.google!.accounts!.id!.initialize({
             client_id: GOOGLE_CLIENT_ID,
             callback: async (response: { credential?: string }) => {
               if (response.credential && !finished) {
@@ -837,12 +890,12 @@ export async function signInWithGoogle(redirectPath: string = ""): Promise<Servi
             itp_support: true,
           });
 
-          (window as any).google.accounts.id.prompt((notification: any) => {
+          win.google!.accounts!.id!.prompt((notification?: GooglePromptNotification) => {
             if (
               !finished &&
-              (notification.isNotDisplayed?.() ||
-                notification.isSkippedMoment?.() ||
-                notification.isDismissedMoment?.())
+              (notification?.isNotDisplayed?.() ||
+                notification?.isSkippedMoment?.() ||
+                notification?.isDismissedMoment?.())
             ) {
               finished = true;
               fallbackToOAuth(supabase, redirectPath).then(resolve);

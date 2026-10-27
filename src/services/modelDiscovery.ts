@@ -718,7 +718,7 @@ export async function discoverProviderModels(
     const headers = spec?.apiStyle === "gemini" ? {} : spec ? buildAuthHeaders(spec, apiKey) : {};
 
     // Guard against unmocked outbound network requests with synthetic test keys
-    const isFetchMocked = Boolean((globalThis.fetch as any)?.mock);
+    const isFetchMocked = Boolean((globalThis.fetch as { mock?: unknown } | undefined)?.mock);
     if (!isFetchMocked && (apiKey.includes("mock") || apiKey.includes("test") || apiKey.includes("dummy"))) {
       const fallback = spec ? getCompatibilityFallbacks(spec) : [];
       return { ok: true, models: fallback, source: "compatibility_fallback" as const };
@@ -750,7 +750,22 @@ export async function discoverProviderModels(
         return { ok: true, models: fallback, source: "compatibility_fallback" as const };
       }
 
-      const data = (await response.json().catch(() => null)) as any;
+      interface ProviderModelsApiResponse {
+        models?: Array<{
+          name?: string;
+          displayName?: string;
+          supportedGenerationMethods?: string[];
+          [key: string]: unknown;
+        }>;
+        data?: Array<{
+          id?: string;
+          name?: string;
+          [key: string]: unknown;
+        }>;
+        [key: string]: unknown;
+      }
+
+      const data = (await response.json().catch(() => null)) as ProviderModelsApiResponse | null;
       const discoveredList: DiscoveredModel[] = [];
       const verifiedAt = new Date().toISOString();
 
@@ -787,7 +802,7 @@ export async function discoverProviderModels(
           discoveredList.push({
             id,
             providerId,
-            displayName: item?.displayName || item?.name || id,
+            displayName: (typeof item?.displayName === "string" ? item.displayName : typeof item?.name === "string" ? item.name : id),
             capabilities,
             contextWindow,
             source: "live_discovery",

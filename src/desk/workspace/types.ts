@@ -96,8 +96,8 @@ const ICONS = {
 export const RESEARCH_PHASES: PhaseDefinition[] = [
   {
     id: "foundation",
-    label: "I. Foundation",
-    description: "Define boundaries and identify research gaps",
+    label: "I. Scope & Blueprint",
+    description: "1. Scope & Blueprint · Define boundaries and identify research gaps",
     stages: [
       { id: "definition", number: 1, label: "Research Definition", shortLabel: "Definition", description: "Define objectives and methodology", icon: ICONS.document },
       { id: "literature", number: 2, label: "Literature Discovery", shortLabel: "Literature", description: "Scholarly literature search", icon: ICONS.search },
@@ -109,8 +109,8 @@ export const RESEARCH_PHASES: PhaseDefinition[] = [
   },
   {
     id: "evidence",
-    label: "II. Evidence",
-    description: "Collect, extract, and analyze data",
+    label: "II. Evidence & Sources",
+    description: "2. Evidence & Sources · Collect, extract, and analyze data",
     stages: [
       { id: "vault_sources", number: 7, label: "Knowledge Vault", shortLabel: "Vault", description: "Pull sources from personal vault", icon: ICONS.database },
       { id: "source_approval_vault", number: 8, label: "Vault Approval", shortLabel: "Approve Vault", description: "Approve vault sources", icon: ICONS.checkCircle },
@@ -124,8 +124,8 @@ export const RESEARCH_PHASES: PhaseDefinition[] = [
   },
   {
     id: "drafting",
-    label: "III. Drafting",
-    description: "Select journal and draft manuscript",
+    label: "III. Studio Drafting",
+    description: "3. Studio Drafting · Select journal and draft manuscript",
     stages: [
       { id: "journal_discovery", number: 15, label: "Journal Discovery", shortLabel: "Find Journal", description: "Find suitable target journals", icon: ICONS.compass },
       { id: "journal_requirements", number: 16, label: "Journal Rules", shortLabel: "Requirements", description: "Extract submission requirements", icon: ICONS.book },
@@ -137,8 +137,8 @@ export const RESEARCH_PHASES: PhaseDefinition[] = [
   },
   {
     id: "review",
-    label: "IV. Peer Review",
-    description: "AI critique and manuscript revision",
+    label: "IV. Review & Simulation",
+    description: "4. Review & Simulation · AI critique and manuscript revision",
     stages: [
       { id: "peer_review", number: 21, label: "AI Peer Review", shortLabel: "Peer Review", description: "7-lens academic critique", icon: ICONS.review },
       { id: "revision", number: 22, label: "AI Revision", shortLabel: "Revision", description: "Map feedback and revise", icon: ICONS.refresh },
@@ -146,8 +146,8 @@ export const RESEARCH_PHASES: PhaseDefinition[] = [
   },
   {
     id: "publication",
-    label: "V. Publication",
-    description: "Final polish and export formatting",
+    label: "V. Audit & Export",
+    description: "5. Audit & Export · Final polish and export formatting",
     stages: [
       { id: "final_editor", number: 23, label: "Final Editor", shortLabel: "Editor", description: "Manual rich-text touch-ups", icon: ICONS.document },
       { id: "publication_readiness", number: 24, label: "Readiness Check", shortLabel: "Readiness", description: "Final compliance verification", icon: ICONS.shield },

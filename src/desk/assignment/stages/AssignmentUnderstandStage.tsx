@@ -1744,6 +1744,11 @@ export default function AssignmentUnderstandStage({
                   <span>Target Word Count</span>
                   <span className="text-rose-500 text-xs">*</span>
                 </span>
+                {localWordCount > 0 && (
+                  <span className="text-[10px] text-neutral-400 font-normal">
+                    {localWordCount.toLocaleString()} words
+                  </span>
+                )}
               </label>
               <div className="flex items-center gap-1.5 w-full min-w-[130px]">
                 <button
@@ -1762,35 +1767,29 @@ export default function AssignmentUnderstandStage({
                   <input
                     id="target_word_count"
                     name="target_word_count"
-                    type="text"
-                    value={
-                      isWordCountFocused
-                        ? (localWordCount > 0 ? String(localWordCount) : "")
-                        : `${(Number(localWordCount) || 2000).toLocaleString()} words`
-                    }
-                    onFocus={() => setIsWordCountFocused(true)}
+                    type="number"
+                    min={100}
+                    max={50000}
+                    step={50}
+                    value={localWordCount > 0 ? localWordCount : ""}
                     onChange={(e) => {
-                      const raw = e.target.value.replace(/[^0-9]/g, "");
-                      if (!raw) {
-                        setLocalWordCount(0);
-                        return;
-                      }
-                      const val = parseInt(raw, 10);
+                      const val = parseInt(e.target.value, 10);
                       if (!isNaN(val)) {
                         const clamped = Math.min(50000, Math.max(0, val));
                         setLocalWordCount(clamped);
                         handleWordCountChange(clamped);
+                      } else {
+                        setLocalWordCount(0);
                       }
                     }}
                     onBlur={() => {
-                      setIsWordCountFocused(false);
                       if (!localWordCount || localWordCount < 100) {
                         handleTargetWordCountChange(2000);
                       }
                     }}
                     aria-label="Target Word Count"
-                    placeholder="2,000 words"
-                    className="w-full min-w-[115px] whitespace-nowrap h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2 text-center text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums shadow-2xs"
+                    placeholder="2000"
+                    className="w-full min-w-[115px] whitespace-nowrap h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2 text-center text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
                 <button

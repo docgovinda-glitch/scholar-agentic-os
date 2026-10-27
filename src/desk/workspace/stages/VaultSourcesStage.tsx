@@ -9,6 +9,7 @@ import { listVaultItems, addVaultItem, type VaultItem } from "../../../services/
 import { rankVaultItemsForProject, type SemanticSearchResult } from "../../../services/vault/semanticSearchService";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
+import { useToast } from "../../../components/ui/FeedbackSystem";
 
 export interface VaultSourceItem {
   id: string;
@@ -58,6 +59,7 @@ export default function VaultSourcesStage({
   onSaved?: (updated: ProjectView) => void;
   onAdvance?: (stage: string) => void;
 }) {
+  const toast = useToast();
   const workspaceContext = useOptionalResearchWorkspace();
   const project = propProject || workspaceContext?.project;
   const def = STAGE_MAP.get(stage);
@@ -551,13 +553,15 @@ export default function VaultSourcesStage({
       setScanResults((prev) => (prev ? [mapped, ...prev] : [mapped]));
       setSelectedSourceIds((prev) => new Set(prev).add(mapped.id));
 
-      setIngestSuccessToast(`Source "${newItem.title}" successfully ingested and staged for review.`);
-      setTimeout(() => setIngestSuccessToast(null), 4000);
+      toast.success(`Source "${newItem.title}" successfully ingested and staged for review.`, {
+        title: "Source Ingested",
+      });
 
       setIsIngestModalOpen(false);
       setIngestForm(INITIAL_INGEST_FORM);
-    } catch (err: any) {
-      alert(`Could not ingest source: ${err.message || "Unknown error"}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Could not ingest source: ${msg}`, { title: "Ingestion Failed" });
     } finally {
       setIsIngesting(false);
     }

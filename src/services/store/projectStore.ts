@@ -8,6 +8,7 @@
 import * as inMemory from "../../app/conductor/projectStore";
 import { createPgProjectStore, createPool } from "./pgProjectStore";
 import { createRestProjectStore } from "./restProjectStore";
+import { createDiskProjectStore } from "./diskProjectStore";
 import type { ProjectRecord, ProjectStore } from "./types";
 
 function inMemoryAsStore(): ProjectStore {
@@ -43,22 +44,15 @@ export function getProjectStore(): ProjectStore {
  *
  * 1. Data API (HTTPS) — preferred. Needs only the two values the server
  *    already requires to verify tokens, and reaches Supabase over the same
- *    hostname and protocol as everything else. It is ranked above the direct
- *    connection because that path failed in production four separate ways:
- *    an IPv6-only hostname on an IPv4-only network, a pooler needing the
- *    right region/port/tenant username, a certificate chain Node does not
- *    trust, and a database password distinct from every other credential.
+ *    hostname and protocol as everything else.
  *
  * 2. Direct Postgres — used when DATABASE_URL is set and the Data API is not
- *    configured. Retained deliberately rather than deleted: it supports SQL
- *    the Data API cannot express, and a future store needing real
- *    transactions will want it.
+ *    configured.
  *
- * 3. In-memory — the last resort, and the dangerous one, because it looks
- *    like it works. It does not survive a restart, so on a plan that idles
- *    out the container a user's projects vanish within the hour with nothing
- *    reported. It is therefore announced loudly at startup rather than
- *    entered quietly.
+ * 3. Disk-backed Store (Atomic JSON write-ahead) — durable local fallback
+ *    preventing project evaporation across server restarts.
+ *
+ * 4. Pure In-memory — strictly isolated for automated testing (`NODE_ENV === "test"`).
  */
 function resolveStore(): ProjectStore {
   if (process.env.NODE_ENV === "test" && !process.env.USE_REAL_STORE_IN_TESTS) {
@@ -87,11 +81,10 @@ function resolveStore(): ProjectStore {
   }
 
   console.warn(
-    "services/store: NO durable backend configured — falling back to the in-memory store. " +
-      "Projects will be lost on every restart. Set VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY " +
-      "(preferred) or DATABASE_URL. See supabase/schema_store.sql."
+    "services/store: NO remote database configured — falling back from in-memory to local atomic file store (data/.scholar_local_store.json). " +
+      "Set VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (preferred) or DATABASE_URL for cloud database persistence."
   );
-  return inMemoryAsStore();
+  return createDiskProjectStore();
 }
 
 export type { ProjectRecord, ProjectStore };
