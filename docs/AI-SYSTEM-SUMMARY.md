@@ -168,4 +168,46 @@ When prompted to build, modify, or extend Scholar OS, adhere to these non-negoti
 
 ---
 
-*Last Updated: 2026-10-26 | Status: Verified Against Active Codebase*
+## 7. System Remediation Execution Status (Steps 1–6 Completed)
+
+All six phases of the foundational system remediation have been executed, verified, and committed:
+
+1. **Step 1: Security & Cryptographic Integrity** (`de441cf`):
+   - **Signed HTTP 426 Challenges**: Server issues HMAC-SHA256 tokens binding `userId`, `projectId`, `promptSha256`, and expiration; re-submitted `llmResult` is cryptographically validated before acceptance.
+   - **Warden SystemPrompt Privacy Guard**: Egress privacy policy inspection extended to evaluate and redact `req.systemPrompt` alongside `req.userPrompt` and segments.
+   - **Local JWT & LRU Auth Cache**: Two-tier fast-path with local HS256 JWT verification (<0.5ms) and bounded 60s LRU token cache to eliminate Supabase round-trip latency.
+   - **Static Route Hardening**: Explicit route handlers for `/robots.txt`, `/llms.txt`, and `/ai-catalog.json` before SPA fallback.
+
+2. **Step 2: Unified AI Pipeline & Resilient Parsing** (`9ef8bd4`):
+   - **Shared `scholarBrain` Guardrails**: Client-side and server-side pipelines consolidated with unified anti-fluff rules, citation formatting, and voice verification.
+   - **Resilient JSON Parser**: Extracts structured JSON from fenced blocks, trims commentary, auto-repairs trailing commas and truncated objects.
+   - **Author-Date NLI Scrubber**: Validates in-text citations against bibliography entries to prevent citation hallucination.
+   - **Model Capability Profiler**: Accurately maps token windows, reasoning models, and streaming support across Gemini, OpenAI, Anthropic, and local runners.
+
+3. **Step 3: Hierarchical Semantic RAG & Streaming Engine** (`a1abb27`):
+   - **Hierarchical Chunking**: Chunks documents with hierarchical heading paths (`# Chapter > ## Section`) for context-preserving retrieval.
+   - **Hybrid Reranker**: Combines BM25 lexical matching with cosine semantic similarity and recency weighting.
+   - **End-to-End SSE Streaming**: Integrated real-time token streaming with live citation bracket replacement and deterministic bibliography compilation.
+
+4. **Step 4: State Architecture & Ephemeral Persistence** (`a1abb27`):
+   - **Typed Zod Project State Accessor**: Runtime schema validation via `projectStateSchema.ts`.
+   - **Transactional Ephemeral Migration**: Seamless transition from guest/ephemeral state to Supabase database without data loss.
+   - **Persistent Disk Store**: Local file-backed store (`.scholar_local_store.json`) for seamless offline operation and dev reliability.
+
+5. **Step 5: Bundle Optimization & Modular Decomposition** (`a1abb27`):
+   - **Dynamic Lazy Loading**: Heavy document parsing and export libraries (`docx`, `pdfmake`, `xlsx`, `pptxgenjs`) deferred until user action.
+   - **God-File Modular Decomposition**: Decomposed monolithic files (`ProjectListScreen.tsx`, `api.ts`, `agentic.ts`) into clean, focused sub-modules.
+
+6. **Step 6: Accessible Feedback, Responsive Ergonomics & A11y** (`4e22895`):
+   - **Unified Feedback System**: `<ToastProvider />` (`useToast()`) and `<ConfirmDialogProvider />` (`useConfirm()`) in `FeedbackSystem.tsx` with focus trapping and ARIA announcements; 0 native `alert()` or `window.confirm()` calls remaining.
+   - **Mobile AI Tutor Drawer**: Slide-over drawer with backdrop (`data-testid="ai-tutor-backdrop"`) and close button on mobile viewports.
+   - **Unsaved Work Guard**: `useUnsavedChangesGuard.ts` with `beforeunload` listener and in-app navigation gating wired into all 5 workspaces.
+   - **Autosave Badge & 5-Stage Spine**: Standardized `<WorkspaceAutosaveBadge />` and harmonized stage subtitles (*Scope & Blueprint → Evidence & Sources → Studio Drafting → Review & Simulation → Audit & Export*).
+   - **13" Laptop Focus Ergonomics**: 1-click Zen Mode toggle (`data-testid="zen-mode-toggle"`) and right rails capped at 288px to guarantee 680px–780px unobstructed central canvas.
+   - **Knowledge Vault Literature Landing**: Direct landing on verified sources and primary datasets (`initialTab="sources"`).
+   - **Screen-Reader Announcements**: Real-time `#scholar-aria-polite` and `#scholar-aria-assertive` updates for AI lifecycles and stage transitions.
+   - **Mobile Touch Targets**: Scoped 44px min-targets in `src/index.css` with hit-slop pseudo-elements.
+
+---
+
+*Last Updated: 2026-10-27 | Status: Verified Against Active Codebase (Remediation Steps 1–6 Complete)*
