@@ -1,18 +1,15 @@
 import express, { Router, Request, Response } from "express";
-import multer from "multer";
 import { parseDocument, normalizeUnicodeNFC } from "../../src/document_intelligence/index.ts";
 import { requireAuth } from "../src/middleware/auth.ts";
+import { createUploadInstance } from "../src/middleware/uploadGuard.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 import type { CanonicalReference } from "../../src/citation_compliance/model/reference.ts";
 import { safeFetchHtml, extractLightweightUrlMetadata } from "../utils/ssrfGuard.ts";
 
 const router = Router();
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 30 * 1024 * 1024, // 30MB limit
-  },
-});
+router.use(requireAuth);
+
+const upload = createUploadInstance({ enforceHeavyParseLimit: true });
 
 /**
  * Heuristic academic metadata extractor from PDF text.

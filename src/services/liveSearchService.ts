@@ -5,6 +5,8 @@
  * Strictly zero `any` types.
  */
 
+import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
+
 export interface LiveSearchResult {
   title: string;
   url: string;
@@ -209,9 +211,21 @@ export async function executeLiveSearch(
 
   // 1. Try local server backend proxy
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (isSupabaseConfigured()) {
+      try {
+        const { data } = await getSupabaseClient().auth.getSession();
+        if (data?.session?.access_token) {
+          headers["Authorization"] = `Bearer ${data.session.access_token}`;
+        }
+      } catch {
+        // Ignore session retrieval error and proceed
+      }
+    }
+
     const res = await fetch("/api/search/live", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ query: cleanQuery, limit, mode }),
       signal: options.signal,
     });

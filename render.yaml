@@ -47,11 +47,11 @@ services:
         value: 3000
       - key: NODE_ENV
         value: production
-      # Caps the JSON/urlencoded body size server.ts will buffer. Default 25
-      # is chosen for the free plan's 512 MB; raise it only alongside a plan
-      # with more memory (see server.ts for the full reasoning).
+      # Caps the JSON/urlencoded/multipart upload size server.ts and multer will
+      # buffer. Default 10 MB is chosen for the free plan's 512 MB ceiling
+      # alongside the 1-at-a-time heavy-parse concurrency guard.
       - key: MAX_UPLOAD_MB
-        value: 25
+        value: 10
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_API_KEY_BACKUP

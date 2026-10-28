@@ -9,6 +9,7 @@
  */
 
 import type { Author } from "./types.ts";
+import { authedFetch, authedJsonFetch } from "./api";
 
 const AUTHORS_CHANGED_EVENT = "scholar_saved_authors_changed";
 
@@ -87,11 +88,7 @@ export function saveAuthorForUser(author: Author, userEmail?: string | null): Au
     window.dispatchEvent(new CustomEvent(AUTHORS_CHANGED_EVENT, { detail: { userEmail } }));
 
     // Synchronize to backend if accessible
-    fetch("/api/user/saved-authors", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ author: updatedAuthor }),
-    }).catch(() => {});
+    authedJsonFetch("/api/user/saved-authors", "POST", { author: updatedAuthor }).catch(() => {});
 
     return next;
   } catch {
@@ -167,7 +164,7 @@ export function removeSavedAuthorForUser(authorId: string, userEmail?: string | 
     window.dispatchEvent(new CustomEvent(AUTHORS_CHANGED_EVENT, { detail: { userEmail } }));
 
     // Notify backend
-    fetch(`/api/user/saved-authors/${encodeURIComponent(authorId)}`, {
+    authedFetch(`/api/user/saved-authors/${encodeURIComponent(authorId)}`, {
       method: "DELETE",
     }).catch(() => {});
 
@@ -182,7 +179,7 @@ export function removeSavedAuthorForUser(authorId: string, userEmail?: string | 
  */
 export async function syncSavedAuthors(userEmail?: string | null): Promise<Author[]> {
   try {
-    const res = await fetch("/api/user/saved-authors");
+    const res = await authedFetch("/api/user/saved-authors");
     if (!res.ok) return getLocalSavedAuthors(userEmail);
     const data = await res.json();
     if (Array.isArray(data?.authors) && data.authors.length > 0) {

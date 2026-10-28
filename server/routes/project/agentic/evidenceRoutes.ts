@@ -571,6 +571,11 @@ Return ONLY valid JSON in this exact format:
 // POST /api/projects/:id/agentic/upload-user-data
 evidenceRoutes.post(
   "/upload-user-data",
+  async (req: express.Request<{ id: string }>, res: express.Response, next: express.NextFunction) => {
+    const project = await getProjectSafe(req, res);
+    if (!project) return;
+    next();
+  },
   userUpload.single("file"),
   async (req: express.Request<{ id: string }>, res: express.Response) => {
     const project = await getProjectSafe(req, res);

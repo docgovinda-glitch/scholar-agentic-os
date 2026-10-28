@@ -1,26 +1,70 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
+import crypto from "node:crypto";
 import request from "supertest";
 import express from "express";
 import { registerVaultRoutes } from "../vault";
+import { __clearTokenCacheForTests } from "../../src/middleware/auth.ts";
+import { __resetHeavyParseGuardForTests } from "../../src/middleware/uploadGuard.ts";
+
+const TEST_JWT_SECRET = "test-vault-jwt-secret-key-for-unit-tests";
+
+function createTestJwt(userId = "11111111-1111-4111-8111-111111111111"): string {
+  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+  const payload = Buffer.from(
+    JSON.stringify({
+      sub: userId,
+      email: "scholar@example.com",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })
+  ).toString("base64url");
+  const sig = crypto
+    .createHmac("sha256", TEST_JWT_SECRET)
+    .update(`${header}.${payload}`)
+    .digest("base64url");
+  return `${header}.${payload}.${sig}`;
+}
+
+const AUTH_HEADER = { Authorization: `Bearer ${createTestJwt()}` };
 
 describe("Vault Server API Routes (/api/vault)", () => {
   let app: express.Express;
 
   beforeEach(() => {
+    process.env.SUPABASE_JWT_SECRET = TEST_JWT_SECRET;
+    __clearTokenCacheForTests();
+    __resetHeavyParseGuardForTests();
     app = express();
     app.use(express.json());
     registerVaultRoutes(app);
   });
 
+  describe("Authentication enforcement across all /api/vault/* utility routes", () => {
+    it.each([
+      ["post", "/api/vault/parse-file"],
+      ["post", "/api/vault/parse-url"],
+      ["post", "/api/vault/lookup-doi"],
+      ["post", "/api/lookup-doi"],
+      ["post", "/api/vault/search-semantic"],
+      ["post", "/api/vault/zotero/sync"],
+      ["post", "/api/vault/mendeley/sync"],
+      ["get", "/api/vault/drive/files"],
+      ["get", "/api/vault/onedrive/files"],
+      ["post", "/api/vault/reset"],
+    ])("returns 401 on %s %s when unauthenticated", async (method, path) => {
+      const res = await (request(app) as any)[method](path).send({});
+      expect(res.status).toBe(401);
+    });
+  });
+
   describe("POST /api/vault/lookup-doi", () => {
     it("returns 400 when doi is missing", async () => {
-      const res = await request(app).post("/api/vault/lookup-doi").send({});
+      const res = await request(app).post("/api/vault/lookup-doi").set(AUTH_HEADER).send({});
       expect(res.status).toBe(400);
       expect(res.body.error).toBe("Missing or invalid DOI");
     });
 
     it("returns 400 when doi is not a string", async () => {
-      const res = await request(app).post("/api/vault/lookup-doi").send({ doi: 12345 });
+      const res = await request(app).post("/api/vault/lookup-doi").set(AUTH_HEADER).send({ doi: 12345 });
       expect(res.status).toBe(400);
       expect(res.body.error).toBe("Missing or invalid DOI");
     });
@@ -28,13 +72,13 @@ describe("Vault Server API Routes (/api/vault)", () => {
 
   describe("POST /api/vault/parse-url", () => {
     it("returns 400 when url is missing", async () => {
-      const res = await request(app).post("/api/vault/parse-url").send({});
+      const res = await request(app).post("/api/vault/parse-url").set(AUTH_HEADER).send({});
       expect(res.status).toBe(400);
       expect(res.body.error).toBe("Missing or invalid URL");
     });
 
     it("returns 400 when url protocol is invalid", async () => {
-      const res = await request(app).post("/api/vault/parse-url").send({ url: "ftp://invalid-domain.com" });
+      const res = await request(app).post("/api/vault/parse-url").set(AUTH_HEADER).send({ url: "ftp://invalid-domain.com" });
       expect(res.status).toBe(400);
       expect(res.body.error).toBe("Invalid protocol");
     });
@@ -42,7 +86,7 @@ describe("Vault Server API Routes (/api/vault)", () => {
 
   describe("POST /api/vault/search-semantic", () => {
     it("returns 400 when query is missing", async () => {
-      const res = await request(app).post("/api/vault/search-semantic").send({});
+      const res = await request(app).post("/api/vault/search-semantic").set(AUTH_HEADER).send({});
       expect(res.status).toBe(400);
       expect(res.body.error).toBe("Missing or invalid search query");
     });
@@ -63,6 +107,7 @@ describe("Vault Server API Routes (/api/vault)", () => {
 
       const res = await request(app)
         .post("/api/vault/search-semantic")
+        .set(AUTH_HEADER)
         .send({ query: "deep neural network transformers", items, topK: 5 });
 
       expect(res.status).toBe(200);
@@ -74,6 +119,7 @@ describe("Vault Server API Routes (/api/vault)", () => {
     it("returns empty results when items are empty", async () => {
       const res = await request(app)
         .post("/api/vault/search-semantic")
+        .set(AUTH_HEADER)
         .send({ query: "anything", items: [] });
 
       expect(res.status).toBe(200);
@@ -83,7 +129,7 @@ describe("Vault Server API Routes (/api/vault)", () => {
 
   describe("POST /api/vault/mendeley/sync", () => {
     it("returns 400 if neither bibtex nor accessToken is provided", async () => {
-      const res = await request(app).post("/api/vault/mendeley/sync").send({});
+      const res = await request(app).post("/api/vault/mendeley/sync").set(AUTH_HEADER).send({});
       expect(res.status).toBe(400);
       expect(res.body.error).toBe("Provide bibtex string or Mendeley accessToken");
     });
@@ -98,7 +144,7 @@ describe("Vault Server API Routes (/api/vault)", () => {
   doi={10.1234/test.5678}
 }
       `;
-      const res = await request(app).post("/api/vault/mendeley/sync").send({ bibtex });
+      const res = await request(app).post("/api/vault/mendeley/sync").set(AUTH_HEADER).send({ bibtex });
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.count).toBe(1);
@@ -111,7 +157,7 @@ describe("Vault Server API Routes (/api/vault)", () => {
 
   describe("POST /api/vault/zotero/sync", () => {
     it("returns 400 when apiKey or userId is missing", async () => {
-      const res = await request(app).post("/api/vault/zotero/sync").send({});
+      const res = await request(app).post("/api/vault/zotero/sync").set(AUTH_HEADER).send({});
       expect(res.status).toBe(400);
       expect(res.body.error).toBe("Missing required Zotero apiKey or userId");
     });
@@ -119,7 +165,7 @@ describe("Vault Server API Routes (/api/vault)", () => {
 
   describe("POST /api/vault/parse-file", () => {
     it("returns 400 when no file is uploaded", async () => {
-      const res = await request(app).post("/api/vault/parse-file");
+      const res = await request(app).post("/api/vault/parse-file").set(AUTH_HEADER);
       expect(res.status).toBe(400);
       expect(res.body.error).toBe("No file uploaded");
     });
@@ -127,6 +173,7 @@ describe("Vault Server API Routes (/api/vault)", () => {
     it("parses an uploaded text file", async () => {
       const res = await request(app)
         .post("/api/vault/parse-file")
+        .set(AUTH_HEADER)
         .attach("file", Buffer.from("Title: My Research\nAbstract: Testing document parser."), "research.txt");
 
       expect(res.status).toBe(200);
@@ -143,6 +190,7 @@ describe("Vault Server API Routes (/api/vault)", () => {
 
       const res = await request(app)
         .post("/api/vault/parse-file")
+        .set(AUTH_HEADER)
         .attach("file", minimalPdf, { filename: "findings.pdf", contentType: "application/pdf" });
 
       expect(res.status).toBe(200);

@@ -850,11 +850,22 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
   );
 
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    try {
+      const { isSupabaseConfigured, getSupabaseClient } = await import("../../../services/supabaseClient");
+      if (isSupabaseConfigured()) {
+        const { data } = await getSupabaseClient().auth.getSession();
+        if (data?.session?.access_token) {
+          headers["Authorization"] = `Bearer ${data.session.access_token}`;
+        }
+      }
+    } catch {}
+
     const response = await fetch(`/api/projects/${projectId}/assignment/stream-section`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
         sectionId: section.id,
         sectionTitle: section.title,

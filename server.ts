@@ -252,7 +252,7 @@ app.use((req, _res, next) => {
 // raw, unbuffered streaming for database, auth, and storage endpoints.
 registerSupabaseProxy(app);
 
-const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 25;
+const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 10;
 const BODY_LIMIT = `${MAX_UPLOAD_MB}mb`;
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ limit: BODY_LIMIT, extended: true }));

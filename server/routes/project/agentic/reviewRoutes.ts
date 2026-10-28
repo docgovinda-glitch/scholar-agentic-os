@@ -1154,7 +1154,7 @@ reviewRoutes.put("/critiques/:critiqueId/waive", async (req, res) => {
     if (config) {
       try {
         const table = new SupabaseTable(config, "peer_review_critiques");
-        await table.request(`?id=eq.${req.params.critiqueId}`, {
+        await table.request(`?id=eq.${encodeURIComponent(req.params.critiqueId)}&project_id=eq.${encodeURIComponent(project.projectId)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ waived: true })

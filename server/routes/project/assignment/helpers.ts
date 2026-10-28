@@ -1,6 +1,6 @@
 import type { ProjectRecord } from "../../../../src/services/store/types.ts";
 import express from "express";
-import multer from "multer";
+import { createUploadInstance } from "../../../src/middleware/uploadGuard.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
@@ -399,12 +399,7 @@ export async function autoUpdateProjectTitleIfUntitled(
   return currentTitle || derivedTitle;
 }
 
-export const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit to support Pro and Admin high-capacity uploads
-  },
-});
+export const upload = createUploadInstance({ enforceHeavyParseLimit: true });
 
 export async function getProjectSafe(req: express.Request<unknown>, res: express.Response) {
   const projectId = (req.params as Record<string, string>).id;
@@ -412,8 +407,9 @@ export async function getProjectSafe(req: express.Request<unknown>, res: express
     res.status(400).json({ error: "Missing project ID" });
     return null;
   }
+  const callerId = (req as express.Request & { user?: { id: string } }).user?.id;
   const project = await getProjectStore().get(projectId);
-  if (!project) {
+  if (!project || !callerId || project.ownerId !== callerId) {
     res.status(404).json({ error: "Project not found" });
     return null;
   }

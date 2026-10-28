@@ -74,7 +74,15 @@ import {
 const router = express.Router({ mergeParams: true });
 
 // 0. POST /api/projects/:id/assignment/parse-brief (File Upload for Briefs)
-router.post("/parse-brief", upload.single("file"), async (req: express.Request<{ id: string }>, res: express.Response) => {
+router.post(
+  "/parse-brief",
+  async (req: express.Request<{ id: string }>, res: express.Response, next: express.NextFunction) => {
+    const project = await getProjectSafe(req, res);
+    if (!project) return;
+    next();
+  },
+  upload.single("file"),
+  async (req: express.Request<{ id: string }>, res: express.Response) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
 
