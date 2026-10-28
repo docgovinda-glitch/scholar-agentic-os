@@ -22,22 +22,26 @@ Rather than generic forms, each academic format in Scholar Core operates through
    - **Stage-Scoped Copilot Personas** (`ContextPanel.tsx`): Advisor (Understand), Librarian (Sources), Scribe (Drafting), Examiner (Submission).
 
 2. **📄 Journal Article Workspace (`OT-10`)**:
-   - **25-Stage Empirical Pipeline**: *Topic Definition → Literature Matrix → Gap Identification → Claim-Evidence Graph → Methodological Framing → Empirical Generation → Double-Blind Adversarial Peer Review*.
-   - **Q1 Journal Style Compliance Engine**: Live manuscript style compliance score card based on the 110-paper corpus, enforcing `Formal Academic` / `Objective` benchmarks during section generation and double-blind peer-review referee evaluation.
+   - **5-Mode Studio & 25-Stage Empirical Pipeline**:
+     - *Mode 1: Protocol Blueprint & Word Budgeter* → *Mode 2: Evidence Matrix & Primary Data Ingestion* → *Mode 3: Grounded Manuscript Studio* → *Mode 4: Unified Referee Rebuttal Workbench* → *Mode 5: Pre-Flight Compliance & Export Studio*.
+   - **Q1 Journal Style Compliance Engine & NLI Citation Lock Scrubber**: Live manuscript style compliance scorecard based on the 110-paper corpus, paired with Natural Language Inference (NLI) claim-evidence entailment verification (`citationLockScrubber.ts`) and hybrid Semantic RAG (`semanticRagEngine.ts`).
 
 3. **💡 Research Proposal Workspace (`OT-19`)**:
    - **Competitive Grant Pipeline**: *Funding Agency Alignment → 1-Page Specific Aims → Significance & Innovation → Research Strategy & Pitfalls → Timeline & Gantt Work Packages → Budget Justification*.
-   - Includes a **Study Section Review Simulator (NIH / NSF Scoring Criteria)**.
+   - Includes a **Study Section Review Simulator (NIH / NSF Scoring Criteria)** powered by `scholarBrain.ts`.
 
 4. **📊 Academic Presentation Studio (`OT-22`)**:
    - **4-Step Guided Workflow**: *01 Understand (Define Topic & Outline) → 02 Design (Curated Presets & Screenshot Cloner) → 03 Edit Slides (100% WYSIWYG Editable Canvas) → 04 Present (Stage View & Live Slide Player)*.
    - **Learned Presentation Benchmark Integration**: Live `OT-22 Style: Conversational Academic · 6x6 Density` header badge and prompt builder enforcing concise assertion-evidence headlines, zero throat-clearing, and 6x6 bullet density.
 
 5. **🎓 Thesis & Dissertation Workspace (`OT-09` / `OT-07`)**:
-   - Multi-chapter milestone tracker, literature synthesis matrix, and 15-question Viva Voce oral defense simulator.
+   - Multi-chapter milestone tracker with sequential chapter readiness gating, literature synthesis matrix, and 15-question Viva Voce oral defense simulator.
 
 6. **💬 Full-Screen Conversational Ask Scholar (`/projects`)**:
    - Immersive dashboard research chat that collapses template starter cards upon interaction, creating an expansive full-screen canvas with citation grounding and direct project initiation.
+
+7. **♿ 100/100 Lighthouse Accessibility & Non-Blocking UX (`FeedbackSystem.tsx`, `AriaLiveAnnouncer.tsx`)**:
+   - Accessible toast/modal feedback system (zero native browser popups), WCAG screen-reader live regions, persistent autosave badges (`WorkspaceAutosaveBadge.tsx`), unsaved-changes guards (`useUnsavedChangesGuard.ts`), and Laptop Focus Mode.
 
 ---
 

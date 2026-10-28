@@ -5,7 +5,33 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-10-22
+## [Unreleased] - 2026-10-28
+
+### Forensic Hardening Batches 1–4, Central `scholarBrain` Orchestrator & 5-Mode Journal Studio
+- **Forensic Batch 4 — Native Popup Elimination, Accessibility & UX Hardening (`FeedbackSystem.tsx`, `AriaLiveAnnouncer.tsx`, `WorkspaceAutosaveBadge.tsx`, `useUnsavedChangesGuard.ts`)**:
+  - Replaced blocking native browser `alert()` and `confirm()` calls across workspaces with an accessible, non-blocking modal confirmation and toast notification system (`FeedbackSystem.tsx`).
+  - Added global WCAG screen-reader live region announcer (`AriaLiveAnnouncer.tsx`) and achieved **100/100 Lighthouse Accessibility** compliance (semantic heading order, label-in-name, contrast ratios, and `>= 44x44px` mobile touch targets).
+  - Added persistent autosave status telemetry (`WorkspaceAutosaveBadge.tsx`) and unsaved changes navigation guard (`useUnsavedChangesGuard.ts`).
+  - Added Laptop Focus Mode (`1366x768` viewport optimization), responsive mobile tutor drawer overlay, and defaulted `VaultSourcesStage` to automatically surface linked vault literature.
+- **Forensic Batch 3 — Bundle Splitting, Type-Safe State Schema & Modularization (`src/shared/projectStateSchema.ts`, `src/desk/api/*`, `server/routes/project/agentic/*`, `src/desk/dashboard/*`)**:
+  - Split the 1.72 MB document export bundle (`pdfmake`, `docx`, `mammoth`, `xlsx`) into on-demand lazy-loaded chunks (`academicPdfCompiler.ts`, `export.ts`, `pdfWriter.ts`, `spreadsheetParser.ts`, `vite.config.ts`).
+  - Replaced all raw `JSON.parse(project.answers)` calls across workspace stages with a unified, Zod-validated schema accessor (`src/shared/projectStateSchema.ts`).
+  - Modularized monolithic files into clean domain packages:
+    - `server/routes/project/agentic.ts` (3,221 lines → 5-line barrel re-exporting `server/routes/project/agentic/{draftingRoutes,evidenceRoutes,reviewRoutes,helpers,types,index}.ts`).
+    - `src/desk/api.ts` (1,890 lines → 5-line barrel re-exporting `src/desk/api/{client,projectsApi,agenticApi,claimEvidenceApi,studioGenerationApi,types,index}.ts`).
+    - `src/desk/ProjectListScreen.tsx` (extracted `src/desk/dashboard/{OutputTypePicker,guideHelper,constants,types,index}.ts`).
+  - Purged all hardcoded `openrouter/auto` model strings in favor of dynamic model discovery (`modelDiscovery.ts`).
+- **Forensic Batch 2 — Shared Guardrails, AST JSON Parser, NLI Citation Scrubber, Semantic RAG & SSE Streaming (`scholarGuardrails.ts`, `llmJsonParser.ts`, `citationLockScrubber.ts`, `semanticRagEngine.ts`)**:
+  - Created `src/shared/scholarGuardrails.ts` enforcing anti-hallucination constraints, banned AI filler lexical lists, and quantitative academic register gates across client and server.
+  - Built deterministic AST state-machine JSON recovery (`src/shared/llmJsonParser.ts`) handling truncated streams, unescaped quotes, and markdown code fences.
+  - Implemented `server/src/utils/citationLockScrubber.ts` with Natural Language Inference (NLI) claim-to-evidence entailment scoring and unverified citation scrubbing.
+  - Built hybrid Semantic RAG Engine (`server/src/services/semanticRagEngine.ts`) combining dense vector similarity, BM25 lexical scoring, and Reciprocal Rank Fusion (RRF).
+  - Added real-time SSE streaming (`/api/ai/stream`) and Thesis sequential chapter readiness gating (`ThesisWorkspace.tsx`).
+- **Central `scholarBrain` System-Wide Orchestrator & 5-Mode Journal Studio (`scholarBrain.ts`, `ProtocolBlueprintMode.tsx`, `EvidenceMatrixMode.tsx`, `RefereeRebuttalMode.tsx`)**:
+  - Wired `server/src/services/scholarBrain.ts` across AskScholar, Coursework (`OT-01`), Journal Article (`OT-10`), Thesis (`OT-09`), Proposal (`OT-19`), and Presentation Studio (`OT-22`), supporting multi-part question decomposition without truncation and mark-weighted word allocation.
+  - Rebuilt Journal Article Workspace (`OT-10`) around a 5-Mode Studio workflow: *Mode 1: Protocol Blueprint & Word Budgeter → Mode 2: Evidence Matrix & Primary Data Ingestion → Mode 3: Grounded Manuscript Studio → Mode 4: Unified Referee Rebuttal Workbench → Mode 5: Pre-Flight Compliance & Export Studio*.
+
+## [1.3.0] - 2026-10-22
 
 ### Phase 2: Supervised ML Style Engine, OT-01 Minimal/Detailed Modes & OT-10/OT-22 Synthesis Integration
 - **110-File Open-Access Peer-Reviewed Corpus (`ml-style-engine/corpus/`, `04_expand_corpus_110_files.py`, `02_verify_corpus.py`)**:

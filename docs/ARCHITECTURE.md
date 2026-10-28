@@ -117,12 +117,24 @@ The Coursework & Essay workspace (`OT-01`) is organized into five canonical sequ
 The Express server modularizes routes across domain boundaries:
 - `registerHealthRoutes`: `/health`, `/healthz`, `/api/health` probes.
 - `registerAuthRoutes`: `/api/auth/verify-signup` with Turnstile token validation.
-- `registerProjectRoutes`: CRUD for projects, stages, claims, evidence, and the dedicated 4-phase assignment endpoints (`server/routes/project/assignment.ts`).
-- `registerAIRoutes`: Unified AI endpoints (`/api/ai/generate`, `/api/ai/chat`, `/api/ai/stream`, `/api/ai/models`).
+- `registerProjectRoutes`: CRUD for projects, stages, claims, evidence, the dedicated 5-phase assignment endpoints (`server/routes/project/assignment.ts`), and the modularized 25-stage / 5-mode agentic research sub-routers (`server/routes/project/agentic/{draftingRoutes,evidenceRoutes,reviewRoutes,helpers,types,index}.ts`).
+- `registerAIRoutes`: Unified AI endpoints (`/api/ai/generate`, `/api/ai/chat`, `/api/ai/stream`, `/api/ai/models`) orchestrated via `scholarBrain.ts` and `semanticRagEngine.ts`.
 - `registerAiAccessRoutes`: Provider credentials, BYOK encryption, and local runner detection.
 - `registerVaultRoutes`: Universal Vault operations, DOI fetching, and cloud links.
 - `registerSearchRoutes`: Proxied scholarly search queries to OpenAlex, Crossref, and Semantic Scholar.
 - `registerSupabaseProxy`: Reverse proxy for Supabase PostgREST and Realtime WebSockets.
+
+### 3.5 Modular Client API, Type-Safe State Accessor & Code Splitting
+- **Modular Client API (`src/desk/api/*`)**:
+  - `client.ts`: Authenticated fetch transport (`authedFetch`), transient BYOK header injection (`x-ai-*`), and offline queue synchronization.
+  - `projectsApi.ts`: Project CRUD, file attachments, and activity logs.
+  - `agenticApi.ts`: 25-stage and 5-mode Journal Studio pipeline operations.
+  - `claimEvidenceApi.ts`: Claim-evidence graph and matrix operations.
+  - `studioGenerationApi.ts`: Thesis (`OT-09`), Proposal (`OT-19`), and Presentation (`OT-22`) generation endpoints.
+- **Type-Safe Project State Accessor (`src/shared/projectStateSchema.ts`)**:
+  - Replaces raw `JSON.parse(project.answers)` calls across workspace stages with a deterministic, schema-validated parser (`parseProjectAnswers`, `readStageAnswer`) that safely handles both serialized strings and hydrated JSONB objects.
+- **Dynamic Document Compiler Chunking (`vite.config.ts`)**:
+  - Heavy document processing libraries (`pdfmake`, `docx`, `mammoth`, `xlsx`, `pdf-parse`) are isolated into lazy-loaded chunks and dynamically imported only when a user triggers document ingestion or manuscript export.
 
 ---
 

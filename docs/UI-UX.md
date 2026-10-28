@@ -51,9 +51,13 @@ The design system avoids arbitrary hex codes in component styles, relying instea
   - **Account Avatar / Menu**: Opens Account Settings (`/settings`) or multi-account switcher.
   - **Stage-Scoped Copilot Toggle**: Slidably opens/closes the contextual AI copilot drawer (`ContextPanel`).
 
-### 2.2 Global State & Feedback
+### 2.2 Global State, Accessibility & Feedback System
 - **Global Loader (`GlobalLoader.tsx`)**: Minimalist top-line progress bar indicating background route switches and heavy view initialization.
 - **Error Boundary (`ErrorBoundary.tsx`)**: Wraps application root and individual workspace modules, providing graceful error containment with a "Return to Dashboard" recovery action.
+- **Non-Blocking Feedback System (`FeedbackSystem.tsx`)**: Replaces native browser `alert()` and `confirm()` dialogs with accessible, keyboard-navigable confirmation modals (`useConfirm`) and toast notifications (`useToast`).
+- **Screen-Reader Live Announcer (`AriaLiveAnnouncer.tsx`)**: Global WCAG `aria-live="polite"` / `aria-live="assertive"` announcer broadcasting stage transitions, autosave events, and AI generation completion.
+- **Autosave Telemetry & Unsaved Changes Guard (`WorkspaceAutosaveBadge.tsx`, `useUnsavedChangesGuard.ts`)**: Real-time `Saved · Just now` / `Saving...` badge in workspace headers paired with browser `beforeunload` protection when dirty edits are pending.
+- **Laptop Focus Mode & Mobile Touch Compliance**: Compact header/rail layout for `1366x768` viewports, responsive slide-over mobile tutor drawer, and `>= 44x44px` interactive touch targets achieving **100/100 Lighthouse Accessibility**.
 
 ---
 

@@ -231,4 +231,24 @@ graph TD
 - **Global & Scoped Toggles**: Configurable in `/ai-access` (`AiAccessPage.tsx`) under user preferences, and toggled on-the-fly in AskScholar (`ProjectListScreen.tsx`) and Copilot panels (`ContextPanel.tsx` for `OT-01` and `OT-10`).
 - **Live Sources Drawer (`LiveSourcesDrawer.tsx`)**: WCAG AAA/AA compliant collapsible drawer rendering real-time links, full snippets, publication venues, and copyable citations with complete keyboard accessibility.
 
+---
+
+## 11. Central `scholarBrain` Orchestrator, Semantic RAG & Citation Lock Scrubber
+
+### 11.1 Central `scholarBrain` Engine (`server/src/services/scholarBrain.ts`)
+- Unified intelligence orchestrator governing AskScholar, Coursework (`OT-01`), Journal Article (`OT-10`), Thesis (`OT-09`), Research Proposal (`OT-19`), and Presentation Studio (`OT-22`).
+- Decomposes multi-part assignment briefs without question truncation and computes mark-weighted section word allocations.
+
+### 11.2 Hybrid Semantic RAG Engine (`server/src/services/semanticRagEngine.ts`)
+- Combines dense vector similarity with BM25 lexical keyword scoring via Reciprocal Rank Fusion (RRF) to retrieve the highest-entailment evidence chunks for each sub-section prior to synthesis.
+
+### 11.3 Shared Scholar Guardrails & AST JSON Recovery (`src/shared/scholarGuardrails.ts` & `src/shared/llmJsonParser.ts`)
+- **`scholarGuardrails.ts`**: Enforces banned AI filler phrases, quantitative sentence burstiness targets, and strict epistemic hedging rules across client and server prompts.
+- **`llmJsonParser.ts`**: Deterministic state-machine AST parser that repairs truncated JSON streams, unescaped internal quotes, and markdown fences without fragile regex fallbacks.
+
+### 11.4 NLI Citation Lock Scrubber (`server/src/utils/citationLockScrubber.ts`)
+- Audits every generated in-text citation against the project's approved reference ledger.
+- Computes Natural Language Inference (NLI) lexical/semantic entailment between the drafted sentence claim and the cited source abstract/evidence snippet, scrubbing unverified hallucinated citations before persistence.
+
+
 
