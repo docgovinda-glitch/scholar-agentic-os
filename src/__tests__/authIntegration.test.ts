@@ -201,25 +201,30 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
   });
 
   describe("Test 1b: CAPTCHA on sign-in and password reset", () => {
-    // Supabase Auth's CAPTCHA setting is per-PROJECT, not per-endpoint:
-    // enabling it protects the password grant and /recover at the same moment
-    // it protects signup. A sign-in that sends no token therefore stops working
-    // the instant CAPTCHA is switched on, locking out every existing user.
-    it("passes the CAPTCHA token through to signInWithPassword", async () => {
-      mockRpc.mockResolvedValueOnce({ data: "user@example.com", error: null });
-      mockAuth.signInWithPassword.mockResolvedValueOnce({
-        data: { user: { id: "user-1", email: "user@example.com" } },
-        error: null,
+    it("passes the CAPTCHA token through to /api/auth/login", async () => {
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            user: { id: "user-1" },
+            session: { access_token: "tok", refresh_token: "ref" },
+            profile: { fullName: "U", phone: "", affiliation: "A", authenticId: "None" },
+          }),
       });
-      mockFrom.mockReturnValue(
-        makeChainable({ data: { full_name: "U", phone: "", affiliation: "A", authentic_id: "None", account_status: "active" }, error: null })
-      );
 
       await signIn({ username: "someone", password: "pw", captchaToken: "signin_token" });
 
-      expect(mockAuth.signInWithPassword).toHaveBeenCalledWith(
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/auth/login",
         expect.objectContaining({
-          options: expect.objectContaining({ captchaToken: "signin_token" }),
+          method: "POST",
+          body: JSON.stringify({
+            identifier: "someone",
+            password: "pw",
+            captchaToken: "signin_token",
+          }),
         })
       );
     });
@@ -296,25 +301,22 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
     });
 
     it("allows login after email is verified", async () => {
-      mockRpc.mockResolvedValueOnce({
-        data: "verified@example.com",
-        error: null,
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            user: { id: "user-verified" },
+            session: { access_token: "token", refresh_token: "refresh-token" },
+            profile: {
+              fullName: "Verified User",
+              phone: "",
+              affiliation: "University",
+              authenticId: "V123",
+            },
+          }),
       });
-
-      mockAuth.signInWithPassword.mockResolvedValueOnce({
-        data: {
-          user: { id: "user-verified", email: "verified@example.com" },
-          session: { access_token: "token", user: { id: "user-verified" } },
-        },
-        error: null,
-      });
-
-      mockFrom.mockReturnValue(
-        makeChainable({
-          data: { id: "user-verified", full_name: "Verified User", phone: "", affiliation: "University", authentic_id: "V123", account_status: "active" },
-          error: null,
-        })
-      );
 
       const result = await signIn({
         username: "verified",
@@ -431,14 +433,14 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
 
   describe("Test 5: Rate Limiting Enforcement", () => {
     it("returns 429 status when login attempts exceed limit", async () => {
-      mockRpc.mockResolvedValueOnce({
-        data: "spamuser@example.com",
-        error: null,
-      });
-
-      mockAuth.signInWithPassword.mockResolvedValueOnce({
-        data: { user: null, session: null },
-        error: { message: "Incorrect password credentials" },
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: () =>
+          Promise.resolve({
+            success: false,
+            error: "Incorrect password. Please try again.",
+          }),
       });
 
       const result = await signIn({
@@ -507,22 +509,15 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
     });
 
     it("prevents login for restricted accounts", async () => {
-      mockRpc.mockResolvedValueOnce({
-        data: "restricted@example.com",
-        error: null,
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: () =>
+          Promise.resolve({
+            success: false,
+            error: "Your account is restricted. Please contact support.",
+          }),
       });
-
-      mockAuth.signInWithPassword.mockResolvedValueOnce({
-        data: { user: { id: "user-restricted" }, session: null },
-        error: null,
-      });
-
-      mockFrom.mockReturnValue(
-        makeChainable({
-          data: { full_name: "Restricted User", phone: "", affiliation: "University", authentic_id: "R123", account_status: "restricted" },
-          error: null,
-        })
-      );
 
       const result = await signIn({
         username: "restricted",
@@ -534,22 +529,15 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
     });
 
     it("prevents login for suspended accounts", async () => {
-      mockRpc.mockResolvedValueOnce({
-        data: "suspended@example.com",
-        error: null,
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: () =>
+          Promise.resolve({
+            success: false,
+            error: "Your account is suspended. Please contact support.",
+          }),
       });
-
-      mockAuth.signInWithPassword.mockResolvedValueOnce({
-        data: { user: { id: "user-suspended" }, session: null },
-        error: null,
-      });
-
-      mockFrom.mockReturnValue(
-        makeChainable({
-          data: { full_name: "Suspended User", phone: "", affiliation: "University", authentic_id: "S123", account_status: "suspended" },
-          error: null,
-        })
-      );
 
       const result = await signIn({
         username: "suspended",
@@ -561,22 +549,15 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
     });
 
     it("prevents login for deleted accounts", async () => {
-      mockRpc.mockResolvedValueOnce({
-        data: "deleted@example.com",
-        error: null,
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: () =>
+          Promise.resolve({
+            success: false,
+            error: "Your account is deleted. Please contact support.",
+          }),
       });
-
-      mockAuth.signInWithPassword.mockResolvedValueOnce({
-        data: { user: { id: "user-deleted" }, session: null },
-        error: null,
-      });
-
-      mockFrom.mockReturnValue(
-        makeChainable({
-          data: { full_name: "Deleted User", phone: "", affiliation: "University", authentic_id: "D123", account_status: "deleted" },
-          error: null,
-        })
-      );
 
       const result = await signIn({
         username: "deleted",
@@ -619,26 +600,23 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
       // Database trigger creates profile with account_status='active' automatically
 
       // Step 5: User verifies email (simulated - Supabase handles this)
-      // Step 6: User can now login
-      mockRpc.mockResolvedValueOnce({
-        data: "e2e@example.com",
-        error: null,
+      // Step 6: User can now login via /api/auth/login
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            user: { id: "user-e2e" },
+            session: { access_token: "token", refresh_token: "refresh-token" },
+            profile: {
+              fullName: "E2E Test User",
+              phone: "+1234567890",
+              affiliation: "Test University",
+              authenticId: "None",
+            },
+          }),
       });
-
-      mockAuth.signInWithPassword.mockResolvedValueOnce({
-        data: {
-          user: { id: "user-e2e", email: "e2e@example.com" },
-          session: { access_token: "token", user: { id: "user-e2e" } },
-        },
-        error: null,
-      });
-
-      mockFrom.mockReturnValue(
-        makeChainable({
-          data: { id: "user-e2e", account_status: "active", email: "e2e@example.com" },
-          error: null,
-        })
-      );
 
       const loginResult = await signIn({
         username: "e2euser",

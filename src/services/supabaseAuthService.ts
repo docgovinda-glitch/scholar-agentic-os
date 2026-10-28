@@ -263,7 +263,7 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
       success: true,
       profile: {
         fullName: data.profile?.fullName ?? "",
-        email: data.profile?.email ?? "",
+        email: data.profile?.email ?? (identifier.includes("@") ? identifier : ""),
         phone: data.profile?.phone ?? "",
         affiliation: data.profile?.affiliation ?? "",
       },

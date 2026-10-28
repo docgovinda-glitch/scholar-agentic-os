@@ -121,6 +121,7 @@ export default function AddSourceModal({
 
   // Load connected drives on mount if not provided
   useEffect(() => {
+    if (initialDrives && initialDrives.length > 0) return;
     let mounted = true;
     (async () => {
       try {
@@ -131,7 +132,7 @@ export default function AddSourceModal({
     return () => {
       mounted = false;
     };
-  }, [userId]);
+  }, [userId, initialDrives]);
 
   // Load user's ongoing projects to populate the Project Selector
   useEffect(() => {

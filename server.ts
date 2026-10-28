@@ -33,7 +33,9 @@ import http from "node:http";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
 import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerDraftingRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerPresentationRoutes, registerSupabaseProxy, registerSupabaseWsProxy } from "./server/routes/index.ts";
 
-dotenv.config();
+if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
+  dotenv.config();
+}
 
 // Bind to environment $PORT if provided (e.g. Render), defaulting to 3000.
 const PORT = Number(process.env.PORT) || 3000;
