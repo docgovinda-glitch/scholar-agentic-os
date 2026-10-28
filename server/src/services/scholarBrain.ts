@@ -424,6 +424,10 @@ export const scholarBrain = {
     const fullSystemPrompt = buildScholarlyVoiceSystemPrompt({ dialect }) + "\n\n" + effectiveSystemPrompt;
     let fullText = "";
 
+    const streamAbort = new AbortController();
+    const onClose = () => streamAbort.abort();
+    req?.on?.("close", onClose);
+
     try {
       sendSSE("status", { message: "Generating scholarly draft via streaming..." });
 
@@ -436,8 +440,10 @@ export const scholarBrain = {
             segments: [{ label: "Input", text: effectiveUserPrompt }],
             temperature,
             maxTokens,
+            signal: streamAbort.signal,
           },
           (chunk: string) => {
+            if (streamAbort.signal.aborted) return;
             fullText += chunk;
             sendSSE("chunk", { token: chunk, accumulatedLength: fullText.length });
             if (onChunk) onChunk(chunk);
@@ -480,10 +486,14 @@ export const scholarBrain = {
       res.end();
       return { text: guardrails.text, fullText };
     } catch (err: unknown) {
-      const errMsg = (err as Error)?.message || "Streaming failed";
-      sendSSE("error", { message: errMsg });
-      res.end();
+      if (!streamAbort.signal.aborted) {
+        const errMsg = (err as Error)?.message || "Streaming failed";
+        sendSSE("error", { message: errMsg });
+        res.end();
+      }
       throw err;
+    } finally {
+      req?.off?.("close", onClose);
     }
   },
 

@@ -52,6 +52,7 @@ function resolveServerDirname(): string {
 const serverDirname = resolveServerDirname();
 
 const app = express();
+app.set("trust proxy", 1);
 
 // Security headers: CSP is enforced in production while disabled in dev to allow Vite HMR.
 // The policy explicitly permits Supabase endpoints, Gemini BYOK, scholarly discovery APIs, and local AI loopback runners.
@@ -447,6 +448,19 @@ async function startServer() {
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
   });
+
+  const gracefulShutdown = (signal: string) => {
+    console.log(`Received ${signal}, shutting down HTTP server gracefully...`);
+    server.close(() => {
+      process.exit(0);
+    });
+    setTimeout(() => {
+      process.exit(1);
+    }, 10_000).unref();
+  };
+
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 }
 
 export { app };

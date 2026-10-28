@@ -123,7 +123,9 @@ export async function searchOpenAlexLive(query: string, limit = 5): Promise<Live
   if (mailto) params.set("mailto", mailto);
 
   try {
-    const res = await fetch(`https://api.openalex.org/works?${params.toString()}`);
+    const res = await fetch(`https://api.openalex.org/works?${params.toString()}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
     if (!res.ok) return [];
     const data = (await res.json()) as OpenAlexApiResponse;
     const works = data.results ?? [];
@@ -168,6 +170,7 @@ export async function searchCrossrefLive(query: string, limit = 5): Promise<Live
 
   try {
     const res = await fetch(`https://api.crossref.org/works?${params.toString()}`, {
+      signal: AbortSignal.timeout(15_000),
       headers: {
         Accept: "application/json",
         "User-Agent": "ScholarCore/2.0 (mailto:scholar-core@users.noreply.github.com)",
@@ -230,7 +233,9 @@ export async function searchWikipediaLive(query: string, limit = 3): Promise<Liv
   });
 
   try {
-    const res = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`);
+    const res = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
     if (!res.ok) return [];
     const data = (await res.json()) as WikipediaSearchResponse;
     const items = data.query?.search ?? [];
@@ -266,6 +271,7 @@ export async function searchProxyWebLive(query: string, limit = 5): Promise<Live
   try {
     const res = await fetch(`${config.supabaseUrl.replace(/\/+$/, "")}/functions/v1/search-proxy`, {
       method: "POST",
+      signal: AbortSignal.timeout(15_000),
       headers: {
         apikey: config.serviceRoleKey,
         Authorization: `Bearer ${config.serviceRoleKey}`,

@@ -479,6 +479,9 @@ export async function streamOpenRouterJSON(
   sendEvent("log", { message: "> Initializing Agent Framework..." });
 
   let fullContent = "";
+  const streamAbort = new AbortController();
+  const onClose = () => streamAbort.abort();
+  (req as any)?.on?.("close", onClose);
 
   try {
     const result = await streamWithFailover(
@@ -488,8 +491,10 @@ export async function streamOpenRouterJSON(
         userPrompt,
         responseFormat: "json",
         segments: [{ label: "Input", text: userPrompt }],
+        signal: streamAbort.signal,
       },
       (chunk: string) => {
+        if (streamAbort.signal.aborted) return;
         fullContent += chunk;
         sendEvent("chunk", { token: chunk });
       },
@@ -520,6 +525,8 @@ export async function streamOpenRouterJSON(
       return;
     }
     throw err;
+  } finally {
+    (req as any)?.off?.("close", onClose);
   }
 }
 
@@ -574,6 +581,9 @@ export async function streamOpenRouterText(
   sendEvent("log", { message: "> Initializing Agent Framework..." });
 
   let fullContent = "";
+  const streamAbort = new AbortController();
+  const onClose = () => streamAbort.abort();
+  (req as any)?.on?.("close", onClose);
 
   try {
     const result = await streamWithFailover(
@@ -582,8 +592,10 @@ export async function streamOpenRouterText(
         systemPrompt,
         userPrompt,
         segments: [{ label: "Input", text: userPrompt }],
+        signal: streamAbort.signal,
       },
       (chunk: string) => {
+        if (streamAbort.signal.aborted) return;
         fullContent += chunk;
         sendEvent("chunk", { token: chunk });
       },
@@ -612,6 +624,8 @@ export async function streamOpenRouterText(
       return;
     }
     throw err;
+  } finally {
+    (req as any)?.off?.("close", onClose);
   }
 }
 
