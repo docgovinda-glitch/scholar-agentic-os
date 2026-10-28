@@ -181,7 +181,7 @@ FROM public.user_cloud_integrations;
 ## 3. Read-Only CLI Checks (Edge Functions & Render Environment)
 
 ### Check 3.1 — List Deployed Supabase Edge Functions (Read-Only CLI)
-Verifies which of the 5 repo Edge Functions (`send-verification-email`, `request-profile-update`, `approve-profile-update`, `request-password-reset`, `approve-password-reset`)—plus `search-proxy` referenced by `opportunityAgent.ts` and `liveSearch.ts`—are deployed in production and whether `--no-verify-jwt` is set:
+Verifies which of the 5 Edge Functions in `supabase/functions/` (`arxiv-proxy`, `imf-proxy`, `request-profile-update`, `search-proxy`, `who-proxy`) are currently deployed in production, whether `--no-verify-jwt` is set, and whether any legacy/removed Edge Functions still referenced in code comments (`send-verification-email`, `approve-profile-update`, `request-password-reset`, `approve-password-reset`) remain deployed as orphaned functions in production:
 ```bash
 npx supabase functions list --project-ref gfjhsijrwodjvkisouzw
 ```

@@ -3,8 +3,11 @@
  * Validates tokens submitted by the client against the CAPTCHA_SECRET_KEY.
  */
 
-const CAPTCHA_SECRET_KEY = process.env.CAPTCHA_SECRET_KEY;
 const CAPTCHA_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
+function getCaptchaSecretKey(): string | undefined {
+  return process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY || process.env.CAPTCHA_SECRET_KEY;
+}
 
 export interface VerifyCaptchaResult {
   success: boolean;
@@ -16,13 +19,13 @@ export interface VerifyCaptchaResult {
  * Verify a CAPTCHA token from Cloudflare Turnstile.
  * Returns success: true if the token is valid.
  *
- * If CAPTCHA_SECRET_KEY is not configured, verification is skipped
- * (returns success: true). This allows the system to work without
- * CAPTCHA while the feature is being rolled out.
+ * If CAPTCHA_SECRET_KEY / CLOUDFLARE_TURNSTILE_SECRET_KEY is not configured,
+ * verification is skipped (returns success: true).
  */
 export async function verifyCaptchaToken(token: string): Promise<VerifyCaptchaResult> {
+  const secretKey = getCaptchaSecretKey();
   // If CAPTCHA is not configured, skip verification (pass through)
-  if (!CAPTCHA_SECRET_KEY) {
+  if (!secretKey) {
     return { success: true };
   }
 
@@ -35,7 +38,7 @@ export async function verifyCaptchaToken(token: string): Promise<VerifyCaptchaRe
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        secret: CAPTCHA_SECRET_KEY,
+        secret: secretKey,
         response: token,
       }),
     });

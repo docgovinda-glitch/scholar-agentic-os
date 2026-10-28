@@ -1,14 +1,11 @@
 // Invoked by src/services/supabaseAuthService.ts's requestProfileUpdate().
-// Mirrors server.ts's /api/request-profile-update EXACTLY, including its
-// current limitation: this is stateless — it only sends notification
-// emails and does not persist or apply the requested change itself
-// (the original didn't either; the actual field updates happened
-// client-side once the scholar entered the emailed verification key).
-// Not changed/improved in this pass — see docs/planning/hosting-and-topology.md
-// for why fidelity to existing behavior was prioritized over redesigning it.
-//
 // Deploy: supabase functions deploy request-profile-update
 // Requires project secrets: RESEND_API_KEY, ADMIN_EMAIL (RESEND_FROM_EMAIL optional)
+//
+// Security invariant (F-04):
+// - NEVER return `verificationKey` in any HTTP response body.
+// - If RESEND_API_KEY / ADMIN_EMAIL is unconfigured or Resend delivery fails,
+//   fail closed with HTTP 503 BEFORE any pending_profile_update persistence.
 
 import { ADMIN_EMAIL } from "../_shared/adminClient.ts";
 import { sendEmail, brandedEmailHtml } from "../_shared/resend.ts";
@@ -36,6 +33,20 @@ Deno.serve(async (req) => {
     });
   }
 
+  if (!ADMIN_EMAIL || !Deno.env.get("RESEND_API_KEY")) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        emailSent: false,
+        error: "Profile update email service is unavailable.",
+      }),
+      {
+        status: 503,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      }
+    );
+  }
+
   const verificationKey = `UP-${Math.floor(100000 + Math.random() * 900000)}`;
 
   const rows = [
@@ -61,7 +72,21 @@ Deno.serve(async (req) => {
     ),
   });
 
-  return new Response(JSON.stringify({ success: true, emailSent: sent, verificationKey, error }), {
+  if (!sent) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        emailSent: false,
+        error: error || "Failed to deliver admin verification email.",
+      }),
+      {
+        status: 503,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      }
+    );
+  }
+
+  return new Response(JSON.stringify({ success: true, emailSent: true }), {
     status: 200,
     headers: { "Content-Type": "application/json", ...corsHeaders },
   });
