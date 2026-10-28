@@ -25,7 +25,7 @@ import {
   AudienceQaSimulator,
   type AudienceQaQuestion,
 } from '../../features/slides';
-import { getProject, saveIntakeAnswers } from '../api';
+import { authedFetch, getProject, saveIntakeAnswers } from '../api';
 import ScholarSidebar from '../../components/navigation/ScholarSidebar';
 import LiveSlidePlayer from './components/LiveSlidePlayer';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
@@ -144,7 +144,7 @@ export default function PresentationWorkspace({
 
         if (!savedDeck) {
           try {
-            const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/presentation/deck`);
+            const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/presentation/deck`);
             if (res.ok) {
               const data = await res.json();
               if (data.deck && Array.isArray(data.deck.slides) && data.deck.slides.length > 0) {
@@ -235,8 +235,8 @@ export default function PresentationWorkspace({
             source_module: deckToSave.sourceModule || 'presentation-studio',
           };
 
-          // 1. Save directly to project-scoped presentation endpoint
-          fetch(
+          // 1. Save directly to project-scoped presentation endpoint via authedFetch
+          authedFetch(
             `/api/projects/${encodeURIComponent(projectId)}/presentation/deck`,
             {
               method: 'PUT',
@@ -255,7 +255,7 @@ export default function PresentationWorkspace({
             .catch(() => {});
 
           // 2. Also update /api/presentations/:id for unified access
-          const res = await fetch(`/api/presentations/${encodeURIComponent(deckToSave.id)}`, {
+          const res = await authedFetch(`/api/presentations/${encodeURIComponent(deckToSave.id)}`, {
             method: 'PUT',
             headers,
             body: JSON.stringify(legacyPayload),

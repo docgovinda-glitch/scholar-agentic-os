@@ -104,6 +104,13 @@ export default function Step04Delivery({ deck, onPrevStep, onClose }: Step04Deli
     setShowExportMenu(false);
   };
 
+  const handleExportPdf = () => {
+    setShowExportMenu(false);
+    if (typeof window !== 'undefined' && typeof window.print === 'function') {
+      window.print();
+    }
+  };
+
   return (
     <div
       className={`min-h-screen w-full flex flex-col justify-between transition-colors relative select-none ${activeTheme.canvasClass}`}
@@ -192,6 +199,13 @@ export default function Step04Delivery({ deck, onPrevStep, onClose }: Step04Deli
                   className="w-full text-left px-3 py-2 text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 rounded-lg"
                 >
                   Export Markdown / Marp
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  className="w-full text-left px-3 py-2 text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 rounded-lg"
+                >
+                  Print / Save as PDF (.pdf)
                 </button>
               </div>
             )}

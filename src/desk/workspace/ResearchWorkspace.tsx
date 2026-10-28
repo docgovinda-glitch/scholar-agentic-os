@@ -67,7 +67,7 @@ function ResearchWorkspaceInner({
   const [engineMenuOpen, setEngineMenuOpen] = useState(false);
   const engineMenuRef = React.useRef<HTMLDivElement>(null);
 
-  useUnsavedChangesGuard(false);
+  useUnsavedChangesGuard(Boolean(isLoading));
 
   // Auto-collapse side panels when user engages Focus/Zen writing mode on < 1440px screens
   React.useEffect(() => {
@@ -118,52 +118,39 @@ function ResearchWorkspaceInner({
 
   // Live Header Telemetry Strip Metrics
   const targetWords = React.useMemo(() => {
-    try {
-      const raw = project?.answers?.["word_budget_blueprint"];
-      if (raw) {
-        const bp = JSON.parse(raw);
-        if (bp?.targetTotalWords) return bp.targetTotalWords;
-      }
-    } catch {}
+    const bp = safeParseAnswerField<{ targetTotalWords?: number } | null>(
+      project?.answers?.["word_budget_blueprint"],
+      null
+    );
+    if (bp && typeof bp.targetTotalWords === "number" && bp.targetTotalWords > 0) {
+      return bp.targetTotalWords;
+    }
     const rawCount = project?.answers?.["target_word_count"];
-    return rawCount ? parseInt(rawCount, 10) || 6000 : 6000;
+    return rawCount ? parseInt(String(rawCount), 10) || 6000 : 6000;
   }, [project?.answers]);
 
   const actualWords = React.useMemo(() => {
     const rawDraft = project?.answers?.["manuscript_draft"] || project?.answers?.["assembled_draft"];
     if (rawDraft) {
-      try {
-        const parsed = JSON.parse(rawDraft);
-        if (Array.isArray(parsed)) {
-          return parsed.reduce((acc: number, sec: Record<string, unknown>) => {
-            const content = String(sec.content || "");
-            return acc + (content ? content.trim().split(/\s+/).filter(Boolean).length : 0);
-          }, 0);
-        }
-      } catch {
-        return String(rawDraft).trim().split(/\s+/).filter(Boolean).length;
+      const parsed = safeParseAnswerField<unknown>(rawDraft, null);
+      if (Array.isArray(parsed)) {
+        return parsed.reduce((acc: number, sec: Record<string, unknown>) => {
+          const content = String(sec?.content || "");
+          return acc + (content ? content.trim().split(/\s+/).filter(Boolean).length : 0);
+        }, 0);
       }
+      return String(rawDraft).trim().split(/\s+/).filter(Boolean).length;
     }
     return 0;
   }, [project?.answers]);
 
   const totalVerifiedSourcesAndData = React.useMemo(() => {
-    let count = 0;
-    try {
-      const u = project?.answers?.["user_datasets"];
-      if (u) {
-        const parsed = JSON.parse(u);
-        if (Array.isArray(parsed)) count += parsed.length;
-      }
-    } catch {}
-    try {
-      const v = project?.answers?.["approved_vault_sources"] || project?.answers?.["vault_sources"];
-      if (v) {
-        const parsed = JSON.parse(v);
-        if (Array.isArray(parsed)) count += parsed.length;
-      }
-    } catch {}
-    return count;
+    const datasets = safeParseAnswerField<unknown[]>(project?.answers?.["user_datasets"], []);
+    const vault = safeParseAnswerField<unknown[]>(
+      project?.answers?.["approved_vault_sources"] || project?.answers?.["vault_sources"],
+      []
+    );
+    return (Array.isArray(datasets) ? datasets.length : 0) + (Array.isArray(vault) ? vault.length : 0);
   }, [project?.answers]);
 
   const activeModelDisplay = manualModelOverride
