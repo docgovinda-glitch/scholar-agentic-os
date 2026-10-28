@@ -141,6 +141,7 @@ describe("Desk — project list", () => {
 
     // The main canvas is purged of project lists; accessing Knowledge Vault from sidebar shows empty state
     fireEvent.click(await screen.findByRole("button", { name: /Knowledge Vault/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Projects/i }));
     expect(await screen.findByText("No projects yet")).toBeInTheDocument();
   });
 
@@ -157,6 +158,7 @@ describe("Desk — project list", () => {
 
     // Access project management via Knowledge Vault in the left sidebar
     fireEvent.click(await screen.findByRole("button", { name: /Knowledge Vault/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Projects/i }));
 
     expect(await screen.findByText(/Workflow Completion/)).toBeInTheDocument();
     expect((await screen.findAllByText("50%"))[0]).toBeInTheDocument();

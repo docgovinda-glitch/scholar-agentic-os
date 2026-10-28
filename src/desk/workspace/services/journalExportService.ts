@@ -8,6 +8,7 @@
  * 3. LaTeX (.tex) and BibTeX (.bib) source for STEM and computing submissions.
  */
 
+import { showAppToast } from "../../../components/ui/FeedbackSystem";
 import {
   Document,
   Packer,
@@ -705,7 +706,7 @@ export function printJournalManuscript(params: JournalExportParams): void {
 
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
-    alert("Popup blocked: please allow popups to open the camera-ready print preview.");
+    showAppToast("Popup blocked: please allow popups to open the camera-ready print preview.", "warning");
     return;
   }
 

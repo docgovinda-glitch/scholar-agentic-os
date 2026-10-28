@@ -28,6 +28,7 @@ import {
 import { getProject, saveIntakeAnswers } from '../api';
 import ScholarSidebar from '../../components/navigation/ScholarSidebar';
 import LiveSlidePlayer from './components/LiveSlidePlayer';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 
 export type { PresentationStudioStep } from '../../features/slides';
 
@@ -60,6 +61,7 @@ export default function PresentationWorkspace({
   const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('saved');
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [projectVersion, setProjectVersion] = useState<number>(1);
+  useUnsavedChangesGuard(autosaveStatus === 'saving');
   const [isHydrated, setIsHydrated] = useState(false);
   const [isAskScholarOpen, setIsAskScholarOpen] = useState(false);
   const [isQaSimulatorOpen, setIsQaSimulatorOpen] = useState(false);

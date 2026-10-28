@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { showAppToast } from "../../../components/ui/FeedbackSystem";
 import type { AssignmentDraftingSection, DiscoveredSource } from "../types";
 import {
   Sparkles,
@@ -343,7 +344,7 @@ export function DraftingActiveEditor({
     const start = el.selectionStart;
     const end = el.selectionEnd;
     if (start === end) {
-      alert("Please select some text to elevate.");
+      showAppToast("Please select some text to elevate.", "warning");
       return;
     }
     const selectedText = manualText.substring(start, end);

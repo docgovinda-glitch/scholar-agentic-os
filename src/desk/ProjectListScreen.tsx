@@ -27,6 +27,7 @@ import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
 import { syncActiveSessionToRegistry } from "../services/auth/multiAccountService";
 import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
+import { showAppToast, requestAppConfirm } from "../components/ui/FeedbackSystem";
 import UserAccountMenu from "./components/UserAccountMenu";
 import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
 import VaultScreen from "./vault/VaultScreen";
@@ -1082,7 +1083,7 @@ export default function ProjectListScreen({
         const trimmed = newTitle.trim();
         // Check for duplicate title against other existing projects (case-insensitive)
         if (isDuplicateProjectTitle(trimmed, item.projectId, projects || [])) {
-          alert(`A project with the name "${trimmed}" already exists. Please choose a unique name.`);
+          showAppToast(`A project with the name "${trimmed}" already exists. Please choose a unique name.`, "error");
           return;
         }
         // Optimistic UI for Recents: update local React state instantly for a snappy UX
@@ -1256,7 +1257,12 @@ export default function ProjectListScreen({
   }
 
   async function handleSignOut() {
-    const confirmed = window.confirm("Sign out of Scholar Core?");
+    const confirmed = await requestAppConfirm({
+      title: "Sign Out",
+      message: "Sign out of Scholar Core?",
+      confirmLabel: "Sign Out",
+      variant: "danger",
+    });
     if (!confirmed) return;
     getSupabaseClient().auth.signOut();
   }
@@ -1739,7 +1745,7 @@ export default function ProjectListScreen({
           <div className="flex-1 overflow-y-auto w-full relative">
             <KnowledgeVault
               userId={userId || "local-user"}
-              initialTab="projects"
+              initialTab="sources"
               onClose={handleCloseCentralView}
               onOpenProject={(pId) => onOpen(pId)}
               onProjectRenamed={handleProjectRenamed}

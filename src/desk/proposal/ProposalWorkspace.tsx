@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import type { ProposalStage, ProposalProjectData } from "./types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 import { authedJsonFetch, getProject, saveIntakeAnswers } from "../api";
+import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
+import { WorkspaceAutosaveBadge } from "../../components/ui/WorkspaceAutosaveBadge";
 import StudySectionScorer from "./components/StudySectionScorer";
 import type {
   StudySectionSimulationResult,
@@ -58,6 +60,7 @@ export default function ProposalWorkspace({
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [projectVersion, setProjectVersion] = useState<number>(1);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useUnsavedChangesGuard(saveStatus === "saving");
 
   // Study section simulation state
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -247,22 +250,11 @@ export default function ProposalWorkspace({
                 {proposalData.mechanism}
               </span>
               {/* Save Status Badge */}
-              <span
-                data-testid="autosave-status"
-                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
-                  saveStatus === "saving"
-                    ? "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
-                    : saveStatus === "error"
-                    ? "bg-red-100 text-red-900 dark:bg-red-950/60 dark:text-red-200"
-                    : "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200"
-                }`}
-              >
-                {saveStatus === "saving"
-                  ? "Saving changes…"
-                  : saveStatus === "error"
-                  ? "Offline Backup"
-                  : `All changes saved${lastSavedTime ? ` · ${lastSavedTime}` : ""}`}
-              </span>
+              <WorkspaceAutosaveBadge
+                status={saveStatus}
+                lastSavedTime={lastSavedTime || undefined}
+                version={projectVersion}
+              />
             </div>
             <p className="text-[10px] text-[color:var(--text-muted)]">
               {proposalData.fundingAgency} · ${proposalData.targetBudgetUSD.toLocaleString()} Ceiling ({proposalData.durationMonths} Mo) · v{projectVersion}

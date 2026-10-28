@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowLeft, Sparkles, PanelLeftOpen } from 'lucide-react';
 import type { PresentationStudioStep } from '../types/slides';
 import ScholarCoreLogo from '../../../components/ScholarCoreLogo';
+import { WorkspaceAutosaveBadge } from '../../../components/ui/WorkspaceAutosaveBadge';
 
 export interface StepItem {
   id: PresentationStudioStep;
@@ -106,41 +107,11 @@ export default function PresentationHeader({
                 SCHOLAR SLIDES ·
               </span>
               <span className="sr-only">Presentation Studio</span>
-              <span
-                className={`text-xs flex items-center gap-1.5 whitespace-nowrap ${
-                  autosaveStatus === 'saving'
-                    ? 'text-amber-700 dark:text-amber-300'
-                    : autosaveStatus === 'error'
-                    ? 'text-rose-700 dark:text-rose-300'
-                    : 'text-neutral-600 dark:text-neutral-400'
-                }`}
-                data-testid="autosave-status"
-              >
-                <span
-                  className={
-                    autosaveStatus === 'saving'
-                      ? 'text-amber-600'
-                      : autosaveStatus === 'error'
-                      ? 'text-rose-600'
-                      : 'text-emerald-600 dark:text-emerald-400'
-                  }
-                >
-                  {autosaveStatus === 'saving' ? '◌' : '●'}
-                </span>
-                <span>
-                  {autosaveStatus === 'saving'
-                    ? 'Saving changes...'
-                    : autosaveStatus === 'error'
-                    ? 'Offline Backup'
-                    : 'All changes saved'}
-                </span>
-                {lastSavedTime && <span className="opacity-70">({lastSavedTime})</span>}
-                {projectVersion !== undefined && (
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-neutral-200/80 dark:bg-white/10 font-mono text-neutral-700 dark:text-neutral-300">
-                    v{projectVersion}
-                  </span>
-                )}
-              </span>
+              <WorkspaceAutosaveBadge
+                status={autosaveStatus}
+                version={projectVersion}
+                lastSavedTime={lastSavedTime || undefined}
+              />
             </div>
 
             <div className="flex items-center gap-1.5 mt-0.5">

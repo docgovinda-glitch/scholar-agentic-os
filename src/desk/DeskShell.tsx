@@ -12,6 +12,7 @@ import {
 } from "./api";
 import { isDuplicateProjectTitle } from "./projectNaming";
 import { plainTextToDocument } from "./plainTextToDocument";
+import { showAppToast } from "../components/ui/FeedbackSystem";
 import Header from "./regions/Header";
 
 import Rail from "./regions/Rail";
@@ -172,7 +173,7 @@ export default function DeskShell({
     try {
       const { items } = await listProjects();
       if (isDuplicateProjectTitle(trimmed, project.projectId, items)) {
-        alert(`A project with the name "${trimmed}" already exists. Please choose a unique name.`);
+        showAppToast(`A project with the name "${trimmed}" already exists. Please choose a unique name.`, "error");
         return;
       }
     } catch {
@@ -190,7 +191,7 @@ export default function DeskShell({
     } catch (err) {
       console.error("Failed to rename project from header:", err);
       setProject(previous);
-      alert((err as Error).message || "Failed to rename project.");
+      showAppToast((err as Error).message || "Failed to rename project.", "error");
     }
   }, [project, projectId]);
 

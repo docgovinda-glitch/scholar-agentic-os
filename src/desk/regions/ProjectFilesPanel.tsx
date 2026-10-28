@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { authedJsonFetch, authedFetch } from "../api";
+import { showAppToast } from "../../components/ui/FeedbackSystem";
 
 interface ProjectFile {
   id: string;
@@ -52,11 +53,11 @@ export default function ProjectFilesPanel({ projectId }: { projectId: string }) 
       } else {
         const err = await res.json();
         console.error("Upload failed", err);
-        alert(`Upload failed: ${err.error || "Unknown error"}`);
+        showAppToast(`Upload failed: ${err.error || "Unknown error"}`, "error");
       }
     } catch (error) {
       console.error("Upload error", error);
-      alert("Failed to upload file.");
+      showAppToast("Failed to upload file.", "error");
     } finally {
       setUploading(false);
       if (fileInputRef.current) {

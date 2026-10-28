@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { showAppToast } from '../../../components/ui/FeedbackSystem';
 import {
   Palette,
   Sparkles,
@@ -268,7 +269,7 @@ export default function CustomThemeStudio({
       showToast(`✓ Extracted content and recreated design theme from "${file.name}"!`);
     } catch (err: any) {
       console.error(err);
-      alert(`Could not parse deck: ${err.message || 'Unknown error'}`);
+      showAppToast(`Could not parse deck: ${err.message || 'Unknown error'}`, 'error');
     } finally {
       setIsUploadingDeck(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -377,7 +378,7 @@ export default function CustomThemeStudio({
       setJsonInput('');
       showToast(`✓ Successfully imported "${data.name}"!`);
     } catch (err: any) {
-      alert(`Import Failed: ${err.message || 'Invalid JSON format'}`);
+      showAppToast(`Import Failed: ${err.message || 'Invalid JSON format'}`, 'error');
     }
   };
 

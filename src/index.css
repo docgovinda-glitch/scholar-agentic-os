@@ -757,7 +757,9 @@ button:disabled {
    a minimum hit area instead, which meets the 44px WCAG 2.5.5 target without
    dictating the control's painted size. */
 @media (max-width: 768px) {
-  button, [role="button"], a[href] {
+  button:not([data-compact="true"]):not(.toolbar-btn):not([role="toolbar"] button):not(table button),
+  [role="button"]:not([data-compact="true"]):not(.toolbar-btn):not([role="toolbar"] [role="button"]):not(table [role="button"]),
+  a[href]:not([data-compact="true"]):not(.toolbar-btn):not([role="toolbar"] a):not(table a) {
     min-height: 44px;
     min-width: 44px;
   }

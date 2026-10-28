@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { searchVaultItems, type VaultItem, isVaultUnlocked } from "../../services/vaultContents";
 import { getEvidenceLedger, addManualSource, extractEvidenceQuote } from "../api";
+import { showAppToast } from "../../components/ui/FeedbackSystem";
 
 export default function ProjectVaultPanel({
   projectId,
@@ -173,7 +174,7 @@ export default function ProjectVaultPanel({
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to upload and parse file.");
+      showAppToast("Failed to upload and parse file.", "error");
     } finally {
       setUploading(false);
       if (fileInputRef.current) {

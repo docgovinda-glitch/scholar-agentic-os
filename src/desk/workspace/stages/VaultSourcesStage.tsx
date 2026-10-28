@@ -9,6 +9,7 @@ import { listVaultItems, addVaultItem, type VaultItem } from "../../../services/
 import { rankVaultItemsForProject, type SemanticSearchResult } from "../../../services/vault/semanticSearchService";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
+import { showAppToast } from "../../../components/ui/FeedbackSystem";
 
 export interface VaultSourceItem {
   id: string;
@@ -557,7 +558,7 @@ export default function VaultSourcesStage({
       setIsIngestModalOpen(false);
       setIngestForm(INITIAL_INGEST_FORM);
     } catch (err: any) {
-      alert(`Could not ingest source: ${err.message || "Unknown error"}`);
+      showAppToast(`Could not ingest source: ${err.message || "Unknown error"}`, "error");
     } finally {
       setIsIngesting(false);
     }

@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from "react";
+import { showAppToast } from "../../components/ui/FeedbackSystem";
 import {
   Search,
   BookOpen,
@@ -87,7 +88,7 @@ function FormatIcon({ id, className = "w-4 h-4" }: { id: string; className?: str
 
 export default function KnowledgeVault({
   userId,
-  initialTab = "projects",
+  initialTab = "sources",
   onClose,
   onOpenProject,
   onProjectRenamed,
@@ -236,7 +237,7 @@ export default function KnowledgeVault({
     } catch (err) {
       console.error("Failed to rename project:", err);
       setProjects(previousProjects);
-      alert("Failed to save project heading. Please try again.");
+      showAppToast("Failed to save project heading. Please try again.", "error");
     }
   };
 
@@ -333,7 +334,7 @@ export default function KnowledgeVault({
       unmarkDeleted(targetProject.projectId);
       setProjects(previousProjects);
       const msg = err instanceof Error ? err.message : "Failed to delete project";
-      alert(`Could not delete project: ${msg}`);
+      showAppToast(`Could not delete project: ${msg}`, "error");
     }
   };
 

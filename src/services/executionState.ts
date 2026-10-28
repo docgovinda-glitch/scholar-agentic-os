@@ -60,6 +60,8 @@ function notify(targetScopeId?: string) {
   });
 }
 
+import { announcePolite } from "../components/ui/AriaLiveAnnouncer";
+
 export function startExecutionScope(
   scopeId: string,
   providerId: string,
@@ -82,6 +84,7 @@ export function startExecutionScope(
   };
   scopes.set(scopeId, scope);
   notify();
+  announcePolite(`AI generation started: ${providerName}${modelId ? ` (${modelId})` : ""}`);
   return scope;
 }
 
@@ -130,6 +133,7 @@ export function endExecutionScope(
       currentScopeId = Array.from(scopes.keys())[0];
     }
     notify();
+    announcePolite(`AI generation ${status === "completed" || status === "success" ? "completed" : status}`);
   }
 }
 

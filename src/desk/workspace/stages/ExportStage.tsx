@@ -10,6 +10,7 @@ import {
   generateJournalLatex,
   downloadBlob,
 } from "../services/journalExportService";
+import { showAppToast } from "../../../components/ui/FeedbackSystem";
 
 export type AcademicTemplate = "ieee" | "nature" | "acm" | "apa7" | "typst_modern" | "elsevier";
 
@@ -440,7 +441,7 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      alert(`Export trigger: ${msg}`);
+      showAppToast(`Export trigger: ${msg}`, "error");
     } finally {
       setTimeout(() => setDownloadingFormat(null), 600);
     }

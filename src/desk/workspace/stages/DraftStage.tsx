@@ -6,6 +6,7 @@ import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedStreamFetch, saveIntakeAnswers, executeAgenticLLM } from "../../api";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
+import { showAppToast } from "../../../components/ui/FeedbackSystem";
 import {
   buildSectionDraftPrompts,
   generateLocalSectionFallback,
@@ -511,7 +512,7 @@ export default function DraftStage({
 
   const handleDeleteSection = async (idxToDelete: number) => {
     if (sections.length <= 1) {
-      alert("A manuscript must retain at least one core section.");
+      showAppToast("A manuscript must retain at least one core section.", "warning");
       return;
     }
     const updated = sections.filter((_, i) => i !== idxToDelete);

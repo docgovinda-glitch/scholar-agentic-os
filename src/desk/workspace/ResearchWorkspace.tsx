@@ -10,6 +10,9 @@ import { useAiAccess } from "../aiAccess/useAiAccess";
 import Tray from "../regions/Tray";
 import AiExhaustedModal from "./AiExhaustedModal";
 import { subscribeExecutionState, type ExecutionScope } from "../../services/executionState";
+import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
+import { WorkspaceAutosaveBadge } from "../../components/ui/WorkspaceAutosaveBadge";
+import { safeParseAnswerField } from "../../shared/projectStateSchema";
 
 import ProtocolBlueprintMode from "./ProtocolBlueprintMode";
 import EvidenceMatrixMode from "./EvidenceMatrixMode";
@@ -53,7 +56,9 @@ function ResearchWorkspaceInner({
 
   const { connected, settings } = useAiAccess();
 
-  const [contextPanelOpen, setContextPanelOpen] = useState(true);
+  const [contextPanelOpen, setContextPanelOpen] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 1440 : false
+  );
   const [stageNavOpen, setStageNavOpen] = useState(false);
   const [trayOpen, setTrayOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -61,6 +66,16 @@ function ResearchWorkspaceInner({
   const [isZenMode, setIsZenMode] = useState(false);
   const [engineMenuOpen, setEngineMenuOpen] = useState(false);
   const engineMenuRef = React.useRef<HTMLDivElement>(null);
+
+  useUnsavedChangesGuard(false);
+
+  // Auto-collapse side panels when user engages Focus/Zen writing mode on < 1440px screens
+  React.useEffect(() => {
+    if (isZenMode && typeof window !== "undefined" && window.innerWidth < 1440) {
+      setContextPanelOpen(false);
+      setSidebarCollapsed(true);
+    }
+  }, [isZenMode]);
 
   // Close engine popover when clicking outside
   React.useEffect(() => {
@@ -322,10 +337,7 @@ function ResearchWorkspaceInner({
               <span className="w-px h-3 bg-[color:var(--border-subtle)]" />
 
               {/* Telemetry 4: Autosave */}
-              <div className="flex items-center gap-1 text-[10px] font-mono text-[color:var(--text-muted)]" title={`Autosave Status v${autosaveVersion}`}>
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500/80 shrink-0" />
-                <span>Autosave v{autosaveVersion}</span>
-              </div>
+              <WorkspaceAutosaveBadge version={autosaveVersion} />
             </div>
 
             <div className="flex items-center gap-2">

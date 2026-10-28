@@ -81,7 +81,7 @@ describe("KnowledgeVault component", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the Knowledge Vault header and Projects tab by default", async () => {
+  it("renders the Knowledge Vault header and Sources tab by default", async () => {
     render(
       <KnowledgeVault
         userId="user-123"
@@ -95,20 +95,15 @@ describe("KnowledgeVault component", () => {
     expect(screen.getByRole("button", { name: /Sources/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Settings/i })).toBeInTheDocument();
 
-    // Verify progress tracking metrics ribbon
-    expect(await screen.findByText("Active Projects")).toBeInTheDocument();
-    expect(screen.getByText("Quality Gates")).toBeInTheDocument();
-    expect(screen.getByText("Overall Progress Average")).toBeInTheDocument();
-
-    // Verify projects list
-    expect(screen.getByText("Genome Editing in Marine Diatoms")).toBeInTheDocument();
-    expect(screen.getByText("Philosophy of Science Essay")).toBeInTheDocument();
+    // Verify Sources tab is default
+    expect(await screen.findByTestId("mock-source-library")).toBeInTheDocument();
   });
 
   it("filters projects by search query in the Vault", async () => {
     render(
       <KnowledgeVault
         userId="user-123"
+        initialTab="projects"
         onClose={vi.fn()}
         onOpenProject={vi.fn()}
       />
@@ -131,6 +126,7 @@ describe("KnowledgeVault component", () => {
     render(
       <KnowledgeVault
         userId="user-123"
+        initialTab="projects"
         onClose={vi.fn()}
         onOpenProject={vi.fn()}
       />
@@ -155,6 +151,7 @@ describe("KnowledgeVault component", () => {
     render(
       <KnowledgeVault
         userId="user-123"
+        initialTab="projects"
         onClose={vi.fn()}
         onOpenProject={onOpenProject}
       />
@@ -170,6 +167,7 @@ describe("KnowledgeVault component", () => {
     render(
       <KnowledgeVault
         userId="user-123"
+        initialTab="projects"
         onClose={vi.fn()}
         onOpenProject={vi.fn()}
       />
@@ -199,6 +197,7 @@ describe("KnowledgeVault component", () => {
     render(
       <KnowledgeVault
         userId="user-123"
+        initialTab="projects"
         onClose={vi.fn()}
         onOpenProject={vi.fn()}
       />
@@ -242,6 +241,7 @@ describe("KnowledgeVault component", () => {
     render(
       <KnowledgeVault
         userId="user-123"
+        initialTab="projects"
         onClose={vi.fn()}
         onOpenProject={vi.fn()}
       />
@@ -258,6 +258,7 @@ describe("KnowledgeVault component", () => {
     render(
       <KnowledgeVault
         userId="user-123"
+        initialTab="projects"
         onClose={vi.fn()}
         onOpenProject={vi.fn()}
         onProjectRenamed={onProjectRenamed}
@@ -299,6 +300,7 @@ describe("KnowledgeVault component", () => {
     render(
       <KnowledgeVault
         userId="user-123"
+        initialTab="projects"
         onClose={vi.fn()}
         onOpenProject={vi.fn()}
       />
@@ -333,6 +335,7 @@ describe("KnowledgeVault component", () => {
       render(
         <KnowledgeVault
           userId="user-123"
+          initialTab="projects"
           onClose={vi.fn()}
           onOpenProject={vi.fn()}
         />
@@ -354,6 +357,7 @@ describe("KnowledgeVault component", () => {
       render(
         <KnowledgeVault
           userId="user-123"
+          initialTab="projects"
           onClose={vi.fn()}
           onOpenProject={vi.fn()}
         />
@@ -388,6 +392,7 @@ describe("KnowledgeVault component", () => {
       render(
         <KnowledgeVault
           userId="user-123"
+          initialTab="projects"
           onClose={vi.fn()}
           onOpenProject={vi.fn()}
         />
@@ -406,6 +411,7 @@ describe("KnowledgeVault component", () => {
       render(
         <KnowledgeVault
           userId="user-123"
+          initialTab="projects"
           onClose={vi.fn()}
           onOpenProject={onOpenProject}
         />
@@ -434,6 +440,7 @@ describe("KnowledgeVault component", () => {
       render(
         <KnowledgeVault
           userId="user-123"
+          initialTab="projects"
           onClose={vi.fn()}
           onOpenProject={vi.fn()}
           onProjectRenamed={onProjectRenamed}

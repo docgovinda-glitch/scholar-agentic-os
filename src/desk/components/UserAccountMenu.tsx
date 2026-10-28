@@ -7,6 +7,7 @@ import {
   removeSavedAccount,
   type StoredAccountProfile,
 } from "../../services/auth/multiAccountService";
+import { requestAppConfirm } from "../../components/ui/FeedbackSystem";
 import EmbeddedAuthModal from "../auth/EmbeddedAuthModal";
 
 export interface UserAccountMenuProps {
@@ -90,7 +91,12 @@ export default function UserAccountMenu({
   }
 
   async function handleSignOut() {
-    const confirmed = window.confirm("Sign out of Scholar Core and return to Home?");
+    const confirmed = await requestAppConfirm({
+      title: "Sign Out",
+      message: "Sign out of Scholar Core and return to Home?",
+      confirmLabel: "Sign Out",
+      variant: "danger",
+    });
     if (!confirmed) return;
     try {
       const supabase = getSupabaseClient();

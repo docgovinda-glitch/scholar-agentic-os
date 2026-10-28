@@ -3,6 +3,8 @@ import type { AssignmentStage, AssignmentPhaseId } from "./types";
 import { AssignmentProvider, useAssignmentWorkspace } from "./AssignmentContext";
 import AssignmentStageNavigation from "./components/AssignmentStageNavigation";
 import { authedJsonFetch } from "../api";
+import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
+import { WorkspaceAutosaveBadge } from "../../components/ui/WorkspaceAutosaveBadge";
 
 import { ASSIGNMENT_AGENT_CONFIGS, ASSIGNMENT_PHASES } from "./types";
 import { sendAssignmentCopilotMessage } from "./services/assignmentCopilotService";
@@ -420,6 +422,7 @@ function AssignmentWorkspaceInner({
 
   const currentPhaseDef = ASSIGNMENT_PHASES.find((p) => p.id === currentPhase);
   const [tutorPanelOpen, setTutorPanelOpen] = useState(true);
+  useUnsavedChangesGuard(Boolean(isLoading));
 
   // Inline-editable title with auto-save on blur / Enter
   const initialTitle =
@@ -622,6 +625,8 @@ function AssignmentWorkspaceInner({
 
           {/* Right Section: Minimal vs Detailed Mode Toggle & Socratic Tutor Drawer Toggle */}
           <div className="flex items-center gap-2.5 shrink-0">
+            <WorkspaceAutosaveBadge version={project?.version} />
+
             {/* Minimal vs Detailed Segmented Control (OT-10 Parity) */}
             <div
               role="radiogroup"
@@ -692,27 +697,55 @@ function AssignmentWorkspaceInner({
 
         {/* Right Column: Collapsible Context Panel Copilot Drawer */}
         {tutorPanelOpen && (
-          <div className="w-80 lg:w-96 shrink-0 h-full overflow-hidden hidden sm:flex flex-col bg-[color:var(--surface-canvas)] border-l border-neutral-200/80 dark:border-white/10">
-            <React.Suspense fallback={<AiTutorSkeleton />}>
-              <ContextPanel
-                currentStage={currentPhase}
-                stageName={currentPhaseDef?.label || currentPhase}
-                isOpen={tutorPanelOpen}
-                onToggle={() => setTutorPanelOpen(false)}
-                agent={ASSIGNMENT_AGENT_CONFIGS[currentPhase]}
-                projectId={projectId}
-                onSendMessage={(text, history) =>
-                  sendAssignmentCopilotMessage(
-                    projectId,
-                    currentPhase,
-                    text,
-                    history,
-                    projectState
-                  )
-                }
-              />
-            </React.Suspense>
-          </div>
+          <>
+            {/* Mobile semi-transparent backdrop */}
+            <div
+              data-testid="mobile-tutor-backdrop"
+              className="fixed inset-0 z-40 bg-black/50 sm:hidden"
+              onClick={() => setTutorPanelOpen(false)}
+            />
+            {/* Slide-over Drawer (Mobile: fixed overlay; Desktop: docked side panel) */}
+            <div
+              data-testid="assignment-tutor-drawer"
+              className="fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-[color:var(--surface-canvas)] shadow-2xl flex flex-col sm:static sm:z-auto sm:inset-auto sm:w-80 sm:lg:w-96 sm:shrink-0 sm:h-full sm:shadow-none sm:border-l sm:border-neutral-200/80 sm:dark:border-white/10"
+            >
+              {/* Mobile Close Bar */}
+              <div className="flex sm:hidden items-center justify-between px-4 py-2.5 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]">
+                <span className="text-xs font-semibold text-[color:var(--text-secondary)]">AI Socratic Tutor</span>
+                <button
+                  type="button"
+                  data-testid="mobile-tutor-close"
+                  onClick={() => setTutorPanelOpen(false)}
+                  className="p-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
+                  aria-label="Close AI Tutor Drawer"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <React.Suspense fallback={<AiTutorSkeleton />}>
+                <ContextPanel
+                  currentStage={currentPhase}
+                  stageName={currentPhaseDef?.label || currentPhase}
+                  isOpen={tutorPanelOpen}
+                  onToggle={() => setTutorPanelOpen(false)}
+                  agent={ASSIGNMENT_AGENT_CONFIGS[currentPhase]}
+                  projectId={projectId}
+                  onSendMessage={(text, history) =>
+                    sendAssignmentCopilotMessage(
+                      projectId,
+                      currentPhase,
+                      text,
+                      history,
+                      projectState
+                    )
+                  }
+                />
+              </React.Suspense>
+            </div>
+          </>
         )}
       </div>
     </div>
