@@ -30,11 +30,22 @@ export type LlmResponseLike = Partial<express.Response> & {
   write?: (chunk: string) => boolean;
 };
 
-const LLM_CHALLENGE_SECRET =
-  process.env.LLM_CHALLENGE_SECRET ||
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_JWT_SECRET ||
-  "scholar-core-ephemeral-challenge-secret";
+const EPHEMERAL_BOOT_CHALLENGE_SECRET = crypto.randomBytes(32).toString("hex");
+
+function resolveLlmChallengeSecret(): string {
+  if (process.env.LLM_CHALLENGE_SECRET && process.env.LLM_CHALLENGE_SECRET.trim().length >= 16) {
+    return process.env.LLM_CHALLENGE_SECRET.trim();
+  }
+  const baseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_JWT_SECRET;
+  if (baseKey && baseKey.trim().length > 0) {
+    // Cryptographically domain-separated subkey via HMAC-SHA256
+    return crypto
+      .createHmac("sha256", baseKey.trim())
+      .update("scholar-core:llm-challenge-signing-key:v1")
+      .digest("hex");
+  }
+  return EPHEMERAL_BOOT_CHALLENGE_SECRET;
+}
 
 export interface LlmChallengePayload {
   userId: string;
@@ -49,7 +60,7 @@ export function computePromptHash(systemPrompt: string = "", userPrompt: string 
 
 export function signLlmChallenge(payload: { userId: string; routeId: string; promptHash: string; expiresAt: number }): string {
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const signature = crypto.createHmac("sha256", LLM_CHALLENGE_SECRET).update(data).digest("base64url");
+  const signature = crypto.createHmac("sha256", resolveLlmChallengeSecret()).update(data).digest("base64url");
   return `${data}.${signature}`;
 }
 
@@ -58,7 +69,7 @@ export function verifyLlmChallenge(token: string, expectedUserId: string, prompt
   const parts = token.split(".");
   if (parts.length !== 2) return false;
   const [data, signature] = parts;
-  const expectedSignature = crypto.createHmac("sha256", LLM_CHALLENGE_SECRET).update(data).digest("base64url");
+  const expectedSignature = crypto.createHmac("sha256", resolveLlmChallengeSecret()).update(data).digest("base64url");
 
   const sigBuf = Buffer.from(signature);
   const expBuf = Buffer.from(expectedSignature);
