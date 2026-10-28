@@ -97,3 +97,57 @@ filesRouter.post(
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+/**
+ * GET /api/projects/:id/files/:fileId/signed-url
+ *
+ * Verifies project ownership and mints a short-lived (60s) signed URL for downloading
+ * an object from the private `project-files` bucket via service_role.
+ */
+filesRouter.get("/:fileId/signed-url", async (req: express.Request<{ id: string; fileId: string }>, res) => {
+  const projectId = req.params.id;
+  const fileId = req.params.fileId;
+
+  const store = getProjectStore();
+  const project = await loadOwnedProject(store, req, res);
+  if (!project) return;
+
+  const config = getSupabaseRestConfig();
+  if (!config) {
+    return res.status(500).json({ error: "Supabase not configured" });
+  }
+
+  try {
+    const table = new SupabaseTable(config, "project_files");
+    const rows = (await table.request(
+      `?id=eq.${encodeURIComponent(fileId)}&project_id=eq.${encodeURIComponent(projectId)}&limit=1`,
+      { method: "GET" }
+    )) as Array<{ id: string; project_id: string; filename: string; storage_path: string }>;
+
+    const fileRow = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    if (!fileRow || !fileRow.storage_path) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    const supabase = createClient(config.supabaseUrl, config.serviceRoleKey);
+    const { data, error } = await supabase.storage
+      .from("project-files")
+      .createSignedUrl(fileRow.storage_path, 60, { download: fileRow.filename });
+
+    if (error || !data?.signedUrl) {
+      console.error("Signed URL error:", error);
+      return res.status(500).json({ error: "Failed to generate download link" });
+    }
+
+    return res.json({
+      data: {
+        signedUrl: data.signedUrl,
+        expiresIn: 60,
+        filename: fileRow.filename,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to generate signed URL:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});

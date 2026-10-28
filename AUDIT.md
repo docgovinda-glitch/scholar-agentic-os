@@ -11,7 +11,7 @@
 
 | ID | Severity | Category | Title | Who Can Exploit | Effort | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **F-01** | **BLOCKER** | 6. Git History Secrets | **7 live production secrets committed in git history** (`28cfaa5:INFRASTRUCTURE_REFERENCE.md`, `01f851f:scripts/setup-infrastructure.md`): Postgres password (`DATABASE_URL`), `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `Cloudflare API Key`, `GitHub PAT`, `RENDER_DEPLOY_KEY`, `ENCRYPTION_KEY` | Anonymous (public repo clone) | **S** (Rotate) / **M** (History scrub) | **Open — Rotate Immediately** |
+| **F-01** | **BLOCKER** | 6. Git History Secrets | **7 live production secrets committed in git history** (`28cfaa5:INFRASTRUCTURE_REFERENCE.md`, `01f851f:scripts/setup-infrastructure.md`): Postgres password (`DATABASE_URL`), `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `Cloudflare API Key`, `GitHub PAT`, `RENDER_DEPLOY_KEY`, `ENCRYPTION_KEY` | Anonymous (public repo clone) | **S** (Rotate) / **M** (History scrub) | **Accepted risk — owner decision, rotation scheduled at project end** |
 | **F-02** | **BLOCKER** | 2. Supabase Exposure | **3 tables missing `ENABLE ROW LEVEL SECURITY` (`project_research_gaps`, `project_titles`, `project_journal_candidates`)** — full read/write/delete via public `VITE_SUPABASE_ANON_KEY` | Anonymous | **S** | **Open** |
 | **F-03** | **BLOCKER** | 2. Supabase Exposure | **`project-files` Storage bucket policies allow anonymous full read/write/update/delete** (`USING (bucket_id = 'project-files')` with no `auth.uid()` or project ownership check) | Anonymous | **S** | **Open** |
 | **F-04** | **BLOCKER** | 3. Auth / Edge Functions | **`request-profile-update` Edge Function returns `verificationKey` in HTTP response when `RESEND_API_KEY` is unset or email delivery fails**, enabling account email takeover | Authenticated user | **S** | **Open** |
@@ -25,7 +25,7 @@
 | **F-12** | **HIGH** | 5. Dependencies | **52 npm audit vulnerabilities (1 Critical, 14 High)** including `proxy-addr` (Critical IP spoofing), `xlsx` (High Prototype Pollution + ReDoS on server upload path, no upstream fix), `multer` (6 CVEs), `@tiptap/core` & `prosemirror-view` (DOM XSS) | Anonymous / Authenticated user | **M** | **Open** |
 | **F-13** | **HIGH** | 3. Auth | **`LLM_CHALLENGE_SECRET` falls back to `SUPABASE_SERVICE_ROLE_KEY` and then a hardcoded static string** (`server/utils/llm.ts:31-35`); `verifyLocalJwt` (`auth.ts:101`) skips `role`/`aud` verification | Authenticated user | **S** | **Open** |
 | **F-14** | **HIGH** | 2. Supabase Exposure | **6 `SECURITY DEFINER` RPCs granted to `anon` (`email_for_username`, `email_for_phone_e164`, `email_for_identifier`, `check_*_available`) allow unauthenticated email/phone/username enumeration** | Anonymous | **S** | **Open** |
-| **F-15** | **MEDIUM** | 3. Auth / Config Drift | **Admin email configuration split across 3 mechanisms**: `MAIN_ADMIN_EMAIL` (`requireAdmin.ts`, `render.yaml`), `ADMIN_EMAIL` (`.env.example`), and hardcoded `'docgovinda@gmail.com'` in SQL RLS policies | Admin / Operator | **S** | **Open** |
+| **F-15** | **MEDIUM** | 3. Auth / Config Drift | **Admin email configuration split across 3 mechanisms**: `MAIN_ADMIN_EMAIL` (`requireAdmin.ts:67`, `.env.example:188`), `ADMIN_EMAIL` (`render.yaml:59`, `supabase/functions/_shared/adminClient.ts:19`), and hardcoded `'docgovinda@gmail.com'` in SQL RLS policies | Admin / Operator | **S** | **Open** |
 | **F-16** | **MEDIUM** | 1. Route Inventory | **Double-prefixed route mount bug**: `GET /api/projects/:id/compliance/api/projects/:id/journal-compliance-report` (`journal_compliance.ts:15` mounted at `/:id/compliance` in `project.ts:121`) | Any user (broken feature) | **S** | **Open** |
 | **F-17** | **MEDIUM** | 7. Reliability | **18 outbound `fetch()` calls lack `AbortSignal.timeout()`**, no `SIGTERM`/`unhandledRejection` handlers, SSE stream lacks `req.on("close")` abort, and `memoryDecks` Map is unbounded | Any user / Upstream hang | **M** | **Open** |
 | **F-18** | **MEDIUM** | 8. Hosting Fit | **Render Free (512 MB RAM, 15m spin-down) + Supabase Free (500 MB DB, 1 GB Storage, 7d pause, 0 backups)** leaves <20 MB headroom on heavy exports/parses and has no automated DB backup | Production workload | **S** | **Decision Needed** |
@@ -178,8 +178,15 @@ Because Docker is not yet installed locally (pending confirmation on the bracket
 - **Proposed Fix**: New migration enabling RLS on all three tables (`ALTER TABLE public.project_research_gaps ENABLE ROW LEVEL SECURITY;`, etc.) with zero anon policies (since the Express server accesses them via `SUPABASE_SERVICE_ROLE_KEY`).
 - **Effort**: **S**
 
-#### `F-03` (BLOCKER): `project-files` Storage Bucket Policies Allow Anonymous Read/Write/Delete Across All Projects
-- **Evidence**: [supabase/migrations/20260820130000_project_files_bucket.sql](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/migrations/20260820130000_project_files_bucket.sql#L2-L25):
+#### `F-03` (BLOCKER): Storage Buckets Inventory (`project-files` & `id-documents`) and Anonymous Access on `project-files`
+- **Storage Buckets Inventory**:
+  1. **`project-files`** ([supabase/migrations/20260820130000_project_files_bucket.sql](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/migrations/20260820130000_project_files_bucket.sql#L2-L25)):
+     - **What is stored**: User-uploaded research PDFs, DOCX, XLSX, CSVs, and figures (`projects/{projectId}/{timestamp}-{filename}`).
+     - **Who can read/write**: **Anyone (`anon` + `authenticated`)** — created with `public = true` and four policies (`project_files_{insert,select,update,delete}`) whose only condition is `bucket_id = 'project-files'` (no `TO authenticated`, no `auth.uid()` check, no project ownership check).
+  2. **`id-documents`** ([supabase/migrations/20260813000000_unified_account_profile.sql](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/migrations/20260813000000_unified_account_profile.sql#L188-L216)):
+     - **What is stored**: Users' institutional/government identity verification documents (`application/pdf`, `image/jpeg`, `image/png`, `image/webp`, up to 10 MB), keyed as `{user_id}/{filename}` and linked via `profiles.id_document_path` and `public.submit_id_document(text)`. *(Note: `20260814000000_account_system_repair.sql:104-108` removed the UI flow and states `id-documents` was never created in prod when `20260814` was written, but `20260813000000` remains in `supabase/migrations/` and creates both the bucket and its policies whenever migrations are applied.)*
+     - **Who can read/write**: Created with `public = false`. Under `20260813000000`, `authenticated` users have direct `SELECT`, `INSERT`, `UPDATE`, `DELETE` policies on `storage.objects` where `bucket_id = 'id-documents' AND (storage.foldername(name))[1] = auth.uid()::text`, and anyone holding `SUPABASE_SERVICE_ROLE_KEY` or `DATABASE_URL` bypasses RLS and can read every user's ID document.
+- **Evidence (`project-files`)**: [supabase/migrations/20260820130000_project_files_bucket.sql](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/migrations/20260820130000_project_files_bucket.sql#L2-L25):
   ```sql
   INSERT INTO storage.buckets (id, name, public) VALUES ('project-files', 'project-files', true) ON CONFLICT (id) DO NOTHING;
   CREATE POLICY "project_files_insert" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'project-files');
@@ -188,7 +195,7 @@ Because Docker is not yet installed locally (pending confirmation on the bracket
   CREATE POLICY "project_files_delete" ON storage.objects FOR DELETE USING (bucket_id = 'project-files');
   ```
 - **Who can exploit**: **Anonymous** (any caller with `VITE_SUPABASE_ANON_KEY` can list, download, overwrite, or delete every uploaded file in `project-files` across all projects).
-- **Proposed Fix**: Since all legitimate uploads and metadata queries go through `server/routes/project/files.ts` using `SUPABASE_SERVICE_ROLE_KEY`, set `public = false` (or restrict `INSERT`/`UPDATE`/`DELETE` to `service_role` / project owners via `(storage.foldername(name))[1] IN (SELECT project_id FROM public.projects WHERE owner_id = auth.uid())`) and drop the four unrestricted policies.
+- **Proposed Fix (Hotfix 2)**: Make all buckets (`project-files` and `id-documents`) private (`public = false`), drop the anonymous/direct client policies on `storage.objects`, and serve all file uploads and downloads exclusively through Express with an ownership check and short-lived signed URLs.
 - **Effort**: **S**
 
 #### `F-10` (HIGH): `/api/supabase/*` Reverse Proxy Bypasses Rate Limiters, Forwards All Upstream Paths, and Disables TLS Verification on WebSocket Upgrades
@@ -248,11 +255,11 @@ Because Docker is not yet installed locally (pending confirmation on the bracket
 
 ### `F-15` (MEDIUM): Admin Identity Configuration Split Across 3 Unsynchronized Places
 - **Evidence**:
-  - [server/src/middleware/requireAdmin.ts](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/server/src/middleware/requireAdmin.ts#L67) and [render.yaml](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/render.yaml#L22) read `process.env.MAIN_ADMIN_EMAIL`.
-  - [.env.example](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/.env.example#L51) documents `ADMIN_EMAIL` (never read anywhere in the codebase).
+  - [server/src/middleware/requireAdmin.ts](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/server/src/middleware/requireAdmin.ts#L67) and [.env.example](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/.env.example#L188) use `MAIN_ADMIN_EMAIL`.
+  - [render.yaml](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/render.yaml#L59) sets `ADMIN_EMAIL` on the Render web service (which `requireAdmin.ts` ignores unless `MAIN_ADMIN_EMAIL` is also set in the Render dashboard!), while [supabase/functions/_shared/adminClient.ts](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/functions/_shared/adminClient.ts#L19) reads `ADMIN_EMAIL` in Edge Functions.
   - [supabase/admin_schema.sql](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/admin_schema.sql#L13) and [supabase/migrations/20260418000001_fix_rls_security.sql](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/migrations/20260418000001_fix_rls_security.sql#L19) hardcode `'docgovinda@gmail.com'` in Postgres RLS policies.
-- **Who can exploit**: Operator misconfiguration / stale admin email retaining RLS privileges in Postgres even if `MAIN_ADMIN_EMAIL` is changed on Render.
-- **Proposed Fix**: Standardize on `MAIN_ADMIN_EMAIL` in `.env.example`, and replace hardcoded email strings in Postgres RLS policies with `EXISTS (SELECT 1 FROM public.admin_users WHERE user_id = auth.uid())`.
+- **Who can exploit**: Operator misconfiguration (`render.yaml` setting `ADMIN_EMAIL` instead of `MAIN_ADMIN_EMAIL`) or stale admin email retaining RLS privileges in Postgres even if `MAIN_ADMIN_EMAIL` is changed on Render.
+- **Proposed Fix**: Align `render.yaml:59` with `MAIN_ADMIN_EMAIL`, and replace hardcoded email strings in Postgres RLS policies with `EXISTS (SELECT 1 FROM public.admin_users WHERE user_id = auth.uid())`.
 - **Effort**: **S**
 
 ---
@@ -290,7 +297,9 @@ Running `npm audit --json` across the `903` total packages (`306` production, `5
 
 ## 6. Git History Secrets Audit
 
-### `F-01` (BLOCKER): Seven Live Production Credentials Committed in Git History
+### `F-01` (BLOCKER — Accepted Risk, Rotation Deferred to Project End): Seven Live Production Credentials Committed in Git History
+> **Owner Decision (`2026-10-28`)**: Credential rotation (`F-01`) is **DEFERRED** until the end of the project (`ROTATION_RUNBOOK.md`). **Important security note**: Until rotation is executed at project end, anyone holding the leaked `SUPABASE_SERVICE_ROLE_KEY` or Postgres `DATABASE_URL` password bypasses PostgreSQL Row Level Security (RLS), Storage bucket policies, RPC `REVOKE` grants, and every application-level authorization fix.
+
 - **Evidence** (values strictly redacted per guardrail; verified via `git log --all --full-history -- INFRASTRUCTURE_REFERENCE.md scripts/setup-infrastructure.md`):
   - Commit `01f851f` (2026-08-04, *"Infrastructure authorization: GitHub Actions, Render, Cloudflare, Supabase"*) added `scripts/setup-infrastructure.md` (252 lines).
   - Commit `28cfaa5` (2026-08-04, *"Add infrastructure reference card and setup checklist"*) added `INFRASTRUCTURE_REFERENCE.md` (201 lines).

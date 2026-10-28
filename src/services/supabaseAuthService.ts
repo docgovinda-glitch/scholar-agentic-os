@@ -190,219 +190,137 @@ function detectIdentifierType(identifier: string): "username" | "email" | "phone
 }
 
 /**
- * Resolve a flexible login identifier (username, email, or phone) to an email address.
- *
- * Called during sign-in to get the email for Supabase Auth's signInWithPassword,
- * which requires email even when the user logged in with username or phone.
- */
-async function resolveIdentifierToEmail(identifier: string): Promise<{ email: string | null; error?: string }> {
-  const supabase = getSupabaseClient();
-  const type = detectIdentifierType(identifier);
-
-  if (type === "unknown") {
-    return { email: null, error: "Invalid User ID, email, or mobile number format." };
-  }
-
-  if (type === "username") {
-    // On lookup failure, deliberately no identifier-specific error: reporting
-    // "no account with that User ID" here would let this form be used to
-    // enumerate registered usernames. signIn() falls back to one generic
-    // message shared by every identifier type when email comes back null.
-    const { data: email } = await supabase.rpc("email_for_username", {
-      lookup_username: identifier,
-    });
-    return { email: email ?? null };
-  }
-
-  if (type === "email") {
-    // Email lookup: directly query auth.users or use a dedicated RPC
-    // For now, we'll handle this on the next Supabase signInWithPassword call
-    // by trying email directly. If the email doesn't exist in auth.users,
-    // signInWithPassword will fail with "Invalid login credentials."
-    return { email: identifier };
-  }
-
-  if (type === "phone") {
-    // Same enumeration concern as the username branch above — no
-    // identifier-specific error on lookup failure.
-    const { data: email } = await supabase.rpc("email_for_phone_e164", {
-      lookup_phone_e164: identifier,
-    });
-    return { email: email ?? null };
-  }
-
-  return { email: null, error: "Could not resolve login identifier." };
-}
-
-/**
  * Logs in with flexible identifier support: username, email, or mobile number.
  *
- * Auto-detects which type of identifier was entered, resolves it to an email,
- * then authenticates with Supabase Auth.
- *
- * Carries a CAPTCHA token for the same reason signUp() does: Supabase Auth's
- * CAPTCHA setting is per-PROJECT, not per-endpoint. Switching it on protects
- * the password grant behind this call and the /recover endpoint behind
- * sendPasswordResetEmail() at the same moment it protects signup.
+ * Delegates identifier-to-email resolution and GoTrue password authentication
+ * to the rate-limited, Turnstile-guarded Express endpoint `POST /api/auth/login`
+ * so the resolved email address is never exposed to unauthenticated clients.
  */
 interface QueryWithMaybeSingle<T> {
   maybeSingle?: () => Promise<{ data: T | null; error: unknown }>;
   single?: () => Promise<{ data: T | null; error: unknown }>;
 }
 
-interface ProfileSignInRow {
-  full_name?: string;
-  phone?: string;
-  affiliation?: string;
-  account_status?: string;
-}
-
 export async function signIn(input: SignInInput): Promise<SignInResult> {
   const supabase = getSupabaseClient();
+  const identifier = input.username.trim();
+  const type = detectIdentifierType(identifier);
 
-  // Resolve the flexible identifier (username, email, or phone) to an email address
-  const { email, error: resolveError } = await resolveIdentifierToEmail(input.username);
-
-  if (!email) {
-    // Provide a generic error that doesn't confirm/deny account existence
-    return { success: false, error: resolveError || "Invalid credentials. Please check your User ID, email, or mobile number and try again." };
+  if (type === "unknown") {
+    return {
+      success: false,
+      error: "Invalid User ID, email, or mobile number format.",
+    };
   }
 
-  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-    email,
-    password: input.password,
-    options: { captchaToken: input.captchaToken },
-  });
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        identifier,
+        password: input.password,
+        captchaToken: input.captchaToken,
+      }),
+    });
 
-  if (signInError) {
-    if (signInError.message?.toLowerCase().includes("email not confirmed")) {
+    const data = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      error?: string;
+      session?: {
+        access_token?: string;
+        refresh_token?: string;
+      };
+      profile?: {
+        fullName?: string;
+        email?: string;
+        phone?: string;
+        affiliation?: string;
+      };
+    };
+
+    if (!res.ok || !data.success) {
       return {
         success: false,
-        error: "Your email address has not been verified yet. Please check your inbox or resend the verification link.",
+        error:
+          data.error ||
+          "Invalid credentials. Please check your User ID, email, or mobile number and try again.",
       };
     }
-    return { success: false, error: "Incorrect password. Please try again." };
-  }
 
-  const profileQuery = supabase
-    .from("profiles")
-    .select("full_name, phone, affiliation, account_status")
-    .eq("id", signInData.user.id);
-  const typedProfileQuery = profileQuery as unknown as QueryWithMaybeSingle<ProfileSignInRow>;
-  const queryRes = typeof typedProfileQuery.maybeSingle === "function"
-    ? await typedProfileQuery.maybeSingle()
-    : typedProfileQuery.single
-    ? await typedProfileQuery.single()
-    : await (profileQuery as unknown as { single: () => Promise<{ data: ProfileSignInRow | null; error: unknown }> }).single();
+    if (
+      data.session?.access_token &&
+      data.session?.refresh_token &&
+      typeof supabase.auth?.setSession === "function"
+    ) {
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+    }
 
-  const rawData = queryRes?.data;
-  const profileError = queryRes?.error;
-  let activeProfile: ProfileSignInRow | null = (Array.isArray(rawData) ? rawData[0] : rawData) as ProfileSignInRow | null;
-  if (!activeProfile && !profileError) {
-    const defaultUsername = signInData.user.email?.split("@")[0] || "researcher";
-    const { data: createdProfile } = await supabase
-      .from("profiles")
-      .insert({
-        id: signInData.user.id,
-        username: defaultUsername,
-        full_name: "",
-        phone: "",
-        phone_country_code: "",
-        account_status: "active",
-      })
-      .select("full_name, phone, affiliation, account_status")
-      .maybeSingle();
-    activeProfile = createdProfile as ProfileSignInRow | null;
-  }
-
-  if (!activeProfile) {
-    return { success: false, error: "Scholar profile could not be loaded." };
-  }
-
-  if (activeProfile.account_status !== 'active') {
-    const statusMessages: Record<string, string> = {
-      'restricted': 'Your account has been restricted. Please contact support.',
-      'suspended': 'Your account has been suspended. Please contact support.',
-      'deleted': 'Your account has been deleted.',
+    return {
+      success: true,
+      profile: {
+        fullName: data.profile?.fullName ?? "",
+        email: data.profile?.email ?? "",
+        phone: data.profile?.phone ?? "",
+        affiliation: data.profile?.affiliation ?? "",
+      },
     };
-    const statusMessage = statusMessages[activeProfile.account_status as string] || 'Your account is not active.';
-    return { success: false, error: statusMessage };
+  } catch {
+    return {
+      success: false,
+      error: "Could not sign you in. Please try again shortly.",
+    };
   }
-
-  return {
-    success: true,
-    profile: {
-      fullName: activeProfile.full_name ?? "",
-      email,
-      phone: activeProfile.phone ?? "",
-      affiliation: activeProfile.affiliation ?? "",
-    },
-  };
 }
 
-/**
- * Fails OPEN (treats an RPC error as "available"), not closed. These three
- * functions are a soft, real-time UX layer on top of enforcement that does
- * not depend on them: Supabase Auth's own built-in email uniqueness (always
- * on, unrelated to any migration here — see signUp()'s empty-identities
- * check above, which is the real duplicate-email backstop), and the
- * database's own unique constraints on profiles.username and
- * profiles.phone_e164 (supabase/migrations/2026-08-15_auth_uniqueness_
- * constraints.sql). If check_username_available/check_email_available/
- * check_phone_available's migration
- * (2026-08-15_duplicate_identifier_detection.sql) hasn't actually been
- * applied to a given Supabase project, the RPC call errors with "function
- * does not exist" — failing closed here (as an earlier version of this code
- * did) would have silently blocked every signup on that project, treating
- * every identifier as "taken." Failing open costs only the early inline
- * warning; the real backstops above still catch a genuine duplicate at
- * signUp() time either way.
- */
-function availableOnRpcFailure(error: unknown, isAvailable: boolean | null): boolean {
-  if (error) return true;
-  return isAvailable ?? true;
+async function checkAvailabilityViaApi(
+  type: "username" | "email" | "phone",
+  value: string
+): Promise<boolean> {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  try {
+    const res = await fetch("/api/auth/check-availability", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, value: trimmed }),
+    });
+    if (!res.ok) return true;
+    const data = (await res.json().catch(() => ({}))) as { available?: boolean };
+    return typeof data.available === "boolean" ? data.available : true;
+  } catch {
+    return true;
+  }
 }
 
 /**
  * Check if a username is available (not already taken).
  *
- * Called during signup form validation to provide real-time feedback
- * as the user types a username.
+ * Called during signup form validation via the rate-limited server endpoint.
  */
 export async function checkUsernameAvailable(username: string): Promise<boolean> {
-  const supabase = getSupabaseClient();
-  const { data: isAvailable, error } = await supabase.rpc("check_username_available", {
-    lookup_username: username.trim(),
-  });
-  return availableOnRpcFailure(error, isAvailable);
+  return checkAvailabilityViaApi("username", username);
 }
 
 /**
  * Check if an email is available (not already registered).
  *
- * Called during signup form validation to provide real-time feedback
- * as the user enters an email address.
+ * Called during signup form validation via the rate-limited server endpoint.
  */
 export async function checkEmailAvailable(email: string): Promise<boolean> {
-  const supabase = getSupabaseClient();
-  const { data: isAvailable, error } = await supabase.rpc("check_email_available", {
-    lookup_email: email.trim(),
-  });
-  return availableOnRpcFailure(error, isAvailable);
+  return checkAvailabilityViaApi("email", email);
 }
 
 /**
  * Check if a phone number in E.164 format is available (not already registered).
  *
- * Called during signup form validation to provide real-time feedback
- * as the user enters a phone number.
+ * Called during signup form validation via the rate-limited server endpoint.
  */
 export async function checkPhoneAvailable(phoneE164: string): Promise<boolean> {
-  const supabase = getSupabaseClient();
-  const { data: isAvailable, error } = await supabase.rpc("check_phone_available", {
-    lookup_phone_e164: phoneE164.trim(),
-  });
-  return availableOnRpcFailure(error, isAvailable);
+  return checkAvailabilityViaApi("phone", phoneE164);
 }
 
 export interface ResendVerificationEmailInput {
@@ -1009,20 +927,13 @@ export interface RequestProfileUpdateInput {
 
 export interface RequestProfileUpdateResult extends ServiceResult {
   emailSent?: boolean;
-  /** Plain key, present so ProfileSettings.tsx can show it as a sandbox-bypass notice exactly as server.ts's route did — never persisted, only ever surfaced transiently in the UI. */
-  verificationKey?: string;
-  /** SHA-256 of verificationKey, computed here (client-side, same algorithm ProfileSettings.tsx's own sha256() helper uses) since the request-profile-update Edge Function only returns the plain key — server.ts's old route computed this hash server-side instead; the two are equivalent, just relocated. */
-  keyHash?: string;
 }
 
-async function sha256(message: string): Promise<string> {
-  const msgBuffer = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/** Stateless, matching server.ts's current behavior exactly — this Edge Function only sends the admin/user notification emails, same as /api/request-profile-update did; it does not persist or apply the change itself. */
+/**
+ * Invokes the `request-profile-update` Edge Function.
+ * Never receives or exposes `verificationKey`; fails closed if the admin
+ * notification email could not be delivered.
+ */
 export async function requestProfileUpdate(input: RequestProfileUpdateInput): Promise<RequestProfileUpdateResult> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.functions.invoke("request-profile-update", { body: input });
@@ -1030,17 +941,12 @@ export async function requestProfileUpdate(input: RequestProfileUpdateInput): Pr
     return { success: false, error: error.message };
   }
 
-  const verificationKey: string | undefined = data?.verificationKey;
-  const keyHash = verificationKey ? await sha256(verificationKey) : undefined;
-
-  if (data && data.emailSent === false) {
+  if (data && (data.success === false || data.emailSent === false)) {
     return {
-      success: true,
-      error: `Update request created, but the admin notification email couldn't be sent${data.error ? `: ${data.error}` : "."}`,
+      success: false,
+      error: data.error || "Profile update request failed because the admin notification email could not be sent.",
       emailSent: false,
-      verificationKey,
-      keyHash,
     };
   }
-  return { success: true, emailSent: data?.emailSent, verificationKey, keyHash };
+  return { success: true, emailSent: data?.emailSent ?? true };
 }

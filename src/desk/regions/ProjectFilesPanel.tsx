@@ -34,6 +34,24 @@ export default function ProjectFilesPanel({ projectId }: { projectId: string }) 
     fileInputRef.current?.click();
   };
 
+  const handleDownload = async (file: ProjectFile) => {
+    try {
+      const res = await authedJsonFetch(`/api/projects/${projectId}/files/${encodeURIComponent(file.id)}/signed-url`, "GET", null);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showAppToast(`Download failed: ${err.error || "Unable to get download link"}`, "error");
+        return;
+      }
+      const json = await res.json();
+      if (json?.data?.signedUrl) {
+        window.open(json.data.signedUrl, "_blank", "noopener,noreferrer");
+      }
+    } catch (error) {
+      console.error("Download error", error);
+      showAppToast("Failed to download file.", "error");
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -112,12 +130,20 @@ export default function ProjectFilesPanel({ projectId }: { projectId: string }) 
                 <svg className="w-5 h-5 text-[color:var(--text-muted)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
-                <div className="flex flex-col min-w-0">
+                <div className="flex flex-col min-w-0 flex-1">
                   <span className="text-sm font-medium text-[color:var(--text-primary)] truncate">{file.filename}</span>
                   <span className="text-xs text-[color:var(--text-muted)]">
                     {(file.size_bytes / 1024).toFixed(1)} KB • {new Date(file.uploaded_at).toLocaleDateString()}
                   </span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => handleDownload(file)}
+                  className="text-xs px-2 py-1 rounded border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
+                  title={`Download ${file.filename}`}
+                >
+                  Download
+                </button>
               </li>
             ))}
           </ul>
