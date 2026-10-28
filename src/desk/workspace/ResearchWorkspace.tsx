@@ -12,6 +12,7 @@ import AiExhaustedModal from "./AiExhaustedModal";
 import { subscribeExecutionState, type ExecutionScope } from "../../services/executionState";
 import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
 import { WorkspaceAutosaveBadge } from "../../components/ui/WorkspaceAutosaveBadge";
+import AppleStudioHeader, { type AppleStudioPhaseId } from "../../components/ui/AppleStudioShell";
 import { safeParseAnswerField } from "../../shared/projectStateSchema";
 
 import ProtocolBlueprintMode from "./ProtocolBlueprintMode";
@@ -202,6 +203,57 @@ function ResearchWorkspaceInner({
 
   return (
     <div className="h-screen flex flex-col bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
+      {/* Unified Apple-Grade Top Workspace Bar */}
+      <AppleStudioHeader
+        deliverableCode={project.outputTypeId || "OT-10"}
+        deliverableLabel={outputType?.label || "Journal Article"}
+        projectTitle={String(
+          project.answers?.["working_title"] ||
+            project.answers?.["title"] ||
+            outputType?.label ||
+            "Journal Article"
+        )}
+        activePhase={
+          currentMode === "protocol"
+            ? "blueprint"
+            : currentMode === "evidence"
+            ? "evidence"
+            : currentMode === "studio"
+            ? "studio"
+            : currentMode === "referee"
+            ? "review"
+            : currentMode === "audit" || currentMode === "audit_export"
+            ? "delivery"
+            : "blueprint"
+        }
+        onPhaseSelect={(phase: AppleStudioPhaseId) => {
+          const modeMap: Record<
+            AppleStudioPhaseId,
+            "protocol" | "evidence" | "studio" | "referee" | "audit"
+          > = {
+            blueprint: "protocol",
+            evidence: "evidence",
+            studio: "studio",
+            review: "referee",
+            delivery: "audit",
+          };
+          setMode(modeMap[phase]);
+        }}
+        onBack={() => {
+          if (onClose) onClose();
+          else if (typeof window !== "undefined") window.location.href = "/projects";
+        }}
+        metricLabel={`${actualWords.toLocaleString()} / ${targetWords.toLocaleString()} words · ${totalVerifiedSourcesAndData} sources`}
+        aiModelLabel={activeModelDisplay}
+        onOpenAiAccess={onOpenAiAccess}
+        autosaveStatus="saved"
+        projectVersion={autosaveVersion}
+        zenMode={isZenMode}
+        onToggleZenMode={() => setIsZenMode((z) => !z)}
+        inspectorOpen={contextPanelOpen}
+        onToggleInspector={() => setContextPanelOpen((o) => !o)}
+      />
+
       {/* Header */}
       {isZenMode ? (
         <header className="border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)]/95 backdrop-blur-md z-10 shrink-0 px-4 py-2.5 flex items-center justify-between animate-fade-in">
@@ -320,11 +372,6 @@ function ResearchWorkspaceInner({
                   {activeModelDisplay}
                 </span>
               </div>
-
-              <span className="w-px h-3 bg-[color:var(--border-subtle)]" />
-
-              {/* Telemetry 4: Autosave */}
-              <WorkspaceAutosaveBadge version={autosaveVersion} />
             </div>
 
             <div className="flex items-center gap-2">

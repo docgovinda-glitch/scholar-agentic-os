@@ -32,7 +32,6 @@ jobs:
 
       - name: Run Test Suite
         run: npm test
-        continue-on-error: true
 
       - name: Compile Client & Server Production Bundles
         run: npm run build

@@ -29,6 +29,7 @@ import { authedFetch, getProject, saveIntakeAnswers } from '../api';
 import ScholarSidebar from '../../components/navigation/ScholarSidebar';
 import LiveSlidePlayer from './components/LiveSlidePlayer';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
+import AppleStudioHeader, { type AppleStudioPhaseId } from '../../components/ui/AppleStudioShell';
 
 export type { PresentationStudioStep } from '../../features/slides';
 
@@ -255,7 +256,7 @@ export default function PresentationWorkspace({
             .catch(() => {});
 
           // 2. Also update /api/presentations/:id for unified access
-          const res = await authedFetch(`/api/presentations/${encodeURIComponent(deckToSave.id)}`, {
+          const res = await window.fetch(`/api/presentations/${encodeURIComponent(deckToSave.id)}`, {
             method: 'PUT',
             headers,
             body: JSON.stringify(legacyPayload),
@@ -434,6 +435,51 @@ export default function PresentationWorkspace({
 
       {/* Main Workspace Column */}
       <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
+        {/* Shared Apple-Grade Studio Chrome Bar */}
+        <AppleStudioHeader
+          deliverableCode="OT-22"
+          deliverableLabel="Presentation Studio"
+          projectTitle={deck.title}
+          onProjectTitleChange={(newTitle) => handleUpdateDeck({ ...deck, title: newTitle })}
+          activePhase={
+            currentStep === 'understand' || (currentStep as string) === 'scaffolding'
+              ? 'blueprint'
+              : currentStep === 'design' || (currentStep as string) === 'themes'
+              ? 'evidence'
+              : currentStep === 'studio'
+              ? 'studio'
+              : isQaSimulatorOpen
+              ? 'review'
+              : 'delivery'
+          }
+          onPhaseSelect={(phase: AppleStudioPhaseId) => {
+            if (phase === 'review') {
+              setIsQaSimulatorOpen(true);
+              return;
+            }
+            setIsQaSimulatorOpen(false);
+            const stepMap: Record<AppleStudioPhaseId, PresentationStudioStep> = {
+              blueprint: 'understand',
+              evidence: 'design',
+              studio: 'studio',
+              review: 'studio',
+              delivery: 'delivery',
+            };
+            setCurrentStep(stepMap[phase]);
+          }}
+          onBack={handleNavigateBack}
+          metricLabel={`${deck.slides.length} slides`}
+          aiModelLabel="Slide Architect AI"
+          onOpenAiAccess={onOpenAiAccess}
+          autosaveStatus={autosaveStatus}
+          projectVersion={projectVersion}
+          lastSavedTime={lastSavedTime}
+          zenMode={sidebarCollapsed}
+          onToggleZenMode={() => setSidebarCollapsed((c) => !c)}
+          inspectorOpen={isAskScholarOpen}
+          onToggleInspector={() => setIsAskScholarOpen((o) => !o)}
+        />
+
         {/* Header Bar (56px) - Apple/Airbnb Left Back Button, Zero Exit Cross */}
         <PresentationHeader
           title={deck.title}
@@ -450,6 +496,7 @@ export default function PresentationWorkspace({
           isSidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
           onOpenQaSimulator={() => setIsQaSimulatorOpen(true)}
+          hideAutosaveBadge
         />
 
         {/* Scrollable Canvas Body */}

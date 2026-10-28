@@ -32,6 +32,7 @@ export interface PresentationHeaderProps {
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onOpenQaSimulator?: () => void;
+  hideAutosaveBadge?: boolean;
   className?: string;
 }
 
@@ -50,6 +51,7 @@ export default function PresentationHeader({
   isSidebarCollapsed,
   onToggleSidebar,
   onOpenQaSimulator,
+  hideAutosaveBadge = false,
   className = '',
 }: PresentationHeaderProps) {
   const handleBack = () => {
@@ -107,11 +109,13 @@ export default function PresentationHeader({
                 SCHOLAR SLIDES ·
               </span>
               <span className="sr-only">Presentation Studio</span>
-              <WorkspaceAutosaveBadge
-                status={autosaveStatus}
-                version={projectVersion}
-                lastSavedTime={lastSavedTime || undefined}
-              />
+              {!hideAutosaveBadge && (
+                <WorkspaceAutosaveBadge
+                  status={autosaveStatus}
+                  version={projectVersion}
+                  lastSavedTime={lastSavedTime || undefined}
+                />
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 mt-0.5">

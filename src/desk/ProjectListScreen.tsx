@@ -1659,7 +1659,7 @@ export default function ProjectListScreen({
           : "flex-1 flex flex-col h-screen w-full bg-[#F8F9FA] dark:bg-[#171717] overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out"
       }`}>
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
-        <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-[#F8F9FA]/85 dark:bg-[#171717]/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
+        <div className="apple-glass-header sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-[#F8F9FA]/85 dark:bg-[#171717]/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
           <div className="flex items-center gap-3">
             {/* Mobile Drawer Trigger Button */}
             <button
@@ -1845,7 +1845,7 @@ export default function ProjectListScreen({
                                 handleCreate(tile.id);
                               }}
                               disabled={isOtherBooting}
-                              className={`group bg-white dark:bg-[#1C1C1E] border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
+                              className={`apple-card group bg-white dark:bg-[#1C1C1E] border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
                                 isOtherBooting
                                   ? "opacity-50 cursor-not-allowed"
                                   : isBootingThis

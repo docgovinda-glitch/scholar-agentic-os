@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import type express from 'express';
 import { completeWithFailover, streamWithFailover } from "../../src/platform/gateway/gateway.js";
 import { defaultPolicy } from "../../src/platform/warden/policy.js";
 import { recordConsent, type EgressPolicy } from "../../src/platform/warden/warden.js";
@@ -9,6 +10,23 @@ import { getEntitlement, isEntitlementActive } from "../src/aiEngine/entitlement
 import { parseAndRepairLLMJson } from "../../src/shared/llmJsonParser.ts";
 
 dotenv.config();
+
+export type LlmRequestLike = Partial<express.Request> & {
+  headers?: Record<string, string | string[] | undefined>;
+  body?: any;
+  user?: { id?: string; email?: string };
+  res?: Partial<express.Response>;
+  originalUrl?: string;
+  url?: string;
+};
+
+export type LlmResponseLike = Partial<express.Response> & {
+  headersSent?: boolean;
+  status: (code: number) => LlmResponseLike;
+  json: (body: unknown) => unknown;
+  writeHead?: (statusCode: number, headers?: Record<string, string>) => unknown;
+  write?: (chunk: string) => boolean;
+};
 
 const LLM_CHALLENGE_SECRET =
   process.env.LLM_CHALLENGE_SECRET ||
@@ -69,7 +87,17 @@ export function verifyLlmChallenge(token: string, expectedUserId: string, prompt
 }
 
 export function mapTaskType(taskType: string): TaskClass {
-  const valid: TaskClass[] = ["drafting", "refinement", "chat", "summarisation", "verification", "rule_extraction", "discovery", "embedding", "classification"];
+  const valid: TaskClass[] = [
+    "drafting",
+    "refinement",
+    "chat",
+    "summarisation",
+    "verification",
+    "rule_extraction",
+    "discovery",
+    "embedding",
+    "classification",
+  ];
   return valid.includes(taskType as TaskClass) ? (taskType as TaskClass) : "chat";
 }
 
@@ -95,21 +123,33 @@ export interface RequestAiConfig {
  * Resolves client-owned transient AI configuration from request headers.
  * Never persists keys on the server and never falls back to server env keys.
  */
-export function resolveRequestAiConfig(req?: any): RequestAiConfig {
+export function resolveRequestAiConfig(req?: LlmRequestLike): RequestAiConfig {
   if (!req || !req.headers) {
     return { candidates: [] };
   }
   const headers = req.headers;
-  const provider = (headers["x-ai-provider"] as string) || (headers["x-provider"] as string) || undefined;
-  const model = (headers["x-ai-model"] as string) || (headers["x-model"] as string) || undefined;
-  const apiKey = (headers["x-ai-api-key"] as string) || (headers["x-api-key"] as string) || undefined;
-  const baseUrl = (headers["x-ai-base-url"] as string) || (headers["x-base-url"] as string) || undefined;
+  const provider =
+    (headers["x-ai-provider"] as string) || (headers["x-provider"] as string) || undefined;
+  const model =
+    (headers["x-ai-model"] as string) || (headers["x-model"] as string) || undefined;
+  const apiKey =
+    (headers["x-ai-api-key"] as string) || (headers["x-api-key"] as string) || undefined;
+  const baseUrl =
+    (headers["x-ai-base-url"] as string) || (headers["x-base-url"] as string) || undefined;
 
   const candidates: CandidateProvider[] = [];
 
-  if (provider && (apiKey || baseUrl || provider === "ollama" || provider === "lmstudio" || provider === "localai" || provider === "vllm")) {
+  if (
+    provider &&
+    (apiKey ||
+      baseUrl ||
+      provider === "ollama" ||
+      provider === "lmstudio" ||
+      provider === "localai" ||
+      provider === "vllm")
+  ) {
     candidates.push({
-      provider: provider as any,
+      provider: provider as CandidateProvider["provider"],
       model: model || undefined,
       apiKey: apiKey || "local-no-credential-required",
       baseUrl: baseUrl || undefined,
@@ -129,7 +169,7 @@ export function resolveRequestAiConfig(req?: any): RequestAiConfig {
  * Returns active candidate AI providers strictly from the caller's transient request headers.
  * Platform-paid or server-sponsored AI keys (process.env.GEMINI_API_KEY, etc.) are strictly disallowed.
  */
-export function getCandidates(req?: any): CandidateProvider[] {
+export function getCandidates(req?: LlmRequestLike): CandidateProvider[] {
   if (req) {
     const config = resolveRequestAiConfig(req);
     if (config.candidates.length > 0) {
@@ -145,7 +185,7 @@ export interface PremiumAiPolicy {
   reason?: string;
 }
 
-export function getPremiumAiPolicy(req?: any): PremiumAiPolicy {
+export function getPremiumAiPolicy(req?: LlmRequestLike): PremiumAiPolicy {
   const isExplicitlyDisabled = process.env.ENABLE_SERVER_AI === "false";
   const candidates = getCandidates(req);
   const hasCredentials = candidates.length > 0;
@@ -172,14 +212,14 @@ export function getPremiumAiPolicy(req?: any): PremiumAiPolicy {
   };
 }
 
-export async function isServerAiAuthorized(req: any): Promise<boolean> {
+export async function isServerAiAuthorized(req: LlmRequestLike): Promise<boolean> {
   const policy = getPremiumAiPolicy(req);
   return policy.isServerAiAuthorized;
 }
 
 export function handleFrontendLLMOverride(
-  req: any,
-  res?: any,
+  req: LlmRequestLike,
+  res?: LlmResponseLike,
   systemPrompt?: string,
   userPrompt?: string
 ): string | null {
@@ -187,37 +227,47 @@ export function handleFrontendLLMOverride(
     return null;
   }
 
-  const token = req.body.challengeToken;
+  const token = req.body.challengeToken as string | undefined;
   const userId = req.user?.id || (req.headers && req.headers["x-user-id"]) || "anonymous";
-  const promptHash = (systemPrompt !== undefined || userPrompt !== undefined)
-    ? computePromptHash(systemPrompt, userPrompt)
-    : "";
+  const promptHash =
+    systemPrompt !== undefined || userPrompt !== undefined
+      ? computePromptHash(systemPrompt, userPrompt)
+      : "";
 
   const isValid = token && verifyLlmChallenge(token, String(userId), promptHash);
   if (!isValid) {
-    const targetRes = res || req.res;
+    const targetRes = res || (req.res as LlmResponseLike | undefined);
     if (targetRes && !targetRes.headersSent) {
       targetRes.status(403).json({ error: "Invalid or unsigned LLM challenge token" });
     }
-    const err = new Error("Invalid or unsigned LLM challenge token");
-    (err as any).status = 403;
+    const err = new Error("Invalid or unsigned LLM challenge token") as Error & { status?: number };
+    err.status = 403;
     throw err;
   }
 
-  let content = req.body.llmResult;
-  if (typeof content === "object" && typeof content.text === "string") {
-    content = content.text;
+  let content = req.body.llmResult as unknown;
+  if (
+    typeof content === "object" &&
+    content !== null &&
+    typeof (content as { text?: unknown }).text === "string"
+  ) {
+    content = (content as { text: string }).text;
   }
   return typeof content === "string" ? content : JSON.stringify(content);
 }
 
-export function parseJsonFromLlm(content: any): any {
+export function parseJsonFromLlm<T = Record<string, unknown>>(content: unknown): T | null {
   if (!content) return null;
-  if (typeof content !== "string") return content;
-  return parseAndRepairLLMJson(content);
+  if (typeof content !== "string") return content as T;
+  return parseAndRepairLLMJson(content) as T | null;
 }
 
-function handleFrontendLLMOverrideJSON(req: any, res?: any, systemPrompt?: string, userPrompt?: string) {
+function handleFrontendLLMOverrideJSON(
+  req: LlmRequestLike,
+  res?: LlmResponseLike,
+  systemPrompt?: string,
+  userPrompt?: string
+) {
   const content = handleFrontendLLMOverride(req, res, systemPrompt, userPrompt);
   if (content) {
     return parseJsonFromLlm(content);
@@ -225,7 +275,11 @@ function handleFrontendLLMOverrideJSON(req: any, res?: any, systemPrompt?: strin
   return null;
 }
 
-function createChallengeTokenForRequest(req: any, systemPrompt: string, userPrompt: string): string {
+function createChallengeTokenForRequest(
+  req: LlmRequestLike,
+  systemPrompt: string,
+  userPrompt: string
+): string {
   const promptHash = computePromptHash(systemPrompt, userPrompt);
   const userId = req?.user?.id || (req?.headers && req.headers["x-user-id"]) || "anonymous";
   const routeId = req?.originalUrl || req?.url || "llm-route";
@@ -237,16 +291,16 @@ function createChallengeTokenForRequest(req: any, systemPrompt: string, userProm
   });
 }
 
-export async function callOpenRouterJSON(
-  req: any,
-  res: any,
+export async function callOpenRouterJSON<T = any>(
+  req: LlmRequestLike,
+  res: LlmResponseLike,
   systemPrompt: string,
   userPrompt: string,
   model?: string,
   taskType: string = "reasoning"
-): Promise<any> {
+): Promise<T> {
   const override = handleFrontendLLMOverrideJSON(req, res, systemPrompt, userPrompt);
-  if (override) return override;
+  if (override) return override as T;
 
   const aiConfig = resolveRequestAiConfig(req);
   const targetModel = model || aiConfig.model;
@@ -261,7 +315,9 @@ export async function callOpenRouterJSON(
 
   if (candidates.length === 0) {
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
+      res
+        .status(426)
+        .json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
     }
     throw new Error("RequireFrontendLLMException");
   }
@@ -273,32 +329,35 @@ export async function callOpenRouterJSON(
         systemPrompt,
         userPrompt,
         responseFormat: "json",
-        segments: [{ label: "Input", text: userPrompt }]
+        segments: [{ label: "Input", text: userPrompt }],
       },
       { candidates },
       buildAuthorizedPolicy(candidates)
     );
-    
+
     if (!result.ok) {
       throw new Error(result.error.message || "AI Agent Generation Failed");
     }
 
     const text = result.value.text;
-    return parseJsonFromLlm(text);
+    return parseJsonFromLlm<T>(text) as T;
   } catch (err: unknown) {
-    if ((err as any)?.status === 403 || (err as any)?.message?.includes("challenge token")) {
+    const typedErr = err as { status?: number; message?: string };
+    if (typedErr?.status === 403 || typedErr?.message?.includes("challenge token")) {
       throw err;
     }
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
+      res
+        .status(426)
+        .json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
     }
     throw new Error("RequireFrontendLLMException");
   }
 }
 
 export async function callOpenRouterText(
-  req: any,
-  res: any,
+  req: LlmRequestLike,
+  res: LlmResponseLike,
   systemPrompt: string,
   userPrompt: string,
   model?: string,
@@ -320,7 +379,9 @@ export async function callOpenRouterText(
 
   if (candidates.length === 0) {
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
+      res
+        .status(426)
+        .json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
     }
     throw new Error("RequireFrontendLLMException");
   }
@@ -331,7 +392,7 @@ export async function callOpenRouterText(
         taskClass: mapTaskType(taskType),
         systemPrompt,
         userPrompt,
-        segments: [{ label: "Input", text: userPrompt }]
+        segments: [{ label: "Input", text: userPrompt }],
       },
       { candidates },
       buildAuthorizedPolicy(candidates)
@@ -341,19 +402,22 @@ export async function callOpenRouterText(
     }
     return result.value.text;
   } catch (err: unknown) {
-    if ((err as any)?.status === 403 || (err as any)?.message?.includes("challenge token")) {
+    const typedErr = err as { status?: number; message?: string };
+    if (typedErr?.status === 403 || typedErr?.message?.includes("challenge token")) {
       throw err;
     }
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
+      res
+        .status(426)
+        .json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
     }
     throw new Error("RequireFrontendLLMException");
   }
 }
 
 export async function streamOpenRouterJSON(
-  req: any,
-  res: any,
+  req: LlmRequestLike,
+  res: LlmResponseLike,
   systemPrompt: string,
   userPrompt: string,
   model?: string,
@@ -375,21 +439,28 @@ export async function streamOpenRouterJSON(
 
   if (candidates.length === 0) {
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType, stream: true });
+      res.status(426).json({
+        requireFrontendLLM: true,
+        challengeToken,
+        systemPrompt,
+        userPrompt,
+        taskType,
+        stream: true,
+      });
     }
     return;
   }
 
-  if (!res.headersSent) {
+  if (!res.headersSent && res.writeHead) {
     res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
     });
   }
 
-  const sendEvent = (event: string, data: any) => {
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  const sendEvent = (event: string, data: unknown) => {
+    res.write?.(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
   sendEvent("log", { message: "> Initializing Agent Framework..." });
@@ -403,7 +474,7 @@ export async function streamOpenRouterJSON(
         systemPrompt,
         userPrompt,
         responseFormat: "json",
-        segments: [{ label: "Input", text: userPrompt }]
+        segments: [{ label: "Input", text: userPrompt }],
       },
       (chunk: string) => {
         fullContent += chunk;
@@ -420,11 +491,19 @@ export async function streamOpenRouterJSON(
     sendEvent("log", { message: "> Parsing final JSON..." });
     return parseJsonFromLlm(fullContent);
   } catch (err: unknown) {
-    if ((err as any)?.status === 403 || (err as any)?.message?.includes("challenge token")) {
+    const typedErr = err as { status?: number; message?: string };
+    if (typedErr?.status === 403 || typedErr?.message?.includes("challenge token")) {
       throw err;
     }
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType, stream: true });
+      res.status(426).json({
+        requireFrontendLLM: true,
+        challengeToken,
+        systemPrompt,
+        userPrompt,
+        taskType,
+        stream: true,
+      });
       return;
     }
     throw err;
@@ -432,8 +511,8 @@ export async function streamOpenRouterJSON(
 }
 
 export async function streamOpenRouterText(
-  req: any,
-  res: any,
+  req: LlmRequestLike,
+  res: LlmResponseLike,
   systemPrompt: string,
   userPrompt: string,
   model?: string,
@@ -455,21 +534,28 @@ export async function streamOpenRouterText(
 
   if (candidates.length === 0) {
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType, stream: true });
+      res.status(426).json({
+        requireFrontendLLM: true,
+        challengeToken,
+        systemPrompt,
+        userPrompt,
+        taskType,
+        stream: true,
+      });
     }
     return;
   }
 
-  if (!res.headersSent) {
+  if (!res.headersSent && res.writeHead) {
     res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
     });
   }
 
-  const sendEvent = (event: string, data: any) => {
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  const sendEvent = (event: string, data: unknown) => {
+    res.write?.(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
   sendEvent("log", { message: "> Initializing Agent Framework..." });
@@ -482,7 +568,7 @@ export async function streamOpenRouterText(
         taskClass: mapTaskType(taskType),
         systemPrompt,
         userPrompt,
-        segments: [{ label: "Input", text: userPrompt }]
+        segments: [{ label: "Input", text: userPrompt }],
       },
       (chunk: string) => {
         fullContent += chunk;
@@ -497,11 +583,19 @@ export async function streamOpenRouterText(
 
     return fullContent;
   } catch (err: unknown) {
-    if ((err as any)?.status === 403 || (err as any)?.message?.includes("challenge token")) {
+    const typedErr = err as { status?: number; message?: string };
+    if (typedErr?.status === 403 || typedErr?.message?.includes("challenge token")) {
       throw err;
     }
     if (!res.headersSent) {
-      res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType, stream: true });
+      res.status(426).json({
+        requireFrontendLLM: true,
+        challengeToken,
+        systemPrompt,
+        userPrompt,
+        taskType,
+        stream: true,
+      });
       return;
     }
     throw err;
@@ -519,13 +613,19 @@ export interface MultimodalAgenticOptions {
   onChunk?: (chunk: string) => void;
 }
 
-export async function executeMultimodalAgentic(options: MultimodalAgenticOptions, req?: any): Promise<{ text: string; provider: string; model: string }> {
-  const candidates = options.candidates && options.candidates.length > 0 ? options.candidates : getCandidates(req);
+export async function executeMultimodalAgentic(
+  options: MultimodalAgenticOptions,
+  req?: LlmRequestLike
+): Promise<{ text: string; provider: string; model: string }> {
+  const candidates =
+    options.candidates && options.candidates.length > 0 ? options.candidates : getCandidates(req);
   if (candidates.length === 0) {
-    throw new Error("No client-owned BYOK API key or local AI runner was supplied for this request. Please configure your credentials in AI Access.");
+    throw new Error(
+      "No client-owned BYOK API key or local AI runner was supplied for this request. Please configure your credentials in AI Access."
+    );
   }
 
-  let orderedCandidates = [...candidates];
+  const orderedCandidates = [...candidates];
   if (options.images && options.images.length > 0) {
     orderedCandidates.sort((a, b) => {
       if (a.provider === "gemini" && b.provider !== "gemini") return -1;
@@ -535,7 +635,9 @@ export async function executeMultimodalAgentic(options: MultimodalAgenticOptions
   }
 
   const policy = buildAuthorizedPolicy(orderedCandidates);
-  const taskClass = mapTaskType(options.taskType || (options.images?.length ? "chat" : "reasoning"));
+  const taskClass = mapTaskType(
+    options.taskType || (options.images?.length ? "chat" : "reasoning")
+  );
 
   if (options.onChunk) {
     let full = "";
@@ -561,7 +663,11 @@ export async function executeMultimodalAgentic(options: MultimodalAgenticOptions
       throw new Error(result.error?.message || "AI Agent Generation Failed");
     }
 
-    return { text: full, provider: result.providerId, model: (result as any).value?.model || "" };
+    const modelVal =
+      typeof result.value === "object" && result.value !== null && "model" in result.value
+        ? String((result.value as { model?: string }).model || "")
+        : "";
+    return { text: full, provider: result.providerId, model: modelVal };
   } else {
     const result = await completeWithFailover(
       {
@@ -594,14 +700,19 @@ export async function generateGeminiEmbedding(text: string, apiKey?: string): Pr
     throw new Error("Client BYOK Gemini API key is required for embeddings.");
   }
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${encodeURIComponent(apiKey)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "models/text-embedding-004",
-      content: { parts: [{ text }] }
-    })
-  });
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${encodeURIComponent(
+      apiKey
+    )}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "models/text-embedding-004",
+        content: { parts: [{ text }] },
+      }),
+    }
+  );
 
   if (!response.ok) {
     const errorText = await response.text();

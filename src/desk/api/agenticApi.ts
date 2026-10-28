@@ -411,3 +411,103 @@ export async function downloadRefereeResponseLetterBlob(
   }
   return res.blob();
 }
+
+export interface ProposalCriterionResult {
+  criterion: string;
+  score: number;
+  verdict: string;
+  critique: string;
+  recommendation: string;
+}
+
+export interface StudySectionSimulationResponse {
+  projectId: string;
+  agency: string;
+  mechanism: string;
+  overallImpactScore: string;
+  recommendationForFunding: string;
+  criteria: ProposalCriterionResult[];
+  auditedAt: string;
+}
+
+export async function simulateStudySectionReview(
+  projectId: string,
+  payload: Record<string, unknown>
+): Promise<StudySectionSimulationResponse> {
+  const res = await authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/proposal/simulate-review`,
+    "POST",
+    payload
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to simulate study section review: HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export interface VivaQuestionItem {
+  id: string;
+  category: string;
+  examinerQuestion: string;
+  assessmentFocus: string;
+  suggestedRebuttalStructure: string[];
+}
+
+export interface VivaSimulationResponse {
+  projectId: string;
+  degreeLevel: string;
+  examinerPersona: string;
+  examinerRigorScore: string;
+  questions: VivaQuestionItem[];
+  generatedAt: string;
+}
+
+export async function simulateVivaDefense(
+  projectId: string,
+  payload: Record<string, unknown>
+): Promise<VivaSimulationResponse> {
+  const res = await authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/thesis/simulate-viva`,
+    "POST",
+    payload
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to simulate Viva Voce defense: HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export interface ThesisChapterAuditResponse {
+  projectId: string;
+  alignmentScore: number;
+  coherenceStatus: string;
+  crossChapterChecks: Array<{
+    check: string;
+    status: "passed" | "warn" | "failed";
+    details: string;
+  }>;
+  chapterSummaries?: Array<{
+    chapterId: string;
+    chapterTitle: string;
+    g3Status: string;
+    g4Status: string;
+    g5Status: string;
+  }>;
+  auditedAt: string;
+}
+
+export async function auditThesisChapters(
+  projectId: string,
+  payload: Record<string, unknown>
+): Promise<ThesisChapterAuditResponse> {
+  const res = await authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/thesis/audit-chapters`,
+    "POST",
+    payload
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to audit thesis chapters: HTTP ${res.status}`);
+  }
+  return res.json();
+}
+

@@ -56,8 +56,9 @@ export class PDFParser implements Parser {
     }
 
     try {
-      // Use pdf-parse for extraction
-      const pdfParseModule = await import("pdf-parse");
+      // Use pdf-parse for extraction dynamically without bundling Node-only pdfjs-dist into the browser client
+      const pdfParsePkg = "pdf-parse";
+      const pdfParseModule = await import(/* @vite-ignore */ pdfParsePkg);
       const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
       let extractedText = "";
       let pages: Array<{ text: string; pageNumber: number }> = [];

@@ -5,6 +5,7 @@ import AssignmentStageNavigation from "./components/AssignmentStageNavigation";
 import { authedJsonFetch } from "../api";
 import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
 import { WorkspaceAutosaveBadge } from "../../components/ui/WorkspaceAutosaveBadge";
+import AppleStudioHeader, { type AppleStudioPhaseId } from "../../components/ui/AppleStudioShell";
 
 import { ASSIGNMENT_AGENT_CONFIGS, ASSIGNMENT_PHASES } from "./types";
 import { sendAssignmentCopilotMessage } from "./services/assignmentCopilotService";
@@ -12,7 +13,7 @@ import { sendAssignmentCopilotMessage } from "./services/assignmentCopilotServic
 const ContextPanel = React.lazy(() => import("../workspace/ContextPanel"));
 
 import AssignmentExtractStage from "./stages/AssignmentExtractStage";
-import AssignmentUnderstandStage from "./stages/AssignmentUnderstandStage";
+const AssignmentUnderstandStage = React.lazy(() => import("./stages/AssignmentUnderstandStage"));
 const AssignmentSourcesStage = React.lazy(() => import("./stages/AssignmentSourcesStage"));
 const AssignmentDraftingStage = React.lazy(() => import("./stages/AssignmentDraftingStage"));
 const AssignmentSubmissionStage = React.lazy(() => import("./stages/AssignmentSubmissionStage"));
@@ -399,6 +400,7 @@ export function AssignmentSubmissionPlaceholder() {
 
 function AssignmentWorkspaceInner({
   onClose,
+  onOpenAiAccess,
 }: {
   onClose?: () => void;
   onOpenAccountSettings?: () => void;
@@ -494,7 +496,7 @@ function AssignmentWorkspaceInner({
   if (isLoading || !project) {
     return (
       <div className="h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 overflow-hidden">
-        <header className="bg-white dark:bg-[#1C1C1E] z-20 shrink-0">
+        <div className="bg-white dark:bg-[#1C1C1E] z-20 shrink-0">
           <div className="flex items-center justify-between px-4 sm:px-6 h-11 gap-4">
             <div className="flex items-center gap-2.5 min-w-0">
               <button
@@ -518,7 +520,7 @@ function AssignmentWorkspaceInner({
               <div className="w-7 h-7 rounded-lg bg-neutral-200 dark:bg-white/10" />
             </div>
           </div>
-        </header>
+        </div>
 
         <PhaseNavSkeleton />
 
@@ -576,6 +578,48 @@ function AssignmentWorkspaceInner({
 
   return (
     <div className="h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 overflow-hidden">
+      {/* Shared Apple-Grade Studio Chrome Bar */}
+      <AppleStudioHeader
+        deliverableCode="OT-01"
+        deliverableLabel="Coursework Studio"
+        projectTitle={editableTitle || "Untitled Assignment"}
+        onProjectTitleChange={(nextTitle) => {
+          setEditableTitle(nextTitle);
+        }}
+        activePhase={
+          currentPhase === "extract"
+            ? "blueprint"
+            : currentPhase === "understand"
+            ? "evidence"
+            : currentPhase === "sources"
+            ? "review"
+            : currentPhase === "drafting"
+            ? "studio"
+            : "delivery"
+        }
+        onPhaseSelect={(phase: AppleStudioPhaseId) => {
+          const map: Record<AppleStudioPhaseId, AssignmentPhaseId> = {
+            blueprint: "extract",
+            evidence: executionMode === "minimal" ? "sources" : "understand",
+            studio: "drafting",
+            review: "sources",
+            delivery: "submission",
+          };
+          setPhase(map[phase]);
+        }}
+        onBack={() => {
+          if (onClose) onClose();
+          else if (typeof window !== "undefined") window.location.href = "/";
+        }}
+        metricLabel={`${executionMode === "minimal" ? "Quick 4-Step" : "Guided 5-Step"}`}
+        aiModelLabel="Socratic Tutor AI"
+        onOpenAiAccess={onOpenAiAccess}
+        autosaveStatus="saved"
+        projectVersion={project?.version}
+        inspectorOpen={tutorPanelOpen}
+        onToggleInspector={() => setTutorPanelOpen((o) => !o)}
+      />
+
       {/* Minimalist Workspace Header */}
       <header className="bg-white dark:bg-[#1C1C1E] z-20 shrink-0">
         <div className="flex items-center justify-between px-4 sm:px-6 pt-2.5 pb-1 gap-4">
@@ -625,8 +669,6 @@ function AssignmentWorkspaceInner({
 
           {/* Right Section: Minimal vs Detailed Mode Toggle & Socratic Tutor Drawer Toggle */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <WorkspaceAutosaveBadge version={project?.version} />
-
             {/* Minimal vs Detailed Segmented Control (OT-10 Parity) */}
             <div
               role="radiogroup"

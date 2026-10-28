@@ -16,29 +16,68 @@ export default defineConfig(() => {
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâ€”file watching is disabled to prevent flickering during agent edits.
+      // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
     build: {
-      chunkSizeWarningLimit: 1500,
+      chunkSizeWarningLimit: 500,
       rollupOptions: {
         output: {
           entryFileNames: 'assets/[name]-[hash].js',
           chunkFileNames: 'assets/[name]-[hash].js',
           assetFileNames: 'assets/[name]-[hash].[ext]',
-          manualChunks: {
-            react: ['react', 'react-dom', 'react-router-dom'],
-            tiptap: ['@tiptap/core', '@tiptap/react', '@tiptap/starter-kit', '@tiptap/extension-placeholder'],
-            supabase: ['@supabase/supabase-js'],
-            ui: ['lucide-react', 'motion'],
-            docx: ['docx'],
-            pdfmake: ['pdfmake'],
-            xlsx: ['xlsx'],
-            mammoth: ['mammoth'],
-            'pdf-parse': ['pdf-parse'],
-          }
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (
+                id.includes('/react/') ||
+                id.includes('/react-dom/') ||
+                id.includes('/react-router') ||
+                id.includes('/scheduler/')
+              ) {
+                return 'react';
+              }
+              if (id.includes('@tiptap') || id.includes('prosemirror')) {
+                return 'tiptap';
+              }
+              if (id.includes('@supabase')) {
+                return 'supabase';
+              }
+              if (id.includes('lucide-react') || id.includes('/motion/') || id.includes('framer-motion')) {
+                return 'ui';
+              }
+              if (id.includes('node_modules/docx/')) {
+                return 'docx';
+              }
+              if (id.includes('/pdfmake/')) {
+                return 'pdfmake';
+              }
+              if (id.includes('/xlsx/')) {
+                return 'xlsx';
+              }
+              if (
+                id.includes('/bluebird/') ||
+                id.includes('/underscore/') ||
+                id.includes('/xmlbuilder/') ||
+                id.includes('/dingbat-to-unicode/') ||
+                id.includes('/lop/') ||
+                id.includes('/jszip/')
+              ) {
+                return 'mammoth-deps';
+              }
+              if (id.includes('/mammoth/')) {
+                return 'mammoth';
+              }
+            }
+            if (
+              id.includes('src/desk/assignment/services/outlineService') ||
+              id.includes('src/desk/assignment/services/scholarlyDiscoveryService')
+            ) {
+              return 'assignment-services';
+            }
+            return undefined;
+          },
         }
       }
     },

@@ -27,6 +27,8 @@ import { __setEnabledOutputTypesForTests } from "../outputTypeAccess.ts";
 // own dedicated tests in outputTypeAccess.test.ts.
 beforeEach(() => {
   __setEnabledOutputTypesForTests("all");
+  __resetProjectStoreForTests();
+  __resetRateLimitStore();
 });
 
 interface IntakeFieldLike {

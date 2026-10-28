@@ -877,16 +877,16 @@ export default function ManuscriptStudioMode() {
             </div>
           </div>
 
-          {/* Text Editor Area */}
+          {/* Text Editor Area: Apple Pages / Ulysses Sheet */}
           <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center">
-            <div className="w-full max-w-4xl flex-1 flex flex-col space-y-6">
+            <div className="apple-sheet w-full max-w-3xl mx-auto py-8 px-6 sm:px-10 shadow-sm rounded-2xl bg-surface flex-1 flex flex-col space-y-6">
               <textarea
                 ref={editorTextareaRef}
                 aria-label="Academic Manuscript Canvas"
                 value={manuscriptText}
                 onChange={(e) => handleManuscriptChange(e.target.value)}
                 placeholder="Compose or assemble your peer-reviewed manuscript here. Sub-sections drafted via Mode 1 budgets and citations inserted from Mode 2 Smart Evidence will appear seamlessly..."
-                className="w-full flex-1 min-h-[460px] bg-[color:var(--surface-canvas)] text-xs md:text-sm font-mono leading-relaxed text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] outline-none resize-none border-0 focus:ring-0 p-2"
+                className="w-full flex-1 min-h-[460px] bg-transparent text-xs md:text-sm font-mono leading-relaxed text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] outline-none resize-none border-0 focus:ring-0 p-2 apple-prose-measure"
               />
 
               {/* Live Verified Bibliography Card */}
