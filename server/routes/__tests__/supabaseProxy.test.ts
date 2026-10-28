@@ -88,4 +88,31 @@ describe("Supabase Reverse Proxy (/api/supabase)", () => {
     expect(res.status).toBe(502);
     expect(res.body.error).toBe("Bad Gateway");
   });
+
+  it("fails closed (returns null and 503) when no Supabase URL env vars are set (F-07)", async () => {
+    delete process.env.SUPABASE_TARGET_URL;
+    delete process.env.SUPABASE_URL;
+    delete process.env.VITE_SUPABASE_URL;
+
+    expect(getRemoteSupabaseUrl()).toBeNull();
+
+    const res = await request(app).get("/api/supabase/auth/v1/health");
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe("Service Unavailable");
+  });
+
+  it("rejects non-allowlisted proxy subpaths and path traversal with 403 Forbidden (F-10)", async () => {
+    const disallowed = [
+      "/api/supabase/admin/users",
+      "/api/supabase/graphql/v1",
+      "/api/supabase/auth/v1/../../secret",
+      "/api/supabase/",
+    ];
+
+    for (const path of disallowed) {
+      const res = await request(app).get(path);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe("Forbidden");
+    }
+  });
 });

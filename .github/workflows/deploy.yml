@@ -34,10 +34,16 @@ jobs:
         run: npm test
 
       - name: Compile Client & Server Production Bundles
-        run: npm run build
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "⚠️ VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY not set in repository secrets; using placeholder build values for CI bundle verification."
+            export VITE_SUPABASE_URL="https://ci-placeholder.supabase.co"
+            export VITE_SUPABASE_ANON_KEY="ci-placeholder-anon-key"
+          fi
+          npm run build
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://gfjhsijrwodjvkisouzw.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmamhzaWpyd29kanZraXNvdXp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2MDU2ODQsImV4cCI6MjEwMDE4MTY4NH0.FWfZ5at-uxMhKTUrQZWyOoU4votgVIzXPOUjkdTnRUU' }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
   deploy:
     name: Deploy to Production
