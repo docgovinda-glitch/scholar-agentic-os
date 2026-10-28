@@ -48,14 +48,16 @@ export async function getConnectedCloudDrives(userId: string): Promise<CloudDriv
             const email = session.user.email || "connected-account";
             const name = (session.user.user_metadata?.full_name as string) || (session.user.user_metadata?.name as string);
 
+            // Do NOT persist raw OAuth access_token / refresh_token directly from the browser
+            // in plaintext (F-11). Server routes encrypt provider tokens with AES-256-GCM.
             await supabase.from("user_cloud_integrations").upsert(
               {
                 user_id: userId,
                 provider: driveProvider,
                 account_email: email,
                 account_name: name,
-                access_token: session.provider_token,
-                refresh_token: session.provider_refresh_token || null,
+                access_token: null,
+                refresh_token: null,
               },
               { onConflict: "user_id, provider" }
             );
@@ -127,8 +129,8 @@ export async function connectCloudDrive(
           provider,
           account_email: details.email,
           account_name: details.name,
-          access_token: details.accessToken || null,
-          refresh_token: details.refreshToken || null,
+          access_token: null,
+          refresh_token: null,
         },
         { onConflict: "user_id, provider" }
       );

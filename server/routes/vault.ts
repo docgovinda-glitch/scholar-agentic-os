@@ -1,10 +1,54 @@
 import express, { Router, Request, Response } from "express";
+import crypto from "node:crypto";
 import { parseDocument, normalizeUnicodeNFC } from "../../src/document_intelligence/index.ts";
 import { requireAuth } from "../src/middleware/auth.ts";
 import { createUploadInstance } from "../src/middleware/uploadGuard.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 import type { CanonicalReference } from "../../src/citation_compliance/model/reference.ts";
 import { safeFetchHtml, extractLightweightUrlMetadata } from "../utils/ssrfGuard.ts";
+import { encrypt, decryptToString } from "../../src/services/crypto/crypto.ts";
+
+const CLOUD_TOKEN_ENC_PREFIX = "enc:v1:";
+
+function resolveCloudTokenEncryptionKey(): Buffer | null {
+  const rawMaster = process.env.MASTER_KEY || process.env.CREDENTIAL_MASTER_KEY;
+  if (rawMaster) {
+    try {
+      const buf = Buffer.from(rawMaster.trim(), "base64");
+      if (buf.length === 32) return buf;
+    } catch {}
+    return crypto.createHash("sha256").update(rawMaster.trim()).digest();
+  }
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return crypto
+      .createHmac("sha256", process.env.SUPABASE_SERVICE_ROLE_KEY.trim())
+      .update("scholar-core:cloud-integration-token-key:v1")
+      .digest();
+  }
+  return null;
+}
+
+export function encryptCloudToken(plaintext: string): string | null {
+  const key = resolveCloudTokenEncryptionKey();
+  if (!key) return null;
+  const payload = encrypt(plaintext, key);
+  return `${CLOUD_TOKEN_ENC_PREFIX}${JSON.stringify(payload)}`;
+}
+
+export function decryptCloudToken(stored: string | null | undefined): string | null {
+  if (!stored) return null;
+  if (!stored.startsWith(CLOUD_TOKEN_ENC_PREFIX)) {
+    return stored;
+  }
+  const key = resolveCloudTokenEncryptionKey();
+  if (!key) return null;
+  try {
+    const parsed = JSON.parse(stored.slice(CLOUD_TOKEN_ENC_PREFIX.length));
+    return decryptToString(parsed, key);
+  } catch {
+    return null;
+  }
+}
 
 const router = Router();
 router.use(requireAuth);
@@ -793,17 +837,21 @@ router.get("/drive/files", requireAuth, async (req: Request, res: Response) => {
       const integrationsTable = new SupabaseTable(config, "user_cloud_integrations");
       const rows = await integrationsTable.select(`user_id=eq.${encodeURIComponent(user.id)}&provider=eq.google_drive`);
       if (rows && rows.length > 0) {
-        accessToken = ((rows[0] as any)?.access_token as string) || null;
+        const rawStored = ((rows[0] as any)?.access_token as string) || null;
+        accessToken = decryptCloudToken(rawStored);
       }
     }
 
-    // If client supplied fresh provider token and config is present, update user_cloud_integrations
+    // If client supplied fresh provider token and config is present, encrypt and update user_cloud_integrations
     if (req.headers["x-provider-token"] && config) {
       try {
-        const integrationsTable = new SupabaseTable(config, "user_cloud_integrations");
-        await integrationsTable.update(`user_id=eq.${encodeURIComponent(user.id)}&provider=eq.google_drive`, {
-          access_token: req.headers["x-provider-token"] as string,
-        });
+        const encryptedToken = encryptCloudToken(req.headers["x-provider-token"] as string);
+        if (encryptedToken) {
+          const integrationsTable = new SupabaseTable(config, "user_cloud_integrations");
+          await integrationsTable.update(`user_id=eq.${encodeURIComponent(user.id)}&provider=eq.google_drive`, {
+            access_token: encryptedToken,
+          });
+        }
       } catch {}
     }
 
@@ -869,16 +917,20 @@ router.get("/onedrive/files", requireAuth, async (req: Request, res: Response) =
       const integrationsTable = new SupabaseTable(config, "user_cloud_integrations");
       const rows = await integrationsTable.select(`user_id=eq.${encodeURIComponent(user.id)}&provider=eq.onedrive`);
       if (rows && rows.length > 0) {
-        accessToken = ((rows[0] as any)?.access_token as string) || null;
+        const rawStored = ((rows[0] as any)?.access_token as string) || null;
+        accessToken = decryptCloudToken(rawStored);
       }
     }
 
     if (req.headers["x-provider-token"] && config) {
       try {
-        const integrationsTable = new SupabaseTable(config, "user_cloud_integrations");
-        await integrationsTable.update(`user_id=eq.${encodeURIComponent(user.id)}&provider=eq.onedrive`, {
-          access_token: req.headers["x-provider-token"] as string,
-        });
+        const encryptedToken = encryptCloudToken(req.headers["x-provider-token"] as string);
+        if (encryptedToken) {
+          const integrationsTable = new SupabaseTable(config, "user_cloud_integrations");
+          await integrationsTable.update(`user_id=eq.${encodeURIComponent(user.id)}&provider=eq.onedrive`, {
+            access_token: encryptedToken,
+          });
+        }
       } catch {}
     }
 
