@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const mockAuthSignUp = vi.fn();
 const mockAuthSignInWithPassword = vi.fn();
 const mockAuthResetPassword = vi.fn();
+const mockAuthSetSession = vi.fn().mockResolvedValue({ data: {}, error: null });
 const mockFrom = vi.fn();
 
 vi.mock("../supabaseClient", () => ({
@@ -20,6 +21,7 @@ vi.mock("../supabaseClient", () => ({
       signUp: mockAuthSignUp,
       signInWithPassword: mockAuthSignInWithPassword,
       resetPasswordForEmail: mockAuthResetPassword,
+      setSession: mockAuthSetSession,
       getUser: vi.fn().mockResolvedValue({ data: { user: { id: "test-user-id" } } }),
     },
     from: mockFrom,
@@ -36,6 +38,7 @@ import {
 describe("Conflict #6 — Access Control & Registration (Direct Supabase Auth vs. Approval Queue)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    global.fetch = vi.fn() as any;
   });
 
   it("1. Self-service registration passes profile data directly to Supabase Auth without approval gate", async () => {
@@ -81,24 +84,17 @@ describe("Conflict #6 — Access Control & Registration (Direct Supabase Auth vs
   });
 
   it("2. Active user can sign in immediately without administrative approval", async () => {
-    // Mock user lookup by email directly
-    mockAuthSignInWithPassword.mockResolvedValueOnce({
-      data: {
-        user: { id: "user-123", email: "user@example.com" },
-        session: { access_token: "jwt-token-xyz" },
-      },
-      error: null,
-    });
-
-    const mockSelect = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: { id: "user-123", account_status: "active", full_name: "Dr. Scholar", phone: "", affiliation: "" },
-          error: null,
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          user: { id: "user-123" },
+          session: { access_token: "jwt-token-xyz", refresh_token: "ref-token" },
+          profile: { fullName: "Dr. Scholar", phone: "", affiliation: "", authenticId: "None" },
         }),
-      }),
     });
-    mockFrom.mockReturnValue({ select: mockSelect });
 
     const result = await signIn({ username: "user@example.com", password: "SecurePassword123!" });
     expect(result.success).toBe(true);
@@ -107,23 +103,15 @@ describe("Conflict #6 — Access Control & Registration (Direct Supabase Auth vs
   });
 
   it("3. Suspended account is rejected at sign-in", async () => {
-    mockAuthSignInWithPassword.mockResolvedValueOnce({
-      data: {
-        user: { id: "user-suspended", email: "suspended@example.com" },
-        session: { access_token: "jwt-token-xyz" },
-      },
-      error: null,
-    });
-
-    const mockSelect = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: { id: "user-suspended", account_status: "suspended", full_name: "Suspended User", phone: "", affiliation: "" },
-          error: null,
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      json: () =>
+        Promise.resolve({
+          success: false,
+          error: "Your account is suspended. Please contact support.",
         }),
-      }),
     });
-    mockFrom.mockReturnValue({ select: mockSelect });
 
     const result = await signIn({ username: "suspended@example.com", password: "password123" });
     expect(result.success).toBe(false);

@@ -9,7 +9,9 @@ import type { CandidateProvider } from "../../src/platform/gateway/types.js";
 import { getEntitlement, isEntitlementActive } from "../src/aiEngine/entitlements.js";
 import { parseAndRepairLLMJson } from "../../src/shared/llmJsonParser.ts";
 
-dotenv.config();
+if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
+  dotenv.config();
+}
 
 export type LlmRequestLike = Partial<express.Request> & {
   headers?: Record<string, string | string[] | undefined>;

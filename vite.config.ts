@@ -14,6 +14,15 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    test: {
+      setupFiles: ['./src/test/vitestSetup.ts'],
+      env: {
+        VITE_SUPABASE_URL: '',
+        SUPABASE_URL: '',
+        SUPABASE_SERVICE_ROLE_KEY: '',
+        DATABASE_URL: '',
+      },
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
