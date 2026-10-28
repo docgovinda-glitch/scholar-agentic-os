@@ -4,14 +4,13 @@ import { AssignmentProvider, useAssignmentWorkspace } from "./AssignmentContext"
 import AssignmentStageNavigation from "./components/AssignmentStageNavigation";
 import { authedJsonFetch } from "../api";
 
-import ContextPanel from "../workspace/ContextPanel";
 import { ASSIGNMENT_AGENT_CONFIGS, ASSIGNMENT_PHASES } from "./types";
 import { sendAssignmentCopilotMessage } from "./services/assignmentCopilotService";
 
+const ContextPanel = React.lazy(() => import("../workspace/ContextPanel"));
+
 import AssignmentExtractStage from "./stages/AssignmentExtractStage";
 import AssignmentUnderstandStage from "./stages/AssignmentUnderstandStage";
-
-// Code-splitting downstream stages with React.lazy
 const AssignmentSourcesStage = React.lazy(() => import("./stages/AssignmentSourcesStage"));
 const AssignmentDraftingStage = React.lazy(() => import("./stages/AssignmentDraftingStage"));
 const AssignmentSubmissionStage = React.lazy(() => import("./stages/AssignmentSubmissionStage"));
@@ -694,23 +693,25 @@ function AssignmentWorkspaceInner({
         {/* Right Column: Collapsible Context Panel Copilot Drawer */}
         {tutorPanelOpen && (
           <div className="w-80 lg:w-96 shrink-0 h-full overflow-hidden hidden sm:flex flex-col bg-[color:var(--surface-canvas)] border-l border-neutral-200/80 dark:border-white/10">
-            <ContextPanel
-              currentStage={currentPhase}
-              stageName={currentPhaseDef?.label || currentPhase}
-              isOpen={tutorPanelOpen}
-              onToggle={() => setTutorPanelOpen(false)}
-              agent={ASSIGNMENT_AGENT_CONFIGS[currentPhase]}
-              projectId={projectId}
-              onSendMessage={(text, history) =>
-                sendAssignmentCopilotMessage(
-                  projectId,
-                  currentPhase,
-                  text,
-                  history,
-                  projectState
-                )
-              }
-            />
+            <React.Suspense fallback={<AiTutorSkeleton />}>
+              <ContextPanel
+                currentStage={currentPhase}
+                stageName={currentPhaseDef?.label || currentPhase}
+                isOpen={tutorPanelOpen}
+                onToggle={() => setTutorPanelOpen(false)}
+                agent={ASSIGNMENT_AGENT_CONFIGS[currentPhase]}
+                projectId={projectId}
+                onSendMessage={(text, history) =>
+                  sendAssignmentCopilotMessage(
+                    projectId,
+                    currentPhase,
+                    text,
+                    history,
+                    projectState
+                  )
+                }
+              />
+            </React.Suspense>
           </div>
         )}
       </div>

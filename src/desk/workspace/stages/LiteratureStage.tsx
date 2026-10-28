@@ -6,6 +6,7 @@ import { executeAgenticLLM, saveIntakeAnswers } from "../../api";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
 import type { ProjectView } from "../../types";
+import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 import {
   buildLiteraturePrompts,
   generateLocalLiteratureFallback,
@@ -46,10 +47,8 @@ export default function LiteratureStage({
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<LiteratureItem[] | null>(() => {
     if (project?.answers?.["discovered_literature"]) {
-      try {
-        const parsed = JSON.parse(project.answers["discovered_literature"]);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (_) {}
+      const parsed = safeParseAnswerField<LiteratureItem[]>(project.answers["discovered_literature"], []);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
     return null;
   });
@@ -107,21 +106,17 @@ export default function LiteratureStage({
   // Sync state if answers change externally
   useEffect(() => {
     if (project?.answers?.["discovered_literature"]) {
-      try {
-        const parsed = JSON.parse(project.answers["discovered_literature"]);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setResults(parsed);
-          setSourcesDiscovered(parsed.length);
-        }
-      } catch (_) {}
+      const parsed = safeParseAnswerField<LiteratureItem[]>(project.answers["discovered_literature"], []);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setResults(parsed);
+        setSourcesDiscovered(parsed.length);
+      }
     }
     if (project?.answers?.["removed_literature"]) {
-      try {
-        const parsed = JSON.parse(project.answers["removed_literature"]);
-        if (Array.isArray(parsed?.removedDois)) setRemovedDois(parsed.removedDois);
-        if (Array.isArray(parsed?.removedIds)) setRemovedIds(parsed.removedIds);
-        if (Array.isArray(parsed?.removedTitles)) setRemovedTitles(parsed.removedTitles);
-      } catch (_) {}
+      const parsed = safeParseAnswerField<any>(project.answers["removed_literature"], null);
+      if (Array.isArray(parsed?.removedDois)) setRemovedDois(parsed.removedDois);
+      if (Array.isArray(parsed?.removedIds)) setRemovedIds(parsed.removedIds);
+      if (Array.isArray(parsed?.removedTitles)) setRemovedTitles(parsed.removedTitles);
     }
   }, [project?.answers]);
 

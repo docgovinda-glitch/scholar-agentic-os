@@ -13,6 +13,7 @@ import {
   generateProjectRebuttalMatrix,
 } from "../api";
 import { normalizeUnicodeNFC } from "../../document_intelligence/index";
+import { safeParseAnswerField } from "../../shared/projectStateSchema";
 
 export const REFEREE_PERSONAS: Array<{
   role: RefereeRole;
@@ -114,22 +115,16 @@ export default function RefereeRebuttalMode() {
   // Sync state if project changes remotely
   useEffect(() => {
     if (answers["peer_review_critiques"] && critiques.length === 0) {
-      try {
-        const parsed = JSON.parse(answers["peer_review_critiques"]);
-        if (Array.isArray(parsed) && parsed.length > 0) setCritiques(parsed);
-      } catch {}
+      const parsed = safeParseAnswerField<RefereeCritique[]>(answers["peer_review_critiques"], []);
+      if (Array.isArray(parsed) && parsed.length > 0) setCritiques(parsed);
     }
     if (answers["rebuttal_matrix"] && rebuttalMatrix.length === 0) {
-      try {
-        const parsed = JSON.parse(answers["rebuttal_matrix"]);
-        if (Array.isArray(parsed) && parsed.length > 0) setRebuttalMatrix(parsed);
-      } catch {}
+      const parsed = safeParseAnswerField<RebuttalMatrixItem[]>(answers["rebuttal_matrix"], []);
+      if (Array.isArray(parsed) && parsed.length > 0) setRebuttalMatrix(parsed);
     }
     if (answers["applied_patch_ids"] && appliedPatchIds.size === 0) {
-      try {
-        const parsed = JSON.parse(answers["applied_patch_ids"]);
-        if (Array.isArray(parsed) && parsed.length > 0) setAppliedPatchIds(new Set(parsed));
-      } catch {}
+      const parsed = safeParseAnswerField<string[]>(answers["applied_patch_ids"], []);
+      if (Array.isArray(parsed) && parsed.length > 0) setAppliedPatchIds(new Set(parsed));
     }
   }, [answers, critiques.length, rebuttalMatrix.length, appliedPatchIds.size]);
 

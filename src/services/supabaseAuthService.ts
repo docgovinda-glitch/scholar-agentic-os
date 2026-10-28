@@ -245,6 +245,18 @@ async function resolveIdentifierToEmail(identifier: string): Promise<{ email: st
  * the password grant behind this call and the /recover endpoint behind
  * sendPasswordResetEmail() at the same moment it protects signup.
  */
+interface QueryWithMaybeSingle<T> {
+  maybeSingle?: () => Promise<{ data: T | null; error: unknown }>;
+  single?: () => Promise<{ data: T | null; error: unknown }>;
+}
+
+interface ProfileSignInRow {
+  full_name?: string;
+  phone?: string;
+  affiliation?: string;
+  account_status?: string;
+}
+
 export async function signIn(input: SignInInput): Promise<SignInResult> {
   const supabase = getSupabaseClient();
 
@@ -276,11 +288,16 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
     .from("profiles")
     .select("full_name, phone, affiliation, account_status")
     .eq("id", signInData.user.id);
-  const { data: profile, error: profileError } = typeof (profileQuery as any).maybeSingle === "function"
-    ? await (profileQuery as any).maybeSingle()
-    : await (profileQuery as any).single();
+  const typedProfileQuery = profileQuery as unknown as QueryWithMaybeSingle<ProfileSignInRow>;
+  const queryRes = typeof typedProfileQuery.maybeSingle === "function"
+    ? await typedProfileQuery.maybeSingle()
+    : typedProfileQuery.single
+    ? await typedProfileQuery.single()
+    : await (profileQuery as unknown as { single: () => Promise<{ data: ProfileSignInRow | null; error: unknown }> }).single();
 
-  let activeProfile = profile;
+  const rawData = queryRes?.data;
+  const profileError = queryRes?.error;
+  let activeProfile: ProfileSignInRow | null = (Array.isArray(rawData) ? rawData[0] : rawData) as ProfileSignInRow | null;
   if (!activeProfile && !profileError) {
     const defaultUsername = signInData.user.email?.split("@")[0] || "researcher";
     const { data: createdProfile } = await supabase
@@ -295,7 +312,7 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
       })
       .select("full_name, phone, affiliation, account_status")
       .maybeSingle();
-    activeProfile = createdProfile;
+    activeProfile = createdProfile as ProfileSignInRow | null;
   }
 
   if (!activeProfile) {
@@ -315,10 +332,10 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
   return {
     success: true,
     profile: {
-      fullName: activeProfile.full_name,
+      fullName: activeProfile.full_name ?? "",
       email,
-      phone: activeProfile.phone,
-      affiliation: activeProfile.affiliation,
+      phone: activeProfile.phone ?? "",
+      affiliation: activeProfile.affiliation ?? "",
     },
   };
 }
@@ -454,13 +471,31 @@ export async function getProfile(): Promise<{ success: true; profile: ProfileFie
     return { success: false, error: "Not signed in." };
   }
 
+  interface ProfileFullRow {
+    username?: string;
+    full_name?: string;
+    phone?: string;
+    phone_country_code?: string;
+    phone_e164?: string;
+    affiliation?: string;
+    user_type?: string;
+    education_level?: string;
+  }
+
   const profileQuery = supabase
     .from("profiles")
     .select("username, full_name, phone, phone_country_code, phone_e164, affiliation, user_type, education_level")
     .eq("id", userData.user.id);
-  let { data, error } = typeof (profileQuery as any).maybeSingle === "function"
-    ? await (profileQuery as any).maybeSingle()
-    : await (profileQuery as any).single();
+  const typedProfileQuery = profileQuery as unknown as QueryWithMaybeSingle<ProfileFullRow>;
+  const queryRes = typeof typedProfileQuery.maybeSingle === "function"
+    ? await typedProfileQuery.maybeSingle()
+    : typedProfileQuery.single
+    ? await typedProfileQuery.single()
+    : await (profileQuery as unknown as { single: () => Promise<{ data: ProfileFullRow | null; error: unknown }> }).single();
+
+  const rawData = queryRes?.data;
+  let data: ProfileFullRow | null = (Array.isArray(rawData) ? rawData[0] : rawData) as ProfileFullRow | null;
+  const error = queryRes?.error;
 
   if (!data && !error) {
     const defaultUsername = userData.user.email?.split("@")[0] || "researcher";
@@ -476,7 +511,7 @@ export async function getProfile(): Promise<{ success: true; profile: ProfileFie
       })
       .select("username, full_name, phone, phone_country_code, phone_e164, affiliation, user_type, education_level")
       .maybeSingle();
-    data = created;
+    data = created as ProfileFullRow | null;
   }
 
   if (error || !data) {
@@ -498,8 +533,8 @@ export async function getProfile(): Promise<{ success: true; profile: ProfileFie
   return {
     success: true,
     profile: {
-      username: data.username,
-      fullName: data.full_name,
+      username: data.username ?? "",
+      fullName: data.full_name ?? "",
       email: userData.user.email ?? "",
       phone: data.phone ?? "",
       phoneCountryCode: data.phone_country_code ?? "",
@@ -533,7 +568,7 @@ export async function saveProfileFields(
     return { success: false, error: "Not signed in." };
   }
 
-  const updatePayload: Record<string, any> = {
+  const updatePayload: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   };
 
@@ -747,11 +782,37 @@ const GOOGLE_CLIENT_ID =
   (typeof process !== "undefined" && (process?.env?.VITE_GOOGLE_CLIENT_ID as string | undefined)) ||
   "321279128437-m3pm3b0qk9kli39mv2em8t5fq2io841p.apps.googleusercontent.com";
 
+interface GoogleIdPromptNotification {
+  isNotDisplayed?: () => boolean;
+  isSkippedMoment?: () => boolean;
+  isDismissedMoment?: () => boolean;
+}
+
+interface GoogleAccountsId {
+  initialize: (options: {
+    client_id: string;
+    callback: (response: { credential?: string }) => void;
+    auto_select?: boolean;
+    cancel_on_tap_outside?: boolean;
+    itp_support?: boolean;
+  }) => void;
+  prompt: (callback?: (notification: GoogleIdPromptNotification) => void) => void;
+}
+
+interface WindowWithGoogle extends Window {
+  google?: {
+    accounts?: {
+      id?: GoogleAccountsId;
+    };
+  };
+}
+
 let gisScriptLoading: Promise<void> | null = null;
 
 export function loadGoogleGsiScript(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
-  if ((window as any).google?.accounts?.id) return Promise.resolve();
+  const win = window as unknown as WindowWithGoogle;
+  if (win.google?.accounts?.id) return Promise.resolve();
   if (gisScriptLoading) return gisScriptLoading;
 
   gisScriptLoading = new Promise((resolve, reject) => {
@@ -819,11 +880,13 @@ export async function signInWithGoogle(redirectPath: string = ""): Promise<Servi
   if (typeof window !== "undefined") {
     try {
       await loadGoogleGsiScript();
-      if ((window as any).google?.accounts?.id) {
+      const win = window as unknown as WindowWithGoogle;
+      if (win.google?.accounts?.id) {
+        const googleId = win.google.accounts.id;
         return await new Promise<ServiceResult>((resolve) => {
           let finished = false;
 
-          (window as any).google.accounts.id.initialize({
+          googleId.initialize({
             client_id: GOOGLE_CLIENT_ID,
             callback: async (response: { credential?: string }) => {
               if (response.credential && !finished) {
@@ -837,7 +900,7 @@ export async function signInWithGoogle(redirectPath: string = ""): Promise<Servi
             itp_support: true,
           });
 
-          (window as any).google.accounts.id.prompt((notification: any) => {
+          googleId.prompt((notification: GoogleIdPromptNotification) => {
             if (
               !finished &&
               (notification.isNotDisplayed?.() ||
@@ -902,19 +965,18 @@ export function onGoogleSignIn(
   if (!isSupabaseConfigured()) return () => {};
   const supabase = getSupabaseClient();
   let fired = false;
-  const fireOnce = (session: { user: { id: string; email?: string; user_metadata?: any } } | null | undefined) => {
+  const fireOnce = (session: { user: { id: string; email?: string; user_metadata?: Record<string, unknown> } } | null | undefined) => {
     if (fired || !session?.user) return;
     if (localStorage.getItem(GOOGLE_OAUTH_PENDING_KEY) !== "1") return;
     fired = true;
     localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY);
+    const meta = session.user.user_metadata;
+    const metaFullName = typeof meta?.full_name === "string" ? meta.full_name : "";
+    const metaName = typeof meta?.name === "string" ? meta.name : "";
     callback({
       id: session.user.id,
       email: session.user.email || "",
-      fullName:
-        session.user.user_metadata?.full_name ||
-        session.user.user_metadata?.name ||
-        session.user.email ||
-        "",
+      fullName: metaFullName || metaName || session.user.email || "",
     });
   };
 

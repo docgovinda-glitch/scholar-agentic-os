@@ -5,6 +5,7 @@ import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedFetch, authedJsonFetch, authedStreamFetch, saveIntakeAnswers } from "../../api";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
+import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 
 export interface AcademicCritique {
   id: string;
@@ -58,11 +59,7 @@ export default function PeerReviewStage({
 
   const anchorGapId = project?.answers?.["anchor_gap_id"];
   const identifiedGaps = useMemo(() => {
-    try {
-      return JSON.parse(project?.answers?.["identified_gaps"] || "[]");
-    } catch {
-      return [];
-    }
+    return safeParseAnswerField<any[]>(project?.answers?.["identified_gaps"], []);
   }, [project?.answers]);
 
   const anchorGap = useMemo(() => {
@@ -79,35 +76,23 @@ export default function PeerReviewStage({
     "Target Academic Journal";
 
   const approvedVaultSources = useMemo(() => {
-    try {
-      const appr = JSON.parse(project?.answers?.["approved_vault_sources"] || "[]");
-      if (appr.length > 0) return appr;
-      return JSON.parse(project?.answers?.["vault_sources"] || "[]");
-    } catch {
-      return [];
-    }
+    const appr = safeParseAnswerField<any[]>(project?.answers?.["approved_vault_sources"], []);
+    if (appr.length > 0) return appr;
+    return safeParseAnswerField<any[]>(project?.answers?.["vault_sources"], []);
   }, [project?.answers]);
 
   const approvedExternalSources = useMemo(() => {
-    try {
-      const appr = JSON.parse(project?.answers?.["approved_external_sources"] || "[]");
-      if (appr.length > 0) return appr;
-      return JSON.parse(project?.answers?.["pending_external_sources"] || "[]");
-    } catch {
-      return [];
-    }
+    const appr = safeParseAnswerField<any[]>(project?.answers?.["approved_external_sources"], []);
+    if (appr.length > 0) return appr;
+    return safeParseAnswerField<any[]>(project?.answers?.["pending_external_sources"], []);
   }, [project?.answers]);
 
   const manuscriptWordCount = useMemo(() => {
     const raw = project?.answers?.["sealed_word_count"];
     if (raw) return parseInt(raw, 10) || 0;
-    try {
-      const draft = JSON.parse(project?.answers?.["manuscript_draft"] || "[]");
-      if (Array.isArray(draft)) {
-        return draft.reduce((acc: number, s: { word_count?: number }) => acc + (s.word_count || 0), 0);
-      }
-    } catch {
-      // Ignore
+    const draft = safeParseAnswerField<any[]>(project?.answers?.["manuscript_draft"], []);
+    if (Array.isArray(draft) && draft.length > 0) {
+      return draft.reduce((acc: number, s: { word_count?: number }) => acc + (s.word_count || 0), 0);
     }
     return 3450;
   }, [project?.answers]);

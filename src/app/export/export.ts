@@ -8,13 +8,10 @@
  */
 
 import type { CanonicalDocument, Block } from "../../desk/types";
-import { renderDocx, renderRefereeResponseLetterDocx } from "./docxWriter";
 import { renderOdt } from "./odtWriter";
-import { renderPdf } from "./pdfWriter";
 import {
   generateLatexSource,
   generateTypstSource,
-  compileAcademicPdf,
   type AcademicExportOptions,
 } from "./academicPdfCompiler";
 import type { ExportFormat, ExportInput, ExportResult, ExportMetadata, PreflightReport } from "./types";
@@ -78,17 +75,25 @@ async function render(
   academicOptions?: AcademicExportOptions
 ): Promise<Buffer> {
   switch (format) {
-    case "docx":
+    case "docx": {
+      const { renderDocx } = await import("./docxWriter");
       return renderDocx(document, metadata, academicOptions);
+    }
     case "rebuttal_letter":
-    case "rebuttal-letter":
+    case "rebuttal-letter": {
+      const { renderRefereeResponseLetterDocx } = await import("./docxWriter");
       return renderRefereeResponseLetterDocx(metadata, academicOptions);
+    }
     case "odt":
       return renderOdt(document, metadata);
-    case "pdf":
+    case "pdf": {
+      const { renderPdf } = await import("./pdfWriter");
       return renderPdf(document, metadata);
-    case "camera_ready_pdf":
+    }
+    case "camera_ready_pdf": {
+      const { compileAcademicPdf } = await import("./academicPdfCompiler");
       return compileAcademicPdf(document, metadata, academicOptions);
+    }
     case "latex": {
       const tex = generateLatexSource(document, metadata, academicOptions);
       return Buffer.from(tex, "utf-8");

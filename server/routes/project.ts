@@ -60,6 +60,7 @@ import { OptimisticLockError } from "../../src/services/store/types.ts";
 import { exportDocument } from "../../src/app/export/export.ts";
 import type { ExportFormat } from "../../src/app/export/types.ts";
 import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../src/app/rubric/rubric.ts";
+import { safeParseAnswerField } from "../../src/shared/projectStateSchema";
 
 import { claimsRouter } from "./project/claims";
 import { evidenceRouter } from "./project/evidence";
@@ -2524,18 +2525,16 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
       const includeRebuttal = req.body?.includeRebuttalAppendix ?? req.query?.includeRebuttalAppendix;
       if (includeRebuttal && record.answers?.["rebuttal_matrix"]) {
-        try {
-          const matrix = JSON.parse(record.answers["rebuttal_matrix"]);
-          if (Array.isArray(matrix) && matrix.length > 0) {
-            mdContent += "\n\n## APPENDIX: POINT-BY-POINT REFEREE REBUTTAL MATRIX\n\n";
-            matrix.forEach((item: { refereeRole?: string; referee?: string; lens?: string; section?: string; critiqueSummary?: string; critique?: string; authorResponse?: string; revisionAction?: string }, idx: number) => {
-              mdContent += `### Item ${idx + 1}: ${item.refereeRole || item.referee || "Referee Critique"} (${item.lens || item.section || "General"})\n`;
-              mdContent += `**Critique**: ${item.critiqueSummary || item.critique || "Critique noted."}\n\n`;
-              mdContent += `**Author Response**: ${item.authorResponse || "Addressed in manuscript."}\n\n`;
-              mdContent += `**Revision Action**: ${item.revisionAction || "Updated corresponding section."}\n\n`;
-            });
-          }
-        } catch {}
+        const matrix = safeParseAnswerField<any[]>(record.answers["rebuttal_matrix"], []);
+        if (Array.isArray(matrix) && matrix.length > 0) {
+          mdContent += "\n\n## APPENDIX: POINT-BY-POINT REFEREE REBUTTAL MATRIX\n\n";
+          matrix.forEach((item: { refereeRole?: string; referee?: string; lens?: string; section?: string; critiqueSummary?: string; critique?: string; authorResponse?: string; revisionAction?: string }, idx: number) => {
+            mdContent += `### Item ${idx + 1}: ${item.refereeRole || item.referee || "Referee Critique"} (${item.lens || item.section || "General"})\n`;
+            mdContent += `**Critique**: ${item.critiqueSummary || item.critique || "Critique noted."}\n\n`;
+            mdContent += `**Author Response**: ${item.authorResponse || "Addressed in manuscript."}\n\n`;
+            mdContent += `**Revision Action**: ${item.revisionAction || "Updated corresponding section."}\n\n`;
+          });
+        }
       }
 
       const buffer = Buffer.from(mdContent, "utf-8");
@@ -2554,10 +2553,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
       let rebuttalMatrix: Array<{ referee: string; lens?: string; section?: string; severity?: string; critique: string; authorResponse: string; revisionAction?: string }> | undefined = undefined;
       if (record.answers?.["rebuttal_matrix"]) {
-        try {
-          const parsed = JSON.parse(record.answers["rebuttal_matrix"]);
-          if (Array.isArray(parsed)) rebuttalMatrix = parsed;
-        } catch {}
+        const parsed = safeParseAnswerField<any[]>(record.answers["rebuttal_matrix"], []);
+        if (Array.isArray(parsed)) rebuttalMatrix = parsed;
       }
 
       const result = await exportDocument({

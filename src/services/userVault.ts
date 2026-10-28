@@ -143,6 +143,19 @@ export async function clearVaultPassphraseVerifier(): Promise<void> {
  * Vault existence (server-side, no secrets)
  * ---------------------------------------------------------------------- */
 
+interface UserVaultRow {
+  user_id?: string;
+  label?: string;
+  created_at?: string;
+  storage_mode?: "local" | "synced" | string;
+}
+
+interface UserVaultUpsertPayload {
+  user_id: string;
+  label: string;
+  storage_mode?: "local" | "synced";
+}
+
 export async function loadVault(): Promise<VaultRecord | null> {
   const supabase = getSupabaseClient();
   if (!supabase?.auth || typeof supabase.auth.getUser !== "function") return null;
@@ -158,12 +171,13 @@ export async function loadVault(): Promise<VaultRecord | null> {
   // No row is the normal state for someone who declined or has not reached
   // this stage — not an error.
   if (error || !data) return null;
+  const row = data as Partial<UserVaultRow>;
   const result: VaultRecord = {
-    label: data.label,
-    createdAt: data.created_at,
+    label: row.label ?? "",
+    createdAt: row.created_at ?? "",
   };
-  if ((data as any).storage_mode) {
-    result.storageMode = (data as any).storage_mode === "local" ? "local" : "synced";
+  if (row.storage_mode) {
+    result.storageMode = row.storage_mode === "local" ? "local" : "synced";
   }
   return result;
 }
@@ -230,13 +244,17 @@ export async function getVaultStorageMode(): Promise<"local" | "synced"> {
       .select("storage_mode")
       .eq("user_id", userData.user.id);
 
-    const res = typeof (query as any).maybeSingle === "function"
-      ? await (query as any).maybeSingle()
+    interface QueryWithMaybeSingle {
+      maybeSingle?: () => Promise<{ data: unknown; error: unknown }>;
+    }
+    const maybeSingleQuery = query as unknown as QueryWithMaybeSingle;
+    const res = typeof maybeSingleQuery.maybeSingle === "function"
+      ? await maybeSingleQuery.maybeSingle()
       : await query;
 
-    const data = Array.isArray(res.data) ? res.data[0] : res.data;
-    if (res.error || !data || !(data as any).storage_mode) return "synced";
-    return (data as any).storage_mode === "local" ? "local" : "synced";
+    const data = (Array.isArray(res.data) ? res.data[0] : res.data) as Partial<UserVaultRow> | null | undefined;
+    if (res.error || !data || !data.storage_mode) return "synced";
+    return data.storage_mode === "local" ? "local" : "synced";
   } catch {
     return "synced";
   }
@@ -251,12 +269,12 @@ export async function createVault(
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return { success: false, error: "Not signed in." };
 
-  const payload: Record<string, any> = { user_id: userData.user.id, label };
+  const payload: UserVaultUpsertPayload = { user_id: userData.user.id, label };
   if (storageMode) payload.storage_mode = storageMode;
 
   const { error } = await supabase
     .from("user_vaults")
-    .upsert(payload as any, { onConflict: "user_id" });
+    .upsert(payload, { onConflict: "user_id" });
 
   return error ? { success: false, error: error.message } : { success: true };
 }
@@ -271,7 +289,7 @@ export async function updateVaultStorageMode(
 
   const { error } = await supabase
     .from("user_vaults")
-    .update({ storage_mode: storageMode } as any)
+    .update({ storage_mode: storageMode })
     .eq("user_id", userData.user.id);
 
   return error ? { success: false, error: error.message } : { success: true };

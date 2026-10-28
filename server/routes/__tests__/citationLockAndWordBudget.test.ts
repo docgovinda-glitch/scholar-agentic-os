@@ -12,6 +12,7 @@ import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { getProjectStore, type ProjectRecord } from "../../../src/services/store/projectStore.ts";
+import { safeParseAnswerField } from "../../../src/shared/projectStateSchema.ts";
 import {
   allocateWordBudget,
   countExactWords,
@@ -112,7 +113,7 @@ describe("Journal Step A: Sub-Section Word Budget Allocator", () => {
     // Verify project persistence
     const saved = await getProjectStore().get(projectId);
     expect(saved?.answers.word_budget_blueprint).toBeDefined();
-    const parsed = JSON.parse(saved!.answers.word_budget_blueprint as string);
+    const parsed = safeParseAnswerField<WordBudgetBlueprint>(saved!.answers.word_budget_blueprint, {} as WordBudgetBlueprint);
     expect(parsed.targetTotalWords).toBe(6000);
     expect(parsed.sections.length).toBeGreaterThanOrEqual(6);
   });

@@ -6,6 +6,7 @@ import { executeAgenticLLM, saveIntakeAnswers } from "../../api";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
 import type { ProjectView } from "../../types";
+import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 import {
   buildGapPrompts,
   generateLocalGapFallback,
@@ -42,10 +43,8 @@ export default function GapIdentificationStage({
 
   const [gaps, setGaps] = useState<GapItem[] | null>(() => {
     if (project?.answers?.["identified_gaps"]) {
-      try {
-        const parsed = JSON.parse(project.answers["identified_gaps"]);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (_) {}
+      const parsed = safeParseAnswerField<GapItem[]>(project.answers["identified_gaps"], []);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
     return null;
   });
@@ -76,10 +75,8 @@ export default function GapIdentificationStage({
 
   useEffect(() => {
     if (project?.answers?.["identified_gaps"] && !gaps) {
-      try {
-        const parsed = JSON.parse(project.answers["identified_gaps"]);
-        if (Array.isArray(parsed) && parsed.length > 0) setGaps(parsed);
-      } catch (_) {}
+      const parsed = safeParseAnswerField<GapItem[]>(project.answers["identified_gaps"], []);
+      if (Array.isArray(parsed) && parsed.length > 0) setGaps(parsed);
     }
   }, [project?.answers]);
 

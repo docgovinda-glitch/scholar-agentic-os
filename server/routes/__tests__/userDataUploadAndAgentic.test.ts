@@ -12,6 +12,7 @@ import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { getProjectStore, type ProjectRecord } from "../../../src/services/store/projectStore.ts";
+import { safeParseAnswerField } from "../../../src/shared/projectStateSchema.ts";
 
 const originalFetch = global.fetch;
 
@@ -59,7 +60,7 @@ describe("Journal Rebuild Step B — Primary User Data Ingestion & Agentic Ledge
     // Verify stored in project answers
     const reloaded = await store.get("proj-user-data-1");
     expect(reloaded?.answers["user_datasets"]).toBeDefined();
-    const datasets = JSON.parse(reloaded!.answers["user_datasets"]);
+    const datasets = safeParseAnswerField<any[]>(reloaded!.answers["user_datasets"], []);
     expect(datasets).toHaveLength(1);
     expect(datasets[0].citationToken).toBe(res.body.dataset.citationToken);
   });
@@ -167,7 +168,7 @@ describe("Journal Rebuild Step B — Primary User Data Ingestion & Agentic Ledge
     expect(res.body.dataset.epistemicRole).toBe("Methodological Anchor");
 
     const reloaded = await store.get("proj-user-data-4");
-    const datasets = JSON.parse(reloaded!.answers["user_datasets"]);
+    const datasets = safeParseAnswerField<any[]>(reloaded!.answers["user_datasets"], []);
     expect(datasets[0].assignedSectionId).toBe("sub-sec-3-2");
     expect(datasets[0].epistemicRole).toBe("Methodological Anchor");
   });

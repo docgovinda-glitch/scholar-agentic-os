@@ -33,7 +33,11 @@ export default defineConfig(() => {
             tiptap: ['@tiptap/core', '@tiptap/react', '@tiptap/starter-kit', '@tiptap/extension-placeholder'],
             supabase: ['@supabase/supabase-js'],
             ui: ['lucide-react', 'motion'],
-            documents: ['docx', 'mammoth', 'pdf-parse', 'pdfmake', 'xlsx']
+            docx: ['docx'],
+            pdfmake: ['pdfmake'],
+            xlsx: ['xlsx'],
+            mammoth: ['mammoth'],
+            'pdf-parse': ['pdf-parse'],
           }
         }
       }

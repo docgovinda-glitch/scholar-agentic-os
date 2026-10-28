@@ -5,6 +5,7 @@ import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedStreamFetch, saveIntakeAnswers, executeAgenticLLM } from "../../api";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
+import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 import {
   buildSectionDraftPrompts,
   generateLocalSectionFallback,
@@ -59,11 +60,7 @@ export default function DraftStage({
     "Empirical Computational Modeling";
   const anchorGapId = project.answers?.["anchor_gap_id"];
   const identifiedGaps = useMemo(() => {
-    try {
-      return JSON.parse(project.answers?.["identified_gaps"] || "[]");
-    } catch {
-      return [];
-    }
+    return safeParseAnswerField<any[]>(project.answers?.["identified_gaps"], []);
   }, [project.answers]);
   const anchorGap = useMemo(() => {
     return (
@@ -74,65 +71,43 @@ export default function DraftStage({
   }, [identifiedGaps, anchorGapId]);
 
   const approvedVaultSources = useMemo(() => {
-    try {
-      const appr = JSON.parse(project.answers?.["approved_vault_sources"] || "[]");
-      if (appr.length > 0) return appr;
-      return JSON.parse(project.answers?.["vault_sources"] || "[]");
-    } catch {
-      return [];
-    }
+    const appr = safeParseAnswerField<any[]>(project.answers?.["approved_vault_sources"], []);
+    if (appr.length > 0) return appr;
+    return safeParseAnswerField<any[]>(project.answers?.["vault_sources"], []);
   }, [project.answers]);
 
   const approvedExternalSources = useMemo(() => {
-    try {
-      const appr = JSON.parse(project.answers?.["approved_external_sources"] || "[]");
-      if (appr.length > 0) return appr;
-      return JSON.parse(project.answers?.["pending_external_sources"] || "[]");
-    } catch {
-      return [];
-    }
+    const appr = safeParseAnswerField<any[]>(project.answers?.["approved_external_sources"], []);
+    if (appr.length > 0) return appr;
+    return safeParseAnswerField<any[]>(project.answers?.["pending_external_sources"], []);
   }, [project.answers]);
 
   const attachedDatasets = useMemo(() => {
-    try {
-      const ds = JSON.parse(project.answers?.["primary_datasets"] || "[]");
-      if (ds.length > 0) return ds;
-      return JSON.parse(project.answers?.["additional_data"] || "[]");
-    } catch {
-      return [];
-    }
+    const ds = safeParseAnswerField<any[]>(project.answers?.["primary_datasets"], []);
+    if (ds.length > 0) return ds;
+    return safeParseAnswerField<any[]>(project.answers?.["additional_data"], []);
   }, [project.answers]);
 
   const argumentClusters = useMemo(() => {
-    try {
-      const matrix = JSON.parse(project.answers?.["evidence_matrix"] || "[]");
-      if (matrix.length > 0) return matrix;
-      return JSON.parse(project.answers?.["thematic_clusters"] || "[]");
-    } catch {
-      return [];
-    }
+    const matrix = safeParseAnswerField<any[]>(project.answers?.["evidence_matrix"], []);
+    if (matrix.length > 0) return matrix;
+    return safeParseAnswerField<any[]>(project.answers?.["thematic_clusters"], []);
   }, [project.answers]);
 
   const targetJournal =
     project.answers?.["target_journal"] || "ACM Transactions on Computer Systems (TOCS)";
 
   const journalConstraints = useMemo(() => {
-    try {
-      return JSON.parse(project.answers?.["journal_constraints"] || "{}");
-    } catch {
-      return {};
-    }
+    return safeParseAnswerField<{ citation_style?: string; max_words?: number | string; [key: string]: unknown }>(project.answers?.["journal_constraints"], {});
   }, [project.answers]);
 
   // Initial sections parsed from project answers
   const initialSections = useMemo<ManuscriptSection[]>(() => {
-    try {
-      const saved = project.answers?.["manuscript_draft"] || project.answers?.["assembled_draft"];
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
+    const saved = project.answers?.["manuscript_draft"] || project.answers?.["assembled_draft"];
+    if (saved) {
+      const parsed = safeParseAnswerField<ManuscriptSection[]>(saved, []);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
     return [];
   }, [project.answers]);
 

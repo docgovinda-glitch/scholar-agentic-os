@@ -5,6 +5,7 @@ import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedStreamFetch, saveIntakeAnswers } from "../../api";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
+import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 
 export interface AuditClaim {
   id: string;
@@ -56,11 +57,7 @@ export default function CitationAuditStage({
 
   const anchorGapId = project?.answers?.["anchor_gap_id"];
   const identifiedGaps = useMemo(() => {
-    try {
-      return JSON.parse(project?.answers?.["identified_gaps"] || "[]");
-    } catch {
-      return [];
-    }
+    return safeParseAnswerField<any[]>(project?.answers?.["identified_gaps"], []);
   }, [project?.answers]);
 
   const anchorGap = useMemo(() => {
@@ -77,35 +74,23 @@ export default function CitationAuditStage({
     "Target Academic Journal";
 
   const approvedVaultSources = useMemo(() => {
-    try {
-      const appr = JSON.parse(project?.answers?.["approved_vault_sources"] || "[]");
-      if (appr.length > 0) return appr;
-      return JSON.parse(project?.answers?.["vault_sources"] || "[]");
-    } catch {
-      return [];
-    }
+    const appr = safeParseAnswerField<any[]>(project?.answers?.["approved_vault_sources"], []);
+    if (appr.length > 0) return appr;
+    return safeParseAnswerField<any[]>(project?.answers?.["vault_sources"], []);
   }, [project?.answers]);
 
   const approvedExternalSources = useMemo(() => {
-    try {
-      const appr = JSON.parse(project?.answers?.["approved_external_sources"] || "[]");
-      if (appr.length > 0) return appr;
-      return JSON.parse(project?.answers?.["pending_external_sources"] || "[]");
-    } catch {
-      return [];
-    }
+    const appr = safeParseAnswerField<any[]>(project?.answers?.["approved_external_sources"], []);
+    if (appr.length > 0) return appr;
+    return safeParseAnswerField<any[]>(project?.answers?.["pending_external_sources"], []);
   }, [project?.answers]);
 
   const manuscriptSections = useMemo(() => {
-    try {
-      const draft = JSON.parse(project?.answers?.["manuscript_draft"] || "[]");
-      if (Array.isArray(draft) && draft.length > 0) return draft;
-      const assembled = JSON.parse(project?.answers?.["assembled_draft"] || "[]");
-      if (Array.isArray(assembled) && assembled.length > 0) return assembled;
-      return [];
-    } catch {
-      return [];
-    }
+    const draft = safeParseAnswerField<any[]>(project?.answers?.["manuscript_draft"], []);
+    if (Array.isArray(draft) && draft.length > 0) return draft;
+    const assembled = safeParseAnswerField<any[]>(project?.answers?.["assembled_draft"], []);
+    if (Array.isArray(assembled) && assembled.length > 0) return assembled;
+    return [];
   }, [project?.answers]);
 
   const manuscriptWordCount = useMemo(() => {
@@ -118,12 +103,8 @@ export default function CitationAuditStage({
   }, [manuscriptSections]);
 
   const citationFormat = useMemo(() => {
-    try {
-      const reqs = JSON.parse(project?.answers?.["journal_requirements_extracted"] || "{}");
-      return reqs.citationStyle || reqs.referenceFormat || "Nature / Numerical Superscript";
-    } catch {
-      return "Nature / Numerical Superscript";
-    }
+    const reqs = safeParseAnswerField<Record<string, any>>(project?.answers?.["journal_requirements_extracted"], {});
+    return reqs.citationStyle || reqs.referenceFormat || "Nature / Numerical Superscript";
   }, [project?.answers]);
 
   // Active state

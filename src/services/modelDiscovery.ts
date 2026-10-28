@@ -64,6 +64,8 @@ function computeKeyFingerprint(key: string): string {
   return `fp_${Math.abs(hash).toString(36)}`;
 }
 
+export type RawModelMetadata = Record<string, unknown>;
+
 /* -------------------------------------------------------------------------
  * Generative Chat Model Verification Predicate
  * ---------------------------------------------------------------------- */
@@ -78,12 +80,17 @@ function computeKeyFingerprint(key: string): string {
  * - Text embedding and reranking models (embedding, embed, bge, rerank, etc.)
  * - Image / video diffusion models (dall-e, stable-diffusion, imagen, flux, etc.)
  */
-export function isGenerativeChatModel(providerId: string, modelId: string, rawMeta?: any): boolean {
+export function isGenerativeChatModel(
+  providerId: string,
+  modelId: string,
+  rawMeta?: unknown
+): boolean {
   if (!modelId) return false;
   const idLower = modelId.toLowerCase().trim();
+  const meta = (rawMeta && typeof rawMeta === "object" ? rawMeta : {}) as Record<string, any>;
 
   // 1. Metadata-based classification if provided by provider API
-  const metaType = String(rawMeta?.type || rawMeta?.task || rawMeta?.pipeline_tag || "").toLowerCase();
+  const metaType = String(meta.type || meta.task || meta.pipeline_tag || "").toLowerCase();
   if (metaType) {
     if (
       metaType.includes("classification") ||
@@ -166,12 +173,14 @@ export function isGenerativeChatModel(providerId: string, modelId: string, rawMe
 export function normalizeCapabilities(
   providerId: string,
   modelId: string,
-  rawMeta?: any
+  rawMeta?: unknown
 ): { capabilities: NormalizedCapability[]; contextWindow?: number } {
   // Non-generative models have 0 capabilities for research agent tasks
   if (!isGenerativeChatModel(providerId, modelId, rawMeta)) {
     return { capabilities: [], contextWindow: 0 };
   }
+
+  const meta = (rawMeta && typeof rawMeta === "object" ? rawMeta : {}) as Record<string, any>;
 
   const caps = new Set<NormalizedCapability>();
   const idLower = modelId.toLowerCase();
@@ -203,7 +212,7 @@ export function normalizeCapabilities(
       idLower.includes("mixtral") ||
       idLower.includes("qwen") ||
       idLower.includes("deepseek") ||
-      rawMeta?.supportsStructuredOutput === true
+      meta?.supportsStructuredOutput === true
     ) {
       caps.add("structuredOutput");
       caps.add("toolCalling");
@@ -296,20 +305,21 @@ export function normalizeCapabilities(
 
   // 2. Defensive metadata overrides if provided by live provider discovery payload
   if (
-    rawMeta?.supportsStructuredOutput === true ||
-    rawMeta?.supports_structured_output === true ||
-    rawMeta?.supports_json === true ||
-    rawMeta?.features?.structured_output === true ||
-    (Array.isArray(rawMeta?.supportedGenerationMethods) && rawMeta.supportedGenerationMethods.includes("generateContent"))
+    meta?.supportsStructuredOutput === true ||
+    meta?.supports_structured_output === true ||
+    meta?.supports_json === true ||
+    meta?.features?.structured_output === true ||
+    (Array.isArray(meta?.supportedGenerationMethods) && meta.supportedGenerationMethods.includes("generateContent"))
   ) {
     caps.add("structuredOutput");
   }
 
   // Vision / Multimodal modality validation from live metadata
   const modalityStr = String(
-    rawMeta?.architecture?.modality ||
-    rawMeta?.modalities?.join?.(",") ||
-    rawMeta?.input_modalities?.join?.(",") ||
+    meta?.architecture?.modality ||
+    meta?.modalities?.join?.(",") ||
+    meta?.input_modalities?.join?.(",") ||
+    meta?.inputModalities?.join?.(",") ||
     ""
   ).toLowerCase();
   if (modalityStr.includes("image") || modalityStr.includes("multimodal") || modalityStr.includes("vision")) {
@@ -318,10 +328,11 @@ export function normalizeCapabilities(
 
   // Context window from explicit provider metadata
   const explicitCtx =
-    rawMeta?.context_window ||
-    rawMeta?.context_length ||
-    rawMeta?.inputTokenLimit ||
-    rawMeta?.max_context_length;
+    meta?.context_window ||
+    meta?.context_length ||
+    meta?.inputTokenLimit ||
+    meta?.max_context_length ||
+    meta?.contextWindow;
   if (typeof explicitCtx === "number" && explicitCtx > 0) {
     contextWindow = explicitCtx;
   }
@@ -341,7 +352,7 @@ export function validateModelCapabilityRuntime(
   providerId: string,
   modelId: string,
   requiredCapabilities: NormalizedCapability[],
-  rawMeta?: any
+  rawMeta?: unknown
 ): { ok: boolean; missingCapabilities: NormalizedCapability[]; contextWindow?: number } {
   const { capabilities, contextWindow } = normalizeCapabilities(providerId, modelId, rawMeta);
   const missing = requiredCapabilities.filter((req) => !capabilities.includes(req));
@@ -589,7 +600,7 @@ export const clearProviderHealth = clearAllProviderHealth;
 export function normalizeDiscoveredCapabilities(
   providerId: string,
   modelId: string,
-  rawMeta?: any
+  rawMeta?: unknown
 ): NormalizedCapability[] {
   return normalizeCapabilities(providerId, modelId, rawMeta).capabilities;
 }
@@ -718,7 +729,7 @@ export async function discoverProviderModels(
     const headers = spec?.apiStyle === "gemini" ? {} : spec ? buildAuthHeaders(spec, apiKey) : {};
 
     // Guard against unmocked outbound network requests with synthetic test keys
-    const isFetchMocked = Boolean((globalThis.fetch as any)?.mock);
+    const isFetchMocked = Boolean((globalThis.fetch as { mock?: unknown } | undefined)?.mock);
     if (!isFetchMocked && (apiKey.includes("mock") || apiKey.includes("test") || apiKey.includes("dummy"))) {
       const fallback = spec ? getCompatibilityFallbacks(spec) : [];
       return { ok: true, models: fallback, source: "compatibility_fallback" as const };
@@ -750,14 +761,14 @@ export async function discoverProviderModels(
         return { ok: true, models: fallback, source: "compatibility_fallback" as const };
       }
 
-      const data = (await response.json().catch(() => null)) as any;
+      const data = (await response.json().catch(() => null)) as Record<string, unknown> | null;
       const discoveredList: DiscoveredModel[] = [];
       const verifiedAt = new Date().toISOString();
 
       if (spec?.apiStyle === "gemini") {
-        const rawList = Array.isArray(data?.models) ? data.models : [];
+        const rawList = Array.isArray(data?.models) ? (data.models as RawModelMetadata[]) : [];
         for (const item of rawList) {
-          const name = (item?.name || "").replace(/^models\//, "");
+          const name = String(item?.name || "").replace(/^models\//, "");
           const methods = Array.isArray(item?.supportedGenerationMethods) ? item.supportedGenerationMethods : [];
           if (!name) continue;
           if (methods.length > 0 && !methods.includes("generateContent")) continue;
@@ -767,7 +778,7 @@ export async function discoverProviderModels(
           discoveredList.push({
             id: name,
             providerId,
-            displayName: item?.displayName || name,
+            displayName: String(item?.displayName || name),
             capabilities,
             contextWindow,
             inputModalities: ["text", "image", "document"],
@@ -777,17 +788,22 @@ export async function discoverProviderModels(
         }
       } else {
         // OpenAI-compatible, Anthropic standard format, and Ollama tags
-        const rawList = Array.isArray(data?.data) ? data.data : Array.isArray(data?.models) ? data.models : [];
+        const rawList = Array.isArray(data?.data)
+          ? (data.data as Array<RawModelMetadata | string>)
+          : Array.isArray(data?.models)
+          ? (data.models as Array<RawModelMetadata | string>)
+          : [];
         for (const item of rawList) {
-          const id = typeof item === "string" ? item : (item?.id || item?.name || item?.model);
+          const itemMeta = typeof item === "object" && item !== null ? item : undefined;
+          const id = typeof item === "string" ? item : (itemMeta?.id || itemMeta?.name || itemMeta?.model);
           if (!id || typeof id !== "string") continue;
-          if (!isGenerativeChatModel(providerId, id, item)) continue;
+          if (!isGenerativeChatModel(providerId, id, itemMeta)) continue;
 
-          const { capabilities, contextWindow } = normalizeCapabilities(providerId, id, item);
+          const { capabilities, contextWindow } = normalizeCapabilities(providerId, id, itemMeta);
           discoveredList.push({
             id,
             providerId,
-            displayName: item?.displayName || item?.name || id,
+            displayName: String(itemMeta?.displayName || itemMeta?.name || id),
             capabilities,
             contextWindow,
             source: "live_discovery",

@@ -22,6 +22,7 @@ import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
 import type { ProjectRecord } from "../../../src/types/project.ts";
+import { safeParseAnswerField } from "../../../src/shared/projectStateSchema.ts";
 
 process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
@@ -123,7 +124,7 @@ describe("Stages 20-22: 5-Referee Peer Review & Point-by-Point Rebuttal Matrix",
     const store = getProjectStore();
     const updated = await store.get(projectId);
     expect(updated?.answers?.["rebuttal_matrix"]).toBeDefined();
-    const parsed = JSON.parse(updated?.answers?.["rebuttal_matrix"] as string);
+    const parsed = safeParseAnswerField<any[]>(updated?.answers?.["rebuttal_matrix"], []);
     expect(parsed[0].refereeRole).toBe("Methodologist");
     expect(parsed[0].authorResponse).toContain("Lemma 1");
   });

@@ -6,21 +6,29 @@
  */
 
 import path from "node:path";
-import pdfMake from "pdfmake";
-import fonts from "pdfmake/fonts/Roboto.js";
 import type { Content } from "pdfmake/interfaces";
 import type { Block, CanonicalDocument } from "../../desk/types";
 import type { ExportMetadata } from "./types";
 
-pdfMake.setFonts(fonts);
-// Content is our own rendered document text, not user-supplied URLs or local
-// paths — deny network access entirely, and local access to everything
-// except the bundled font files pdfmake itself needs to read to render text.
-const fontsDir = path.dirname(fonts.Roboto.normal);
-pdfMake.setUrlAccessPolicy(() => false);
-pdfMake.setLocalAccessPolicy((filePath: string) => path.resolve(filePath).startsWith(fontsDir));
+let cachedPdfMake: unknown = null;
+
+async function getPdfMake(): Promise<any> {
+  if (cachedPdfMake) return cachedPdfMake;
+  const pdfMakeModule = await import("pdfmake");
+  const pdfMakeInstance = (pdfMakeModule as any).default || pdfMakeModule;
+  const fontsModule = await import("pdfmake/fonts/Roboto.js");
+  const fonts = (fontsModule as any).default || fontsModule;
+
+  pdfMakeInstance.setFonts(fonts);
+  const fontsDir = path.dirname(fonts.Roboto.normal);
+  pdfMakeInstance.setUrlAccessPolicy(() => false);
+  pdfMakeInstance.setLocalAccessPolicy((filePath: string) => path.resolve(filePath).startsWith(fontsDir));
+  cachedPdfMake = pdfMakeInstance;
+  return pdfMakeInstance;
+}
 
 export async function renderPdf(document: CanonicalDocument, metadata: ExportMetadata): Promise<Buffer> {
+  const pdfMake = await getPdfMake();
   const content: Content[] = [
     { text: document.title, style: "title" },
     { text: `By ${metadata.author || "Author"}`, style: "byline" },

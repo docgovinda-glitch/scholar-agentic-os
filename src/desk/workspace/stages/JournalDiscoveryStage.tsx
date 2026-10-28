@@ -5,6 +5,7 @@ import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedStreamFetch, saveIntakeAnswers } from "../../api";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
+import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 
 export interface JournalCandidate {
   id: string;
@@ -43,11 +44,7 @@ export default function JournalDiscoveryStage({
     project.answers?.["working_title"] || "Autonomous Scholar Article";
   const anchorGapId = project.answers?.["anchor_gap_id"];
   const identifiedGaps = useMemo(() => {
-    try {
-      return JSON.parse(project.answers?.["identified_gaps"] || "[]");
-    } catch {
-      return [];
-    }
+    return safeParseAnswerField<any[]>(project.answers?.["identified_gaps"], []);
   }, [project.answers]);
   const anchorGap = useMemo(() => {
     return (
@@ -58,51 +55,33 @@ export default function JournalDiscoveryStage({
   }, [identifiedGaps, anchorGapId]);
 
   const approvedVaultSources = useMemo(() => {
-    try {
-      const appr = JSON.parse(project.answers?.["approved_vault_sources"] || "[]");
-      if (appr.length > 0) return appr;
-      return JSON.parse(project.answers?.["vault_sources"] || "[]");
-    } catch {
-      return [];
-    }
+    const appr = safeParseAnswerField<any[]>(project.answers?.["approved_vault_sources"], []);
+    if (appr.length > 0) return appr;
+    return safeParseAnswerField<any[]>(project.answers?.["vault_sources"], []);
   }, [project.answers]);
 
   const approvedExternalSources = useMemo(() => {
-    try {
-      const appr = JSON.parse(project.answers?.["approved_external_sources"] || "[]");
-      if (appr.length > 0) return appr;
-      return JSON.parse(project.answers?.["pending_external_sources"] || "[]");
-    } catch {
-      return [];
-    }
+    const appr = safeParseAnswerField<any[]>(project.answers?.["approved_external_sources"], []);
+    if (appr.length > 0) return appr;
+    return safeParseAnswerField<any[]>(project.answers?.["pending_external_sources"], []);
   }, [project.answers]);
 
   const attachedDatasets = useMemo(() => {
-    try {
-      const ds = JSON.parse(project.answers?.["primary_datasets"] || "[]");
-      if (ds.length > 0) return ds;
-      return JSON.parse(project.answers?.["additional_data"] || "[]");
-    } catch {
-      return [];
-    }
+    const ds = safeParseAnswerField<any[]>(project.answers?.["primary_datasets"], []);
+    if (ds.length > 0) return ds;
+    return safeParseAnswerField<any[]>(project.answers?.["additional_data"], []);
   }, [project.answers]);
 
   const argumentClusters = useMemo(() => {
-    try {
-      const matrix = JSON.parse(project.answers?.["evidence_matrix"] || "[]");
-      if (matrix.length > 0) return matrix;
-      return JSON.parse(project.answers?.["thematic_clusters"] || "[]");
-    } catch {
-      return [];
-    }
+    const matrix = safeParseAnswerField<any[]>(project.answers?.["evidence_matrix"], []);
+    if (matrix.length > 0) return matrix;
+    return safeParseAnswerField<any[]>(project.answers?.["thematic_clusters"], []);
   }, [project.answers]);
 
   // Initial candidate journals parsed from project answers if previously saved
   const initialJournals = useMemo<JournalCandidate[]>(() => {
-    try {
-      const saved = JSON.parse(project.answers?.["discovered_journals"] || "[]");
-      if (Array.isArray(saved) && saved.length > 0) return saved;
-    } catch {}
+    const saved = safeParseAnswerField<JournalCandidate[]>(project.answers?.["discovered_journals"], []);
+    if (Array.isArray(saved) && saved.length > 0) return saved;
     return [];
   }, [project.answers]);
 

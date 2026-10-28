@@ -15,6 +15,7 @@ import { parseJsonFromLlm } from "../../../utils/jsonParser";
 import { AllAiResourcesExhaustedModal } from "../../aiAccess/AllAiResourcesExhaustedModal";
 import { executeTitleLockAndProceed } from "../titleLockContract";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
+import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 
 export default function TitleSelectionStage({
   stage,
@@ -39,10 +40,8 @@ export default function TitleSelectionStage({
   const [isPolishing, setIsPolishing] = useState(false);
   const [results, setResults] = useState<TitleItem[] | null>(() => {
     if (project?.answers?.["generated_titles"]) {
-      try {
-        const parsed = JSON.parse(project.answers["generated_titles"]);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (_) {}
+      const parsed = safeParseAnswerField<TitleItem[]>(project.answers["generated_titles"], []);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
     return null;
   });

@@ -4,6 +4,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import { authedJsonFetch, getDocument, saveIntakeAnswers } from "../../api";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
+import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 
 export interface ComplianceCheck {
   id: string;
@@ -96,16 +97,12 @@ export default function PublicationReadinessStage({
   }, [project?.answers]);
 
   const anchorGap = useMemo(() => {
-    try {
-      const gaps = project?.answers?.["identified_gaps"];
-      if (gaps) {
-        const parsed = JSON.parse(gaps);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed[0].title || parsed[0].description || "Deterministic provenance verification";
-        }
+    const gaps = project?.answers?.["identified_gaps"];
+    if (gaps) {
+      const parsed = safeParseAnswerField<any[]>(gaps, []);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed[0].title || parsed[0].description || "Deterministic provenance verification";
       }
-    } catch {
-      // Ignore
     }
     return "Deterministic provenance verification";
   }, [project?.answers]);
@@ -119,26 +116,19 @@ export default function PublicationReadinessStage({
       return project.answers.full_text_markdown;
     }
     if (project?.answers?.assembled_draft) {
-      try {
-        const parsed = JSON.parse(project.answers.assembled_draft);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((s: { section?: string; section_name?: string; content?: string }) => `${s.section || s.section_name || ""}\n${s.content || ""}`).join("\n\n");
-        }
-      } catch {
-        if (!project.answers.assembled_draft.trim().startsWith("[")) {
-          return project.answers.assembled_draft;
-        }
+      const parsed = safeParseAnswerField<any[]>(project.answers.assembled_draft, []);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((s: { section?: string; section_name?: string; content?: string }) => `${s.section || s.section_name || ""}\n${s.content || ""}`).join("\n\n");
+      }
+      if (typeof project.answers.assembled_draft === "string" && !project.answers.assembled_draft.trim().startsWith("[")) {
+        return project.answers.assembled_draft;
       }
     }
     const raw = project?.answers?.manuscript_draft;
     if (raw) {
-      try {
-        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((s: { section?: string; section_name?: string; content?: string }) => `${s.section || s.section_name || ""}\n${s.content || ""}`).join("\n\n");
-        }
-      } catch {
-        // Fall through
+      const parsed = safeParseAnswerField<any[]>(raw, []);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((s: { section?: string; section_name?: string; content?: string }) => `${s.section || s.section_name || ""}\n${s.content || ""}`).join("\n\n");
       }
     }
     return "";
@@ -161,14 +151,10 @@ export default function PublicationReadinessStage({
   const citationCount = useMemo(() => {
     const matches = manuscriptText.match(/\[@[^\]]+\]|\([A-Z][a-zA-Z\s]+,\s*\d{4}\)/g);
     if (matches) return matches.length;
-    try {
-      const approvedVault = project?.answers?.approved_vault_sources;
-      if (approvedVault) {
-        const parsed = JSON.parse(approvedVault);
-        if (Array.isArray(parsed)) return parsed.length + 3;
-      }
-    } catch {
-      // Fall through
+    const approvedVault = project?.answers?.approved_vault_sources;
+    if (approvedVault) {
+      const parsed = safeParseAnswerField<any[]>(approvedVault, []);
+      if (Array.isArray(parsed)) return parsed.length + 3;
     }
     return 18;
   }, [manuscriptText, project?.answers]);
@@ -304,16 +290,12 @@ export default function PublicationReadinessStage({
 
   // Results state: restore from project answers if previously run
   const [results, setResults] = useState<ReadinessResult | null>(() => {
-    try {
-      const saved = project?.answers?.publication_readiness;
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && Array.isArray(parsed.checks)) {
-          return parsed;
-        }
+    const saved = project?.answers?.publication_readiness;
+    if (saved) {
+      const parsed = safeParseAnswerField<ReadinessResult | null>(saved, null);
+      if (parsed && Array.isArray(parsed.checks)) {
+        return parsed;
       }
-    } catch {
-      // Ignore
     }
     return null;
   });

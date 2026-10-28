@@ -13,6 +13,7 @@ import {
   uploadProjectUserData,
   updateProjectUserData,
 } from "../api";
+import { safeParseAnswerField } from "../../shared/projectStateSchema";
 import {
   harvestFromOpenAlex,
   harvestFromCrossref,
@@ -133,16 +134,13 @@ export default function EvidenceMatrixMode() {
   // Sync state if project changes
   useEffect(() => {
     if (answers["user_datasets"]) {
-      try {
-        const parsed = JSON.parse(answers["user_datasets"]);
-        if (Array.isArray(parsed)) setUserDatasets(parsed);
-      } catch {}
+      const parsed = safeParseAnswerField<UserDatasetItem[]>(answers["user_datasets"], []);
+      if (Array.isArray(parsed)) setUserDatasets(parsed);
     }
     const rawVault = answers["approved_vault_sources"] || answers["vault_sources"];
     if (rawVault && scholarlySources.length === 0) {
-      try {
-        const parsed = JSON.parse(rawVault);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+      const parsed = safeParseAnswerField<Record<string, unknown>[]>(rawVault, []);
+      if (Array.isArray(parsed) && parsed.length > 0) {
           const list: SmartEvidenceRow[] = parsed.map((item: Record<string, unknown>, idx: number) => {
             const id = String(item.id || `src_${idx + 1}`);
             return {
@@ -169,8 +167,7 @@ export default function EvidenceMatrixMode() {
           });
           setScholarlySources(list);
         }
-      } catch {}
-    }
+      }
   }, [answers["user_datasets"], answers["approved_vault_sources"], answers["vault_sources"]]);
 
   // Handle File Upload to backend

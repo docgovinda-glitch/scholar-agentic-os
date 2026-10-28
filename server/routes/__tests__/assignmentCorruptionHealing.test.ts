@@ -5,6 +5,7 @@ import {
   deriveHeuristicTitle,
 } from "../project/assignment";
 import { isTutorialOrShortQABrief, isClassroomLogisticsLine } from "../../../src/utils/briefExtractor";
+import { safeParseAnswerField } from "../../../src/shared/projectStateSchema";
 
 describe("Assignment State Integrity & Corruption Healing", () => {
   it("detects machine learning headings leaked on an OB/leadership topic", () => {
@@ -51,7 +52,7 @@ describe("Assignment State Integrity & Corruption Healing", () => {
     const healed = healCorruptedProjectStructure(corruptedProject);
     expect(healed).toBe(true);
 
-    const healedStructure = JSON.parse(corruptedProject.answers.assignment_structure);
+    const healedStructure = safeParseAnswerField<{ headings: any[] }>(corruptedProject.answers.assignment_structure, { headings: [] });
     expect(healedStructure.headings.length).toBeGreaterThan(0);
     // Verified no ML headings remain
     const allTitles = healedStructure.headings.map((h: any) => h.title.toLowerCase());

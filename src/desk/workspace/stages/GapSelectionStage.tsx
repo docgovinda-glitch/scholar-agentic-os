@@ -6,6 +6,7 @@ import { saveIntakeAnswers } from "../../api";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
 import { generateLocalGapFallback, type GapItem } from "../agentPrompts/gapPrompts";
+import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 
 export default function GapSelectionStage({
   stage,
@@ -27,10 +28,8 @@ export default function GapSelectionStage({
 
   const [gaps, setGaps] = useState<GapItem[] | null>(() => {
     if (project?.answers?.["identified_gaps"]) {
-      try {
-        const parsed = JSON.parse(project.answers["identified_gaps"]);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (_) {}
+      const parsed = safeParseAnswerField<GapItem[]>(project.answers["identified_gaps"], []);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
     return null;
   });
@@ -45,11 +44,9 @@ export default function GapSelectionStage({
 
   // Multi-gap selection state
   const initialSelectedGaps = (() => {
-    try {
-      const raw = project?.answers?.["selected_gaps"];
-      if (Array.isArray(raw)) return raw;
-      if (typeof raw === "string" && raw.startsWith("[")) return JSON.parse(raw);
-    } catch (_) {}
+    const raw = project?.answers?.["selected_gaps"];
+    if (Array.isArray(raw)) return raw;
+    if (raw) return safeParseAnswerField<string[]>(raw, []);
     return project?.answers?.["selected_gap"] ? [project.answers["selected_gap"]] : [];
   })();
 
@@ -64,10 +61,8 @@ export default function GapSelectionStage({
 
   useEffect(() => {
     if (project?.answers?.["identified_gaps"] && !gaps) {
-      try {
-        const parsed = JSON.parse(project.answers["identified_gaps"]);
-        if (Array.isArray(parsed) && parsed.length > 0) setGaps(parsed);
-      } catch (_) {}
+      const parsed = safeParseAnswerField<GapItem[]>(project.answers["identified_gaps"], []);
+      if (Array.isArray(parsed) && parsed.length > 0) setGaps(parsed);
     }
   }, [project?.answers]);
 

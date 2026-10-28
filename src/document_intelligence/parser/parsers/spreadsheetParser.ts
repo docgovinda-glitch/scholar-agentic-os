@@ -5,7 +5,6 @@
  * Extracts sheet names, row counts, formatted samples, and summaries with NFC Unicode normalization.
  */
 
-import * as XLSX from "xlsx";
 import type { Parser, ParserMetadata, DocumentInput, ParserOperationResult, ParserResult } from "../types";
 
 export class SpreadsheetParser implements Parser {
@@ -33,6 +32,8 @@ export class SpreadsheetParser implements Parser {
     const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
 
     try {
+      const xlsxModule = await import("xlsx");
+      const XLSX = ((xlsxModule as unknown as { default?: typeof import("xlsx") }).default || xlsxModule) as typeof import("xlsx");
       const workbook = XLSX.read(buffer, { type: "buffer" });
       const sheetNames = workbook.SheetNames || [];
       const textParts: string[] = [];
