@@ -104,10 +104,6 @@ const PUBLIC_API_ALLOWLIST = new Set<string>([
   "POST /api/auth/verify-signup",
   "POST /api/auth/login",
   "POST /api/auth/check-availability",
-  // Tracked for removal in PR 4.3 (F-08):
-  "POST /api/ai/search",
-  "POST /api/ai/deep-research",
-  "POST /api/ai/agent",
 ]);
 
 function materializeRoutePath(
@@ -209,10 +205,9 @@ describe("Automated Express Route Authz & Ownership Matrix", () => {
   it("rejects cross-user access (User B -> User A resource) with 403 or 404 on every project & presentation :id route", async () => {
     const resourceRoutes = allApiRoutes.filter(
       (r) =>
-        (r.path.startsWith("/api/projects/:id") ||
-          r.path.startsWith("/api/projects/:projectId") ||
-          r.path.startsWith("/api/presentations/:id")) &&
-        !r.path.includes("/compliance/api/projects/"), // Known F-16 typo route fixed in PR 4.3
+        r.path.startsWith("/api/projects/:id") ||
+        r.path.startsWith("/api/projects/:projectId") ||
+        r.path.startsWith("/api/presentations/:id"),
     );
 
     expect(resourceRoutes.length).toBeGreaterThan(150);

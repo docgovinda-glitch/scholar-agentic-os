@@ -1,4 +1,5 @@
 import express, { Request, Response } from "express";
+import { requireAuth } from "../src/middleware/auth.ts";
 import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic, handleFrontendLLMOverride, resolveRequestAiConfig, signLlmChallenge, computePromptHash } from "../utils/llm.ts";
 import { executeWebSearch, formatSearchResultsForPrompt } from "../src/research/webSearchEngine.ts";
 import { executeDeepResearch } from "../src/research/deepResearchEngine.ts";
@@ -201,7 +202,7 @@ export function registerAIRoutes(
    * POST /api/ai/search
    * Dedicated Web Search endpoint.
    */
-  router.post("/search", async (req: Request, res: Response) => {
+  router.post("/search", requireAuth, async (req: Request, res: Response) => {
     try {
       const { query, maxResults = 5 } = req.body || {};
       if (!query || typeof query !== "string") {
@@ -222,7 +223,7 @@ export function registerAIRoutes(
    * POST /api/ai/deep-research
    * Dedicated Deep Research pipeline with full document and image support.
    */
-  router.post("/deep-research", async (req: Request, res: Response) => {
+  router.post("/deep-research", requireAuth, async (req: Request, res: Response) => {
     try {
       const { topic, files = [], images = [] } = req.body || {};
       if (!topic || typeof topic !== "string") {
@@ -294,7 +295,7 @@ export function registerAIRoutes(
    * Primary unified research agent endpoint:
    * Handles text, files, images, web search, deep research, conversation context, and failover.
    */
-    router.post("/agent", async (req: Request, res: Response) => {
+  router.post("/agent", requireAuth, async (req: Request, res: Response) => {
     try {
       const {
         prompt,
@@ -311,7 +312,7 @@ export function registerAIRoutes(
       }
 
       const makeChallengeToken = (sysPrompt: string, uPrompt: string): string => {
-        const userId = (req as any)?.user?.id || (req.headers && req.headers["x-user-id"]) || "anonymous";
+        const userId = (req as any)?.user?.id || "anonymous";
         const routeId = req.originalUrl || req.url || "/api/ai/chat";
         return signLlmChallenge({
           userId: String(userId),

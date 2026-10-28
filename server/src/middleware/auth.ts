@@ -68,8 +68,12 @@ interface CachedTokenEntry {
 
 const tokenCache = new Map<string, CachedTokenEntry>();
 
+const accountStatusCache = new Map<string, { blocked: boolean; expiresAt: number }>();
+const ACCOUNT_STATUS_TTL_MS = 60_000; // 60 seconds
+
 export function __clearTokenCacheForTests(): void {
   tokenCache.clear();
+  accountStatusCache.clear();
 }
 
 function getCachedUser(token: string): AuthenticatedUser | null {
@@ -125,6 +129,14 @@ function verifyLocalJwt(token: string, secret: string): VerifyResult | null {
     }
 
     if (!payload.sub || typeof payload.sub !== "string") {
+      return { ok: false, reason: "invalid" };
+    }
+
+    // Reject anon or service_role tokens if presented as user access tokens
+    if (payload.role && payload.role !== "authenticated") {
+      return { ok: false, reason: "invalid" };
+    }
+    if (payload.aud && payload.aud !== "authenticated") {
       return { ok: false, reason: "invalid" };
     }
 
@@ -224,6 +236,11 @@ interface ProfileStatusRow extends Record<string, unknown> {
  * one has run) is treated the same way — active by default, not blocked.
  */
 async function isAccountBlocked(userId: string): Promise<boolean> {
+  const cached = accountStatusCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.blocked;
+  }
+
   const config = getSupabaseRestConfig();
   if (!config) return false;
   try {
@@ -232,7 +249,13 @@ async function isAccountBlocked(userId: string): Promise<boolean> {
     // Only an actual, present, non-'active' string blocks — an
     // unexpectedly-shaped or missing field fails open rather than locking
     // everyone out over a malformed response.
-    return typeof row?.account_status === "string" && row.account_status !== "active";
+    const blocked = typeof row?.account_status === "string" && row.account_status !== "active";
+    if (accountStatusCache.size >= MAX_CACHE_SIZE) {
+      const oldestKey = accountStatusCache.keys().next().value;
+      if (oldestKey) accountStatusCache.delete(oldestKey);
+    }
+    accountStatusCache.set(userId, { blocked, expiresAt: Date.now() + ACCOUNT_STATUS_TTL_MS });
+    return blocked;
   } catch {
     return false;
   }
