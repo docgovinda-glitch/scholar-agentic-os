@@ -109,6 +109,29 @@ done
 ```
 - **Expected**: Every line prints `400`.
 
+### Check 6 — Positive Authenticated Controls (`200 OK` for Authorized Owner)
+Verify that legitimate authenticated operations for the project owner (`ALICE_TOKEN`) succeed:
+
+```bash
+# 6a. Owner can list their own project files (200 OK):
+curl -sS -o /dev/null -w "Owner GET /files -> %{http_code}\n" \
+  "${BASE_URL}/api/projects/${ALICE_PROJECT_ID}/files" \
+  -H "Authorization: Bearer ${ALICE_TOKEN}"
+
+# 6b. Owner can upload and parse a valid <10 MB PDF on /api/vault/parse-file (200 OK):
+printf '%%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n%%%%EOF' | \
+  curl -sS -o /dev/null -w "Authenticated valid PDF parse -> %{http_code}\n" \
+    -X POST "${BASE_URL}/api/vault/parse-file" \
+    -H "Authorization: Bearer ${ALICE_TOKEN}" \
+    -F "file=@-;filename=valid_small.pdf;type=application/pdf"
+
+# 6c. Authenticated scholar can run live search (200 OK):
+curl -sS -o /dev/null -w "Authenticated GET /api/search/live -> %{http_code}\n" \
+  "${BASE_URL}/api/search/live?q=transformer+attention&limit=3" \
+  -H "Authorization: Bearer ${ALICE_TOKEN}"
+```
+- **Expected**: Every line prints `200`.
+
 ---
 
 ## 3. How to Roll Back on Render

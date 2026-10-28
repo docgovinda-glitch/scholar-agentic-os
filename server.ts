@@ -9,6 +9,7 @@ import dotenv from "dotenv";
 import "express-async-errors";
 import { rateLimit } from "./server/src/middleware/rateLimit.ts";
 import { errorHandler } from "./server/src/middleware/errorHandler.ts";
+import { getMaxUploadMb } from "./server/src/middleware/uploadGuard.ts";
 import { registerDefaultParsers, detectHeadings } from "./src/document_intelligence/index.ts";
 import { registerBuiltinAgents } from "./src/app/mesh/agents/index.ts";
 import type { CanonicalReference, ReferenceAuthor, ReferenceKind } from "./src/citation_compliance/model/reference.ts";
@@ -254,7 +255,7 @@ app.use((req, _res, next) => {
 // raw, unbuffered streaming for database, auth, and storage endpoints.
 registerSupabaseProxy(app);
 
-const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 10;
+const MAX_UPLOAD_MB = getMaxUploadMb();
 const BODY_LIMIT = `${MAX_UPLOAD_MB}mb`;
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ limit: BODY_LIMIT, extended: true }));

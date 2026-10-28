@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction, RequestHandler } from "express";
 import multer from "multer";
 
 export const DEFAULT_MAX_UPLOAD_MB = 10;
+export const HARD_MAX_UPLOAD_MB_CEILING = 25;
 export const HEAVY_PARSE_RETRY_AFTER_SECONDS = 5;
 
 const HEAVY_EXTENSIONS = new Set([
@@ -23,12 +24,14 @@ const HEAVY_MIME_PATTERNS = [
 ];
 
 /**
- * Returns the configured maximum upload size in megabytes (defaults to 10 MB).
+ * Returns the configured maximum upload size in megabytes (defaults to 10 MB,
+ * hard-clamped to [1, HARD_MAX_UPLOAD_MB_CEILING] in code so a misconfigured
+ * environment variable cannot reopen the 512 MB OOM vector).
  */
 export function getMaxUploadMb(): number {
   const raw = Number(process.env.MAX_UPLOAD_MB);
   if (Number.isFinite(raw) && raw > 0) {
-    return raw;
+    return Math.min(Math.max(1, raw), HARD_MAX_UPLOAD_MB_CEILING);
   }
   return DEFAULT_MAX_UPLOAD_MB;
 }
