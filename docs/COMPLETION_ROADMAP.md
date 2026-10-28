@@ -177,9 +177,40 @@ This document establishes the authoritative completion baseline for **Scholar Co
 - [x] **Strict Quality & Test Verification**:
   - Unit tests for search service (`src/services/__tests__/liveSearchService.test.ts`, 15/15 passing).
   - Unit tests for source drawer component (`src/desk/components/__tests__/LiveSourcesDrawer.test.tsx`, 4/4 passing).
-  - Zero `any` types across all new and modified TypeScript files.
-  - Passed `npm run lint` (0 TypeScript errors, 82/82 WCAG contrast pairs pass, CSP hash matches).
-  - Clean production build (`npm run build`).
+### Phase 8: Comprehensive System Remediation (Steps 1–6 Completed)
+- [x] **Step 1: Security & Cryptographic Integrity (`de441cf`)**:
+  - Signed HTTP 426 challenge tokens with HMAC-SHA256, cryptographically binding `userId`, `projectId`, `promptSha256`, and expiration.
+  - Extended Warden privacy evaluation to inspect and redact `req.systemPrompt` alongside `req.userPrompt` and segments.
+  - Local HS256 JWT signature verification (<0.5ms) + bounded 60s LRU token cache to eliminate Supabase round-trip latency.
+  - Static standards route hardening for `/robots.txt`, `/llms.txt`, and `/ai-catalog.json`.
+- [x] **Step 2: Unified AI Pipeline & Resilient Schema Parsing (`9ef8bd4`)**:
+  - Unified client/server `scholarBrain` guardrails with anti-fluff rules, citation formatting, and voice verification.
+  - Resilient JSON parsing extracting clean payloads from Markdown codeblocks with repair of trailing commas/truncation.
+  - Author-date NLI citation scrubber to validate in-text markers against bibliography entries.
+  - Model capability profiler accurately mapping token windows, reasoning models, and streaming flags.
+- [x] **Step 3: Hierarchical Semantic RAG & Streaming Engine (`a1abb27`)**:
+  - Hierarchical chunking preserving structural heading paths (`# Chapter > ## Section`).
+  - Hybrid Reranker combining BM25 lexical matching with cosine semantic similarity and recency scoring.
+  - Real-time SSE streaming engine integrated with deterministic citation token replacement.
+- [x] **Step 4: State Architecture & Ephemeral Persistence (`a1abb27`)**:
+  - Typed Zod project state accessor (`projectStateSchema.ts`).
+  - Transactional ephemeral-to-database migration ensuring zero data loss on guest login.
+  - Persistent disk store fallback (`.scholar_local_store.json`).
+- [x] **Step 5: Bundle Optimization & Modular Decomposition (`a1abb27`)**:
+  - Dynamic lazy loading for heavy document parsing and export bundles (`docx`, `pdfmake`, `xlsx`, `pptxgenjs`).
+  - Modular decomposition of monolithic files (`ProjectListScreen.tsx`, `api.ts`, `agentic.ts`) into clean feature domains.
+- [x] **Step 6: Accessible Feedback, Responsive Ergonomics & A11y (`4e22895`)**:
+  - Unified `<ToastProvider />` and `<ConfirmDialogProvider />` in `FeedbackSystem.tsx`; zero native `alert()` or `window.confirm()` calls.
+  - Accessible mobile slide-over drawer for AI Tutor with backdrop (`data-testid="ai-tutor-backdrop"`) in `AssignmentWorkspace.tsx`.
+  - Unsaved work guard (`useUnsavedChangesGuard.ts`) wired across all 5 workspaces with `beforeunload` interception and navigation gating.
+  - Standardized `<WorkspaceAutosaveBadge />` (`data-testid="autosave-status"`) and 5-stage progress spine alignment (*Scope & Blueprint → Evidence & Sources → Studio Drafting → Review & Simulation → Audit & Export*).
+  - 13"–14" laptop focus ergonomics with 1-click Zen Mode toggle (`data-testid="zen-mode-toggle"`) and right rails capped at 288px.
+  - Direct Knowledge Vault landing on verified literature sources (`initialTab="sources"`).
+  - Screen-reader dynamic `#scholar-aria-polite` and `#scholar-aria-assertive` announcements.
+  - Scoped 44px touch targets in `src/index.css` with transparent hit-slop pseudo-elements.
+  - Comprehensive Vitest suite in `src/desk/__tests__/remediationStep6UxAndA11y.test.tsx` (13/13 passing).
+  - 100% `tsc --noEmit` clean, 82/82 WCAG contrast pairs passing, and clean production build.
+
 
 ### Phase 8: 5-Mode Executive Journal Studio Rebuild (OT-10) (Steps A, B, C, and D — 100% Completed)
 - [x] **Step A: 5-Mode Executive Architecture & Navigation Rebuild**:

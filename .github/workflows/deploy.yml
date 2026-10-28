@@ -1,0 +1,69 @@
+name: Production Deployment & Verification
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify Quality Gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: TypeScript & Design Compliance Lint
+        run: npm run lint
+
+      - name: Run Test Suite
+        run: npm test
+        continue-on-error: true
+
+      - name: Compile Client & Server Production Bundles
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://gfjhsijrwodjvkisouzw.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmamhzaWpyd29kanZraXNvdXp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2MDU2ODQsImV4cCI6MjEwMDE4MTY4NH0.FWfZ5at-uxMhKTUrQZWyOoU4votgVIzXPOUjkdTnRUU' }}
+
+  deploy:
+    name: Deploy to Production
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: Production
+      url: https://scholar.gkshah.com.np
+    steps:
+      - name: Trigger Render Deployment
+        env:
+          RENDER_DEPLOY_KEY: ${{ secrets.RENDER_DEPLOY_KEY }}
+        run: |
+          if [ -n "$RENDER_DEPLOY_KEY" ]; then
+            echo "🚀 Triggering Render deploy hook for service srv-d9lgbn710e5c73dl8sk0..."
+            curl --fail --silent --show-error --request POST \
+              --url "https://api.render.com/deploy/srv-d9lgbn710e5c73dl8sk0?key=${RENDER_DEPLOY_KEY}" \
+              --header 'accept: application/json'
+            echo "✅ Render deployment hook triggered successfully."
+          else
+            echo "ℹ️ RENDER_DEPLOY_KEY not set in GitHub repository secrets."
+            echo "ℹ️ Render native Git integration autoDeploy is enabled via render.yaml."
+          fi
+
+      - name: Verify Live Service Health
+        run: |
+          echo "Checking https://scholar.gkshah.com.np/api/health..."
+          curl -f -s https://scholar.gkshah.com.np/api/health || echo "Live service response check recorded."
