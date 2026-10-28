@@ -9,6 +9,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
+import { storeProviderKey, forgetProviderKey } from "./userAiSettings";
 import { getCaptchaConfig } from "./captchaService";
 
 export interface SignUpInput {
@@ -547,27 +548,23 @@ export async function saveApiKeys(apiKeys: Record<string, string>): Promise<Serv
   }
 
   const providers = Object.keys(apiKeys);
-  const toDelete = providers.filter((p) => !apiKeys[p]);
-  const toUpsert = providers.filter((p) => apiKeys[p]);
+  for (const provider of providers) {
+    const val = apiKeys[provider];
+    if (val) {
+      await storeProviderKey(provider, val);
+    } else {
+      forgetProviderKey(provider);
+    }
+  }
 
-  if (toDelete.length > 0) {
+  // Purge any legacy plaintext rows in public.api_credentials rather than
+  // ever writing unencrypted keys to the database (F-11).
+  if (providers.length > 0) {
     const { error } = await supabase
       .from("api_credentials")
       .delete()
       .eq("user_id", userData.user.id)
-      .in("provider", toDelete);
-    if (error) return { success: false, error: error.message };
-  }
-
-  if (toUpsert.length > 0) {
-    const rows = toUpsert.map((provider) => ({
-      user_id: userData.user!.id,
-      provider,
-      encrypted_api_key: apiKeys[provider],
-      api_key_hash: "", // hashing strategy is part of the same open question noted above
-      updated_at: new Date().toISOString(),
-    }));
-    const { error } = await supabase.from("api_credentials").upsert(rows, { onConflict: "user_id,provider" });
+      .in("provider", providers);
     if (error) return { success: false, error: error.message };
   }
 
