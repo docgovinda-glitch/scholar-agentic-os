@@ -1,6 +1,6 @@
 # End-of-Project Credential Rotation & History Scrub Runbook (`ROTATION_RUNBOOK.md`)
 
-**Purpose**: Complete, step-by-step runbook to rotate all leaked credentials (`F-01`) at project end, re-wrap encrypted platform credentials, force cloud OAuth reconnection, and scrub git history.  
+**Purpose**: Complete, step-by-step runbook to rotate all leaked credentials (`F-01`) at project end, re-wrap encrypted platform credentials, revoke/purge cloud OAuth tokens, remove `DATABASE_URL` from CI, and scrub git history.  
 **Security Rule**: This document uses `<PLACEHOLDERS>` only. Never paste real secret values into repo files or commit messages.
 
 ---
@@ -10,34 +10,46 @@
 | # | Credential | Leaked Format in `01f851f` / `28cfaa5` | Render Env (`srv-d9lgbn710e5c73dl8sk0`) | GitHub Actions Secrets (`docgovinda-glitch/scholar-agentic-os`) | Supabase Edge Function Secrets (`gfjhsijrwodjvkisouzw`) | Vite Build Args (`Dockerfile` / `deploy.yml`) | Local `.env` & Scripts |
 | :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **1** | **Supabase Secret / Service-Role Key** (`SUPABASE_SERVICE_ROLE_KEY`) | `sb_secret_<REDACTED>` (new API key architecture) | `SUPABASE_SERVICE_ROLE_KEY` | Not used in CI | Auto-injected by Supabase runtime (`SUPABASE_SERVICE_ROLE_KEY`) | Never passed to Vite | `.env`, `scripts/seedAiRegistry.ts`, `scripts/create_bucket.ts`, `scripts/reset-all-vaults.ts` |
-| **2** | **Postgres Superuser Password** (`DATABASE_URL`) | `postgresql://postgres.gfjhsijrwodjvkisouzw:<DB_PASSWORD>@...` | `DATABASE_URL` *(optional fallback when `SUPABASE_SERVICE_ROLE_KEY` is set)* | `DATABASE_URL` *(in `deploy.yml:47`)* | Not used | Passed in `deploy.yml:47` (unused by Vite build) | `.env`, `scripts/apply-*.ts`, `scripts/rewrap-platform-credentials.ts` |
-| **3** | **`ENCRYPTION_KEY` / `MASTER_KEY`** | 64-char hex (`ENCRYPTION_KEY`) | `MASTER_KEY` (32-byte base64 used by `credentialVault.ts`) / `ENCRYPTION_KEY` (legacy) | Not used | Not used | Never passed to Vite | `.env`, `scripts/rewrap-platform-credentials.ts` |
+| **2** | **Postgres Superuser Password** (`DATABASE_URL`) | `postgresql://postgres.gfjhsijrwodjvkisouzw:<DB_PASSWORD>@...` | Remove from Render (app uses PostgREST over HTTPS) | **REMOVE from GitHub Actions Secrets** (`gh secret delete DATABASE_URL`; unused by `ci.yml` and `deploy.yml`) | Not used | Removed from `deploy.yml` in PR #72 | `.env`, `scripts/apply-*.ts`, `scripts/rewrap-platform-credentials.ts` |
+| **3** | **`ENCRYPTION_KEY` / `MASTER_KEY`** | 64-char hex (`ENCRYPTION_KEY`) | `MASTER_KEY` (32-byte base64 used by `credentialVault.ts` & `vault.ts`) / `ENCRYPTION_KEY` (legacy) | Not used | Not used | Never passed to Vite | `.env`, `scripts/rewrap-platform-credentials.ts` |
 | **4** | **GitHub Personal Access Token (`GitHub PAT`)** | `ghp_<REDACTED>` (classic PAT) | Not used | Not used (Actions uses automatic `GITHUB_TOKEN`) | Not used | Never | Local git credential helper / operator CLI |
 | **5** | **Cloudflare Global API Key** | 52-char hex/token + Zone ID | Not used at runtime | Not used | Not used | Never | Used manually on `2026-08-04` for DNS setup |
 | **6** | **Resend API Key** (`RESEND_API_KEY`) | `re_<REDACTED>` | `RESEND_API_KEY` *(legacy)* | Not used | `RESEND_API_KEY` (used by `request-profile-update`) | Never | `.env` |
-| **7** | **Render Deploy Key** (`RENDER_DEPLOY_KEY`) | 29-char alphanumeric hook key | Configured under Render Service → Settings → Deploy Hook | `RENDER_DEPLOY_KEY` (`deploy.yml:62`) | Not used | Never | None |
-| **8** | **Supabase JWT Secret & Anon Key** (`SUPABASE_JWT_SECRET` / `VITE_SUPABASE_ANON_KEY`) | `VITE_SUPABASE_ANON_KEY` (`eyJ...`) in `deploy.yml` & source fallbacks (`F-07`) | `SUPABASE_JWT_SECRET`, `VITE_SUPABASE_ANON_KEY` | `VITE_SUPABASE_ANON_KEY` | Auto-injected by Supabase runtime | **YES** (`VITE_SUPABASE_ANON_KEY` baked into client bundle at `vite build` time) | `.env` |
+| **7** | **Render Deploy Key** (`RENDER_DEPLOY_KEY`) | 29-char alphanumeric hook key | Configured under Render Service → Settings → Deploy Hook | `RENDER_DEPLOY_KEY` | Not used | Never | None |
+| **8** | **Supabase JWT Secret & Anon Key** (`SUPABASE_JWT_SECRET` / `VITE_SUPABASE_ANON_KEY`) | `VITE_SUPABASE_ANON_KEY` (`eyJ...`) in `deploy.yml` & source fallbacks (`F-05`) | `SUPABASE_JWT_SECRET`, `VITE_SUPABASE_ANON_KEY` | `VITE_SUPABASE_ANON_KEY` | Auto-injected by Supabase runtime | **YES** (`VITE_SUPABASE_ANON_KEY` baked into client bundle at `vite build` time) | `.env` |
 
 ---
 
-## 2. Supabase `SUPABASE_SERVICE_ROLE_KEY` Rotation: New `sb_secret_...` Keys vs. Legacy JWT Secret Rotation
+## 2. Supabase `SUPABASE_SERVICE_ROLE_KEY` Rotation: New `sb_secret_...` Keys vs. Legacy JWT Keys
 
 ### 2.1 Least Disruptive Path: Rotate `sb_secret_...` API Key Only (Zero Session Downtime)
 Because the leaked key in `INFRASTRUCTURE_REFERENCE.md` uses Supabase's new **Secret API Key** format (`sb_secret_<REDACTED>`):
 - **How Supabase's New API Keys Work**:
   - `sb_secret_...` keys are managed in **Supabase Dashboard → Project Settings → API Keys → Secret keys**.
-  - Unlike the legacy `service_role` JWT, `sb_secret_...` keys are **not** signed with `SUPABASE_JWT_SECRET`; Supabase's API Gateway validates them independently and translates them internally into a short-lived `service_role` Postgres session.
+  - Unlike the legacy `service_role` JWT, `sb_secret_...` keys are **not** signed with `SUPABASE_JWT_SECRET`; Supabase's API Gateway validates them independently and translates them internally into a `service_role` Postgres session.
   - Multiple `sb_secret_...` keys can coexist during rotation!
 - **Impact of Rotating `sb_secret_...`**:
   - **User sessions**: **Zero impact** — active signed-in users stay signed in.
   - **`VITE_SUPABASE_ANON_KEY` build arg**: **Zero impact** — no client rebuild needed.
   - **`verifyLocalJwt` / `SUPABASE_JWT_SECRET`**: **Zero impact** — `SUPABASE_JWT_SECRET` does not change.
-- **Step-by-Step**:
+
+> [!CAUTION]
+> **CRITICAL PREREQUISITE BEFORE DISABLING LEGACY JWT API KEYS**:
+> In Supabase's API Keys settings, disabling **Legacy JWT-based API keys** (`anon` and `service_role` `eyJ...` JWTs) disables **both** the legacy `service_role` JWT **and** the legacy `anon` JWT (`eyJ...`) simultaneously!
+> Because production currently passes the legacy `eyJ...` anon key as `VITE_SUPABASE_ANON_KEY`, disabling Legacy API Keys before migrating the frontend to a new **Publishable key** (`sb_publishable_...`) will **immediately break login and all browser Supabase requests**.
+> - **If you only rotate `sb_secret_...`**: Leave Legacy API Keys enabled until you are ready to switch `VITE_SUPABASE_ANON_KEY`.
+> - **If you want to disable Legacy JWT API Keys**:
+>   1. First create a **Publishable key** (`sb_publishable_<NEW>`) in **Project Settings → API Keys**.
+>   2. Set `VITE_SUPABASE_ANON_KEY=sb_publishable_<NEW>` in **Render Dashboard → Environment** and in **GitHub Actions Secrets** (`gh secret set VITE_SUPABASE_ANON_KEY`).
+>   3. Trigger a full Render build & deploy (`Clear build cache & deploy`) so Vite bakes `sb_publishable_<NEW>` into the static client bundle.
+>   4. Verify browser login and `/rest/v1/*` requests succeed using `sb_publishable_<NEW>`.
+>   5. **Only after step 4 succeeds**, disable Legacy JWT-based API keys in the Supabase Dashboard.
+
+- **Step-by-Step (`sb_secret_...` Rotation)**:
   1. In **Supabase Dashboard → Project Settings → API Keys**, click **Create new secret key** (e.g., name: `render-prod-2026-10`). Copy `<NEW_SB_SECRET_KEY>`.
-  2. Also verify in the **Legacy API Keys** tab whether the legacy `service_role` JWT is enabled; if the legacy `service_role` JWT was never leaked, disable legacy API keys (or leave `SUPABASE_JWT_SECRET` untouched unless performing Section 2.2).
-  3. In **Render Dashboard → `scholar-agentic-os` → Environment**, update `SUPABASE_SERVICE_ROLE_KEY=<NEW_SB_SECRET_KEY>`, save, and wait ~90 seconds for the rolling restart to complete.
-  4. In **Supabase Dashboard → Project Settings → API Keys**, click **Revoke / Delete** on the old leaked `sb_secret_<OLD>` key.
-  5. **Confirm Old Key No Longer Works**:
+  2. In **Render Dashboard → `scholar-agentic-os` → Environment**, update `SUPABASE_SERVICE_ROLE_KEY=<NEW_SB_SECRET_KEY>`, save, and wait ~90 seconds for the rolling restart to complete.
+  3. In **Supabase Dashboard → Project Settings → API Keys**, click **Revoke / Delete** on the old leaked `sb_secret_<OLD>` key.
+  4. **Confirm Old Key No Longer Works**:
      ```bash
      curl -i -s "https://gfjhsijrwodjvkisouzw.supabase.co/rest/v1/profiles?select=id&limit=1" \
        -H "apikey: <OLD_SB_SECRET_KEY>" \
@@ -45,9 +57,9 @@ Because the leaked key in `INFRASTRUCTURE_REFERENCE.md` uses Supabase's new **Se
      # Expected: HTTP/2 401 Unauthorized
      ```
 
-### 2.2 Optional Full JWT Secret Rotation (Only If Rotating `SUPABASE_JWT_SECRET` / `VITE_SUPABASE_ANON_KEY`)
+### 2.2 Optional Full JWT Secret Rotation (Only If Rotating `SUPABASE_JWT_SECRET`)
 - **Impact**:
-  - Immediately invalidates **all** active user sessions (`access_token`s), the legacy `anon` JWT (`VITE_SUPABASE_ANON_KEY`), and the legacy `service_role` JWT.
+  - Immediately invalidates **all** active user sessions (`access_token`s), the legacy `anon` JWT, and the legacy `service_role` JWT.
   - Requires updating `SUPABASE_JWT_SECRET` and `VITE_SUPABASE_ANON_KEY` on Render, updating `VITE_SUPABASE_ANON_KEY` in GitHub Actions Secrets, and running a full Docker/Vite build (`npm run build`) because `VITE_SUPABASE_ANON_KEY` is baked into the static frontend bundle at build time (`Dockerfile:30`).
   - Expected downtime: **~2–3 minutes** while the new frontend bundle builds and deploys on Render.
 
@@ -55,7 +67,7 @@ Because the leaked key in `INFRASTRUCTURE_REFERENCE.md` uses Supabase's new **Se
 
 ## 3. Ordered Rotation Procedure (All Other Leaked Credentials)
 
-Execute in the order below to maintain **zero downtime** across steps 1–6 and **<90 seconds rolling restart** on step 7:
+Execute in the order below to maintain **zero downtime** across steps 1–5 and **<90 seconds rolling restart** on step 6:
 
 ### Step 1 — GitHub Personal Access Token (`GitHub PAT`) — *0s Downtime*
 1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)** (`https://github.com/settings/tokens`).
@@ -107,13 +119,13 @@ Execute in the order below to maintain **zero downtime** across steps 1–6 and 
    # Expected: HTTP 401 / 403 Invalid API key
    ```
 
-### Step 5 — Postgres Database Password (`DATABASE_URL`) — *0s App Downtime*
+### Step 5 — Postgres Database Password (`DATABASE_URL`) & Removal from CI — *0s App Downtime*
 Because the Express server uses PostgREST over HTTPS (`VITE_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`) whenever both are set ([`projectStore.ts:139-142`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/src/services/store/projectStore.ts#L139-L142)), rotating the Postgres password causes **zero application downtime**:
 1. In **Supabase Dashboard → Project Settings → Database → Database password**, click **Reset database password** and generate a new strong password (`<NEW_DB_PASSWORD>`).
-2. In **Render Dashboard → `scholar-agentic-os` → Environment**, either **remove** `DATABASE_URL` (recommended so only PostgREST is used) or update `DATABASE_URL` with `<NEW_DB_PASSWORD>`.
-3. In **GitHub Actions Secrets**, update or remove `DATABASE_URL`:
+2. In **Render Dashboard → `scholar-agentic-os` → Environment**, **delete** `DATABASE_URL` so the app never opens direct `pg.Pool` connections and relies purely on PostgREST over HTTPS.
+3. **Delete `DATABASE_URL` from GitHub Actions Secrets** (neither `.github/workflows/ci.yml` nor `.github/workflows/deploy.yml` uses `DATABASE_URL`, and PR #72 removed the unused `DATABASE_URL` env reference from `deploy.yml`):
    ```bash
-   gh secret set DATABASE_URL -R docgovinda-glitch/scholar-agentic-os
+   gh secret delete DATABASE_URL -R docgovinda-glitch/scholar-agentic-os
    ```
 4. **Confirm Old Password Fails**:
    ```bash
@@ -129,7 +141,7 @@ Because the Express server uses PostgREST over HTTPS (`VITE_SUPABASE_URL` + `SUP
    ```bash
    node -e 'console.log(require("crypto").randomBytes(32).toString("base64"))'
    ```
-2. Run [`scripts/rewrap-platform-credentials.ts`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/scripts/rewrap-platform-credentials.ts) in **`--dry-run`** mode first:
+2. Run [`scripts/rewrap-platform-credentials.ts`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/scripts/rewrap-platform-credentials.ts) in **`--dry-run`** mode first (temporarily allowing your operator IP in Supabase Network Restrictions if enabled):
    ```bash
    OLD_MASTER_KEY="<CURRENT_MASTER_KEY_OR_HEX_ENCRYPTION_KEY>" \
    NEW_MASTER_KEY="<NEW_MASTER_KEY_BASE64>" \
@@ -164,28 +176,42 @@ Because anyone who held both the leaked `SUPABASE_SERVICE_ROLE_KEY` and `MASTER_
 
 ---
 
-## 4. Plan to Revoke & Force Reconnection of OAuth Tokens in `user_cloud_integrations`
+## 4. Plan to Revoke & Force Reconnection of OAuth Tokens in `user_cloud_integrations` (Google Drive & Microsoft OneDrive)
 
-Because Google Drive and Microsoft OneDrive OAuth `access_token` and `refresh_token` rows in `public.user_cloud_integrations` were stored in plaintext during the exposure window (`F-11`):
-1. **Server-Side Revocation & Table Wipe**:
-   - For any existing rows in `public.user_cloud_integrations`:
-     - Best-effort revoke each Google token via `POST https://oauth2.googleapis.com/revoke?token=<token>`.
-     - Delete all pre-rotation rows in `public.user_cloud_integrations` so no pre-exposure token remains trusted:
-       ```sql
-       BEGIN;
-       DELETE FROM public.user_cloud_integrations;
-       COMMIT;
-       ```
-2. **User Experience on Next Vault Visit**:
-   - [`src/services/vault/cloudDriveService.ts`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/src/services/vault/cloudDriveService.ts) and `/api/vault/drive/files` / `/api/vault/onedrive/files` already return `404` (`"Google Drive not connected"` / `"OneDrive not connected"`) when no row exists in `user_cloud_integrations`, prompting the user in the Vault UI to click **Connect Google Drive** / **Connect OneDrive** again.
-   - Once Task 4.7 lands, all newly connected OAuth tokens are envelope-encrypted at rest before storage.
+Because Google Drive, Microsoft OneDrive, Zotero, and Mendeley OAuth `access_token` and `refresh_token` rows in `public.user_cloud_integrations` were stored in plaintext prior to PR #79 (`F-08`), and because PR #79's `encryptCloudToken` uses `MASTER_KEY` / `SUPABASE_SERVICE_ROLE_KEY` (which is leaked until Step 6 above completes):
+
+1. **Google Drive Token Revocation (`provider = 'google_drive'`)**:
+   - Before deleting rows, best-effort revoke each Google OAuth token via Google's RFC 7009 revocation endpoint:
+     ```bash
+     curl -sS -X POST "https://oauth2.googleapis.com/revoke" \
+       -H "Content-Type: application/x-www-form-urlencoded" \
+       -d "token=<GOOGLE_ACCESS_OR_REFRESH_TOKEN>"
+     ```
+2. **Microsoft OneDrive Token Invalidations (`provider = 'onedrive'`)**:
+   - **Important Protocol Difference**: Unlike Google, the Microsoft identity platform (`login.microsoftonline.com/common/oauth2/v2.0`) does **not** provide an RFC 7009 single-token revocation endpoint for delegated `Files.Read` access/refresh tokens (Microsoft Graph's `POST /me/revokeSignInSessions` revokes all Microsoft sessions for the user and requires `User.ReadWrite.All` scope, which Scholar Core does not request).
+   - **How to Invalidate All Issued OneDrive Refresh Tokens Centrally**:
+     1. Open **Microsoft Entra Admin Center (`https://entra.microsoft.com`) → Applications → App registrations → Scholar Core → Certificates & secrets**.
+     2. Create a new **Client secret** (`<NEW_MICROSOFT_CLIENT_SECRET>`), update `MICROSOFT_CLIENT_SECRET` in **Render Dashboard → Environment**, and **delete the old Client secret**. Any attacker attempting to exchange a leaked OneDrive `refresh_token` without the valid `MICROSOFT_CLIENT_SECRET` (for confidential web clients) is rejected by Microsoft's token endpoint.
+     3. Instruct OneDrive users in `USER_NOTICE.md` to revoke app consent directly at `https://account.live.com/consent/Manage` (personal Microsoft accounts) or `https://myapps.microsoft.com` (work/school Entra ID accounts), which immediately invalidates both access and refresh tokens at Microsoft.
+3. **Database Purge Migration (`20261028010000_purge_plaintext_credentials.sql`) & Post-Rotation Wipe**:
+   - Migration [`supabase/migrations/20261028010000_purge_plaintext_credentials.sql`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/migrations/20261028010000_purge_plaintext_credentials.sql) deletes all existing plaintext rows in `public.api_credentials` and `public.user_cloud_integrations` and drops direct client `SELECT`/`INSERT`/`UPDATE` policies on `public.user_cloud_integrations`.
+   - When Step 6 (`MASTER_KEY` rotation) is executed at project end, run:
+     ```sql
+     BEGIN;
+     DELETE FROM public.user_cloud_integrations;
+     DELETE FROM public.api_credentials;
+     COMMIT;
+     ```
+     so any tokens encrypted under the old `MASTER_KEY` are also purged and re-issued under `<NEW_MASTER_KEY_BASE64>`.
+4. **User Experience on Next Vault Visit**:
+   - [`src/services/vault/cloudDriveService.ts`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/src/services/vault/cloudDriveService.ts) and `/api/vault/drive/files` / `/api/vault/onedrive/files` return `404` (`"Google Drive not connected"` / `"OneDrive not connected"`) when no row exists in `user_cloud_integrations`, prompting the user in the Vault UI to click **Connect Google Drive** / **Connect OneDrive** again.
 
 ---
 
 ## 5. Git History Rewrite Commands (Execute ONLY After All Rotations Above Are Complete)
 
 > [!CAUTION]
-> **Run only after all 7 credentials have been rotated**, and coordinate with any collaborators (`Aaditya Sah`) beforehand because `git filter-repo` rewrites commit SHAs across all branches.
+> **Run only after all leaked credentials have been rotated**, and coordinate with any collaborators (`Aaditya Sah`) beforehand because `git filter-repo` rewrites commit SHAs across all branches.
 
 ```bash
 # 1. Install git-filter-repo (if not already installed)

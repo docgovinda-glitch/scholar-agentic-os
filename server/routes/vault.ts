@@ -10,6 +10,16 @@ import { encrypt, decryptToString } from "../../src/services/crypto/crypto.ts";
 
 const CLOUD_TOKEN_ENC_PREFIX = "enc:v1:";
 
+/**
+ * Resolves the 32-byte AES-256-GCM key used by `encryptCloudToken` / `decryptCloudToken`.
+ *
+ * SECURITY NOTE (F-01 / F-07 / F-08):
+ * `encryptCloudToken` derives its key from `MASTER_KEY` / `CREDENTIAL_MASTER_KEY`
+ * (or falls back to an HMAC of `SUPABASE_SERVICE_ROLE_KEY`). Because both
+ * `MASTER_KEY` and `SUPABASE_SERVICE_ROLE_KEY` were exposed in git history (`F-01`),
+ * this encryption-at-rest layer only provides real cryptographic protection against
+ * an external attacker AFTER `F-01` secret rotation is executed (`ROTATION_RUNBOOK.md`).
+ */
 function resolveCloudTokenEncryptionKey(): Buffer | null {
   const rawMaster = process.env.MASTER_KEY || process.env.CREDENTIAL_MASTER_KEY;
   if (rawMaster) {

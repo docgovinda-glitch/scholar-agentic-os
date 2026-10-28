@@ -926,22 +926,38 @@ export interface RequestProfileUpdateResult extends ServiceResult {
   emailSent?: boolean;
 }
 
+export const PROFILE_UPDATE_DISABLED_USER_MESSAGE =
+  "Email and username change requests requiring administrator verification are temporarily unavailable during a security upgrade (TICKET-SEC-01). You can still update your Full Name, Phone Number, and Institution directly in Account Settings.";
+
 /**
  * Invokes the `request-profile-update` Edge Function.
- * Never receives or exposes `verificationKey`; fails closed if the admin
- * notification email could not be delivered.
+ * Never receives or exposes `verificationKey`; surfaces a clear user-facing
+ * explanation when the endpoint returns 410 Gone (TICKET-SEC-01).
  */
 export async function requestProfileUpdate(input: RequestProfileUpdateInput): Promise<RequestProfileUpdateResult> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.functions.invoke("request-profile-update", { body: input });
   if (error) {
-    return { success: false, error: error.message };
+    const rawMsg = typeof error.message === "string" ? error.message : "";
+    if (
+      rawMsg.includes("410") ||
+      rawMsg.includes("PROFILE_UPDATE_DISABLED") ||
+      rawMsg.includes("FunctionsHttpError") ||
+      rawMsg.includes("non-2xx")
+    ) {
+      return {
+        success: false,
+        emailSent: false,
+        error: PROFILE_UPDATE_DISABLED_USER_MESSAGE,
+      };
+    }
+    return { success: false, error: rawMsg || PROFILE_UPDATE_DISABLED_USER_MESSAGE };
   }
 
-  if (data && (data.success === false || data.emailSent === false)) {
+  if (data && (data.code === "PROFILE_UPDATE_DISABLED" || data.success === false || data.emailSent === false)) {
     return {
       success: false,
-      error: data.error || "Profile update request failed because the admin notification email could not be sent.",
+      error: data.error || PROFILE_UPDATE_DISABLED_USER_MESSAGE,
       emailSent: false,
     };
   }

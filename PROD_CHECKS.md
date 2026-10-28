@@ -1,7 +1,7 @@
 # Read-Only Production Verification Runbook (`PROD_CHECKS.md`)
 
 **Target Production Project**: `gfjhsijrwodjvkisouzw` (Supabase) & `srv-d9lgbn710e5c73dl8sk0` (Render)  
-**Safety Guarantee**: Every SQL query in this document is strictly **`SELECT`-only** against `pg_catalog` / `information_schema` / `supabase_migrations` / `storage`, and every CLI command is **read-only**. Do **not** run any `ALTER`, `DROP`, `INSERT`, `UPDATE`, or `DELETE` until the results below are reviewed.
+**Safety Guarantee**: Every SQL query in this document is strictly **`SELECT`-only** against `pg_catalog` / `information_schema` / `supabase_migrations` / `storage`, and every CLI command is **read-only**. All SQL queries have been verified locally against `@electric-sql/pglite`. Do **not** run any `ALTER`, `DROP`, `INSERT`, `UPDATE`, or `DELETE` until the results below are reviewed.
 
 ---
 
@@ -10,7 +10,7 @@
 Copy and run each block in the Supabase Dashboard → **SQL Editor** for project `gfjhsijrwodjvkisouzw` and paste the JSON/table output back.
 
 ### Check 1.1 — Applied Migrations Tracking Table
-Verifies whether Supabase CLI migration tracking (`supabase_migrations.schema_migrations`) exists and which of the 28 repo migrations were recorded vs. applied manually.
+Verifies whether Supabase CLI migration tracking (`supabase_migrations.schema_migrations`) exists and which of the repo migrations were recorded vs. applied manually.
 ```sql
 SELECT
   version,
@@ -89,8 +89,8 @@ WHERE n.nspname = 'public'
 ORDER BY p.prosecdef DESC, p.proname ASC;
 ```
 
-### Check 1.6 — Storage Bucket Visibility & Size (`F-03` & `F-18` Verification)
-Checks whether `project-files` and `id-documents` are marked `public = true` and how much of the 1 GB free storage limit is currently consumed.
+### Check 1.6 — Storage Bucket Visibility, Size & `id-documents` Inventory (`F-03` & `F-18` Verification)
+Checks whether `project-files` and `id-documents` are marked `public = true`, how much of the storage limit is consumed, and whether any identity document objects (`id-documents`) remain stored in production (`20260814000000_account_system_repair.sql` stopped collecting ID documents, so `object_count` on `id-documents` determines whether `USER_NOTICE.md` needs to mention identity documents).
 ```sql
 SELECT
   b.id AS bucket_id,
@@ -111,37 +111,38 @@ ORDER BY b.id;
 ## 2. Forensic Checks for Past Exploitation (Read-Only SQL)
 
 ### Check 2.1 — Pending or Suspicious Profile Email Updates (`F-04` `verificationKey` Leak)
-Checks whether any account has a pending or recently completed profile update triggered via `request-profile-update`.
+Checks whether any account has a pending or recently completed profile update triggered via `request-profile-update` (uses `to_jsonb(p)` so the query succeeds whether or not `pending_profile_update` or `role` exist as columns on `public.profiles`).
 ```sql
 SELECT
-  id,
-  username,
-  role,
-  account_status,
-  pending_profile_update IS NOT NULL AS has_pending_update,
-  pending_profile_update->>'requested_at' AS requested_at,
-  pending_profile_update->>'expires_at' AS expires_at,
-  updated_at
-FROM public.profiles
-WHERE pending_profile_update IS NOT NULL
-   OR updated_at > NOW() - INTERVAL '30 days'
-ORDER BY updated_at DESC
+  p.id,
+  p.account_status,
+  p.user_type,
+  to_jsonb(p)->>'role' AS legacy_role,
+  (to_jsonb(p)->'pending_profile_update' IS NOT NULL AND to_jsonb(p)->>'pending_profile_update' <> 'null') AS has_pending_update,
+  to_jsonb(p)->'pending_profile_update'->>'requested_at' AS requested_at,
+  to_jsonb(p)->'pending_profile_update'->>'expires_at' AS expires_at,
+  p.updated_at
+FROM public.profiles p
+WHERE (to_jsonb(p)->'pending_profile_update' IS NOT NULL AND to_jsonb(p)->>'pending_profile_update' <> 'null')
+   OR p.updated_at > NOW() - INTERVAL '30 days'
+ORDER BY p.updated_at DESC
 LIMIT 50;
 ```
 
 ### Check 2.2 — Orphaned or Cross-User `project_files`, `project_evidence`, and `peer_review_critiques` (`F-06` IDOR Check)
-Checks for any waived critiques or uploaded files/evidence targeting non-existent projects or anomalous activity in the last 30 days.
+Checks for any waived critiques or uploaded files/evidence targeting non-existent projects or anomalous activity in the last 30 days (verified against `20260728000000_relational_project_store.sql`: columns `id, project_id, filename, storage_path, size_bytes, mime_type, uploaded_at`).
 ```sql
 SELECT
   pf.id,
   pf.project_id,
-  pf.file_name,
-  pf.file_size,
-  pf.created_at,
+  pf.filename,
+  pf.size_bytes,
+  pf.mime_type,
+  pf.uploaded_at,
   p.owner_id AS project_owner_id
 FROM public.project_files pf
 LEFT JOIN public.projects p ON p.project_id = pf.project_id
-ORDER BY pf.created_at DESC
+ORDER BY pf.uploaded_at DESC
 LIMIT 50;
 ```
 
@@ -149,8 +150,9 @@ LIMIT 50;
 SELECT
   id,
   project_id,
+  lens,
+  severity,
   waived,
-  waiver_reason,
   created_at
 FROM public.peer_review_critiques
 WHERE waived = true
@@ -158,21 +160,21 @@ ORDER BY created_at DESC
 LIMIT 50;
 ```
 
-### Check 2.3 — Plaintext Credentials Stored in `api_credentials` and `user_cloud_integrations` (`F-11` Count Only — Never Select Secret Values)
+### Check 2.3 — Plaintext Credentials Stored in `api_credentials` and `user_cloud_integrations` (`F-07` / `F-08` Count Only — Never Select Secret Values)
 Counts how many rows exist in `api_credentials` and `user_cloud_integrations` without printing any key or token material.
 ```sql
 SELECT
   'api_credentials' AS table_name,
   COUNT(*) AS row_count,
   COUNT(DISTINCT user_id) AS distinct_users,
-  BOOL_OR(length(encrypted_api_key) > 0 AND api_key_hash = '') AS has_unhashed_plaintext_rows
+  COALESCE(BOOL_OR(encrypted_api_key NOT LIKE 'enc:v1:%' AND encrypted_api_key NOT LIKE '{"ciphertext"%'), false) AS has_unencrypted_plaintext_rows
 FROM public.api_credentials
 UNION ALL
 SELECT
   'user_cloud_integrations' AS table_name,
   COUNT(*) AS row_count,
   COUNT(DISTINCT user_id) AS distinct_users,
-  BOOL_OR(length(access_token) > 0) AS has_unhashed_plaintext_rows
+  COALESCE(BOOL_OR(access_token NOT LIKE 'enc:v1:%'), false) AS has_unencrypted_plaintext_rows
 FROM public.user_cloud_integrations;
 ```
 
@@ -200,4 +202,3 @@ In the Render Dashboard for `scholar-agentic-os` (`srv-d9lgbn710e5c73dl8sk0`) �
 - `RESEND_API_KEY`
 - `TAVILY_API_KEY`
 - `MAX_UPLOAD_MB`
-

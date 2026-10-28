@@ -292,10 +292,13 @@ describe("Hotfix Containment (Part A & Part A2): Authz, IDOR, 10MB Limit, Concur
       }
     });
 
-    it("hard-clamps MAX_UPLOAD_MB to HARD_MAX_UPLOAD_MB_CEILING (25 MB) even if env var is set higher", () => {
-      process.env.MAX_UPLOAD_MB = "500";
+    it("hard-clamps MAX_UPLOAD_MB to HARD_MAX_UPLOAD_MB_CEILING (10 MB) even if MAX_UPLOAD_MB=25 or 500", () => {
+      process.env.MAX_UPLOAD_MB = "25";
+      expect(getMaxUploadMb()).toBe(10);
       expect(getMaxUploadMb()).toBe(HARD_MAX_UPLOAD_MB_CEILING);
-      expect(getMaxUploadMb()).toBe(25);
+
+      process.env.MAX_UPLOAD_MB = "500";
+      expect(getMaxUploadMb()).toBe(10);
 
       process.env.MAX_UPLOAD_MB = "-10";
       expect(getMaxUploadMb()).toBe(10);
