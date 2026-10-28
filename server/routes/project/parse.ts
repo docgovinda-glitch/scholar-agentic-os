@@ -1,16 +1,25 @@
-import { Router, Request, Response } from "express";
-import multer from "multer";
+import { Router, Request, Response, NextFunction } from "express";
 import { parseDocument, cleanHtmlToText, normalizeUnicodeNFC } from "../../../src/document_intelligence/index.ts";
+import { getProjectStore } from "../../../src/services/store/projectStore.ts";
+import { loadOwnedProject } from "./core/projectHelpers.ts";
+import { createUploadInstance } from "../../src/middleware/uploadGuard.ts";
+import { safeFetchHtml } from "../../utils/ssrfGuard.ts";
 
 const parseRouter = Router({ mergeParams: true });
 
-// Enforce strict ephemeral in-memory buffer handling (Multer memoryStorage only, zero residual disk writes)
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 25 * 1024 * 1024, // 25MB limit
-  },
+// Verify project ownership before parsing files or fetching URLs
+parseRouter.use(async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const record = await loadOwnedProject(getProjectStore(), req, res);
+    if (!record) return;
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
+
+// Enforce strict ephemeral in-memory buffer handling (MAX_UPLOAD_MB default 10 MB + heavy-parse concurrency guard)
+const upload = createUploadInstance({ enforceHeavyParseLimit: true });
 
 /**
  * POST /api/projects/:id/parse-file
@@ -99,7 +108,7 @@ parseRouter.post("/", upload.single("file"), async (req: Request, res: Response)
 
 /**
  * POST /api/projects/:id/parse-file/url
- * Fetch and extract article content from web pages / academic URLs
+ * Fetch and extract article content from web pages / academic URLs with SSRF & DNS rebinding defense
  */
 parseRouter.post("/url", async (req: Request, res: Response) => {
   const { url } = req.body || {};
@@ -108,22 +117,20 @@ parseRouter.post("/url", async (req: Request, res: Response) => {
   }
 
   try {
-    const parsedUrl = new URL(url.trim());
-    const response = await fetch(parsedUrl.toString(), {
-      headers: {
-        "User-Agent": "ScholarCoreAcademicReader/2.0 (Research & Citation Grounding)",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-    });
-
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: `Could not access URL (${response.status} ${response.statusText})`,
-      });
+    const trimmed = url.trim();
+    const parsedUrl = new URL(trimmed);
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      return res.status(400).json({ error: "Invalid protocol" });
     }
 
-    const html = await response.text();
-    const { title, text } = cleanHtmlToText(html);
+    const fetchResult = await safeFetchHtml(trimmed, {
+      timeoutMs: 8000,
+      maxBytes: 2 * 1024 * 1024,
+      maxRedirects: 5,
+    });
+
+    const finalUrl = new URL(fetchResult.url);
+    const { title, text } = cleanHtmlToText(fetchResult.body);
 
     return res.json({
       success: true,
@@ -131,8 +138,8 @@ parseRouter.post("/url", async (req: Request, res: Response) => {
       title,
       sourceType: "weblink",
       metadata: {
-        url: parsedUrl.toString(),
-        domain: parsedUrl.hostname,
+        url: finalUrl.toString(),
+        domain: finalUrl.hostname,
         fetchedAt: new Date().toISOString(),
       },
     });

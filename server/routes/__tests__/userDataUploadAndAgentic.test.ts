@@ -30,7 +30,7 @@ describe("Journal Rebuild Step B — Primary User Data Ingestion & Agentic Ledge
     const store = getProjectStore();
     const proj: ProjectRecord = {
       projectId: "proj-user-data-1",
-      userId: TEST_USER_ID,
+      ownerId: TEST_USER_ID,
       title: "Quantum Error Correction Project",
       intakeData: {},
       answers: {},
@@ -69,7 +69,7 @@ describe("Journal Rebuild Step B — Primary User Data Ingestion & Agentic Ledge
     const store = getProjectStore();
     const proj: ProjectRecord = {
       projectId: "proj-user-data-2",
-      userId: TEST_USER_ID,
+      ownerId: TEST_USER_ID,
       title: "Historical Sanskrit Philology",
       intakeData: {},
       answers: {},
@@ -99,7 +99,7 @@ describe("Journal Rebuild Step B — Primary User Data Ingestion & Agentic Ledge
     const store = getProjectStore();
     const proj: ProjectRecord = {
       projectId: "proj-user-data-3",
-      userId: TEST_USER_ID,
+      ownerId: TEST_USER_ID,
       title: "Clinical Trial Analysis",
       intakeData: {},
       answers: {},
@@ -144,7 +144,7 @@ describe("Journal Rebuild Step B — Primary User Data Ingestion & Agentic Ledge
 
     const proj: ProjectRecord = {
       projectId: "proj-user-data-4",
-      userId: TEST_USER_ID,
+      ownerId: TEST_USER_ID,
       title: "Benchmarking",
       intakeData: {},
       answers: {
@@ -193,7 +193,7 @@ describe("Journal Rebuild Step B — Primary User Data Ingestion & Agentic Ledge
 
     const proj: ProjectRecord = {
       projectId: "proj-user-data-5",
-      userId: TEST_USER_ID,
+      ownerId: TEST_USER_ID,
       title: "Quantum Decoder Paper",
       intakeData: {},
       answers: {

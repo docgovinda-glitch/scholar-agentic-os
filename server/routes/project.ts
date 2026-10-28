@@ -161,26 +161,32 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   
   // Manual Human Editor Routes for relational data overrides
   router.put("/:id/editor/gaps/:gapId", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     const config = getSupabaseRestConfig();
     if (!config) return res.status(500).json({ error: "Supabase config missing" });
     const table = new SupabaseTable(config, "project_evidence"); // Gaps are saved here by agent
-    await table.update(`id=eq.${req.params.gapId}&project_id=eq.${req.params.id}`, req.body);
+    await table.update(`id=eq.${encodeURIComponent(req.params.gapId)}&project_id=eq.${encodeURIComponent(record.projectId)}`, req.body);
     res.json({ ok: true });
   }));
 
   router.put("/:id/editor/evidence/:evidenceId", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     const config = getSupabaseRestConfig();
     if (!config) return res.status(500).json({ error: "Supabase config missing" });
     const table = new SupabaseTable(config, "project_evidence");
-    await table.update(`id=eq.${req.params.evidenceId}&project_id=eq.${req.params.id}`, req.body);
+    await table.update(`id=eq.${encodeURIComponent(req.params.evidenceId)}&project_id=eq.${encodeURIComponent(record.projectId)}`, req.body);
     res.json({ ok: true });
   }));
 
   router.put("/:id/editor/claims/:claimId", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     const config = getSupabaseRestConfig();
     if (!config) return res.status(500).json({ error: "Supabase config missing" });
-    const table = new SupabaseTable(config, "project_claims"); // Assuming a project_claims table
-    await table.update(`id=eq.${req.params.claimId}&project_id=eq.${req.params.id}`, req.body);
+    const table = new SupabaseTable(config, "project_claims");
+    await table.update(`id=eq.${encodeURIComponent(req.params.claimId)}&project_id=eq.${encodeURIComponent(record.projectId)}`, req.body);
     res.json({ ok: true });
   }));
 
@@ -464,13 +470,13 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
   const userSavedAuthorsMap = new Map<string, any[]>();
 
-    app.get("/api/user/saved-authors", projectLimit, asyncRoute(async (req, res) => {
+    app.get("/api/user/saved-authors", requireAuth, projectLimit, asyncRoute(async (req, res) => {
     const userId = currentUserId(req);
     const authors = userSavedAuthorsMap.get(userId) || [];
     res.json({ authors });
   }));
 
-    app.post("/api/user/saved-authors", projectLimit, asyncRoute(async (req, res) => {
+    app.post("/api/user/saved-authors", requireAuth, projectLimit, asyncRoute(async (req, res) => {
     const userId = currentUserId(req);
     const { author } = req.body ?? {};
     if (!author) {
@@ -499,7 +505,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     res.json({ ok: true, authors: current });
   }));
 
-    app.delete("/api/user/saved-authors/:authorId", projectLimit, asyncRoute(async (req, res) => {
+    app.delete("/api/user/saved-authors/:authorId", requireAuth, projectLimit, asyncRoute(async (req, res) => {
     const userId = currentUserId(req);
     const { authorId } = req.params;
     const current = userSavedAuthorsMap.get(userId) || [];

@@ -1,6 +1,7 @@
 import express from "express";
 import { getProjectStore } from "../../src/services/store/projectStore.ts";
 import { currentUserId, asyncRoute } from "./project.ts";
+import { requireAuth } from "../src/middleware/auth.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 
 interface ClaimRow {
@@ -11,6 +12,7 @@ interface ClaimRow {
 
 export function registerSearchRoutes(app: express.Application) {
   const router = express.Router();
+  router.use(requireAuth);
 
   router.get("/", asyncRoute(async (req, res) => {
     const query = (req.query.q as string || "").toLowerCase();
@@ -26,14 +28,12 @@ export function registerSearchRoutes(app: express.Application) {
     });
 
     let matchingClaims: Array<{ id: string; title: string; type: string }> = [];
-    if (query.trim().length > 0) {
+    if (query.trim().length > 0 && projects.length > 0) {
       const config = getSupabaseRestConfig();
       if (config) {
         const claimsTable = new SupabaseTable(config, "project_claims");
-        // Use a wildcard search, but filter to user's projects if possible
-        // For simplicity and speed without complex joins in PostgREST, we just search all 
-        // claims matching text and then filter by user's known projects.
-        const claimsRows = (await claimsTable.select(`text=ilike.*${query}*&limit=50`)) as unknown as ClaimRow[];
+        const encodedQuery = encodeURIComponent(query.trim());
+        const claimsRows = (await claimsTable.select(`text=ilike.*${encodedQuery}*&limit=50`)) as unknown as ClaimRow[];
         
         const userProjectIds = new Set(projects.map(p => p.projectId));
         matchingClaims = claimsRows

@@ -326,8 +326,20 @@ export default function Step01Understand({
           const formData = new FormData();
           formData.append('file', file);
 
+          const headers: Record<string, string> = {};
+          try {
+            const { isSupabaseConfigured, getSupabaseClient } = await import('../../../services/supabaseClient');
+            if (isSupabaseConfigured()) {
+              const { data } = await getSupabaseClient().auth.getSession();
+              if (data?.session?.access_token) {
+                headers['Authorization'] = `Bearer ${data.session.access_token}`;
+              }
+            }
+          } catch {}
+
           const res = await fetch('/api/presentations/parse-document', {
             method: 'POST',
+            ...(Object.keys(headers).length > 0 ? { headers } : {}),
             body: formData,
           });
 

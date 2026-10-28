@@ -9,7 +9,7 @@
  * 5. Guarantees complete project isolation.
  */
 
-import { executeAgenticLLM } from "../../api";
+import { executeAgenticLLM, authedFetch, authedJsonFetch } from "../../api";
 import { parseAndRepairLLMJson } from "../../../shared/llmJsonParser";
 import type { UploadedSourceDocument, EvidenceItem, ExtractedSourceEvidence } from "../types";
 
@@ -458,7 +458,7 @@ export async function parseProjectFile(
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/parse-file`, {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/parse-file`, {
     method: "POST",
     body: formData,
   });
@@ -485,11 +485,11 @@ export async function parseProjectUrl(
   projectId: string,
   url: string
 ): Promise<ParsedSourcePayload> {
-  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/parse-file/url`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
-  });
+  const res = await authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/parse-file/url`,
+    "POST",
+    { url }
+  );
 
   if (!res.ok) {
     const errorBody = await res.json().catch(() => ({}));
@@ -514,11 +514,11 @@ export async function parseProjectText(
   text: string,
   title?: string
 ): Promise<ParsedSourcePayload> {
-  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/parse-file/text`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, title }),
-  });
+  const res = await authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/parse-file/text`,
+    "POST",
+    { text, title }
+  );
 
   if (!res.ok) {
     const errorBody = await res.json().catch(() => ({}));

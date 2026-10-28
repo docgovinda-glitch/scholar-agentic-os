@@ -7,16 +7,13 @@
 
 import express, { Router, Request, Response } from "express";
 import { randomUUID } from "node:crypto";
-import multer from "multer";
 import JSZip from "jszip";
 import { parseDocument, normalizeUnicodeNFC } from "../../src/document_intelligence/index.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 import { requireAuth } from "../src/middleware/auth.ts";
+import { createUploadInstance } from "../src/middleware/uploadGuard.ts";
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
-});
+const upload = createUploadInstance({ enforceHeavyParseLimit: true });
 
 async function extractTextFromPptx(buffer: Buffer): Promise<{ text: string; themeColors?: { accent?: string; canvasBg?: string; cardBg?: string; textPrimary?: string } }> {
   try {

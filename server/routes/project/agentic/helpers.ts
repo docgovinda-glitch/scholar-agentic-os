@@ -3,7 +3,7 @@ import { getProjectStore, type ProjectRecord } from "../../../../src/services/st
 import { normalizeUnicodeNFC } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import type { CanonicalDocument, Block } from "../../../../src/desk/types.ts";
 import { safeParseAnswerField } from "../../../../src/shared/projectStateSchema.ts";
-import multer from "multer";
+import { createUploadInstance } from "../../../src/middleware/uploadGuard.ts";
 import type {
   RefereeRole,
   AcademicCritiqueItem,
@@ -11,12 +11,7 @@ import type {
   CitationReconciliationReport,
 } from "./types.ts";
 
-export const userUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 25 * 1024 * 1024, // 25MB limit
-  },
-});
+export const userUpload = createUploadInstance({ enforceHeavyParseLimit: true });
 
 export async function getProjectSafe<P extends Record<string, string | undefined> = Record<string, string | undefined>>(
   req: express.Request<P>,
@@ -28,8 +23,9 @@ export async function getProjectSafe<P extends Record<string, string | undefined
     res.status(400).json({ error: "Missing project ID" });
     return null;
   }
+  const callerId = (req as express.Request & { user?: { id: string } }).user?.id;
   const project = await getProjectStore().get(projectId);
-  if (!project) {
+  if (!project || !callerId || project.ownerId !== callerId) {
     res.status(404).json({ error: "Project not found" });
     return null;
   }
