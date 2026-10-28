@@ -62,8 +62,8 @@ export default defineConfig(() => {
               if (id.includes('/pdfmake/')) {
                 return 'pdfmake';
               }
-              if (id.includes('/xlsx/')) {
-                return 'xlsx';
+              if (id.includes('/exceljs/')) {
+                return 'exceljs';
               }
               if (
                 id.includes('/bluebird/') ||
