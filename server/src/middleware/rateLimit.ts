@@ -27,6 +27,17 @@ export interface RateLimitOptions {
 }
 
 const store = new Map<string, RateLimitEntry>();
+export const MAX_RATE_LIMIT_ENTRIES = 10_000;
+
+function setRateLimitEntry(key: string, entry: RateLimitEntry) {
+  if (!store.has(key) && store.size >= MAX_RATE_LIMIT_ENTRIES) {
+    const oldestKey = store.keys().next().value;
+    if (oldestKey !== undefined) {
+      store.delete(oldestKey);
+    }
+  }
+  store.set(key, entry);
+}
 
 // Test helper: allows Vitest to isolate rate limit windows deterministically.
 // Kept minimal and in-memory only; safe for production usage (no-op unless called).
@@ -34,8 +45,12 @@ export function __resetRateLimitStore() {
   store.clear();
 }
 
+export function __getRateLimitStoreSize() {
+  return store.size;
+}
+
 // Clean up expired entries every minute to prevent memory leak
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of store.entries()) {
     if (entry.resetTime < now) {
@@ -43,13 +58,20 @@ setInterval(() => {
     }
   }
 }, 60000);
+cleanupInterval.unref?.();
 
 function getBaseIp(req: any): string {
-  return (req.ip || req.headers?.["x-forwarded-for"] || "unknown").toString();
-}
-
-function getUserAgent(req: any): string {
-  return req.get?.("User-Agent") || "unknown";
+  if (req.ip) {
+    return String(req.ip).trim();
+  }
+  const forwarded = req.headers?.["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.length > 0) {
+    return forwarded.split(",")[0].trim() || "unknown";
+  }
+  if (Array.isArray(forwarded) && forwarded.length > 0) {
+    return String(forwarded[0]).split(",")[0].trim() || "unknown";
+  }
+  return "unknown";
 }
 
 function normalizeUserKeyPart(v: unknown): string | undefined {
@@ -82,7 +104,7 @@ export function rateLimit(options: RateLimitOptions) {
           });
           return;
         }
-        store.set(overridden, entry);
+        setRateLimitEntry(overridden, entry);
         next();
         return;
       }
@@ -98,14 +120,12 @@ export function rateLimit(options: RateLimitOptions) {
       userPart = normalizeUserKeyPart(fromBody ?? fromQuery);
     }
 
-    // Keep existing behavior compatible with old middleware:
-    // include UA to reduce collisions across clients behind shared IPs.
-    const uaPart = getUserAgent(req);
-
+    // Do NOT include User-Agent in the rate-limit key: rotating User-Agent
+    // previously created a fresh bucket per request (F-09).
     const key =
       limitBy === "ip+user" && userPart
-        ? `${ipPart}:${userPart}:${uaPart}`
-        : `${ipPart}:${uaPart}`;
+        ? `${ipPart}:${userPart}`
+        : ipPart;
 
     const entry = store.get(key) || { count: 0, resetTime: now + options.windowMs };
 
@@ -125,7 +145,7 @@ export function rateLimit(options: RateLimitOptions) {
       return;
     }
 
-    store.set(key, entry);
+    setRateLimitEntry(key, entry);
     next();
   };
 }
