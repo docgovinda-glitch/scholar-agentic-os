@@ -30,6 +30,9 @@ jobs:
       - name: TypeScript & Design Compliance Lint
         run: npm run lint
 
+      - name: Dependency audit (production deps, high/critical)
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Run Test Suite
         run: npm test
 
@@ -68,7 +71,42 @@ jobs:
             echo "ℹ️ Render native Git integration autoDeploy is enabled via render.yaml."
           fi
 
-      - name: Verify Live Service Health
+      - name: Wait until the new commit is live
         run: |
-          echo "Checking https://scholar.gkshah.com.np/api/health..."
-          curl -f -s https://scholar.gkshah.com.np/api/health
+          want="${GITHUB_SHA::7}"
+          for i in $(seq 1 60); do
+            live=$(curl -s --max-time 60 https://scholar.gkshah.com.np/api/health | jq -r '.commit // empty' || true)
+            if [ "$live" = "$want" ]; then echo "Live commit $live"; exit 0; fi
+            echo "live=${live:-unknown} want=$want (attempt $i)"; sleep 20
+          done
+          echo "::error::Render did not report commit $want within 20 minutes"
+          exit 1
+
+      - name: Deep health check
+        run: curl -f -s --max-time 60 'https://scholar.gkshah.com.np/api/health?deep=1'
+
+      - name: Checkout smoke suite
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Production smoke suite
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SMOKE_SUPABASE_SERVICE_ROLE_KEY }}
+          SMOKE_A_EMAIL: ${{ secrets.SMOKE_A_EMAIL }}
+          SMOKE_A_PASSWORD: ${{ secrets.SMOKE_A_PASSWORD }}
+          SMOKE_B_EMAIL: ${{ secrets.SMOKE_B_EMAIL }}
+          SMOKE_B_PASSWORD: ${{ secrets.SMOKE_B_PASSWORD }}
+        run: |
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$SMOKE_A_EMAIL" ]; then
+            echo "::warning::Smoke secrets not set (SMOKE_SUPABASE_SERVICE_ROLE_KEY, SMOKE_A/B_EMAIL/PASSWORD); skipping the smoke suite."
+            exit 0
+          fi
+          node scripts/smoke-prod.mjs
