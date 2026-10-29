@@ -368,8 +368,11 @@ export default function ExternalResearchStage({
                 open_access_pdf_url: d.open_access_pdf_url || undefined,
               }));
 
-            setResults(minedSources);
-            await persistDiscoveredSources(minedSources);
+            // An empty answer must not wipe papers the user already has.
+            if (minedSources.length > 0) {
+              setResults(minedSources);
+              await persistDiscoveredSources(minedSources);
+            }
 
             setLogs((prev) => [
               ...prev,

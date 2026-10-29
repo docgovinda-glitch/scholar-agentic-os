@@ -178,126 +178,6 @@ export default function EvidenceExtractionStage({
     [handleSave, project, projectId]
   );
 
-  // Generate local fallback claims if stream encounters error/offline
-  const generateFallbackClaims = (): EvidenceItem[] => {
-    const claims: EvidenceItem[] = [];
-
-    // From approved sources: deep multi-lens extraction per source
-    approvedSources.forEach((src: any, idx: number) => {
-      const sourceCitation = `${src.author || "Primary Source"} (${src.year || "2024"})`;
-      const baseTags = Array.isArray(src.matched_concepts) && src.matched_concepts.length > 0
-        ? src.matched_concepts
-        : [methodology, "Empirical"];
-
-      // Lens 1: Direct Empirical / Benchmark Finding (preserving src.snippet for exact fidelity)
-      claims.push({
-        id: `ev-src-emp-${Date.now()}-${idx}`,
-        quote: src.snippet || `Empirical findings demonstrating performance bounds in ${src.title}.`,
-        source: sourceCitation,
-        claim_type: src.evidentiary_role === "benchmark" ? "Benchmark Statistic" : "Empirical Support",
-        strength: (src.relevance_score || 85) >= 90 ? "Strong" : "Moderate",
-        page_or_loc: "Section 4 / Empirical Results",
-        notes: `Quantitative empirical baseline from ${src.title} establishing observable performance bounds.`,
-        tags: Array.from(new Set([...baseTags, "Primary Evidence", "Empirical"])),
-      });
-
-      // Lens 2: Methodological Protocol & Parameterization
-      claims.push({
-        id: `ev-src-meth-${Date.now()}-${idx}`,
-        quote: `Methodological protocol in ${src.title} standardizes evaluation under controlled latency variations with rigorous failure boundary stress-testing.`,
-        source: sourceCitation,
-        claim_type: "Methodological Rationale",
-        strength: "Strong",
-        page_or_loc: "Section 3 / Experimental Design",
-        notes: `Controlled experimental parameterization and invariant stress-testing protocol from ${src.title}.`,
-        tags: Array.from(new Set([...baseTags, "Methodology", "Protocol Invariants"])),
-      });
-
-      // Lens 3: Theoretical Guarantee / Correctness Bound
-      claims.push({
-        id: `ev-src-theo-${Date.now()}-${idx}`,
-        quote: `Theoretical proofs in ${src.title} establish safety invariants and resilience guarantees under asynchronous network partitions.`,
-        source: sourceCitation,
-        claim_type: "Theoretical Proof",
-        strength: (src.relevance_score || 85) >= 88 ? "Strong" : "Moderate",
-        page_or_loc: "Theorem 1 / Correctness Proof",
-        notes: `Formal boundary conditions verifying worst-case asymptotic bounds and safety properties.`,
-        tags: Array.from(new Set([...baseTags, "Theoretical Proof", "Safety Bounds"])),
-      });
-    });
-
-    // From attached datasets: multi-dimensional extraction
-    attachedDatasets.forEach((data: any, idx: number) => {
-      // Metric 1: Verified Telemetry Traces
-      claims.push({
-        id: `ev-data-bench-${Date.now()}-${idx}`,
-        quote: `Empirical measurement traces from ${data.name}: verified ${data.rowCount || "multi-node"} telemetry records.`,
-        source: `${data.name} (Dataset)`,
-        claim_type: "Benchmark Statistic",
-        strength: "Strong",
-        page_or_loc: "Telemetry Ledger",
-        notes: `Direct empirical observation extracted from verified tabular dataset ${data.name}.`,
-        tags: ["Primary Data", data.format?.toUpperCase() || "CSV", "Direct Telemetry"],
-      });
-
-      // Metric 2: Distribution and Variance Analysis
-      claims.push({
-        id: `ev-data-dist-${Date.now()}-${idx}`,
-        quote: `Statistical distribution in ${data.name} demonstrates bounded dispersion and quantitative parameter stability across sampled intervals.`,
-        source: `${data.name} (Distribution Telemetry)`,
-        claim_type: "Empirical Support",
-        strength: "Strong",
-        page_or_loc: "Distribution Summary",
-        notes: `Quantile telemetry validating variance bounds and sample integrity.`,
-        tags: ["Primary Data", "Distribution", "Variance Analysis"],
-      });
-    });
-
-    if (claims.length === 0) {
-      claims.push({
-        id: `ev-fallback-${Date.now()}-1`,
-        quote: `Formal theoretical formulation and empirical boundary analysis addressing ${anchorGap?.title || workingTitle}.`,
-        source: `${workingTitle} (Core Investigation)`,
-        claim_type: "Theoretical Proof",
-        strength: "Strong",
-        page_or_loc: "Analytical Framework",
-        notes: "Foundational mathematical bounds under target operating assumptions.",
-        tags: [methodology || "Empirical", "Analytical Bounds", "Foundational"],
-      });
-      claims.push({
-        id: `ev-fallback-${Date.now()}-2`,
-        quote: `Systematic experimental baseline demonstrating verifiable fidelity and rigor under peer-reviewed parameters.`,
-        source: `${workingTitle} (Benchmark Validation)`,
-        claim_type: "Benchmark Statistic",
-        strength: "Strong",
-        page_or_loc: "Benchmarking Protocol",
-        notes: "Empirical baseline measurements establishing quantitative comparison.",
-        tags: ["Validation", "Rigor", "Empirical Baseline"],
-      });
-      claims.push({
-        id: `ev-fallback-${Date.now()}-3`,
-        quote: `Rigorous sampling methodology enforcing systematic parameterization across all evaluation phases.`,
-        source: `${workingTitle} (Methodology Specification)`,
-        claim_type: "Methodological Rationale",
-        strength: "Strong",
-        page_or_loc: "Section 3 / Methodological Controls",
-        notes: "Methodological protocol ensuring reproducibility and control standards.",
-        tags: ["Methodology", "Control Standards", "Reproducibility"],
-      });
-      claims.push({
-        id: `ev-fallback-${Date.now()}-4`,
-        quote: `Comparative baseline analysis evaluating tradeoffs against state-of-the-art approaches in ${targetJournal}.`,
-        source: `${workingTitle} (Comparative Baseline)`,
-        claim_type: "Comparative Baseline",
-        strength: "Moderate",
-        page_or_loc: "Section 5 / Related Work",
-        notes: "State-of-the-art comparative evaluation identifying key trade-off surfaces.",
-        tags: ["Comparative Baseline", "Tradeoff Analysis"],
-      });
-    }
-
-    return claims;
-  };
 
   // 5. Extraction Runner
   const startExtraction = async () => {
@@ -309,7 +189,7 @@ export default function EvidenceExtractionStage({
         id: `log-${Date.now()}-1`,
         timestamp: new Date().toLocaleTimeString([], { hour12: false }),
         level: "info",
-        message: `Initializing Deep Evidence Mining Agent...`,
+        message: "Starting evidence extraction…",
       },
       {
         id: `log-${Date.now()}-2`,
@@ -319,29 +199,6 @@ export default function EvidenceExtractionStage({
       },
     ]);
 
-    const progressMessages = [
-      "Parsing PDF structural elements, tabular claims, and experimental schemas...",
-      "Extracting quantitative empirical findings (effect sizes, sample sizes N, p-values)...",
-      "Isolating experimental protocols, control variables, and baseline configurations...",
-      "Decomposing theoretical guarantees, correctness proofs, and boundary invariants...",
-      "Cross-referencing dataset telemetry and evaluating statistical distributions...",
-      "Mapping extracted quotes and evidentiary proofs to academic citation ledger...",
-      "Verifying zero-hallucination compliance across evidence ledger...",
-    ];
-
-    let stepIdx = 0;
-    logIntervalRef.current = setInterval(() => {
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: `log-${Date.now()}-${Math.random()}`,
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "action",
-          message: progressMessages[stepIdx % progressMessages.length],
-        },
-      ]);
-      stepIdx++;
-    }, 950);
 
     try {
       await authedStreamFetch(
@@ -369,21 +226,26 @@ export default function EvidenceExtractionStage({
             ]);
           } else if (event === "done") {
             clearTimer();
-            const minedItems: EvidenceItem[] = Array.isArray(data.data) && data.data.length > 0
-              ? data.data.map((d: any, i: number) => ({
-                  id: d.id || `ev-mined-${Date.now()}-${i}`,
-                  quote: d.quote || "",
-                  source: d.source || "Primary Literature Source",
-                  claim_type: (d.claim_type as ClaimType) || "Empirical Support",
-                  strength: (d.strength as ClaimStrength) || "Strong",
-                  tags: Array.isArray(d.tags) ? d.tags : [],
-                  page_or_loc: d.page_or_loc || "",
-                  notes: d.notes || "",
-                }))
-              : generateFallbackClaims();
+            // Only claims the AI extracted (with a quote); no invented source
+            // name or "Strong" rating.
+            const minedItems: EvidenceItem[] = (Array.isArray(data.data) ? data.data : [])
+              .filter((d: any) => typeof d?.quote === "string" && d.quote.trim())
+              .map((d: any, i: number) => ({
+                id: d.id || `ev-mined-${Date.now()}-${i}`,
+                quote: d.quote,
+                source: d.source || "",
+                claim_type: (d.claim_type as ClaimType) || "Empirical Support",
+                strength: (d.strength as ClaimStrength) || "Weak",
+                tags: Array.isArray(d.tags) ? d.tags : [],
+                page_or_loc: d.page_or_loc || "",
+                notes: d.notes || "",
+              }));
 
-            setResults(minedItems);
-            await persistEvidence(minedItems);
+            // An empty answer must not wipe evidence the user already has.
+            if (minedItems.length > 0) {
+              setResults(minedItems);
+              await persistEvidence(minedItems);
+            }
 
             setLogs((prev) => [
               ...prev,
@@ -391,11 +253,14 @@ export default function EvidenceExtractionStage({
                 id: `log-${Date.now()}-done`,
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                 level: "success",
-                message: `Extraction complete: Mined and indexed ${minedItems.length} citable evidence claims into manuscript ledger.`,
+                message:
+                  minedItems.length > 0
+                    ? `Extraction complete: ${minedItems.length} claims extracted. Check each against its source.`
+                    : "The AI extracted no claims. Nothing was added.",
               },
             ]);
 
-            setSuccessToast(`Successfully mined ${minedItems.length} evidence claims! You can now review, edit, or add custom claims.`);
+            setSuccessToast(minedItems.length > 0 ? `Extracted ${minedItems.length} claims. Review, edit, or add your own.` : "No claims extracted.");
             setTimeout(() => setSuccessToast(null), 5000);
           } else if (event === "error") {
             throw new Error(data.message || "Streaming endpoint returned an error.");
@@ -404,23 +269,16 @@ export default function EvidenceExtractionStage({
       );
     } catch (err: any) {
       clearTimer();
-      console.warn("Remote evidence-extraction failed, using local corpus synthesis:", err);
-      const fallbackItems = generateFallbackClaims();
-      setResults(fallbackItems);
-      await persistEvidence(fallbackItems);
-
+      console.warn("AI request failed:", err);
       setLogs((prev) => [
         ...prev,
         {
-          id: `log-${Date.now()}-fallback`,
+          id: `log-${Date.now()}-fail`,
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `Local corpus synthesis complete: Extracted ${fallbackItems.length} evidence claims from approved vault sources and datasets.`,
+          level: "error",
+          message: "Evidence extraction unavailable: nothing was added. Connect an AI provider in AI Access, or try again.",
         },
       ]);
-
-      setSuccessToast(`Extracted ${fallbackItems.length} evidence claims from your authorized sources.`);
-      setTimeout(() => setSuccessToast(null), 5000);
     } finally {
       clearTimer();
       setIsProcessing(false);
