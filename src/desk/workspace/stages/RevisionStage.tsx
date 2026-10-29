@@ -271,7 +271,9 @@ export default function RevisionStage({
       throw new Error("Server returned non-ok status");
     } catch (err: unknown) {
       console.warn("Rebuttal matrix request failed:", err instanceof Error ? err.message : String(err));
-      appendLog("Rebuttal drafting unavailable: nothing was written. Connect an AI provider in AI Access, or try again.", "warn");
+      const msg = "Rebuttal drafting unavailable: nothing was written. Connect an AI provider in AI Access, or try again.";
+      appendLog(msg, "warn");
+      setError(msg);
     } finally {
       setIsGeneratingRebuttal(false);
     }
@@ -328,13 +330,16 @@ export default function RevisionStage({
 
       if (receivedPatches.length === 0) {
         appendLog("The AI proposed no revisions. Nothing was changed.", "warn");
+        setError("The AI proposed no revisions. Nothing was changed.");
       } else {
         setPatches(receivedPatches);
         appendLog("Revision proposals ready. Review each one before applying.", "done");
       }
     } catch (err: unknown) {
       console.warn("Revision agent unavailable:", err instanceof Error ? err.message : String(err));
-      appendLog("Revision agent unavailable: nothing was changed. Connect an AI provider in AI Access, or try again.", "warn");
+      const msg = "Revision agent unavailable: nothing was changed. Connect an AI provider in AI Access, or try again.";
+      appendLog(msg, "warn");
+      setError(msg);
     } finally {
       clearTimer();
       setScanProgress(100);
