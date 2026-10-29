@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
-import Step01Scaffolding from "../Step01Scaffolding";
+import Step01Scaffolding from "../Step01Understand";
 import type { SlideDeck } from "../../types/slides";
 
 const mockDeck: SlideDeck = {
@@ -91,7 +91,7 @@ describe("Step01Scaffolding (Document Upload & Coursework Intake)", () => {
     expect(screen.getByRole("button", { name: /Select Document File/i })).toBeInTheDocument();
   });
 
-  it("processes uploaded text/markdown file, derives topic, and calls onUpdateDeck with 5 beats", async () => {
+  it("processes uploaded text/markdown file, derives topic, and builds cards from its sections", async () => {
     const handleUpdate = vi.fn();
     render(
       <Step01Scaffolding
@@ -118,7 +118,11 @@ describe("Step01Scaffolding (Document Upload & Coursework Intake)", () => {
     });
 
     const updatedDeck = handleUpdate.mock.calls[0][0];
-    expect(updatedDeck.slides.length).toBe(5);
+    // One card per section of the document plus a title card; no filler slides.
+    expect(updatedDeck.slides.length).toBe(2);
+    expect(updatedDeck.slides[0].layoutType).toBe("title");
+    // The figure on the stat card is the one in the document.
+    expect(JSON.stringify(updatedDeck.slides[1].content.stats)).toContain("99.8%");
     expect(screen.getByText("quantum_cryptography.md")).toBeInTheDocument();
     expect(screen.getByText(/words extracted/i)).toBeInTheDocument();
   });

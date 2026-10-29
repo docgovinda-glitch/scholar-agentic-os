@@ -8,9 +8,11 @@ import {
 import { scholarBrain } from "../../src/services/scholarBrain.ts";
 import {
   memoryDecks,
+  setMemoryDeck,
   getDecksTable,
   PresentationDeckRow,
 } from "../presentations.ts";
+import { parseGammaCard, GAMMA_LAYOUT_IDS, type GammaCardPayload } from "./presentationCards.ts";
 
 const router = Router({ mergeParams: true });
 
@@ -32,6 +34,8 @@ export interface SlidePresentationItem {
   layoutType?: "bullets" | "image-split" | "metric-focus" | "two-column" | "quote-evidence";
   metricValue?: string;
   metricLabel?: string;
+  /** Gamma-style card content (layout + structured fields) rendered by the studio. */
+  card?: GammaCardPayload;
 }
 
 export interface AudienceQuestion {
@@ -77,116 +81,135 @@ function generateProjectDerivedFallbackDeck(
   empiricalNotes: string,
   sourcesSummary: string[]
 ): SlidePresentationItem[] {
-  const safeTitle = normalizeUnicodeNFC(projectTitle || "Autonomous Empirical Synthesis in Scholarly AI");
+  // Uses only what the project actually contains. Where a field is empty the
+  // card says what to add instead of inventing findings or references.
+  const safeTitle = normalizeUnicodeNFC(projectTitle || "Untitled presentation");
   const slideDuration = Math.max(60, Math.round((durationMinutes * 60) / 6));
+  const rq = researchQuestions.filter((q) => q && q.trim());
+  const sentences = (t: string) =>
+    t
+      .split(/(?<=[.!?])\s+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  const methodSteps = methodologyText ? sentences(methodologyText).slice(0, 4) : [];
+  const findings = empiricalNotes ? sentences(empiricalNotes).slice(0, 4) : [];
 
-  const rq1 = researchQuestions[0] || "How do grounded multi-agent architectures mitigate hallucinations?";
-  const rq2 = researchQuestions[1] || "What empirical guarantees can be proven under adversarial peer review?";
-
-  const slides: SlidePresentationItem[] = [
+  return [
     {
       slideNumber: 1,
       type: "title",
       title: safeTitle,
-      subtitle: `${targetAudience} · Duration: ${durationMinutes} Mins · Research Defense`,
-      visualFocus: "Clean high-contrast title banner with institutional affiliation and grant attribution.",
-      keyPoints: [
-        "Principal Investigator & Affiliated Laboratory",
-        "Empirical Research Programme Deliverables",
-        "Formal Defense & Conference Proceedings",
-      ],
-      speakerNotes: `Good morning everyone. Today I am presenting our empirical research on ${safeTitle}. Over the next ${durationMinutes} minutes, we will examine our core epistemological problem, our methodology, and our reproducible findings.`,
+      subtitle: `${targetAudience} · ${durationMinutes} minutes`,
+      visualFocus: "Title card",
+      keyPoints: [],
+      speakerNotes: `Introduce yourself and the question behind ${safeTitle}. Tell the audience what they will be able to judge by the end.`,
       targetDurationSeconds: Math.min(90, slideDuration),
       layoutType: "bullets",
+      card: { layout: "title", eyebrow: targetAudience, lede: rq[0] || undefined, items: [], stats: [] },
     },
     {
       slideNumber: 2,
       type: "problem_gap",
-      title: "The Epistemic Deficit in Current Literature",
-      subtitle: "Why Traditional Synthesis Pipelines Suffer Severe Verification Degradation",
-      visualFocus: "Comparative problem breakdown chart highlighting baseline failure rates.",
-      keyPoints: [
-        "Linear scaling assumptions fail under domain scrutiny",
-        "Unverified models exhibit 84% citation failure rates",
-        "Surface fluency frequently masks epistemic divergence",
-        "Urgent requirement: Deterministic cryptographic citation provenance",
-      ],
-      speakerNotes: `To contextualise our contribution, we must examine the fundamental failure modes in contemporary literature. Traditional synthesis methods lack verifiable grounding, resulting in substantial hallucination rates across complex bibliographic corpora.`,
+      title: rq.length ? "The question this work answers" : "What is at stake",
+      subtitle: rq[0] || "State the gap in one sentence",
+      visualFocus: "Statement card",
+      keyPoints: rq.slice(0, 4),
+      speakerNotes: rq.length
+        ? `Frame the problem through the research question: ${rq.join(" ")}`
+        : "Explain the gap in current knowledge and who is affected by it. Add your research question to the project to fill this card.",
       targetDurationSeconds: slideDuration,
-      layoutType: "two-column",
+      layoutType: "bullets",
+      card: rq.length > 1
+        ? { layout: "list", eyebrow: "Research questions", items: rq.slice(0, 4).map((q) => ({ title: q })), stats: [] }
+        : { layout: "statement", eyebrow: "The gap", lede: rq[0] ? undefined : "Add your research question to the project to fill this card.", items: [], stats: [] },
     },
     {
       slideNumber: 3,
       type: "framework_methodology",
-      title: "Methodological Architecture & Triangulated Design",
-      subtitle: "Multi-Agent Consensus & Cryptographic Verification Protocol",
-      visualFocus: "Multi-stage pipeline workflow diagram linking ingest to consensus gates.",
-      keyPoints: [
-        `Primary research focus: ${rq1.slice(0, 48)}`,
-        `Formal design: ${methodologyText.slice(0, 52)}`,
-        "Verified Knowledge Vault cryptographic hashing",
-        "Multi-agent adversarial consensus gate verification",
-      ],
-      speakerNotes: `Our methodological design addresses these vulnerabilities through triangulated verification. By coupling deterministic knowledge vault indexing with non-Markovian agentic debate, we ensure each empirical claim is anchored in verifiable source texts.`,
+      title: "How the study was done",
+      subtitle: methodSteps[0] || "Describe your design, data and analysis",
+      visualFocus: "Timeline of the method",
+      keyPoints: methodSteps.length ? methodSteps : ["Design", "Data", "Analysis"],
+      speakerNotes: methodologyText || "Walk through the design, the data you collected and how you analysed it.",
       targetDurationSeconds: slideDuration,
       layoutType: "image-split",
+      card: {
+        layout: "timeline",
+        eyebrow: "Method",
+        items: methodSteps.length
+          ? methodSteps.map((m) => ({ title: m }))
+          : [
+              { title: "Design", body: "The type of study and why it fits the question." },
+              { title: "Data", body: "What was collected, from whom, and when." },
+              { title: "Analysis", body: "How the data were analysed." },
+            ],
+        stats: [],
+      },
     },
     {
       slideNumber: 4,
       type: "empirical_findings",
-      title: "Empirical Benchmarks & Comparative Lift",
-      subtitle: "Quantitative Validation Across 5 Independent Benchmark Corpora",
-      visualFocus: "High-contrast metric callout with comparative performance bar chart.",
-      keyPoints: [
-        "99.8% precision in bibliographic attribution",
-        "4.2x turnaround acceleration over manual review",
-        "Zero hallucinated citations across 1,000 trials",
-        "Statistical significance established at p < 0.001",
-      ],
-      speakerNotes: `Turning to our empirical results: As evidenced across 1,000 double-blind trials, our architecture achieved a 99.8% precision score with statistically significant variance reduction (p < 0.001).`,
+      title: "What the evidence shows",
+      subtitle: findings[0] || "Add your key findings",
+      visualFocus: "Findings",
+      keyPoints: findings.length ? findings : ["Add your strongest finding", "Add a supporting finding"],
+      speakerNotes: empiricalNotes || "Present the findings you can cite. Say the source as you give each number.",
       targetDurationSeconds: slideDuration,
-      layoutType: "metric-focus",
-      metricValue: "99.8%",
-      metricLabel: "Attribution Precision",
+      layoutType: "bullets",
+      card: {
+        layout: findings.length >= 3 ? "bento" : "list",
+        eyebrow: "Findings",
+        items: findings.length
+          ? findings.map((f) => ({ title: f }))
+          : [
+              { title: "Strongest finding", body: "Add it from your results or a cited source." },
+              { title: "Supporting finding", body: "What else points the same way?" },
+            ],
+        stats: [],
+      },
     },
     {
       slideNumber: 5,
       type: "discussion_implications",
-      title: "Theoretical Implications & Core Contributions",
-      subtitle: "Reframing Autonomous Scholarly Governance and Open Science",
-      visualFocus: "Conceptual contribution matrix contrasting baseline vs grounded paradigms.",
-      keyPoints: [
-        "Eliminates phantom citations in automated synthesis",
-        `Addresses secondary aim: ${rq2.slice(0, 48)}`,
-        "Provides reproducible cryptographic verification audit trail",
-        "Establishes foundation for autonomous literature governance",
-      ],
-      speakerNotes: `These findings carry major implications for scholarly communication. Rather than treating artificial intelligence as an infallible author, we demonstrate that deterministic verification rails enable reliable, autonomous scientific synthesis.`,
+      title: "What this means",
+      subtitle: "Contribution, limits and next steps",
+      visualFocus: "Implications",
+      keyPoints: ["Contribution", "Limitations", "Next steps"],
+      speakerNotes: "Say what your work adds, where it stops, and what should be studied next.",
       targetDurationSeconds: slideDuration,
       layoutType: "bullets",
+      card: {
+        layout: "list",
+        eyebrow: "Implications",
+        items: [
+          { title: "Contribution", body: "What this adds to what was known." },
+          { title: "Limitations", body: "Where the findings may not hold." },
+          { title: "Next steps", body: "The most useful follow-up study or action." },
+        ],
+        stats: [],
+      },
     },
     {
       slideNumber: 6,
       type: "references",
-      title: "References & Provenance Ledger",
-      subtitle: "Verified Knowledge Vault Citations & Reproducibility Package",
-      visualFocus: "Bibliographic ledger display with persistent identifiers and DOI badges.",
-      keyPoints:
-        sourcesSummary.length > 0
-          ? sourcesSummary.slice(0, 4)
-          : [
-              "Vance et al. (2025) Epistemic Rigour in Multi-Agent Verification. Nature Mach. Intell.",
-              "Chen & Aris (2024) Non-Markovian Decision Dynamics in Scholarly Review. IEEE Trans.",
-              "Open Science Framework: Full benchmark replication dataset OSF.IO/SCHOLAR",
-              "Code & Weights: MIT Open-Source Licence available on GitHub",
-            ],
-      speakerNotes: `All sources cited today are cryptographically indexed within our Knowledge Vault. The complete benchmark suite and reproducibility notebooks are available on the Open Science Framework. Thank you, and I welcome your questions.`,
+      title: "Sources",
+      subtitle: sourcesSummary.length ? "From your Knowledge Vault" : "Add sources to your Knowledge Vault",
+      visualFocus: "Reference list",
+      keyPoints: sourcesSummary.slice(0, 4),
+      speakerNotes: sourcesSummary.length
+        ? "These are the sources cited in this talk. Thank the audience and invite questions."
+        : "No sources are attached to this project yet. Add them to the Knowledge Vault before presenting.",
       targetDurationSeconds: Math.min(90, slideDuration),
       layoutType: "bullets",
+      card: {
+        layout: sourcesSummary.length ? "list" : "statement",
+        eyebrow: "References",
+        lede: sourcesSummary.length ? undefined : "No sources are attached to this project yet.",
+        items: sourcesSummary.slice(0, 6).map((src) => ({ title: src })),
+        stats: [],
+      },
     },
   ];
-
-  return slides;
 }
 
 /**
@@ -253,9 +276,7 @@ function generateFallbackQAScenarios(
   ];
 }
 
-/**
- * Transforms SlidePresentationItem array into SlideDeck cards for the UI.
- */
+
 function buildSlideDeckFromItems(
   deckId: string,
   title: string,
@@ -269,8 +290,20 @@ function buildSlideDeckFromItems(
     speakerNotes: s.speakerNotes,
     framework: "Standard-Narrative",
     frameworkPhase: s.type,
-    layoutType: s.layoutType || "bullets",
+    layoutType: s.card?.layout || s.layoutType || "bullets",
     targetDurationSeconds: s.targetDurationSeconds,
+    content: s.card
+      ? {
+          eyebrow: s.card.eyebrow,
+          headline: s.title,
+          lede: s.card.lede,
+          items: s.card.items,
+          stats: s.card.stats,
+          columns: s.card.columns,
+          quote: s.card.quote,
+          takeaway: s.card.takeaway,
+        }
+      : undefined,
     blocks: [
       {
         type: "action-header",
@@ -298,7 +331,7 @@ function buildSlideDeckFromItems(
     title,
     topic: title,
     framework: "Standard-Narrative",
-    themeId: "sand-academic",
+    themeId: "scholar-paper",
     slides: cards,
     activeSlideIndex: 0,
     sourceModule: "presentation-studio",
@@ -318,38 +351,45 @@ router.post(
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
 
-    const {
-      durationMinutes = 20,
-      targetAudience = "Academic Conference",
-      narrativeFramework = "Standard-Narrative",
-    } = req.body || {};
+    const body = (req.body || {}) as Record<string, unknown>;
+    const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+    const AUDIENCE: Record<string, string> = { general: "General audience", executive: "Executive briefing", academic: "Academic seminar" };
 
-    const rawTitle = (req.body && req.body.title) || (record.answers?.title as string) || "Academic Research Presentation";
+    const durationMinutes = Math.min(180, Math.max(1, Number(body.durationMinutes) || 20));
+    const targetAudience = str(body.targetAudience, 120) || AUDIENCE[str(body.audienceLevel, 20)] || "Academic Conference";
+    const narrativeFramework = str(body.narrativeFramework, 60) || str(body.framework, 60) || "Standard-Narrative";
+    const requestedSlides = Math.min(15, Math.max(4, Number(body.slideCount) || 6));
+    const userTopic = str(body.topic, 300);
+    const userText = str(body.rawText, 20000);
+
+    const rawTitle = str(body.title, 300) || userTopic || (record.answers?.title as string) || "Academic Research Presentation";
     const projectTitle = normalizeUnicodeNFC(rawTitle);
 
     const answers = (record.answers || {}) as Record<string, unknown>;
+    // Only the project's own data; no invented defaults.
     const researchQuestions: string[] = Array.isArray(answers.researchQuestions)
-      ? (answers.researchQuestions as string[])
-      : [
-          (answers.overarchingHypothesis as string) ||
-            "How do grounded multi-agent architectures mitigate hallucinations?",
-        ];
+      ? (answers.researchQuestions as unknown[]).filter((q): q is string => typeof q === "string" && !!q.trim())
+      : typeof answers.overarchingHypothesis === "string" && answers.overarchingHypothesis.trim()
+      ? [answers.overarchingHypothesis as string]
+      : [];
 
     const methodologyText =
-      (answers.methodology as string) ||
-      (answers.methodologicalDesign as string) ||
-      "Triangulated empirical benchmarking and multi-agent peer review verification.";
+      (typeof answers.methodology === "string" && answers.methodology) ||
+      (typeof answers.methodologicalDesign === "string" && answers.methodologicalDesign) ||
+      "";
 
-    const empiricalNotes =
-      (answers.significanceStatement as string) ||
-      "99.8% precision with zero fabricated citations across rigorous double-blind trials.";
+    const empiricalNotes = (typeof answers.significanceStatement === "string" && answers.significanceStatement) || "";
 
     const sourcesSummary: string[] = Array.isArray(record.evidenceLedger?.sources)
-      ? record.evidenceLedger.sources.slice(0, 4).map((s: { title?: string; year?: number | string; doi?: string }) => `${s.title || "Scholarly Source"} (${s.year || "2025"}). DOI: ${s.doi || "10.1000/scholar"}`)
+      ? record.evidenceLedger.sources
+          .slice(0, 6)
+          .filter((s: { title?: string }) => !!s.title)
+          .map((s: { title?: string; year?: number | string; doi?: string }) => `${s.title}${s.year ? ` (${s.year})` : ""}${s.doi ? `. DOI: ${s.doi}` : ""}`)
       : [];
 
     let generatedSlides: SlidePresentationItem[] | null = null;
     let generatedBy: "ai-gateway" | "heuristic-fallback" = "heuristic-fallback";
+    let sourceCorpus = "";
 
     // 1. Multi-Portal & Knowledge Vault Evidence Retrieval via scholarBrain
     const rawVaultSources = Array.isArray(record.evidenceLedger?.sources) ? record.evidenceLedger.sources : [];
@@ -367,53 +407,71 @@ router.post(
 
     if (candidates.length > 0) {
       try {
-        const systemPrompt = `You are an elite Academic Conference Slide Architect and Presentation Synthesizer.
-Synthesize the provided academic research project into a high-impact, 16:9 presentation slide deck following the 6 standard academic presentation beats:
-1. Title: Project title, authors/affiliation, context, and duration.
-2. Problem & Literature Gap: Critical deficit in current literature, why existing paradigms fail under empirical scrutiny.
-3. Theoretical & Methodological Framework: Epistemological stance, formal design, triangulated verification pipeline.
-4. Empirical Findings & Benchmarks: Concrete metrics, quantitative comparisons, statistical significance (p < 0.001).
-5. Discussion & Theoretical Implications: Core contributions to knowledge, boundary conditions, future research agenda.
-6. References & Provenance: Grounded citations, verified DOIs, open-science artifact availability.
+        const systemPrompt = `You design presentation decks in the style of Gamma: each slide is a visual card, not a wall of bullets.
+Write a ${requestedSlides}-card deck for the given topic and material.
 
-Rules:
-- Strictly suppress LLM clichés (e.g. "delve", "tapestry", "testament", "underscores", "pivotal").
-- Key points must strictly adhere to the 6x6 bullet rule (maximum 6 words per bullet, maximum 4 bullets per slide).
-- Speaker notes must be scholarly verbatim delivery scripts (60-150 words).
-- Preserve lossless NFC Unicode / IAST diacritics.
-- Output must be strict JSON matching this schema:
+Narrative: open with a title card, establish the problem or question, explain the key ideas and how they work, present the evidence, compare perspectives or options where relevant, and close with implications or a single takeaway.
+
+For every card choose the layout that fits its content and vary layouts across the deck:
+- "title": the opening card.
+- "bento": 3-6 parallel ideas (items with a short title and one-line body).
+- "stats": 1-4 headline figures (stats with value, label, optional detail). ONLY use figures that appear in the provided material. Never invent numbers, percentages, p-values or sample sizes.
+- "timeline": 3-5 ordered steps or phases (items).
+- "comparison": two sides, options or perspectives (columns: exactly 2, each with title and 2-5 points).
+- "list": 2-5 key points beside the headline (items).
+- "quote": a real quotation from the material (quote.text, quote.attribution). Never invent quotations.
+- "split": a case or example with 2-4 items.
+- "statement": one idea, centred (headline + optional lede).
+
+Writing rules:
+- Headlines are short assertions (max 12 words) that state the point of the card.
+- Item titles max 8 words; bodies max 20 words. No filler, no clichés ("delve", "tapestry", "testament", "underscores", "pivotal").
+- Cite only sources present in the material. If the material lacks evidence, write the card as a clear prompt for the author instead of inventing it.
+- Speaker notes: 40-120 words, spoken English.
+- Preserve NFC Unicode / diacritics.
+
+Output strict JSON only:
 {
   "deckTitle": "string",
-  "narrativeFramework": "string",
-  "targetAudience": "string",
   "slides": [
     {
       "slideNumber": 1,
-      "type": "title",
-      "title": "string",
-      "subtitle": "string",
-      "visualFocus": "string",
-      "keyPoints": ["string", "string"],
+      "type": "title" | "problem_gap" | "framework_methodology" | "empirical_findings" | "discussion_implications" | "references",
+      "title": "card headline",
+      "subtitle": "one-line lede",
+      "keyPoints": ["short plain-text summary of the card's points"],
       "speakerNotes": "string",
       "targetDurationSeconds": 90,
-      "layoutType": "bullets",
-      "metricValue": "string or null",
-      "metricLabel": "string or null"
+      "card": {
+        "layout": "${GAMMA_LAYOUT_IDS.join('" | "')}",
+        "eyebrow": "2-3 word section label",
+        "lede": "string or null",
+        "items": [{ "title": "string", "body": "string" }],
+        "stats": [{ "value": "string", "label": "string", "detail": "source or context" }],
+        "columns": [{ "title": "string", "points": ["string"] }, { "title": "string", "points": ["string"] }],
+        "quote": { "text": "string", "attribution": "string" },
+        "takeaway": "string or null"
+      }
     }
   ]
-}
-Output ONLY valid JSON. Zero markdown codeblocks, zero conversational filler.`;
+}`;
 
         const evidenceSummary = evidence.map((e) => `${e.citationToken}: ${e.title} (${e.year || "n.d."})`).join("; ");
 
-        const userPrompt = `Project Title: ${projectTitle}
-Duration: ${durationMinutes} minutes
-Target Audience: ${targetAudience}
-Narrative Framework: ${narrativeFramework}
-Research Questions: ${JSON.stringify(researchQuestions)}
-Methodology: ${methodologyText}
-Key Results: ${empiricalNotes}
-Verified Sources & Evidence: ${evidenceSummary || JSON.stringify(sourcesSummary)}`;
+        const userPrompt = [
+          `Topic: ${projectTitle}`,
+          `Audience: ${targetAudience}`,
+          `Duration: ${durationMinutes} minutes`,
+          `Narrative framework: ${narrativeFramework}`,
+          researchQuestions.length ? `Research questions: ${JSON.stringify(researchQuestions)}` : "",
+          methodologyText ? `Methodology: ${methodologyText}` : "",
+          empiricalNotes ? `Key results: ${empiricalNotes}` : "",
+          evidenceSummary || sourcesSummary.length ? `Verified sources: ${evidenceSummary || sourcesSummary.join("; ")}` : "",
+          userText ? `Author's material:\n${userText}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n");
+        sourceCorpus = userPrompt;
 
         const brainRes = await scholarBrain.complete({
           req,
@@ -441,6 +499,7 @@ Verified Sources & Evidence: ${evidenceSummary || JSON.stringify(sourcesSummary)
             layoutType: (s.layoutType as SlidePresentationItem["layoutType"]) || "bullets",
             metricValue: (s.metricValue as string) || undefined,
             metricLabel: (s.metricLabel as string) || undefined,
+            card: parseGammaCard(s.card, sourceCorpus),
           }));
           generatedBy = "ai-gateway";
         }
@@ -481,13 +540,13 @@ Verified Sources & Evidence: ${evidenceSummary || JSON.stringify(sourcesSummary)
         title: projectTitle,
         topic: projectTitle,
         framework: narrativeFramework,
-        theme_id: "sand-academic",
+        theme_id: "scholar-paper",
         slides: (formattedDeck.slides as unknown[]),
         source_module: "presentation-studio",
         created_at: now,
         updated_at: now,
       };
-      memoryDecks.set(deckId, presentationRow);
+      setMemoryDeck(deckId, presentationRow);
 
       const table = getDecksTable();
       if (table) {
@@ -748,7 +807,7 @@ router.put(
       updated_at: now,
     };
 
-    memoryDecks.set(deckId, presentationRow);
+    setMemoryDeck(deckId, presentationRow);
 
     const table = getDecksTable();
     if (table) {

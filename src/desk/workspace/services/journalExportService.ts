@@ -102,9 +102,11 @@ export function downloadBlob(blob: Blob, filename: string): void {
   a.download = filename;
   window.document.body.appendChild(a);
   a.click();
+  // Capture URL now: the timer may fire after the page (or a test's DOM) is gone.
+  const urlApi = window.URL;
   setTimeout(() => {
-    window.document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    a.remove();
+    urlApi.revokeObjectURL(url);
   }, 100);
 }
 

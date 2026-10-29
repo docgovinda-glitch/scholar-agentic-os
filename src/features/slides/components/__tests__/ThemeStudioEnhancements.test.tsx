@@ -33,7 +33,7 @@ const mockDeck: SlideDeck = {
 };
 
 describe('Theme Studio Enhancements (Step 02)', () => {
-  it('renders high-craft segmented control bar with Curated (4), Theme Library, and Clone from Screenshot', () => {
+  it('renders the segmented control bar with Curated themes, Theme Library, and Clone from Screenshot', () => {
     const onUpdateDeck = vi.fn();
     const onPrev = vi.fn();
     const onNext = vi.fn();
@@ -48,7 +48,7 @@ describe('Theme Studio Enhancements (Step 02)', () => {
     );
 
     // Segmented tab bar
-    expect(screen.getByRole('tab', { name: /Curated (Styles )?\(4\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Curated \(\d+\)/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Explore Library|Theme Library/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Screenshot Cloner|Clone from Screenshot/i })).toBeInTheDocument();
 

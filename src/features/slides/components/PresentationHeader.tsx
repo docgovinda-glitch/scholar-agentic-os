@@ -1,20 +1,20 @@
 import React from 'react';
-import { ArrowLeft, Sparkles, PanelLeftOpen } from 'lucide-react';
+import { ArrowLeft, MessagesSquare, PanelLeftOpen, Play, Sparkles } from 'lucide-react';
 import type { PresentationStudioStep } from '../types/slides';
-import ScholarCoreLogo from '../../../components/ScholarCoreLogo';
 import { WorkspaceAutosaveBadge } from '../../../components/ui/WorkspaceAutosaveBadge';
 
 export interface StepItem {
   id: PresentationStudioStep;
+  number: string;
+  name: string;
   label: string;
-  icon: string;
 }
 
 export const PRESENTATION_STEPS: readonly StepItem[] = [
-  { id: 'understand', label: '01 Understand', icon: '⚡' },
-  { id: 'design', label: '02 Design', icon: '🎨' },
-  { id: 'studio', label: '03 Edit Slides', icon: '✏️' },
-  { id: 'delivery', label: '04 Present', icon: '🖥️' },
+  { id: 'understand', number: '01', name: 'Understand', label: '01 Understand' },
+  { id: 'design', number: '02', name: 'Design', label: '02 Design' },
+  { id: 'studio', number: '03', name: 'Edit Slides', label: '03 Edit Slides' },
+  { id: 'delivery', number: '04', name: 'Present', label: '04 Present' },
 ] as const;
 
 export interface PresentationHeaderProps {
@@ -36,6 +36,10 @@ export interface PresentationHeaderProps {
   className?: string;
 }
 
+/**
+ * The single top bar of Presentation Studio: back, editable deck title,
+ * the four-step switcher, save state and the assistant toggles.
+ */
 export default function PresentationHeader({
   title,
   onTitleChange,
@@ -55,171 +59,132 @@ export default function PresentationHeader({
   className = '',
 }: PresentationHeaderProps) {
   const handleBack = () => {
-    if (onNavigateBack) {
-      onNavigateBack();
-    } else if (typeof window !== 'undefined') {
-      window.location.href = '/projects';
-    }
+    if (onNavigateBack) onNavigateBack();
+    else if (typeof window !== 'undefined') window.location.href = '/projects';
   };
+
+  const ghostBtn =
+    'inline-flex items-center gap-1.5 h-8 rounded-full px-3 text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-900/[0.05] dark:text-neutral-400 dark:hover:text-neutral-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer';
 
   return (
     <header
-      className={`h-14 border-b border-neutral-200/80 dark:border-white/10 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between gap-4 shrink-0 z-30 ${className}`}
+      className={`h-14 shrink-0 z-30 border-b border-neutral-900/[0.06] dark:border-white/[0.07] bg-[#F8F7F4]/85 dark:bg-[#171717]/85 backdrop-blur-xl px-3 sm:px-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 ${className}`}
       data-testid="presentation-header"
     >
-      {/* Left: Back button & Module Identity */}
-      <div className="flex items-center gap-3 min-w-0">
-        {/* Sidebar Expand Button (when collapsed) */}
+      {/* Left: navigation + title */}
+      <div className="flex items-center gap-1.5 min-w-0">
         {isSidebarCollapsed && onToggleSidebar && (
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="p-1.5 -ml-1 text-neutral-500 hover:text-neutral-900 dark:hover:text-white rounded-lg hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer shrink-0"
-            title="Expand sidebar (»)"
+            className={`${ghostBtn} px-2`}
+            title="Expand sidebar"
             aria-label="Expand sidebar"
             data-testid="expand-sidebar-btn"
           >
             <PanelLeftOpen className="w-4 h-4" />
           </button>
         )}
-
-        {/* Apple/Airbnb-Style Back Button */}
-        <button
-          type="button"
-          onClick={handleBack}
-          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60 dark:text-neutral-400 dark:hover:text-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer shrink-0"
-          aria-label="Back to Workspace"
-          title="Back to Workspace"
-        >
-          <ArrowLeft className="w-3.5 h-3.5 stroke-[2]" />
-          <span className="text-xs font-semibold pr-0.5">Workspace</span>
+        <button type="button" onClick={handleBack} className={`${ghostBtn} pl-2 shrink-0`} aria-label="Back to Workspace" title="Back to Workspace">
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span className="hidden lg:inline">Workspace</span>
+          <span className="sr-only lg:hidden">Workspace</span>
         </button>
-
-        <div className="h-4 w-px bg-neutral-200 dark:bg-white/10 shrink-0" />
-
-        {/* Scholar Core Logo & Module Identity */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-6 h-6 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center flex-shrink-0 shadow-xs">
-            <ScholarCoreLogo size="sm" className="text-white dark:text-neutral-900" />
-          </div>
-
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200 whitespace-nowrap">
-                SCHOLAR SLIDES ·
-              </span>
-              <span className="sr-only">Presentation Studio</span>
-              {!hideAutosaveBadge && (
-                <WorkspaceAutosaveBadge
-                  status={autosaveStatus}
-                  version={projectVersion}
-                  lastSavedTime={lastSavedTime || undefined}
-                />
-              )}
-            </div>
-
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => onTitleChange(e.target.value)}
-                aria-label="Presentation Title"
-                className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-neutral-700 focus:border-neutral-900 dark:focus:border-white focus:outline-none transition-colors max-w-xs sm:max-w-md truncate"
-                placeholder="MN6094NI Developing Breakthrough Leadership"
-              />
-            </div>
-          </div>
-        </div>
+        <span className="h-4 w-px bg-neutral-900/10 dark:bg-white/10 shrink-0 mx-1" aria-hidden />
+        <span className="sr-only">Presentation Studio</span>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          aria-label="Presentation Title"
+          placeholder="Untitled presentation"
+          className="min-w-0 flex-1 max-w-[360px] h-8 px-2 rounded-lg bg-transparent text-sm font-semibold text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 truncate hover:bg-neutral-900/[0.04] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-[#212121] focus:outline-none focus:ring-1 focus:ring-neutral-900/15 dark:focus:ring-white/15 transition-colors"
+        />
       </div>
 
-      {/* Center: 4-Step Stepper Navigation */}
-      <nav
-        aria-label="Presentation Studio Workflow"
-        className="flex items-center bg-neutral-100 dark:bg-white/5 p-1 rounded-xl gap-1 overflow-x-auto shrink-0"
-      >
+      {/* Centre: four-step switcher */}
+      <nav aria-label="Presentation Studio Workflow" className="flex items-center gap-0.5 p-1 rounded-full bg-neutral-900/[0.05] dark:bg-white/[0.06]">
         {PRESENTATION_STEPS.map((step) => {
           const isCurrent =
             currentStep === step.id ||
-            (step.id === 'understand' && (currentStep as string) === 'scaffolding') ||
-            (step.id === 'design' && (currentStep as string) === 'themes');
-
+            (step.id === 'understand' && currentStep === 'scaffolding') ||
+            (step.id === 'design' && currentStep === 'themes');
           return (
             <button
               key={step.id}
               type="button"
               onClick={() => onStepChange(step.id)}
               aria-label={step.label}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+              aria-current={isCurrent ? 'step' : undefined}
+              className={`h-7 px-3 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
                 isCurrent
-                  ? 'bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white shadow-xs'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+                  ? 'bg-white text-neutral-900 shadow-[0_1px_2px_rgba(23,23,23,0.08)] dark:bg-[#2A2A2A] dark:text-white'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
               }`}
             >
-              <span>{step.icon}</span>
-              <span>{step.label}</span>
+              <span className={`tabular-nums text-[10px] ${isCurrent ? 'text-neutral-400 dark:text-neutral-500' : 'opacity-60'}`}>{step.number}</span>
+              <span className="hidden md:inline">{step.name}</span>
             </button>
           );
         })}
       </nav>
 
-      {/* Right: Presentation Controls & Ask Scholar (Zero Close exit cross) */}
-      <div className="flex items-center gap-2 shrink-0">
-        {/* Start Presentation Button: Only visible in Step 04 ("04 Present") */}
-        {currentStep === 'delivery' && onStartPresentation && (
-          <button
-            type="button"
-            data-testid="present-fullscreen-btn"
-            onClick={onStartPresentation}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-          >
-            <span>⤢</span>
-            <span>Start Presentation (F)</span>
-          </button>
-        )}
-
-        {/* Learned ML Style Compliance Badge (OT-22 presentation_slides) */}
+      {/* Right: status + assistants */}
+      <div className="flex items-center justify-end gap-1.5 min-w-0">
         <div
           data-testid="presentation-style-badge"
-          className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium border border-neutral-200/80 dark:border-white/10 bg-neutral-50 dark:bg-neutral-800/60 text-neutral-700 dark:text-neutral-300 shadow-xs"
-          title="Style Engine: Conversational Academic (Assertion-Evidence 6x6)"
+          className="hidden 2xl:inline-flex items-center gap-1.5 px-2.5 h-7 rounded-full text-[11px] text-neutral-500 dark:text-neutral-400"
+          title="Writing style: conversational academic, at most 6 points of 6 words"
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-          <span className="font-semibold text-neutral-900 dark:text-white">OT-22 Style:</span>
+          <span className="sr-only">OT-22 Style:</span>
           <span>Conversational Academic</span>
-          <span className="text-[10px] font-mono text-neutral-400">· 6x6 Density</span>
+          <span className="text-neutral-400">· 6x6 Density</span>
         </div>
-
-        {/* Audience Q&A Simulator Button */}
+        {!hideAutosaveBadge && (
+          <WorkspaceAutosaveBadge
+            status={autosaveStatus}
+            version={projectVersion}
+            lastSavedTime={lastSavedTime || undefined}
+            className="hidden md:inline-flex whitespace-nowrap shrink-0"
+          />
+        )}
         {onOpenQaSimulator && (
           <button
             type="button"
             onClick={onOpenQaSimulator}
             data-testid="open-qa-simulator-btn"
-            className="rounded-full px-3 py-1.5 text-xs font-semibold border border-purple-500/30 bg-purple-50 hover:bg-purple-100 dark:border-purple-500/20 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 text-purple-900 dark:text-purple-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            title="Simulate Audience Q&A & Defense Questions"
+            className={ghostBtn}
+            title="Rehearse audience questions"
             aria-label="Simulate Audience Q&A"
           >
-            <span>🛡️</span>
-            <span className="hidden md:inline">Audience Q&amp;A</span>
+            <MessagesSquare className="w-3.5 h-3.5" />
+            <span className="hidden 2xl:inline">Q&amp;A</span>
           </button>
         )}
-
-        {/* Ask Scholar Drawer Toggle Pill */}
         <button
           type="button"
           onClick={onToggleAskScholar}
           data-testid="toggle-ask-scholar-btn"
-          className={`rounded-full px-3.5 py-1.5 text-xs font-medium border border-neutral-200/80 bg-white hover:bg-neutral-50 dark:border-white/10 dark:bg-[#1C1C1E] dark:hover:bg-neutral-800 transition-colors flex items-center gap-1.5 cursor-pointer ${
-            isAskScholarOpen
-              ? 'ring-2 ring-blue-500/20 font-bold border-blue-500/40 text-neutral-900 dark:text-white'
-              : 'text-neutral-700 dark:text-neutral-300'
-          }`}
-          title="Toggle Ask Scholar drawer"
+          aria-pressed={isAskScholarOpen}
+          className={`${ghostBtn} ${isAskScholarOpen ? 'bg-neutral-900/[0.06] text-neutral-900 dark:bg-white/[0.08] dark:text-white' : ''}`}
+          title="Ask Scholar"
           aria-label="Toggle Ask Scholar"
         >
-          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-          <span className="hidden sm:inline">Ask Scholar</span>
+          <Sparkles className="w-3.5 h-3.5" />
+          <span className="hidden 2xl:inline whitespace-nowrap">Ask Scholar</span>
         </button>
+        {currentStep === 'delivery' && onStartPresentation && (
+          <button
+            type="button"
+            data-testid="present-fullscreen-btn"
+            onClick={onStartPresentation}
+            className="inline-flex items-center gap-1.5 h-8 rounded-full pl-3 pr-3.5 text-xs font-semibold bg-[#171717] text-[#F8F7F4] dark:bg-[#F8F7F4] dark:text-[#171717] hover:opacity-90 transition-opacity cursor-pointer shrink-0"
+          >
+            <Play className="w-3 h-3 fill-current" />
+            <span aria-hidden>Present</span>
+            <span className="sr-only">Start Presentation (F)</span>
+          </button>
+        )}
       </div>
     </header>
   );

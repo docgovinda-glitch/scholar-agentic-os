@@ -19,3 +19,7 @@ users.json
 data/
 supabase/.temp/
 supabase/.branches/
+
+# Claude Code local preferences
+.claude/settings.local.json
+artifacts/
