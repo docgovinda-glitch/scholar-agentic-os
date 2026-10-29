@@ -108,7 +108,7 @@ export interface VerifyKeyResult {
   note?: string;
 }
 
-/** User BYOK keys are verified directly in the browser and are never sent to the Scholar server. */
+/** User BYOK keys are verified directly in the browser. They reach the Scholar server only as a per-request header on AI routes (see routeUsesClientAi in desk/api/client.ts). */
 export const verifyProviderKey = (providerId: string, apiKey: string, baseUrlOverride?: string): Promise<VerifyKeyResult> =>
   clientVerifyProviderKey(providerId, apiKey, baseUrlOverride);
 
