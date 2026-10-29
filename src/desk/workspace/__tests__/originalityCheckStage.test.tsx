@@ -93,8 +93,10 @@ describe("Stage 19: Originality & Academic Integrity Check (OriginalityCheckStag
     expect(screen.getByText(/< 15% Overlap/i)).toBeInTheDocument();
 
     // Initial action prompt
-    expect(screen.getByText(/Ready for Academic Originality & Overlap Verification/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Begin Originality Scan/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: /AI Phrasing Review/i })).toBeInTheDocument();
+    // Honest about what it is: an AI read, not a plagiarism check.
+    expect(screen.getAllByText(/not a plagiarism check/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /Start AI Phrasing Review/i })).toBeInTheDocument();
   });
 
   it("triggers originality scan agent, streams results, renders HUD, and DOES NOT auto-advance", async () => {
@@ -133,17 +135,18 @@ describe("Stage 19: Originality & Academic Integrity Check (OriginalityCheckStag
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Begin Originality Scan/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Start AI Phrasing Review/i }));
 
     // Await scan completion
     await waitFor(() => {
-      expect(screen.getByText(/^Originality Score$/i)).toBeInTheDocument();
+      expect(screen.getByText(/^AI-estimated originality$/i)).toBeInTheDocument();
     });
 
     // Verify HUD metrics
     expect(screen.getByText("95%")).toBeInTheDocument();
-    expect(screen.getByText(/Publication Safe/i)).toBeInTheDocument();
-    expect(screen.getByText(/Below 15% tolerance/i)).toBeInTheDocument();
+    expect(screen.getByText(/Few phrasing concerns/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Publication Safe/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Journal guideline: under 15% similarity/i)).toBeInTheDocument();
 
     // Verify flag rendered
     expect(screen.getByText(/Conventional Academic Phrasing/i)).toBeInTheDocument();
@@ -154,7 +157,9 @@ describe("Stage 19: Originality & Academic Integrity Check (OriginalityCheckStag
     expect(onAdvanceMock).not.toHaveBeenCalled();
   });
 
-  it("engages local fallback scanning engine when stream fails and generates valid report", async () => {
+  it("shows no report and says nothing was generated when the AI review fails", async () => {
+    // Rewritten 2026-10-29: this used to assert a hardcoded "96% unique"
+    // fallback report. A failed review must not produce any result.
     (authedStreamFetch as any).mockRejectedValue(new Error("Network drop during originality check stream"));
 
     render(
@@ -165,15 +170,14 @@ describe("Stage 19: Originality & Academic Integrity Check (OriginalityCheckStag
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Begin Originality Scan/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Start AI Phrasing Review/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/^Originality Score$/i)).toBeInTheDocument();
+      expect(screen.getByText(/AI phrasing review unavailable: nothing was generated/i)).toBeInTheDocument();
     });
-
-    expect(screen.getByText("96%")).toBeInTheDocument();
-    expect(screen.getByText(/Standard Mathematical Formulation Overlap/i)).toBeInTheDocument();
-    expect(screen.getByText(/IEEE Transactions on Information Theory/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^AI-estimated originality$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("96%")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Standard Mathematical Formulation Overlap/i)).not.toBeInTheDocument();
   });
 
   it("filters flags by tab (All, Unresolved, Resolved) and searches by query", async () => {
@@ -212,7 +216,7 @@ describe("Stage 19: Originality & Academic Integrity Check (OriginalityCheckStag
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Begin Originality Scan/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Start AI Phrasing Review/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/Alpha Overlap Issue/i)).toBeInTheDocument();
@@ -255,7 +259,7 @@ describe("Stage 19: Originality & Academic Integrity Check (OriginalityCheckStag
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Begin Originality Scan/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Start AI Phrasing Review/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/Standard Formulation Overlap/i)).toBeInTheDocument();
@@ -307,15 +311,15 @@ describe("Stage 19: Originality & Academic Integrity Check (OriginalityCheckStag
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Begin Originality Scan/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Start AI Phrasing Review/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/^Originality Score$/i)).toBeInTheDocument();
+      expect(screen.getByText(/^AI-estimated originality$/i)).toBeInTheDocument();
     });
 
     // Click deliberate advance button
     const advanceBtn = screen.getByRole("button", {
-      name: /Confirm Originality Attestation & Proceed to Draft Preview/i,
+      name: /Proceed to Draft Preview/i,
     });
     fireEvent.click(advanceBtn);
 
