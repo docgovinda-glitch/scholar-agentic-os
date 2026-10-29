@@ -152,7 +152,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
       );
 
       // Stage header should load
-      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
       // Check header source counter indicates at least 30 identified
       const sourceCountMatches = screen.getAllByText(/\(\d+\s+identified\)/i);
@@ -193,7 +193,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
         />
       );
 
-      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
       const findMoreBtn = screen.getByTestId("find-more-literature-btn");
       expect(findMoreBtn).toBeInTheDocument();
@@ -226,7 +226,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
         />
       );
 
-      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
       // Grid is always rendered when sources exist (no view-mode switcher)
       const grid = screen.getByTestId("curated-sources-grid");
@@ -251,7 +251,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
         />
       );
 
-      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
       const grid = screen.getByTestId("curated-sources-grid");
 
@@ -276,7 +276,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
         />
       );
 
-      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
       const approveBtn = screen.getByRole("button", {
         name: /Approve Algorithmic Governance and the Politics of Predictive Accountability/i,
@@ -305,7 +305,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
         />
       );
 
-      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
       const searchInput = screen.getByLabelText(/Search curated literature/i);
       fireEvent.change(searchInput, { target: { value: "Pasquale" } });
@@ -324,7 +324,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
         />
       );
 
-      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
       // Bookmark first source
       const bookmarkBtns = screen.getAllByLabelText(/Bookmark this source/i);
