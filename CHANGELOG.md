@@ -5,6 +5,18 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-10-29
+
+### Presentation Studio (OT-22): Gamma-style Slides & Keynotes with native PowerPoint export
+- **Shared card engine (`src/features/slides/gamma/`)**: one layout engine for the editor, theme previews, presenter, PDF print and `.pptx` export. Nine card layouts (title, bento grid, big numbers, timeline, comparison, key points, image + text, quote, statement) computed on a 1280×720 canvas; switching layout reflows the same content.
+- **Native `.pptx` export**: editable text, speaker notes and embedded images, drawn from the same geometry as the web canvas (pptxgenjs, lazy-loaded). Added to Edit Slides and the Present export menu, alongside PDF (one card per page), Markdown and JSON.
+- **Themes**: 8 curated themes led by scientific monochrome Paper (`#F8F7F4`) and Ink (`#171717`); no pure black. The theme gallery previews each theme with the user's own slides; the 100-design library, screenshot cloner and custom accents still apply.
+- **Editor**: thumbnail rail (reorder, duplicate, delete), inline editing on the card, theme menu, add/remove points, device image upload (CSP-safe data URLs), speaker notes, AI rewrite.
+- **Presenter**: full-screen audience/presenter modes with notes, next card, timer and keyboard control.
+- **Single studio header** replaces the two overlapping header bars.
+- **No invented evidence**: offline composer builds cards from the user's own text and only uses figures present in it; topic-only decks are labelled scaffolds. `POST /api/projects/:id/presentation/generate-deck` now uses the requested topic, text, slide count and audience, returns zod-validated structured cards, and drops figures not found in the source material. Removed the fabricated fallback deck and defaults; the copilot "big metric" action no longer makes up numbers.
+- Docs: rewrote `docs/presentation-studio.md`.
+
 ## [Unreleased] - 2026-10-28
 
 ### Forensic Hardening Batches 1–4, Central `scholarBrain` Orchestrator & 5-Mode Journal Studio
