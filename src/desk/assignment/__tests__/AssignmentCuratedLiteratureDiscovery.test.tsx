@@ -30,6 +30,23 @@ class UnauthenticatedError extends Error {
   }
 }
 
+// Live literature search is a network call; these UI tests stand in for it
+// with fixture sources, so the grid/filter/approve behaviour is still tested.
+// (The app itself no longer substitutes catalog entries when search fails.)
+vi.mock("../services/realScholarlyDiscoveryService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../services/realScholarlyDiscoveryService")>();
+  const fixtures = await import("../services/scholarlyDiscoveryService");
+  return {
+    ...actual,
+    discoverRealScholarlySourcesFromServer: vi.fn(async (question: string, style = "apa7") =>
+      fixtures.generateCuratedLiteratureSources(question, style)
+    ),
+    fetchMoreRealSources: vi.fn(async (existing: Parameters<typeof fixtures.fetchMoreLiteratureSources>[0], question: string, n = 10) =>
+      fixtures.fetchMoreLiteratureSources(existing, question, n)
+    ),
+  };
+});
+
 vi.mock("../../api", () => ({
   UnauthenticatedError,
   getProject: (...a: unknown[]) => getProject(...a),
@@ -68,6 +85,8 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
       hasDocument: false,
       answers: {
         assignment_question: "Critically evaluate algorithmic governance, procedural due process, and predictive accountability in administrative public decision-making.",
+        // Fixture: sources a previous live search saved to this project.
+        assignment_sources: JSON.stringify(generateCuratedLiteratureSources("Critically evaluate algorithmic governance, procedural due process, and predictive accountability in administrative public decision-making.", "apa7")),
         word_count: 2500,
         citation_style: "apa7",
         academic_level: "postgraduate",

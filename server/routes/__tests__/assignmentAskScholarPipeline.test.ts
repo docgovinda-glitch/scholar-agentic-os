@@ -283,6 +283,34 @@ Both architectures scale effectively [1, 2].
     });
   });
 
+  describe("1b. No invented fallback sources (POST /research)", () => {
+    it("returns and saves an empty list when live discovery finds nothing", async () => {
+      const { discoverMultiPortalSources } = await import("../../src/discovery/discovery.ts");
+      vi.mocked(discoverMultiPortalSources).mockResolvedValueOnce([]);
+      const projectId = await createCourseworkProject();
+
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/assignment/research`)
+        .send({ question: "An obscure question no index can answer", citationStyle: "apa7" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.sources).toEqual([]);
+    });
+
+    it("returns an empty list when live discovery errors", async () => {
+      const { discoverMultiPortalSources } = await import("../../src/discovery/discovery.ts");
+      vi.mocked(discoverMultiPortalSources).mockRejectedValueOnce(new Error("network down"));
+      const projectId = await createCourseworkProject();
+
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/assignment/research`)
+        .send({ question: "Critically evaluate algorithmic governance", citationStyle: "apa7" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.sources).toEqual([]);
+    });
+  });
+
   describe("4. Citation Grounding (POST /citations-ground)", () => {
     it("returns verified multi-portal scholarly sources with deterministic citations", async () => {
       const projectId = await createCourseworkProject("apa7");

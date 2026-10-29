@@ -11,6 +11,9 @@ import {
   calculateScholarlyRelevance,
 } from "../services/scholarlyDiscoveryService";
 import type { DiscoveredSource } from "../types";
+import { generateCuratedLiteratureSources as seedSourcesFixture } from "../services/scholarlyDiscoveryService";
+const seedSources = (question: string) => seedSourcesFixture(question, "apa7");
+
 
 const getProject = vi.fn();
 const getDocument = vi.fn();
@@ -26,6 +29,23 @@ class UnauthenticatedError extends Error {
     this.name = "UnauthenticatedError";
   }
 }
+
+// Live literature search is a network call; these UI tests stand in for it
+// with fixture sources, so the grid/filter/approve behaviour is still tested.
+// (The app itself no longer substitutes catalog entries when search fails.)
+vi.mock("../services/realScholarlyDiscoveryService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../services/realScholarlyDiscoveryService")>();
+  const fixtures = await import("../services/scholarlyDiscoveryService");
+  return {
+    ...actual,
+    discoverRealScholarlySourcesFromServer: vi.fn(async (question: string, style = "apa7") =>
+      fixtures.generateCuratedLiteratureSources(question, style)
+    ),
+    fetchMoreRealSources: vi.fn(async (existing: Parameters<typeof fixtures.fetchMoreLiteratureSources>[0], question: string, n = 10) =>
+      fixtures.fetchMoreLiteratureSources(existing, question, n)
+    ),
+  };
+});
 
 vi.mock("../../api", () => ({
   UnauthenticatedError,
@@ -71,6 +91,10 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
       hasDocument: false,
       answers: {
         assignment_question: ukraineQuestion,
+
+        // Fixture: sources a previous live search saved to this project.
+
+        assignment_sources: JSON.stringify(seedSources(ukraineQuestion)),
         word_count: 2500,
         citation_style: "apa7",
         academic_level: "postgraduate",
@@ -199,7 +223,7 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
         />
       );
 
-      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
       // Verify standardised grid is rendered
       const grid = await screen.findByTestId("curated-sources-grid");
@@ -219,7 +243,7 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
         />
       );
 
-      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
       // Open advanced filters drawer
       const filterToggle = screen.getByRole("button", { name: /Filters/i });
@@ -243,7 +267,7 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
         />
       );
 
-      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
       // Open advanced filters drawer
       const filterToggle = screen.getByRole("button", { name: /Filters/i });
