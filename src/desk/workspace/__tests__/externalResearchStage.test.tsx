@@ -300,12 +300,14 @@ describe("Stage 11: External Research (ExternalResearchStage)", () => {
       // CRITICAL: Must NOT auto-advance!
       expect(onAdvance).not.toHaveBeenCalled();
       expect(
-        screen.getByText(/Crawl successful! Discovered 1 external papers\. Review and prune before triage\./i)
+        screen.getByText(/Found 1 records\. Review and prune before triage\./i)
       ).toBeInTheDocument();
     });
   });
 
-  it("handles streaming failure gracefully with fallback corpus synthesis", async () => {
+  it("adds nothing and says so when the literature search fails", async () => {
+    // Rewritten 2026-10-29: this used to assert invented fallback papers
+    // ("Formal Bounds on Quorum Intersections…") being saved on failure.
     (api.authedStreamFetch as any).mockRejectedValue(new Error("External API Timeout"));
 
     render(
@@ -322,16 +324,15 @@ describe("Stage 11: External Research (ExternalResearchStage)", () => {
       />
     );
 
-    const crawlBtn = screen.getByRole("button", { name: /Launch Web Crawler Agent/i });
-    fireEvent.click(crawlBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Launch Web Crawler Agent/i }));
 
     await waitFor(() => {
-      expect(api.saveIntakeAnswers).toHaveBeenCalled();
-      expect(screen.getByText(/Local corpus synthesis complete/i)).toBeInTheDocument();
-      expect(
-        screen.getByText(/Formal Bounds on Quorum Intersections for Partition-Resilient State Machine Replication/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Literature search unavailable: nothing was added/i)).toBeInTheDocument();
     });
+    expect(api.saveIntakeAnswers).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText(/Formal Bounds on Quorum Intersections for Partition-Resilient State Machine Replication/i)
+    ).not.toBeInTheDocument();
   });
 
   it("locks discovered sources and advances to Stage 12 (source_approval_external) on user action", async () => {
