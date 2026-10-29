@@ -72,11 +72,20 @@ jobs:
           fi
 
       - name: Wait until the new commit is live
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           want="${GITHUB_SHA::7}"
           for i in $(seq 1 60); do
             live=$(curl -s --max-time 60 https://scholar.gkshah.com.np/api/health | jq -r '.commit // empty' || true)
             if [ "$live" = "$want" ]; then echo "Live commit $live"; exit 0; fi
+            # Render builds the newest main, so a later merge can replace this
+            # commit before it is ever reported. A live commit that already
+            # contains this one also proves this change is deployed.
+            if [ -n "$live" ]; then
+              rel=$(gh api "repos/$GITHUB_REPOSITORY/compare/$GITHUB_SHA...$live" --jq .status 2>/dev/null || true)
+              if [ "$rel" = "ahead" ]; then echo "Live commit $live already contains $want"; exit 0; fi
+            fi
             echo "live=${live:-unknown} want=$want (attempt $i)"; sleep 20
           done
           echo "::error::Render did not report commit $want within 20 minutes"
