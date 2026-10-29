@@ -103,3 +103,20 @@ describe("POST /api/projects/:id/agent/external-research (P0-2)", () => {
     expect(doneEvent(res.text)).toBeNull();
   });
 });
+
+describe("POST /api/projects/:id/agent/literature (P1-7, retired)", () => {
+  beforeEach(async () => {
+    __resetProjectStoreForTests();
+    vi.clearAllMocks();
+    await createJournalProject();
+  });
+
+  it("no longer exists, so no LLM can be asked to generate sources", async () => {
+    const res = await request(app)
+      .post(`/api/projects/${PROJECT_ID}/agent/literature`)
+      .set("x-ai-provider", "ollama")
+      .send({});
+    expect(res.status).toBe(404);
+    expect(llmCalls).not.toHaveBeenCalled();
+  });
+});
