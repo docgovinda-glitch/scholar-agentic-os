@@ -85,7 +85,7 @@ describe("Hotfix 2 — Database, Storage, RPC, and Edge Function Lockdown (F-02,
       expect(sql).toContain("REVOKE ALL ON TABLE public.project_journal_candidates FROM PUBLIC, anon, authenticated;");
     });
 
-    it("sets all storage buckets private and drops anonymous/client policies on project-files and id-documents (F-03)", () => {
+    it("sets all storage buckets private, drops open project-files policies, and retains id_documents_*_own policies (F-03)", () => {
       expect(sql).toContain("UPDATE storage.buckets");
       expect(sql).toContain("SET public = false");
       for (const policy of [
@@ -93,16 +93,21 @@ describe("Hotfix 2 — Database, Storage, RPC, and Edge Function Lockdown (F-02,
         "project_files_select",
         "project_files_update",
         "project_files_delete",
+      ]) {
+        expect(sql).toContain(`DROP POLICY IF EXISTS "${policy}" ON storage.objects;`);
+      }
+      for (const ownPolicy of [
         "id_documents_insert_own",
         "id_documents_select_own",
         "id_documents_update_own",
         "id_documents_delete_own",
       ]) {
-        expect(sql).toContain(`DROP POLICY IF EXISTS "${policy}" ON storage.objects;`);
+        expect(sql).not.toContain(`DROP POLICY IF EXISTS "${ownPolicy}"`);
       }
     });
 
-    it("revokes PUBLIC, anon, and authenticated EXECUTE on all 6 account-enumeration RPCs and grants only to service_role (F-14)", () => {
+    it("revokes PUBLIC, anon, and authenticated EXECUTE on all 6 account-enumeration RPCs without CREATE OR REPLACE FUNCTION (F-14)", () => {
+      expect(sql).not.toContain("CREATE OR REPLACE FUNCTION");
       for (const fn of [
         "email_for_username",
         "email_for_phone_e164",
@@ -168,7 +173,8 @@ describe("Hotfix 2 — Database, Storage, RPC, and Edge Function Lockdown (F-02,
       expect(JSON.stringify(res.body)).not.toContain("secret.alice@university.edu");
     });
 
-    it("never leaks whether a username exists or its email when password fails", async () => {
+    it("returns the exact same 401 message and executes GoTrue round-trip for both unknown username and wrong password", async () => {
+      let goTrueCalls = 0;
       global.fetch = vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url.includes("/rest/v1/rpc/email_for_username")) {
@@ -178,6 +184,7 @@ describe("Hotfix 2 — Database, Storage, RPC, and Edge Function Lockdown (F-02,
           });
         }
         if (url.includes("/auth/v1/token?grant_type=password")) {
+          goTrueCalls++;
           return new Response(
             JSON.stringify({ error_description: "Invalid login credentials" }),
             { status: 400, headers: { "Content-Type": "application/json" } }
@@ -186,14 +193,43 @@ describe("Hotfix 2 — Database, Storage, RPC, and Edge Function Lockdown (F-02,
         return new Response("{}", { status: 200 });
       }) as typeof fetch;
 
-      const res = await request(app)
+      const resWrongPass = await request(app)
         .post("/api/auth/login")
         .set("User-Agent", "hotfix2-test-login-wrong-pass")
         .send({ identifier: "alice_user", password: "wrong-password" });
 
-      expect(res.status).toBe(401);
-      expect(res.body.success).toBe(false);
-      expect(JSON.stringify(res.body)).not.toContain("secret.alice@university.edu");
+      expect(resWrongPass.status).toBe(401);
+      expect(resWrongPass.body.success).toBe(false);
+      expect(JSON.stringify(resWrongPass.body)).not.toContain("secret.alice@university.edu");
+      expect(goTrueCalls).toBe(1);
+
+      // Now simulate unknown username (RPC returns null)
+      global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/rest/v1/rpc/email_for_username")) {
+          return new Response(JSON.stringify(null), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (url.includes("/auth/v1/token?grant_type=password")) {
+          goTrueCalls++;
+          return new Response(
+            JSON.stringify({ error_description: "Invalid login credentials" }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        return new Response("{}", { status: 200 });
+      }) as typeof fetch;
+
+      const resUnknownUser = await request(app)
+        .post("/api/auth/login")
+        .set("User-Agent", "hotfix2-test-login-unknown-user")
+        .send({ identifier: "ghost_user", password: "wrong-password" });
+
+      expect(resUnknownUser.status).toBe(401);
+      expect(resUnknownUser.body).toEqual(resWrongPass.body);
+      expect(goTrueCalls).toBe(2);
     });
 
     it("enforces Turnstile verification on POST /api/auth/login when CLOUDFLARE_TURNSTILE_SECRET_KEY is set", async () => {
@@ -260,7 +296,7 @@ describe("Hotfix 2 — Database, Storage, RPC, and Edge Function Lockdown (F-02,
     });
   });
 
-  describe("4. request-profile-update Edge Function Lockdown (F-04)", () => {
+  describe("4. request-profile-update Edge Function Lockdown (F-04 / TICKET-SEC-01)", () => {
     const edgeFnPath = path.resolve(
       process.cwd(),
       "supabase/functions/request-profile-update/index.ts"
@@ -269,15 +305,16 @@ describe("Hotfix 2 — Database, Storage, RPC, and Edge Function Lockdown (F-02,
 
     it("never includes verificationKey in any HTTP Response JSON payload", () => {
       const responseMatches = [...edgeFnSource.matchAll(/new Response\(([\s\S]*?)\)/g)];
-      expect(responseMatches.length).toBeGreaterThanOrEqual(3);
+      expect(responseMatches.length).toBeGreaterThanOrEqual(2);
       for (const match of responseMatches) {
         expect(match[1]).not.toContain("verificationKey");
       }
     });
 
-    it("fails closed with HTTP 503 when ADMIN_EMAIL / RESEND_API_KEY is missing or email sending fails", () => {
+    it("returns HTTP 410 Gone (PROFILE_UPDATE_DISABLED) and fails closed with 503 when unconfigured", () => {
+      expect(edgeFnSource).toContain("status: 410");
+      expect(edgeFnSource).toContain("PROFILE_UPDATE_DISABLED");
       expect(edgeFnSource).toContain("status: 503");
-      expect(edgeFnSource).toContain("if (!sent)");
     });
   });
 });

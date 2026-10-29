@@ -64,7 +64,7 @@ export interface AdminInfo {
 }
 
 function mainAdminEmail(): string | null {
-  const email = process.env.MAIN_ADMIN_EMAIL;
+  const email = process.env.MAIN_ADMIN_EMAIL || process.env.ADMIN_EMAIL;
   return email ? email.trim().toLowerCase() : null;
 }
 

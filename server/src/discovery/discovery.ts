@@ -60,6 +60,7 @@ async function callProxy<T>(fn: "arxiv-proxy" | "search-proxy", body: unknown): 
   }
   const res = await fetch(`${config.supabaseUrl.replace(/\/+$/, "")}/functions/v1/${fn}`, {
     method: "POST",
+    signal: AbortSignal.timeout(15_000),
     headers: {
       apikey: config.serviceRoleKey,
       Authorization: `Bearer ${config.serviceRoleKey}`,
@@ -144,7 +145,9 @@ export async function discoverOpenAlexSources(query: string, maxResults = 10): P
 
   let res: Response;
   try {
-    res = await fetch(`https://api.openalex.org/works?${params.toString()}`);
+    res = await fetch(`https://api.openalex.org/works?${params.toString()}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
   } catch (err) {
     throw new Error(`OpenAlex request failed: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -172,6 +175,7 @@ export async function discoverCrossrefSources(query: string, maxResults = 25): P
   let res: Response;
   try {
     res = await fetch(`https://api.crossref.org/works?${params.toString()}`, {
+      signal: AbortSignal.timeout(15_000),
       headers: {
         Accept: "application/json",
         "User-Agent": "ScholarCore/2.0 (mailto:scholar-core@users.noreply.github.com)",
@@ -210,7 +214,9 @@ export async function discoverCrossrefSources(query: string, maxResults = 25): P
 export async function discoverDoajSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {
   let res: Response;
   try {
-    res = await fetch(`https://doaj.org/api/search/articles/${encodeURIComponent(query)}?pageSize=${maxResults}`);
+    res = await fetch(`https://doaj.org/api/search/articles/${encodeURIComponent(query)}?pageSize=${maxResults}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
   } catch (err) {
     throw new Error(`DOAJ request failed: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -243,7 +249,9 @@ export async function discoverDoajSources(query: string, maxResults = 25): Promi
 export async function discoverDataCiteSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {
   let res: Response;
   try {
-    res = await fetch(`https://api.datacite.org/dois?query=${encodeURIComponent(query)}&page[size]=${maxResults}`);
+    res = await fetch(`https://api.datacite.org/dois?query=${encodeURIComponent(query)}&page[size]=${maxResults}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
   } catch (err) {
     throw new Error(`DataCite request failed: ${err instanceof Error ? err.message : String(err)}`);
   }

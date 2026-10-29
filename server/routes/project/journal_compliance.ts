@@ -12,7 +12,7 @@ export function journalComplianceRouter(projectLimit: express.RequestHandler): e
   const router = express.Router({ mergeParams: true });
   const store = getSharedStore();
 
-  router.get("/api/projects/:id/journal-compliance-report", projectLimit, asyncRoute(async (req, res) => {
+  const evaluateJournalCompliance = asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
 
@@ -35,6 +35,9 @@ export function journalComplianceRouter(projectLimit: express.RequestHandler): e
     const report = buildReport(rules, record.document);
     
     res.json({ report });
-  }));
+  });
+
+  router.get("/", projectLimit, evaluateJournalCompliance);
+  router.get("/journal-compliance-report", projectLimit, evaluateJournalCompliance);
   return router;
 }

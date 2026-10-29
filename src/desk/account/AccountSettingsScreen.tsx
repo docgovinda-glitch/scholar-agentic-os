@@ -354,6 +354,12 @@ export default function AccountSettingsScreen({
                           />
                         </div>
                       </div>
+                      <p
+                        data-testid="profile-update-disabled-notice"
+                        className="mt-2.5 text-[11px] text-[color:var(--text-muted)] border-t border-[color:var(--border-subtle)] pt-2"
+                      >
+                        Note: Email and username change requests requiring administrator verification are temporarily paused during a security upgrade (TICKET-SEC-01). You can update your Full Name, Phone Number, Institution, and Academic Profile directly below.
+                      </p>
                     </div>
 
                     {/* Profile Fields Section */}

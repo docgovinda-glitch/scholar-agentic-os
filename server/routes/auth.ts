@@ -1,7 +1,11 @@
+import crypto from "node:crypto";
 import express from "express";
 import { verifyCaptchaToken } from "../src/middleware/captchaVerify.ts";
 import { rateLimit } from "../src/middleware/rateLimit.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
+
+export const UNIFORM_LOGIN_ERROR =
+  "Invalid credentials. Please check your User ID, email, or mobile number and try again.";
 
 export type IdentifierType = "email" | "username" | "phone" | "unknown";
 
@@ -155,13 +159,16 @@ export function registerAuthRoutes(app: express.Express): void {
         );
       }
 
-      if (!resolvedEmail || typeof resolvedEmail !== "string") {
-        return res.status(401).json({
-          success: false,
-          error: "Invalid credentials. Please check your User ID, email, or mobile number and try again.",
-        });
-      }
+      const hasResolvedEmail =
+        typeof resolvedEmail === "string" && resolvedEmail.trim().length > 0;
+      const emailForGoTrue =
+        typeof resolvedEmail === "string" && resolvedEmail.trim().length > 0
+          ? resolvedEmail.trim()
+          : `unregistered.${crypto.randomUUID()}@invalid.local`;
 
+      // Always execute the GoTrue password-grant request even when the identifier
+      // did not resolve to a registered account, equalizing network + hashing timing
+      // and returning the exact same HTTP 401 status and message on every failure path.
       const baseUrl = config.supabaseUrl.replace(/\/+$/, "");
       const tokenRes = await fetch(`${baseUrl}/auth/v1/token?grant_type=password`, {
         method: "POST",
@@ -170,7 +177,7 @@ export function registerAuthRoutes(app: express.Express): void {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: resolvedEmail,
+          email: emailForGoTrue,
           password,
           ...(captchaToken ? { gotrue_meta_security: { captcha_token: captchaToken } } : {}),
         }),
@@ -187,22 +194,10 @@ export function registerAuthRoutes(app: express.Express): void {
         message?: string;
       };
 
-      if (!tokenRes.ok || !tokenJson.access_token || !tokenJson.user?.id) {
-        const errMsg = (
-          tokenJson.msg ||
-          tokenJson.error_description ||
-          tokenJson.message ||
-          ""
-        ).toLowerCase();
-        if (errMsg.includes("email not confirmed")) {
-          return res.status(403).json({
-            success: false,
-            error: "Your email address has not been verified yet. Please check your inbox or resend the verification link.",
-          });
-        }
+      if (!hasResolvedEmail || !tokenRes.ok || !tokenJson.access_token || !tokenJson.user?.id) {
         return res.status(401).json({
           success: false,
-          error: "Incorrect password. Please try again.",
+          error: UNIFORM_LOGIN_ERROR,
         });
       }
 
@@ -220,7 +215,7 @@ export function registerAuthRoutes(app: express.Express): void {
 
       let activeProfile = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
       if (!activeProfile) {
-        const defaultUsername = resolvedEmail.split("@")[0] || "researcher";
+        const defaultUsername = emailForGoTrue.split("@")[0] || "researcher";
         const createdRows = (await profilesTable.request("", {
           method: "POST",
           headers: {

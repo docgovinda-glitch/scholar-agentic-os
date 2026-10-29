@@ -33,11 +33,15 @@ export function registerSearchRoutes(app: express.Application) {
       if (config) {
         const claimsTable = new SupabaseTable(config, "project_claims");
         const encodedQuery = encodeURIComponent(query.trim());
-        const claimsRows = (await claimsTable.select(`text=ilike.*${encodedQuery}*&limit=50`)) as unknown as ClaimRow[];
+        const userProjectIds = projects.map(p => p.projectId);
+        const inList = userProjectIds.map(id => encodeURIComponent(id)).join(",");
+        const claimsRows = (await claimsTable.select(
+          `project_id=in.(${inList})&text=ilike.*${encodedQuery}*&limit=50`
+        )) as unknown as ClaimRow[];
         
-        const userProjectIds = new Set(projects.map(p => p.projectId));
+        const userProjectIdSet = new Set(userProjectIds);
         matchingClaims = claimsRows
-          .filter(r => userProjectIds.has(r.project_id))
+          .filter(r => userProjectIdSet.has(r.project_id))
           .map(r => ({
             id: r.claim_id,
             title: r.text.length > 80 ? r.text.substring(0, 80) + "..." : r.text,

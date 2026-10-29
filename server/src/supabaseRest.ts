@@ -16,7 +16,7 @@
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
-const REQUEST_TIMEOUT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 15_000;
 
 export interface SupabaseRestConfig {
   supabaseUrl: string;

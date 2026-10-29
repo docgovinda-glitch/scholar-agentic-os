@@ -125,7 +125,18 @@ const router = Router();
 router.use(requireAuth);
 
 // In-memory deck store fallback for local development and offline environments
+export const MAX_MEMORY_DECKS = 100;
 export const memoryDecks = new Map<string, PresentationDeckRow>();
+
+export function setMemoryDeck(id: string, deck: PresentationDeckRow): void {
+  if (!memoryDecks.has(id) && memoryDecks.size >= MAX_MEMORY_DECKS) {
+    const oldestKey = memoryDecks.keys().next().value;
+    if (oldestKey !== undefined) {
+      memoryDecks.delete(oldestKey);
+    }
+  }
+  memoryDecks.set(id, deck);
+}
 
 export function getDecksTable(): SupabaseTable<PresentationDeckRow> | null {
   const config = getSupabaseRestConfig();
@@ -342,7 +353,7 @@ router.post("/", async (req: Request, res: Response) => {
       updated_at: now,
     };
 
-    memoryDecks.set(id, newDeck);
+    setMemoryDeck(id, newDeck);
 
     const table = getDecksTable();
     if (table) {
@@ -401,7 +412,7 @@ router.put("/:id", async (req: Request, res: Response) => {
       updated_at: now,
     };
 
-    memoryDecks.set(id, updatedDeck);
+    setMemoryDeck(id, updatedDeck);
 
     if (table) {
       try {
@@ -584,7 +595,7 @@ router.post("/:id/copilot", async (req: Request, res: Response) => {
     if (deck && deck.slides && deck.slides[slideIndex]) {
       deck.slides[slideIndex] = mutatedSlide;
       deck.updated_at = new Date().toISOString();
-      memoryDecks.set(id, deck);
+      setMemoryDeck(id, deck);
     }
 
     res.json({

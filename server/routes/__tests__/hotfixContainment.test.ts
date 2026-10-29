@@ -1,11 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import crypto from "node:crypto";
+import http from "node:http";
 import request from "supertest";
 import { __clearTokenCacheForTests } from "../../src/middleware/auth.ts";
 import {
   __resetHeavyParseGuardForTests,
   tryAcquireHeavyParseSlot,
+  getMaxUploadMb,
+  HARD_MAX_UPLOAD_MB_CEILING,
 } from "../../src/middleware/uploadGuard.ts";
+import { safeFetchHtml } from "../../utils/ssrfGuard.ts";
 
 const ALICE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const BOB_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -287,6 +291,18 @@ describe("Hotfix Containment (Part A & Part A2): Authz, IDOR, 10MB Limit, Concur
         expect(res.body.error).toMatch(/1 MB upload limit/i);
       }
     });
+
+    it("hard-clamps MAX_UPLOAD_MB to HARD_MAX_UPLOAD_MB_CEILING (10 MB) even if MAX_UPLOAD_MB=25 or 500", () => {
+      process.env.MAX_UPLOAD_MB = "25";
+      expect(getMaxUploadMb()).toBe(10);
+      expect(getMaxUploadMb()).toBe(HARD_MAX_UPLOAD_MB_CEILING);
+
+      process.env.MAX_UPLOAD_MB = "500";
+      expect(getMaxUploadMb()).toBe(10);
+
+      process.env.MAX_UPLOAD_MB = "-10";
+      expect(getMaxUploadMb()).toBe(10);
+    });
   });
 
   describe("4. Server-wide heavy parse concurrency guard -> 503 with Retry-After", () => {
@@ -334,12 +350,21 @@ describe("Hotfix Containment (Part A & Part A2): Authz, IDOR, 10MB Limit, Concur
       "http://127.0.0.1:8080/internal",
       "http://localhost:3000/api/health",
       "http://[::1]:3000/",
+      "http://[::ffff:127.0.0.1]:3000/",
+      "http://[::ffff:7f00:1]:3000/",
+      "http://[::ffff:169.254.169.254]/latest/meta-data/",
+      "http://[fc00::1]/secret",
+      "http://[fe80::1]/link-local",
+      "http://0.0.0.0:3000/",
       "http://10.0.0.1/admin",
+      "http://100.64.0.1/cgnat",
       "http://172.16.0.1/secret",
       "http://192.168.1.1/router",
       "http://169.254.169.254/latest/meta-data/",
       "http://metadata.google.internal/computeMetadata/v1/",
       "ftp://example.com/file.pdf",
+      "file:///etc/passwd",
+      "gopher://127.0.0.1:6379/_INFO",
     ];
 
     it.each(FORBIDDEN_URLS)("rejects unsafe URL %s on POST /api/vault/parse-url", async (unsafeUrl) => {
@@ -361,6 +386,41 @@ describe("Hotfix Containment (Part A & Part A2): Authz, IDOR, 10MB Limit, Concur
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBeTruthy();
+    });
+
+    it("rejects HTTP 302 redirects pointing to loopback (127.0.0.1), cloud metadata (169.254.169.254), or IPv6 loopback ([::1])", async () => {
+      // Simulate an initial HTTP 302 redirect response to a forbidden internal target
+      const origRequest = http.request;
+      const redirectTargets = [
+        "http://127.0.0.1:3000/api/health",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://[::1]:3000/internal",
+        "http://[::ffff:127.0.0.1]:8080/admin",
+        "file:///etc/passwd",
+      ];
+
+      try {
+        for (const target of redirectTargets) {
+          (http as any).request = (_url: unknown, _opts: unknown, cb: (res: any) => void) => {
+            const fakeRes = {
+              statusCode: 302,
+              headers: { location: target },
+              resume: () => {},
+              on: () => {},
+            };
+            process.nextTick(() => cb(fakeRes));
+            return {
+              on: () => {},
+              end: () => {},
+              destroy: () => {},
+            };
+          };
+
+          await expect(safeFetchHtml("http://93.184.216.34/initial")).rejects.toThrow(/SSRF Blocked/i);
+        }
+      } finally {
+        (http as any).request = origRequest;
+      }
     });
   });
 });

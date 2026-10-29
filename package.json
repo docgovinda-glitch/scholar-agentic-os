@@ -28,14 +28,15 @@
     "@langchain/langgraph": "^1.4.18",
     "@langchain/openai": "^1.5.13",
     "@supabase/supabase-js": "^2.110.7",
-    "@tiptap/core": "^3.30.1",
-    "@tiptap/extension-placeholder": "^3.30.1",
-    "@tiptap/pm": "^3.30.1",
-    "@tiptap/react": "^3.30.1",
-    "@tiptap/starter-kit": "^3.30.1",
+    "@tiptap/core": "^3.32.0",
+    "@tiptap/extension-placeholder": "^3.32.0",
+    "@tiptap/pm": "^3.32.0",
+    "@tiptap/react": "^3.32.0",
+    "@tiptap/starter-kit": "^3.32.0",
     "@types/pg": "^8.20.0",
     "docx": "^9.7.1",
     "dotenv": "^17.2.3",
+    "exceljs": "^4.4.0",
     "express": "^4.21.2",
     "express-async-errors": "^3.1.1",
     "helmet": "^8.3.0",
@@ -43,7 +44,7 @@
     "lucide-react": "^0.546.0",
     "mammoth": "^1.12.0",
     "motion": "^12.23.24",
-    "multer": "^2.2.0",
+    "multer": "^2.4.1",
     "pdf-parse": "^2.4.5",
     "pdfmake": "^0.3.11",
     "pg": "^8.22.0",
@@ -52,8 +53,15 @@
     "react-dom": "^19.0.1",
     "react-router-dom": "^7.18.2",
     "uuid": "^14.0.1",
-    "xlsx": "^0.18.5",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "$uuid"
+    },
+    "@vitejs/devtools-vitest": {
+      "vitest": "^4.1.12"
+    }
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.14",
@@ -67,7 +75,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/supertest": "^7.2.1",
     "@vitejs/plugin-react": "^5.0.4",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.12",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
     "fake-indexeddb": "^6.2.5",
@@ -78,8 +86,7 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3",
-    "vite-plugin-pwa": "^1.3.0",
-    "vitest": "^4.1.10"
+    "vite": "^6.4.4",
+    "vitest": "^4.1.12"
   }
 }

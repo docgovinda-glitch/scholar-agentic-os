@@ -9,6 +9,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
+import { storeProviderKey, forgetProviderKey } from "./userAiSettings";
 import { getCaptchaConfig } from "./captchaService";
 
 export interface SignUpInput {
@@ -263,7 +264,7 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
       success: true,
       profile: {
         fullName: data.profile?.fullName ?? "",
-        email: data.profile?.email ?? "",
+        email: data.profile?.email ?? (identifier.includes("@") ? identifier : ""),
         phone: data.profile?.phone ?? "",
         affiliation: data.profile?.affiliation ?? "",
       },
@@ -547,27 +548,23 @@ export async function saveApiKeys(apiKeys: Record<string, string>): Promise<Serv
   }
 
   const providers = Object.keys(apiKeys);
-  const toDelete = providers.filter((p) => !apiKeys[p]);
-  const toUpsert = providers.filter((p) => apiKeys[p]);
+  for (const provider of providers) {
+    const val = apiKeys[provider];
+    if (val) {
+      await storeProviderKey(provider, val);
+    } else {
+      forgetProviderKey(provider);
+    }
+  }
 
-  if (toDelete.length > 0) {
+  // Purge any legacy plaintext rows in public.api_credentials rather than
+  // ever writing unencrypted keys to the database (F-11).
+  if (providers.length > 0) {
     const { error } = await supabase
       .from("api_credentials")
       .delete()
       .eq("user_id", userData.user.id)
-      .in("provider", toDelete);
-    if (error) return { success: false, error: error.message };
-  }
-
-  if (toUpsert.length > 0) {
-    const rows = toUpsert.map((provider) => ({
-      user_id: userData.user!.id,
-      provider,
-      encrypted_api_key: apiKeys[provider],
-      api_key_hash: "", // hashing strategy is part of the same open question noted above
-      updated_at: new Date().toISOString(),
-    }));
-    const { error } = await supabase.from("api_credentials").upsert(rows, { onConflict: "user_id,provider" });
+      .in("provider", providers);
     if (error) return { success: false, error: error.message };
   }
 
@@ -929,22 +926,38 @@ export interface RequestProfileUpdateResult extends ServiceResult {
   emailSent?: boolean;
 }
 
+export const PROFILE_UPDATE_DISABLED_USER_MESSAGE =
+  "Email and username change requests requiring administrator verification are temporarily unavailable during a security upgrade (TICKET-SEC-01). You can still update your Full Name, Phone Number, and Institution directly in Account Settings.";
+
 /**
  * Invokes the `request-profile-update` Edge Function.
- * Never receives or exposes `verificationKey`; fails closed if the admin
- * notification email could not be delivered.
+ * Never receives or exposes `verificationKey`; surfaces a clear user-facing
+ * explanation when the endpoint returns 410 Gone (TICKET-SEC-01).
  */
 export async function requestProfileUpdate(input: RequestProfileUpdateInput): Promise<RequestProfileUpdateResult> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.functions.invoke("request-profile-update", { body: input });
   if (error) {
-    return { success: false, error: error.message };
+    const rawMsg = typeof error.message === "string" ? error.message : "";
+    if (
+      rawMsg.includes("410") ||
+      rawMsg.includes("PROFILE_UPDATE_DISABLED") ||
+      rawMsg.includes("FunctionsHttpError") ||
+      rawMsg.includes("non-2xx")
+    ) {
+      return {
+        success: false,
+        emailSent: false,
+        error: PROFILE_UPDATE_DISABLED_USER_MESSAGE,
+      };
+    }
+    return { success: false, error: rawMsg || PROFILE_UPDATE_DISABLED_USER_MESSAGE };
   }
 
-  if (data && (data.success === false || data.emailSent === false)) {
+  if (data && (data.code === "PROFILE_UPDATE_DISABLED" || data.success === false || data.emailSent === false)) {
     return {
       success: false,
-      error: data.error || "Profile update request failed because the admin notification email could not be sent.",
+      error: data.error || PROFILE_UPDATE_DISABLED_USER_MESSAGE,
       emailSent: false,
     };
   }

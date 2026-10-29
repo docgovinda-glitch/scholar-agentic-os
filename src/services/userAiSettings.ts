@@ -11,9 +11,11 @@
  *
  * WHAT LIVES WHERE, and why:
  *
- *   API keys      → this device's localStorage, encrypted. Never sent to our
- *                   server. A database compromise exposes no provider
- *                   credentials because none are stored there.
+ *   API keys      → this device's localStorage, encrypted at rest. Never persisted
+ *                   in our database. When executing server-orchestrated AI workflows,
+ *                   keys are forwarded over HTTPS in transient request headers
+ *                   (x-ai-api-key) for that single call, used in-memory only, and
+ *                   never logged or written to disk.
  *   Provider/model → public.user_ai_settings, so the choice follows the user
  *                   to another device even though the key does not.
  *
