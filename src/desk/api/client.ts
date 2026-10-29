@@ -121,6 +121,28 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/**
+ * Server routes that execute AI with the caller's own provider credentials
+ * (server/routes/ai.ts, drafting.ts and the per-project agent/assignment/
+ * thesis/proposal/presentation routers). Only these receive the transient
+ * x-ai-* headers.
+ */
+export const AI_ROUTE_PATTERNS: RegExp[] = [
+  /^\/api\/ai(\/|$)/,
+  /^\/api\/drafting(\/|$)/,
+  /^\/api\/projects\/[^/]+\/(agent|agentic|assignment|thesis|proposal|presentation)(\/|$)/,
+];
+
+export function routeUsesClientAi(input: string): boolean {
+  let path = input;
+  try {
+    path = new URL(input, "http://local.invalid").pathname;
+  } catch {
+    path = input.split("?")[0];
+  }
+  return AI_ROUTE_PATTERNS.some((re) => re.test(path));
+}
+
 /** GET/DELETE with credentials attached */
 export async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const draftMatch = typeof input === "string" ? input.match(/\/api\/projects\/(draft-[^/]+)(\/.*)?/) : null;
@@ -139,7 +161,9 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
     }
   }
 
-  const aiConfig = await getClientAiRuntimeConfig().catch(() => null);
+  // The user's own AI key goes only to routes that run AI on the server for
+  // this request (see AI_ROUTE_PATTERNS), never with every API call.
+  const aiConfig = routeUsesClientAi(input) ? await getClientAiRuntimeConfig().catch(() => null) : null;
   const transientAiHeaders: Record<string, string> = {};
   if (aiConfig && aiConfig.isConfigured) {
     if (aiConfig.provider) transientAiHeaders["x-ai-provider"] = aiConfig.provider;

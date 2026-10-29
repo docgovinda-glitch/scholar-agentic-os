@@ -26,11 +26,12 @@ Integrity rule used throughout: **anything a user could hand in or rely on must 
 | # | Finding | Evidence |
 | :-: | :--- | :--- |
 | P1-1 | No end-to-end tests: no Playwright suite, no E2E in CI (B2). | no `playwright.config.*`, no `e2e/` |
-| P1-2 | Several AI layers in parallel: `scholarBrain`, `src/platform/gateway`, `server/utils/llm.ts`, plus per-stage prompts (B3, One Brain). | see AI map below (to be completed in B3) |
+| P1-2 | Several AI layers in parallel: `scholarBrain`, `src/platform/gateway`, `server/utils/llm.ts`, plus per-stage prompts (B3, One Brain). | `docs/AI-CALL-MAP.md` |
 | P1-3 | The presentation copilot and generator don't yet go through One Brain or the shared project context-builder (B6.7). | `server/routes/project/presentation.ts`, `src/features/slides/services/*` |
 | P1-4 | The Thesis (`src/desk/thesis/ThesisWorkspace.tsx`, 1 file of ~1.1k lines) and Proposal (`src/desk/proposal/ProposalWorkspace.tsx`) workspaces are thin single-screen editors compared with the Journal pipeline. Their stage coverage (blueprint → export) is **UNVERIFIED**. | file sizes: thesis 1,368 lines, proposal 1,289 lines in total |
 | P1-5 | Offline OCR returns canned text in headless environments only (not reached by browsers). Keep it out of production paths. | `src/services/vault/ocrService.ts:141-165` |
 | P1-7 | Unused server route `/agent/literature` still prompts an LLM to "generate" 15 sources. No client calls it (it is the canary in `serverAiIsolation.test.ts`); retire it with One Brain (B3). | `server/routes/project/agentic/evidenceRoutes.ts:15` |
+| P1-8 | Premium (server-held keys) applies only to journal requirements extraction, manuscript section generation, coherence, peer review, cover letter, anonymization and Studio refine. The staged workspaces need the user's own key. The AI Access page doesn't say which features Premium covers (B4). | `server/routes/project/core/projectHelpers.ts:219-775`, `server/routes/studio.ts:70`; `src/desk/aiAccess/AiAccessPage.tsx:1202` |
 | P1-6 | Auth rate limit at Supabase is still the default 30 per 5 min (owner action, STATUS OWNER ATTENTION 2). | `GET /v1/projects/{ref}/config/auth` |
 
 ## Areas (a–j)
@@ -43,7 +44,7 @@ Integrity rule used throughout: **anything a user could hand in or rely on must 
 | d. Knowledge Vault | `src/desk/vault/*` (12 files); `/api/vault/parse-file`, `parse-url` (SSRF-guarded), `lookup-doi`, `search-semantic`, Zotero/Mendeley sync, Drive/OneDrive, cloud connections | PDF parse, 413, SSRF and anon-401 are verified (smoke). Zotero, Mendeley and Drive need real accounts: **UNVERIFIED**. |
 | e. Literature & citations | live search (`/api/search/live`), scholarly APIs, citation formatters `src/citation_compliance/*` | The live search path is real. The fallbacks are fabricated (P0-1/P0-2). |
 | f. AI Access | `src/desk/aiAccess/*` (8 files), `/api/ai-access/*`, credentials vault, credits/entitlements/premium requests | Premium-request RLS is verified strict (T5). BYOK per provider, local AI and quotas are **UNVERIFIED** (B4). |
-| g. AI architecture | `server/src/aiEngine/*` (omniRouter, userRouter/adminRouter), `src/platform/gateway/*`, `server/utils/llm.ts`, `src/app/mesh` agents | To be mapped call site by call site in B3. |
+| g. AI architecture | `server/src/aiEngine/*` (omniRouter, userRouter/adminRouter), `src/platform/gateway/*`, `server/utils/llm.ts`, `src/app/mesh` agents | **Mapped:** `docs/AI-CALL-MAP.md` (layers, call sites, 7 inconsistencies, B3 plan). Premium covers only the manuscript/gate pipeline and Studio refine (P1-8). |
 | h. Admin app | `/admin/*` → `src/admin/AdminApp.tsx` (lazy) + `src/desk/admin/*` | `admin_users` 2 and audit log consistent (T5). UI **UNVERIFIED**. |
 | i. Exports | DOCX/PDF/Markdown: `journalExportService.ts`, `assignmentExportService.ts`; Presentation .pptx/PDF/MD/JSON (#81, parity CI) | PPTX parity is verified in CI. DOCX/PDF per workspace is **UNVERIFIED**. |
 | j. Cross-cutting UI/UX | tokens in `src/index.css`, contrast check in lint | B7. |

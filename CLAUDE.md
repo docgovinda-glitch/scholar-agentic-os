@@ -58,7 +58,7 @@ supabase/                 schema*.sql, migrations/ (timestamped), functions/ (De
 - Path alias `@/*` → repo root (not `src/`).
 - Server code imports shared modules from `src/` (citation formatters, document_intelligence, mesh agents) — keep those modules free of browser-only APIs.
 - **Supabase**: Auth (GoTrue), Postgres with RLS, private storage buckets, Edge Functions (Resend email, search proxies). The server persists through Supabase's HTTPS Data API (`server/src/supabaseRest.ts`) using `VITE_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`; `DATABASE_URL` direct Postgres is an optional fallback only.
-- **AI**: Gemini (`@google/genai`) by default, plus BYOK and admin-managed provider pools; LangChain/LangGraph for graph workflows. Clients must never send provider credentials to the server (`rejectClientCredentials`).
+- **AI**: Gemini (`@google/genai`) by default, plus BYOK and admin-managed provider pools; LangChain/LangGraph for graph workflows. Request bodies must never carry provider credentials (`rejectClientCredentials`); a user's own key reaches the server only as transient `x-ai-*` headers on AI routes (`routeUsesClientAi` in `src/desk/api/client.ts`).
 - Deeper docs: `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DATA-MODEL.md`, `docs/WORKFLOWS.md`, `docs/AI-SYSTEM.md`, `docs/UI-UX.md`, `SYSTEM_MAP.md`, `SETUP.md`. Security context: `AUDIT.md`, `ROTATION_RUNBOOK.md`, `HOTFIX*_DEPLOY.md`.
 
 ## Slides & Keynotes (Presentation Studio, OT-22)
