@@ -3,24 +3,59 @@
 **Single Source of Truth Rule (Standing Rule 0)**:
 1. Re-read `STATUS.md` and the relevant source/doc files at the start of every task and before writing any report.
 2. Every factual claim in any report must cite `file:line` or paste raw command output. Anything not verified directly from code or command output must be labeled **`unverified`**.
-3. No production Supabase connections (`gfjhsijrwodjvkisouzw`), no merges, no force-pushes, and never print secret values.
+3. Production changes follow the Production Change Protocol (backup/snapshot → apply → verify → record here). No force-pushes; never print secret values.
 
 ---
 
-## 0. Update 2026-10-29 ~10:45Z (verified via Supabase Management API / Render API)
+## OWNER ATTENTION (2026-10-29)
 
-- `20261028000000_hotfix2` and `20261028010000_purge` (the version on `main`, purge only) **APPLIED to production** and recorded in `supabase_migrations.schema_migrations`. Verified after: `anon` cannot execute `email_for_username`; RLS on `project_titles` / `project_research_gaps` / `project_journal_candidates`; `user_cloud_integrations` rows 1 → 0, `api_credentials` 0. Before: policy, grant and RLS snapshot taken (full `pg_dump` impossible from the sandbox: no raw TCP).
-- Because the purge file was already applied, the notice table and client-policy drops added to it on this branch were moved to `20261029010000_credential_reset_notices.sql` (idempotent; `NULL::timestamptz` cast fixed; tested twice on local Supabase). The one user whose cloud connection was purged has no notice row.
-- `LLM_CHALLENGE_SECRET` set on Render (random, new). PR #81 merged (`ff330c3`).
-- `premium_requests` policies on production are already the strict ones; PR #83 makes fresh databases match.
-- Sections below predate this update.
+1. **Reset the Supabase database password** (dashboard → Project Settings → Database). Network Restrictions were removed by the owner on 2026-10-29 and the old password is in git history (`F-01`). Then update `SUPABASE_DB_PASSWORD` in `~/.scholar-agent.env` / Render `DATABASE_URL`.
+2. **Raise Auth rate limit** "sign-ups and sign-ins" 30 → 300 / 5 min (dashboard → Authentication → Rate Limits). Not changed by the agent: the Management API field for this box could not be identified with certainty (`GET /v1/projects/{ref}/config/auth` returns `rate_limit_verify=30`, `rate_limit_otp=30`, `rate_limit_token_refresh=150`, …).
+3. No compromise indicators found in T5 (see below). No F1 containment beyond the reversible `is_username_approved` revoke.
+4. Full encrypted `pg_dump` backups are impossible from the agent sandbox (HTTPS-only egress, no raw TCP to Postgres). Prod changes on 2026-10-29 were preceded by policy/grant/RLS snapshots only (`~/backups/*-20261029T104243Z.json`, agent machine). Supabase Pro daily backups are the restore path.
 
-## 1. Current Production & `origin/main` State
+## 0. Task checklist (status as of 2026-10-29 11:45Z)
 
-- **Current `origin/main` HEAD**: `cbf38da` (`cbf38da8934a6aa0d8e6654063bb253729b64e78`, `Merge pull request #80 from docgovinda-glitch/fix/credential-encryption-and-honest-byok-ui`, head commit `0d5b0df`, merged `2026-10-29T04:58:43Z` by `docgovinda-glitch`).
-- **Render Production Service (`srv-d9lgbn710e5c73dl8sk0`, `https://scholar.gkshah.com.np`)**: **Running PR `#80` (`cbf38da`)** — deployed manually by owner on `2026-10-29` *(owner confirming exact Render deploy SHA via Render Dashboard → Events / Deploys; run `POST_DEPLOY_80.md` to verify all 7 live behaviors)*.
-- **Supabase Network Restrictions (`gfjhsijrwodjvkisouzw`)**: **ON (`2026-10-29`)** — only the owner's workstation IP (`/32`) is permitted for direct Postgres TCP connections (`5432`/`6543`); Render, Edge Functions, and CI use HTTPS Data API (`PostgREST` / `GoTrue` / `Storage`) exclusively.
-- **Database Migrations (`20261028000000_hotfix2` & `20261028010000_purge`)**: **NOT APPLIED — MARKED `UNVERIFIED`** until Section 3 local Docker Supabase checks pass (`./scripts/verify-local-supabase.sh`).
+| Task | Status | Evidence |
+| :--- | :--- | :--- |
+| T0 Bootstrap | DONE | this file; `~/.scholar-agent.env` (chmod 600, outside repo) |
+| T1 Post-#80 verification | PARTIAL | `POST_DEPLOY_80.md`; live checks below; `scripts/smoke-prod.sh` NOT YET written (TEST_A/TEST_B accounts not created) |
+| T2 Doc corrections | DONE (PR #82) | `USER_NOTICE.md`, `COMPROMISE_CHECKS.md`, `PROD_CHECKS.md` |
+| T3 Local Supabase proof | DONE | local Supabase 17 run; `scripts/verify-local-supabase.sh`; findings posted on #82 |
+| T4 Auth rate limits | PARTIAL | server per-IP cap 5/5 min (`server/routes/auth.ts`, #82); Auth limit raise → OWNER ATTENTION 2 |
+| T5 Prod read-only checks | DONE | section "T5 results" below |
+| T6 Hotfix 2 SQL | DONE | applied 10:44Z; `anon` RPC → denied; 3 tables RLS on |
+| T7 Edge Function | DONE | `request-profile-update` v11 returns `PROFILE_UPDATE_DISABLED`, no `verificationKey` |
+| T8 Purge | DONE (order deviation) | purge applied 10:44Z (1 cloud row, 0 api_credentials); notice table applied 11:10Z via `20261029010000` — the one affected user got no notice row |
+| T9 Migration reconciliation | TODO | |
+| T10 Production readiness | TODO | |
+| T11 AUDIT findings | PARTIAL | F-01 accepted; F-02/03/04/11/13/14 closed today; presentation ownership + memory cap closed in #81 |
+| B1–B5, B7, B8 | TODO | |
+| B6 Presentation | DONE except E2E (B2) and One Brain (B3) | PR #81, Slide Visual Parity CI |
+| T12 Handover | TODO | |
+
+## 1. Deploy & production change ledger
+
+| When (UTC) | Change | Before | Verification | Rollback |
+| :--- | :--- | :--- | :--- | :--- |
+| 10:44 | SQL `20261028000000_hotfix2` | policy/grant/RLS snapshot | anon `email_for_username` execute = false; RLS on 3 tables; `/rest/v1/rpc/email_for_username` anon → 404 | re-grant per migration header |
+| 10:44 | SQL `20261028010000_purge` (main version) | counts: api_credentials 0, user_cloud_integrations 1 | both 0 after | none (deletion approved, T8) |
+| 10:46 | Render env `LLM_CHALLENGE_SECRET` added (new random) | name absent | name present | delete var |
+| 10:48 | PR #81 merged `ff330c3` → CI green → Render live `ff330c3` 11:00 | live `cbf38da` | `/api/health` 200; `/presentation` 200; anon `/api/presentations` 401 | redeploy `cbf38da` |
+| 11:00 | PR #82 merged `a8771bd`; 11:01 PR #83 merged `efa5187` → Render live `efa5187` 11:15 | live `ff330c3` | health 200; anon `/api/vault/cloud/connections` 401; login without CAPTCHA → 400 | redeploy `ff330c3` |
+| 11:10 | SQL `20261029000000_reapply_premium_request_integrity` | already strict | 3 policies, unchanged | n/a |
+| 11:10 | SQL `20261029010000_credential_reset_notices` | table absent | RLS on, 2 policies; `user_cloud_integrations` 0 client policies | drop table |
+
+## T5 results (2026-10-29, read-only, `default_transaction_read_only = on`, counts only)
+
+- Login/superuser/bypassrls roles: 11, all Supabase-managed (`cli_login_postgres` = Supabase CLI login role). Extensions: no `dblink`/`http`/`pg_net`/`pg_cron`. Webhook triggers: 0. Non-repo triggers: 6, all Supabase storage guards.
+- Event triggers: 7 = Supabase system + `ensure_rls` (Supabase automatic RLS).
+- Non-repo SECURITY DEFINER functions: `rls_auto_enable` (Supabase) and legacy `is_username_approved(text)` — anon-executable username probe, unused by app code → revoked by `20261029020000_revoke_legacy_is_username_approved.sql` (F1 containment, reversible).
+- `admin_users` 2 rows, both with matching `grant_admin` / dated audit entries; `admin_audit_log` 9 entries, all recognized actions.
+- `auth.users` 7 (super_admin 0, non-authenticated role 0); profiles 7, non-active 0, pending profile updates 0.
+- Credit balance vs ledger mismatches 0; unbacked entitlements 0; AI usage anomalies 0.
+- RLS disabled on 0 public tables. Buckets: `project-files`, `vault-files`, both private, 0 objects.
+- `api_credentials` 0 rows, `user_cloud_integrations` 0 rows.
 
 ---
 
@@ -38,8 +73,9 @@
 | **#78** | `fix/remove-supabase-fallbacks-and-harden-proxy` | `fix/rate-limit-trust-proxy-and-reliability` *(stacked)* | Merged into parent branch (`2026-10-28T10:48:58Z`) | `152d7a0` (`2807e91`) | `docgovinda-glitch` | **YES** *(via `#80` `cbf38da`)* | PR 4.6: Remove hardcoded Supabase URL/anon fallbacks (`F-07`) and harden `/api/supabase` proxy (`F-10`). |
 | **#79** | `fix/credential-encryption-and-honest-byok-ui` | `fix/remove-supabase-fallbacks-and-harden-proxy` *(stacked)* | Merged into parent branch (`2026-10-28T10:56:38Z`) | `aeff13c` (`70368e5`) | `docgovinda-glitch` | **YES** *(via `#80` `cbf38da`)* | PR 4.7: AES-256-GCM cloud OAuth token encryption, stop server `api_credentials` writes, honest BYOK UI copy (`F-11`). |
 | **#80** | `fix/credential-encryption-and-honest-byok-ui` | `main` | **MERGED & DEPLOYED** (`2026-10-29T04:58:43Z`) | `cbf38da` (`0d5b0df`) | `docgovinda-glitch` | **YES (LIVE)** | Consolidated `#73`–`#79` rebased on `206deb6` + reconciliation fixes: Cloudflare right-most hop CIDR IP verification (`rateLimit.ts`), `10 MB` hard upload ceiling (`uploadGuard.ts`), constant-path GoTrue timing on `/api/auth/login`, `REVOKE`-only Hotfix 2 SQL v2 *(SQL unapplied)*, `20261028010000_purge` v1 *(SQL unapplied)*, `COMPROMISE_CHECKS.md`, `USER_NOTICE.md`, `MERGE_PLAN.md`. |
-| **#81** | `claude/jolly-mayer-k74uad` | `main` | **OPEN** (`2026-10-29T05:10:56Z`) | `a90623a` | — | **NO** | Feature PR by docgovinda-glitch / Claude: Slides & Keynotes Gamma-style card studio with native .pptx export (+ CI unblock). |
-| **#82** | `fix/post-80-verification-login-purge-notices` | `main` | **OPEN** (`https://github.com/docgovinda-glitch/scholar-agentic-os/pull/82`) | `10b5ed8` | — | **NO** | Post-`#80` follow-up: `POST_DEPLOY_80.md`, `STATUS.md`, single-use Turnstile passthrough on `POST /api/auth/login` + `5 req / 5 min` per-IP cap + `Sb-Forwarded-For` + uniform GoTrue `429` handling (`server/routes/auth.ts`), fail-closed `LLM_CHALLENGE_SECRET` in production (`server/utils/llm.ts`), `/api/vault/cloud/connections` + `CredentialResetNotice` + `security_credential_reset_notices` (`F-11`), `journalExportService.ts:106` CI timer fix, `scripts/verify-local-supabase.sh`, reconciled `COMPROMISE_CHECKS.md` / `USER_NOTICE.md` / `MERGE_PLAN.md` (with 37-provider spend-cap table). |
+| **#81** | `claude/jolly-mayer-k74uad` | `main` | **MERGED & DEPLOYED** (`2026-10-29T10:48Z`) | `ff330c3` (`1f52034`) | `docgovinda-glitch` (agent, owner-authorized) | **YES** | Slides & Keynotes Gamma card studio, native .pptx, deck ownership fail-closed, Slide Visual Parity CI, CI timer fix. |
+| **#82** | `fix/post-80-verification-login-purge-notices` | `main` | **MERGED & DEPLOYED** (`2026-10-29T11:00Z`) | `a8771bd` (`1b91e8c`) | `docgovinda-glitch` (agent, owner-authorized) | **YES** | Post-#80 hardening (Turnstile passthrough, login cap, fail-closed `LLM_CHALLENGE_SECRET`, cloud connections API, `CredentialResetNotice`); notice SQL moved to `20261029010000`. |
+| **#83** | `claude/jolly-mayer-k74uad` | `main` | **MERGED & DEPLOYED** (`2026-10-29T11:01Z`) | `efa5187` (`92c48c6`) | `docgovinda-glitch` (agent, owner-authorized) | **YES** | `20261029000000_reapply_premium_request_integrity.sql` (fresh-DB policy order fix; no-op in prod). |
 
 ---
 
