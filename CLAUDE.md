@@ -61,6 +61,16 @@ supabase/                 schema*.sql, migrations/ (timestamped), functions/ (De
 - **AI**: Gemini (`@google/genai`) by default, plus BYOK and admin-managed provider pools; LangChain/LangGraph for graph workflows. Clients must never send provider credentials to the server (`rejectClientCredentials`).
 - Deeper docs: `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DATA-MODEL.md`, `docs/WORKFLOWS.md`, `docs/AI-SYSTEM.md`, `docs/UI-UX.md`, `SYSTEM_MAP.md`, `SETUP.md`. Security context: `AUDIT.md`, `ROTATION_RUNBOOK.md`, `HOTFIX*_DEPLOY.md`.
 
+## Slides & Keynotes (Presentation Studio, OT-22)
+
+- Live route: `/presentation` (also mounted for OT-22 projects) → `src/desk/presentation/PresentationWorkspace.tsx` → steps `Step01Understand`, `Step02Design`, `Step03StudioCanvas` (aliased `Step03EditSlides`), `Step04Delivery` (aliased `Step04Present`) in `src/features/slides/components/`. `/presentation` works signed-out, which is handy for checking changes in a browser.
+- All slide rendering goes through `src/features/slides/gamma/`:
+  - `content.ts`: layout-independent `CardContent` + 9 Gamma layouts. `getCardContent` derives content from legacy `blocks`; `writeCardContent` stores content and regenerates blocks (fingerprinted so copilot/Ask Scholar block edits still win).
+  - `geometry.ts`: each layout → positioned primitives on a 1280×720 canvas. **Both** the web renderer (`GammaCard.tsx`) and `.pptx` export (`pptxExport.ts`, lazy-loaded pptxgenjs) draw these same boxes; change a layout here, not in a component.
+  - `theme.ts`: curated deck themes (hex tokens, no `#000000`; default `scholar-paper` #F8F7F4 / `scholar-ink` #171717) + adapter for legacy library/custom themes.
+  - `composer.ts`: offline deck builder; uses only figures present in the user's text. Server AI path: `server/routes/project/presentation.ts` + `presentationCards.ts` (zod-validated cards, ungrounded figures dropped).
+- Never add invented metrics, citations or p-values to generators, fallbacks or demo content.
+
 ## UI conventions
 
 - React 19 + TypeScript, Tailwind CSS v4 via `@tailwindcss/vite` (no tailwind.config; tokens live in `src/index.css` `@theme` / `:root`).

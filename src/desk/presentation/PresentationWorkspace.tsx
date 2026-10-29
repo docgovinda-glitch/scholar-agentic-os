@@ -1,35 +1,22 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import type {
-  SlideDeck,
-  SlideCard,
-  SlideViewMode,
-  NarrativeFramework,
-  PresentationStudioStep,
-  BulletListBlock,
-} from '../../features/slides';
+import type { SlideDeck, PresentationStudioStep } from '../../features/slides';
 import {
   Step01Understand,
   Step02Design,
-  Step02ThemeTemplate,
   Step03EditSlides,
-  Step03StudioCanvas,
   Step04Present,
-  Step04Delivery,
-  SlideCanvas,
-  generateSlideDeck,
-  extractSlidesFromAcademicText,
-  SLIDE_THEMES,
-  type SlideThemeId,
   AskScholarPresentationDrawer,
   PresentationHeader,
   AudienceQaSimulator,
   type AudienceQaQuestion,
 } from '../../features/slides';
 import { authedFetch, getProject, saveIntakeAnswers } from '../api';
+import { DEFAULT_DECK_THEME_ID } from '../../features/slides/gamma/theme';
+import { composeDeckFromText, composeDeckFromTopic } from '../../features/slides/gamma/composer';
+import { normalizeDeck } from '../../features/slides/gamma/content';
 import ScholarSidebar from '../../components/navigation/ScholarSidebar';
-import LiveSlidePlayer from './components/LiveSlidePlayer';
+import GammaPlayer from '../../features/slides/gamma/GammaPlayer';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
-import AppleStudioHeader, { type AppleStudioPhaseId } from '../../components/ui/AppleStudioShell';
 
 export type { PresentationStudioStep } from '../../features/slides';
 
@@ -59,6 +46,7 @@ export default function PresentationWorkspace({
   const [currentStep, setCurrentStep] = useState<PresentationStudioStep>(computedInitialStep);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showLivePlayer, setShowLivePlayer] = useState(false);
+  const [playerStartIndex, setPlayerStartIndex] = useState(0);
   const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('saved');
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [projectVersion, setProjectVersion] = useState<number>(1);
@@ -76,18 +64,12 @@ export default function PresentationWorkspace({
     if (initialDeck !== undefined) return initialDeck;
     if (initialCourseworkText !== undefined) {
       if (!initialCourseworkText.trim()) return null;
-      return generateSlideDeck({
-        text: initialCourseworkText,
-        framework: 'Standard-Narrative',
-      });
+      return composeDeckFromText(initialCourseworkText, { framework: 'Standard-Narrative', slideCount: 12 });
     }
 
     // If step was requested as studio or delivery, provide starter slides for editing/delivery canvas
     if (computedInitialStep === 'studio' || computedInitialStep === 'delivery') {
-      return generateSlideDeck({
-        topic: 'Research Synthesis & Presentation',
-        framework: 'Standard-Narrative',
-      });
+      return composeDeckFromTopic('Research Synthesis & Presentation', { framework: 'Standard-Narrative', slideCount: 6 });
     }
 
     // Default: Clean empty presentation with zero pre-filled mock slides
@@ -162,7 +144,7 @@ export default function PresentationWorkspace({
 
         // Apply hydrated deck if not overridden by explicit initial props
         if (savedDeck && !initialDeck && initialCourseworkText === undefined) {
-          setDeck(savedDeck);
+          setDeck(normalizeDeck(savedDeck));
         } else if (!savedDeck && !initialDeck && initialCourseworkText === undefined) {
           // Initialize cleanly from project's existing research metadata
           const projTitle = a['title'] || project.title || 'Untitled Presentation';
@@ -230,7 +212,7 @@ export default function PresentationWorkspace({
             title: deckToSave.title,
             topic: deckToSave.topic,
             framework: deckToSave.framework,
-            theme_id: deckToSave.themeId || 'sand-academic',
+            theme_id: deckToSave.themeId || DEFAULT_DECK_THEME_ID,
             custom_theme: deckToSave.customTheme,
             slides: deckToSave.slides,
             source_module: deckToSave.sourceModule || 'presentation-studio',
@@ -303,10 +285,7 @@ export default function PresentationWorkspace({
   // Convert empty coursework input
   const handleExtractFromDraft = () => {
     if (!draftInput.trim()) return;
-    const generated = generateSlideDeck({
-      text: draftInput,
-      framework: 'Standard-Narrative',
-    });
+    const generated = composeDeckFromText(draftInput, { framework: 'Standard-Narrative', slideCount: 12 });
     setDeck(generated);
     triggerDebouncedAutosave(generated);
     setCurrentStep('studio');
@@ -316,7 +295,7 @@ export default function PresentationWorkspace({
   if (deck === null) {
     return (
       <div
-        className="min-h-screen bg-[#F7F5F0] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 p-6 flex flex-col justify-center items-center"
+        className="min-h-screen bg-[#F8F7F4] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 p-6 flex flex-col justify-center items-center"
         data-testid="slide-card-empty-state"
       >
         <div className="max-w-xl w-full bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl border border-neutral-200/80 dark:border-white/10 shadow-xl space-y-6 text-center">
@@ -367,45 +346,12 @@ export default function PresentationWorkspace({
     );
   }
 
-  // Fullscreen Live Player Mode
+  // Full-screen presenter (same card renderer as the editor and the .pptx export)
   if (showLivePlayer) {
-    const playerDeckData = {
-      projectId,
-      title: deck.title,
-      durationMinutes: 10,
-      targetAudience: 'Scholarly Presentation',
-      narrativeHook: 'Verified Empirical Evidence',
-      coreInsight: 'Structured Synthesis and Analysis',
-      slides: deck.slides.length > 0 ? deck.slides.map((s, idx) => {
-        const bulletBlock = s.blocks.find((b): b is BulletListBlock => b.type === 'bullet-list');
-        return {
-          slideNumber: idx + 1,
-          type: 'architecture' as const,
-          title: s.actionHeadline,
-          subtitle: s.frameworkPhase || 'Empirical Synthesis',
-          visualFocus: s.methodologyNote || 'Focus layout',
-          keyPoints: bulletBlock?.items || [s.actionHeadline],
-          speakerNotes: s.speakerNotes,
-          targetDurationSeconds: 120,
-        };
-      }) : [
-        {
-          slideNumber: 1,
-          type: 'architecture' as const,
-          title: deck.title || 'Empirical Presentation',
-          subtitle: 'Empirical Synthesis',
-          visualFocus: 'Introduction',
-          keyPoints: ['Structured empirical findings and analysis'],
-          speakerNotes: 'Slide overview',
-          targetDurationSeconds: 120,
-        },
-      ],
-    };
-
     return (
-      <LiveSlidePlayer
-        deckData={playerDeckData}
-        initialSlideIndex={deck.activeSlideIndex || 0}
+      <GammaPlayer
+        deck={deck}
+        initialSlideIndex={playerStartIndex}
         onClose={() => setShowLivePlayer(false)}
       />
     );
@@ -413,7 +359,7 @@ export default function PresentationWorkspace({
 
   return (
     <div
-      className="flex h-screen w-full overflow-hidden bg-[#F7F5F0] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200"
+      className="flex h-screen w-full overflow-hidden bg-[#F8F7F4] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200"
       data-testid="presentation-workspace"
     >
       {/* Left Sidebar Shell */}
@@ -435,52 +381,7 @@ export default function PresentationWorkspace({
 
       {/* Main Workspace Column */}
       <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
-        {/* Shared Apple-Grade Studio Chrome Bar */}
-        <AppleStudioHeader
-          deliverableCode="OT-22"
-          deliverableLabel="Presentation Studio"
-          projectTitle={deck.title}
-          onProjectTitleChange={(newTitle) => handleUpdateDeck({ ...deck, title: newTitle })}
-          activePhase={
-            currentStep === 'understand' || (currentStep as string) === 'scaffolding'
-              ? 'blueprint'
-              : currentStep === 'design' || (currentStep as string) === 'themes'
-              ? 'evidence'
-              : currentStep === 'studio'
-              ? 'studio'
-              : isQaSimulatorOpen
-              ? 'review'
-              : 'delivery'
-          }
-          onPhaseSelect={(phase: AppleStudioPhaseId) => {
-            if (phase === 'review') {
-              setIsQaSimulatorOpen(true);
-              return;
-            }
-            setIsQaSimulatorOpen(false);
-            const stepMap: Record<AppleStudioPhaseId, PresentationStudioStep> = {
-              blueprint: 'understand',
-              evidence: 'design',
-              studio: 'studio',
-              review: 'studio',
-              delivery: 'delivery',
-            };
-            setCurrentStep(stepMap[phase]);
-          }}
-          onBack={handleNavigateBack}
-          metricLabel={`${deck.slides.length} slides`}
-          aiModelLabel="Slide Architect AI"
-          onOpenAiAccess={onOpenAiAccess}
-          autosaveStatus={autosaveStatus}
-          projectVersion={projectVersion}
-          lastSavedTime={lastSavedTime}
-          zenMode={sidebarCollapsed}
-          onToggleZenMode={() => setSidebarCollapsed((c) => !c)}
-          inspectorOpen={isAskScholarOpen}
-          onToggleInspector={() => setIsAskScholarOpen((o) => !o)}
-        />
-
-        {/* Header Bar (56px) - Apple/Airbnb Left Back Button, Zero Exit Cross */}
+        {/* Single studio header: back, title, steps, save state, assistants */}
         <PresentationHeader
           title={deck.title}
           onTitleChange={(newTitle) => handleUpdateDeck({ ...deck, title: newTitle })}
@@ -491,17 +392,27 @@ export default function PresentationWorkspace({
           projectVersion={projectVersion}
           isAskScholarOpen={isAskScholarOpen}
           onToggleAskScholar={() => setIsAskScholarOpen(!isAskScholarOpen)}
-          onStartPresentation={() => setShowLivePlayer(true)}
+          onStartPresentation={() => {
+            setPlayerStartIndex(deck.activeSlideIndex || 0);
+            setShowLivePlayer(true);
+          }}
           onNavigateBack={handleNavigateBack}
           isSidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
           onOpenQaSimulator={() => setIsQaSimulatorOpen(true)}
-          hideAutosaveBadge
         />
 
         {/* Scrollable Canvas Body */}
-        <main className="flex-1 overflow-y-auto px-6 py-8 min-h-0">
-          <div className="max-w-5xl mx-auto w-full">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-8 min-h-0">
+          <div
+            className={`mx-auto w-full ${
+              currentStep === 'studio' || currentStep === 'delivery'
+                ? 'max-w-[1360px]'
+                : currentStep === 'design' || currentStep === 'themes'
+                ? 'max-w-6xl'
+                : 'max-w-5xl'
+            }`}
+          >
             {(currentStep === 'understand' || currentStep === 'scaffolding') && (
               <Step01Understand
                 projectId={projectId}
@@ -521,32 +432,12 @@ export default function PresentationWorkspace({
             )}
 
             {currentStep === 'studio' && (
-              <div className="space-y-6">
-                {/* Secondary Preview Header for Test Compatibility */}
-                <div className="hidden">
-                  <div>Interactive Slide Deck Studio</div>
-                  <div>Speaker Notes &amp; Delivery Script</div>
-                  <div>Slide 1 of 5</div>
-                  <div>Slide 2 of 5</div>
-                  <div>The Reproducibility Bottleneck</div>
-                  <button type="button">Next →</button>
-                  <button type="button">1. Timing &amp; Constraints</button>
-                  <button type="button">4. Speaker Script &amp; Notes</button>
-                  <button
-                    type="button"
-                    onClick={() => setIsQaSimulatorOpen(true)}
-                  >
-                    6. Q&amp;A &amp; Delivery Simulator
-                  </button>
-                </div>
-
                 <Step03EditSlides
                   deck={deck}
                   onUpdateDeck={handleUpdateDeck}
                   onPrevStep={() => setCurrentStep('design')}
                   onNextStep={() => setCurrentStep('delivery')}
                 />
-              </div>
             )}
 
             {currentStep === 'delivery' && (
@@ -554,6 +445,10 @@ export default function PresentationWorkspace({
                 deck={deck}
                 onPrevStep={() => setCurrentStep('studio')}
                 onClose={handleNavigateBack}
+                onStartPresentation={(slideIndex) => {
+                  setPlayerStartIndex(slideIndex);
+                  setShowLivePlayer(true);
+                }}
               />
             )}
           </div>

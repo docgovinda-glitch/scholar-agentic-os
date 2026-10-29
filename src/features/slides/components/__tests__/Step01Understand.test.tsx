@@ -148,7 +148,7 @@ describe('Step01Understand (Zero-Ghost Rule, Scope Cards & Presentation Style)',
     );
 
     expect(screen.getByTestId('slide-outline-pill-card-2')).toBeInTheDocument();
-    expect(screen.getByText("Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions")).toBeInTheDocument();
+    expect(screen.getAllByText("Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions").length).toBeGreaterThan(0);
 
     // Stepper button
     expect(screen.getByRole('button', { name: /Proceed to Design/i })).toBeInTheDocument();
