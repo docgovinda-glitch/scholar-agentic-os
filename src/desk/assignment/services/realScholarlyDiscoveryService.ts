@@ -10,10 +10,6 @@
 
 import type { DiscoveredSource, SourceVerificationStatus } from "../types";
 import { authedJsonFetch } from "../../api";
-import {
-  generateCuratedLiteratureSources,
-  fetchMoreLiteratureSources as fetchMoreMockSources,
-} from "./scholarlyDiscoveryService";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types for server response
@@ -293,8 +289,10 @@ export async function discoverRealScholarlySourcesFromServer(
     console.warn("[RealDiscovery] Semantic Scholar fallback failed:", err);
   }
 
-  console.warn("[RealDiscovery] All live APIs failed. Falling back to mock catalog.");
-  return generateCuratedLiteratureSources(question, citationStyle);
+  // Never substitute catalog or synthesized entries for live results: an
+  // empty list lets the UI say plainly that no sources were found.
+  console.warn("[RealDiscovery] All live APIs failed; returning no sources.");
+  return [];
 }
 
 /**
@@ -333,13 +331,13 @@ export async function fetchMoreRealSources(
     );
 
     if (!response.ok) {
-      return fetchMoreMockSources(existingSources, question, batchSize);
+      return [];
     }
 
     const data: MultiPortalResponse = await response.json();
 
     if (!data.success || !Array.isArray(data.sources) || data.sources.length === 0) {
-      return fetchMoreMockSources(existingSources, question, batchSize);
+      return [];
     }
 
     // Map and filter out duplicates against existing sources
@@ -357,7 +355,7 @@ export async function fetchMoreRealSources(
 
     return deduplicateSources(mapped).slice(0, batchSize);
   } catch (err) {
-    console.warn("[RealDiscovery] fetchMore failed, falling back to mock:", err);
-    return fetchMoreMockSources(existingSources, question, batchSize);
+    console.warn("[RealDiscovery] fetchMore failed; returning no sources:", err);
+    return [];
   }
 }

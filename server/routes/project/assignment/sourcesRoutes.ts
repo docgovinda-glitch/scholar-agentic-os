@@ -39,7 +39,6 @@ import {
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,
 } from "../../../../src/desk/assignment/services/outlineService.ts";
-import { conductAskScholarResearchForOutline } from "../../../../src/desk/assignment/services/scholarlyDiscoveryService.ts";
 import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
 import { classifyScopeBoundaries, stripLineTags } from "../../../../src/features/understand/services/scopeClassifier.ts";
 import { generateSectionDraft } from "../../../../src/features/drafting/services/sectionDraftingEngine.ts";
@@ -109,7 +108,7 @@ router.post("/research", async (req: express.Request<{ id: string }>, res) => {
 
     if (discoveredDrafts && discoveredDrafts.length > 0) {
       sources = discoveredDrafts.map((draft, idx) => {
-        const yearStr = draft.year ? String(draft.year) : "2024";
+        const yearStr = draft.year ? String(draft.year) : "n.d.";
         const srcId = `src-${Date.now()}-${idx + 1}`;
         const authorStr =
           draft.authors.length > 0
@@ -117,7 +116,6 @@ router.post("/research", async (req: express.Request<{ id: string }>, res) => {
               ? `${draft.authors[0]} et al.`
               : draft.authors.join(" & ")
             : "Unknown Author";
-        const venue = draft.venue || "Academic Press";
         const citationStr = `${authorStr} (${yearStr}). ${draft.title}.${draft.venue ? ` ${draft.venue}.` : ""}${
           draft.doi ? ` https://doi.org/${draft.doi}` : ""
         }`;
@@ -132,9 +130,8 @@ router.post("/research", async (req: express.Request<{ id: string }>, res) => {
           doi: draft.doi,
           url: draft.url,
           relevanceScore: Math.max(75, 98 - idx * 2),
-          mainFinding: draft.venue
-            ? `Published in ${draft.venue}. Empirical literature addressing foundational aspects of the question.`
-            : "Peer-reviewed literature addressing central research question.",
+          // Only what the index returned; no summary of findings is invented.
+          mainFinding: draft.venue ? `Published in ${draft.venue}.` : "",
           suggestedUse:
             draft.authorityTier === "A"
               ? "Primary theoretical framework & empirical evidence grounding"
@@ -150,18 +147,9 @@ router.post("/research", async (req: express.Request<{ id: string }>, res) => {
               : "Standard Academic / University Press",
         } as DiscoveredSource;
       });
-    } else {
-      // Graceful fallback to curated discovery catalog if external APIs are unreachable (e.g. offline testing)
-      const mockResult = conductAskScholarResearchForOutline({
-        question: effectiveQuery,
-        assignmentType: (project.answers["assignment_type"] || "essay") as any,
-        academicLevel: academicLevel as any,
-        targetWordCount: Number(project.answers["targetWordCount"] || 2000),
-      });
-      if (mockResult?.curatedDiscoveredSources && mockResult.curatedDiscoveredSources.length > 0) {
-        sources = mockResult.curatedDiscoveredSources;
-      }
     }
+    // When live discovery finds nothing the list stays empty: no catalog or
+    // synthesized entries are ever offered or saved as discovered sources.
 
     // Persist discovered sources to Supabase project_sources
     await persistSourcesToSupabase(project.projectId, sources);

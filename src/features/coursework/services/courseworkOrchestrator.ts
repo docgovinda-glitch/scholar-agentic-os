@@ -49,9 +49,6 @@ import {
 import {
   discoverRealScholarlySourcesFromServer,
 } from "../../../desk/assignment/services/realScholarlyDiscoveryService";
-import {
-  generateCuratedLiteratureSources,
-} from "../../../desk/assignment/services/scholarlyDiscoveryService";
 import type {
   CourseworkProgressEvent,
   DeconstructedPrompt,
@@ -488,12 +485,8 @@ export async function executeMinimalSources(
       maxResults
     );
   } catch (err) {
-    console.warn("Server discovery fallback to curated literature:", err);
-    discoveredSources = generateCuratedLiteratureSources(params.question, citationStyle);
-  }
-
-  if (discoveredSources.length === 0) {
-    discoveredSources = generateCuratedLiteratureSources(params.question, citationStyle);
+    // No invented fallback: an empty result is reported as "no sources found".
+    console.warn("Server discovery failed; no sources returned:", err);
   }
 
   const generatedQueries = [
@@ -724,12 +717,8 @@ export async function executeDetailedAutonomousSynthesis(
       30
     );
   } catch (err) {
-    console.warn("Autonomous discovery fallback:", err);
-    discoveredSources = generateCuratedLiteratureSources(config.question, config.citationStyle);
-  }
-
-  if (discoveredSources.length === 0) {
-    discoveredSources = generateCuratedLiteratureSources(config.question, config.citationStyle);
+    // No invented fallback: an empty result is reported as "no sources found".
+    console.warn("Autonomous discovery failed; no sources returned:", err);
   }
 
   emitProgress(
