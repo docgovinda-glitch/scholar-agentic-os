@@ -939,7 +939,7 @@ export default function Step01Understand({
             </div>
           </div>
 
-          {/* Clean Tactile Outline Cards with SlideOutlinePillCard */}
+          {/* Outline: every generated card as a live thumbnail */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200">

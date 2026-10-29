@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useKeynoteShortcuts } from '../useKeynoteShortcuts';
+import { useKeynoteShortcuts } from '../usePresentationShortcuts';
 
 describe('useKeynoteShortcuts', () => {
   it('calls onNextSlide when ArrowRight, Space, or PageDown is pressed', () => {

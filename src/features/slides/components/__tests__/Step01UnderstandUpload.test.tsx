@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
-import Step01Scaffolding from "../Step01Scaffolding";
+import Step01Scaffolding from "../Step01Understand";
 import type { SlideDeck } from "../../types/slides";
 
 const mockDeck: SlideDeck = {
