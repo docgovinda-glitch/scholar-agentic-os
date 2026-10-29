@@ -41,7 +41,56 @@ This document specifies all currently active server endpoints, authentication pr
 
 ## 3. Authentication & Verification Endpoints
 
-### 3.1 CAPTCHA Signup Verification
+### 3.1 Multi-Identifier Login
+- **Method**: `POST`
+- **Path**: `/api/auth/login`
+- **Purpose**: Authenticates a user using email, username, or E.164 phone number via backend service-role resolution and upstream Supabase GoTrue password grant.
+- **Authentication**: None (Public, protected by Cloudflare Turnstile & Express client-IP rate limiter).
+- **Rate Limit**: 5 attempts per 5 minutes per verified client IP (`AUTH_LOGIN_MAX_PER_WINDOW = 5`). Upstream GoTrue HTTP 429 returns uniform `UPSTREAM_AUTH_RATE_LIMIT`.
+- **Request**:
+  ```json
+  {
+    "identifier": "scholar_alice",
+    "password": "SecurePassword123!",
+    "captchaToken": "0.XXXXX..."
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "session": {
+      "access_token": "eyJhbGciOi...",
+      "refresh_token": "...",
+      "user": {
+        "id": "uuid",
+        "email": "alice@oxford.ac.uk"
+      }
+    }
+  }
+  ```
+- **Errors**: `400 Bad Request` (missing identifier/password), `401 Unauthorized` (invalid credentials), `429 Too Many Requests` (`UPSTREAM_AUTH_RATE_LIMIT`).
+
+### 3.2 Identifier Availability Check
+- **Method**: `POST`
+- **Path**: `/api/auth/check-availability`
+- **Purpose**: Verifies whether an email, username, or phone number is available for registration without exposing raw account enumerations to the client.
+- **Authentication**: None (Public, IP-rate limited).
+- **Request**:
+  ```json
+  {
+    "type": "username",
+    "value": "alice_scholar"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "available": true
+  }
+  ```
+
+### 3.3 CAPTCHA Signup Verification
 - **Method**: `POST`
 - **Path**: `/api/auth/verify-signup`
 - **Purpose**: Verifies Cloudflare Turnstile token prior to user creation to prevent bot spam.
@@ -61,6 +110,19 @@ This document specifies all currently active server endpoints, authentication pr
   }
   ```
 - **Errors**: `400 Bad Request` if token is missing or failed Cloudflare verification.
+
+### 3.4 Request Profile Update (Deprecated Edge Function)
+- **Method**: `POST`
+- **Path**: `https://<project-ref>.supabase.co/functions/v1/request-profile-update`
+- **Status**: **HTTP 410 Gone (`F-04` Closed)**
+- **Response**:
+  ```json
+  {
+    "success": false,
+    "code": "PROFILE_UPDATE_DISABLED",
+    "error": "Email and username change requests requiring administrator verification are temporarily unavailable during a security upgrade (TICKET-SEC-01)..."
+  }
+  ```
 
 ---
 
@@ -290,22 +352,41 @@ This document specifies all currently active server endpoints, authentication pr
 ### 7.1 List Vault Items
 - **Method**: `GET`
 - **Path**: `/api/vault`
+- **Authentication**: Required (`requireAuth`)
 - **Response**: Array of `UniversalVaultItem` records.
 
 ### 7.2 Ingest DOI Metadata
 - **Method**: `POST`
 - **Path**: `/api/vault/doi`
-- **Request**: `{ "doi": "10.1038/s41586-024-00000-0" }`.
+- **Authentication**: Required (`requireAuth`)
+- **Request**: `{ "doi": "10.1038/s41586-024-00000-0" }`
 - **Response**: Standardized bibliographic item fetched from Crossref/OpenAlex.
 
-### 7.3 Connect Cloud Drive Pointer
+### 7.3 Parse File Upload
 - **Method**: `POST`
-- **Path**: `/api/vault/cloud-link`
-- **Request**: `{ "provider": "google_drive", "fileId": "1aB...", "viewUrl": "...", "title": "..." }`.
+- **Path**: `/api/vault/parse-file`
+- **Authentication**: Required (`requireAuth`)
+- **Upload Limit**: Hard-clamped to `10 MB` (`MAX_UPLOAD_MB`).
+- **Concurrency Guard**: Maximum 1 heavy parse per server instance. Extra requests return HTTP `503 Service Unavailable` with `Retry-After: 5`.
+
+### 7.4 Cloud Integration Connections
+- **Method**: `GET`
+- **Path**: `/api/vault/cloud/connections`
+- **Authentication**: Required (`requireAuth`)
+- **Response**:
+  ```json
+  {
+    "google": { "connected": true, "needsAuth": false, "email": "alice@gmail.com" },
+    "onedrive": { "connected": false, "needsAuth": false },
+    "zotero": { "connected": false, "needsAuth": false },
+    "mendeley": { "connected": false, "needsAuth": false }
+  }
+  ```
 
 ---
 
 ## 8. Supabase Proxy Endpoints (`server/routes/supabaseProxy.ts`)
 
-- **HTTP Proxy**: `/api/supabase/*` -> Forwards requests to remote Supabase REST and Auth endpoints, transparently passing headers and cookies.
-- **WebSocket Realtime Proxy**: `/api/supabase/realtime/v1/*` -> Proxies live WebSocket duplex streams for real-time collaboration.
+- **Strict Route Allowlist**: Only `/rest/v1/*`, `/auth/v1/*`, `/realtime/v1/*`, and `/storage/v1/*` are proxied. Administrative paths (`/pg/*`, `/meta/*`, `/functions/*`, `/platform/*`) return HTTP `403 Forbidden`.
+- **TLS Verification**: Enforces `rejectUnauthorized: true` on all upstream proxy agent connections.
+- **WebSocket Realtime Proxy**: `/api/supabase/realtime/v1/*` proxies live WebSocket duplex streams with origin validation.
