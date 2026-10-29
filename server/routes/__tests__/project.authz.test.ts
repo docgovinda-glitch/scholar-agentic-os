@@ -279,6 +279,11 @@ describe("project API — ownership", () => {
   });
 
   it("refuses to read another user's presentation deck", async () => {
+    // The Supabase URL configured for this suite is unreachable. Deck routes
+    // now fail closed (503) instead of silently saving to process memory, so
+    // the create is refused and Bob can never receive Alice's deck. Full
+    // owner/non-owner coverage against a working store lives in
+    // presentationsAuthz.test.ts.
     const createRes = await request(app)
       .post("/api/presentations")
       .set(asAlice())
@@ -286,13 +291,14 @@ describe("project API — ownership", () => {
         id: "alice-deck-authz",
         title: "Alice Deck",
       });
-    expect(createRes.status).toBe(201);
+    expect(createRes.status).toBe(503);
 
     const res = await request(app)
       .get("/api/presentations/alice-deck-authz")
       .set(asBob());
 
-    expect(res.status).toBe(404);
+    expect([404, 503]).toContain(res.status);
+    expect(res.body.deck).toBeUndefined();
   });
 
   it("lets the owner keep working on their own project", async () => {
