@@ -1,6 +1,20 @@
 # Hotfix 2 — Database, Storage, RPC & Edge Function Lockdown (`HOTFIX2_DEPLOY.md`)
 
-**Scope**: Remediates `F-02` (missing RLS on 3 tables), `F-03` (`project-files` & `id-documents` bucket privacy and Express-mediated signed URLs), `F-04` (`request-profile-update` `verificationKey` leak & fail-closed email check), and `F-14` (`anon`/`authenticated` `EXECUTE` revocation on 6 `SECURITY DEFINER` account-enumeration RPCs + Turnstile/rate-limited Express login & availability endpoints).
+> [!WARNING]
+> **Verification Status: `UNVERIFIED AGAINST SUPABASE`**  
+> Docker and Colima are **not installed** on this machine (`which docker colima` returned not found, so `supabase start` could not be executed against a local Supabase stack). The migration SQL in [`supabase/migrations/20261028000000_hotfix2_db_storage_rpc_lockdown.sql`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/migrations/20261028000000_hotfix2_db_storage_rpc_lockdown.sql) has been verified against an in-memory Postgres engine (`@electric-sql/pglite`) and via Express/client Vitest suites, but **must be treated as unverified against a live Supabase instance** until run in a staging project or production after taking the `pg_dump` backup below.
+
+> [!IMPORTANT]
+> **Explicit Prerequisite Dependencies (`MERGE_PLAN.md`)**:
+> 1. **PR #76 (`proxy-addr` / dependency audit)** must be present before **PR #77**.
+> 2. **PR #77 (IP rate-limiting & `trust proxy = 1` with Cloudflare hop verification)** MUST be deployed with or before **Hotfix 2 (`PR #73`)**, because Hotfix 2 moves login and identifier availability checks to `POST /api/auth/login` and `POST /api/auth/check-availability`, which rely on `rateLimit.ts` to prevent brute-force and account enumeration.
+
+**Scope**:
+- **`F-02`**: Enables Row Level Security (`ENABLE ROW LEVEL SECURITY`) and revokes `PUBLIC, anon, authenticated` privileges on `public.project_research_gaps`, `public.project_titles`, and `public.project_journal_candidates`.
+- **`F-03`**: Sets `public = false` on all storage buckets (`project-files`, `id-documents`, `vault-files`), drops the open `project_files_*` policies on `storage.objects`, **retains** the user-folder-scoped `id_documents_*_own` policies (`(storage.foldername(name))[1] = auth.uid()::text`) on `id-documents`, and serves `project-files` downloads via short-lived signed URLs from `GET /api/projects/:id/files/:fileId/signed-url` after verifying `ownerId === req.user.id`.
+- **`F-04` (`TICKET-SEC-01` Known Breakage)**: Disables the unauthenticated `request-profile-update` Edge Function so it never generates or returns `verificationKey` and immediately returns `HTTP 410 Gone` (`code: "PROFILE_UPDATE_DISABLED"`), paired with an in-app notice in [`AccountSettingsScreen.tsx`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/src/desk/account/AccountSettingsScreen.tsx#L351-L356) explaining that admin-verified email/username change requests are paused during a security upgrade while Full Name, Phone, Institution, and Academic Profile remain directly editable.
+- **`F-14`**: Revokes `PUBLIC, anon, authenticated` `EXECUTE` privileges (using **only `REVOKE`/`GRANT`**, zero `CREATE OR REPLACE FUNCTION`) on `email_for_username(text)`, `email_for_phone_e164(text)`, `email_for_identifier(text)`, `check_username_available(text)`, `check_email_available(text)`, `check_phone_available(text)`, and `submit_id_document(text)`. Moves login resolution and availability checks to `POST /api/auth/login` and `POST /api/auth/check-availability` with identical HTTP `401` messages and constant-path GoTrue round-trip timing.
+  - **`submit_id_document(text)` Call-Site Audit**: Grepping `src/`, `server/`, and `supabase/functions/` confirms **0 callers** anywhere in the application (`submit_id_document` was defined in `supabase/migrations/20260813000000_unified_account_profile.sql:155` and superseded by `20260814000000_account_system_repair.sql`). Revoking `anon, authenticated` `EXECUTE` on it breaks nothing.
 
 ---
 
@@ -9,22 +23,41 @@
 To guarantee **zero login or signup downtime**, execute the deployment in this exact order:
 
 1. **Step 1 — Deploy the Express + Frontend App (`Render`) FIRST**:
-   - The updated frontend (`src/services/supabaseAuthService.ts`) switches `signIn()` to `POST /api/auth/login` and availability checks to `POST /api/auth/check-availability`, which execute the RPCs server-side using `SUPABASE_SERVICE_ROLE_KEY`.
+   - The updated frontend ([`src/services/supabaseAuthService.ts`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/src/services/supabaseAuthService.ts)) switches `signIn()` to `POST /api/auth/login` and availability checks to `POST /api/auth/check-availability`, which execute the RPCs server-side using `SUPABASE_SERVICE_ROLE_KEY`.
    - Until Step 2 runs, both the old and new paths work; once Step 1 is live on `https://scholar.gkshah.com.np`, no legitimate client calls the RPCs with the `anon` key anymore.
-2. **Step 2 — Take a Manual Database Backup (`pg_dump`) & Apply the SQL Migration (`Supabase SQL Editor`)**:
-   - Enables RLS on the 3 unprotected tables, makes all storage buckets private (`public = false`) and removes direct client policies, and revokes `PUBLIC, anon, authenticated` `EXECUTE` on the 6 RPCs (`service_role` retains `EXECUTE`, so Step 1's `/api/auth/login` continues working uninterrupted).
+2. **Step 2 — Take a Verified, Encrypted Database Backup (`pg_dump`) & Apply the SQL Migration (`Supabase SQL Editor`)**:
+   - Enables RLS on the 3 unprotected tables, makes all storage buckets private (`public = false`), drops open `project_files_*` policies, and revokes `PUBLIC, anon, authenticated` `EXECUTE` on the 6 RPCs + `submit_id_document` (`service_role` retains `EXECUTE`, so Step 1's `/api/auth/login` continues working uninterrupted).
 3. **Step 3 — Deploy the Updated `request-profile-update` Edge Function**:
-   - Redeploys `supabase/functions/request-profile-update/index.ts` so `verificationKey` is never returned in HTTP responses and email failures return HTTP `503`.
+   - Redeploys `supabase/functions/request-profile-update/index.ts` so it returns HTTP `410 Gone` (`PROFILE_UPDATE_DISABLED`) and never generates or returns `verificationKey`.
 
 ---
 
-## 2. Pre-Migration Backup Command (`pg_dump`)
+## 2. Pre-Migration Backup (`pg_dump`), Encryption & Restore Verification
 
-Before running the migration in production, take a full logical dump (schema + data, including `auth`, `storage`, and `public`) from your operator machine using the direct/session pooler connection string (never commit the `.dump` file to git):
+### 2.1 `pg_dump` Version Requirement
+Supabase Postgres runs **PostgreSQL 15.x / 17.x**. macOS ships without `pg_dump` or with an older libpq. Ensure your client `pg_dump` major version is `>=` the Supabase Postgres server version before dumping:
+```bash
+# Install latest libpq via Homebrew if needed:
+brew install libpq
+export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
+pg_dump --version
+```
+
+### 2.2 Dump & Encrypt at Rest
+Never store an unencrypted production dump containing `auth.users` password hashes and user PII in a world-readable folder, cloud sync directory (iCloud/Dropbox/OneDrive), or git repository:
 
 ```bash
-# Replace <DB_PASSWORD> in your shell environment (never inline in history)
-export PGPASSWORD="<DB_PASSWORD>"
+umask 077
+mkdir -p "$HOME/.scholar-backups"
+chmod 700 "$HOME/.scholar-backups"
+
+export DUMP_TS="$(date -u +%Y%m%dT%H%M%SZ)"
+export RAW_DUMP="$HOME/.scholar-backups/scholar-prod-pre-hotfix2-${DUMP_TS}.dump"
+
+# Prompt interactively for DB password (avoids shell history exposure):
+read -r -s -p "Supabase Postgres password: " PGPASSWORD
+echo ""
+export PGPASSWORD
 
 pg_dump \
   --host="aws-0-ap-south-1.pooler.supabase.com" \
@@ -37,9 +70,25 @@ pg_dump \
   --schema=public \
   --schema=auth \
   --schema=storage \
-  --file="$HOME/scholar-prod-pre-hotfix2-$(date -u +%Y%m%dT%H%M%SZ).dump"
+  --file="${RAW_DUMP}"
 
 unset PGPASSWORD
+```
+
+### 2.3 Verify Archive Integrity (`pg_restore --list`) & Encrypt with AES-256
+Before running any migration, verify the custom dump archive table of contents is readable and non-empty, then encrypt it with GPG (`AES256`) and remove the plaintext `.dump`:
+```bash
+# 1. Verify archive header & object list (must list public.projects, public.profiles, auth.users, etc.):
+pg_restore --list "${RAW_DUMP}" | head -n 40
+pg_restore --list "${RAW_DUMP}" | grep -E "TABLE DATA public (projects|profiles|project_claims)"
+
+# 2. Optional full restore test into a disposable local Postgres database:
+# createdb scholar_restore_verify && pg_restore --no-owner --no-acl -d scholar_restore_verify "${RAW_DUMP}" && dropdb scholar_restore_verify
+
+# 3. Encrypt the dump file with AES-256 and shred/remove the unencrypted file:
+gpg --symmetric --cipher-algo AES256 --output "${RAW_DUMP}.gpg" "${RAW_DUMP}"
+rm -P "${RAW_DUMP}" 2>/dev/null || rm -f "${RAW_DUMP}"
+ls -lh "${RAW_DUMP}.gpg"
 ```
 
 ---
@@ -74,13 +123,15 @@ BEGIN
   END IF;
 END $$;
 
--- 2. Storage Lockdown: make all buckets private & drop client policies (F-03)
+-- 2. Storage Lockdown: make all buckets private & drop open project-files policies (F-03)
+--    Note: id_documents_*_own policies (scoped to (storage.foldername(name))[1] = auth.uid()::text)
+--    are intentionally retained on the now-private id-documents bucket.
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'storage' AND tablename = 'buckets') THEN
     UPDATE storage.buckets
     SET public = false
-    WHERE public = true OR id IN ('project-files', 'id-documents');
+    WHERE public = true OR id IN ('project-files', 'id-documents', 'vault-files');
   END IF;
 
   IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'storage' AND tablename = 'objects') THEN
@@ -88,103 +139,11 @@ BEGIN
     DROP POLICY IF EXISTS "project_files_select" ON storage.objects;
     DROP POLICY IF EXISTS "project_files_update" ON storage.objects;
     DROP POLICY IF EXISTS "project_files_delete" ON storage.objects;
-
-    DROP POLICY IF EXISTS "id_documents_insert_own" ON storage.objects;
-    DROP POLICY IF EXISTS "id_documents_select_own" ON storage.objects;
-    DROP POLICY IF EXISTS "id_documents_update_own" ON storage.objects;
-    DROP POLICY IF EXISTS "id_documents_delete_own" ON storage.objects;
   END IF;
 END $$;
 
--- 3. Ensure RPCs exist for service_role and revoke anon/authenticated (F-14)
-CREATE OR REPLACE FUNCTION public.email_for_username(lookup_username text)
-RETURNS text
-LANGUAGE sql
-SECURITY DEFINER SET search_path = public
-STABLE
-AS $$
-  SELECT au.email
-  FROM public.profiles p
-  JOIN auth.users au ON au.id = p.id
-  WHERE p.username = lookup_username
-  LIMIT 1;
-$$;
-
-CREATE OR REPLACE FUNCTION public.email_for_phone_e164(lookup_phone_e164 text)
-RETURNS text
-LANGUAGE sql
-SECURITY DEFINER SET search_path = public
-STABLE
-AS $$
-  SELECT au.email
-  FROM public.profiles p
-  JOIN auth.users au ON au.id = p.id
-  WHERE p.phone_e164 = lookup_phone_e164
-  LIMIT 1;
-$$;
-
-CREATE OR REPLACE FUNCTION public.email_for_identifier(lookup_identifier text)
-RETURNS TABLE(email text, found_by text)
-LANGUAGE sql
-SECURITY DEFINER SET search_path = public
-STABLE
-AS $$
-  (SELECT au.email, 'username'::text AS found_by
-   FROM public.profiles p
-   JOIN auth.users au ON au.id = p.id
-   WHERE p.username = lookup_identifier
-   LIMIT 1)
-  UNION ALL
-  (SELECT au.email, 'email'::text AS found_by
-   FROM auth.users au
-   WHERE au.email = lookup_identifier
-   LIMIT 1)
-  UNION ALL
-  (SELECT au.email, 'phone'::text AS found_by
-   FROM public.profiles p
-   JOIN auth.users au ON au.id = p.id
-   WHERE p.phone_e164 = lookup_identifier
-     AND lookup_identifier LIKE '+%'
-   LIMIT 1);
-$$;
-
-CREATE OR REPLACE FUNCTION public.check_username_available(lookup_username text)
-RETURNS boolean
-LANGUAGE sql
-SECURITY DEFINER SET search_path = public
-STABLE
-AS $$
-  SELECT NOT EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE username = lookup_username
-  );
-$$;
-
-CREATE OR REPLACE FUNCTION public.check_email_available(lookup_email text)
-RETURNS boolean
-LANGUAGE sql
-SECURITY DEFINER SET search_path = public
-STABLE
-AS $$
-  SELECT NOT EXISTS (
-    SELECT 1 FROM auth.users
-    WHERE email = lookup_email
-  );
-$$;
-
-CREATE OR REPLACE FUNCTION public.check_phone_available(lookup_phone_e164 text)
-RETURNS boolean
-LANGUAGE sql
-SECURITY DEFINER SET search_path = public
-STABLE
-AS $$
-  SELECT NOT EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE phone_e164 = lookup_phone_e164
-      AND phone_e164 IS NOT NULL
-  );
-$$;
-
+-- 3. Revoke PUBLIC, anon, and authenticated EXECUTE on account RPCs (F-14)
+--    Only REVOKE / GRANT is performed; no function bodies are replaced.
 REVOKE ALL ON FUNCTION public.email_for_username(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.email_for_username(text) TO service_role;
 
@@ -231,7 +190,7 @@ npx supabase functions deploy request-profile-update --project-ref gfjhsijrwodjv
 ## 5. Verification `SELECT`s (Run After Step 2)
 
 ```sql
--- 1. Confirm RLS is enabled on all 3 tables (expected: rls_enabled = true for all 3)
+-- 1. Confirm RLS is enabled on all 3 tables (expected: rls_enabled = true, anon_can_select = false, authenticated_can_select = false)
 SELECT
   c.relname AS table_name,
   c.relrowsecurity AS rls_enabled,
@@ -249,13 +208,14 @@ SELECT id, name, public, file_size_limit, allowed_mime_types
 FROM storage.buckets
 ORDER BY id;
 
--- 3. Confirm no anonymous/client policies remain on project-files or id-documents (expected: 0 rows)
+-- 3. Confirm project_files_* open policies are gone while id_documents_*_own policies remain intact
 SELECT policyname, roles, cmd, qual, with_check
 FROM pg_catalog.pg_policies
 WHERE schemaname = 'storage'
-  AND tablename = 'objects';
+  AND tablename = 'objects'
+ORDER BY policyname;
 
--- 4. Confirm anon and authenticated cannot execute the 6 RPCs, while service_role can
+-- 4. Confirm anon and authenticated cannot execute the 6 RPCs or submit_id_document, while service_role can
 SELECT
   p.proname AS function_name,
   has_function_privilege('anon', p.oid, 'EXECUTE') AS anon_can_exec,
@@ -278,19 +238,26 @@ ORDER BY p.proname;
 
 ---
 
-## 6. Emergency Rollback SQL
+## 6. Known Intentional Breakage & Follow-Up Ticket (`TICKET-SEC-01`)
+
+| Ticket ID | Feature Affected | Current Lockdown Behavior | Replacement Design Required to Re-Enable |
+| :--- | :--- | :--- | :--- |
+| **`TICKET-SEC-01`** | Admin-verified Email / Username update request (`request-profile-update` Edge Function) | Edge Function returns `HTTP 410 Gone` (`code: "PROFILE_UPDATE_DISABLED"`). [`AccountSettingsScreen.tsx`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/src/desk/account/AccountSettingsScreen.tsx#L351-L356) displays a clear notice explaining that email/username changes requiring administrator verification are paused during a security upgrade, while Full Name, Phone Number, Institution, User Type, and Education Level remain directly editable. | 1. Require a valid user Bearer JWT on `request-profile-update` (`supabase.auth.getUser(jwt)`), binding `username` to the authenticated caller's `profiles.id = user.id` rather than trusting `req.body.username`.<br>2. Store a cryptographic hash (`sha256(verificationKey)`) and expiry timestamp in a dedicated `public.profile_update_requests` table (`RLS` enabled, `service_role` only).<br>3. Never return `verificationKey` in the HTTP response; deliver it exclusively to `ADMIN_EMAIL` via Resend. |
+
+---
+
+## 7. Emergency Rollback SQL
 
 > [!CAUTION]
-> **WARNING — RUNNING THIS ROLLBACK RE-OPENS THE `F-02`, `F-03`, AND `F-14` SECURITY HOLES!**  
+> **WARNING — RUNNING THIS ROLLBACK RE-OPENS THE `F-14` PII ENUMERATION HOLE!**  
 > Only run this if you must roll back the Express application on Render to a pre-Hotfix-2 commit where the browser still calls `email_for_*` and `check_*_available` directly with the `anon` key.
 
 ```sql
 -- ============================================================================
--- EMERGENCY ROLLBACK ONLY — RE-OPENS ANONYMOUS RLS, STORAGE, AND RPC HOLES!
+-- EMERGENCY ROLLBACK ONLY — RE-OPENS ANONYMOUS RPC ENUMERATION (F-14)!
 -- ============================================================================
 BEGIN;
 
--- Re-grant RPC execute to anon and authenticated (RE-OPENS F-14 PII ENUMERATION)
 GRANT EXECUTE ON FUNCTION public.email_for_username(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.email_for_phone_e164(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.email_for_identifier(text) TO anon, authenticated;
@@ -298,27 +265,9 @@ GRANT EXECUTE ON FUNCTION public.check_username_available(text) TO anon, authent
 GRANT EXECUTE ON FUNCTION public.check_email_available(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.check_phone_available(text) TO anon, authenticated;
 
--- Restore id-documents authenticated policies (if needed)
-CREATE POLICY "id_documents_insert_own" ON storage.objects
-  FOR INSERT TO authenticated
-  WITH CHECK (bucket_id = 'id-documents' AND (storage.foldername(name))[1] = auth.uid()::text);
-CREATE POLICY "id_documents_select_own" ON storage.objects
-  FOR SELECT TO authenticated
-  USING (bucket_id = 'id-documents' AND (storage.foldername(name))[1] = auth.uid()::text);
-CREATE POLICY "id_documents_update_own" ON storage.objects
-  FOR UPDATE TO authenticated
-  USING (bucket_id = 'id-documents' AND (storage.foldername(name))[1] = auth.uid()::text)
-  WITH CHECK (bucket_id = 'id-documents' AND (storage.foldername(name))[1] = auth.uid()::text);
-CREATE POLICY "id_documents_delete_own" ON storage.objects
-  FOR DELETE TO authenticated
-  USING (bucket_id = 'id-documents' AND (storage.foldername(name))[1] = auth.uid()::text);
-
 -- NOTE: Even in an emergency rollback of login RPCs, DO NOT disable RLS on
 -- project_research_gaps / project_titles / project_journal_candidates and
--- DO NOT re-enable anonymous policies on project-files unless strictly required:
--- ALTER TABLE IF EXISTS public.project_research_gaps DISABLE ROW LEVEL SECURITY;
--- ALTER TABLE IF EXISTS public.project_titles DISABLE ROW LEVEL SECURITY;
--- ALTER TABLE IF EXISTS public.project_journal_candidates DISABLE ROW LEVEL SECURITY;
+-- DO NOT re-enable anonymous policies on project-files.
 
 COMMIT;
 ```

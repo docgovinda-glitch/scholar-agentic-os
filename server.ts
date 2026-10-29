@@ -9,6 +9,7 @@ import dotenv from "dotenv";
 import "express-async-errors";
 import { rateLimit } from "./server/src/middleware/rateLimit.ts";
 import { errorHandler } from "./server/src/middleware/errorHandler.ts";
+import { getMaxUploadMb } from "./server/src/middleware/uploadGuard.ts";
 import { registerDefaultParsers, detectHeadings } from "./src/document_intelligence/index.ts";
 import { registerBuiltinAgents } from "./src/app/mesh/agents/index.ts";
 import type { CanonicalReference, ReferenceAuthor, ReferenceKind } from "./src/citation_compliance/model/reference.ts";
@@ -33,7 +34,9 @@ import http from "node:http";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
 import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerDraftingRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerPresentationRoutes, registerSupabaseProxy, registerSupabaseWsProxy } from "./server/routes/index.ts";
 
-dotenv.config();
+if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
+  dotenv.config();
+}
 
 // Bind to environment $PORT if provided (e.g. Render), defaulting to 3000.
 const PORT = Number(process.env.PORT) || 3000;
@@ -49,6 +52,7 @@ function resolveServerDirname(): string {
 const serverDirname = resolveServerDirname();
 
 const app = express();
+app.set("trust proxy", 1);
 
 // Security headers: CSP is enforced in production while disabled in dev to allow Vite HMR.
 // The policy explicitly permits Supabase endpoints, Gemini BYOK, scholarly discovery APIs, and local AI loopback runners.
@@ -252,7 +256,7 @@ app.use((req, _res, next) => {
 // raw, unbuffered streaming for database, auth, and storage endpoints.
 registerSupabaseProxy(app);
 
-const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 10;
+const MAX_UPLOAD_MB = getMaxUploadMb();
 const BODY_LIMIT = `${MAX_UPLOAD_MB}mb`;
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ limit: BODY_LIMIT, extended: true }));
@@ -444,6 +448,19 @@ async function startServer() {
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
   });
+
+  const gracefulShutdown = (signal: string) => {
+    console.log(`Received ${signal}, shutting down HTTP server gracefully...`);
+    server.close(() => {
+      process.exit(0);
+    });
+    setTimeout(() => {
+      process.exit(1);
+    }, 10_000).unref();
+  };
+
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 }
 
 export { app };

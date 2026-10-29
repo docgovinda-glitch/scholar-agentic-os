@@ -4,55 +4,94 @@ import http from "node:http";
 import tls from "node:tls";
 import net from "node:net";
 import { URL } from "node:url";
+import { rateLimit } from "../src/middleware/rateLimit.ts";
+
+const ALLOWED_SUPABASE_PREFIXES = [
+  "/auth/v1",
+  "/rest/v1",
+  "/storage/v1",
+  "/functions/v1",
+  "/realtime/v1",
+];
+
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: true,
+  keepAlive: true,
+});
+
+const supabaseProxyRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  limitBy: "ip",
+});
 
 /**
- * Returns the remote upstream Supabase URL.
- * Prefers SUPABASE_TARGET_URL or an explicit full https URL from VITE_SUPABASE_URL.
- * Falls back to the production project URL.
+ * Returns the remote upstream Supabase URL, or null when unconfigured (fail-closed, F-07).
+ * Prefers SUPABASE_TARGET_URL, SUPABASE_URL, or an explicit full http(s) URL from VITE_SUPABASE_URL.
  */
-export function getRemoteSupabaseUrl(): string {
-  const customTarget = process.env.SUPABASE_TARGET_URL;
-  if (customTarget && customTarget.startsWith("http")) {
-    return customTarget.replace(/\/+$/, "");
+export function getRemoteSupabaseUrl(): string | null {
+  const candidates = [
+    process.env.SUPABASE_TARGET_URL,
+    process.env.SUPABASE_URL,
+    process.env.VITE_SUPABASE_URL,
+  ];
+
+  for (const raw of candidates) {
+    if (raw && raw.startsWith("http") && !raw.includes("/api/supabase")) {
+      return raw.replace(/\/+$/, "");
+    }
   }
 
-  const viteUrl = process.env.VITE_SUPABASE_URL;
-  if (viteUrl && viteUrl.startsWith("http") && !viteUrl.includes("/api/supabase")) {
-    return viteUrl.replace(/\/+$/, "");
-  }
+  return null;
+}
 
-  return "https://gfjhsijrwodjvkisouzw.supabase.co";
+export function isAllowedSupabaseSubpath(subpath: string): boolean {
+  const pathOnly = (subpath.split("?")[0] || "/").trim();
+  if (pathOnly.includes("..") || pathOnly.includes("\\")) {
+    return false;
+  }
+  return ALLOWED_SUPABASE_PREFIXES.some(
+    (prefix) => pathOnly === prefix || pathOnly.startsWith(`${prefix}/`)
+  );
 }
 
 /**
  * Registers a transparent, zero-memory-buffering streaming reverse proxy
  * for Supabase endpoints at `/api/supabase/*`.
- *
- * This allows client browsers on institutional networks (which block *.supabase.co)
- * to interact with Supabase purely through the application's own origin
- * (scholar.gkshah.com.np/api/supabase/*), entirely preventing SSL interception
- * and firewall access-denied blocks.
  */
 export function registerSupabaseProxy(app: Express): void {
-  const remoteUrlStr = getRemoteSupabaseUrl();
-  let targetUrl: URL;
-  try {
-    targetUrl = new URL(remoteUrlStr);
-  } catch {
-    targetUrl = new URL("https://gfjhsijrwodjvkisouzw.supabase.co");
-  }
+  app.use("/api/supabase", supabaseProxyRateLimit, (req: Request, res: Response) => {
+    const remoteUrlStr = getRemoteSupabaseUrl();
+    if (!remoteUrlStr) {
+      res.status(503).json({
+        error: "Service Unavailable",
+        message: "Supabase upstream URL is not configured (set VITE_SUPABASE_URL or SUPABASE_URL).",
+      });
+      return;
+    }
 
-  const isHttps = targetUrl.protocol === "https:";
-  const transport = isHttps ? https : http;
-  const defaultPort = isHttps ? 443 : 80;
+    let targetUrl: URL;
+    try {
+      targetUrl = new URL(remoteUrlStr);
+    } catch {
+      res.status(503).json({
+        error: "Service Unavailable",
+        message: "Invalid Supabase upstream URL configuration.",
+      });
+      return;
+    }
 
-  app.use("/api/supabase", (req: Request, res: Response) => {
     // req.url inside app.use('/api/supabase') has /api/supabase stripped by Express
     const subpath = req.url || "/";
 
-    // If an incoming request requests a WebSocket upgrade, standard Express HTTP middleware
-    // cannot switch protocols. Return a 426 Upgrade Required with clean guidance instead of forwarding
-    // a truncated HTTP GET request to Supabase that triggers upstream 500 errors.
+    if (!isAllowedSupabaseSubpath(subpath)) {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "Proxy path is not on the Supabase API allowlist (/auth/v1, /rest/v1, /storage/v1, /functions/v1).",
+      });
+      return;
+    }
+
     if (req.headers.upgrade && String(req.headers.upgrade).toLowerCase() === "websocket") {
       res.status(426).json({
         error: "Upgrade Required",
@@ -60,6 +99,10 @@ export function registerSupabaseProxy(app: Express): void {
       });
       return;
     }
+
+    const isHttps = targetUrl.protocol === "https:";
+    const transport = isHttps ? https : http;
+    const defaultPort = isHttps ? 443 : 80;
 
     // Clone and sanitize incoming headers
     const forwardedHeaders: Record<string, string | string[] | undefined> = {
@@ -81,6 +124,7 @@ export function registerSupabaseProxy(app: Express): void {
       method: req.method,
       headers: forwardedHeaders,
       timeout: 30000,
+      ...(isHttps ? { agent: httpsAgent, rejectUnauthorized: true } : {}),
     };
 
     const proxyReq = transport.request(requestOptions, (proxyRes) => {
@@ -122,38 +166,42 @@ export function registerSupabaseProxy(app: Express): void {
 
 /**
  * Registers an HTTP WebSocket upgrade proxy on the underlying Node http.Server.
- *
- * Intercepts incoming WebSocket upgrades targeting `/api/supabase/realtime/*`
- * and transparently forwards them to the upstream Supabase Realtime endpoint.
- * Because the browser connects to the same-origin URL (e.g. wss://scholar.gkshah.com.np/api/supabase/...),
- * this completely eliminates browser-level `ERR_CERT_AUTHORITY_INVALID` certificate errors caused by
- * corporate/institutional proxies intercepting direct connections to `*.supabase.co`.
  */
 export function registerSupabaseWsProxy(server: http.Server): void {
-  const remoteUrlStr = getRemoteSupabaseUrl();
-  let targetUrl: URL;
-  try {
-    targetUrl = new URL(remoteUrlStr);
-  } catch {
-    targetUrl = new URL("https://gfjhsijrwodjvkisouzw.supabase.co");
-  }
-
-  const isHttps = targetUrl.protocol === "https:";
-  const defaultPort = isHttps ? 443 : 80;
-  const targetPort = targetUrl.port ? Number(targetUrl.port) : defaultPort;
-
   server.on("upgrade", (req: http.IncomingMessage, clientSocket: net.Socket, head: Buffer) => {
     if (!req.url || !req.url.startsWith("/api/supabase")) {
       return;
     }
 
+    const remoteUrlStr = getRemoteSupabaseUrl();
+    if (!remoteUrlStr) {
+      clientSocket.destroy();
+      return;
+    }
+
+    let targetUrl: URL;
+    try {
+      targetUrl = new URL(remoteUrlStr);
+    } catch {
+      clientSocket.destroy();
+      return;
+    }
+
     const subpath = req.url.replace(/^\/api\/supabase/, "") || "/";
+    if (!isAllowedSupabaseSubpath(subpath)) {
+      clientSocket.destroy();
+      return;
+    }
+
+    const isHttps = targetUrl.protocol === "https:";
+    const defaultPort = isHttps ? 443 : 80;
+    const targetPort = targetUrl.port ? Number(targetUrl.port) : defaultPort;
 
     const connectOptions: tls.ConnectionOptions = {
       host: targetUrl.hostname,
       port: targetPort,
       servername: targetUrl.hostname,
-      rejectUnauthorized: false,
+      rejectUnauthorized: true,
     };
 
     const upstreamSocket: net.Socket = isHttps
@@ -204,4 +252,3 @@ export function registerSupabaseWsProxy(server: http.Server): void {
     });
   });
 }
-

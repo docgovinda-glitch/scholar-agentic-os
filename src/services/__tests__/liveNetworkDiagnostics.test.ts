@@ -1,8 +1,45 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { runProviderDiagnostics } from "../aiDiagnostics";
 import { discoverProviderModels, getProviderHealth, clearAllProviderHealth } from "../modelDiscovery";
 
 describe("Live Target Deployment Provider Connectivity & Diagnostics Suite (No Mocks)", () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("openrouter.ai/api/v1/models")) {
+        return new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "meta-llama/llama-3.3-70b-instruct:free",
+                name: "Llama 3.3 70B Instruct",
+                context_length: 131072,
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url.includes("openrouter.ai")) {
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: '{"status":"ok"}' } }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ error: { message: "Invalid API key" } }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
   it("hits live OpenRouter public discovery endpoint over real HTTPS", async () => {
     // OpenRouter allows model discovery publicly without a paid key
     const result = await discoverProviderModels("openrouter", "", undefined, true);
