@@ -7,7 +7,6 @@ import {
   STUDY_DESIGN_GUIDELINES,
   buildFinerDiagnosticPrompts,
   buildPicoSynthesisPrompts,
-  generateLocalFinerFallback,
   generateLocalPicoFallback,
   type FinerDiagnosticResult,
   type PicoSynthesisResult,
@@ -504,15 +503,8 @@ export default function DefinitionStage({
       setFinerResult(parsed);
     } catch (e: any) {
       const msg = e.message || String(e);
-      // Fallback to intelligent local heuristic so the user is never blocked
-      const fallback = generateLocalFinerFallback({
-        workingTitle: answers.working_title,
-        primaryResearchQuestion: answers.primary_research_question,
-        researchArea: answers.research_area,
-        studyDesign: answers.study_design,
-        expectedContribution: answers.expected_contribution,
-      });
-      setFinerResult(fallback);
+      // No invented FINER scores or comments: say the assessment is unavailable.
+      setError(`FINER assessment unavailable: nothing was scored (${msg}). Connect an AI provider in AI Access, or try again.`);
       if (msg.toLowerCase().includes("exhausted") || msg.toLowerCase().includes("no provider")) {
         setExhaustedReason(msg);
       }

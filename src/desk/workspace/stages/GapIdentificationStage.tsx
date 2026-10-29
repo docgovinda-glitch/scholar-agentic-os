@@ -9,7 +9,6 @@ import type { ProjectView } from "../../types";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 import {
   buildGapPrompts,
-  generateLocalGapFallback,
   type GapItem,
 } from "../agentPrompts/gapPrompts";
 import { parseJsonFromLlm } from "../../../utils/jsonParser";
@@ -179,13 +178,10 @@ export default function GapIdentificationStage({
       const parsedData = parseJsonFromLlm(rawText);
       let data: GapItem[] = parsedData && Array.isArray(parsedData.data) ? parsedData.data : [];
 
+      // Only gaps the AI actually described; never invented scores.
+      data = data.filter((g) => typeof g?.description === "string" && g.description.trim());
       if (data.length === 0) {
-        data = generateLocalGapFallback({
-          workingTitle,
-          researchArea,
-          projectAnswers: project?.answers || {},
-          focusArea: customFocus,
-        });
+        throw new Error("The AI identified no research gaps. Nothing was added.");
       }
 
       // Fallback normalization if title is missing in older model outputs
@@ -194,8 +190,8 @@ export default function GapIdentificationStage({
         id: g.id || `gap-${Date.now()}-${idx}`,
         title: g.title || `${(g.gap_type || "Research").toUpperCase()} GAP ${idx + 1}`,
         status: g.status || "identified",
-        importance_score: g.importance_score || 85,
-        feasibility_score: g.feasibility_score || 80,
+        importance_score: g.importance_score,
+        feasibility_score: g.feasibility_score,
       }));
 
       setGaps(normalizedGaps);
@@ -229,39 +225,15 @@ export default function GapIdentificationStage({
     } catch (err: any) {
       const errMsg = err.message || "Failed to identify research gaps.";
 
-      // Fallback to intelligent local gap synthesis so user is never blocked
-      const fallbackGaps = generateLocalGapFallback({
-        workingTitle,
-        researchArea,
-        projectAnswers: project?.answers || {},
-        focusArea: customFocus,
-      });
-
-      setGaps(fallbackGaps);
-
-      try {
-        const updated = await saveIntakeAnswers(projectId, {
-          identified_gaps: JSON.stringify(fallbackGaps),
-          current_stage: "gap_identification",
-        });
-        setProject(updated);
-      } catch (saveErr) {
-        console.warn("[GapIdentificationStage] Failed to persist fallback gaps:", saveErr);
-      }
-
+      // No invented gaps: report the failure and keep any existing ones.
+      setError(errMsg);
       setLogs((prev) => [
         ...prev,
         {
-          id: Date.now().toString() + "fallback",
+          id: Date.now().toString() + "fail",
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "warning",
-          message: `ℹ️ Local synthesis activated (${errMsg}): ${fallbackGaps.length} domain-grounded candidate gaps generated.`,
-        },
-        {
-          id: Date.now().toString() + "done2",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `✓ Candidate research gaps ready for review and selection.`,
+          level: "error",
+          message: `Gap identification unavailable: nothing was added (${errMsg}). Add a gap manually, or try again.`,
         },
       ]);
     } finally {
