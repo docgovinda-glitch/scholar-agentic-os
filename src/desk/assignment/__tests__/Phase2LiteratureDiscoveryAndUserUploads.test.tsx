@@ -9,6 +9,9 @@ import {
   extractResearchIntent,
 } from "../services/scholarlyDiscoveryService";
 import type { UploadedSourceDocument } from "../types";
+import { generateCuratedLiteratureSources as seedSourcesFixture } from "../services/scholarlyDiscoveryService";
+const seedSources = (question: string) => seedSourcesFixture(question, "apa7");
+
 
 const getProject = vi.fn();
 const getDocument = vi.fn();
@@ -24,6 +27,23 @@ class UnauthenticatedError extends Error {
     this.name = "UnauthenticatedError";
   }
 }
+
+// Live literature search is a network call; these UI tests stand in for it
+// with fixture sources, so the grid/filter/approve behaviour is still tested.
+// (The app itself no longer substitutes catalog entries when search fails.)
+vi.mock("../services/realScholarlyDiscoveryService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../services/realScholarlyDiscoveryService")>();
+  const fixtures = await import("../services/scholarlyDiscoveryService");
+  return {
+    ...actual,
+    discoverRealScholarlySourcesFromServer: vi.fn(async (question: string, style = "apa7") =>
+      fixtures.generateCuratedLiteratureSources(question, style)
+    ),
+    fetchMoreRealSources: vi.fn(async (existing: Parameters<typeof fixtures.fetchMoreLiteratureSources>[0], question: string, n = 10) =>
+      fixtures.fetchMoreLiteratureSources(existing, question, n)
+    ),
+  };
+});
 
 vi.mock("../../api", () => ({
   UnauthenticatedError,
@@ -65,6 +85,10 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
       hasDocument: false,
       answers: {
         assignment_question: unQuestion,
+
+        // Fixture: sources a previous live search saved to this project.
+
+        assignment_sources: JSON.stringify(seedSources(unQuestion)),
         word_count: 2000,
         target_word_count: 2000,
         citation_style: "apa7",
@@ -145,7 +169,7 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
       );
 
       // New Phase 2 h1 heading
-      expect(await screen.findByText(/Sources & Course Materials/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
       // Topic breadcrumb shows the assignment question from Phase 1 context
       expect(screen.getByText(unQuestion)).toBeInTheDocument();
@@ -184,6 +208,10 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
         hasDocument: false,
         answers: {
           assignment_question: unQuestion,
+
+          // Fixture: sources a previous live search saved to this project.
+
+          assignment_sources: JSON.stringify(seedSources(unQuestion)),
           word_count: 2000,
           target_word_count: 2000,
           citation_style: "apa7",
@@ -205,7 +233,7 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
         />
       );
 
-      await screen.findByText(/Sources & Course Materials/i);
+      await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 });
       const curatedGrid = await screen.findByTestId("curated-sources-grid");
       expect(within(curatedGrid).getByText("Week_05_UN_Security_Council_Veto.pptx")).toBeInTheDocument();
       expect(screen.getByText(/Uploaded: PPTX/i)).toBeInTheDocument();
@@ -255,6 +283,10 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
         hasDocument: false,
         answers: {
           assignment_question: unQuestion,
+
+          // Fixture: sources a previous live search saved to this project.
+
+          assignment_sources: JSON.stringify(seedSources(unQuestion)),
           word_count: 2000,
           target_word_count: 2000,
           citation_style: "apa7",
@@ -276,7 +308,7 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
         />
       );
 
-      await screen.findByText(/Sources & Course Materials/i);
+      await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 });
       const curatedGrid = await screen.findByTestId("curated-sources-grid");
       expect(within(curatedGrid).getByText("UN_Peacekeeping_Budgets_And_Fatalities_1990_2024.xlsx")).toBeInTheDocument();
       expect(within(curatedGrid).getByText(/Uploaded: SPREADSHEET/i)).toBeInTheDocument();

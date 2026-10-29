@@ -6,6 +6,7 @@ import { normalizeUnicodeNFC } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { safeParseAnswerField } from "../../../../src/shared/projectStateSchema.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import { getProjectSafe, userUpload } from "./helpers.ts";
+import { discoverMultiPortalSources } from "../../../src/discovery/discovery.ts";
 import type { UserDatasetRecord } from "./types.ts";
 
 export const evidenceRoutes = express.Router({ mergeParams: true });
@@ -393,70 +394,45 @@ Return ONLY valid JSON in this exact format:
 evidenceRoutes.post("/external-research", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
-  const context = JSON.stringify(project.answers);
-  const query = req.body?.query || project.answers["core_problem"] || project.answers["working_title"] || "academic external research";
-  const requestedDatabases = Array.isArray(req.body?.databases) && req.body.databases.length > 0
-    ? req.body.databases.join(", ")
-    : "CrossRef, arXiv, Semantic Scholar, IEEE Xplore, PubMed, DOAJ";
-  const minRelevance = Number(req.body?.minRelevance) || 75;
-  const anchorGap = req.body?.anchorGap || project.answers["anchor_gap_id"] || "Primary Research Gap";
+  const query = String(
+    req.body?.query || project.answers["core_problem"] || project.answers["working_title"] || ""
+  ).trim();
+  const anchorGap = req.body?.anchorGap || project.answers["anchor_gap_id"] || "";
+  if (!query) {
+    return res.status(400).json({ error: "Add a search query or working title first." });
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  const send = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
   try {
-    const systemPrompt = `You are an expert autonomous scholarly research crawler agent conducting Deep External Literature Discovery.
-Target academic registries: ${requestedDatabases}.
-Target search query: "${query}".
-Evidentiary gap to address: "${anchorGap}".
-Minimum relevance threshold: ${minRelevance}%.
-
-Generate 10 to 16 publication-grade, peer-reviewed external papers or verified preprints that fill the unaddressed literature gap.
-For each paper, classify its evidentiary role into one of: 'benchmark', 'empirical', 'theoretical', 'methodological', or 'comparative'.
-Provide realistic metadata including authors, publication year (2020-2025 preferred), valid DOIs or arXiv identifiers, target journal/conference, citation count, matched concepts, and a verbatim abstract snippet detailing concrete empirical or theoretical findings.
-
-Return ONLY valid JSON in this exact format:
-{
-  "data": [
-    {
-      "id": "ext-1",
-      "title": "Exact Title of External Paper",
-      "author": "Author One, Author Two, & Author Three",
-      "year": 2024,
-      "database": "CrossRef",
-      "doi": "10.1145/3547659.3560812",
-      "gap_addressed": "${anchorGap}",
-      "snippet": "Empirical and theoretical findings resolving boundary conditions...",
-      "relevance": 94,
-      "relevance_score": 94,
-      "evidentiary_role": "benchmark",
-      "matched_concepts": ["Concept1", "Concept2"],
-      "citation_count": 58,
-      "journal": "ACM Transactions on Computer Systems"
-    }
-  ]
-}`;
-    const searchContext = `Search Parameters:
-- Query: ${query}
-- Target Databases: ${requestedDatabases}
-- Anchor Gap: ${anchorGap}
-- Manuscript Working Title: ${project.answers["working_title"] || project.answers["title"] || "Research Manuscript"}
-- Target Venue: ${project.answers["target_journal"] || "Peer-Reviewed Venue"}
-- Methodology: ${project.answers["methodology"] || "Empirical Research"}
-
-Research Context: ${context}`;
-
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, searchContext);
-    if (!result) return;
-    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    // Real index search only (OpenAlex, Crossref, DOAJ, DataCite, arXiv).
+    // This route used to ask an LLM to "generate" papers with realistic
+    // metadata; every result now comes from a scholarly index.
+    send("log", { message: `Searching OpenAlex, Crossref, DOAJ, DataCite and arXiv for "${query.slice(0, 120)}"…` });
+    const drafts = await discoverMultiPortalSources(query, 16);
+    const data = drafts.map((d, idx) => ({
+      id: `ext-${Date.now()}-${idx}`,
+      title: d.title,
+      author: d.authors.join(", "),
+      year: d.year,
+      database: d.discoveredVia,
+      doi: d.doi,
+      url: d.url,
+      journal: d.venue,
+      gap_addressed: anchorGap || undefined,
+      snippet: "",
+      matched_concepts: [],
+    }));
+    send("log", { message: `Found ${data.length} records.` });
+    send("done", { ok: true, data });
     res.end();
   } catch (err: unknown) {
-    if (res.writableEnded) return;
     const message = err instanceof Error ? err.message : String(err);
-    if (message === "RequireFrontendLLMException") return;
-    if (!res.headersSent) {
-      res.status(500).json({ error: message });
-    } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
-      res.end();
-    }
+    send("error", { message: `Literature search failed: ${message}` });
+    res.end();
   }
 });
 

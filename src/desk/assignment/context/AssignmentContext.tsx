@@ -59,7 +59,6 @@ import {
   type InternalSectionPlan,
 } from "../services/invisibleChunkerService";
 import { auditCitations, evaluateRubricCompliance, auditFlowAndTransitions } from "../services/submissionAuditService";
-import { generateCuratedLiteratureSources } from "../services/scholarlyDiscoveryService";
 import { getCitationCoverage } from "../services/citationAnchoringService";
 import { generateReferenceListBlock } from "../services/referenceListGenerator";
 import { stripCircularReferences } from "../../../utils/briefExtractor";
@@ -768,7 +767,7 @@ export function AssignmentProvider({
         // fallback
       }
     }
-    const fromSources = (sources && sources.length > 0 ? sources : generateCuratedLiteratureSources(question, citationStyle))
+    const fromSources = (sources ?? [])
       .filter((s) => s.status !== "removed" && !s.isExcluded)
       .map((s) => s.id);
     const fromUploaded = userUploadedSources.map((u) => u.id);

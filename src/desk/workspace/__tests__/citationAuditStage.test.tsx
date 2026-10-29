@@ -175,7 +175,9 @@ describe("Stage 18: Citation Provenance & Claim Audit (CitationAuditStage)", () 
     expect(onAdvanceMock).not.toHaveBeenCalled();
   });
 
-  it("engages local fallback auditing engine when stream fails and maps claims against vault corpus", async () => {
+  it("shows no claims and says nothing was generated when the audit fails", async () => {
+    // Rewritten 2026-10-29: this used to assert hardcoded "verified" fallback
+    // claims. A failed audit must not produce any result.
     (authedStreamFetch as any).mockRejectedValue(new Error("Network drop during citation audit stream"));
 
     render(
@@ -186,17 +188,13 @@ describe("Stage 18: Citation Provenance & Claim Audit (CitationAuditStage)", () 
       />
     );
 
-    const startBtn = screen.getByRole("button", { name: /Begin Citation Audit/i });
-    fireEvent.click(startBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Begin Citation Audit/i }));
 
-    // Fallback activates
     await waitFor(() => {
-      expect(screen.getByText(/Provenance Score/i)).toBeInTheDocument();
+      expect(screen.getByText(/Citation audit unavailable: nothing was generated/i)).toBeInTheDocument();
     });
-
-    // Fallback synthesized claims should exist
-    expect(screen.getByText(/Autonomous reasoning architectures demonstrate an average variance reduction/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Verbatim Vault Evidence Chunk:/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Provenance Score/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Autonomous reasoning architectures demonstrate an average variance reduction/i)).not.toBeInTheDocument();
   });
 
   it("filters claims by tab (All, Verified, Needs Review) and searches by query", async () => {

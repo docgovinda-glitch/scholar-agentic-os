@@ -6,8 +6,6 @@ import { CuratedSourceCard } from "../components/CuratedSourceCard";
 import { LectureUploadDropzone } from "../components/LectureUploadDropzone";
 import { ScholarlyResearchPipeline } from "../components/ScholarlyResearchPipeline";
 import {
-  generateCuratedLiteratureSources,
-  fetchMoreLiteratureSources,
   areSourcesRelevantToQuestion,
 } from "../services/scholarlyDiscoveryService";
 import {
@@ -72,80 +70,6 @@ export function formatHarvardCitation(source: Partial<DiscoveredSource>): string
   return `${authorsStr} (${yearStr}) ${titleStr}, ${venueStr}${volStr}${doiStr}.`;
 }
 
-const REPLACEMENT_POOL: DiscoveredSource[] = [
-  {
-    id: "src-curated-alt-1",
-    title: "Governance by Dashboard: Performance Metrics and Institutional Isomorphism",
-    authors: ["Espeland, W. N.", "Sauder, M."],
-    year: "2023",
-    type: "journal",
-    journal: "American Journal of Sociology",
-    volumeIssue: "128(6), 1642–1689",
-    doi: "10.1086/724890",
-    relevanceScore: 93,
-    mainFinding: "Traces organizational reactivity to quantitative rankings, documenting how metrics distort primary public mission objectives.",
-    suggestedUse: "Offers institutional sociology critique for examining broader organizational consequences of automation.",
-    citation: "Espeland, W. N. & Sauder, M. (2023). Governance by Dashboard. American Journal of Sociology, 128(6), 1642–1689.",
-    abstract: "Drawing on a longitudinal study of public sector agencies adopting quantitative performance management regimes, this article details how performance targets distort professional discretion.",
-    citationCount: 1650,
-    citationImpact: "Highly Cited",
-    methodology: "Qualitative Case Study",
-    keyConcepts: ["Institutional Isomorphism", "Metric Gaming", "Reactivity"],
-    domain: "Sociology & Organization Studies",
-    isOpenAccess: false,
-    isVerifiedAcademic: true,
-    sourceCredibility: "peer-reviewed",
-    status: "kept",
-  },
-  {
-    id: "src-curated-alt-2",
-    title: "The Human Element: Socratic Oversight in Machine-Mediated Education",
-    authors: ["Biesta, G."],
-    year: "2022",
-    type: "book",
-    journal: "Routledge",
-    publisher: "Routledge",
-    doi: "10.4324/9781003180425",
-    relevanceScore: 90,
-    mainFinding: "Argues that pedagogic engagement cannot be reduced to predictive skill optimization without abandoning moral agency.",
-    suggestedUse: "Ideal philosophical argument for pedagogical, moral, or student autonomy perspectives.",
-    citation: "Biesta, G. (2022). World-Centred Education: A View for the Present. Routledge.",
-    abstract: "This philosophical treatise challenges the instrumental reduction of education into adaptive algorithmic micro-learning.",
-    citationCount: 1480,
-    citationImpact: "Highly Cited",
-    methodology: "Theoretical Framework",
-    keyConcepts: ["Subjectification", "Pedagogical Autonomy", "Instrumentalism"],
-    domain: "Education & Philosophy of Mind",
-    isOpenAccess: false,
-    isVerifiedAcademic: true,
-    sourceCredibility: "academic-press",
-    status: "kept",
-  },
-  {
-    id: "src-curated-alt-3",
-    title: "Auditing Public Algorithms: Methodological Standards and Verification Gaps",
-    authors: ["Sandvig, C.", "Hamilton, K."],
-    year: "2024",
-    type: "institutional",
-    journal: "Center for Information Technology Policy, Princeton University",
-    publisher: "CITP Policy Paper Series",
-    doi: "10.1145/audit.2024.08",
-    relevanceScore: 89,
-    mainFinding: "Proposes standardized forensic audit methodologies and non-infringing scraping standards for academic researchers.",
-    suggestedUse: "Direct evidentiary support for policy recommendations, investigative methodology, and conclusion sections.",
-    citation: "Sandvig, C. & Hamilton, K. (2024). Auditing Public Algorithms. CITP Policy Paper, Princeton University.",
-    abstract: "Independent algorithmic auditing is currently impeded by restrictive anti-hacking statutes. This institutional study proposes a statutory safe harbor protocol.",
-    citationCount: 380,
-    citationImpact: "Recent Landmark",
-    methodology: "Systematic Review",
-    keyConcepts: ["Algorithmic Auditing", "Disparate Impact", "Safe Harbor"],
-    domain: "Public Interest Technology & Law",
-    isOpenAccess: true,
-    isVerifiedAcademic: true,
-    sourceCredibility: "institutional-report",
-    status: "kept",
-  },
-];
 
 export interface AssignmentSourcesStageProps {
   onProceed?: () => void;
@@ -462,10 +386,10 @@ export default function AssignmentSourcesStage({
       })
       .catch(() => {
         if (!cancelled) {
-          // Fallback to mock catalog
-          const generated = generateCuratedLiteratureSources(question, citationStyle);
-          setSources(generated);
+          // No invented fallback: leave the list empty and say so.
+          setSources([]);
           setIsDiscoveringInitial(false);
+          setDiscoverySuccessMsg("Literature search is unavailable right now. Try again, or add your own sources.");
         }
       });
     
@@ -493,19 +417,13 @@ export default function AssignmentSourcesStage({
       if (setApprovedSourceIds && approvedSourceIds.length > 0) {
         await setApprovedSourceIds(discovered.map((s) => s.id));
       }
-      const isReal = discovered.length > 0 && discovered[0].retrievalSource;
       setDiscoverySuccessMsg(
-        isReal
+        discovered.length > 0
           ? `Discovered ${discovered.length} scholarly sources from OpenAlex, CrossRef, DOAJ, DataCite & arXiv.`
-          : `Curated ${discovered.length} literature sources matching your assignment prompt.`
+          : "No sources found for this question. Try rewording it, or add your own sources."
       );
     } catch {
-      const generated = generateCuratedLiteratureSources(question, citationStyle);
-      await setSources(generated);
-      if (setApprovedSourceIds && approvedSourceIds.length > 0) {
-        await setApprovedSourceIds(generated.map((s) => s.id));
-      }
-      setDiscoverySuccessMsg(`Curated ${generated.length} literature sources matching your assignment prompt.`);
+      setDiscoverySuccessMsg("Literature search is unavailable right now. Try again, or add your own sources.");
     }
     setIsFindingMore(false);
     setTimeout(() => setDiscoverySuccessMsg(null), 5000);
@@ -521,20 +439,13 @@ export default function AssignmentSourcesStage({
       if (setApprovedSourceIds) {
         await setApprovedSourceIds(Array.from(new Set([...approvedSourceIds, ...moreBatch.map((s) => s.id)])));
       }
-      const isReal = moreBatch.length > 0 && moreBatch[0].retrievalSource;
       setDiscoverySuccessMsg(
-        isReal
+        moreBatch.length > 0
           ? `Retrieved and added ${moreBatch.length} additional scholarly sources from academic databases.`
-          : `Retrieved and added ${moreBatch.length} additional literature sources.`
+          : "No further sources found for this question."
       );
     } catch {
-      const moreBatch = fetchMoreLiteratureSources(sources, question, 10);
-      const nextSources = [...sources, ...moreBatch];
-      await setSources(nextSources);
-      if (setApprovedSourceIds) {
-        await setApprovedSourceIds(Array.from(new Set([...approvedSourceIds, ...moreBatch.map((s) => s.id)])));
-      }
-      setDiscoverySuccessMsg(`Retrieved and added ${moreBatch.length} additional literature sources.`);
+      setDiscoverySuccessMsg("Literature search is unavailable right now. Try again later.");
     }
     setIsFindingMore(false);
     setTimeout(() => setDiscoverySuccessMsg(null), 5000);
@@ -552,7 +463,7 @@ export default function AssignmentSourcesStage({
       try {
         newSources = await discoverRealScholarlySourcesFromServer(combinedTopic, citationStyle);
       } catch {
-        newSources = fetchMoreLiteratureSources(sources, combinedTopic, 6);
+        newSources = [];
       }
 
       const existingIds = new Set(sources.map((s) => s.id));
@@ -735,12 +646,8 @@ export default function AssignmentSourcesStage({
     if (!hasTopic && !hasUploadedDocs) {
       return [];
     }
-    // Use whatever sources are in state; fallback to synchronous generator while async discovery resolves
-    const raw = (sources && sources.length > 0)
-      ? sources
-      : (hasTopic || hasUploadedDocs)
-      ? generateCuratedLiteratureSources(question, citationStyle)
-      : [];
+    // Only sources actually in state (live discovery results or the user's own).
+    const raw = sources && sources.length > 0 ? sources : [];
 
     return raw.map((s, idx) => ({
       ...s,
@@ -752,10 +659,9 @@ export default function AssignmentSourcesStage({
   // Map user-uploaded documents to DiscoveredSource objects to unify into literature collection
   const mappedUserSources = useMemo<DiscoveredSource[]>(() => {
     return (userUploadedSources || []).map((doc) => {
-      const authorList = doc.author ? [doc.author] : ["Uploaded Material"];
-      const yearStr = doc.publicationDate
-        ? doc.publicationDate.slice(0, 4)
-        : new Date(doc.uploadedAt || Date.now()).getFullYear().toString();
+      const authorList = doc.author ? [doc.author] : [];
+      // Upload date is not a publication date; unknown stays unknown.
+      const yearStr = doc.publicationDate ? doc.publicationDate.slice(0, 4) : "n.d.";
       const formatBadge = (doc.sourceType || "doc").toUpperCase();
 
       return {

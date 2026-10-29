@@ -3,6 +3,9 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
+import { generateCuratedLiteratureSources as seedSourcesFixture } from "../services/scholarlyDiscoveryService";
+const seedSources = (question: string) => seedSourcesFixture(question, "apa7");
+
 
 const getProject = vi.fn();
 const getDocument = vi.fn();
@@ -11,6 +14,23 @@ const getOutputTypeSpec = vi.fn();
 const saveIntakeAnswers = vi.fn();
 const authedFetch = vi.fn();
 const authedJsonFetch = vi.fn();
+
+// Live literature search is a network call; these UI tests stand in for it
+// with fixture sources, so the grid/filter/approve behaviour is still tested.
+// (The app itself no longer substitutes catalog entries when search fails.)
+vi.mock("../services/realScholarlyDiscoveryService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../services/realScholarlyDiscoveryService")>();
+  const fixtures = await import("../services/scholarlyDiscoveryService");
+  return {
+    ...actual,
+    discoverRealScholarlySourcesFromServer: vi.fn(async (question: string, style = "apa7") =>
+      fixtures.generateCuratedLiteratureSources(question, style)
+    ),
+    fetchMoreRealSources: vi.fn(async (existing: Parameters<typeof fixtures.fetchMoreLiteratureSources>[0], question: string, n = 10) =>
+      fixtures.fetchMoreLiteratureSources(existing, question, n)
+    ),
+  };
+});
 
 vi.mock("../../api", () => ({
   getProject: (...a: unknown[]) => getProject(...a),
@@ -48,6 +68,10 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
       hasDocument: false,
       answers: {
         assignment_question: "Critically evaluate the ethics of autonomous decision-making systems.",
+
+        // Fixture: sources a previous live search saved to this project.
+
+        assignment_sources: JSON.stringify(seedSources("Critically evaluate the ethics of autonomous decision-making systems.")),
         word_count: 2000,
         target_word_count: 2000,
         citation_style: "apa7",
@@ -113,6 +137,10 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
         hasDocument: false,
         answers: {
           assignment_question: "",
+
+          // Fixture: sources a previous live search saved to this project.
+
+          assignment_sources: JSON.stringify(seedSources("")),
           word_count: 0,
           citation_style: "",
         },
@@ -211,6 +239,10 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
         hasDocument: false,
         answers: {
           assignment_question: "Critically evaluate the ethics of autonomous decision-making systems.",
+
+          // Fixture: sources a previous live search saved to this project.
+
+          assignment_sources: JSON.stringify(seedSources("Critically evaluate the ethics of autonomous decision-making systems.")),
           word_count: 2000,
           citation_style: "apa7",
           academic_level: "undergraduate",
@@ -270,6 +302,10 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
         hasDocument: false,
         answers: {
           assignment_question: "",
+
+          // Fixture: sources a previous live search saved to this project.
+
+          assignment_sources: JSON.stringify(seedSources("")),
           word_count: 0,
           citation_style: "",
           approved_source_ids: [],

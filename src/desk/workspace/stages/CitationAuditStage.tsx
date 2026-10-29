@@ -175,107 +175,6 @@ export default function CitationAuditStage({
   }, [claims, citationFormat]);
 
   // Resilient domain-aware offline fallback auditor
-  const generateFallbackAudit = useCallback((): AuditClaim[] => {
-    const vaultList = approvedVaultSources.length > 0 ? approvedVaultSources : [
-      { id: "v-01", title: "Empirical Grounding in Autonomous Academic Synthesis", authors: "Vaswani, A. et al.", year: 2024, doi: "10.1038/s41586-024-001" },
-      { id: "v-02", title: "Provable Provenance Bounds in Scientific Language Generation", authors: "Kaplan, J. & Henighan, T.", year: 2023, doi: "10.1145/3543873" },
-      { id: "v-03", title: "Verification of Latent Claims in Empirical AI Pipelines", authors: "Chowdhery, A. et al.", year: 2024, doi: "10.1009/TPAMI.2024.08" },
-    ];
-
-    const extList = approvedExternalSources.length > 0 ? approvedExternalSources : [
-      { id: "ext-01", title: "Addressing Methodological Latency in Distributed Consensus", authors: "Lamport, L. et al.", year: 2023, doi: "10.1145/357112" },
-      { id: "ext-02", title: "Statistical Integrity in Automated Hypothesis Testing", authors: "Fisher, R. & Pearl, J.", year: 2024, doi: "10.1214/23-AOS1982" },
-    ];
-
-    const fallbackClaims: AuditClaim[] = [
-      {
-        id: "cit-claim-01",
-        claim: `Autonomous reasoning architectures demonstrate an average variance reduction of 28.4% when anchored to validated knowledge graphs.`,
-        section: "Introduction",
-        source: vaultList[0]?.title || "Empirical Grounding in Autonomous Academic Synthesis",
-        sourceId: vaultList[0]?.id || "v-01",
-        authors: vaultList[0]?.authors || "Vaswani, A. et al.",
-        year: vaultList[0]?.year || 2024,
-        doi: vaultList[0]?.doi || "10.1038/s41586-024-001",
-        status: "verified",
-        provenanceConfidence: 0.99,
-        matchType: "empirical_data",
-        exactQuote: `In controlled multi-agent trials, the integration of verified knowledge bounds decreased hallucinated variance by 28.4% (p < 0.001).`,
-      },
-      {
-        id: "cit-claim-02",
-        claim: `Prior literature has consistently exhibited an unresolved attribution deficit (${anchorGap}) across large-scale document pipelines.`,
-        section: "Literature Review",
-        source: vaultList[1]?.title || "Provable Provenance Bounds in Scientific Language Generation",
-        sourceId: vaultList[1]?.id || "v-02",
-        authors: vaultList[1]?.authors || "Kaplan, J. & Henighan, T.",
-        year: vaultList[1]?.year || 2023,
-        doi: vaultList[1]?.doi || "10.1145/3543873",
-        status: "verified",
-        provenanceConfidence: 0.97,
-        matchType: "thematic_synthesis",
-        exactQuote: `Current generation frameworks lack an immutable cross-reference audit trail, leaving synthesized claims epistemically disconnected from primary literature.`,
-      },
-      {
-        id: "cit-claim-03",
-        claim: `The mathematical formulation of the provenance matrix relies on deterministic bipartite claim-to-evidence projections.`,
-        section: "Methodology",
-        source: extList[0]?.title || "Addressing Methodological Latency in Distributed Consensus",
-        sourceId: extList[0]?.id || "ext-01",
-        authors: extList[0]?.authors || "Lamport, L. et al.",
-        year: extList[0]?.year || 2023,
-        doi: extList[0]?.doi || "10.1145/357112",
-        status: "verified",
-        provenanceConfidence: 0.95,
-        matchType: "methodological_precedent",
-        exactQuote: `We define the projection operator P: C -> E as a deterministic bipartite matching problem over confidence threshold tau.`,
-      },
-      {
-        id: "cit-claim-04",
-        claim: `Benchmarking against the attached empirical dataset yielded a 3.4x throughput acceleration while sustaining strict zero-hallucination thresholds.`,
-        section: "Results & Evaluation",
-        source: vaultList[2]?.title || "Verification of Latent Claims in Empirical AI Pipelines",
-        sourceId: vaultList[2]?.id || "v-03",
-        authors: vaultList[2]?.authors || "Chowdhery, A. et al.",
-        year: vaultList[2]?.year || 2024,
-        doi: vaultList[2]?.doi || "10.1009/TPAMI.2024.08",
-        status: "verified",
-        provenanceConfidence: 0.98,
-        matchType: "empirical_data",
-        exactQuote: `Experimental results across 50,000 synthesized tokens confirmed 3.4x speedup under deterministic verification constraint verification.`,
-      },
-      {
-        id: "cit-claim-05",
-        claim: `Preliminary extrapolation suggests marginal inference gains under uncalibrated out-of-distribution domain shifts.`,
-        section: "Discussion",
-        source: extList[1]?.title || "Statistical Integrity in Automated Hypothesis Testing",
-        sourceId: extList[1]?.id || "ext-02",
-        authors: extList[1]?.authors || "Fisher, R. & Pearl, J.",
-        year: extList[1]?.year || 2024,
-        doi: extList[1]?.doi || "10.1214/23-AOS1982",
-        status: "advisory",
-        provenanceConfidence: 0.88,
-        matchType: "thematic_synthesis",
-        exactQuote: `Domain-shifted distributions reveal heightened epistemic uncertainty, demanding secondary human verification for boundary conditions.`,
-      },
-      {
-        id: "cit-claim-06",
-        claim: `The framework guarantees provable attribution bounds compliant with ${targetJournal} publication criteria.`,
-        section: "Conclusion",
-        source: vaultList[0]?.title || "Empirical Grounding in Autonomous Academic Synthesis",
-        sourceId: vaultList[0]?.id || "v-01",
-        authors: vaultList[0]?.authors || "Vaswani, A. et al.",
-        year: vaultList[0]?.year || 2024,
-        doi: vaultList[0]?.doi || "10.1038/s41586-024-001",
-        status: "verified",
-        provenanceConfidence: 0.99,
-        matchType: "direct_quotation",
-        exactQuote: `All derived assertions meet standard Q1 editorial standards for provenance verification and citation integrity.`,
-      },
-    ];
-
-    return fallbackClaims;
-  }, [approvedVaultSources, approvedExternalSources, anchorGap, targetJournal]);
 
   // Execute Agentic Citation Audit
   const startAgent = async () => {
@@ -290,27 +189,15 @@ export default function CitationAuditStage({
       },
     ]);
 
-    const logsArray = [
-      "Extracting factual and empirical assertions across manuscript sections...",
-      "Mapping inline citations against approved Knowledge Vault corpus...",
-      "Executing vector similarity matching against source evidence excerpts...",
-      `Checking reference typography against ${citationFormat} standards...`,
-      "Verifying DOI resolutions and mathematical claim alignments...",
-      "Detecting ungrounded or potential hallucination risks...",
-      "Compiling bipartite claim-to-evidence provenance ledger...",
-    ];
-
-    logIntervalRef.current = setInterval(() => {
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString() + Math.random(),
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "action",
-          message: logsArray[Math.floor(Math.random() * logsArray.length)],
-        },
-      ]);
-    }, 850);
+    setLogs((prev) => [
+      ...prev,
+      {
+        id: "log-wait-" + Date.now(),
+        timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+        level: "info",
+        message: "Waiting for the AI auditor…",
+      },
+    ]);
 
     try {
       await authedStreamFetch(
@@ -332,23 +219,23 @@ export default function CitationAuditStage({
             clearTimer();
             let parsedClaims: AuditClaim[] = [];
             if (data?.data && Array.isArray(data.data)) {
-              parsedClaims = data.data.map((item: any, idx: number) => ({
-                id: item.id || `cit-${idx + 1}`,
-                claim: item.claim || "Manuscript assertion",
-                section: item.section || (idx === 0 ? "Introduction" : idx === 1 ? "Methods" : idx === 2 ? "Results" : "Discussion"),
-                source: item.source || "Approved Vault Evidence",
-                authors: item.authors || "Primary Investigator et al.",
-                year: item.year || 2024,
-                doi: item.doi || "10.1038/s41586-024-001",
-                status: item.status === "flagged" ? "flagged" : "verified",
-                provenanceConfidence: item.confidence || 0.96,
-                matchType: item.matchType || "empirical_data",
-                exactQuote: item.exactQuote || item.source,
-              }));
-            }
-
-            if (parsedClaims.length === 0) {
-              parsedClaims = generateFallbackAudit();
+              // Keep only what the AI returned; never invent a source, DOI,
+              // year, confidence or a "verified" status.
+              parsedClaims = data.data
+                .filter((item: any) => typeof item?.claim === "string" && item.claim.trim())
+                .map((item: any, idx: number) => ({
+                  id: item.id || `cit-${idx + 1}`,
+                  claim: item.claim,
+                  section: item.section || "Unspecified section",
+                  source: item.source || "",
+                  authors: item.authors || undefined,
+                  year: item.year || undefined,
+                  doi: item.doi || undefined,
+                  status: item.status === "verified" ? "verified" : item.status === "flagged" ? "flagged" : "advisory",
+                  provenanceConfidence: typeof item.confidence === "number" ? item.confidence : 0,
+                  matchType: item.matchType || "thematic_synthesis",
+                  exactQuote: item.exactQuote || undefined,
+                }));
             }
 
             setClaims(parsedClaims);
@@ -358,21 +245,22 @@ export default function CitationAuditStage({
                 id: "log-done-" + Date.now(),
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                 level: "success",
-                message: `Audit complete: ${parsedClaims.length} claims audited. Provenance verified.`,
+                message:
+                  parsedClaims.length > 0
+                    ? `Audit complete: ${parsedClaims.length} claims returned by the AI auditor. Review each one.`
+                    : "The AI auditor returned no claims. Nothing was generated.",
               },
             ]);
           } else if (event === "error") {
             clearTimer();
-            console.warn("Audit stream error, engaging domain-aware offline fallback auditor:", data);
-            const fallback = generateFallbackAudit();
-            setClaims(fallback);
+            console.warn("Citation audit stream error:", data);
             setLogs((prev) => [
               ...prev,
               {
-                id: "log-fallback-" + Date.now(),
+                id: "log-fail-" + Date.now(),
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                level: "info",
-                message: "Engaged local provenance verification engine: 6/6 claims verified against Vault corpus.",
+                level: "error",
+                message: "Citation audit unavailable: nothing was generated. Connect an AI provider in AI Access, or try again.",
               },
             ]);
           }
@@ -380,16 +268,14 @@ export default function CitationAuditStage({
       );
     } catch (err: any) {
       clearTimer();
-      console.warn("Remote audit agent unavailable, activating local fallback auditor:", err);
-      const fallback = generateFallbackAudit();
-      setClaims(fallback);
+      console.warn("Citation audit agent unavailable:", err);
       setLogs((prev) => [
         ...prev,
         {
-          id: "log-fallback-err-" + Date.now(),
+          id: "log-fail-" + Date.now(),
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "info",
-          message: "Engaged local provenance verification engine: 6/6 claims verified against Vault corpus.",
+          level: "error",
+          message: "Citation audit unavailable: nothing was generated. Connect an AI provider in AI Access, or try again.",
         },
       ]);
     } finally {

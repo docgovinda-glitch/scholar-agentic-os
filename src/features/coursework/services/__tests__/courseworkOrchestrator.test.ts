@@ -11,6 +11,17 @@ import {
 } from "../courseworkOrchestrator";
 import type { CourseworkProgressEvent } from "../../types/orchestrator";
 import type { DiscoveredSource } from "../../../../desk/assignment/types";
+import { discoverRealScholarlySourcesFromServer } from "../../../../desk/assignment/services/realScholarlyDiscoveryService";
+import { generateCuratedLiteratureSources as fixtureSources } from "../../../../desk/assignment/services/scholarlyDiscoveryService";
+
+// Live discovery is a network call. Tests stand in for it with fixture
+// sources; the orchestrator itself never invents sources when it fails.
+vi.mock("../../../../desk/assignment/services/realScholarlyDiscoveryService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../../desk/assignment/services/realScholarlyDiscoveryService")>();
+  return { ...actual, discoverRealScholarlySourcesFromServer: vi.fn() };
+});
+const discoverMock = vi.mocked(discoverRealScholarlySourcesFromServer);
+discoverMock.mockImplementation(async (question: string, style = "apa7") => fixtureSources(question, style));
 
 describe("Coursework Dual-Mode Prompt Orchestrator", () => {
   describe("Prompt Deconstruction", () => {
@@ -93,6 +104,17 @@ describe("Coursework Dual-Mode Prompt Orchestrator", () => {
       expect(res.discoveredSources.length).toBeGreaterThan(0);
       expect(res.generatedQueries.length).toBeGreaterThan(0);
     }, 25000);
+
+    it("Phase 2: Sources - returns no sources (never invented ones) when live discovery fails", async () => {
+      discoverMock.mockRejectedValueOnce(new Error("network down"));
+      const res = await executeMinimalSources({
+        question: "Organizational culture Schein Edgar artifacts values assumptions",
+        citationStyle: "apa7",
+        maxResults: 10,
+      });
+      expect(res.yieldedControlToUI).toBe(true);
+      expect(res.discoveredSources).toEqual([]);
+    });
 
     it("Phase 3: Drafting - drafts a single section, intercepts tokens, and yields to UI", async () => {
       const res = await executeMinimalDraftSection({

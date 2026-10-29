@@ -4050,46 +4050,11 @@ export function conductAskScholarResearchForOutline(
 
   const expectedOutcomes = `A rigorous, research-blueprint-grounded ${assignmentType.replace(/_/g, " ")} delivering an original, evidence-backed answer to each assignment inquiry without generic filler.`;
 
-  // 4. Retrieve & Synthesize Ask Scholar Literature
-  const curatedDiscoveredSources = generateCuratedLiteratureSources(combinedText || question, "apa7");
-  const sources: ResearchSourceReference[] = curatedDiscoveredSources.map((s) => ({
-    id: s.id,
-    title: s.title,
-    authors: s.authors,
-    year: s.year,
-    journalOrPublisher: s.journal || s.publisher,
-    citation: s.citation,
-    role: s.roleInAssignment || "Empirical evidence",
-    relevance: s.mainFinding || s.suggestedUse,
-    doi: s.doi,
-    url: s.url,
-    keyFinding: s.mainFinding,
-  }));
-
-  // Ensure balance of contemporary (2024-2026) and seminal foundations
-  const hasContemporary = sources.some((s) => parseInt(s.year, 10) >= 2024);
-  const hasSeminal = sources.some((s) => parseInt(s.year, 10) <= 2015);
-
-  if (!hasContemporary || !hasSeminal || sources.length < 5) {
-    const existingIds = new Set(sources.map((s) => s.id));
-    const existingTitles = new Set(sources.map((s) => s.title.toLowerCase().trim()));
-    const additional = synthesizeQuestionDrivenLiterature(deconstruction, 6, existingIds, existingTitles);
-    for (const add of additional) {
-      sources.push({
-        id: add.id,
-        title: add.title,
-        authors: add.authors,
-        year: add.year,
-        journalOrPublisher: add.journal || add.publisher,
-        citation: add.citation,
-        role: add.roleInAssignment || "Empirical evidence",
-        relevance: add.mainFinding,
-        doi: add.doi,
-        url: add.url,
-        keyFinding: add.mainFinding,
-      });
-    }
-  }
+  // 4. Literature: the outline plan carries no references of its own. Sources
+  // come only from live discovery or the user's vault, attached later; this
+  // planner never invents or pre-selects citations.
+  const curatedDiscoveredSources: DiscoveredSource[] = [];
+  const sources: ResearchSourceReference[] = [];
 
   // 5. Construct Question-to-Section Mapping Matrix
   const questionMappingMatrix: QuestionMappingMatrixItem[] = subQuestions.map((subQ, idx) => {
@@ -4170,9 +4135,9 @@ export function conductAskScholarResearchForOutline(
     freeOfGenericFluff: true,
     literatureGrounded: sources.length >= 3,
     debatesIncluded: true,
-    recencyBalanced: hasContemporary,
+    recencyBalanced: false,
     clearProgression: true,
-    reviewNotes: `Verified 100% question coverage across ${subQuestions.length} core inquiry dimensions. Grounded in ${sources.length} peer-reviewed sources with balanced recency (2024-2026) and seminal foundations.`,
+    reviewNotes: `Outline maps ${subQuestions.length} inquiry dimensions. Sources are attached from live discovery or your vault; none are pre-selected here.`,
   };
 
   return {

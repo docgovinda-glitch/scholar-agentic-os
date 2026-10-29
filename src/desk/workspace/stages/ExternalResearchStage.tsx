@@ -28,9 +28,10 @@ export interface ExternalSourceItem {
   id: string;
   title: string;
   author: string;
-  year: number;
+  year?: number;
   database: AcademicDatabase | string;
-  doi: string;
+  doi?: string;
+  url?: string;
   gap_addressed: string;
   snippet: string;
   relevance: number; // 0-100
@@ -45,23 +46,25 @@ export interface ExternalSourceItem {
 }
 
 export function formatApaCitation(item: ExternalSourceItem): string {
-  const author = item.author || "Unknown Author";
-  const year = item.year || new Date().getFullYear();
-  const title = item.title || "Untitled Paper";
-  const journal = item.journal || "Scholarly Literature";
-  return `${author} (${year}). ${title}. ${journal}. https://doi.org/${item.doi}`;
+  // Missing metadata stays visibly missing; nothing is invented.
+  const author = item.author || "[Author unknown]";
+  const year = item.year || "n.d.";
+  const title = item.title || "[Untitled]";
+  const journal = item.journal ? ` ${item.journal}.` : "";
+  const link = item.doi ? ` https://doi.org/${item.doi}` : item.url ? ` ${item.url}` : "";
+  return `${author} (${year}). ${title}.${journal}${link}`;
 }
 
 export function formatBibtexCitation(item: ExternalSourceItem): string {
   const firstAuthor = (item.author?.split(/[\s,]+/)[0] || "Author").replace(/[^a-zA-Z]/g, "");
   const firstWord = (item.title?.split(/[\s,]+/)[0] || "Paper").replace(/[^a-zA-Z]/g, "");
-  const citeKey = `${firstAuthor.toLowerCase()}${item.year || 2024}${firstWord.toLowerCase()}`;
+  const citeKey = `${firstAuthor.toLowerCase()}${item.year || "nd"}${firstWord.toLowerCase()}`;
   return `@article{${citeKey},
   author = {${item.author || "Unknown"}},
   title = {${item.title}},
-  journal = {${item.journal || "Scholarly Literature"}},
-  year = {${item.year || 2024}},
-  doi = {${item.doi}},
+  journal = {${item.journal || ""}},
+  year = {${item.year || ""}},
+  doi = {${item.doi || ""}},
   note = {Evidentiary Role: ${item.evidentiary_role || "general"}}
 }`;
 }
@@ -69,9 +72,10 @@ export function formatBibtexCitation(item: ExternalSourceItem): string {
 export interface ManualSourceForm {
   title: string;
   author: string;
-  year: number;
+  year?: number;
   database: AcademicDatabase | string;
-  doi: string;
+  doi?: string;
+  url?: string;
   gap_addressed: string;
   snippet: string;
   evidentiary_role: string;
@@ -289,363 +293,6 @@ export default function ExternalResearchStage({
     );
   };
 
-  // 7. Fallback Corpus Synthesis
-  const generateFallbackExternalSources = (): ExternalSourceItem[] => {
-    const gapName = anchorGap?.title || workingTitle || "Core Evidentiary Gap";
-    const isByzantineTopic = /byzantine|distributed systems|quorum/i.test(workingTitle || "");
-    if (isByzantineTopic) {
-      return [
-        {
-          id: `ext-crawl-${Date.now()}-1`,
-          title: `Adaptive Consensus Reconfiguration Under Byzantine Adversaries and Partitioned WANs`,
-          author: `V. Balasubramanian, D. Malkhi, & M. K. Reiter`,
-          year: 2024,
-          database: "arXiv",
-          doi: "10.48550/arXiv.2403.09112",
-          gap_addressed: gapName,
-          snippet:
-            "Presents empirical measurements showing dynamic leader rotation limits round-trip latency to sub-second bounds under 35% network partition drops.",
-          relevance: 96,
-          relevance_score: 96,
-          evidentiary_role: "benchmark",
-          matched_concepts: ["Byzantine Fault Tolerance", "WAN Latency", "Dynamic Quorums"],
-          citation_count: 42,
-          journal: "arXiv Preprint cs.DC",
-          is_open_access: true,
-        },
-        {
-          id: `ext-crawl-${Date.now()}-2`,
-          title: `Quantifying Asymmetric Network Delays in Modern Cloud Datacenters and Edge Fabrics`,
-          author: `S. Al-Kiswany & P. Bernstein`,
-          year: 2023,
-          database: "IEEE Xplore",
-          doi: "10.1109/TNET.2023.3289014",
-          gap_addressed: gapName,
-          snippet:
-            "Comprehensive telemetry over 1.2M multi-region network packets documenting tail latency skew across transatlantic optical interconnects.",
-          relevance: 91,
-          relevance_score: 91,
-          evidentiary_role: "empirical",
-          matched_concepts: ["Tail Latency", "Network Partitions", "Packet Loss"],
-          citation_count: 118,
-          journal: "IEEE/ACM Transactions on Networking",
-          is_open_access: false,
-        },
-        {
-          id: `ext-crawl-${Date.now()}-3`,
-          title: `Formal Bounds on Quorum Intersections for Partition-Resilient State Machine Replication`,
-          author: `H. Howard, R. Mortier, & J. Crowcroft`,
-          year: 2022,
-          database: "CrossRef",
-          doi: "10.1145/3547659.3560812",
-          gap_addressed: gapName,
-          snippet:
-            "Rigorous mathematical proof that flexible quorums guarantee linearizability even when leader election messages experience unbounded network delay.",
-          relevance: 88,
-          relevance_score: 88,
-          evidentiary_role: "theoretical",
-          matched_concepts: ["Flexible Quorums", "Linearizability", "State Machine Replication"],
-          citation_count: 89,
-          journal: "ACM Symposium on Principles of Distributed Computing (PODC)",
-          is_open_access: false,
-        },
-        {
-          id: `ext-crawl-${Date.now()}-4`,
-          title: `Comparative Survey of High-Throughput BFT Consensus Protocols for Decentralized Ledgers`,
-          author: `M. Vukolić & G. Gueta`,
-          year: 2023,
-          database: "Semantic Scholar",
-          doi: "10.1007/978-3-031-25460-4_8",
-          gap_addressed: gapName,
-          snippet:
-            "Systematic cross-benchmark comparing throughput, crash recovery times, and validator scaling across HotStuff, Narwhal, and Bullshark.",
-          relevance: 84,
-          relevance_score: 84,
-          evidentiary_role: "comparative",
-          matched_concepts: ["BFT Protocols", "Validator Scaling", "Crash Recovery"],
-          citation_count: 156,
-          journal: "Springer Lecture Notes in Computer Science",
-          is_open_access: false,
-        },
-        {
-          id: `ext-crawl-${Date.now()}-5`,
-          title: `Optimal Byzantine Quorum Systems for Asymmetric Wide-Area Network Topologies`,
-          author: `J. Li, A. Clement, & M. Dahlin`,
-          year: 2024,
-          database: "IEEE Xplore",
-          doi: "10.1109/TDSC.2024.3361209",
-          gap_addressed: gapName,
-          snippet: "Presents optimal latency quorum configurations under asymmetric cross-region link delays with formal resilience bounds.",
-          relevance: 95,
-          relevance_score: 95,
-          evidentiary_role: "theoretical",
-          matched_concepts: ["Asymmetric WAN", "Quorum Optimization", "Resilience Bounds"],
-          citation_count: 53,
-          journal: "IEEE Transactions on Dependable and Secure Computing",
-          is_open_access: true,
-        },
-        {
-          id: `ext-crawl-${Date.now()}-6`,
-          title: `Cross-Datacenter Replication with Bounded Tail Latency under Byzantine Adversaries`,
-          author: `E. Kokoris-Kogias & P. Jovanovic`,
-          year: 2023,
-          database: "CrossRef",
-          doi: "10.1145/3600006.3613155",
-          gap_addressed: gapName,
-          snippet: "Evaluates tail latency distributions over 14 international AWS regions, establishing bounded p99 delays below 850ms.",
-          relevance: 93,
-          relevance_score: 93,
-          evidentiary_role: "empirical",
-          matched_concepts: ["Tail Latency", "Cross-Datacenter", "p99 Bounded Delay"],
-          citation_count: 67,
-          journal: "ACM SOSP Proceedings",
-          is_open_access: false,
-        },
-        {
-          id: `ext-crawl-${Date.now()}-7`,
-          title: `Decentralized State Machine Replication: Methodological Instrumentation and WAN Benchmarks`,
-          author: `C. Cachin & B. Ford`,
-          year: 2024,
-          database: "DOAJ",
-          doi: "10.3390/app14020612",
-          gap_addressed: gapName,
-          snippet: "Standardizes methodological protocols for reproducing crash and partition benchmarks across heterogeneous cloud providers.",
-          relevance: 90,
-          relevance_score: 90,
-          evidentiary_role: "methodological",
-          matched_concepts: ["Methodology", "Cloud Benchmarks", "Reproducibility"],
-          citation_count: 38,
-          journal: "Open Journal of Distributed Systems",
-          is_open_access: true,
-        },
-        {
-          id: `ext-crawl-${Date.now()}-8`,
-          title: `Empirical Verification of Adaptive Leaderless Consensus in Partitioned Environments`,
-          author: `R. Pass & E. Shi`,
-          year: 2023,
-          database: "Semantic Scholar",
-          doi: "10.1007/s00446-023-00451-2",
-          gap_addressed: gapName,
-          snippet: "Confirms that eliminating designated leaders removes single-point bottleneck stalls during unexpected WAN network splits.",
-          relevance: 92,
-          relevance_score: 92,
-          evidentiary_role: "empirical",
-          matched_concepts: ["Leaderless Consensus", "Empirical Verification", "Partition Tolerance"],
-          citation_count: 81,
-          journal: "Distributed Computing (Springer)",
-          is_open_access: false,
-        },
-        {
-          id: `ext-crawl-${Date.now()}-9`,
-          title: `Resilience Guarantees in Asynchronous Quorums Subject to Malicious Node Drops`,
-          author: `D. Malkhi & F. B. Schneider`,
-          year: 2023,
-          database: "PubMed",
-          doi: "10.1038/s41598-023-45678-x",
-          gap_addressed: gapName,
-          snippet: "Analytical model demonstrating survival properties and failure resilience when network partitions trigger cascading drops.",
-          relevance: 89,
-          relevance_score: 89,
-          evidentiary_role: "theoretical",
-          matched_concepts: ["Asynchronous Quorums", "Cascading Failure", "Fault Bounds"],
-          citation_count: 45,
-          journal: "Scientific Reports",
-          is_open_access: true,
-        },
-        {
-          id: `ext-crawl-${Date.now()}-10`,
-          title: `Comparative Latency Benchmark of DAG-Based BFT Engines Across Heterogeneous Nodes`,
-          author: `A. Spiegelman & N. Giridharan`,
-          year: 2024,
-          database: "CrossRef",
-          doi: "10.1145/3627703.3629567",
-          gap_addressed: gapName,
-          snippet: "Direct comparative evaluation between block-based and DAG-based consensus mechanisms measuring transaction commit latency.",
-          relevance: 88,
-          relevance_score: 88,
-          evidentiary_role: "comparative",
-          matched_concepts: ["DAG-Based BFT", "Comparative Benchmark", "Throughput"],
-          citation_count: 64,
-          journal: "ACM EuroSys Proceedings",
-          is_open_access: false,
-        },
-        {
-          id: `ext-crawl-${Date.now()}-11`,
-          title: `Statistical Characterization of Packet Loss and Jitter in Geo-Distributed Consensus Nodes`,
-          author: `M. Bravo & Z. Chiba`,
-          year: 2024,
-          database: "IEEE Xplore",
-          doi: "10.1109/INFOCOM.2024.10621432",
-          gap_addressed: gapName,
-          snippet: "Multi-terabyte statistical dataset characterizing inter-region latency jitter and packet drop dynamics during undersea cable outages.",
-          relevance: 91,
-          relevance_score: 91,
-          evidentiary_role: "empirical",
-          matched_concepts: ["Jitter Analysis", "Packet Drop Dynamics", "Telemetry"],
-          citation_count: 31,
-          journal: "IEEE INFOCOM",
-          is_open_access: false,
-        },
-        {
-          id: `ext-crawl-${Date.now()}-12`,
-          title: `Formal Verification and Model Checking for High-Assurance Byzantine State Machines`,
-          author: `T. H. Austin & M. P. Herlihy`,
-          year: 2024,
-          database: "DOAJ",
-          doi: "10.4204/EPTCS.398.4",
-          gap_addressed: gapName,
-          snippet: "TLA+ model checking specification verifying safety and liveness invariants under arbitrary adversarial network delays.",
-          relevance: 90,
-          relevance_score: 90,
-          evidentiary_role: "methodological",
-          matched_concepts: ["Formal Verification", "TLA+ Model Checking", "Liveness Invariant"],
-          citation_count: 27,
-          journal: "Electronic Proceedings in Theoretical Computer Science",
-          is_open_access: true,
-        },
-      ];
-    }
-
-    // Dynamic domain-aware fallback for any domain (e.g. Vedic, ML, Medicine, Economics, Physics)
-    return [
-      {
-        id: `ext-crawl-${Date.now()}-1`,
-        title: `Comprehensive Systematic Review and Theoretical Foundations for ${workingTitle}`,
-        author: `A. Sharma, J. Thorne, & M. Vance`,
-        year: 2024,
-        database: "CrossRef",
-        doi: `10.1016/j.res.${Date.now().toString().slice(-6)}`,
-        gap_addressed: gapName,
-        snippet: `Rigorous analytical review establishing empirical baseline benchmarks, methodological fidelity, and conceptual boundaries for ${workingTitle}.`,
-        relevance: 95,
-        relevance_score: 95,
-        evidentiary_role: "benchmark",
-        matched_concepts: [methodology || "Empirical", "Foundational", "Systematic Review"],
-        citation_count: 64,
-        journal: targetJournal || "Journal of Academic Research",
-        is_open_access: false,
-      },
-      {
-        id: `ext-crawl-${Date.now()}-2`,
-        title: `Methodological Formulations and Observational Proofs Addressing ${gapName}`,
-        author: `E. Chen, R. K. Gupta, & D. Miller`,
-        year: 2023,
-        database: "Semantic Scholar",
-        doi: `10.1103/PhysRev.${Date.now().toString().slice(-6)}`,
-        gap_addressed: gapName,
-        snippet: `Formulates structured validation methodologies that resolve known discrepancies in ${gapName} through systematic modeling.`,
-        relevance: 91,
-        relevance_score: 91,
-        evidentiary_role: "empirical",
-        matched_concepts: ["Methodological Rigor", "Validation", "Empirical Proof"],
-        citation_count: 48,
-        journal: "International Journal of Methodological Studies",
-        is_open_access: false,
-      },
-      {
-        id: `ext-crawl-${Date.now()}-3`,
-        title: `Mathematical and Structural Paradigms in Modern ${methodology || "Empirical"} Research`,
-        author: `K. H. Patel, L. Weber, & S. Tanaka`,
-        year: 2023,
-        database: "arXiv",
-        doi: `10.48550/arXiv.2311.${Date.now().toString().slice(-5)}`,
-        gap_addressed: gapName,
-        snippet: `Establishes formal theoretical proofs and predictive models that substantiate qualitative and quantitative assertions.`,
-        relevance: 87,
-        relevance_score: 87,
-        evidentiary_role: "theoretical",
-        matched_concepts: ["Formal Models", "Theoretical Bounds", "Structural Analysis"],
-        citation_count: 35,
-        journal: "arXiv Preprint",
-        is_open_access: true,
-      },
-      {
-        id: `ext-crawl-${Date.now()}-4`,
-        title: `Comparative Evaluation of Contemporary Frameworks: Benchmarks and Future Horizons`,
-        author: `M. O'Connor & S. R. Narayan`,
-        year: 2024,
-        database: "CrossRef",
-        doi: `10.1038/s41586-024-${Date.now().toString().slice(-5)}`,
-        gap_addressed: gapName,
-        snippet: `Cross-comparative benchmark verifying reproducibility, boundary sensitivity, and cross-domain applicability.`,
-        relevance: 85,
-        relevance_score: 85,
-        evidentiary_role: "comparative",
-        matched_concepts: ["Comparative Analysis", "Reproducibility", "Performance Metrics"],
-        citation_count: 72,
-        journal: "Nature Communications",
-        is_open_access: false,
-      },
-      {
-        id: `ext-crawl-${Date.now()}-5`,
-        title: `Empirical Quantification and Experimental Verification of ${gapName}`,
-        author: `H. Zhao, F. Rossi, & D. Kowalski`,
-        year: 2024,
-        database: "IEEE Xplore",
-        doi: `10.1109/ACCESS.${Date.now().toString().slice(-6)}`,
-        gap_addressed: gapName,
-        snippet: `Large-scale empirical investigation validating observable telemetry and testing statistical distributions under adverse load conditions.`,
-        relevance: 93,
-        relevance_score: 93,
-        evidentiary_role: "empirical",
-        matched_concepts: ["Empirical Evaluation", "Statistical Distribution", "Stress Testing"],
-        citation_count: 41,
-        journal: "IEEE Access",
-        is_open_access: true,
-      },
-      {
-        id: `ext-crawl-${Date.now()}-6`,
-        title: `Theoretical Correctness Bounds and Invariant Preservation for ${workingTitle}`,
-        author: `S. V. Ramanathan & G. L. Wright`,
-        year: 2023,
-        database: "PubMed",
-        doi: `10.1371/journal.pone.${Date.now().toString().slice(-6)}`,
-        gap_addressed: gapName,
-        snippet: `Formal deductive derivation verifying safety guarantees and asymptotic complexity bounds across parameter extremes.`,
-        relevance: 92,
-        relevance_score: 92,
-        evidentiary_role: "theoretical",
-        matched_concepts: ["Theoretical Bounds", "Safety Invariants", "Asymptotic Analysis"],
-        citation_count: 29,
-        journal: "PLOS ONE",
-        is_open_access: true,
-      },
-      {
-        id: `ext-crawl-${Date.now()}-7`,
-        title: `Open Science Benchmarking Protocols and Instrumentation Standards`,
-        author: `L. B. Meyer & J. K. Lindqvist`,
-        year: 2024,
-        database: "DOAJ",
-        doi: `10.3390/data9010015`,
-        gap_addressed: gapName,
-        snippet: `Standardized reporting protocol enabling open reproduction and comparative replication across scientific cohorts.`,
-        relevance: 89,
-        relevance_score: 89,
-        evidentiary_role: "methodological",
-        matched_concepts: ["Open Science", "Replication", "Methodological Standard"],
-        citation_count: 36,
-        journal: "Data (MDPI Open Access)",
-        is_open_access: true,
-      },
-      {
-        id: `ext-crawl-${Date.now()}-8`,
-        title: `Cross-Domain Comparative Analysis of Competing Paradigm Frameworks`,
-        author: `P. T. Johansson & N. K. Al-Hassan`,
-        year: 2023,
-        database: "Semantic Scholar",
-        doi: `10.1007/s11276-023-03412-1`,
-        gap_addressed: gapName,
-        snippet: `Multivariate comparative benchmark establishing quantitative tradeoff Pareto frontiers between efficiency and robustness.`,
-        relevance: 88,
-        relevance_score: 88,
-        evidentiary_role: "comparative",
-        matched_concepts: ["Tradeoff Analysis", "Pareto Frontier", "Comparative Analysis"],
-        citation_count: 57,
-        journal: "Wireless Networks & Systems",
-        is_open_access: false,
-      },
-    ];
-  };
 
   // 8. Start Search / Web Crawler
   const startSearch = async () => {
@@ -660,7 +307,7 @@ export default function ExternalResearchStage({
         id: `log-${Date.now()}-1`,
         timestamp: new Date().toLocaleTimeString([], { hour12: false }),
         level: "info",
-        message: `Initializing Web Crawler Agent with ${activeDbs.length} targeted databases...`,
+        message: "Starting literature search…",
       },
       {
         id: `log-${Date.now()}-2`,
@@ -670,27 +317,6 @@ export default function ExternalResearchStage({
       },
     ]);
 
-    const progressMessages = [
-      `Querying ${activeDbs[0] || "CrossRef"} API with tokenized research keywords...`,
-      `Filtering non-peer-reviewed results and evaluating citation velocities...`,
-      `Parsing abstract proofs across ${activeDbs.join(", ")}...`,
-      `Scoring paper relevancy against working title and anchor gap...`,
-      `Extracting DOI links, open-access metadata, and evidentiary role candidates...`,
-    ];
-
-    let stepIdx = 0;
-    logIntervalRef.current = setInterval(() => {
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: `log-${Date.now()}-${Math.random()}`,
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "action",
-          message: progressMessages[stepIdx % progressMessages.length],
-        },
-      ]);
-      stepIdx++;
-    }, 950);
 
     try {
       await authedStreamFetch(
@@ -718,27 +344,29 @@ export default function ExternalResearchStage({
             ]);
           } else if (event === "done") {
             clearTimer();
-            const minedSources: ExternalSourceItem[] =
-              Array.isArray(data.data) && data.data.length > 0
-                ? data.data.map((d: any, idx: number) => ({
-                    id: d.id || `ext-stream-${Date.now()}-${idx}`,
-                    title: d.title || "External Scholarly Article",
-                    author: d.author || "Scholarly Author",
-                    year: Number(d.year) || new Date().getFullYear(),
-                    database: d.database || activeDbs[idx % activeDbs.length],
-                    doi: d.doi || `10.1016/j.cs.${Date.now()}.${idx}`,
-                    gap_addressed: d.gap_addressed || anchorGap?.title || "Research Gap",
-                    snippet: d.snippet || "Empirical findings addressing external literature gaps.",
-                    relevance: Number(d.relevance) || 88,
-                    relevance_score: Number(d.relevance) || 88,
-                    evidentiary_role: d.evidentiary_role || "comparative",
-                    matched_concepts: Array.isArray(d.matched_concepts) ? d.matched_concepts : [],
-                    citation_count: Number(d.citation_count) || Math.floor(Math.random() * 50) + 10,
-                    journal: d.journal || "Peer-Reviewed Journal",
-                    is_open_access: Boolean(d.is_open_access ?? (idx % 2 === 0)),
-                    open_access_pdf_url: d.open_access_pdf_url || (d.doi ? `https://doi.org/${d.doi}` : undefined),
-                  }))
-                : generateFallbackExternalSources();
+            // Only records the scholarly indexes returned; nothing is
+            // filled in (no default DOI, relevance, citations or snippet).
+            const minedSources: ExternalSourceItem[] = (Array.isArray(data.data) ? data.data : [])
+              .filter((d: any) => typeof d?.title === "string" && d.title.trim())
+              .map((d: any, idx: number) => ({
+                id: d.id || `ext-stream-${Date.now()}-${idx}`,
+                title: d.title,
+                author: d.author || "",
+                year: Number(d.year) || undefined,
+                database: d.database || "",
+                doi: d.doi || undefined,
+                url: d.url || undefined,
+                gap_addressed: d.gap_addressed || anchorGap?.title || "",
+                snippet: d.snippet || "",
+                relevance: Number(d.relevance) || 0,
+                relevance_score: Number(d.relevance) || 0,
+                evidentiary_role: d.evidentiary_role || undefined,
+                matched_concepts: Array.isArray(d.matched_concepts) ? d.matched_concepts : [],
+                citation_count: typeof d.citation_count === "number" ? d.citation_count : undefined,
+                journal: d.journal || undefined,
+                is_open_access: d.is_open_access === true,
+                open_access_pdf_url: d.open_access_pdf_url || undefined,
+              }));
 
             setResults(minedSources);
             await persistDiscoveredSources(minedSources);
@@ -749,12 +377,15 @@ export default function ExternalResearchStage({
                 id: `log-${Date.now()}-done`,
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                 level: "success",
-                message: `Crawl complete. Discovered ${minedSources.length} peer-reviewed papers addressing missing literature gaps. Ready for triage review.`,
+                message:
+                  minedSources.length > 0
+                    ? `Search complete: ${minedSources.length} records from scholarly indexes. Review and prune before triage.`
+                    : "No records found for this query. Try different keywords.",
               },
             ]);
 
             setSuccessToast(
-              `Crawl successful! Discovered ${minedSources.length} external papers. Review and prune before triage.`
+              minedSources.length > 0 ? `Found ${minedSources.length} records. Review and prune before triage.` : "No records found."
             );
             setTimeout(() => setSuccessToast(null), 5000);
           } else if (event === "error") {
@@ -764,23 +395,16 @@ export default function ExternalResearchStage({
       );
     } catch (err: any) {
       clearTimer();
-      console.warn("External research streaming failed, using fallback corpus synthesis:", err);
-      const fallbackSources = generateFallbackExternalSources();
-      setResults(fallbackSources);
-      await persistDiscoveredSources(fallbackSources);
-
+      console.warn("External literature search failed:", err);
       setLogs((prev) => [
         ...prev,
         {
-          id: `log-${Date.now()}-fallback`,
+          id: `log-${Date.now()}-fail`,
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `Local corpus synthesis complete: Indexed ${fallbackSources.length} external papers from academic preprint and index records.`,
+          level: "error",
+          message: "Literature search unavailable: nothing was added. Try again, or add papers manually.",
         },
       ]);
-
-      setSuccessToast(`Discovered ${fallbackSources.length} external papers matching your research parameters.`);
-      setTimeout(() => setSuccessToast(null), 5000);
     } finally {
       clearTimer();
       setIsProcessing(false);
@@ -803,19 +427,19 @@ export default function ExternalResearchStage({
     const newPaper: ExternalSourceItem = {
       id: `ext-manual-${Date.now()}`,
       title: manualForm.title.trim(),
-      author: manualForm.author.trim() || "Independent Researcher",
-      year: Number(manualForm.year) || new Date().getFullYear(),
+      author: manualForm.author.trim(),
+      year: Number(manualForm.year) || undefined,
       database: manualForm.database || "CrossRef",
-      doi: manualForm.doi.trim() || `10.manual/${Date.now()}`,
+      doi: (manualForm.doi || "").trim() || undefined,
       gap_addressed: manualForm.gap_addressed || anchorGap?.title || "Identified Gap",
-      snippet: manualForm.snippet.trim() || "Manual scholarly paper ingested by researcher.",
-      relevance: Number(manualForm.relevance) || 95,
-      relevance_score: Number(manualForm.relevance) || 95,
+      snippet: manualForm.snippet.trim(),
+      relevance: Number(manualForm.relevance) || 0,
+      relevance_score: Number(manualForm.relevance) || 0,
       evidentiary_role: manualForm.evidentiary_role || "comparative",
       matched_concepts: ["Manual Addition", manualForm.database.toString()],
-      citation_count: 25,
-      journal: "Academic Literature",
-      is_open_access: true,
+      citation_count: undefined,
+      journal: undefined,
+      is_open_access: false,
     };
 
     const nextResults = [newPaper, ...(results || [])];
@@ -955,7 +579,7 @@ export default function ExternalResearchStage({
         item.title.toLowerCase().includes(q) ||
         item.author.toLowerCase().includes(q) ||
         item.snippet.toLowerCase().includes(q) ||
-        item.doi.toLowerCase().includes(q) ||
+        (item.doi || "").toLowerCase().includes(q) ||
         item.gap_addressed.toLowerCase().includes(q) ||
         (item.evidentiary_role && item.evidentiary_role.toLowerCase().includes(q));
 
@@ -1519,9 +1143,11 @@ export default function ExternalResearchStage({
                           {item.database}
                         </span>
 
-                        <span className="inline-flex items-center gap-1 font-mono text-xs font-bold px-2 py-0.5 rounded bg-[color:var(--surface-sunken)] text-[color:var(--state-success)] border border-[color:var(--border-subtle)]">
-                          ★ {item.relevance}% Match
-                        </span>
+                        {item.relevance > 0 && (
+                          <span className="inline-flex items-center gap-1 font-mono text-xs font-bold px-2 py-0.5 rounded bg-[color:var(--surface-sunken)] text-[color:var(--state-success)] border border-[color:var(--border-subtle)]">
+                            ★ {item.relevance}% Match
+                          </span>
+                        )}
 
                         {item.evidentiary_role && (
                           <span className="capitalize px-2 py-0.5 rounded bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)] font-medium text-[11px]">
@@ -1535,15 +1161,17 @@ export default function ExternalResearchStage({
                           </span>
                         )}
 
-                        <a
-                          href={`https://doi.org/${item.doi}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[color:var(--text-muted)] hover:text-[color:var(--accent)] font-mono text-[11px] truncate max-w-[180px] hover:underline"
-                          title={`Open DOI: ${item.doi}`}
-                        >
-                          doi:{item.doi} ↗
-                        </a>
+                        {item.doi && (
+                          <a
+                            href={`https://doi.org/${item.doi}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[color:var(--text-muted)] hover:text-[color:var(--accent)] font-mono text-[11px] truncate max-w-[180px] hover:underline"
+                            title={`Open DOI: ${item.doi}`}
+                          >
+                            doi:{item.doi} ↗
+                          </a>
+                        )}
                       </div>
 
                       {/* Card Action Buttons */}
@@ -1598,7 +1226,7 @@ export default function ExternalResearchStage({
                         {item.title}
                       </h4>
                       <p className="text-xs text-[color:var(--text-secondary)] mt-1">
-                        <strong className="text-[color:var(--text-primary)]">{item.author}</strong> ({item.year}) • {item.journal || "Academic Literature"}
+                        <strong className="text-[color:var(--text-primary)]">{item.author}</strong> ({item.year}) • {item.journal || "Venue not listed"}
                         {item.citation_count !== undefined && (
                           <span className="ml-2 font-mono text-[color:var(--text-muted)]">
                             • {item.citation_count} Citations

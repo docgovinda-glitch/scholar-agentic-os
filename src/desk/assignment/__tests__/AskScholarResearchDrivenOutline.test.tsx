@@ -58,7 +58,10 @@ describe("Ask Scholar Research-Driven Outline Architecture", () => {
   });
 
   describe("2. Ask Scholar Literature Grounding & Recency Balance", () => {
-    it("retrieves peer-reviewed literature with citations, authors, and roles", () => {
+    it("never invents literature: the outline planner proposes no references of its own", () => {
+      // Rewritten 2026-10-29: the planner used to return catalog/synthesized
+      // "sources" (most DOIs did not resolve). References now come only from
+      // live discovery or the user's vault.
       const result = conductAskScholarResearchForOutline({
         question: "Does Economic Interdependence Reduce Interstate Conflict?",
         academicLevel: "undergraduate",
@@ -66,21 +69,9 @@ describe("Ask Scholar Research-Driven Outline Architecture", () => {
         targetWordCount: 2000,
       });
 
-      expect(result.sources.length).toBeGreaterThanOrEqual(4);
-      // Verified academic metadata
-      for (const s of result.sources) {
-        expect(s.title).toBeDefined();
-        expect(s.authors.length).toBeGreaterThanOrEqual(1);
-        expect(s.year).toMatch(/^\d{4}$/);
-        expect(s.citation).toBeDefined();
-        expect(s.role).toBeDefined();
-      }
-
-      // Recency balance: includes recent contemporary literature (2024-2026) alongside seminal classics
-      const hasRecent = result.sources.some((s) => parseInt(s.year, 10) >= 2024);
-      const hasSeminal = result.sources.some((s) => parseInt(s.year, 10) <= 2015);
-      expect(hasRecent).toBe(true);
-      expect(hasSeminal).toBe(true);
+      expect(result.sources).toEqual([]);
+      expect(result.curatedDiscoveredSources).toEqual([]);
+      expect(result.qualityControlChecklist.literatureGrounded).toBe(false);
     });
   });
 
@@ -102,7 +93,8 @@ describe("Ask Scholar Research-Driven Outline Architecture", () => {
         expect(mapping.analyticalObjective.length).toBeGreaterThan(15);
         expect(mapping.researchNeeded).toBeDefined();
         expect(mapping.keyArguments.length).toBeGreaterThanOrEqual(2);
-        expect(mapping.relevantSources.length).toBeGreaterThanOrEqual(1);
+        // No pre-selected references (see the "never invents literature" test).
+        expect(mapping.relevantSources).toEqual([]);
         expect(mapping.proposedSectionTitle).toBeDefined();
         expect(mapping.proposedSectionNumber).toBe(idx + 1);
       });
@@ -128,9 +120,10 @@ describe("Ask Scholar Research-Driven Outline Architecture", () => {
       // Quality control checklist verified
       const qc = structure.researchBlueprintOverview?.qualityControlChecklist;
       expect(qc?.allQuestionsCovered).toBe(true);
-      expect(qc?.literatureGrounded).toBe(true);
+      // The planner no longer claims literature grounding it doesn't have.
+      expect(qc?.literatureGrounded).toBe(false);
       expect(qc?.freeOfGenericFluff).toBe(true);
-      expect(qc?.recencyBalanced).toBe(true);
+      expect(qc?.recencyBalanced).toBe(false);
 
       // Check Main Headings
       for (const heading of structure.headings) {
@@ -142,7 +135,7 @@ describe("Ask Scholar Research-Driven Outline Architecture", () => {
         expect(heading.evidenceRequired).toBeDefined();
         expect(heading.counterarguments?.length).toBeGreaterThanOrEqual(1);
         expect(heading.expectedContribution).toBeDefined();
-        expect(heading.scholarlySources?.length).toBeGreaterThanOrEqual(1);
+        expect(heading.scholarlySources ?? []).toEqual([]); // no pre-selected references
 
         // Check Subheadings
         for (const sub of heading.subheadings) {
@@ -150,9 +143,11 @@ describe("Ask Scholar Research-Driven Outline Architecture", () => {
           expect(sub.assignmentQuestionAddressed).toBeDefined();
           expect(sub.keyTheories?.length).toBeGreaterThanOrEqual(1);
           expect(sub.keyArguments?.length).toBeGreaterThanOrEqual(1);
-          expect(sub.scholarlySources?.length).toBeGreaterThanOrEqual(1);
-          expect(sub.boundSourceIds?.length).toBeGreaterThanOrEqual(1);
-          expect(sub.researchStatus).toBe("sufficient");
+          // Without discovered sources nothing is bound, and the section
+          // honestly reports that it has not been researched yet.
+          expect(sub.scholarlySources ?? []).toEqual([]);
+          expect(sub.boundSourceIds ?? []).toEqual([]);
+          expect(sub.researchStatus).toBe("not_researched");
         }
       }
     });
@@ -208,7 +203,8 @@ describe("Ask Scholar Research-Driven Outline Architecture", () => {
       expect(screen.getByText(/Section 1 Research Basis/i)).toBeDefined();
       expect(screen.getByText("Purpose & Objective")).toBeDefined();
       expect(screen.getByText("Empirical Evidence Required")).toBeDefined();
-      expect(screen.getByText(/Supporting Scholarly Sources/i)).toBeDefined();
+      // No pre-selected references, so no "Supporting Scholarly Sources" list.
+      expect(screen.queryByText(/Supporting Scholarly Sources/i)).toBeNull();
     });
   });
 });
