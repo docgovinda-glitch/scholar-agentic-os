@@ -6,6 +6,7 @@ import { defaultPolicy } from "../../src/platform/warden/policy.js";
 import { recordConsent, type EgressPolicy } from "../../src/platform/warden/warden.js";
 import type { TaskClass } from "../../src/platform/warden/types.js";
 import type { CandidateProvider } from "../../src/platform/gateway/types.js";
+import { resolveClientAiConfig, type ClientAiConfig } from "../src/ai/clientAiConfig.ts";
 import { getEntitlement, isEntitlementActive } from "../src/aiEngine/entitlements.js";
 import { parseAndRepairLLMJson } from "../../src/shared/llmJsonParser.ts";
 
@@ -121,58 +122,14 @@ export function buildAuthorizedPolicy(candidates: CandidateProvider[]): EgressPo
   return policy;
 }
 
-export interface RequestAiConfig {
-  provider?: string;
-  model?: string;
-  apiKey?: string;
-  baseUrl?: string;
-  candidates: CandidateProvider[];
-}
+export type RequestAiConfig = ClientAiConfig;
 
 /**
  * Resolves client-owned transient AI configuration from request headers.
  * Never persists keys on the server and never falls back to server env keys.
  */
 export function resolveRequestAiConfig(req?: LlmRequestLike): RequestAiConfig {
-  if (!req || !req.headers) {
-    return { candidates: [] };
-  }
-  const headers = req.headers;
-  const provider =
-    (headers["x-ai-provider"] as string) || (headers["x-provider"] as string) || undefined;
-  const model =
-    (headers["x-ai-model"] as string) || (headers["x-model"] as string) || undefined;
-  const apiKey =
-    (headers["x-ai-api-key"] as string) || (headers["x-api-key"] as string) || undefined;
-  const baseUrl =
-    (headers["x-ai-base-url"] as string) || (headers["x-base-url"] as string) || undefined;
-
-  const candidates: CandidateProvider[] = [];
-
-  if (
-    provider &&
-    (apiKey ||
-      baseUrl ||
-      provider === "ollama" ||
-      provider === "lmstudio" ||
-      provider === "localai" ||
-      provider === "vllm")
-  ) {
-    candidates.push({
-      provider: provider as CandidateProvider["provider"],
-      model: model || undefined,
-      apiKey: apiKey || "local-no-credential-required",
-      baseUrl: baseUrl || undefined,
-    });
-  }
-
-  return {
-    provider,
-    model,
-    apiKey,
-    baseUrl,
-    candidates,
-  };
+  return resolveClientAiConfig(req?.headers);
 }
 
 /**
