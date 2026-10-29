@@ -73,15 +73,9 @@ import type { SubmissionRecord, SubmissionStatus } from "../../../../src/domain/
 import { countWords, MIN_GUIDELINES_WORDS } from "../../../../src/domain/journal/types.ts";
 import type { JournalRequirements, JournalRequirementsProposal } from "../../../../src/domain/journal/types.ts";
 import { isOutputTypeEnabled, MAINTENANCE_MESSAGE } from "../../outputTypeAccess.ts";
-import { extractJournalRequirements, GatewayDenied } from "../../../../src/app/journal/extract.ts";
-import { assembleUserCandidates } from "../../../src/aiEngine/userRouter.ts";
-import { resolvePremiumResources } from "../../../src/aiEngine/adminRouter.ts";
-import { getDecryptedCredential } from "../../../src/aiEngine/credentialVault.ts";
-import { checkPerTaskLimit } from "../../../src/aiEngine/quotaEngine.ts";
-import { creditsForUsage, estimateMaxCreditsForInput } from "../../../src/aiEngine/creditPolicy.ts";
-import { deductCredits, type DeductResult } from "../../../src/aiEngine/creditEngine.ts";
-import { recordProviderFailure, recordProviderSuccess } from "../../../src/aiEngine/providerHealth.ts";
-import { getSupabaseRestConfig, SupabaseTable } from "../../../src/supabaseRest.ts";
+import { extractJournalRequirements } from "../../../../src/app/journal/extract.ts";
+import { estimateMaxCreditsForInput } from "../../../src/aiEngine/creditPolicy.ts";
+import { runPremium, type PremiumOutcome } from "../../../src/ai/premium.ts";
 import { allocateWordBudget } from "../../../../src/domain/manuscript/wordBudget.ts";
 import type { GeneratedSection, SectionPlan } from "../../../../src/domain/manuscript/types.ts";
 import {
@@ -122,10 +116,6 @@ export function isGateId(value: unknown): value is GateId {
   return GateIdSchema.safeParse(value).success;
 }
 
-
-
-
-
 export function isValidEvidenceSpan(value: unknown): value is EvidenceSpan {
   return EvidenceSpanSchema.safeParse(value).success;
 }
@@ -151,173 +141,21 @@ export function isValidJournalRequirementsInput(
   return JournalRequirementsInputSchema.safeParse(value).success;
 }
 
-/**
- * Why a charge was refused, in the user's terms. Duplicated from
- * server/routes/studio.ts's own DEDUCT_FAILURE_MESSAGES rather than shared:
- * both are four short user-facing strings keyed to creditEngine's
- * DeductResult union, studio.ts doesn't export it, and the two pipelines
- * otherwise have nothing in common worth factoring out for this.
- */
-export const DEDUCT_FAILURE_MESSAGES: Record<Exclude<DeductResult, "ok">, string> = {
-  daily_limit_exceeded: "You've reached your daily Premium credit limit. It resets at the start of tomorrow (UTC).",
-  weekly_limit_exceeded: "You've reached your weekly Premium credit limit. It resets at the start of next week (UTC).",
-  monthly_limit_exceeded: "You've reached your monthly Premium credit limit. It resets at the start of next month (UTC).",
-  insufficient_balance: "You don't have enough Premium credits left for this request.",
-};
+export { DEDUCT_FAILURE_MESSAGES, recordPremiumUsage } from "../../../src/ai/premium.ts";
 
-interface PremiumUsageLedgerRow extends Record<string, unknown> {
-  user_id: string;
-  provider_id: string;
-  model_id: string;
-  tier: "premium";
-  task_type: string;
-  input_tokens: number | null;
-  output_tokens: number | null;
-  scholar_credits_charged: number;
-  request_id: string;
-  status: "success" | "quota_exhausted";
-}
-
-/** Shared audit-ledger writer for every Premium AI pipeline in this file (journal-requirements extraction, manuscript-section generation) — `taskType` is what keeps their usage rows distinguishable in ai_usage_ledger. */
-export async function recordPremiumUsage(
-  userId: string,
-  providerId: string,
-  modelId: string,
-  usage: { inputTokensEstimate: number; outputTokensEstimate: number } | undefined,
-  requestId: string,
-  creditsCharged: number,
-  status: "success" | "quota_exhausted",
-  taskType: string
-): Promise<void> {
-  const config = getSupabaseRestConfig();
-  if (!config) return;
-  const ledger = new SupabaseTable<PremiumUsageLedgerRow>(config, "ai_usage_ledger");
-  await ledger.insert({
-    user_id: userId,
-    provider_id: providerId,
-    model_id: modelId,
-    tier: "premium",
-    task_type: taskType,
-    input_tokens: usage?.inputTokensEstimate ?? null,
-    output_tokens: usage?.outputTokensEstimate ?? null,
-    scholar_credits_charged: creditsCharged,
-    request_id: requestId,
-    status,
-  });
-}
-
-/**
- * Runs journal-requirements extraction's Premium path — structurally
- * identical to server/routes/studio.ts's runPremiumRefine (see that
- * function's own comment for the reasoning behind each step: independently
- * re-deriving entitlement/quota server-side, retrying across Premium
- * fallbacks, recording provider health before deducting credits so a
- * Supabase blip during deduction can't retroactively mark a working
- * provider down). Duplicated rather than imported since studio.ts's version
- * is typed against StudioRefineInput/Result, not this feature's shape.
- */
+/** Journal requirements extraction on Premium. Steps and their reasons: server/src/ai/premium.ts. */
 export async function runPremiumJournalExtraction(
   userId: string,
   extractInput: Omit<Parameters<typeof extractJournalRequirements>[0], "provider" | "apiKey" | "model">
-): Promise<
-  | {
-      ok: true;
-      result: Awaited<ReturnType<typeof extractJournalRequirements>>;
-      aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number };
-    }
-  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
-> {
-  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
-  if (!entitlementActive) {
-    return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
-  }
-
-  const preCheckAmount = estimateMaxCreditsForInput(extractInput.guidelinesText);
-  const perTask = quota ? checkPerTaskLimit(preCheckAmount, quota) : { allowed: true };
-  if (!perTask.allowed) {
-    return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
-  }
-
-  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
-    return {
-      ok: false,
-      status: 402,
-      error:
-        premiumQuotaRemaining <= 0
-          ? "Your Premium quota for this period is exhausted."
-          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
-    };
-  }
-
-  const resources = await resolvePremiumResources(userId, "reasoning");
-  if (resources.length === 0) {
-    return {
-      ok: false,
-      status: 402,
-      error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator.",
-    };
-  }
-
-  let lastError = "No Premium resource is currently available.";
-
-  for (const resource of resources) {
-    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
-    if (!credential) {
-      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
-      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
-      continue;
-    }
-
-    const model = resource.modelId || undefined;
-    const start = Date.now();
-
-    let result: Awaited<ReturnType<typeof extractJournalRequirements>>;
-    try {
-      result = await extractJournalRequirements({ ...extractInput, provider: resource.providerId, apiKey: credential, model });
-    } catch (err) {
-      if (err instanceof GatewayDenied) {
-        if (err.requiresConsent) {
-          return { ok: false, status: 428, error: err.message, provider: resource.providerId };
-        }
-        return { ok: false, status: 403, error: err.message };
-      }
-      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
-      lastError = err instanceof Error ? err.message : "Unknown error";
-      continue;
-    }
-
-    await recordProviderSuccess(resource.providerId, Date.now() - start);
-
-    const usage = result.usage;
-    const modelUsed = model ?? usage.model;
-    const creditsUsed = creditsForUsage(usage.inputTokensEstimate, usage.outputTokensEstimate);
-    const requestId = crypto.randomUUID();
-    const deductResult = await deductCredits(
-      userId,
-      creditsUsed,
-      quota?.dailyCredits ?? null,
-      quota?.monthlyCredits ?? null,
-      "usage",
-      requestId,
-      `journal requirements extraction: ${resource.label}`,
-      quota?.weeklyCredits ?? null
-    );
-
-    if (deductResult !== "ok") {
-      await recordPremiumUsage(userId, resource.providerId, modelUsed, usage, requestId, 0, "quota_exhausted", "journal_requirements_extraction");
-      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
-    }
-
-    await recordPremiumUsage(userId, resource.providerId, modelUsed, usage, requestId, creditsUsed, "success", "journal_requirements_extraction");
-
-    return {
-      ok: true,
-      result,
-      aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed },
-    };
-  }
-
-  return { ok: false, status: 502, error: lastError };
+): Promise<PremiumOutcome<Awaited<ReturnType<typeof extractJournalRequirements>>>> {
+  return runPremium({
+    userId,
+    estimatedCredits: estimateMaxCreditsForInput(extractInput.guidelinesText),
+    taskType: "journal_requirements_extraction",
+    describe: (label) => `journal requirements extraction: ${label}`,
+    call: (target) => extractJournalRequirements({ ...extractInput, ...target }),
+    usageOf: (result) => result.usage,
+  });
 }
 
 /**
@@ -357,215 +195,41 @@ export function buildSectionContextPacket(record: ProjectRecord, section: Sectio
   };
 }
 
-/**
- * Runs one section's Premium generation — structurally identical to
- * runPremiumJournalExtraction/runPremiumRefine (see those functions' own
- * comments for the reasoning behind each step). Duplicated rather than
- * shared for the same reason as the others: each pipeline has its own
- * input/result shape and otherwise nothing in common worth factoring out.
- */
+/** One manuscript section on Premium. Steps and their reasons: server/src/ai/premium.ts. */
 export async function runPremiumSectionGeneration(
   userId: string,
   packet: SectionContextPacket,
   policy: import("../../../../src/platform/warden/warden.ts").EgressPolicy
-): Promise<
-  | {
-      ok: true;
-      result: Awaited<ReturnType<typeof generateSection>>;
-      aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number };
-    }
-  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
-> {
-  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
-  if (!entitlementActive) {
-    return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
-  }
-
-  const preCheckAmount = estimateMaxCreditsForInput(packet.researchContext + packet.section.guidance);
-  const perTask = quota ? checkPerTaskLimit(preCheckAmount, quota) : { allowed: true };
-  if (!perTask.allowed) {
-    return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
-  }
-
-  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
-    return {
-      ok: false,
-      status: 402,
-      error:
-        premiumQuotaRemaining <= 0
-          ? "Your Premium quota for this period is exhausted."
-          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
-    };
-  }
-
-  const resources = await resolvePremiumResources(userId, "reasoning");
-  if (resources.length === 0) {
-    return {
-      ok: false,
-      status: 402,
-      error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator.",
-    };
-  }
-
-  let lastError = "No Premium resource is currently available.";
-
-  for (const resource of resources) {
-    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
-    if (!credential) {
-      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
-      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
-      continue;
-    }
-
-    const model = resource.modelId || undefined;
-    const start = Date.now();
-
-    let result: Awaited<ReturnType<typeof generateSection>>;
-    try {
-      result = await generateSection({ packet, provider: resource.providerId, apiKey: credential, model, policy });
-    } catch (err) {
-      if (err instanceof GatewayDenied) {
-        if (err.requiresConsent) {
-          return { ok: false, status: 428, error: err.message, provider: resource.providerId };
-        }
-        return { ok: false, status: 403, error: err.message };
-      }
-      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
-      lastError = err instanceof Error ? err.message : "Unknown error";
-      continue;
-    }
-
-    await recordProviderSuccess(resource.providerId, Date.now() - start);
-
-    const usage = result.usage;
-    const modelUsed = model ?? usage.model;
-    const creditsUsed = creditsForUsage(usage.inputTokensEstimate, usage.outputTokensEstimate);
-    const requestId = crypto.randomUUID();
-    const deductResult = await deductCredits(
-      userId,
-      creditsUsed,
-      quota?.dailyCredits ?? null,
-      quota?.monthlyCredits ?? null,
-      "usage",
-      requestId,
-      `manuscript generation: ${resource.label} (${packet.section.key})`,
-      quota?.weeklyCredits ?? null
-    );
-
-    if (deductResult !== "ok") {
-      await recordPremiumUsage(userId, resource.providerId, modelUsed, usage, requestId, 0, "quota_exhausted", "manuscript_generation");
-      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
-    }
-
-    await recordPremiumUsage(userId, resource.providerId, modelUsed, usage, requestId, creditsUsed, "success", "manuscript_generation");
-
-    return {
-      ok: true,
-      result,
-      aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed },
-    };
-  }
-
-  return { ok: false, status: 502, error: lastError };
+): Promise<PremiumOutcome<Awaited<ReturnType<typeof generateSection>>>> {
+  return runPremium({
+    userId,
+    estimatedCredits: estimateMaxCreditsForInput(packet.researchContext + packet.section.guidance),
+    taskType: "manuscript_generation",
+    describe: (label) => `manuscript generation: ${label} (${packet.section.key})`,
+    call: (target) => generateSection({ packet, ...target, policy }),
+    usageOf: (result) => result.usage,
+  });
 }
 
-/**
- * Runs the global coherence pass's Premium path — retries across every
- * resolved Premium resource on failure, same reliable-fallback discipline
- * as runPremiumSectionGeneration (a single resource's outage or
- * misconfiguration no longer fails the whole check when another resource
- * is available).
- */
+/** The global coherence pass on Premium; a failed resource falls through to the next. Steps and their reasons: server/src/ai/premium.ts. */
 export async function runPremiumCoherenceCheck(
   userId: string,
   sections: GeneratedSection[],
   dimensions: CoherenceDimension[] | undefined,
   policy: import("../../../../src/platform/warden/warden.ts").EgressPolicy
-): Promise<
-  | { ok: true; result: Awaited<ReturnType<typeof checkCoherence>>; aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number } }
-  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
-> {
-  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
-  if (!entitlementActive) {
-    return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
-  }
-
+): Promise<PremiumOutcome<Awaited<ReturnType<typeof checkCoherence>>>> {
   const combinedText = sections.map((s) => s.text).join("\n");
-  const preCheckAmount = estimateMaxCreditsForInput(combinedText) * (dimensions?.length ?? COHERENCE_DIMENSIONS.length);
-  const perTask = quota ? checkPerTaskLimit(preCheckAmount, quota) : { allowed: true };
-  if (!perTask.allowed) {
-    return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
-  }
-  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
-    return {
-      ok: false,
-      status: 402,
-      error:
-        premiumQuotaRemaining <= 0
-          ? "Your Premium quota for this period is exhausted."
-          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
-    };
-  }
-
-  const resources = await resolvePremiumResources(userId, "reasoning");
-  if (resources.length === 0) {
-    return { ok: false, status: 402, error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator." };
-  }
-
-  let lastError = "No Premium resource is currently available.";
-
-  for (const resource of resources) {
-    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
-    if (!credential) {
-      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
-      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
-      continue;
-    }
-
-    const model = resource.modelId || undefined;
-    const start = Date.now();
-    let result: Awaited<ReturnType<typeof checkCoherence>>;
-    try {
-      result = await checkCoherence({ sections, provider: resource.providerId, apiKey: credential, model, policy, dimensions });
-    } catch (err) {
-      if (err instanceof GatewayDenied) {
-        if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
-        return { ok: false, status: 403, error: err.message };
-      }
-      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
-      lastError = err instanceof Error ? err.message : "Unknown error";
-      continue;
-    }
-    await recordProviderSuccess(resource.providerId, Date.now() - start);
-
-    // Real usage per pass isn't threaded back out of checkCoherence today, so
-    // the pre-check estimate is what gets charged — same honest fallback
-    // runPremiumRefine uses when a level's usage is unavailable.
-    const creditsUsed = preCheckAmount;
-    const requestId = crypto.randomUUID();
-    const deductResult = await deductCredits(
-      userId,
-      creditsUsed,
-      quota?.dailyCredits ?? null,
-      quota?.monthlyCredits ?? null,
-      "usage",
-      requestId,
-      `coherence check: ${resource.label}`,
-      quota?.weeklyCredits ?? null
-    );
-    if (deductResult !== "ok") {
-      await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "coherence_check");
-      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
-    }
-    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "coherence_check");
-
-    return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
-  }
-
-  return { ok: false, status: 502, error: lastError };
+  // checkCoherence doesn't report usage, so the estimate is what is charged.
+  return runPremium({
+    userId,
+    estimatedCredits: estimateMaxCreditsForInput(combinedText) * (dimensions?.length ?? COHERENCE_DIMENSIONS.length),
+    taskType: "coherence_check",
+    describe: (label) => `coherence check: ${label}`,
+    call: (target) => checkCoherence({ sections, ...target, policy, dimensions }),
+  });
 }
 
-/** Runs one peer-review round's Premium path — retries across every resolved Premium resource on failure, same reliable-fallback discipline as runPremiumSectionGeneration/runPremiumCoherenceCheck. */
+/** Peer review on Premium. Steps and their reasons: server/src/ai/premium.ts. */
 export async function runPremiumPeerReview(
   userId: string,
   sections: GeneratedSection[],
@@ -573,263 +237,50 @@ export async function runPremiumPeerReview(
   journalRequirements: { journalName: string } | undefined,
   lenses: ReviewLens[] | undefined,
   policy: import("../../../../src/platform/warden/warden.ts").EgressPolicy
-): Promise<
-  | { ok: true; result: Awaited<ReturnType<typeof runPeerReview>>; aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number } }
-  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
-> {
-  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
-  if (!entitlementActive) {
-    return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
-  }
-
+): Promise<PremiumOutcome<Awaited<ReturnType<typeof runPeerReview>>>> {
   const combinedText = sections.map((s) => s.text).join("\n");
-  const preCheckAmount = estimateMaxCreditsForInput(combinedText) * (lenses?.length ?? REVIEW_LENSES.length);
-  const perTask = quota ? checkPerTaskLimit(preCheckAmount, quota) : { allowed: true };
-  if (!perTask.allowed) {
-    return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
-  }
-  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
-    return {
-      ok: false,
-      status: 402,
-      error:
-        premiumQuotaRemaining <= 0
-          ? "Your Premium quota for this period is exhausted."
-          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
-    };
-  }
-
-  const resources = await resolvePremiumResources(userId, "reasoning");
-  if (resources.length === 0) {
-    return { ok: false, status: 402, error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator." };
-  }
-
-  let lastError = "No Premium resource is currently available.";
-
-  for (const resource of resources) {
-    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
-    if (!credential) {
-      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
-      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
-      continue;
-    }
-
-    const model = resource.modelId || undefined;
-    const start = Date.now();
-    let result: Awaited<ReturnType<typeof runPeerReview>>;
-    try {
-      result = await runPeerReview({ sections, roundNumber, journalRequirements, provider: resource.providerId, apiKey: credential, model, policy, lenses });
-    } catch (err) {
-      if (err instanceof GatewayDenied) {
-        if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
-        return { ok: false, status: 403, error: err.message };
-      }
-      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
-      lastError = err instanceof Error ? err.message : "Unknown error";
-      continue;
-    }
-    await recordProviderSuccess(resource.providerId, Date.now() - start);
-
-    const creditsUsed = preCheckAmount;
-    const requestId = crypto.randomUUID();
-    const deductResult = await deductCredits(
-      userId,
-      creditsUsed,
-      quota?.dailyCredits ?? null,
-      quota?.monthlyCredits ?? null,
-      "usage",
-      requestId,
-      `peer review: ${resource.label}`,
-      quota?.weeklyCredits ?? null
-    );
-    if (deductResult !== "ok") {
-      await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "peer_review");
-      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
-    }
-    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "peer_review");
-
-    return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
-  }
-
-  return { ok: false, status: 502, error: lastError };
+  // runPeerReview doesn't report usage, so the estimate is what is charged.
+  return runPremium({
+    userId,
+    estimatedCredits: estimateMaxCreditsForInput(combinedText) * (lenses?.length ?? REVIEW_LENSES.length),
+    taskType: "peer_review",
+    describe: (label) => `peer review: ${label}`,
+    call: (target) => runPeerReview({ sections, roundNumber, journalRequirements, ...target, policy, lenses }),
+  });
 }
 
-/** Runs cover letter generation's Premium path — retries across every resolved Premium resource on failure, same reliable-fallback discipline as runPremiumSectionGeneration. */
+/** Cover letter on Premium. Steps and their reasons: server/src/ai/premium.ts. */
 export async function runPremiumCoverLetter(
   userId: string,
   document: CanonicalDocument,
   journalRequirements: JournalRequirements,
   policy: import("../../../../src/platform/warden/warden.ts").EgressPolicy
-): Promise<
-  | { ok: true; result: Awaited<ReturnType<typeof generateCoverLetter>>; aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number } }
-  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
-> {
-  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
-  if (!entitlementActive) {
-    return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
-  }
-
+): Promise<PremiumOutcome<Awaited<ReturnType<typeof generateCoverLetter>>>> {
   const combinedText = document.blocks.map((b) => b.text).join("\n");
-  const preCheckAmount = estimateMaxCreditsForInput(combinedText);
-  const perTask = quota ? checkPerTaskLimit(preCheckAmount, quota) : { allowed: true };
-  if (!perTask.allowed) {
-    return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
-  }
-  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
-    return {
-      ok: false,
-      status: 402,
-      error:
-        premiumQuotaRemaining <= 0
-          ? "Your Premium quota for this period is exhausted."
-          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
-    };
-  }
-
-  const resources = await resolvePremiumResources(userId, "reasoning");
-  if (resources.length === 0) {
-    return { ok: false, status: 402, error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator." };
-  }
-
-  let lastError = "No Premium resource is currently available.";
-
-  for (const resource of resources) {
-    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
-    if (!credential) {
-      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
-      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
-      continue;
-    }
-
-    const model = resource.modelId || undefined;
-    const start = Date.now();
-    let result: Awaited<ReturnType<typeof generateCoverLetter>>;
-    try {
-      result = await generateCoverLetter({ document, journalRequirements, provider: resource.providerId, apiKey: credential, model, policy });
-    } catch (err) {
-      if (err instanceof GatewayDenied) {
-        if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
-        return { ok: false, status: 403, error: err.message };
-      }
-      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
-      lastError = err instanceof Error ? err.message : "Unknown error";
-      continue;
-    }
-    await recordProviderSuccess(resource.providerId, Date.now() - start);
-
-    const creditsUsed = preCheckAmount;
-    const requestId = crypto.randomUUID();
-    const deductResult = await deductCredits(
-      userId,
-      creditsUsed,
-      quota?.dailyCredits ?? null,
-      quota?.monthlyCredits ?? null,
-      "usage",
-      requestId,
-      `cover letter: ${resource.label}`,
-      quota?.weeklyCredits ?? null
-    );
-    if (deductResult !== "ok") {
-      await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "cover_letter");
-      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
-    }
-    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "cover_letter");
-
-    return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
-  }
-
-  return { ok: false, status: 502, error: lastError };
+  return runPremium({
+    userId,
+    estimatedCredits: estimateMaxCreditsForInput(combinedText),
+    taskType: "cover_letter",
+    describe: (label) => `cover letter: ${label}`,
+    call: (target) => generateCoverLetter({ document, journalRequirements, ...target, policy }),
+  });
 }
 
-/** Runs anonymization-proposal generation's Premium path — retries across every resolved Premium resource on failure, same reliable-fallback discipline as runPremiumSectionGeneration. */
+/** Anonymisation proposal on Premium. Steps and their reasons: server/src/ai/premium.ts. */
 export async function runPremiumAnonymization(
   userId: string,
   document: CanonicalDocument,
   policy: import("../../../../src/platform/warden/warden.ts").EgressPolicy
-): Promise<
-  | { ok: true; result: Awaited<ReturnType<typeof proposeAnonymization>>; aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number } }
-  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
-> {
-  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
-  if (!entitlementActive) {
-    return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
-  }
-
+): Promise<PremiumOutcome<Awaited<ReturnType<typeof proposeAnonymization>>>> {
   const combinedText = document.blocks.map((b) => b.text).join("\n");
-  const preCheckAmount = estimateMaxCreditsForInput(combinedText);
-  const perTask = quota ? checkPerTaskLimit(preCheckAmount, quota) : { allowed: true };
-  if (!perTask.allowed) {
-    return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
-  }
-  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
-    return {
-      ok: false,
-      status: 402,
-      error:
-        premiumQuotaRemaining <= 0
-          ? "Your Premium quota for this period is exhausted."
-          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
-    };
-  }
-
-  const resources = await resolvePremiumResources(userId, "reasoning");
-  if (resources.length === 0) {
-    return { ok: false, status: 402, error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator." };
-  }
-
-  let lastError = "No Premium resource is currently available.";
-
-  for (const resource of resources) {
-    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
-    if (!credential) {
-      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
-      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
-      continue;
-    }
-
-    const model = resource.modelId || undefined;
-    const start = Date.now();
-    let result: Awaited<ReturnType<typeof proposeAnonymization>>;
-    try {
-      result = await proposeAnonymization({ document, provider: resource.providerId, apiKey: credential, model, policy });
-    } catch (err) {
-      if (err instanceof GatewayDenied) {
-        if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
-        return { ok: false, status: 403, error: err.message };
-      }
-      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
-      lastError = err instanceof Error ? err.message : "Unknown error";
-      continue;
-    }
-    await recordProviderSuccess(resource.providerId, Date.now() - start);
-
-    const creditsUsed = preCheckAmount;
-    const requestId = crypto.randomUUID();
-    const deductResult = await deductCredits(
-      userId,
-      creditsUsed,
-      quota?.dailyCredits ?? null,
-      quota?.monthlyCredits ?? null,
-      "usage",
-      requestId,
-      `anonymization proposal: ${resource.label}`,
-      quota?.weeklyCredits ?? null
-    );
-    if (deductResult !== "ok") {
-      await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "anonymization_propose");
-      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
-    }
-    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "anonymization_propose");
-
-    return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
-  }
-
-  return { ok: false, status: 502, error: lastError };
+  return runPremium({
+    userId,
+    estimatedCredits: estimateMaxCreditsForInput(combinedText),
+    taskType: "anonymization_propose",
+    describe: (label) => `anonymization proposal: ${label}`,
+    call: (target) => proposeAnonymization({ document, ...target, policy }),
+  });
 }
-
-
-
-
 
 /**
  * Recompute the Rubric report and G6 exit criteria from a project's

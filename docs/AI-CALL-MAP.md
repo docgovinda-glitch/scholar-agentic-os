@@ -45,11 +45,11 @@ The user's key reaches the server only on AI routes (`routeUsesClientAi`, #93).
 4. **No usage ledger or credit accounting** on BYOK/local calls (only the Premium engine records usage). Whether BYOK calls should be metered is a product decision: P1, to confirm.
 5. **Prompts are inline in route files.** There is no prompt/version registry.
 6. **Premium covers only part of the product.** Premium (Scholar Core's server-held keys) works for the manuscript/gate pipeline and Studio refine. The staged workspaces (Coursework, Journal stages, Thesis, Proposal, Presentation, Ask Scholar) accept only the user's own key or browser AI. The AI Access copy "Premium uses Scholar Core's own keys, held server-side" is true for those features but should not imply every workspace. B4 must make the Premium scope visible in the UI.
-7. **Six near-identical `runPremium*` functions** (plus `runPremiumRefine`) repeat the entitlement → quota → resource loop → credit deduction sequence. One Brain should own that loop once.
+7. ~~**Six near-identical `runPremium*` functions** (plus `runPremiumRefine`) repeat the entitlement → quota → resource loop → credit deduction sequence.~~ **Done:** all seven are thin wrappers over `server/src/ai/premium.ts` `runPremium`.
 
 ## B3 plan (one PR per step)
 
-1. A single `resolveClientAiCandidates(req)` used by both llm.ts and scholarBrain, and a single `runPremium(userId, task, call)` replacing the seven `runPremium*` copies. **No behaviour change.**
+1. **Done (#95 and the Premium PR).** A single `resolveClientAiCandidates(req)` used by both llm.ts and scholarBrain, and a single `runPremium(userId, task, call)` replacing the seven `runPremium*` copies. **No behaviour change.**
 2. One request/response contract in `server/src/ai/brain.ts` (`run({ task, workspace, projectId, input, stream })` → typed errors `no-provider` (426 with prompts), `quota-exceeded`, `consent-required`, `provider-error`, `timeout`). It wraps the gateway, Warden, guardrails, JSON repair and abort-on-disconnect.
 3. Migrate route files one workspace at a time: Coursework, then Journal, Proposal, Thesis, Presentation, then Vault/discovery. Each migration is guarded by the E2E suite (#91) and its unit tests. Remove `callOpenRouter*` / `scholarBrain` when the last caller moves.
 4. One client hook (`useBrain`) wrapping `authedStreamFetch` + the 426 → `executeAgenticLLM` path, with uniform loading/error/"connect an AI provider" states.
