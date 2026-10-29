@@ -25,7 +25,7 @@ describe("Three-Way Architectural AI Isolation Tests", () => {
 
   it("Test 1: Non-premium user calling server AI route is DENIED (returns 426)", async () => {
     const res = await request(app)
-      .post(`/api/projects/${projectId}/agent/literature`)
+      .post(`/api/projects/${projectId}/agent/gaps`)
       .send({});
 
     // Non-premium user gets HTTP 426 requiring frontend LLM execution
@@ -35,7 +35,7 @@ describe("Three-Way Architectural AI Isolation Tests", () => {
 
   it("Test 2: Server explicitly rejects client-supplied BYOK API keys with 400", async () => {
     const res = await request(app)
-      .post(`/api/projects/${projectId}/agent/literature`)
+      .post(`/api/projects/${projectId}/agent/gaps`)
       .send({
         apiKey: "sk-user-byok-secret-123",
       });
@@ -49,7 +49,7 @@ describe("Three-Way Architectural AI Isolation Tests", () => {
 
     // With active entitlement, if server has no platform candidates configured, it still cleanly signals or handles
     const res = await request(app)
-      .post(`/api/projects/${projectId}/agent/literature`)
+      .post(`/api/projects/${projectId}/agent/gaps`)
       .send({});
 
     // If server candidates are not populated in env during test, it returns 426 or 404/200, never leaking
