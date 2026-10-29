@@ -203,15 +203,22 @@ function normalizeUserKeyPart(v: unknown): string | undefined {
   return trimmed.length ? trimmed.toLowerCase() : undefined;
 }
 
+let limiterSeq = 0;
+
 export function rateLimit(options: RateLimitOptions) {
   const limitBy: LimitBy = options.limitBy ?? "ip";
+  // Each limiter counts in its own namespace. Without this, every limiter
+  // shared one counter per IP, so e.g. a handful of ordinary API requests
+  // exhausted the 5-attempt login limit for that IP.
+  const ns = `rl${++limiterSeq}`;
 
   return (req: any, res: any, next: any) => {
     const now = Date.now();
 
     if (options.keyOverride) {
-      const overridden = options.keyOverride(req);
-      if (overridden) {
+      const overriddenKey = options.keyOverride(req);
+      if (overriddenKey) {
+        const overridden = `${ns}:${overriddenKey}`;
         const entry = store.get(overridden) || { count: 0, resetTime: now + options.windowMs };
         if (entry.resetTime < now) {
           entry.count = 0;
@@ -247,8 +254,8 @@ export function rateLimit(options: RateLimitOptions) {
     // previously created a fresh bucket per request (F-09).
     const key =
       limitBy === "ip+user" && userPart
-        ? `${ipPart}:${userPart}`
-        : ipPart;
+        ? `${ns}:${ipPart}:${userPart}`
+        : `${ns}:${ipPart}`;
 
     const entry = store.get(key) || { count: 0, resetTime: now + options.windowMs };
 

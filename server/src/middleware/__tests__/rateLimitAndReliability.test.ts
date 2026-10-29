@@ -20,6 +20,26 @@ describe("Rate limiting & reliability guards (F-09, F-17)", () => {
     expect(app.get("trust proxy")).toBe(1);
   });
 
+  it("keeps a separate counter per limiter (other API traffic does not use up the login limit)", () => {
+    const general = rateLimit({ windowMs: 60_000, max: 100, limitBy: "ip" });
+    const login = rateLimit({ windowMs: 60_000, max: 5, limitBy: "ip" });
+    const req = { ip: "198.51.100.7", headers: {}, get: () => undefined };
+    let status = 200;
+    const res = { status(c: number) { status = c; return this; }, json() { return this; } };
+    let passed = 0;
+    // Ten ordinary requests through the general limiter…
+    for (let i = 0; i < 10; i++) general(req, res, () => passed++);
+    expect(passed).toBe(10);
+    // …must not count against the login limiter: the first 5 logins pass.
+    let logins = 0;
+    for (let i = 0; i < 5; i++) login(req, res, () => logins++);
+    expect(logins).toBe(5);
+    // And the login limit itself still applies.
+    login(req, res, () => logins++);
+    expect(logins).toBe(5);
+    expect(status).toBe(429);
+  });
+
   it("does NOT allow rotating User-Agent to bypass IP rate limits", () => {
     const limiter = rateLimit({ windowMs: 60_000, max: 3, limitBy: "ip" });
     let statusSent = 200;
