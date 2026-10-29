@@ -185,68 +185,10 @@ Preliminary Context: ${preliminaryContext || "General peer-reviewed scholarly co
       }
     } catch (err: unknown) {
       console.warn("Error discovering literature gaps:", err);
-      // Fallback deterministic academic gaps
-      const fallbackGaps: GapProposal[] = [
-        {
-          id: "gap_empirical_1",
-          gap_type: "empirical",
-          description: `Limited longitudinal empirical evidence evaluating real-world efficacy in "${topic.slice(0, 60)}" across heterogeneous operating conditions.`,
-          importance_score: 94,
-          supporting_doi: "10.1038/s41586-024-07100-2",
-          why_it_matters: "Current studies rely disproportionately on small, cross-sectional cohorts without statistical power controls.",
-        },
-        {
-          id: "gap_methodological_2",
-          gap_type: "methodological",
-          description: `Absence of standardized quantitative benchmarks measuring causal attribution rather than correlative observational patterns.`,
-          importance_score: 88,
-          supporting_doi: "10.1145/3618257.3624800",
-          why_it_matters: "Without standardized measurement protocols, comparative meta-analysis between existing frameworks remains inconclusive.",
-        },
-        {
-          id: "gap_theoretical_3",
-          gap_type: "theoretical",
-          description: `Unresolved theoretical tension regarding boundary limits when scaling from controlled micro-environments to real-world architectures.`,
-          importance_score: 91,
-          supporting_doi: "10.1109/TPAMI.2023.3298412",
-          why_it_matters: "Extrapolating current models produces unverified divergence in asymptotic error thresholds.",
-        },
-      ];
-
-      const fallbackTitles: TitleProposal[] = [
-        {
-          id: "t_fallback_1",
-          title_text: normalizeUnicodeNFC(topic.length > 10 ? topic : "Empirical Foundations and Methodological Framework"),
-          subtitle_text: "A Rigorous Cross-Sectional and Theoretical Investigation",
-          rationale: "Direct, scholarly, and immediately identifies both domain and analytical posture.",
-        },
-        {
-          id: "t_fallback_2",
-          title_text: "Bridging the Empirical Void in Modern Scholarly Research",
-          subtitle_text: `Quantitative Evaluation and Systematic Analysis of ${topic.slice(0, 40)}`,
-          rationale: "Addresses the primary identified literature gap directly in the title.",
-        },
-      ];
-
-      setDiscoveredGaps(fallbackGaps);
-      setProposedTitles(fallbackTitles);
-      setSelectedGapId(fallbackGaps[0].id);
-      if (!workingTitle) {
-        setWorkingTitle(fallbackTitles[0].title_text + ": " + fallbackTitles[0].subtitle_text);
-      }
-
-      if (project?.projectId) {
-        const nextAnswers: Record<string, string> = {
-          ...answers,
-          core_problem: normalizeUnicodeNFC(topic),
-          preliminary_context: normalizeUnicodeNFC(preliminaryContext),
-          identified_gaps: JSON.stringify(fallbackGaps),
-          title_options: JSON.stringify(fallbackTitles),
-          selected_gap: fallbackGaps[0].id,
-        };
-        const updated = await saveIntakeAnswers(project.projectId, nextAnswers);
-        setProject(updated);
-      }
+      // No invented gaps, DOIs or titles: report the failure.
+      setDiscoveryError(
+        "Gap discovery unavailable: nothing was generated. Connect an AI provider in AI Access, or try again."
+      );
     } finally {
       setIsDiscoveringGaps(false);
     }
