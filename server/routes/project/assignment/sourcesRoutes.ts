@@ -254,52 +254,9 @@ router.post("/citations-ground", async (req: express.Request<{ id: string }>, re
       return res.json({ citations });
     }
 
-    // Fallback to LLM if external multi-portal search is empty or offline
-    const prompt = `You are the Scholar Core Academic Citation & Grounding Agent.
-Identify and format 8-12 realistic, high-impact peer-reviewed scholarly sources to ground this assignment:
-
-Question: "${question}"
-Academic Level: ${academicLevel}
-Citation Style: ${citationStyle}
-Themes: ${JSON.stringify(themes)}
-
-For each source, provide:
-- High relevance to the themes
-- Verified academic journal or scholarly university press publication
-- Full bibliographic citation formatted strictly in ${citationStyle}
-- In-text citation format (e.g., "(Smith & Doe, 2024)" for APA/Harvard or "[1]" for IEEE)
-- Quote or key empirical finding snippet
-
-Return ONLY valid JSON matching:
-{
-  "citations": [
-    {
-      "id": "cit-1",
-      "sourceTitle": "...",
-      "authors": ["..."],
-      "year": "2024",
-      "journalOrPublisher": "...",
-      "doi": "10.1016/...",
-      "citationText": "...",
-      "inTextCitation": "...",
-      "citationStyle": "${citationStyle}",
-      "verifiedPeerReviewed": true,
-      "linkedThemeIds": [],
-      "quoteOrFindingSnippet": "..."
-    }
-  ]
-}`;
-
-    const data = await callOpenRouterJSON(
-      req,
-      res,
-      "You are the Scholar Core Academic Citation & Grounding Agent.",
-      prompt,
-      undefined,
-      "discovery"
-    );
-    if (!data) return;
-    res.json(data);
+    // No LLM-written citations: an LLM asked to "identify realistic sources"
+    // produces references that may not exist. Report that none were found.
+    res.json({ citations: [] });
   } catch (err: unknown) {
     if ((err as Error)?.message === "RequireFrontendLLMException") return;
     console.error("Citation grounding error:", err);
