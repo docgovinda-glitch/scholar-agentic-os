@@ -1198,7 +1198,7 @@ function PreferencesSection({
                 <p className="font-semibold text-[color:var(--text-primary)]">Data Privacy & Key Encryption</p>
                 <ul className="space-y-1 text-[11px] text-[color:var(--text-muted)] list-disc pl-3">
                   <li>Your API keys are encrypted at rest in this browser&apos;s local storage and are never stored in Scholar Core&apos;s database.</li>
-                  <li>For server-orchestrated workflows (Ask Scholar, Deep Research, and Studio routes), your key is sent over HTTPS in a transient request header, used in-memory for that request only, and never logged or persisted on disk.</li>
+                  <li>When an AI step runs on Scholar Core&apos;s server (project agents, drafting, Ask Scholar and Deep Research), your key is sent over HTTPS in a request header for that request only, used in memory, and never logged or stored. Other requests never include it.</li>
                   <li>Premium uses Scholar Core&apos;s own keys, held server-side. They are never sent to your browser.</li>
                   <li>Local runners receive your text directly from this device; it never reaches Scholar Core&apos;s servers.</li>
                 </ul>
