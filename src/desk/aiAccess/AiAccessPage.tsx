@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { PREMIUM_SCOPE_SENTENCE } from "./premiumScope";
 import { getCloudProvider, providerAccessFacts, CLOUD_PROVIDERS, type CloudProviderSpec } from "../../config/providerCatalog";
 import { getLocalRunner, LOCAL_RUNNERS, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
 import {
@@ -839,7 +840,7 @@ function SubscriptionSection({ access }: { access: ReturnType<typeof useAiAccess
         </h3>
         <p className="mt-1 text-xs text-[color:var(--text-secondary)]">
           {access.premiumActive
-            ? "Nothing to configure. Scholar Core uses Premium automatically when it is the best available source for a task."
+            ? `Nothing to configure. In the features it covers, Scholar Core uses Premium automatically when it is the best available source. ${PREMIUM_SCOPE_SENTENCE}`
             : "Your status is verified on Scholar Core's server on every request — this page cannot switch it on."}
         </p>
         {access.premiumActive && expiresInDays !== null && expiresInDays <= 14 && (
@@ -1199,7 +1200,7 @@ function PreferencesSection({
                 <ul className="space-y-1 text-[11px] text-[color:var(--text-muted)] list-disc pl-3">
                   <li>Your API keys are encrypted at rest in this browser&apos;s local storage and are never stored in Scholar Core&apos;s database.</li>
                   <li>For server-orchestrated workflows (Ask Scholar, Deep Research, and Studio routes), your key is sent over HTTPS in a transient request header, used in-memory for that request only, and never logged or persisted on disk.</li>
-                  <li>Premium uses Scholar Core&apos;s own keys, held server-side. They are never sent to your browser.</li>
+                  <li>Premium uses Scholar Core&apos;s own keys, held server-side. They are never sent to your browser. {PREMIUM_SCOPE_SENTENCE}</li>
                   <li>Local runners receive your text directly from this device; it never reaches Scholar Core&apos;s servers.</li>
                 </ul>
               </div>
