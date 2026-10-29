@@ -49,8 +49,8 @@ describe("Multi-Portal Literature Harvester", () => {
   });
 
   describe("Multi-Portal Discovery Execution & >= 50 Guarantee", () => {
-    it("executes multi-portal discovery and guarantees at least 50 curated items", async () => {
-      // Mock global fetch to return minimal or empty portal results to trigger synthesizer top-up
+    it("executes multi-portal discovery and returns only portal results (no synthetic top-up)", async () => {
+      // Minimal portal results: the harvester must not pad them with synthesized papers.
       global.fetch = vi.fn().mockImplementation((url: string) => {
         if (url.includes("openalex.org")) {
           return Promise.resolve({
@@ -125,7 +125,9 @@ describe("Multi-Portal Literature Harvester", () => {
       });
 
       // Verify at least 50 sources are returned
-      expect(results.items.length).toBeGreaterThanOrEqual(50);
+      // Rewritten 2026-10-29: the harvester used to pad to 50 with synthesized papers.
+      expect(results.items.length).toBeLessThan(50);
+      expect(results.items.every((i) => i.portal !== "synthetic")).toBe(true);
 
       // Verify real fetched items are retained
       const openAlexItem = results.items.find((r) => r.doi === "10.1000/1001");
