@@ -35,7 +35,7 @@ WHERE r.rolcanlogin = true
    OR r.rolbypassrls = true
 ORDER BY r.rolname;
 ```
-- **What normal looks like**: Standard managed Supabase roles only (`postgres`, `authenticator`, `supabase_admin`, `supabase_auth_admin`, `supabase_storage_admin`, `supabase_replication_admin`, `supabase_read_only_user`, `service_role`, `dashboard_user`, `pgbouncer`). Zero unfamiliar custom login roles.
+- **What normal looks like**: Standard managed Supabase roles only (`cli_login_postgres` — created by `supabase` CLI logins, `supabase_etl_admin`, `postgres`, `authenticator`, `supabase_admin`, `supabase_auth_admin`, `supabase_storage_admin`, `supabase_replication_admin`, `supabase_read_only_user`, `service_role`, `dashboard_user`, `pgbouncer`). Zero unfamiliar custom login roles.
 - **What to paste back**: Role count and any unfamiliar role names.
 
 ---
@@ -79,7 +79,7 @@ SELECT
 FROM pg_catalog.pg_event_trigger
 ORDER BY evtname;
 ```
-- **What normal looks like**: Either `0` rows or only built-in Supabase system triggers owned by `supabase_admin` (`issue_pg_cron_access`, `issue_pg_graphql_access`, `issue_pg_net_access`, `pgrst_ddl_watch`, `pgrst_drop_watch`).
+- **What normal looks like**: Either `0` rows or only built-in Supabase system triggers owned by `supabase_admin` (`issue_graphql_placeholder`, `issue_pg_cron_access`, `issue_pg_graphql_access`, `issue_pg_net_access`, `pgrst_ddl_watch`, `pgrst_drop_watch`), plus `ensure_rls` (owner `postgres`, calls `public.rls_auto_enable()`), which Supabase creates when the dashboard's automatic-RLS option is on.
 - **What to paste back**: Count and any non-`supabase_admin` rows.
 
 ---
@@ -138,7 +138,14 @@ WHERE NOT t.tgisinternal
     'objects_update_create_prefix',
     'objects_delete_delete_prefix',
     'prefixes_create_hierarchy',
-    'prefixes_delete_hierarchy'
+    'prefixes_delete_hierarchy',
+    -- Supabase-managed storage.buckets / storage.objects guards (seen in production 2026-10-29):
+    'enforce_bucket_name_length_trigger',
+    'protect_bucket_control_insert',
+    'protect_bucket_control_update',
+    'protect_bucket_control_update_role',
+    'protect_buckets_delete',
+    'protect_objects_delete'
   )
 ORDER BY n.nspname, c.relname, t.tgname;
 ```
@@ -200,7 +207,7 @@ ORDER BY is_unrecognized_function DESC, p.proname;
 ```
 - **What normal looks like**:
   - `1.4a`: `0` rows.
-  - `1.4b`: `is_unrecognized_function = false` for all rows, and `source_preview` of `handle_new_user`, `deduct_credits`, `grant_credits`, `submit_id_document`, `email_for_*`, `check_*_available` matches repo SQL with no outbound HTTP calls or backdoor grants.
+  - `1.4b`: two known non-repo rows are expected: `rls_auto_enable` (Supabase automatic-RLS helper) and the legacy `is_username_approved(text)` (EXECUTE revoked from `anon`/`authenticated` by `20261029020000_revoke_legacy_is_username_approved.sql`). Otherwise `is_unrecognized_function = false` for all rows, and `source_preview` of `handle_new_user`, `deduct_credits`, `grant_credits`, `submit_id_document`, `email_for_*`, `check_*_available` matches repo SQL with no outbound HTTP calls or backdoor grants.
 - **What to paste back**: Row count of `1.4a`, and `function_name`, `is_unrecognized_function`, `source_md5` from `1.4b` (plus full `source_preview` of any row where `is_unrecognized_function = true`).
 
 ---
