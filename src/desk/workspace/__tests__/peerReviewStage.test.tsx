@@ -157,7 +157,9 @@ describe("Stage 21: AI Peer Review (PeerReviewStage)", () => {
     expect(onAdvanceMock).not.toHaveBeenCalled();
   });
 
-  it("engages local fallback critique generator when stream fails, verifying all 7 academic lenses", async () => {
+  it("generates no critiques and says so when the AI review fails", async () => {
+    // Rewritten 2026-10-29: this used to assert seven locally invented
+    // "reviewer" critiques appearing on network failure.
     (authedStreamFetch as any).mockRejectedValue(new Error("Network drop during peer review stream"));
 
     render(
@@ -171,14 +173,9 @@ describe("Stage 21: AI Peer Review (PeerReviewStage)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Begin 7-Lens Critique/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/^Recommendation$/i)).toBeInTheDocument();
+      expect(screen.getByText(/AI review unavailable: nothing was generated/i)).toBeInTheDocument();
     });
-
-    // Should have generated 7 critiques
-    expect(screen.getAllByText("7").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Logical Flow & Coherence/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Methodological Rigor/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Publication Compliance/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^Recommendation$/i)).not.toBeInTheDocument();
   });
 
   it("filters critiques by status (Active, Waived) and by Lens dropdown", async () => {

@@ -11,9 +11,10 @@ export interface JournalCandidate {
   id: string;
   title: string;
   publisher: string;
-  impact_factor: number;
-  sjr_quartile: "Q1" | "Q2" | "Q3" | "Q4";
-  match_score: number;
+  /** AI-suggested; unknown when absent. Verify on the journal's site. */
+  impact_factor?: number;
+  sjr_quartile?: "Q1" | "Q2" | "Q3" | "Q4";
+  match_score?: number;
   open_access: boolean;
   acceptance_rate?: string;
   review_speed_weeks?: number;
@@ -123,143 +124,6 @@ export default function JournalDiscoveryStage({
     }
   }, [project.answers, initialJournals, journals.length, selectedJournalTitle]);
 
-  // Fallback realistic high-tier journals generator based on project context
-  const generateFallbackJournals = useCallback((): JournalCandidate[] => {
-    const field = project.answers?.["research_area"] || project.answers?.["research_domain"] || "Computer Science & Distributed Systems";
-    const title = workingTitle;
-    const isByzantineOrCS = /byzantine|distributed systems|computer systems|quorum/i.test(workingTitle || "") ||
-      /distributed systems|computer science/i.test(field || "");
-
-    if (isByzantineOrCS) {
-      return [
-        {
-          id: "j-1",
-          title: "ACM Transactions on Computer Systems (TOCS)",
-          publisher: "Association for Computing Machinery",
-          impact_factor: 5.8,
-          sjr_quartile: "Q1",
-          match_score: 98,
-          open_access: false,
-          acceptance_rate: "12%",
-          review_speed_weeks: 5.2,
-          aims_scope: "Publishes premier research in computer systems design, distributed networks, fault tolerance, and empirical evaluation.",
-          fit_rationale: `Direct thematic alignment with "${title}". High valuation of empirical partition benchmarks and rigorous quorum proofs.`,
-          indexing: ["Scopus", "Web of Science", "ACM Digital Library", "EI Compendex"],
-          max_words: 12000,
-        },
-        {
-          id: "j-2",
-          title: "IEEE Transactions on Dependable and Secure Computing (TDSC)",
-          publisher: "IEEE Computer Society",
-          impact_factor: 6.4,
-          sjr_quartile: "Q1",
-          match_score: 95,
-          open_access: true,
-          acceptance_rate: "14%",
-          review_speed_weeks: 4.8,
-          aims_scope: "Focuses on cryptographic guarantees, Byzantine fault tolerance, resilient consensus protocols, and systems survivability.",
-          fit_rationale: `Strong match for asymmetric partition handling and Byzantine fault tolerance theorems addressed in your anchor gap "${anchorGap}".`,
-          indexing: ["IEEE Xplore", "Scopus", "Web of Science", "PubMed"],
-          max_words: 10000,
-        },
-        {
-          id: "j-3",
-          title: "IEEE Transactions on Parallel and Distributed Systems (TPDS)",
-          publisher: "IEEE Computer Society",
-          impact_factor: 5.3,
-          sjr_quartile: "Q1",
-          match_score: 92,
-          open_access: false,
-          acceptance_rate: "18%",
-          review_speed_weeks: 4.1,
-          aims_scope: "Dedicated to all architectural, design, and operational aspects of parallel and distributed computing algorithms and protocols.",
-          fit_rationale: `Ideal venue for dynamic reconfiguration benchmarks and high-throughput wide-area network latency optimizations.`,
-          indexing: ["IEEE Xplore", "Scopus", "Web of Science"],
-          max_words: 9500,
-        },
-        {
-          id: "j-4",
-          title: "Journal of Systems Architecture",
-          publisher: "Elsevier",
-          impact_factor: 4.5,
-          sjr_quartile: "Q1",
-          match_score: 88,
-          open_access: true,
-          acceptance_rate: "22%",
-          review_speed_weeks: 3.9,
-          aims_scope: "Covers embedded systems, distributed architectures, microservices, and reliable decentralized network protocols.",
-          fit_rationale: `Rapid review cycle and open access dissemination for modular partition recovery frameworks.`,
-          indexing: ["Scopus", "ScienceDirect", "Inspec"],
-          max_words: 8500,
-        },
-        {
-          id: "j-5",
-          title: "Communications of the ACM (Research Highlights)",
-          publisher: "ACM",
-          impact_factor: 14.1,
-          sjr_quartile: "Q1",
-          match_score: 85,
-          open_access: true,
-          acceptance_rate: "8%",
-          review_speed_weeks: 6.0,
-          aims_scope: "Selects broad-impact breakthroughs in computing with exceptional foundational or empirical significance.",
-          fit_rationale: `Recommended if your sub-second Byzantine consensus evaluation demonstrates industry-transformative latency gains.`,
-          indexing: ["ACM Digital Library", "Scopus", "Web of Science"],
-          max_words: 6000,
-        },
-      ];
-    }
-
-    // Dynamic domain-aware fallback for any user topic
-    const targetJournal = project.answers?.["target_journal"] || "Nature Machine Intelligence";
-    return [
-      {
-        id: "j-1",
-        title: targetJournal,
-        publisher: "Springer Nature",
-        impact_factor: 18.8,
-        sjr_quartile: "Q1",
-        match_score: 98,
-        open_access: true,
-        acceptance_rate: "9%",
-        review_speed_weeks: 4.5,
-        aims_scope: `Publishes high-impact research bridging computational modeling, theoretical frameworks, and empirical science.`,
-        fit_rationale: `Direct thematic alignment with "${title}". High valuation of computational rigor and interdisciplinary modeling.`,
-        indexing: ["Scopus", "Web of Science", "PubMed"],
-        max_words: 8000,
-      },
-      {
-        id: "j-2",
-        title: "PLOS ONE (Interdisciplinary Computational Studies)",
-        publisher: "Public Library of Science",
-        impact_factor: 3.7,
-        sjr_quartile: "Q1",
-        match_score: 93,
-        open_access: true,
-        acceptance_rate: "48%",
-        review_speed_weeks: 3.5,
-        aims_scope: "Accepts scientifically rigorous research across all disciplines with an emphasis on reproducible open science.",
-        fit_rationale: `Rapid peer review and global open access indexing for foundational computational modeling studies.`,
-        indexing: ["PubMed Central", "Scopus", "Web of Science"],
-        max_words: 10000,
-      },
-      {
-        id: "j-3",
-        title: "Journal of Computational Science",
-        publisher: "Elsevier",
-        impact_factor: 3.8,
-        sjr_quartile: "Q1",
-        match_score: 90,
-        open_access: false,
-        acceptance_rate: "24%",
-        review_speed_weeks: 4.0,
-        aims_scope: "Dedicated to novel computational methods, mathematical models, and simulations advancing scientific understanding.",
-        fit_rationale: `Strong match for mathematical formulations and computational models addressing "${anchorGap || title}".`,
-        indexing: ["Scopus", "ScienceDirect", "Inspec"],
-        max_words: 9500,
-      },
-    ];
-  }, [workingTitle, anchorGap, project.answers]);
 
   // Trigger Radar Scan Agent
   const startAgent = async () => {
@@ -270,13 +134,13 @@ export default function JournalDiscoveryStage({
         id: Date.now().toString() + "-1",
         timestamp: new Date().toLocaleTimeString([], { hour12: false }),
         level: "info",
-        message: `Initializing Academic Venue Radar & Matchmaking Agent...`,
+        message: "Asking the AI for journal suggestions…",
       },
       {
         id: Date.now().toString() + "-2",
         timestamp: new Date().toLocaleTimeString([], { hour12: false }),
         level: "action",
-        message: `Cross-indexing working title "${workingTitle}" against IEEE, ACM, Springer Nature, and Elsevier catalogues...`,
+        message: `Working title: "${workingTitle}"`,
       },
       {
         id: Date.now().toString() + "-3",
@@ -304,23 +168,28 @@ export default function JournalDiscoveryStage({
             ]);
           } else if (event === "done") {
             const rawData = data.data || [];
-            const parsedList: JournalCandidate[] = rawData.map((item: any, idx: number) => ({
-              id: item.id || `j-disc-${Date.now()}-${idx}`,
-              title: item.title,
-              publisher: item.publisher || "Academic Press",
-              impact_factor: item.impact_factor ?? item.impactFactor ?? 4.5,
-              sjr_quartile: (item.sjr_quartile || "Q1") as "Q1" | "Q2" | "Q3" | "Q4",
-              match_score: item.match_score ?? item.matchScore ?? 92,
-              open_access: item.open_access !== undefined ? item.open_access : Boolean(item.openAccess),
-              acceptance_rate: item.acceptance_rate || "15%",
-              review_speed_weeks: item.review_speed_weeks || 4.5,
-              aims_scope: item.aims_scope || "Peer-reviewed international journal targeting original computational and experimental research.",
-              fit_rationale: item.fit_rationale || `Strong scope alignment with ${workingTitle}.`,
-              indexing: item.indexing || ["Scopus", "Web of Science", "Google Scholar"],
-              max_words: item.max_words || 9000,
-            }));
+            // Keep what the AI returned; leave unknown metrics unknown rather
+            // than filling in impact factors, quartiles or acceptance rates.
+            const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+            const parsedList: JournalCandidate[] = (Array.isArray(rawData) ? rawData : [])
+              .filter((item: any) => typeof item?.title === "string" && item.title.trim())
+              .map((item: any, idx: number) => ({
+                id: item.id || `j-disc-${Date.now()}-${idx}`,
+                title: item.title,
+                publisher: item.publisher || "",
+                impact_factor: num(item.impact_factor ?? item.impactFactor),
+                sjr_quartile: ["Q1", "Q2", "Q3", "Q4"].includes(item.sjr_quartile) ? item.sjr_quartile : undefined,
+                match_score: num(item.match_score ?? item.matchScore),
+                open_access: item.open_access !== undefined ? Boolean(item.open_access) : Boolean(item.openAccess),
+                acceptance_rate: item.acceptance_rate || undefined,
+                review_speed_weeks: num(item.review_speed_weeks),
+                aims_scope: item.aims_scope || undefined,
+                fit_rationale: item.fit_rationale || undefined,
+                indexing: Array.isArray(item.indexing) ? item.indexing : undefined,
+                max_words: num(item.max_words),
+              }));
 
-            const finalJournals = parsedList.length > 0 ? parsedList : generateFallbackJournals();
+            const finalJournals = parsedList;
             setJournals(finalJournals);
 
             // Auto-select top match if none currently selected
@@ -328,8 +197,9 @@ export default function JournalDiscoveryStage({
               setSelectedJournalTitle(finalJournals[0].title);
             }
 
-            // Persist discovered journals into project answers
-            try {
+            // Persist discovered journals into project answers (never overwrite
+            // an existing list with an empty answer).
+            if (finalJournals.length > 0) try {
               const updatedAnswers = {
                 ...project.answers,
                 discovered_journals: JSON.stringify(finalJournals),
@@ -346,7 +216,10 @@ export default function JournalDiscoveryStage({
                 id: Date.now().toString() + "-done",
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                 level: "success",
-                message: `Radar scan complete: Evaluated top academic venues. Found ${finalJournals.length} high-match journals.`,
+                message:
+                  finalJournals.length > 0
+                    ? `AI suggested ${finalJournals.length} journals. Check each journal\'s website for current metrics and scope.`
+                    : "The AI suggested no journals. Nothing was added.",
               },
             ]);
           } else if (event === "error") {
@@ -355,40 +228,16 @@ export default function JournalDiscoveryStage({
         }
       );
     } catch (err: any) {
-      console.warn("Remote journal discovery endpoint unavailable, activating local fallback synthesis:", err);
-      // Resilient local synthesis fallback
-      const fallbacks = generateFallbackJournals();
-      setJournals(fallbacks);
-      if (!selectedJournalTitle && fallbacks.length > 0) {
-        setSelectedJournalTitle(fallbacks[0].title);
-      }
-
+      console.warn("Journal discovery failed:", err);
       setLogs((prev) => [
         ...prev,
         {
-          id: Date.now().toString() + "-fallback",
+          id: `log-${Date.now()}-fail`,
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "info",
-          message: `Notice: Switched to Local Radar Synthesis Engine (Academic Corpus Index). Generated ${fallbacks.length} validated high-tier venues.`,
-        },
-        {
-          id: Date.now().toString() + "-done",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `Venue radar scan complete: ${fallbacks.length} target candidates ready for review.`,
+          level: "error",
+          message: "Journal suggestions unavailable: nothing was added. Connect an AI provider in AI Access, or try again.",
         },
       ]);
-
-      try {
-        const updatedAnswers = {
-          ...project.answers,
-          discovered_journals: JSON.stringify(fallbacks),
-        };
-        const updated = await saveIntakeAnswers(projectId, updatedAnswers as Record<string, string>);
-        onSaved(updated);
-      } catch (saveErr) {
-        console.warn("Failed to persist fallback discovered journals", saveErr);
-      }
     } finally {
       setIsProcessing(false);
     }
@@ -412,12 +261,8 @@ export default function JournalDiscoveryStage({
     const activeJournalObj = journals.find((j) => j.title === selectedJournalTitle) || {
       id: `manual-${Date.now()}`,
       title: selectedJournalTitle,
-      publisher: "Custom Specification",
-      impact_factor: 4.5,
-      sjr_quartile: "Q1",
-      match_score: 100,
-      open_access: true,
-      max_words: 8000,
+      publisher: "",
+      open_access: false,
     };
 
     try {
@@ -452,15 +297,15 @@ export default function JournalDiscoveryStage({
       id: `custom-${Date.now()}`,
       title: manualTitle.trim(),
       publisher: manualPublisher.trim() || "Independent / Society Press",
-      impact_factor: parseFloat(manualIF) || 3.5,
+      impact_factor: parseFloat(manualIF) || undefined,
       sjr_quartile: manualQuartile,
-      match_score: 95,
+      match_score: undefined,
       open_access: manualOA,
-      acceptance_rate: "18%",
-      review_speed_weeks: 4.0,
+      acceptance_rate: undefined,
+      review_speed_weeks: undefined,
       aims_scope: manualAims.trim() || "Author-specified target journal.",
       fit_rationale: "Directly nominated by the lead investigator for targeted submission.",
-      indexing: ["Scopus", "Web of Science"],
+      indexing: undefined,
       max_words: 9000,
       is_custom: true,
     };
@@ -509,7 +354,7 @@ export default function JournalDiscoveryStage({
       if (quartileFilter === "Q1" && item.sjr_quartile !== "Q1") return false;
 
       // Min IF filter
-      if (minImpactFactor > 0 && item.impact_factor < minImpactFactor) return false;
+      if (minImpactFactor > 0 && (item.impact_factor ?? 0) < minImpactFactor) return false;
 
       return true;
     });
@@ -802,10 +647,10 @@ export default function JournalDiscoveryStage({
                       <div className="flex items-center justify-between gap-2 mb-3">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-md bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-primary)]">
-                            IF: {journal.impact_factor.toFixed(1)}
+                            IF: {journal.impact_factor !== undefined ? journal.impact_factor.toFixed(1) : "—"}
                           </span>
                           <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)] border border-[color:var(--accent-border)]">
-                            {journal.sjr_quartile}
+                            {journal.sjr_quartile ?? "Q—"}
                           </span>
                           {journal.open_access ? (
                             <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)] border border-[color:var(--state-success)]/30">
@@ -819,7 +664,7 @@ export default function JournalDiscoveryStage({
                         </div>
 
                         <span className="text-xs font-bold font-mono px-2.5 py-0.5 rounded-full bg-[color:var(--state-info-subtle)] text-[color:var(--state-info)] border border-[color:var(--state-info)]/20">
-                          {journal.match_score}% Match
+                          {journal.match_score !== undefined ? `${journal.match_score}% Match` : "AI suggestion"}
                         </span>
                       </div>
 
@@ -828,7 +673,7 @@ export default function JournalDiscoveryStage({
                         {journal.title}
                       </h4>
                       <p className="text-[11px] text-[color:var(--text-muted)] mt-1 font-mono">
-                        Published by {journal.publisher}
+                        {journal.publisher ? `Published by ${journal.publisher}` : "Publisher not listed"}
                       </p>
 
                       {/* Fit Rationale */}
@@ -842,11 +687,11 @@ export default function JournalDiscoveryStage({
                       <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-[color:var(--border-subtle)] text-[11px] font-mono text-[color:var(--text-secondary)]">
                         <div>
                           <span className="text-[color:var(--text-muted)]">Acceptance:</span>{" "}
-                          <strong className="text-[color:var(--text-primary)]">{journal.acceptance_rate || "15%"}</strong>
+                          <strong className="text-[color:var(--text-primary)]">{journal.acceptance_rate || "—"}</strong>
                         </div>
                         <div>
                           <span className="text-[color:var(--text-muted)]">First Decision:</span>{" "}
-                          <strong className="text-[color:var(--text-primary)]">{journal.review_speed_weeks ? `${journal.review_speed_weeks} wks` : "4.5 wks"}</strong>
+                          <strong className="text-[color:var(--text-primary)]">{journal.review_speed_weeks ? `${journal.review_speed_weeks} wks` : "—"}</strong>
                         </div>
                       </div>
                     </div>
@@ -923,7 +768,7 @@ export default function JournalDiscoveryStage({
             )}
             {selectedJournalObj && (
               <span className="ml-2 font-mono text-[11px] text-[color:var(--accent)]">
-                (IF {selectedJournalObj.impact_factor} • {selectedJournalObj.sjr_quartile} • {selectedJournalObj.match_score}% Match)
+                (IF {selectedJournalObj.impact_factor ?? "—"} • {selectedJournalObj.sjr_quartile ?? "Q—"})
               </span>
             )}
           </span>
@@ -984,25 +829,25 @@ export default function JournalDiscoveryStage({
                 <div>
                   <div className="text-[10px] uppercase text-[color:var(--text-muted)]">Impact Factor</div>
                   <div className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
-                    {inspectingJournal.impact_factor}
+                    {inspectingJournal.impact_factor ?? "—"}
                   </div>
                 </div>
                 <div>
                   <div className="text-[10px] uppercase text-[color:var(--text-muted)]">SJR Rank</div>
                   <div className="text-base font-bold text-[color:var(--accent)] mt-0.5">
-                    {inspectingJournal.sjr_quartile}
+                    {inspectingJournal.sjr_quartile ?? "—"}
                   </div>
                 </div>
                 <div>
                   <div className="text-[10px] uppercase text-[color:var(--text-muted)]">Acceptance</div>
                   <div className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
-                    {inspectingJournal.acceptance_rate || "14%"}
+                    {inspectingJournal.acceptance_rate || "—"}
                   </div>
                 </div>
                 <div>
                   <div className="text-[10px] uppercase text-[color:var(--text-muted)]">Decision Time</div>
                   <div className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
-                    {inspectingJournal.review_speed_weeks ? `${inspectingJournal.review_speed_weeks} wks` : "4.5 wks"}
+                    {inspectingJournal.review_speed_weeks ? `${inspectingJournal.review_speed_weeks} wks` : "—"}
                   </div>
                 </div>
               </div>
@@ -1013,7 +858,7 @@ export default function JournalDiscoveryStage({
                   Aims &amp; Scope
                 </h4>
                 <p className="text-[color:var(--text-secondary)] leading-relaxed bg-[color:var(--surface-canvas)] p-4 rounded-xl border border-[color:var(--border-subtle)]">
-                  {inspectingJournal.aims_scope || "Focuses on innovative architectural designs, rigorous empirical benchmarking, and distributed fault recovery models."}
+                  {inspectingJournal.aims_scope || "Not provided. See the journal\'s website."}
                 </p>
               </div>
 
@@ -1033,7 +878,7 @@ export default function JournalDiscoveryStage({
                   Recognized Indexing &amp; Archival
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {(inspectingJournal.indexing || ["Scopus", "Web of Science", "IEEE Xplore", "Google Scholar"]).map((idx) => (
+                  {(inspectingJournal.indexing || []).map((idx) => (
                     <span
                       key={idx}
                       className="px-2.5 py-1 rounded-lg bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] text-[11px] font-mono text-[color:var(--text-secondary)]"

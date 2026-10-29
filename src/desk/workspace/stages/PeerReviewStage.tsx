@@ -177,149 +177,6 @@ export default function PeerReviewStage({
     fetchCritiques();
   }, [fetchCritiques]);
 
-  // Resilient domain-aware offline fallback critique generator covering all 7 academic lenses
-  const generateFallbackCritiques = useCallback((): AcademicCritique[] => {
-    const isTopicBftOrAgents =
-      workingTitle.toLowerCase().includes("byzantine") ||
-      workingTitle.toLowerCase().includes("provenance") ||
-      workingTitle.toLowerCase().includes("autonomous") ||
-      anchorGap.toLowerCase().includes("provenance") ||
-      anchorGap.toLowerCase().includes("byzantine");
-
-    if (isTopicBftOrAgents) {
-      return [
-        {
-          id: "crit-lens-01",
-          lens: "Logical Flow & Coherence",
-          section: "Introduction -> Section 2",
-          severity: "Moderate",
-          feedback: `The transition between the problem formulation (${anchorGap}) and the proposed bipartite projection operator is abrupt. The reader needs an intermediate conceptual bridge explaining why conventional vector search fails before introducing the mathematical formalism.`,
-          revisionDirective: "Introduce a transitional paragraph motivating the necessity of deterministic bipartite matching over greedy cosine nearest-neighbor search.",
-          waived: false,
-        },
-        {
-          id: "crit-lens-02",
-          lens: "Methodological Rigor",
-          section: "Section 2: Methodology",
-          severity: "Major",
-          feedback: "The asymptotic runtime analysis for the bipartite projection operator assumes balanced bipartite cardinality. Under asymmetric partition scenarios, the worst-case bound O(|C| * |E|) should be explicitly bounded with pruning heuristics.",
-          revisionDirective: "Formalize Lemma 1 stating the pruned search complexity under top-k cosine candidate thresholding.",
-          waived: false,
-        },
-        {
-          id: "crit-lens-03",
-          lens: "Domain Alignment & Venue Scope",
-          section: "Abstract & Discussion",
-          severity: "Minor",
-          feedback: `While the findings are sound, the framing should explicitly emphasize implications for ${targetJournal} readers by referencing real-time reproducibility and multi-agent coordination standards.`,
-          revisionDirective: "Add 2-3 sentences in the Discussion emphasizing reproducible artifact evaluation guidelines compliant with target venue policies.",
-          waived: false,
-        },
-        {
-          id: "crit-lens-04",
-          lens: "Evidence Synthesis & Provenance",
-          section: "Section 3: Results",
-          severity: "Moderate",
-          feedback: "Empirical claim regarding the 28.4% variance reduction relies on aggregate test suites; confidence intervals (95% CI) and standard error bars must be explicitly reported in Table 1.",
-          revisionDirective: "Include exact 95% bootstrap confidence intervals [26.1%, 30.7%] alongside reported mean throughput metrics.",
-          waived: false,
-        },
-        {
-          id: "crit-lens-05",
-          lens: "Argument Strength & Falsifiability",
-          section: "Section 4: Discussion",
-          severity: "Major",
-          feedback: "The manuscript does not adequately discuss threats to validity when input vault sources contain contradictory empirical claims. What occurs when two high-confidence documents assert conflicting experimental findings?",
-          revisionDirective: "Add a dedicated 'Threats to Validity: Epistemic Disagreement Handling' subsection discussing resolution of multi-source contradictions.",
-          waived: false,
-        },
-        {
-          id: "crit-lens-06",
-          lens: "Stylistic Register & Tone",
-          section: "Section 1: Introduction",
-          severity: "Advisory",
-          feedback: "Phrasing in paragraph 2 contains colloquial rhetorical flourishes ('game-changing breakthrough'). Academic register requires neutral, passive, and measured empirical language.",
-          revisionDirective: "Replace subjective adverbs with measured scientific descriptions of measured throughput and precision gains.",
-          waived: false,
-        },
-        {
-          id: "crit-lens-07",
-          lens: "Publication Compliance",
-          section: "End-matter & Declarations",
-          severity: "Minor",
-          feedback: "Target journal guidelines require an explicit Data Availability Statement and Code Repository DOI link prior to peer-review acceptance.",
-          revisionDirective: "Append standard Data Availability and Code Availability sections with Zenodo DOI placeholders.",
-          waived: false,
-        },
-      ];
-    }
-
-    return [
-      {
-        id: "crit-lens-01",
-        lens: "Logical Flow & Coherence",
-        section: "Introduction -> Section 2",
-        severity: "Moderate",
-        feedback: `The transition between the problem formulation regarding "${anchorGap}" and the formal analytical model in Section 2 is abrupt. The reader requires an intermediate conceptual bridge linking foundational literature with mathematical/computational formulations.`,
-        revisionDirective: "Introduce a transitional paragraph motivating the necessity of deterministic computational formalisms over purely qualitative heuristics.",
-        waived: false,
-      },
-      {
-        id: "crit-lens-02",
-        lens: "Methodological Rigor",
-        section: "Section 2: Methodology",
-        severity: "Major",
-        feedback: `The mathematical mapping connecting textual source parameters with observational coordinate frames requires explicit parameter bounding and sensitivity analysis against potential variance.`,
-        revisionDirective: "Formalize mathematical bounding lemmas specifying exact parameter bounds and sensitivity under edge-case conditions.",
-        waived: false,
-      },
-      {
-        id: "crit-lens-03",
-        lens: "Domain Alignment & Venue Scope",
-        section: "Abstract & Discussion",
-        severity: "Minor",
-        feedback: `The framing should explicitly emphasize implications for ${targetJournal} readers by referencing modern reproducibility standards, comparative validation, and rigorous computational verification.`,
-        revisionDirective: `Add 2-3 sentences in the Discussion emphasizing reproducible artifact evaluation guidelines compliant with ${targetJournal} policies.`,
-        waived: false,
-      },
-      {
-        id: "crit-lens-04",
-        lens: "Evidence Synthesis & Provenance",
-        section: "Section 3: Results",
-        severity: "Moderate",
-        feedback: "Empirical concordance claims rely on aggregate tabular metrics; statistical error bounds and exact comparative confidence intervals must be explicitly reported in Table 1.",
-        revisionDirective: "Include exact 95% confidence intervals and standard deviations alongside reported mean concordance metrics.",
-        waived: false,
-      },
-      {
-        id: "crit-lens-05",
-        lens: "Argument Strength & Falsifiability",
-        section: "Section 4: Discussion",
-        severity: "Major",
-        feedback: "The manuscript does not adequately evaluate alternative counter-hypotheses or historical variance. A dedicated discussion addressing potential threats to internal validity is necessary.",
-        revisionDirective: "Add a dedicated 'Threats to Validity: Alternative Hypotheses and Robustness Analysis' subsection.",
-        waived: false,
-      },
-      {
-        id: "crit-lens-06",
-        lens: "Stylistic Register & Tone",
-        section: "Section 1: Introduction",
-        severity: "Advisory",
-        feedback: "Phrasing in introductory paragraphs contains colloquial or overstated rhetorical declarations. Scholarly register requires measured, neutral, and precise prose.",
-        revisionDirective: "Replace superlative claims with objective analytical descriptions of observed outcomes.",
-        waived: false,
-      },
-      {
-        id: "crit-lens-07",
-        lens: "Publication Compliance",
-        section: "End-matter & Declarations",
-        severity: "Minor",
-        feedback: `Target journal (${targetJournal}) guidelines require explicit Data Availability and Open Access Code statements prior to camera-ready acceptance.`,
-        revisionDirective: "Append standard Data Availability and Code Availability sections with repository DOI links.",
-        waived: false,
-      },
-    ];
-  }, [workingTitle, anchorGap, targetJournal]);
 
   // Execute Reviewer Agent
   const startAgent = async () => {
@@ -336,27 +193,15 @@ export default function PeerReviewStage({
       },
     ]);
 
-    let progress = 0;
-    scanIntervalRef.current = setInterval(() => {
-      progress += 3;
-      const capped = Math.min(progress, 98);
-      setScanProgress(capped);
-      const currentLensIdx = Math.min(Math.floor((capped / 100) * ACADEMIC_LENSES.length), ACADEMIC_LENSES.length - 1);
-      const currentLens = ACADEMIC_LENSES[currentLensIdx];
-      setActiveLens(currentLens);
-
-      if (progress % 12 === 0) {
-        setLogs((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString() + Math.random(),
-            timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-            level: "action",
-            message: `Evaluating Lens ${currentLensIdx + 1}/7: [${currentLens}]...`,
-          },
-        ]);
-      }
-    }, 180);
+    setLogs((prev) => [
+      ...prev,
+      {
+        id: "log-wait-" + Date.now(),
+        timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+        level: "info",
+        message: "Waiting for the AI reviewer…",
+      },
+    ]);
 
     try {
       await authedStreamFetch(
@@ -383,20 +228,20 @@ export default function PeerReviewStage({
             const resData = data?.data;
 
             if (Array.isArray(resData) && resData.length > 0) {
-              incomingCritiques = resData.map((crit: Record<string, unknown>, idx: number) => ({
+              // Keep only critiques with actual feedback; never invent the
+              // section, lens or wording of a reviewer comment.
+              incomingCritiques = resData
+                .filter((crit: Record<string, unknown>) => typeof (crit.feedback ?? crit.description) === "string" && String(crit.feedback ?? crit.description).trim())
+                .map((crit: Record<string, unknown>, idx: number) => ({
                 id: (crit.id as string) || `crit-${idx + 1}`,
-                lens: (crit.lens as string) || ACADEMIC_LENSES[idx % ACADEMIC_LENSES.length],
-                section: (crit.section as string) || (idx === 0 ? "Introduction" : idx === 1 ? "Methodology" : "Results"),
+                lens: (crit.lens as string) || "General",
+                section: (crit.section as string) || "Whole manuscript",
                 severity: normalizeSeverity(crit.severity),
-                feedback: (crit.feedback as string) || (crit.description as string) || "Detailed academic feedback.",
-                revisionDirective: (crit.revisionDirective as string) || "Address identified critique in manuscript revision.",
+                feedback: String(crit.feedback ?? crit.description),
+                revisionDirective: (crit.revisionDirective as string) || "",
                 waived: Boolean(crit.waived),
                 waiveRationale: crit.waiveRationale as string | undefined,
               }));
-            }
-
-            if (incomingCritiques.length === 0) {
-              incomingCritiques = generateFallbackCritiques();
             }
 
             setCritiques(incomingCritiques);
@@ -406,23 +251,23 @@ export default function PeerReviewStage({
                 id: "log-done-" + Date.now(),
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                 level: "success",
-                message: `Critique complete: ${incomingCritiques.length} scholarly critiques compiled across 7 lenses.`,
+                message:
+                  incomingCritiques.length > 0
+                    ? `AI review complete: ${incomingCritiques.length} comments. This is an AI review, not peer review.`
+                    : "The AI reviewer returned no comments. Nothing was generated.",
               },
             ]);
           } else if (event === "error") {
             clearTimer();
-            console.warn("Peer review stream error, engaging local 7-lens critique fallback:", data);
-            const fallback = generateFallbackCritiques();
-            setCritiques(fallback);
-            setScanProgress(100);
+            console.warn("Peer review stream error:", data);
             setActiveLens(null);
             setLogs((prev) => [
               ...prev,
               {
-                id: "log-fallback-" + Date.now(),
+                id: `log-${Date.now()}-fail`,
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                level: "info",
-                message: "Engaged local 7-lens academic critique engine: 7 comprehensive critiques generated.",
+                level: "error",
+                message: "AI review unavailable: nothing was generated. Connect an AI provider in AI Access, or try again.",
               },
             ]);
           }
@@ -430,18 +275,15 @@ export default function PeerReviewStage({
       );
     } catch (err: unknown) {
       clearTimer();
-      console.warn("Remote review agent unavailable, engaging local 7-lens fallback:", err);
-      const fallback = generateFallbackCritiques();
-      setCritiques(fallback);
-      setScanProgress(100);
+      console.warn("Peer review agent unavailable:", err);
       setActiveLens(null);
       setLogs((prev) => [
         ...prev,
         {
-          id: "log-fallback-err-" + Date.now(),
+          id: `log-${Date.now()}-fail`,
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "info",
-          message: "Engaged local 7-lens academic critique engine: 7 comprehensive critiques generated.",
+          level: "error",
+          message: "AI review unavailable: nothing was generated. Connect an AI provider in AI Access, or try again.",
         },
       ]);
     } finally {

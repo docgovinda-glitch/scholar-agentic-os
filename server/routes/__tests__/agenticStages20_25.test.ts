@@ -131,6 +131,13 @@ describe("Stages 20-22: 5-Referee Peer Review & Point-by-Point Rebuttal Matrix",
 });
 
 describe("Stage 23: Discourse-Level Humanized Copy-Editing (/final-editor)", () => {
+  it("refuses to polish anything when the project has no manuscript (no demo stand-in text)", async () => {
+    const projectId = await createStageProject({ manuscript_draft: "", manuscript_markdown: "" });
+    const res = await request(app).post(`/api/projects/${projectId}/agent/final-editor`).send({});
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).not.toMatch(/94\.2%|p < 0\.001|Vaswani/);
+  });
+
   it("executes copy-editing pass suppressing clichés, enforcing British orthography and NFC diacritics while preserving citations", async () => {
     const projectId = await createStageProject();
 

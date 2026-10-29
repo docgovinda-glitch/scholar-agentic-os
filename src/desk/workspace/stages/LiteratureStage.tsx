@@ -2,14 +2,12 @@ import React, { useState, useEffect, useMemo } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { executeAgenticLLM, saveIntakeAnswers } from "../../api";
+import { saveIntakeAnswers } from "../../api";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
 import type { ProjectView } from "../../types";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 import {
-  buildLiteraturePrompts,
-  generateLocalLiteratureFallback,
   formatAsBibtex,
   formatAsApa,
   formatAsVancouver,
@@ -19,7 +17,6 @@ import {
   executeMultiPortalDiscovery,
   type PortalHarvestItem,
 } from "../../../services/discovery/multiPortalLiteratureHarvester";
-import { parseJsonFromLlm } from "../../../utils/jsonParser";
 import { AllAiResourcesExhaustedModal } from "../../aiAccess/AllAiResourcesExhaustedModal";
 
 export type { LiteratureItem, PortalHarvestItem };
@@ -259,66 +256,9 @@ export default function LiteratureStage({
     const researchArea = project?.answers?.["research_area"] || project?.answers?.["research_domain"] || "the field";
 
     try {
-      // 1. Build prompts client-side directly
-      const { systemPrompt, userPrompt } = buildLiteraturePrompts({
-        workingTitle,
-        researchArea,
-        projectAnswers: project?.answers || {},
-        isBroadened,
-        focusDiscipline,
-        excludeIds,
-        excludeDois,
-        excludeTitles,
-      });
-
-      // 2. Execute via client AI resource pool
-      const rawText = await executeAgenticLLM(
-        systemPrompt,
-        userPrompt,
-        "reasoning",
-        (chunk) => {
-          setLogs((prev) => {
-            const last = prev[prev.length - 1];
-            if (last && last.message.startsWith("> Agent Reasoning")) return prev;
-            return [
-              ...prev,
-              {
-                id: Date.now().toString() + Math.random(),
-                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                level: "info",
-                message: "> Agent Reasoning [streaming JSON analysis]...",
-              },
-            ];
-          });
-          setSourceAgent("Analyzing Literature Corpus...");
-        },
-        (failoverEvt) => {
-          if (failoverEvt.userMessage) {
-            setLogs((prev) => [
-              ...prev,
-              {
-                id: Date.now().toString() + Math.random(),
-                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                level: failoverEvt.type === "success" ? "success" : "warning",
-                message: failoverEvt.type === "success" ? (failoverEvt.userMessage || "Success") : `⚠️ ${failoverEvt.userMessage || "Failover"}`,
-              },
-            ]);
-          }
-          if (failoverEvt.type === "switch") {
-            setSourceAgent("Switching Model...");
-            setAnalysisAgent("Retrying with backup...");
-          } else if (failoverEvt.type === "retry") {
-            setSourceAgent("Retrying...");
-          } else if (failoverEvt.type === "success") {
-            setSourceAgent("Analyzing Literature Corpus...");
-            setAnalysisAgent("Synthesizing Context...");
-          }
-        }
-      );
-
-      // 3. Parse JSON from LLM output
-      const parsedData = parseJsonFromLlm(rawText);
-      let rawItems: LiteratureItem[] = parsedData && Array.isArray(parsedData.data) ? parsedData.data : [];
+      // Literature comes only from the scholarly indexes below. (An LLM used
+      // to be asked to "generate" 15 sources first; those were not real.)
+      let rawItems: LiteratureItem[] = [];
 
       // 4. Execute Multi-Portal Scholarly Harvester across OpenAlex, CrossRef, arXiv, DOAJ, DataCite, Europe PMC
       setSourceAgent("Querying Open Portals (OpenAlex, CrossRef, arXiv, DOAJ, DataCite)...");
@@ -358,20 +298,6 @@ export default function LiteratureStage({
         console.warn("[LiteratureStage] Open portal harvesting notice:", harvestErr);
       }
 
-      // Ensure corpus meets the mandatory quota of at least 50 sources
-      if (rawItems.length < 50) {
-        const topUp = generateLocalLiteratureFallback({
-          workingTitle,
-          researchArea,
-          projectAnswers: project?.answers || {},
-          isBroadened,
-          focusDiscipline,
-          excludeIds,
-          excludeDois,
-          excludeTitles,
-        }, Math.max(50, 50 - rawItems.length));
-        rawItems = [...rawItems, ...topUp];
-      }
 
       // Filter out any duplicates against exclusions
       const existingKeptDois = new Set(currentKeptDois.map((d) => d.toLowerCase().trim()));
@@ -430,72 +356,21 @@ export default function LiteratureStage({
     } catch (err: any) {
       const errMsg = err.message || "Failed to discover literature.";
 
-      // Fallback to intelligent local literature synthesis so research flow is uninterrupted with at least 50 sources
-      const fallbackItems = generateLocalLiteratureFallback({
-        workingTitle,
-        researchArea,
-        projectAnswers: project?.answers || {},
-        isBroadened,
-        focusDiscipline,
-        excludeIds,
-        excludeDois,
-        excludeTitles,
-      }, 50);
-
-      if (fallbackItems.length > 0) {
-        const updatedList = results && (isBroadened || results.length > 0) ? [...results, ...fallbackItems] : fallbackItems;
-        setResults(updatedList);
-        setSourcesDiscovered(updatedList.length);
-
-        try {
-          const updatedProject = await saveIntakeAnswers(projectId, {
-            discovered_literature: JSON.stringify(updatedList),
-            removed_literature: JSON.stringify({ removedDois, removedIds, removedTitles }),
-            current_stage: "literature",
-          });
-          setProject(updatedProject);
-        } catch (saveErr) {
-          console.warn("[LiteratureStage] Failed to persist answers:", saveErr);
-        }
-
-        setLogs((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString() + "fallback-notice",
-            timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-            level: "warning",
-            message: `⚠️ Remote AI notice: ${errMsg}. Local heuristic discovery synthesized ${fallbackItems.length} foundational papers for "${researchArea}".`,
-          },
-          {
-            id: Date.now().toString() + "done",
-            timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-            level: "success",
-            message: isBroadened
-              ? `✓ Broadened literature synthesis complete: added ${fallbackItems.length} interdisciplinary sources.`
-              : `✓ Foundational corpus synthesized: ${fallbackItems.length} peer-reviewed publications curated.`,
-          },
-        ]);
-
-        setSourceAgent("Complete ✓");
-        setAnalysisAgent("Complete ✓");
-        setEvidenceAgent("Complete ✓");
-        setKnowledgeAgent("Complete ✓");
-      } else {
-        setError(errMsg);
-        setLogs((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString() + "err",
-            timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-            level: "error",
-            message: `❌ ${errMsg}`,
-          },
-        ]);
-        setSourceAgent("Failed");
-        setAnalysisAgent("Halted");
-        setEvidenceAgent("Halted");
-        setKnowledgeAgent("Halted");
-      }
+      // No synthesized stand-in literature: report the failure.
+      setError(errMsg);
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + "err",
+          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+          level: "error",
+          message: `❌ ${errMsg}`,
+        },
+      ]);
+      setSourceAgent("Failed");
+      setAnalysisAgent("Halted");
+      setEvidenceAgent("Halted");
+      setKnowledgeAgent("Halted");
 
       if (errMsg.includes("No AI providers") || errMsg.includes("unavailable") || errMsg.includes("exhausted")) {
         setExhaustedReason(errMsg);

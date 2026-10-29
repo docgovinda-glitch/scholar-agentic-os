@@ -201,106 +201,6 @@ export default function EvidenceAnalysisStage({
     [handleSave, project, projectId]
   );
 
-  // 6. Local Fallback Matrix Synthesis
-  const generateFallbackArgumentClusters = (): ArgumentMatrixRow[] => {
-    const gapTitle = anchorGap?.title || workingTitle || "Partition Tolerance in Wide-Area Consensus";
-    const isByzantineTopic = /byzantine|distributed systems|quorum/i.test(workingTitle || "");
-
-    if (isByzantineTopic) {
-      const vaultPrimary =
-        approvedVaultSources[0]?.title || "Castro & Liskov (2002) Practical Byzantine Fault Tolerance";
-      const extSupport =
-        approvedExternalSources[0]?.title || "Balasubramanian et al. (2024) Adaptive BFT Reconfiguration";
-
-      return [
-        {
-          id: `arg-matrix-${Date.now()}-1`,
-          theme: "Latency Bounds Under Asymmetric Wide-Area Network Partitions",
-          primary_claim:
-            "Static quorum sizing imposes severe throughput penalties when latency skew exceeds 3x between geographic partitions.",
-          source_primary: vaultPrimary,
-          synthesized_support:
-            "Dynamic leader rotation and asymmetric threshold quorums maintain sub-second commit latency during 35% packet drops without violating safety.",
-          source_support: extSupport,
-          argument_strength: "Very High",
-          status: "Mapped to Empirical Framework",
-          alignment_type: "Corroboration",
-          notes: "Directly addresses core thesis on WAN partition survival.",
-        },
-        {
-          id: `arg-matrix-${Date.now()}-2`,
-          theme: "Byzantine Safety Guarantees During Dynamic Quorum Reconfiguration",
-          primary_claim:
-            "Reconfiguring quorum memberships during active packet loss risks split-brain if quorum intersection proofs fail across epoch transitions.",
-          source_primary: "Howard et al. (2022) Flexible Paxos & Quorum Intersections",
-          synthesized_support:
-            "Intersection invariants remain mathematically sound provided the union of read/write quorums spans at least f+1 verified non-faulty replicas.",
-          source_support: "Vukolić & Gueta (2023) Comparative BFT Protocol Scaling",
-          argument_strength: "High",
-          status: "Mapped to Theoretical Framework",
-          alignment_type: "Extension",
-          notes: "Provides formal mathematical backing for dynamic quorum validity.",
-        },
-        {
-          id: `arg-matrix-${Date.now()}-3`,
-          theme: "Telemetry Verification on Multi-Region Transatlantic Interconnects",
-          primary_claim:
-            "Simulated partition models underestimate round-trip jitter variance in real-world undersea fiber conduits.",
-          source_primary: "Attached Primary Dataset: WAN-Benchmark-Traces.csv",
-          synthesized_support:
-            "Empirical telemetry across 1.2M cloud packets reveals heavy-tailed latency distributions requiring adaptive window timeouts.",
-          source_support: "Al-Kiswany & Bernstein (2023) Cloud Datacenter Delays",
-          argument_strength: "Very High",
-          status: "Mapped to Evaluation Section",
-          alignment_type: "Methodological Grounding",
-          notes: "Bridges benchmark traces with external datacenter studies.",
-        },
-      ];
-    }
-
-    // Dynamic domain-aware synthesis for any discipline (e.g. Vedic, ML, Medicine, Economics, Physics)
-    const primarySrc = approvedVaultSources[0]?.title || `${workingTitle} (Foundational Thesis)`;
-    const secondarySrc = approvedExternalSources[0]?.title || `Contemporary Literature on ${methodology || "Empirical Research"}`;
-
-    return [
-      {
-        id: `arg-matrix-${Date.now()}-1`,
-        theme: `Theoretical Foundations and Structural Formulations for ${gapTitle}`,
-        primary_claim: `Core theoretical paradigms establish rigorous conceptual linkages directly addressing ${gapTitle}.`,
-        source_primary: primarySrc,
-        synthesized_support: `Systematic derivations and analytical structures confirm the validity of proposed hypotheses within ${methodology || "empirical"} frameworks.`,
-        source_support: secondarySrc,
-        argument_strength: "Very High",
-        status: "Mapped to Theoretical Framework",
-        alignment_type: "Corroboration",
-        notes: `Establishes fundamental theoretical scaffolding for ${workingTitle}.`,
-      },
-      {
-        id: `arg-matrix-${Date.now()}-2`,
-        theme: `Methodological Rigor and Observational Validation Bounds`,
-        primary_claim: `Empirical observations confirm reproducible consistency across boundary conditions.`,
-        source_primary: primarySrc,
-        synthesized_support: `Comparative analysis demonstrates that the proposed architecture overcomes classical methodological constraints.`,
-        source_support: secondarySrc,
-        argument_strength: "High",
-        status: "Mapped to Methodology Section",
-        alignment_type: "Extension",
-        notes: "Verifies experimental and analytical soundness against recognized standards.",
-      },
-      {
-        id: `arg-matrix-${Date.now()}-3`,
-        theme: `Cross-Domain Implications and Synthesis of Findings`,
-        primary_claim: `Synthesized findings demonstrate broad explanatory power across complementary analytical models.`,
-        source_primary: primarySrc,
-        synthesized_support: `Cross-referencing historical literature and contemporary metrics validates generalizability.`,
-        source_support: secondarySrc,
-        argument_strength: "Very High",
-        status: "Mapped to Discussion Section",
-        alignment_type: "Synthesis",
-        notes: "Articulates key contributions and prospective research trajectories.",
-      },
-    ];
-  };
 
   // 7. Synthesizer Agent Runner
   const startAnalysis = async () => {
@@ -323,27 +223,6 @@ export default function EvidenceAnalysisStage({
       },
     ]);
 
-    const progressMessages = [
-      "Mapping vault empirical findings to external literature claims...",
-      "Detecting thematic convergence and identifying potential contradictory evidence...",
-      "Synthesizing theoretical argument pillars around anchor gap...",
-      "Evaluating argument coherence and empirical proof strength...",
-      "Structuring thematic argument matrix for publication drafting...",
-    ];
-
-    let stepIdx = 0;
-    logIntervalRef.current = setInterval(() => {
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: `log-${Date.now()}-${Math.random()}`,
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "action",
-          message: progressMessages[stepIdx % progressMessages.length],
-        },
-      ]);
-      stepIdx++;
-    }, 950);
 
     try {
       await authedStreamFetch(
@@ -368,24 +247,28 @@ export default function EvidenceAnalysisStage({
             ]);
           } else if (event === "done") {
             clearTimer();
-            const clusters: ArgumentMatrixRow[] =
-              Array.isArray(data.data) && data.data.length > 0
-                ? data.data.map((d: any, idx: number) => ({
-                    id: d.id || `arg-matrix-${Date.now()}-${idx}`,
-                    theme: d.theme || `Thematic Argument Cluster ${idx + 1}`,
-                    primary_claim: d.primary_claim || "Empirical baseline finding.",
-                    source_primary: d.source_primary || "Authorized Vault Source",
-                    synthesized_support: d.synthesized_support || "Cross-corroborating literature proof.",
-                    source_support: d.source_support || "External Peer-Reviewed Source",
-                    argument_strength: (d.argument_strength as ArgumentStrength) || "Very High",
-                    status: d.status || "Mapped to Framework",
-                    alignment_type: (d.alignment_type as AlignmentType) || "Corroboration",
-                    notes: d.notes || "",
-                  }))
-                : generateFallbackArgumentClusters();
+            // Only clusters the AI produced with a claim; no invented source
+            // names, "Very High" strength (lowest rating if unrated) or status.
+            const clusters: ArgumentMatrixRow[] = (Array.isArray(data.data) ? data.data : [])
+              .filter((d: any) => typeof d?.primary_claim === "string" && d.primary_claim.trim())
+              .map((d: any, idx: number) => ({
+                id: d.id || `arg-matrix-${Date.now()}-${idx}`,
+                theme: d.theme || `Argument cluster ${idx + 1}`,
+                primary_claim: d.primary_claim,
+                source_primary: d.source_primary || "",
+                synthesized_support: d.synthesized_support || "",
+                source_support: d.source_support || "",
+                argument_strength: (d.argument_strength as ArgumentStrength) || "Moderate",
+                status: d.status || "Needs review",
+                alignment_type: (d.alignment_type as AlignmentType) || "Corroboration",
+                notes: d.notes || "",
+              }));
 
-            setResults(clusters);
-            await persistClusters(clusters);
+            // An empty answer must not wipe the user's existing matrix.
+            if (clusters.length > 0) {
+              setResults(clusters);
+              await persistClusters(clusters);
+            }
 
             setLogs((prev) => [
               ...prev,
@@ -393,12 +276,15 @@ export default function EvidenceAnalysisStage({
                 id: `log-${Date.now()}-done`,
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                 level: "success",
-                message: `Synthesis complete: Structured ${clusters.length} theoretical argument clusters into publication matrix. Ready for researcher review.`,
+                message:
+                  clusters.length > 0
+                    ? `Synthesis complete: ${clusters.length} argument clusters. Review each before proceeding.`
+                    : "The AI returned no argument clusters. Nothing was added.",
               },
             ]);
 
             setSuccessToast(
-              `Evidence synthesis complete! Generated ${clusters.length} argument clusters. Review and refine before proceeding.`
+              clusters.length > 0 ? `Generated ${clusters.length} argument clusters. Review and refine before proceeding.` : "No argument clusters generated."
             );
             setTimeout(() => setSuccessToast(null), 5000);
           } else if (event === "error") {
@@ -408,25 +294,16 @@ export default function EvidenceAnalysisStage({
       );
     } catch (err: any) {
       clearTimer();
-      console.warn("Evidence analysis streaming failed, using fallback corpus synthesis:", err);
-      const fallbackClusters = generateFallbackArgumentClusters();
-      setResults(fallbackClusters);
-      await persistClusters(fallbackClusters);
-
+      console.warn("AI request failed:", err);
       setLogs((prev) => [
         ...prev,
         {
-          id: `log-${Date.now()}-fallback`,
+          id: `log-${Date.now()}-fail`,
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `Local corpus synthesis complete: Assembled ${fallbackClusters.length} theoretical argument clusters from approved sources.`,
+          level: "error",
+          message: "Evidence synthesis unavailable: nothing was added. Connect an AI provider in AI Access, or try again.",
         },
       ]);
-
-      setSuccessToast(
-        `Synthesized ${fallbackClusters.length} theoretical argument clusters from your approved corpus.`
-      );
-      setTimeout(() => setSuccessToast(null), 5000);
     } finally {
       clearTimer();
       setIsProcessing(false);

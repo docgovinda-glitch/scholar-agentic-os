@@ -113,106 +113,6 @@ export default function JournalRequirementsStage({
     }
   }, [initialConstraints, constraints]);
 
-  // Fallback domain-aware rubric generator tailored to target journal
-  const generateFallbackConstraints = useCallback((journalName: string): JournalConstraints => {
-    const isIEEE = /ieee/i.test(journalName);
-    const isACM = /acm/i.test(journalName);
-
-    if (isIEEE) {
-      return {
-        max_words: 10000,
-        abstract_limit_words: 250,
-        citation_style: "IEEE Transactions Numerical",
-        citation_bracket_format: "[1], [2]–[4]",
-        bibliography_ordering: "order_of_appearance",
-        required_sections: [
-          "Abstract",
-          "Introduction",
-          "Related Work",
-          "System Model & Assumptions",
-          "Theoretical Byzantine Formulation",
-          "Empirical Benchmark Evaluation",
-          "Discussion & Failure Boundaries",
-          "Conclusion",
-        ],
-        formatting_rules: [
-          "Two-column IEEE Computer Society format (10pt Times Roman)",
-          "Numbered Roman headings (I. INTRODUCTION, II. RELATED WORK)",
-          "Vector graphic figures with 300 DPI minimum resolution",
-          "Direct mathematical equation cross-referencing (Eq. 1)",
-        ],
-        blind_review_model: "Double-Blind",
-        data_availability_policy: "Mandatory replication package deposit with stable DOI (Zenodo or GitHub release)",
-        code_repository_policy: "Artifact evaluation badge eligibility requires runnable Docker benchmarks",
-        conflict_of_interest_policy: "IEEE standard ethics disclosure statement required at submission",
-        max_figures_tables: 14,
-        doi_mandatory: true,
-      };
-    }
-
-    if (isACM) {
-      return {
-        max_words: 12000,
-        abstract_limit_words: 300,
-        citation_style: "ACM Reference Format (Numerical)",
-        citation_bracket_format: "[1]",
-        bibliography_ordering: "alphabetical",
-        required_sections: [
-          "Abstract",
-          "Introduction",
-          "Background & Motivation",
-          "Asymmetric Quorum Design",
-          "System Implementation",
-          "Empirical Evaluation",
-          "Related Work",
-          "Discussion",
-          "Conclusion",
-        ],
-        formatting_rules: [
-          "ACM Master Article Template (acmart, review, manuscript)",
-          "CCS Concepts XML indexing tags and author keywords (3–6 terms)",
-          "Benchmark latency distribution tables in booktabs standard",
-          "Footnotes permitted for software package versions and repository hashes",
-        ],
-        blind_review_model: "Double-Blind",
-        data_availability_policy: "Artifacts available upon request or Open Data repository link",
-        code_repository_policy: "ACM Artifact Badging (Available, Functional, Replicated)",
-        conflict_of_interest_policy: "Standard ACM conflict of interest declaration",
-        max_figures_tables: 16,
-        doi_mandatory: true,
-      };
-    }
-
-    // Default top-tier scholarly journal
-    return {
-      max_words: 8500,
-      abstract_limit_words: 250,
-      citation_style: "APA 7th Edition (Author-Date) or Journal Standard",
-      citation_bracket_format: "(Author, Year)",
-      bibliography_ordering: "alphabetical",
-      required_sections: [
-        "Abstract",
-        "Introduction",
-        "Literature Review",
-        "Methodology & Experimental Protocol",
-        "Empirical Results & Statistical Analysis",
-        "Discussion & Practical Implications",
-        "Conclusion",
-      ],
-      formatting_rules: [
-        "Standard 12pt double-spaced typography with 1-inch margins",
-        "Structured abstract with Background, Methods, Results, and Conclusions",
-        "Continuous line numbering for peer reviewer ease of reference",
-        "Self-contained captions positioned directly below all figures and tables",
-      ],
-      blind_review_model: "Double-Blind",
-      data_availability_policy: "Open Data Statement with accessible repository DOI",
-      code_repository_policy: "Analysis and plotting scripts must be archived for replication",
-      conflict_of_interest_policy: "ICMJE conflict of interest declaration required",
-      max_figures_tables: 10,
-      doi_mandatory: true,
-    };
-  }, []);
 
   // Sync edit modal with active constraints
   const openEditModal = () => {
@@ -272,43 +172,24 @@ export default function JournalRequirementsStage({
             ]);
           } else if (event === "done") {
             const rawData = data.data || {};
+            // Keep only what the AI extracted; unknown requirements say so
+            // instead of inventing word limits, styles or journal policies.
+            const NS = "Not specified — check the journal's author guidelines";
+            const list = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()) : []);
             const parsedConstraints: JournalConstraints = {
-              max_words: rawData.max_words || 8000,
-              abstract_limit_words: rawData.abstract_limit_words || 250,
-              citation_style: rawData.citation_style || "IEEE Transactions Numerical",
-              citation_bracket_format: rawData.citation_bracket_format || "[1]",
-              bibliography_ordering: rawData.bibliography_ordering || "order_of_appearance",
-              required_sections:
-                Array.isArray(rawData.required_sections) && rawData.required_sections.length > 0
-                  ? rawData.required_sections
-                  : [
-                      "Abstract",
-                      "Introduction",
-                      "Methods",
-                      "Results",
-                      "Discussion",
-                      "Conclusion",
-                    ],
-              formatting_rules:
-                Array.isArray(rawData.formatting_rules) && rawData.formatting_rules.length > 0
-                  ? rawData.formatting_rules
-                  : [
-                      "Double column IEEE standard format",
-                      "12pt serif font with 1-inch margins",
-                      "Numbered reference brackets [1]",
-                    ],
-              blind_review_model: rawData.blind_review_model || "Double-Blind",
-              data_availability_policy:
-                rawData.data_availability_policy ||
-                "Mandatory open replication package deposit with stable DOI",
-              code_repository_policy:
-                rawData.code_repository_policy ||
-                "Artifact evaluation badge eligibility requires runnable benchmarks",
-              conflict_of_interest_policy:
-                rawData.conflict_of_interest_policy ||
-                "Standard ethics and disclosures statement required",
-              max_figures_tables: rawData.max_figures_tables || 12,
-              doi_mandatory: true,
+              max_words: rawData.max_words || NS,
+              abstract_limit_words: rawData.abstract_limit_words || undefined,
+              citation_style: rawData.citation_style || NS,
+              citation_bracket_format: rawData.citation_bracket_format || undefined,
+              bibliography_ordering: rawData.bibliography_ordering || undefined,
+              required_sections: list(rawData.required_sections),
+              formatting_rules: list(rawData.formatting_rules),
+              blind_review_model: rawData.blind_review_model || undefined,
+              data_availability_policy: rawData.data_availability_policy || undefined,
+              code_repository_policy: rawData.code_repository_policy || undefined,
+              conflict_of_interest_policy: rawData.conflict_of_interest_policy || undefined,
+              max_figures_tables: rawData.max_figures_tables || undefined,
+              doi_mandatory: rawData.doi_mandatory === true,
             };
 
             setConstraints(parsedConstraints);
@@ -333,7 +214,7 @@ export default function JournalRequirementsStage({
                 id: Date.now().toString() + "-done",
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                 level: "success",
-                message: `Requirements distilled successfully for ${selectedJournal}: ${parsedConstraints.required_sections.length} required sections and ${parsedConstraints.citation_style} citation matrix locked.`,
+                message: `AI-extracted requirements for ${selectedJournal}. Confirm them against the journal\'s author guidelines.`,
               },
             ]);
           } else if (event === "error") {
@@ -342,36 +223,16 @@ export default function JournalRequirementsStage({
         }
       );
     } catch (err: any) {
-      console.warn("Remote requirements extraction unavailable, activating local fallback synthesis:", err);
-      const fallback = generateFallbackConstraints(selectedJournal);
-      setConstraints(fallback);
-
+      console.warn("Requirements extraction failed:", err);
       setLogs((prev) => [
         ...prev,
         {
-          id: Date.now().toString() + "-fallback",
+          id: `log-${Date.now()}-fail`,
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "info",
-          message: `Notice: Switched to Local Rubric Distillation Engine for "${selectedJournal}". Formulated validated ${fallback.blind_review_model} guidelines.`,
-        },
-        {
-          id: Date.now().toString() + "-done",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `Submission constraints locked: ${fallback.max_words} words max, ${fallback.citation_style}, and ${fallback.required_sections.length} sections defined.`,
+          level: "error",
+          message: "Requirements extraction unavailable: nothing was filled in. Paste the author guidelines, or try again.",
         },
       ]);
-
-      try {
-        const newAnswers = {
-          ...project.answers,
-          journal_constraints: JSON.stringify(fallback),
-        };
-        const updated = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
-        onSaved(updated);
-      } catch (saveErr) {
-        console.warn("Failed to persist fallback constraints", saveErr);
-      }
     } finally {
       setIsProcessing(false);
     }

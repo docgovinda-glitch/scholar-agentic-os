@@ -295,12 +295,14 @@ describe("Stage 10: Evidence Extraction (EvidenceExtractionStage)", () => {
       // CRITICAL CHECK: Must NOT advance automatically! User reviews first!
       expect(onAdvance).not.toHaveBeenCalled();
       expect(
-        screen.getByText(/Successfully mined 1 evidence claims! You can now review, edit, or add custom claims\./i)
+        screen.getByText(/Extracted 1 claims\. Review, edit, or add your own\./i)
       ).toBeInTheDocument();
     });
   });
 
-  it("handles streaming failure gracefully with fallback corpus synthesis", async () => {
+  it("adds nothing and says so when extraction fails", async () => {
+    // Rewritten 2026-10-29: this used to assert invented fallback claims
+    // ("PBFT provides 1-2 orders of magnitude…") being saved on failure.
     (api.authedStreamFetch as any).mockRejectedValue(new Error("Network disconnect"));
 
     render(
@@ -317,15 +319,13 @@ describe("Stage 10: Evidence Extraction (EvidenceExtractionStage)", () => {
       />
     );
 
-    const mineBtn = screen.getByRole("button", { name: /Run Data Miner Agent/i });
-    fireEvent.click(mineBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Run Data Miner Agent/i }));
 
     await waitFor(() => {
-      expect(api.saveIntakeAnswers).toHaveBeenCalled();
-      // Fallback generates claims from approved sources and datasets
-      expect(screen.getByText(/Local corpus synthesis complete/i)).toBeInTheDocument();
-      expect(screen.getByText(/PBFT provides 1-2 orders of magnitude faster state transitions/i)).toBeInTheDocument();
+      expect(screen.getByText(/Evidence extraction unavailable: nothing was added/i)).toBeInTheDocument();
     });
+    expect(api.saveIntakeAnswers).not.toHaveBeenCalled();
+    expect(screen.queryByText(/PBFT provides 1-2 orders of magnitude faster state transitions/i)).not.toBeInTheDocument();
   });
 
   it("locks evidence ledger and advances to Stage 11 (external_research) on user action", async () => {

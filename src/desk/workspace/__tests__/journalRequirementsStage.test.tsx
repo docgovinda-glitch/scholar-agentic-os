@@ -140,7 +140,9 @@ describe("Stage 16: Journal Rules & Requirements (JournalRequirementsStage)", ()
     });
   });
 
-  it("engages local fallback synthesis when stream throws an error", async () => {
+  it("fills in nothing and says so when extraction fails", async () => {
+    // Rewritten 2026-10-29: this used to assert rules invented from the
+    // journal's name ("10,000 words", "Theoretical Byzantine Formulation").
     (api.authedStreamFetch as any).mockRejectedValue(new Error("Timeout reaching OpenRouter"));
 
     render(
@@ -153,14 +155,12 @@ describe("Stage 16: Journal Rules & Requirements (JournalRequirementsStage)", ()
       />
     );
 
-    const extractBtn = screen.getByRole("button", { name: /Extract Constraints/i });
-    fireEvent.click(extractBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Extract Constraints/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Local Rubric Distillation Engine/i)).toBeInTheDocument();
-      expect(screen.getByText(/10,000 words/i)).toBeInTheDocument();
-      expect(screen.getByText(/Theoretical Byzantine Formulation/i)).toBeInTheDocument();
+      expect(screen.getByText(/Requirements extraction unavailable: nothing was filled in/i)).toBeInTheDocument();
     });
+    expect(screen.queryByText(/Theoretical Byzantine Formulation/i)).not.toBeInTheDocument();
   });
 
   it("allows interactive section taxonomy editing (adding, reordering, removing sections)", async () => {

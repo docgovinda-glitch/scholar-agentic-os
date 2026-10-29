@@ -214,7 +214,10 @@ describe("Stage 2: Literature Discovery (LiteratureStage)", () => {
     expect(onAdvance).toHaveBeenCalledWith("gap_identification");
   });
 
-  it("falls back to local heuristic synthesis when executeAgenticLLM throws or fails", async () => {
+  it("never shows synthesized papers: literature comes only from the scholarly indexes", async () => {
+    // Rewritten 2026-10-29: this used to assert locally synthesized papers
+    // ("Architectural Principles and Empirical Benchmarks…") when AI failed.
+    // The stage no longer uses an LLM to find literature at all.
     (api.executeAgenticLLM as any).mockRejectedValue(new Error("AI service unavailable or quota exceeded"));
 
     const emptyProject: ProjectView = {
@@ -240,20 +243,12 @@ describe("Stage 2: Literature Discovery (LiteratureStage)", () => {
       />
     );
 
-    // Initial state shows zero papers found, start discovery button
-    const discoverBtn = screen.getByRole("button", { name: /Start Literature Discovery/i });
-    fireEvent.click(discoverBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Start Literature Discovery/i }));
 
-    // Wait for fallback papers to be generated and displayed
     await waitFor(() => {
-      expect(screen.getByText(/Architectural Principles and Empirical Benchmarks/i)).toBeInTheDocument();
+      expect(api.saveIntakeAnswers).toHaveBeenCalled();
     });
-
-    expect(api.saveIntakeAnswers).toHaveBeenCalledWith(
-      "proj-lit-empty",
-      expect.objectContaining({
-        discovered_literature: expect.any(String),
-      })
-    );
+    expect(api.executeAgenticLLM).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Architectural Principles and Empirical Benchmarks/i)).not.toBeInTheDocument();
   });
 });

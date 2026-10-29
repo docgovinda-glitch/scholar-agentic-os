@@ -251,122 +251,7 @@ export default function RevisionStage({
     ]);
   }, []);
 
-  // Offline fallback generator: builds high-fidelity, section-targeted academic patches
-  const generateFallbackPatches = useCallback((): RevisionPatch[] => {
-    return [
-      {
-        id: "patch-fb-01",
-        section: "Introduction",
-        critiqueLens: "Logical Flow & Coherence",
-        severity: "Major",
-        find: "Autonomous reasoning architectures demonstrate an average variance reduction. However, deterministic bounds remain unaddressed in multi-agent configurations, which may compromise stability during adversarial divergence.",
-        replace:
-          "Autonomous reasoning architectures demonstrate reproducible variance reduction across multi-agent benchmarks. Crucially, established formalisms fail to guarantee deterministic convergence bounds in decentralized synthesis—inducing systemic failure modes under adversarial epistemic divergence.",
-        explanation:
-          "Clarifies the causal connection between decentralized agent interaction and epistemic instability, directly resolving the logical flow critique.",
-        accepted: true,
-      },
-      {
-        id: "patch-fb-02",
-        section: "Methodology",
-        critiqueLens: "Methodological Rigor",
-        severity: "Major",
-        find: "The computational complexity is assumed to scale linearly across participating agents under symmetric communications.",
-        replace:
-          "To substantiate tractability, we establish Lemma 1: Under symmetric sparse communication topologies, the bipartite matching operator terminates in O(V · E log V) steps, strictly bounding computational overhead and preventing algorithmic stall.",
-        explanation:
-          "Formalizes asymptotic runtime bounds and establishes Lemma 1 as requested during peer review triage.",
-        accepted: true,
-      },
-      {
-        id: "patch-fb-03",
-        section: "Results",
-        critiqueLens: "Evidence & Empirical Support",
-        severity: "Moderate",
-        find: "Evaluation against synthetic benchmark suites indicates a 94.2% fidelity rate. The empirical runtime exhibits minimal latency degradation across varying agent group sizes up to n=128.",
-        replace:
-          "Empirical evaluation against standard multi-agent benchmarks demonstrates a 94.2% fidelity rate (95% CI: [92.8%, 95.6%], p < 0.001). Runtime overhead remained bounded under 42ms per decision cycle up to n=128 participating agents.",
-        explanation:
-          "Incorporates 95% confidence intervals and statistical significance notation to satisfy empirical verification standards.",
-        accepted: true,
-      },
-      {
-        id: "patch-fb-04",
-        section: "Discussion",
-        critiqueLens: "Argument Strength & Falsifiability",
-        severity: "Major",
-        find: "Further research is necessary to evaluate high-noise sensor regimes.",
-        replace:
-          "Threats to Validity & Boundary Conditions: While our proofs hold under bounded Byzantine failure regimes (f < n/3), stochastic packet loss exceeding 35% induces graceful latency degradation rather than catastrophic divergence. Future investigations will probe uncoordinated asynchronous partitions.",
-        explanation:
-          "Adds an explicit Threats to Validity subsection detailing failure regimes and boundary conditions.",
-        accepted: true,
-      },
-    ];
-  }, []);
 
-  // Fallback 5-Referee Point-by-Point Rebuttal Matrix Generator
-  const generateFallbackRebuttalMatrix = useCallback((): RebuttalMatrixItem[] => {
-    return [
-      {
-        id: "reb-methodologist",
-        refereeRole: "Methodologist",
-        critique: "The asymptotic runtime analysis for the bipartite projection operator assumes balanced bipartite cardinality. Under asymmetric partition scenarios, the worst-case bound O(|C| * |E|) must be rigorously established with pruning bounds.",
-        authorResponse: "We concur with the Methodologist. We have formally established Lemma 1 in Section 2, demonstrating that under symmetric sparse communication topologies and top-k candidate thresholding, computational overhead is strictly bounded to O(V · E log V), eliminating algorithmic stall.",
-        revisionAction: "Formulated Lemma 1 and accompanying proof in Section 2 (Methodology).",
-        section: "Methodology",
-        manuscriptDiff: {
-          original: "The computational complexity is assumed to scale linearly across participating agents under symmetric communications.",
-          revised: "To substantiate tractability, we establish Lemma 1: Under symmetric sparse communication topologies, the bipartite matching operator terminates in O(V · E log V) steps, strictly bounding computational overhead and preventing algorithmic stall.",
-        },
-        status: "Accepted & Revised",
-      },
-      {
-        id: "reb-domain-spec",
-        refereeRole: "Domain Specialist",
-        critique: `While the findings are sound, the framing should explicitly emphasize implications for ${targetJournal} readers by referencing real-time reproducibility and multi-agent coordination standards.`,
-        authorResponse: `We appreciate this guidance. We have augmented the Discussion to situate our deterministic bounds directly within the reproducibility guidelines mandated by ${targetJournal}, citing recent multi-agent governance benchmarks.`,
-        revisionAction: "Added 2 paragraphs to Section 4 (Discussion) addressing venue reproducibility standards.",
-        section: "Discussion",
-        status: "Accepted & Revised",
-      },
-      {
-        id: "reb-biostatistician",
-        refereeRole: "Biostatistician",
-        critique: "Empirical claim regarding the 28.4% variance reduction relies on aggregate test suites; confidence intervals (95% CI) and standard error bars must be explicitly reported in Table 1.",
-        authorResponse: "We thank the Biostatistician for this critical correction. We have recomputed all empirical evaluations with 10,000 bootstrap resamples and now report exact 95% confidence intervals ([92.8%, 95.6%], p < 0.001) alongside mean values.",
-        revisionAction: "Inserted 95% bootstrap confidence intervals and p-values into Section 3 (Results) and Table 1.",
-        section: "Results",
-        manuscriptDiff: {
-          original: "Evaluation against synthetic benchmark suites indicates a 94.2% fidelity rate.",
-          revised: "Empirical evaluation against standard multi-agent benchmarks demonstrates a 94.2% fidelity rate (95% CI: [92.8%, 95.6%], p < 0.001).",
-        },
-        status: "Accepted & Revised",
-      },
-      {
-        id: "reb-synthesizer",
-        refereeRole: "Synthesizer",
-        critique: "The manuscript does not adequately discuss threats to validity when input vault sources contain contradictory empirical claims. What occurs when two high-confidence documents assert conflicting findings?",
-        authorResponse: "We thank the Synthesizer for highlighting this epistemic edge case. We have incorporated a dedicated subsection 'Threats to Validity: Epistemic Disagreement Resolution' formalizing confidence-weighted Bayesian voting for contradictory source claims.",
-        revisionAction: "Added Subsection 4.2 detailing epistemic disagreement arbitration.",
-        section: "Discussion",
-        status: "Accepted & Revised",
-      },
-      {
-        id: "reb-formal-editor",
-        refereeRole: "Formal Editor",
-        critique: "Phrasing in introductory paragraphs contains colloquial or overstated rhetorical declarations. Academic register requires measured, neutral, and precise prose without hyperbolic claims.",
-        authorResponse: "We have thoroughly revised the prose throughout Section 1 to ensure a rigorous, objective academic register adhering to British/Oxford scholarly conventions and eliminating conversational hyperbole.",
-        revisionAction: "Substituted subjective flourishes with empirical declarative descriptions throughout Introduction.",
-        section: "Introduction",
-        manuscriptDiff: {
-          original: "Autonomous reasoning architectures demonstrate an average variance reduction. However, deterministic bounds remain unaddressed...",
-          revised: "Autonomous reasoning architectures demonstrate reproducible variance reduction across multi-agent benchmarks. Crucially, established formalisms fail to guarantee deterministic convergence bounds...",
-        },
-        status: "Accepted & Revised",
-      },
-    ];
-  }, [targetJournal]);
 
   // Load or synthesize Point-by-Point Rebuttal Matrix from backend
   const loadOrGenerateRebuttalMatrix = useCallback(async () => {
@@ -385,22 +270,15 @@ export default function RevisionStage({
       }
       throw new Error("Server returned non-ok status");
     } catch (err: unknown) {
-      console.warn("Using local resilient rebuttal synthesis:", err instanceof Error ? err.message : String(err));
-      const fallbackMatrix = generateFallbackRebuttalMatrix();
-      setRebuttalMatrix(fallbackMatrix);
-      appendLog(`Synthesized ${fallbackMatrix.length} Point-by-Point Rebuttal Matrix entries via local scholarly synthesis.`, "info");
+      console.warn("Rebuttal matrix request failed:", err instanceof Error ? err.message : String(err));
+      const msg = "Rebuttal drafting unavailable: nothing was written. Connect an AI provider in AI Access, or try again.";
+      appendLog(msg, "warn");
+      setError(msg);
     } finally {
       setIsGeneratingRebuttal(false);
     }
-  }, [projectId, peerCritiques, appendLog, generateFallbackRebuttalMatrix]);
+  }, [projectId, peerCritiques, appendLog]);
 
-  // Auto-seed rebuttal matrix if empty but peer critiques exist
-  useEffect(() => {
-    if (rebuttalMatrix.length === 0 && peerCritiques.length > 0 && !isGeneratingRebuttal) {
-      const fallback = generateFallbackRebuttalMatrix();
-      setRebuttalMatrix(fallback);
-    }
-  }, [rebuttalMatrix.length, peerCritiques.length, isGeneratingRebuttal, generateFallbackRebuttalMatrix]);
 
   // Trigger automated revision mapping agent
   const startAgent = async () => {
@@ -411,19 +289,7 @@ export default function RevisionStage({
 
     appendLog("Initiating Automated Revision Mapping Engine...", "info");
 
-    let progress = 0;
-    progressIntervalRef.current = setInterval(() => {
-      progress += 4;
-      if (progress >= 96) {
-        progress = 96;
-      }
-      setScanProgress(progress);
-      const taskIndex = Math.min(
-        Math.floor((progress / 100) * TASKS.length),
-        TASKS.length - 1
-      );
-      setActiveTask(TASKS[taskIndex]);
-    }, 120);
+    appendLog("Waiting for the AI revision agent…", "info");
 
     try {
       let receivedPatches: RevisionPatch[] = [];
@@ -441,14 +307,17 @@ export default function RevisionStage({
           } else if (event === "done") {
             const rawData = streamData.data;
             if (Array.isArray(rawData) && rawData.length > 0) {
-              receivedPatches = rawData.map((p: Record<string, unknown>, idx: number) => ({
+              // Only real find/replace patches (with text to find).
+              receivedPatches = rawData
+                .filter((p: Record<string, unknown>) => typeof p.find === "string" && p.find && typeof p.replace === "string")
+                .map((p: Record<string, unknown>, idx: number) => ({
                 id: (p.id as string) || `patch-${idx + 1}`,
                 section: (p.section as string) || (p.section_name as string) || "General",
-                critiqueLens: (p.critiqueLens as string) || (p.lens as string) || "Methodological Rigor",
-                severity: (p.severity as RevisionPatch["severity"]) || "Major",
-                find: (p.find as string) || "",
-                replace: (p.replace as string) || "",
-                explanation: (p.explanation as string) || "Revision addressing peer review critique.",
+                critiqueLens: (p.critiqueLens as string) || (p.lens as string) || "",
+                severity: (p.severity as RevisionPatch["severity"]) || "Minor",
+                find: p.find as string,
+                replace: p.replace as string,
+                explanation: (p.explanation as string) || "",
                 accepted: true,
               }));
               appendLog(`Successfully received ${receivedPatches.length} revision patches from stream.`, "done");
@@ -459,23 +328,22 @@ export default function RevisionStage({
         }
       );
 
-      // If stream ended without patches, fallback
       if (receivedPatches.length === 0) {
-        receivedPatches = generateFallbackPatches();
-        appendLog(`Applied ${receivedPatches.length} domain-aware academic patches via resilient fallback.`, "patch");
+        appendLog("The AI proposed no revisions. Nothing was changed.", "warn");
+        setError("The AI proposed no revisions. Nothing was changed.");
+      } else {
+        setPatches(receivedPatches);
+        appendLog("Revision proposals ready. Review each one before applying.", "done");
       }
-
-      setPatches(receivedPatches);
-      appendLog("Revision mapping complete. Manuscript diff generated for author review.", "done");
     } catch (err: unknown) {
-      console.warn("Remote revision agent unavailable, engaging local fallback:", err instanceof Error ? err.message : String(err));
-      const fallbackPatches = generateFallbackPatches();
-      setPatches(fallbackPatches);
-      appendLog(`Engaged local resilient revision engine: generated ${fallbackPatches.length} academic patches.`, "warn");
+      console.warn("Revision agent unavailable:", err instanceof Error ? err.message : String(err));
+      const msg = "Revision agent unavailable: nothing was changed. Connect an AI provider in AI Access, or try again.";
+      appendLog(msg, "warn");
+      setError(msg);
     } finally {
       clearTimer();
       setScanProgress(100);
-      setActiveTask("Revision Mapping Complete");
+      setActiveTask("");
       setIsProcessing(false);
     }
   };

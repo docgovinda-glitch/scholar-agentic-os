@@ -285,12 +285,14 @@ describe("Stage 13: Evidence Analysis (EvidenceAnalysisStage)", () => {
       // CRITICAL CHECK: Must NOT auto-advance!
       expect(onAdvance).not.toHaveBeenCalled();
       expect(
-        screen.getByText(/Evidence synthesis complete! Generated 1 argument clusters\. Review and refine before proceeding\./i)
+        screen.getByText(/Generated 1 argument clusters\. Review and refine before proceeding\./i)
       ).toBeInTheDocument();
     });
   });
 
-  it("handles streaming failure gracefully with fallback corpus synthesis", async () => {
+  it("adds nothing and says so when synthesis fails", async () => {
+    // Rewritten 2026-10-29: this used to assert invented fallback clusters
+    // being saved on failure.
     (api.authedStreamFetch as any).mockRejectedValue(new Error("Synthesizer LLM connection dropped"));
 
     render(
@@ -307,16 +309,13 @@ describe("Stage 13: Evidence Analysis (EvidenceAnalysisStage)", () => {
       />
     );
 
-    const synthBtn = screen.getByRole("button", { name: /Launch Synthesizer Agent/i });
-    fireEvent.click(synthBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Launch Synthesizer Agent/i }));
 
     await waitFor(() => {
-      expect(api.saveIntakeAnswers).toHaveBeenCalled();
-      expect(screen.getByText(/Local corpus synthesis complete/i)).toBeInTheDocument();
-      expect(
-        screen.getByText(/Telemetry Verification on Multi-Region Transatlantic Interconnects/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Evidence synthesis unavailable: nothing was added/i)).toBeInTheDocument();
     });
+    expect(api.saveIntakeAnswers).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Telemetry Verification on Multi-Region Transatlantic Interconnects/i)).not.toBeInTheDocument();
   });
 
   it("locks evidence matrix and advances to Stage 14 (manual_review) on user action", async () => {

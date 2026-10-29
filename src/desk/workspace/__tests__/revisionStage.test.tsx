@@ -193,7 +193,9 @@ describe("Stage 22: AI Revision (RevisionStage)", () => {
     expect(onAdvanceMock).not.toHaveBeenCalled();
   });
 
-  it("engages local fallback patch generator when stream fails, verifying section-level patches", async () => {
+  it("proposes no patches and says so when the revision agent fails", async () => {
+    // Rewritten 2026-10-29: this used to assert four locally invented patches
+    // ("…we establish Lemma 1…") appearing on network failure.
     (authedStreamFetch as any).mockRejectedValue(new Error("Network drop during revision stream"));
 
     render(
@@ -207,13 +209,9 @@ describe("Stage 22: AI Revision (RevisionStage)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Begin Automated Revision Mapping/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Patches Generated/i)).toBeInTheDocument();
+      expect(screen.getByText(/Revision agent unavailable: nothing was changed/i)).toBeInTheDocument();
     });
-
-    // Should have generated 4 fallback patches
-    expect(screen.getByText("4/4")).toBeInTheDocument();
-    expect(screen.getByText(/To substantiate tractability, we establish Lemma 1/i)).toBeInTheDocument();
-    expect(screen.getByText(/Threats to Validity & Boundary Conditions/i)).toBeInTheDocument();
+    expect(screen.queryByText(/To substantiate tractability, we establish Lemma 1/i)).not.toBeInTheDocument();
   });
 
   it("allows toggling patch acceptance (accept, revert) and updates HUD count and bulk actions", async () => {

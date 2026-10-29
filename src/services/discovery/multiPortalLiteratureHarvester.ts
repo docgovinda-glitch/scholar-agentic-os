@@ -15,7 +15,7 @@
  * normalizes DOIs, unifies thematic clusters, and classifies landmark/seminal works.
  */
 
-import { type LiteratureItem, synthesizeTopUpSources } from "../../desk/workspace/agentPrompts/literaturePrompts";
+import { type LiteratureItem } from "../../desk/workspace/agentPrompts/literaturePrompts";
 import { normalizeDoi, normalizeTitle, calculateTokenSimilarity } from "../vault/duplicateDetection";
 export { normalizeDoi, normalizeTitle, calculateTokenSimilarity };
 
@@ -730,28 +730,13 @@ export async function executeMultiPortalDiscovery(
     excludeTitles
   );
 
-  // Guarantee at least minResults (50) sources
+  // No synthetic top-up: the corpus is exactly what the open portals
+  // returned, even when that is fewer than minResults.
   if (deduplicated.length < minResults) {
-    const deficit = minResults - deduplicated.length;
     onProgress?.({
       step: "topup",
-      message: `> Open portals yielded ${deduplicated.length} deduplicated sources. Activating domain synthesis for ${deficit} foundational top-up sources to achieve ≥${minResults} quota...`,
+      message: `> Open portals returned ${deduplicated.length} deduplicated sources (target ${minResults}). Broaden the query to find more; nothing was synthesized.`,
     });
-
-    const existingDois = new Set(deduplicated.map((d) => d.doi?.toLowerCase()).filter(Boolean) as string[]);
-    const existingTitles = new Set(deduplicated.map((d) => normalizeTitle(d.title)));
-
-    const topUp = synthesizeTopUpSources(
-      deficit,
-      workingTitle,
-      researchArea,
-      focusDiscipline,
-      existingDois,
-      existingTitles
-    );
-
-    portalCounts.synthetic = topUp.length;
-    deduplicated = [...deduplicated, ...topUp];
   }
 
   // Extract unique thematic clusters
