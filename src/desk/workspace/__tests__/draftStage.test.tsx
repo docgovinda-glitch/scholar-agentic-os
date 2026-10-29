@@ -153,7 +153,9 @@ describe("Stage 17: AI Draft Generation (DraftStage)", () => {
     expect(onAdvanceMock).not.toHaveBeenCalled();
   });
 
-  it("engages local fallback drafting engine when stream fails", async () => {
+  it("writes nothing into the manuscript and says so when drafting fails", async () => {
+    // Rewritten 2026-10-29: this used to assert a locally invented paper
+    // ("Wide-area distributed systems increasingly operate…") being drafted.
     (api.authedStreamFetch as any).mockRejectedValue(new Error("Network drop during long-context generation"));
 
     render(
@@ -166,14 +168,13 @@ describe("Stage 17: AI Draft Generation (DraftStage)", () => {
       />
     );
 
-    const drafterBtn = screen.getByRole("button", { name: /Initialize Multi-Agent Drafter/i });
-    fireEvent.click(drafterBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Initialize Multi-Agent Drafter/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Local Academic Drafting Engine/i)).toBeInTheDocument();
-      expect(screen.getByText(/Wide-area distributed systems increasingly operate over heterogeneous cloud infrastructures/i)).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Regenerate Full Draft/i })).toBeInTheDocument();
+      expect(screen.getByText(/Drafting unavailable: your draft was not changed/i)).toBeInTheDocument();
     });
+    expect(api.saveIntakeAnswers).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Wide-area distributed systems increasingly operate over heterogeneous cloud infrastructures/i)).not.toBeInTheDocument();
   });
 
   it("navigates across sections in the dual-pane workspace", async () => {
