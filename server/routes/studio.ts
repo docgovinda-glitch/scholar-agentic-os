@@ -10,7 +10,6 @@
  * scope note on session-policy persistence.
  */
 
-import { randomUUID } from "node:crypto";
 import express from "express";
 import { refine, GatewayDenied } from "../../src/app/studio/studio.ts";
 import { getPolicyForSession, grantConsent, restrictScope } from "../../src/app/studio/sessionPolicyStore.ts";
@@ -20,240 +19,27 @@ import { ALL_L1_PROFILES } from "../../src/domain/language/l1Patterns.ts";
 import { buildVoiceProfile } from "../../src/domain/language/voiceProfile.ts";
 import type { InterventionLevel, VoiceProfile } from "../../src/domain/language/types.ts";
 import { requireAuth, type AuthenticatedUser } from "../src/middleware/auth.ts";
-import { assembleUserCandidates } from "../src/aiEngine/userRouter.ts";
-import { resolvePremiumResources } from "../src/aiEngine/adminRouter.ts";
-import { getDecryptedCredential } from "../src/aiEngine/credentialVault.ts";
-import { checkPerTaskLimit } from "../src/aiEngine/quotaEngine.ts";
-import { creditsForUsage, estimateMaxCreditsForInput } from "../src/aiEngine/creditPolicy.ts";
-import { deductCredits, type DeductResult } from "../src/aiEngine/creditEngine.ts";
-import { recordProviderFailure, recordProviderSuccess } from "../src/aiEngine/providerHealth.ts";
-import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
+import { estimateMaxCreditsForInput } from "../src/aiEngine/creditPolicy.ts";
+import { runPremium, type PremiumOutcome } from "../src/ai/premium.ts";
 
 /**
- * Why a charge was refused, in the user's terms. Keyed on every non-"ok"
- * DeductResult so adding a new refusal reason to the credit engine is a type
- * error here rather than a silently generic message.
- */
-const DEDUCT_FAILURE_MESSAGES: Record<Exclude<DeductResult, "ok">, string> = {
-  daily_limit_exceeded: "You've reached your daily Premium credit limit. It resets at the start of tomorrow (UTC).",
-  weekly_limit_exceeded: "You've reached your weekly Premium credit limit. It resets at the start of next week (UTC).",
-  monthly_limit_exceeded: "You've reached your monthly Premium credit limit. It resets at the start of next month (UTC).",
-  insufficient_balance: "You don't have enough Premium credits left for this request.",
-};
-
-/**
- * Runs Studio's Premium path: independently re-derives the Omni Router's
- * decision server-side (never trusting the client's `useEngine: "premium"`
- * flag as a grant — see Priority 7 test "user cannot force a Premium
- * provider without entitlement"), executes against Scholar's own
- * credential, meters usage, and atomically deducts credits only for a
- * request that actually reached a provider and got a response back.
- *
- * Retries across premium fallbacks (bounded) on a provider failure — never
- * silently drops to Free/BYOK, since the server has no user's device-held
- * key to do that with; falling back across tiers is the CLIENT's job
- * (src/desk/regions/StudioPanel.tsx calls /api/ai-access/route first and
- * owns retrying with its own locally-stored key for a different tier).
- *
- * A GatewayDenied from the Warden is handled BEFORE the generic
- * provider-failure path below, not folded into it: a consent-required or
- * hard-denied decision is a privacy verdict, not "this provider is down",
- * and Free/BYOK's manual path (this same file's /api/studio/refine handler)
- * already surfaces it as a 428/403 the client knows how to act on. Premium
- * follows the identical rule — same GatewayDenied class, same policy
- * object (`refineInput.policy`, from the same session-scoped store) — so a
- * consent prompt here is stopped and returned immediately rather than
- * silently retried against the next Premium fallback, which would either
- * ask again for a provider that already has consent or waste an attempt on
- * one that doesn't.
+ * Studio's Premium path. The server re-derives entitlement and quota itself
+ * (the client's `useEngine: "premium"` flag is never a grant), runs on
+ * Scholar's own credential and charges only for a call that answered.
+ * It never drops to Free/BYOK: tier fallback is the client's job
+ * (StudioPanel.tsx). Steps and their reasons: server/src/ai/premium.ts.
  */
 async function runPremiumRefine(
   userId: string,
   refineInput: Omit<Parameters<typeof refine>[0], "provider" | "apiKey" | "model">
-): Promise<
-  | { ok: true; result: Awaited<ReturnType<typeof refine>>; aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number } }
-  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
-> {
-  // The USER's own router settles quota and entitlement; it knows Premium
-  // only as one opaque capability, never as a list of providers.
-  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
-
-  if (!entitlementActive) {
-    return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
-  }
-
-  const preCheckAmount = estimateMaxCreditsForInput(refineInput.text);
-  const perTask = quota ? checkPerTaskLimit(preCheckAmount, quota) : { allowed: true };
-  if (!perTask.allowed) {
-    return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
-  }
-
-  // The Omni Router only excludes Premium candidates once the balance hits
-  // zero, so a user with 2 credits left could still reach a provider with a
-  // request estimated at 40 and only be stopped by deduct_credits AFTER the
-  // provider had been paid. This is the same `balance < amount` comparison
-  // deduct_credits itself makes — no window/reset logic is duplicated here,
-  // deliberately: the daily/weekly/monthly caps stay the database's call,
-  // decided under its row lock, and are handled after the call below.
-  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
-    return {
-      ok: false,
-      status: 402,
-      // Nothing left at all and "not quite enough for this one" are different
-      // situations to be in, and the first is the one a user needs named
-      // plainly — an arithmetic shortfall message would read as though a
-      // smaller request might work when none will.
-      error:
-        premiumQuotaRemaining <= 0
-          ? "Your Premium quota for this period is exhausted."
-          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
-    };
-  }
-
-  // The ADMIN's router decides which of the platform's own resources serves
-  // this request. Resolved here rather than in the user's router so the two
-  // stay separate systems: the user's side asked for "Premium", and what
-  // Premium is made of is the administrator's business. Re-pointing a
-  // resource at a different provider changes this list and nothing else.
-  const resources = await resolvePremiumResources(userId, "reasoning");
-  if (resources.length === 0) {
-    return {
-      ok: false,
-      status: 402,
-      error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator.",
-    };
-  }
-
-  let lastError = "No Premium resource is currently available.";
-
-  for (const resource of resources) {
-    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
-    if (!credential) {
-      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
-      // Named by the admin's label, not the provider — the message may reach
-      // the user, and Premium does not disclose what runs underneath.
-      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
-      continue;
-    }
-
-    const model = resource.modelId || undefined;
-    const start = Date.now();
-
-    // Only the provider call itself belongs in this try. Post-success
-    // bookkeeping (deduct/record) used to share it, so a Supabase blip while
-    // charging would land in the provider-failure branch below: it marked a
-    // provider that had just answered correctly as DOWN, then continued the
-    // loop and re-ran the whole generation against the next one — paying two
-    // providers for one request and charging the user for neither.
-    let result: Awaited<ReturnType<typeof refine>>;
-    try {
-      result = await refine({ ...refineInput, provider: resource.providerId, apiKey: credential, model });
-    } catch (err) {
-      if (err instanceof GatewayDenied) {
-        // Never counted as a provider failure (this provider isn't
-        // "down" — the request was never sent), and never deducts credits.
-        if (err.requiresConsent) {
-          return { ok: false, status: 428, error: err.message, provider: resource.providerId };
-        }
-        return { ok: false, status: 403, error: err.message };
-      }
-      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
-      lastError = err instanceof Error ? err.message : "Unknown error";
-      // Try the next premium fallback, if any — never deducts credits for a
-      // failed attempt (Priority 5).
-      continue;
-    }
-
-    await recordProviderSuccess(resource.providerId, Date.now() - start);
-
-    const usage = result.usage;
-    const modelUsed = model ?? usage?.model ?? "";
-    const creditsUsed = usage ? creditsForUsage(usage.inputTokensEstimate, usage.outputTokensEstimate) : preCheckAmount;
-    const requestId = randomUUID();
-    const deductResult = await deductCredits(
-      userId,
-      creditsUsed,
-      quota?.dailyCredits ?? null,
-      quota?.monthlyCredits ?? null,
-      "usage",
-      requestId,
-      `studio refine: ${resource.label}`,
-      quota?.weeklyCredits ?? null
-    );
-
-    // A non-"ok" result means a daily/weekly/monthly cap or the balance
-    // stopped the charge. The refinement is NOT returned in that case: doing
-    // so (the previous behaviour) handed back a completed Premium generation,
-    // recorded zero credits, left the balance untouched, and so made every
-    // request past the cap free and unlimited — the cap enforced nothing.
-    //
-    // The provider has already been paid for this call by then, which is why
-    // the balance pre-check below the router runs first and makes reaching
-    // here rare; it cannot be eliminated entirely, because only
-    // deduct_credits (which holds the row lock) can decide a window limit
-    // authoritatively. The spend is still recorded, as a quota_exhausted
-    // ledger row charged 0, so the gap between provider cost and revenue
-    // stays auditable rather than invisible.
-    if (deductResult !== "ok") {
-      await recordUsage(userId, resource.providerId, modelUsed, usage, requestId, 0, "quota_exhausted");
-      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
-    }
-
-    await recordUsage(userId, resource.providerId, modelUsed, usage, requestId, creditsUsed, "success");
-
-    return {
-      ok: true,
-      result,
-      // The user is told the admin's resource LABEL, never the provider or
-      // model behind it. That is what makes Premium provider-agnostic: an
-      // admin re-pointing "Advanced writing" from one provider to another
-      // changes nothing the subscriber sees.
-      aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed },
-    };
-  }
-
-  return { ok: false, status: 502, error: lastError };
-}
-
-interface UsageLedgerRow extends Record<string, unknown> {
-  user_id: string;
-  provider_id: string;
-  model_id: string;
-  tier: "premium";
-  task_type: string;
-  input_tokens: number | null;
-  output_tokens: number | null;
-  scholar_credits_charged: number;
-  request_id: string;
-  status: UsageStatus;
-}
-
-/** Subset of ai_usage_ledger.status (schema_ai_engine.sql) this route writes. */
-type UsageStatus = "success" | "quota_exhausted";
-
-async function recordUsage(
-  userId: string,
-  providerId: string,
-  modelId: string,
-  usage: { inputTokensEstimate: number; outputTokensEstimate: number } | undefined,
-  requestId: string,
-  creditsCharged: number,
-  status: UsageStatus
-): Promise<void> {
-  const config = getSupabaseRestConfig();
-  if (!config) return;
-  const ledger = new SupabaseTable<UsageLedgerRow>(config, "ai_usage_ledger");
-  await ledger.insert({
-    user_id: userId,
-    provider_id: providerId,
-    model_id: modelId,
-    tier: "premium",
-    task_type: "refinement",
-    input_tokens: usage?.inputTokensEstimate ?? null,
-    output_tokens: usage?.outputTokensEstimate ?? null,
-    scholar_credits_charged: creditsCharged,
-    request_id: requestId,
-    status,
+): Promise<PremiumOutcome<Awaited<ReturnType<typeof refine>>>> {
+  return runPremium({
+    userId,
+    estimatedCredits: estimateMaxCreditsForInput(refineInput.text),
+    taskType: "refinement",
+    describe: (label) => `studio refine: ${label}`,
+    call: (target) => refine({ ...refineInput, ...target }),
+    usageOf: (result) => result.usage,
   });
 }
 
