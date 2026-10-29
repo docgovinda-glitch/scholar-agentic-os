@@ -14,24 +14,27 @@
 3. No compromise indicators found in T5 (see below). No F1 containment beyond the reversible `is_username_approved` revoke.
 4. Full encrypted `pg_dump` backups are impossible from the agent sandbox (HTTPS-only egress, no raw TCP to Postgres). Prod changes on 2026-10-29 were preceded by policy/grant/RLS snapshots only (`~/backups/*-20261029T104243Z.json`, agent machine). Supabase Pro daily backups are the restore path.
 
-## 0. Task checklist (status as of 2026-10-29 11:45Z)
+## 0. Task checklist (status as of 2026-10-29 15:30Z)
 
 | Task | Status | Evidence |
 | :--- | :--- | :--- |
 | T0 Bootstrap | DONE | this file; `~/.scholar-agent.env` (chmod 600, outside repo) |
-| T1 Post-#80 verification | PARTIAL | `POST_DEPLOY_80.md`; live checks below; `scripts/smoke-prod.sh` NOT YET written (TEST_A/TEST_B accounts not created) |
-| T2 Doc corrections | DONE (PR #82) | `USER_NOTICE.md`, `COMPROMISE_CHECKS.md`, `PROD_CHECKS.md` |
-| T3 Local Supabase proof | DONE | local Supabase 17 run; `scripts/verify-local-supabase.sh`; findings posted on #82 |
-| T4 Auth rate limits | PARTIAL | server per-IP cap 5/5 min (`server/routes/auth.ts`, #82); Auth limit raise → OWNER ATTENTION 2 |
-| T5 Prod read-only checks | DONE | section "T5 results" below |
-| T6 Hotfix 2 SQL | DONE | applied 10:44Z; `anon` RPC → denied; 3 tables RLS on |
-| T7 Edge Function | DONE | `request-profile-update` v11 returns `PROFILE_UPDATE_DISABLED`, no `verificationKey` |
-| T8 Purge | DONE (order deviation) | purge applied 10:44Z (1 cloud row, 0 api_credentials); notice table applied 11:10Z via `20261029010000` — the one affected user got no notice row |
-| T9 Migration reconciliation | TODO | |
-| T10 Production readiness | TODO | |
-| T11 AUDIT findings | PARTIAL | F-01 accepted; F-02/03/04/11/13/14 closed today; presentation ownership + memory cap closed in #81 |
-| B1–B5, B7, B8 | TODO | |
-| B6 Presentation | DONE except E2E (B2) and One Brain (B3) | PR #81, Slide Visual Parity CI |
+| T1 Post-#80 verification | DONE | `scripts/smoke-prod.sh` (#85): production 35/35 after #85 |
+| T2 Doc corrections | DONE (#82) | |
+| T3 Local Supabase proof | DONE | `scripts/db/replay-migrations.sh` rebuilds a fresh DB from the repo (#91, used by CI) |
+| T4 Auth rate limits | PARTIAL | server cap 5/5 min (#82); limiter isolation bug fixed (#90); GoTrue limit raise → OWNER ATTENTION 2 |
+| T5 Prod read-only checks | DONE (#84) | no compromise indicators; legacy `is_username_approved` revoked |
+| T6 Hotfix 2 | DONE | |
+| T7 Edge Function | DONE | v11 |
+| T8 Purge | DONE (order deviation) | |
+| T9 Migration reconciliation | PARTIAL | fresh-DB replay works with 2 documented workarounds (`authentic_id`, premium_requests order); schema diff vs production not possible from sandbox (no raw TCP for `pg_dump`) |
+| T10 Production readiness | PARTIAL | PR CI + audit gate, deploy waits for live commit + deep health + smoke, uptime workflow, Render health check path (#86); branch protection, error tracking, rollback drill → owner/next |
+| T11 AUDIT findings | PARTIAL | see section 3 |
+| B1 Product audit | FIRST PASS | `PRODUCT_AUDIT.md` |
+| P0 fabricated content | DONE | #87, #88, #89 (Coursework + Journal: no invented sources, audits, originality, drafts, journals, gaps) |
+| B2 E2E harness | DONE (first cut) | #91: Playwright, local Supabase in CI, 11 specs + smoke on every PR |
+| B3–B5, B7, B8 | TODO | |
+| B6 Presentation | DONE except One Brain (B3); decks persist (#85) | |
 | T12 Handover | TODO | |
 
 ## 1. Deploy & production change ledger
@@ -45,6 +48,11 @@
 | 11:00 | PR #82 merged `a8771bd`; 11:01 PR #83 merged `efa5187` → Render live `efa5187` 11:15 | live `ff330c3` | health 200; anon `/api/vault/cloud/connections` 401; login without CAPTCHA → 400 | redeploy `ff330c3` |
 | 11:10 | SQL `20261029000000_reapply_premium_request_integrity` | already strict | 3 policies, unchanged | n/a |
 | 11:10 | SQL `20261029010000_credential_reset_notices` | table absent | RLS on, 2 policies; `user_cloud_integrations` 0 client policies | drop table |
+
+| 11:55 | SQL `20261029020000_revoke_legacy_is_username_approved` (#84) | anon could execute | anon execute false | re-grant (in file header) |
+| 12:35 | SQL `20261029030000_presentation_decks` (#85) | table absent; deck saves 503 | smoke 35/35 | drop table while empty |
+| 12:40 | Render health check path set to `/api/health` | empty | API read-back | clear field |
+| 13:10 → 15:05 | Deploys #86 (`d998166`), #87 (`33bd6e3`), #88 (`fc7085a`), #89+#90 (`823d11d`) | | health `commit` matches; `?deep=1` database ok | redeploy previous |
 
 ## T5 results (2026-10-29, read-only, `default_transaction_read_only = on`, counts only)
 
