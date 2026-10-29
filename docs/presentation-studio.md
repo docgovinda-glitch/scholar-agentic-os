@@ -1,240 +1,76 @@
-# Scholar OS Presentation Studio Specification & Architecture
+# Presentation Studio (OT-22): Slides & Keynotes
 
-## 1. Overview & Architectural Principles
+Gamma-style card decks with a scientific monochrome look, inline editing, one-click layout and theme switching, a full-screen presenter, and native PowerPoint export that matches what is on screen.
 
-Scholar OS **Presentation Studio** is a web-native, academic-grade slide authoring and presentation delivery suite. It adheres strictly to the Apple/Airbnb design system and matches the UX of Scholar OS Coursework and Essay drafting environments, completely eliminating developer jargon, database leakage, orphaned elements, and UI bloat.
+## 1. Where it lives
 
-```
-01 Understand ──▶ 02 Design ──▶ 03 Edit Slides ──▶ 04 Present
-```
-
-### Core Design Pillars
-1. **Coursework & Essay UX Alignment**: Replaces confusing jargon (*"Scaffolding"*, *"Decomposition"*, *"5-Beat Narrative"*) with plain English (*"Understand"*, *"Topic"*, *"Key Points"*).
-2. **Subtle & Private Auto-Save**: Replaces developer database strings (`"Saved to PostgreSQL"`) with a quiet, non-intrusive status indicator (`● Saved` or `◌ Saving changes...`) with green/amber status dot and timestamp.
-3. **Collapsible Right-Side "Ask Scholar" Copilot**: Matches the Coursework `Advisor.tsx` layout architecture. Renders inside an anchored `<aside>` container with avatar, subtitle `"Slide & Outline Advisor"`, 4 quick action chips, scrollable chat thread, and firmly anchored bottom dock input pill (zero orphaned floating inputs).
-4. **Header Navigation Hygiene**: Completely purges the premature `Present Fullscreen` pill from Steps 01, 02, and 03. Presentation controls are relocated exclusively to Step 04 ("04 Present") where `"Start Presentation (F)"` triggers the native browser Fullscreen API and Live Slide Player.
-5. **Zero-Ghost Outlines & 1-to-1 Scope Binding**: Before a user enters a topic or uploads a brief, a clean dashed empty-state prompt appears. Once generated, the 5 points from the Green Scope Box map directly 1-to-1 into the 5 slide outline cards.
-6. **Zero "Key Analytical Synthesis" Anti-Pattern**: All generic placeholders and repetitive titles are eradicated across the codebase.
-7. **Apple-Grade 3-Tab Theme Studio**: Top segmented switcher (`[ Curated Styles (4) ]` | `[ Explore Library ]` | `[ 📸 Screenshot Cloner ]`) with 4 handcrafted aesthetic heroes, searchable theme library, and client-side screenshot palette extraction.
-8. **Presentation Style Writing Tone & Narrative Architecture**: `Presentation Style` dropdown actively controls writing tone, bullet constraints (`strict-6x6`, `conversational-brief`, `data-led`), and layout distribution.
-
----
-
-## 2. Layout & Workspace Architecture
-
-`src/desk/presentation/PresentationWorkspace.tsx` and `src/layouts/AppLayout.tsx` integrate Presentation Studio seamlessly into the Scholar Core navigation shell:
-
-```tsx
-<div className="flex h-screen w-full overflow-hidden bg-[#F7F5F0] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 font-sans">
-  {/* Left Sidebar Shell (Scholar Core Navigation Rail) */}
-  <ScholarSidebar
-    isCollapsed={sidebarCollapsed}
-    onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-    activeItem="presentation"
-  />
-
-  {/* Main Workspace Column */}
-  <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
-    {/* Global Header (Height: 56px / h-14) - Zero ✕ exit cross, Apple/Airbnb ← Workspace back button */}
-    <PresentationHeader
-      onNavigateBack={handleNavigateBack}
-      isSidebarCollapsed={sidebarCollapsed}
-      onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
-    />
-
-    {/* Scrollable Canvas Body */}
-    <main className="flex-1 overflow-y-auto px-6 py-8 min-h-0">
-      <div className="max-w-5xl mx-auto w-full">
-        {currentStep === 'understand' && <Step01Understand />}
-        {currentStep === 'design' && <Step02Design />}
-        {currentStep === 'studio' && <Step03EditSlides />}
-        {currentStep === 'delivery' && <Step04Present />}
-      </div>
-    </main>
-  </div>
-
-  {/* Right Collapsible Ask Scholar Drawer */}
-  {isAskScholarOpen && (
-    <aside className="w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] h-full shadow-lg z-20">
-      <AskScholarPresentationDrawer onClose={() => setIsAskScholarOpen(false)} />
-    </aside>
-  )}
-</div>
-```
-
----
-
-## 3. The 4-Step Guided Workflow
-
-### Step 01: Understand Your Presentation (`Step01Understand.tsx`)
-- **Intake Controls**:
-  - **Slide Count**: Configurable slide deck length (3–15 slides, default 5).
-  - **Presentation Style**: Controls writing tone and narrative mechanics:
-    - `Standard Narrative` (Scholarly, linear, thesis-driven; strict 6x6 bullet rule).
-    - `Problem & Solution (SCR)` (Direct, problem-focused, actionable; 2-column contrast friction).
-    - `Case Study Analysis` (Empirical, investigative; grounded in organizational evidence).
-    - `Executive Pitch` (Concise, high ROI emphasis, big metric callouts).
-  - **Audience Level**: `Academic Seminar`, `Executive Board`, `General Public`, `Student Workshop`.
-- **Zero-Ghost Empty State**:
-  - When no topic or brief is loaded, renders a clean dashed prompt box (`"Ready to outline your presentation. Enter a topic or upload your assignment brief above to generate your slides."`) with zero fake cards.
-- **Side-by-Side Scope Analysis Boxes**:
-  - **Green Box (`What This Presentation Covers`)**: 5 key analytical points with count pill (`5 Key Points · Editable`), editable items, and `+ Add Key Point`.
-  - **Yellow Box (`What to Avoid (Out of Scope)`)**: 4 guardrail rules (`4 Rules · Editable`), editable items, and `+ Add Rule`.
-- **1-to-1 Outline Binding & Badge Stacking Fix (`SlideOutlinePillCard.tsx`)**:
-  - Directly binds the 5 covered points into distinct, question-grounded slide cards:
-    - **Slide 1**: `SLIDE 1` | `Key Points` — *"Why Zappos Pays New Hires $2,000 to Quit"* (Analyzes how financial exit bonuses filter for genuine cultural alignment).
-    - **Slide 2**: `SLIDE 2` | `Framework` — *"Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions"* (Deconstructs workplace culture across symbols, declared philosophies, and unconscious beliefs).
-    - **Slide 3**: `SLIDE 3` | `2-Column Comparison` — *"The Limits of Artifacts: Why Changing Perks Fails to Shift Culture"* (Evaluates why cosmetic changes produce superficial compliance).
-    - **Slide 4**: `SLIDE 4` | `Key Points` — *"Leadership Intervention: Targeting Values and Habits to Shift Assumptions"* (Assesses which cultural tier leaders must engage first).
-    - **Slide 5**: `SLIDE 5` | `Key Points` — *"Assessing Organizational Culture in Candidate Job Interviews"* (Diagnostic framework for observing artifacts and probing unwritten rules).
-  - **Badge Wrapping Fix**: Uses `inline-flex items-center justify-center whitespace-nowrap shrink-0` on `SLIDE {N}`, preventing wrapping on cards like `SLIDE 3`.
-
-### Step 02: Choose Presentation Design (`Step02Design.tsx`)
-- **Apple-Style Top Segmented Switcher**:
-  - `[ Curated Styles (4) ]` | `[ Explore Library ]` | `[ 📸 Screenshot Cloner ]`.
-- **Tab 1: Curated Styles (4)**:
-  1. **Sand Academic**: Canvas `#F7F5F0`, Card `#FFFFFF`, Slate text `#0F172A`, Royal blue accent `#2563EB`.
-  2. **Minimal Clean**: Canvas `#F8FAFC`, Card `#FFFFFF`, Dark text `#1E293B`, Slate charcoal accent `#0F172A`.
-  3. **Editorial Warm**: Canvas `#FAF8F5`, Card `#FFFDF9`, Charcoal text `#292524`, Terracotta accent `#C2410C`.
-  4. **Deep Midnight**: Canvas `#171717`, Card `#1C1C1E`, Light text `#F8FAFC`, Sky blue accent `#60A5FA`.
-  - **Live Dynamic Cards**: Renders actual Slide 1 action title instead of static mock strings.
-  - **Docked Custom Accent Picker**: Custom color picker with live WCAG AA contrast calculation. Redundant inline `Day / Night` toggle pill purged; theme toggling belongs exclusively to the global Scholar Core sidebar switcher.
-
-- **Tab 2: Explore Library (`ThemeLibraryGrid.tsx`)**:
-  - **100 Curated Royalty-Free & Public Domain Slide Designs**:
-    - **Academic & Thesis Defense (20)**: Oxford Empirical Monograph, Cambridge Quadrangle, Harvard Law Casebook, MIT Linear Algebra, Sorbonne Scholastic, Max Planck Quantum, etc.
-    - **Executive & McKinsey/BCG Consulting (20)**: McKinsey Pyramid Principle, BCG Growth-Share Matrix, Bain Strategic Horizon, Deloitte Digital Transformation, etc.
-    - **Apple Keynote & High-Growth Tech (20)**: Apple Cupertino Minimal, Space Black Pro, Stripe Developer Velocity, Linear Modernist, Arc Browser Glass, Figma Neo-Canvas, etc.
-    - **Editorial & Publishing Longform (15)**: The New Yorker Monograph, The Economist Briefing, Financial Times Salmon, The Atlantic Longform, Monocle Tokyo Paper, etc.
-    - **Scientific & Data-Dense Infographics (15)**: BioRender Cellular Topology, Genomic Atlas Chromosome, NASA Jet Propulsion Blueprint, Climate Science Flux, etc.
-  - **Creative 2D Vector Sketches with Human Figures & Bespoke Frameworks (`SlideCreativeSketchIllustration.tsx`)**:
-    - **Zero Generic Wireframes**: Replaced repetitive generic wireframe placeholder boxes with 100% royalty-free, public domain vector SVG art that dynamically adapts to each theme's color palette.
-    - **Human Figures & Consulting Frameworks**:
-      - **McKinsey Pyramid Principle**: 2D consultant sketch in suit pointing with stylus to a 3-tier governing strategy pyramid with MECE supporting evidence.
-      - **BCG Growth-Share Matrix**: 2D business analyst sketch standing beside a 2x2 matrix with 🌟 Stars, ❓ Question Marks, 🐄 Cash Cows, and 🐕 Harvest/Dogs.
-      - **Bain Strategic Horizons**: 2D visionary sketch with telescope surveying Horizon 1 (Core), Horizon 2 (Emerging), and Horizon 3 (Disruptive) stair platforms.
-      - **Deloitte Digital Transformation**: 2D engineer sketch with tablet calibrating interlocking mechanical gears and cloud circuits with green dot signal.
-      - **Harvard Law Casebook**: 2D legal advocate sketch in gown holding gavel beside the classical scales of justice and law citation folio.
-      - **MIT Linear Algebra**: 2D researcher sketch at chalkboard with 3D coordinate frame, orthogonal planes, and matrix eigenvectors ($Av = \lambda v$).
-      - **NASA Jet Propulsion Blueprint**: 2D aerospace engineer sketch with telemetry headset observing an orbital satellite probe, solar panels, and planetary transfer ellipse.
-      - **TED Global Keynote**: 2D speaker sketch on the iconic circular red rug on stage, headset mic, dramatic dual spotlight cone beams from above, and curved amphitheater audience silhouettes.
-      - **YC Demo Day Pitch**: 2D tech founder sketch pitching exponential hockey-stick ARR chart on big screen with YC badge.
-      - **Academic & Thesis (Oxford, Cambridge, Sorbonne)**: 2D professor sketch at wooden lectern with spectacles, open folio, and Gaussian normal distribution curve on chalkboard.
-      - **Apple & Tech (Apple, Stripe, Linear, Figma, Arc)**: 2D developer sketch seated at dual-monitor workstation with headphones and sleek bento code window.
-      - **BioRender & Scientific (Cellular & Genomic)**: 2D eukaryotic cell topology cross-section with membrane receptors, nucleus, mitochondria, DNA double-helix, and lab scientist with pipette.
-      - **Editorial & Publishing (New Yorker, FT, Monocle)**: 2D New Yorker-style pen-and-ink café reader sketch with open broadsheet newspaper, coffee cup, and vintage masthead.
-  - **Canva & Gamma Style 5-Slide Progression (`MultiSlideDeckPreview.tsx`)**:
-    - Every theme card in the Library and Curated Styles now features interactive multi-slide preview controls (`[ 1 ] [ 2 ] [ 3 ] [ 4 ] [ 5 ]` and `< >` arrows) showing the full 5-slide presentation arc:
-      1. **Slide 1 (Cover)**: High-impact hero title, presenter attribution, subtitle, category badge, and motif watermark.
-      2. **Slide 2 (Executive Synthesis)**: 2-column comparative contrast (Legacy Inertia vs Target Value).
-      3. **Slide 3 (Signature Framework)**: Authentic bespoke 2D vector sketch & consulting framework diagram (`SlideCreativeSketchIllustration.tsx`).
-      4. **Slide 4 (Quantitative Metrics)**: 3-pillar KPI metrics with bold stats (`+84.2%`, `3.8x`, `<12ms`) and context markers.
-      5. **Slide 5 (Strategic Roadmap)**: Phased execution governance milestones and closing takeaway.
-    - **Expanded 5-Slide Modal (`DeckPreviewModal.tsx`)**: Click the expand icon on any theme to view all 5 slides laid out simultaneously in a high-resolution presentation strip.
-  - **Instant Filtering & WCAG AA Verification**: Category pills (`All (100+)`, `Academic`, `Minimal`, `Executive`, `Editorial`, `Vibrant`, `Apple & Tech`, `Scientific`, `Conference`), Day/Night mode filter, and instant search across titles, motifs, and archetypes.
-
-- **Tab 3: Bring Your Own Theme (`CustomThemeStudio.tsx`)**:
-  - **Custom Design System Builder**: Define bespoke 60/30/10 color architecture (canvas background, card surface, brand accent, primary/secondary text).
-  - **Typography & Motif Pairing**: Switch between Inter Sans, Newsreader Serif, and JetBrains Mono with customizable visual watermark motifs.
-  - **Real-Time WCAG AA Contrast**: Live contrast score calculations for accent and text against card backgrounds with instant Pass/Fail indicators.
-  - **JSON Export & Import Portability**: One-click JSON export to share custom brand themes with teammates or clients, and JSON import modal to load external theme configurations.
-  - **Local Storage Persistence**: Save custom themes to the local library so they persist across sessions and appear seamlessly in the theme selector.
-  - **Live Multi-Slide Preview**: Real-time 5-slide preview dynamically updating as users tweak colors, fonts, and layout options.
-
-- **Tab 4: Screenshot Cloner (`ThemeScreenshotCloner.tsx`)**:
-  - Drag-and-drop dropzone for slide screenshots, posters, and brand imagery.
-  - Client-side HTML5 canvas color extraction (background luminance, card surface, structural typography, accent signal).
-  - Real-time swatch inspection and instant live preview with `"Apply Cloned Theme"`.
-
-### Step 03: Edit Slides (`Step03StudioCanvas.tsx`)
-- **100% WYSIWYG Editable Card Canvas**:
-  - Click-to-edit Action Headlines (max 8–10 words).
-  - Click-to-edit Category Badges.
-  - 6x6 Bullet Constraint: Inline items with live word-count warning badges (`⚠️ >6 words`).
-  - Big Metric Focus: Editable metric stat (48–72pt) and empirical context note.
-  - 2-Column Comparison: Side-by-side editable headers and bullet arrays.
-  - Split Image + Text (`image-split`): 50% image dropzone/uploader + 50% action title and bullets.
-- **In-Slide AI Prompt Copilot**:
-  - One-click quick actions (*"Add an image to this slide"*, *"Change to 2 columns"*, *"Focus on big metric"*, *"Shorten bullets"*).
-- **Speaker Rehearsal Notes Drawer**:
-  - Expandable bottom drawer for word-for-word delivery cues and timing reminders.
-
-### Step 04: Present & Deliver (`Step04Delivery.tsx`)
-- **Fullscreen Live Player Mode**:
-  - `"Start Presentation (F)"` button triggers browser Fullscreen API and mounts `LiveSlidePlayer.tsx`.
-  - Global presentation controls exclusively mounted in Step 04 header and canvas.
-- **Rehearsal Timer**:
-  - Integrated elapsed timer in `MM:SS` with pause and reset controls.
-- **Dual Presentation Views**:
-  - **Stage View**: Clean visual presentation designed for audience projection.
-  - **Leave-Behind View**: Exposes methodology notes, research provenance, and citations.
-- **Export Formats**:
-  - Native JSON slide deck export.
-  - Marp-compatible Markdown export.
-
----
-
-## 4. Ask Scholar Presentation Drawer (`AskScholarPresentationDrawer.tsx`)
-
-A dedicated slide copilot drawer matching Coursework `Advisor.tsx`:
-- **Header**:
-  - Avatar with ScholarCoreLogo.
-  - Title: **"Ask Scholar"**.
-  - Subtitle: `"Slide & Outline Advisor"`.
-  - Close button: `✕`.
-- **4 Quick Action Chips**:
-  - `"Improve action headlines"`: Rewrites passive slide titles into conclusive, punchy claims.
-  - `"Audit 6x6 bullet rules"`: Audits all slides against the 6-bullet / 6-words-per-bullet rule with violation reports.
-  - `"Check visual pacing"`: Assesses balance between bullet lists and visual/metric callouts across deck length.
-  - `"Suggest image ideas"`: Suggests relevant visual concepts and diagrams for the active slide.
-- **Scrollable Chat Thread**:
-  - Instant scholarly advice and recommendation cards.
-- **Firmly Anchored Bottom Input Dock**:
-  - Docked input pill with submit icon firmly anchored to drawer bottom (`shrink-0`). Never detaches or floats across header.
-
----
-
-## 5. Keyboard Shortcuts Reference
-
-| Key Combination | Action | Scope |
+| Route | Mounted by | Notes |
 | :--- | :--- | :--- |
-| `ArrowRight` / `Space` / `PageDown` | Advance to next slide | Disabled when editing text |
-| `ArrowLeft` / `PageUp` | Return to previous slide | Disabled when editing text |
-| `Home` | Jump to first slide | Disabled when editing text |
-| `End` | Jump to last slide | Disabled when editing text |
-| `KeyF` / `f` | Toggle Fullscreen Mode | Global / Step 04 |
-| `p` / `P` | Toggle Presenter Notes View | Live Slide Player |
-| `Escape` | Exit Fullscreen / Close Player | Global |
+| `/presentation` | `src/desk/DeskApp.tsx` | Works signed-out (demo project); use it to check changes in a browser. |
+| OT-22 projects | `DeskApp.tsx` (`outputTypeId === "OT-22"`) | Same workspace, with project hydration and autosave. |
 
----
+`src/desk/presentation/PresentationWorkspace.tsx` owns deck state, autosave (`PUT /api/projects/:id/presentation/deck` and `/api/presentations/:id`), the single studio header and the full-screen player. It renders four steps from `src/features/slides/components/`:
 
-## 6. Verification & Automated Quality Gates
+| Step | Component | What the user does |
+| :--- | :--- | :--- |
+| 01 Understand | `Step01Understand.tsx` | Enter a topic or upload a document (`.md`, `.txt`, `.pdf`, `.docx`, `.pptx`, image); generate an outline shown as card thumbnails. |
+| 02 Design | `Step02Design.tsx` | Pick one of 8 curated themes (each previewed with the user's own slides), browse the library, bring a theme, clone from a screenshot, or set an accent colour (WCAG AA checked). |
+| 03 Edit Slides | `Step03StudioCanvas.tsx` (alias `Step03EditSlides`) | Thumbnail rail, inline editing on the card, layout switcher, theme menu, add/remove points, image upload, speaker notes, AI rewrite, **Export .pptx**. |
+| 04 Present | `Step04Delivery.tsx` (alias `Step04Present`) | Stage and leave-behind views, export menu (PowerPoint, PDF, Markdown, JSON), start the presenter. |
 
-The Presentation Studio is protected by automated regression suites:
-- **`scripts/verify-scholar-presentation-mega.mjs`**: Validates 8 core architectural gates:
-  1. Zero `"Key Analytical Synthesis"` occurrences across repository.
-  2. Ask Scholar drawer layout, subtitle, ✕ close button, and firmly anchored bottom dock.
-  3. Header cleanup: zero premature fullscreen pills in Steps 01–03; exclusive Step 04 mounting.
-  4. Step 02 Theme Studio visibility and 3-tab segmented control.
-  5. Step 01 Scope 1-to-1 outline binding and `SLIDE {N}` `whitespace-nowrap` badge fix.
-  6. Presentation Style writing tone and narrative scaffolding binding.
-  7. Vitest test suite (23 test files, 117 tests passing).
-  8. TypeScript (`tsc --noEmit`) and ESLint with 0 errors and 0 warnings.
+## 2. The card engine (`src/features/slides/gamma/`)
 
----
+Every surface (editor, thumbnails, theme gallery, presenter, PDF print and `.pptx`) draws slides through this one engine, so they always match.
 
-## 7. 100 Best Royalty-Free Slide Designs Library
+| File | Responsibility |
+| :--- | :--- |
+| `content.ts` | Layout-independent `CardContent` (eyebrow, headline, lede, items, stats, columns, quote, image, takeaway). `getCardContent` derives it from legacy `blocks`; `writeCardContent` stores it and regenerates `blocks` with a fingerprint, so edits made by the copilot or Ask Scholar through `blocks` are detected and win. `reflowContent` coerces content into any layout without inventing numbers. |
+| `geometry.ts` | Computes each layout as positioned text, rectangles, ellipses, lines and images on a fixed **1280×720** canvas, with deterministic font fitting. |
+| `measure.ts` | Real text measurement via canvas (Plus Jakarta Sans / Georgia on the web, Arial / Georgia for PowerPoint), with a calibrated fallback under jsdom/Node. |
+| `GammaCard.tsx` | Web renderer: scales the 1280×720 stage to its container; optional inline editing (`contentEditable`, plain-text paste, Enter to commit, Esc to cancel). |
+| `pptxExport.ts` | Draws the same geometry with pptxgenjs (lazy-loaded chunk) at 96 px/in on the 13.333×7.5 in wide layout. Text stays editable; speaker notes and images are included. |
+| `GammaPlayer.tsx` | Full-screen presenter: keyboard navigation, audience/presenter mode (N), notes, next card, timer, progress bar. |
+| `theme.ts` | Curated deck themes as hex tokens (`bg`, `surface`, `surfaceAlt`, `text`, `muted`, `accent`, `onAccent`, `border`, fonts) plus an adapter for legacy library, cloned and custom themes. Pure `#000000` is never used. |
+| `composer.ts` | Offline deck builder (see §4). |
+| `StudioControls.tsx` | Layout glyphs, theme menu, export button. |
 
-### Taxonomy & Curated Disciplines
-1. **Academic & Thesis Defense (20 templates)**: Oxford Empirical Monograph, Cambridge Quadrangle, Harvard Law Casebook, MIT Linear Algebra, Sorbonne Scholastic, Max Planck Quantum...
-2. **Executive & McKinsey/BCG Consulting (20 templates)**: McKinsey Pyramid Principle, BCG Growth-Share Matrix, Bain Strategic Horizon, Deloitte Digital Transformation...
-3. **Apple Keynote & High-Growth Tech (20 templates)**: Apple Cupertino Minimal, Space Black Pro, Stripe Developer Velocity, Linear Modernist, Arc Browser Glass, Figma Neo-Canvas...
-4. **Editorial & Publishing Longform (15 templates)**: The New Yorker Monograph, The Economist Briefing, Financial Times Salmon, The Atlantic Longform, Monocle Tokyo Paper...
-5. **Scientific & Data-Dense Infographics (15 templates)**: BioRender Cellular Topology, Genomic Atlas Chromosome, NASA Jet Propulsion Blueprint, Climate Science Flux...
-6. **Conference Showcase & TED Keynotes (10 templates)**: TED Global Horizon, Y Combinator Demo Day Pitch, Davos World Economic Forum, SXSW Interactive Signal...
+**Layouts:** `title`, `bento`, `stats` (big numbers), `timeline`, `comparison`, `list` (key points), `split` (image + text), `quote`, `statement`. Old layout ids (`metric-focus`, `two-column`, `cover`, …) map onto these automatically.
 
-### Design Polish & Safeguards
-- **Vibrant Category Purged**: Neon cyber themes (`cyber-cyan`, `monokai-terminal`, `neo-tokyo`, `sunset-velvet`, `solar-amber`, `midnight-onyx`, `obsidian-aurora`, `aqua-charity`) completely removed.
-- **Warm Clay Works Preserved**: "Warm Clay Works (Rose Quartz)" retained and reassigned to the Editorial category.
-- **Immediate Discovery**: Step 02 Tab 1 features a prominent quick-jump banner directing users to the 100-template library, and Tab 2 provides full category filtering, real-time search, and instant accent customization.
+**Themes:** Paper (`#F8F7F4`, default), Ink (`#171717`), Sand Academic, Minimal Clean, Editorial Warm, Deep Midnight, Forest Lab, Graphite Amber. Tests enforce text ≥ 7:1, muted text ≥ 4.5:1 and on-accent text ≥ 4.5:1 contrast.
 
+To change how a layout looks, edit `geometry.ts`; the web view and the export follow automatically.
+
+## 3. Images
+
+Images are uploaded from the user's device, downscaled in the browser (max 1600 px) and stored in the deck as data URLs. This keeps them within the production CSP (`img-src 'self' data:`) and lets the exporter embed them directly. Images referenced by external URL are not supported.
+
+## 4. Generation and the no-invented-evidence rule
+
+Decks never contain figures, quotations or citations that are not in the user's material.
+
+- **AI path** (signed in, provider configured): `POST /api/projects/:id/presentation/generate-deck` in `server/routes/project/presentation.ts`. It uses the requested topic, uploaded text, slide count and audience, asks the model for structured cards, and validates them with zod in `server/routes/project/presentationCards.ts`. Any stat whose number is not found in the source material is dropped; a stats card left empty becomes a key-points card.
+- **Server fallback** (no provider): builds cards only from the project's own research questions, methodology, findings and Knowledge Vault sources; empty fields become clear prompts for the author.
+- **Offline composer** (`composer.ts`, used when the server is unavailable):
+  - From text: one card per section. Numbers in the text become stat cards (keeping the original sentence and citation as detail), ordered steps become timelines, contrasts become comparisons, parallel points become bento grids or lists, and the prose is kept as speaker notes.
+  - From a bare topic: a structured starter deck whose placeholder text is an instruction to the author, never a claim.
+- The copilot's "big metric" action only promotes a number already on the slide; otherwise it switches to numbered cards.
+
+## 5. Keyboard shortcuts
+
+| Where | Keys |
+| :--- | :--- |
+| Edit Slides | ↑ / ↓ or PageUp / PageDown: previous / next card (when not typing). Enter: commit inline edit; Shift+Enter: new line; Esc: cancel edit. |
+| Present (step 4) | ← / →: previous / next; F: start presenting. |
+| Presenter | → / Space / Enter / PageDown: next. ← / Backspace / PageUp: previous. Home / End. N: presenter notes. F: full screen. Esc: exit. |
+
+## 6. Tests
+
+- `src/features/slides/gamma/__tests__/gammaEngine.test.ts`: content model, reflow without invented figures, theme contrast, geometry stays on canvas for every layout and theme, composer output, `.pptx` structure (slides, notes, colours).
+- `server/routes/__tests__/presentationCards.test.ts`: zod validation and figure grounding.
+- `src/desk/presentation/__tests__/PresentationWorkspace.test.tsx` and `src/features/slides/components/__tests__/*`: workspace flow, steps, theme studio.
+
+## 7. Known limitations
+
+- Exported decks use Arial and Georgia so they render the same on Windows and macOS; text is slightly narrower in PowerPoint than in the app's web font.
+- The audience Q&A simulator's offline fallback (`generateFallbackQAScenarios`) still contains example figures and has not yet been reworked.
+- Coursework (`CourseworkWorkspace.tsx`) still previews slides with the older `SlideCanvas` component.

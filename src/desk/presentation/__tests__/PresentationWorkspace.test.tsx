@@ -78,7 +78,7 @@ describe("PresentationWorkspace", () => {
     expect(screen.getAllByText(/Why Zappos Pays New Hires to Quit/i).length).toBeGreaterThan(0);
   });
 
-  it("Step 02: displays exactly 4 curated theme cards and custom accent picker with zero cloner or 20+ filter chips", () => {
+  it("Step 02: displays the curated theme gallery (including the 4 classic presets) and accent picker without legacy bloat", () => {
     render(<PresentationWorkspace projectId="proj-pres-1" />);
 
     // Go to design themes
@@ -100,28 +100,32 @@ describe("PresentationWorkspace", () => {
     expect(screen.queryByText(/Freestyle \(Random\)/i)).not.toBeInTheDocument();
   });
 
-  it("Step 03: supports WYSIWYG text editing, 6x6 bullet alerts, layout switching, and Split Image + Text layout", () => {
+  it("Step 03: edits cards inline and reflows the same content across Gamma layouts", () => {
     render(<PresentationWorkspace projectId="proj-pres-1" initialStep="studio" />);
 
-    // Defaults to studio
     expect(screen.getByTestId("step-03-studio-canvas")).toBeInTheDocument();
-    expect(screen.getByTestId("wysiwyg-slide-card")).toBeInTheDocument();
+    const card = () => screen.getByTestId("wysiwyg-slide-card");
+    expect(card()).toHaveAttribute("data-layout", "title");
 
-    // Switch layout to Big Metric Focus
-    const metricLayoutBtn = screen.getByRole("button", { name: /Big Metric Focus/i });
-    fireEvent.click(metricLayoutBtn);
-    expect(screen.getByDisplayValue("4.2x")).toBeInTheDocument();
+    // Layout switching keeps the content and changes the composition.
+    fireEvent.click(screen.getByRole("radio", { name: "Big numbers" }));
+    expect(card()).toHaveAttribute("data-layout", "stats");
 
-    // Switch layout to Split Image + Text
-    const splitLayoutBtn = screen.getByRole("button", { name: /Split Image \+ Text/i });
-    fireEvent.click(splitLayoutBtn);
-    expect(screen.getByTestId("split-image-text-container")).toBeInTheDocument();
-    expect(screen.getByText(/Key Points/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "Image + text" }));
+    expect(card()).toHaveAttribute("data-layout", "split");
 
-    // Switch layout to 2-Column Comparison
-    const colLayoutBtn = screen.getByRole("button", { name: /2-Column Comparison/i });
-    fireEvent.click(colLayoutBtn);
-    expect(screen.getByDisplayValue(/Baseline Framework|Baseline Heuristic Model/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "Comparison" }));
+    expect(card()).toHaveAttribute("data-layout", "comparison");
+    expect(card()).toHaveTextContent("vs");
+
+    // Inline editing writes straight into the card.
+    const headline = card().querySelector('[data-path="headline"]') as HTMLElement;
+    headline.textContent = "Remote work redraws the housing map";
+    fireEvent.blur(headline);
+    expect(card()).toHaveTextContent("Remote work redraws the housing map");
+
+    // The old fabricated benchmark figures are gone.
+    expect(screen.queryByText("4.2x")).not.toBeInTheDocument();
   });
 
   it("Step 04: toggles between Stage View and Leave-Behind View with methodology provenance", () => {
@@ -147,11 +151,10 @@ describe("PresentationWorkspace", () => {
 
     render(<PresentationWorkspace projectId="proj-pres-deb" initialStep="studio" />);
 
-    // In Studio canvas, edit headline
-    const headlineTextarea = screen.getByPlaceholderText(/Action Headline asserting singular conclusion/i);
-    fireEvent.change(headlineTextarea, {
-      target: { value: "Empirical Proof: 99.8% Grounding Precision Achieved" },
-    });
+    // In the studio canvas, edit the headline inline
+    const headline = screen.getByTestId("wysiwyg-slide-card").querySelector('[data-path="headline"]') as HTMLElement;
+    headline.textContent = "Grounded synthesis in practice";
+    fireEvent.blur(headline);
 
     expect(screen.getByText(/Saving changes\.\.\./i)).toBeInTheDocument();
     expect(screen.queryByText(/PostgreSQL/i)).not.toBeInTheDocument();
@@ -224,8 +227,8 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
 
     // Check action headline
     expect(screen.getAllByText(/Generative AI tools without cryptographic provenance fail 84%/i).length).toBeGreaterThan(0);
-    // Check metric
-    expect(screen.getByDisplayValue("84%")).toBeInTheDocument();
+    // The figure comes from the text itself and becomes a stat card
+    expect(screen.getAllByText("84%").length).toBeGreaterThan(0);
   });
 
   it("renders clean empty state with zero ghost metrics or phantom references when empty coursework text is provided", () => {
@@ -259,7 +262,7 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
 
     expect(screen.queryByTestId("slide-card-empty-state")).not.toBeInTheDocument();
     expect(screen.getByTestId("step-03-studio-canvas")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("99.8%")).toBeInTheDocument();
+    expect(screen.getAllByText("99.8%").length).toBeGreaterThan(0);
   });
 
   it("mounts collapsible right-side 'Ask Scholar' drawer and toggles smoothly via header button", async () => {

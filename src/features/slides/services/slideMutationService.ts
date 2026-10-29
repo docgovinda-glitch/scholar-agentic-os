@@ -143,11 +143,11 @@ export function highlightAsBigMetric(
 
   // Look for existing metric in blocks or generate intelligent default
   const existingMetricIdx = blocks.findIndex((b) => b.type === 'metric-callout');
-  let chosenMetric = metricValue || '+84.2%';
-  let chosenLabel = metricLabel || 'Verified Performance Lift';
-  let chosenContext = 'Double-blind cohort benchmark (p < 0.001)';
+  // Never invent figures: use the caller's metric or a number already in the text.
+  let chosenMetric = metricValue || '';
+  let chosenLabel = metricLabel || 'Key figure';
+  const chosenContext: string | undefined = undefined;
 
-  // Try extracting a percentage or number from existing bullets or headline
   if (!metricValue) {
     const textCorpus = [
       slide.actionHeadline,
@@ -159,8 +159,13 @@ export function highlightAsBigMetric(
     const numMatch = textCorpus.match(/(\+?-?\d+(?:\.\d+)?%|\$?\d+(?:,\d{3})*(?:\.\d+)?[xXkKmMbB]?)/);
     if (numMatch) {
       chosenMetric = numMatch[1];
-      chosenLabel = 'Primary Quantitative Proof';
+      chosenLabel = metricLabel || 'Key figure';
     }
+  }
+
+  if (!chosenMetric) {
+    // No figure in the slide: show its points as big numbered cards instead.
+    return { ...slide, layoutType: 'stats' };
   }
 
   const metricBlock: MetricCalloutBlock = {

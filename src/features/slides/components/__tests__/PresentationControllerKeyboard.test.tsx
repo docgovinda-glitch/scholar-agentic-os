@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import KeynoteController from '../KeynoteController';
+import KeynoteController from '../PresentationController';
 import type { SlideCard } from '../../types/slides';
 
 describe('KeynoteController', () => {

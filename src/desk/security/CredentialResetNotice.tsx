@@ -7,7 +7,7 @@ export const CREDENTIAL_PURGE_NOTICE_MESSAGE =
 /**
  * Displays an in-app security notice ONLY to users whose legacy plaintext rows
  * in `public.api_credentials` or `public.user_cloud_integrations` were removed
- * by `20261028010000_purge_plaintext_credentials.sql` (`F-11`).
+ * by `20261029010000_credential_reset_notices.sql` (`F-11`).
  */
 export default function CredentialResetNotice({ className = "" }: { className?: string }) {
   const [visible, setVisible] = useState(false);
@@ -39,7 +39,7 @@ export default function CredentialResetNotice({ className = "" }: { className?: 
         setUserId(uid);
         setVisible(true);
       } catch {
-        // Table may not exist before migration 20261028010000 runs; fail closed silently.
+        // Table may not exist before migration 20261029010000 runs; fail closed silently.
       }
     }
     void checkNotice();

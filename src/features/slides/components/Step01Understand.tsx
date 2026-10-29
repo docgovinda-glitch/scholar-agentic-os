@@ -18,9 +18,17 @@ import {
   decomposeToSwissEditorial,
   PRESENTATION_STYLE_PROFILES,
 } from '../services/slideGenerator';
-import { generateNaturalSlideTitle } from '../services/slideTitleGenerator';
 import { classifyPresentationScope } from '../services/presentationScopeClassifier';
-import SlideOutlinePillCard from './SlideOutlinePillCard';
+import { composeDeckFromText, composeDeckFromTopic, legacyDeckToGamma } from '../gamma/composer';
+import { DEFAULT_DECK_THEME_ID, resolveDeckTheme } from '../gamma/theme';
+import { GammaSlide } from '../gamma/GammaCard';
+import { normalizeDeck } from '../gamma/content';
+
+const AUDIENCE_LABELS: Record<'general' | 'executive' | 'academic', string> = {
+  general: 'General audience',
+  executive: 'Executive briefing',
+  academic: 'Academic seminar',
+};
 import { authedJsonFetch } from '../../../../src/desk/api';
 
 export interface Step01UnderstandProps {
@@ -60,6 +68,7 @@ export default function Step01Understand({
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const outlineTheme = resolveDeckTheme(deck.themeId || DEFAULT_DECK_THEME_ID, deck.customTheme);
 
   // Green ("What This Covers") & Yellow/Orange ("What to Avoid") Scope State
   const [scope, setScope] = useState<PresentationScopeBoundaries>(() => {
@@ -135,101 +144,38 @@ export default function Step01Understand({
       const nextScope = classifyPresentationScope(textToUse || '', topicToUse || '');
       setScope(nextScope);
 
+      const lowerTopic = (topicToUse || '').toLowerCase();
       const isSwiss =
-        topicToUse.toLowerCase().includes('bird') ||
-        topicToUse.toLowerCase().includes('plover') ||
-        topicToUse.toLowerCase().includes('swiss') ||
-        topicToUse.toLowerCase().includes('editorial') ||
-        deck.themeId === 'swiss-editorial';
+        ['bird', 'plover', 'swiss', 'editorial'].some((k) => lowerTopic.includes(k)) || deck.themeId === 'swiss-editorial';
+      // Curated course case study with real, hand-written content.
+      const isCuratedCase = ['zappos', 'schein', 'mn6094ni'].some((k) => lowerTopic.includes(k));
+      const audienceLabel = AUDIENCE_LABELS[audienceLevel];
+      const composeOpts = {
+        topic: topicToUse,
+        slideCount: Number(slideCount),
+        framework: selectedFramework,
+        audience: audienceLabel,
+        deckId: deck.id,
+      };
 
-      const generatedDeck = isSwiss
-        ? decomposeToSwissEditorial({
-            topic: topicToUse,
-            text: textToUse,
-            framework: selectedFramework,
-            slideCount: Number(slideCount),
-            presentationStyle: selectedFramework,
-            audienceLevel: audienceLevel,
-          })
-        : generateSlideDeck({
-            topic: topicToUse,
-            text: textToUse,
-            framework: selectedFramework,
-            slideCount: Number(slideCount),
-            presentationStyle: selectedFramework,
-            audienceLevel: audienceLevel,
-          });
-
-      // Ensure slides have natural human headlines and are bound 1-to-1 to scope coveredPoints
-      const isZappos =
-        topicToUse.toLowerCase().includes('zappos') ||
-        topicToUse.toLowerCase().includes('schein') ||
-        topicToUse.toLowerCase().includes('culture') ||
-        topicToUse.toLowerCase().includes('leadership') ||
-        topicToUse.toLowerCase().includes('mn6094ni');
-
-      const zapposCards = [
-        {
-          actionHeadline: 'Why Zappos Pays New Hires $2,000 to Quit',
-          summary: 'Analyzes how financial exit bonuses filter for genuine cultural alignment over short-term monetary compensation.',
-          layoutType: 'bullets',
-          frameworkPhase: 'Key Points',
-        },
-        {
-          actionHeadline: "Schein's 3 Levels: Artifacts, Espoused Values & Basic Assumptions",
-          summary: 'Deconstructs workplace culture across tangible physical symbols, declared philosophies, and unconscious beliefs.',
-          layoutType: 'framework',
-          frameworkPhase: 'Framework',
-        },
-        {
-          actionHeadline: 'The Limits of Artifacts: Why Changing Perks Fails to Shift Culture',
-          summary: 'Evaluates why cosmetic changes like open offices and dress codes produce superficial compliance rather than core behavioral shifts.',
-          layoutType: 'two-column',
-          frameworkPhase: '2-Column Comparison',
-        },
-        {
-          actionHeadline: 'Leadership Intervention: Targeting Values and Habits to Shift Assumptions',
-          summary: 'Assesses which cultural tier leaders must engage first to facilitate authentic, enduring organizational change.',
-          layoutType: 'bullets',
-          frameworkPhase: 'Key Points',
-        },
-        {
-          actionHeadline: 'Assessing Organizational Culture in Candidate Job Interviews',
-          summary: 'Provides a diagnostic framework for candidates to observe workplace artifacts and probe beneath scripted corporate rhetoric.',
-          layoutType: 'bullets',
-          frameworkPhase: 'Key Points',
-        },
-      ];
-
-      const humanizedSlides = generatedDeck.slides.map((s, idx) => {
-        if (isZappos && zapposCards[idx]) {
-          return {
-            ...s,
-            actionHeadline: zapposCards[idx].actionHeadline,
-            summary: zapposCards[idx].summary,
-            layoutType: zapposCards[idx].layoutType as any,
-            frameworkPhase: zapposCards[idx].frameworkPhase,
-          };
-        }
-
-        const scopeSummary = nextScope.covers[idx]
-          ? nextScope.covers[idx]
-          : s.summary;
-
-        return {
-          ...s,
-          actionHeadline: s.actionHeadline?.includes('Grounded Analysis')
-            ? generateNaturalSlideTitle(s.actionHeadline, topicToUse, idx)
-            : s.actionHeadline,
-          summary: scopeSummary,
-        };
-      });
+      let generatedDeck: SlideDeck;
+      if (textToUse && textToUse.trim().length > 40) {
+        // Build cards from the user's own text; figures only if they are in it.
+        generatedDeck = composeDeckFromText(textToUse, { ...composeOpts, title: topicToUse || undefined });
+      } else if (isSwiss || isCuratedCase) {
+        const legacy = isSwiss
+          ? decomposeToSwissEditorial({ topic: topicToUse, text: textToUse, framework: selectedFramework, slideCount: Number(slideCount), presentationStyle: selectedFramework, audienceLevel })
+          : generateSlideDeck({ topic: topicToUse, text: textToUse, framework: selectedFramework, slideCount: Number(slideCount), presentationStyle: selectedFramework, audienceLevel });
+        // Curated decks are trusted content: keep every figure they carry.
+        generatedDeck = legacyDeckToGamma(legacy, JSON.stringify(legacy.slides));
+      } else {
+        generatedDeck = composeDeckFromTopic(topicToUse, composeOpts);
+      }
 
       onUpdateDeck({
         ...generatedDeck,
-        slides: humanizedSlides,
         id: deck.id || generatedDeck.id,
-        themeId: isSwiss ? 'swiss-editorial' : (deck.themeId || 'sand-academic'),
+        themeId: isSwiss ? 'swiss-editorial' : deck.themeId || DEFAULT_DECK_THEME_ID,
         customTheme: deck.customTheme,
       });
     } finally {
@@ -262,9 +208,9 @@ export default function Step01Understand({
         const data = await res.json();
         if (data.deck && Array.isArray(data.deck.slides) && data.deck.slides.length > 0) {
           onUpdateDeck({
-            ...data.deck,
+            ...normalizeDeck(data.deck as SlideDeck),
             id: deck.id || data.deck.id,
-            themeId: deck.themeId || 'sand-academic',
+            themeId: deck.themeId || DEFAULT_DECK_THEME_ID,
             customTheme: deck.customTheme,
           });
           return;
@@ -993,7 +939,7 @@ export default function Step01Understand({
             </div>
           </div>
 
-          {/* Clean Tactile Outline Cards with SlideOutlinePillCard */}
+          {/* Outline: every generated card as a live thumbnail */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200">
@@ -1004,11 +950,22 @@ export default function Step01Understand({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" data-testid="outline-card-grid">
               {deck.slides.map((slide, idx) => (
-                <SlideOutlinePillCard key={slide.id || idx} slide={slide} index={idx} />
+                <li key={slide.id || idx} className="space-y-2" data-testid={`slide-outline-pill-card-${idx + 1}`}>
+                  <GammaSlide slide={slide} index={idx} theme={outlineTheme} />
+                  <div className="flex items-baseline gap-2 px-0.5">
+                    <span className="text-[11px] tabular-nums font-semibold text-neutral-400">{String(idx + 1).padStart(2, '0')}</span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 line-clamp-2">{slide.actionHeadline}</p>
+                      {slide.summary && slide.summary !== slide.actionHeadline && (
+                        <p className="mt-0.5 text-[11px] leading-snug text-neutral-500 dark:text-neutral-400 line-clamp-2">{slide.summary}</p>
+                      )}
+                    </div>
+                  </div>
+                </li>
               ))}
-            </div>
+            </ol>
 
             {/* Stepper Navigation Proceed */}
             <div className="flex justify-end pt-4">

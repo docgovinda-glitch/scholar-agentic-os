@@ -31,8 +31,9 @@ Rather than generic forms, each academic format in Scholar Core operates through
    - Includes a **Study Section Review Simulator (NIH / NSF Scoring Criteria)** powered by `scholarBrain.ts`.
 
 4. **📊 Academic Presentation Studio (`OT-22`)**:
-   - **4-Step Guided Workflow**: *01 Understand (Define Topic & Outline) → 02 Design (Curated Presets & Screenshot Cloner) → 03 Edit Slides (100% WYSIWYG Editable Canvas) → 04 Present (Stage View & Live Slide Player)*.
-   - **Learned Presentation Benchmark Integration**: Live `OT-22 Style: Conversational Academic · 6x6 Density` header badge and prompt builder enforcing concise assertion-evidence headlines, zero throat-clearing, and 6x6 bullet density.
+   - **4-Step Guided Workflow**: *01 Understand (topic or document → card outline) → 02 Design (8 curated themes previewed with your slides, library, screenshot cloner) → 03 Edit Slides (Gamma-style cards, inline editing, one-click layout and theme switching) → 04 Present (stage / leave-behind views, full-screen presenter)*.
+   - **Gamma-style cards**: bento grids, big-number callouts, timelines, comparisons, quotes and image + text layouts in a scientific monochrome look (`#F8F7F4` / `#171717`).
+   - **Native PowerPoint export (`.pptx`)** that matches the on-screen slides, plus PDF, Markdown and JSON. Generated decks only use figures found in your own material. See [`docs/presentation-studio.md`](docs/presentation-studio.md).
 
 5. **🎓 Thesis & Dissertation Workspace (`OT-09` / `OT-07`)**:
    - Multi-chapter milestone tracker with sequential chapter readiness gating, literature synthesis matrix, and 15-question Viva Voce oral defense simulator.

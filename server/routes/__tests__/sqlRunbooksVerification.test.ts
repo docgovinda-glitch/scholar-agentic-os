@@ -159,11 +159,13 @@ describe("SQL Runbooks & Hotfix Migrations — Schema & Column Verification", ()
     }
   });
 
-  it("verifies 20261028010000_purge_plaintext_credentials.sql records affected users, deletes plaintext rows, and drops client policies (F-11)", () => {
-    const purgeSql = fs.readFileSync(
-      path.resolve(process.cwd(), "supabase/migrations/20261028010000_purge_plaintext_credentials.sql"),
-      "utf8"
-    );
+  it("verifies the F-11 purge migrations record affected users, deletes plaintext rows, and drops client policies (F-11)", () => {
+    const purgeSql = [
+      "supabase/migrations/20261028010000_purge_plaintext_credentials.sql",
+      "supabase/migrations/20261029010000_credential_reset_notices.sql",
+    ]
+      .map((file) => fs.readFileSync(path.resolve(process.cwd(), file), "utf8"))
+      .join("\n");
     expect(purgeSql).toContain("CREATE TABLE IF NOT EXISTS public.security_credential_reset_notices");
     expect(purgeSql).toContain("DELETE FROM public.api_credentials;");
     expect(purgeSql).toContain("DELETE FROM public.user_cloud_integrations");

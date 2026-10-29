@@ -7,6 +7,14 @@
 
 ---
 
+## 0. Update 2026-10-29 ~10:45Z (verified via Supabase Management API / Render API)
+
+- `20261028000000_hotfix2` and `20261028010000_purge` (the version on `main`, purge only) **APPLIED to production** and recorded in `supabase_migrations.schema_migrations`. Verified after: `anon` cannot execute `email_for_username`; RLS on `project_titles` / `project_research_gaps` / `project_journal_candidates`; `user_cloud_integrations` rows 1 → 0, `api_credentials` 0. Before: policy, grant and RLS snapshot taken (full `pg_dump` impossible from the sandbox: no raw TCP).
+- Because the purge file was already applied, the notice table and client-policy drops added to it on this branch were moved to `20261029010000_credential_reset_notices.sql` (idempotent; `NULL::timestamptz` cast fixed; tested twice on local Supabase). The one user whose cloud connection was purged has no notice row.
+- `LLM_CHALLENGE_SECRET` set on Render (random, new). PR #81 merged (`ff330c3`).
+- `premium_requests` policies on production are already the strict ones; PR #83 makes fresh databases match.
+- Sections below predate this update.
+
 ## 1. Current Production & `origin/main` State
 
 - **Current `origin/main` HEAD**: `cbf38da` (`cbf38da8934a6aa0d8e6654063bb253729b64e78`, `Merge pull request #80 from docgovinda-glitch/fix/credential-encryption-and-honest-byok-ui`, head commit `0d5b0df`, merged `2026-10-29T04:58:43Z` by `docgovinda-glitch`).

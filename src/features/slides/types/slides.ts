@@ -14,7 +14,52 @@ export type SlideBlockType =
   | 'quote-evidence'
   | 'image';
 
+/**
+ * Gamma-style card layouts rendered by src/features/slides/gamma. The same
+ * content reflows into any of them, on the web canvas and in .pptx export.
+ */
+export type GammaLayout =
+  | 'title'
+  | 'bento'
+  | 'stats'
+  | 'timeline'
+  | 'comparison'
+  | 'list'
+  | 'quote'
+  | 'split'
+  | 'statement';
+
+export interface CardItem {
+  title: string;
+  body?: string;
+}
+
+export interface CardStat {
+  value: string;
+  label: string;
+  detail?: string;
+}
+
+export interface CardColumn {
+  title: string;
+  points: string[];
+}
+
+/** Layout-independent content of one card. */
+export interface CardContent {
+  eyebrow?: string;
+  headline: string;
+  lede?: string;
+  items: CardItem[];
+  stats: CardStat[];
+  columns?: [CardColumn, CardColumn];
+  quote?: { text: string; attribution?: string };
+  image?: { url: string; alt?: string; caption?: string };
+  takeaway?: string;
+}
+
 export type SlideLayoutType =
+  | GammaLayout
   | 'bullets'
   | 'image-split'
   | 'image-hero'
@@ -183,6 +228,15 @@ export interface SlideCard {
   // Image Media Extensions
   imageUrl?: string;
   imageCaption?: string;
+
+  /**
+   * Canonical card content written by the Gamma studio. Legacy `blocks` are
+   * regenerated from it on every edit; `contentFingerprint` records which
+   * blocks it produced so an outside edit to `blocks` (copilot, Ask Scholar)
+   * is detected and wins.
+   */
+  content?: CardContent;
+  contentFingerprint?: string;
 }
 
 export interface SlideDeck {
