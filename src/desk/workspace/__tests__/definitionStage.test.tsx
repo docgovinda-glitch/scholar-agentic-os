@@ -221,7 +221,9 @@ describe("Stage 1: Research Definition (DefinitionStage)", () => {
     });
   });
 
-  it("provides intelligent local heuristic when FINER diagnostic is triggered and AI throws", async () => {
+  it("shows no FINER scores and says so when the AI assessment fails", async () => {
+    // Rewritten 2026-10-29: this used to assert locally invented FINER
+    // scores ("Heuristic Appraisal Active") on AI failure.
     (api.executeAgenticLLM as any).mockRejectedValue(new Error("AI quota exhausted or offline"));
 
     render(
@@ -233,14 +235,12 @@ describe("Stage 1: Research Definition (DefinitionStage)", () => {
       />
     );
 
-    const finerBtn = screen.getByRole("button", { name: /AI Architect & FINER/i });
-    fireEvent.click(finerBtn);
+    fireEvent.click(screen.getByRole("button", { name: /AI Architect & FINER/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Composite FINER Score/i)).toBeInTheDocument();
-      expect(screen.getByText(/Heuristic Appraisal Active/i)).toBeInTheDocument();
-      expect(screen.getByText(/Publication-Grade Refinement Proposals/i)).toBeInTheDocument();
+      expect(screen.getByText(/FINER assessment unavailable: nothing was scored/i)).toBeInTheDocument();
     });
+    expect(screen.queryByText(/Composite FINER Score/i)).not.toBeInTheDocument();
   });
 
   it("synthesizes PICO parameters into research question using heuristic fallback when AI throws", async () => {

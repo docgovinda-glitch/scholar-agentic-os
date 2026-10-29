@@ -482,7 +482,7 @@ export default function TitleLockStage({
 
                       <div className="flex items-center gap-2.5 text-xs">
                         <span className="text-[11px] text-[color:var(--text-muted)]">
-                          Importance: <strong className="text-[color:var(--text-primary)]">{anchorGap.importance_score}%</strong>
+                          Importance: <strong className="text-[color:var(--text-primary)]">{anchorGap.importance_score !== undefined ? `${anchorGap.importance_score}%` : "—"}</strong>
                         </span>
                         {anchorGap.feasibility_score !== undefined && (
                           <span className="text-[11px] text-[color:var(--text-muted)]">

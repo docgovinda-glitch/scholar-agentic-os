@@ -228,41 +228,6 @@ export default function GapSelectionStage({
     return gaps?.filter((g) => selectedGapIds.includes(g.id) && g.id !== anchorGapId) || [];
   }, [gaps, selectedGapIds, anchorGapId]);
 
-  const handleSynthesizeFallbackGaps = async () => {
-    const workingTitle =
-      project?.answers?.["working_title"] ||
-      project?.answers?.["title"] ||
-      "Untitled Research";
-    const researchArea =
-      project?.answers?.["research_area"] ||
-      project?.answers?.["research_domain"] ||
-      "the field";
-
-    const fallback = generateLocalGapFallback({
-      workingTitle,
-      researchArea,
-      projectAnswers: project?.answers || {},
-    });
-    setGaps(fallback);
-    const initialId = fallback[0]?.id || "";
-    setSelectedGapIds(initialId ? [initialId] : []);
-    setAnchorGapId(initialId);
-
-    try {
-      const updated = await saveIntakeAnswers(projectId, {
-        identified_gaps: JSON.stringify(fallback),
-        selected_gaps: JSON.stringify(initialId ? [initialId] : []),
-        selected_gap: initialId,
-        anchor_gap_id: initialId,
-        selected_gap_title: fallback[0]?.title || "",
-        selected_gap_type: fallback[0]?.gap_type || "empirical",
-        current_stage: "gap_selection",
-      });
-      setProject(updated);
-    } catch (err) {
-      console.warn("[GapSelectionStage] Failed to persist generated fallback gaps:", err);
-    }
-  };
 
   if (!def) return <div className="p-8 text-[color:var(--text-muted)]">Unknown stage</div>;
 
@@ -352,7 +317,7 @@ export default function GapSelectionStage({
                 No Research Gaps Identified Yet
               </h3>
               <p className="text-xs text-[color:var(--text-secondary)] max-w-md mx-auto leading-relaxed">
-                Stage 4 requires candidate gaps identified in Stage 3. Return to Gap Identification to scan your literature corpus, or auto-synthesize domain-grounded candidate gaps right now.
+                Stage 4 requires candidate gaps identified in Stage 3. Return to Gap Identification to scan your literature corpus, or add your own gap there.
               </p>
               <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
                 <button
@@ -361,14 +326,6 @@ export default function GapSelectionStage({
                   className="px-5 py-2.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-control)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] text-xs font-bold rounded-full transition-all shadow-xs cursor-pointer"
                 >
                   ← Go to Stage 3: Gap Identification
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSynthesizeFallbackGaps}
-                  className="px-6 py-2.5 bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-[color:var(--text-inverse)] text-xs font-bold rounded-full transition-all shadow-md cursor-pointer flex items-center gap-1.5"
-                >
-                  <span>✦</span>
-                  <span>Auto-Synthesize Gaps</span>
                 </button>
               </div>
             </div>
@@ -485,7 +442,7 @@ export default function GapSelectionStage({
                       <div className="flex items-center gap-3 text-xs">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[11px] text-[color:var(--text-muted)]">Importance:</span>
-                          <span className="font-black text-[color:var(--text-primary)]">{item.importance_score}%</span>
+                          <span className="font-black text-[color:var(--text-primary)]">{item.importance_score !== undefined ? `${item.importance_score}%` : "—"}</span>
                         </div>
                         {item.feasibility_score !== undefined && (
                           <div className="flex items-center gap-1.5">

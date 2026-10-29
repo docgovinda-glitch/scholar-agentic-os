@@ -312,6 +312,19 @@ Both architectures scale effectively [1, 2].
   });
 
   describe("4. Citation Grounding (POST /citations-ground)", () => {
+    it("returns no citations (and never asks an LLM to write some) when discovery finds nothing", async () => {
+      const { discoverMultiPortalSources } = await import("../../src/discovery/discovery.ts");
+      const { callOpenRouterJSON } = await import("../../utils/llm.ts");
+      vi.mocked(discoverMultiPortalSources).mockResolvedValueOnce([]);
+      const projectId = await createCourseworkProject("apa7");
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/assignment/citations-ground`)
+        .send({ question: "Nothing indexes this", citationStyle: "apa" });
+      expect(res.status).toBe(200);
+      expect(res.body.citations).toEqual([]);
+      expect(callOpenRouterJSON).not.toHaveBeenCalled();
+    });
+
     it("returns verified multi-portal scholarly sources with deterministic citations", async () => {
       const projectId = await createCourseworkProject("apa7");
 
