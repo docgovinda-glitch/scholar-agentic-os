@@ -149,7 +149,9 @@ describe("Stage 15: Journal Discovery (JournalDiscoveryStage)", () => {
     });
   });
 
-  it("engages local fallback synthesis gracefully when stream fails", async () => {
+  it("suggests nothing and says so when the AI request fails", async () => {
+    // Rewritten 2026-10-29: this used to assert a hardcoded fallback list of
+    // journals ("ACM Transactions on Computer Systems (TOCS)" …) with invented metrics.
     (api.authedStreamFetch as any).mockRejectedValue(new Error("Network connection dropped"));
 
     render(
@@ -162,15 +164,12 @@ describe("Stage 15: Journal Discovery (JournalDiscoveryStage)", () => {
       />
     );
 
-    const scanBtn = screen.getByRole("button", { name: /Initialize Radar Scan/i });
-    fireEvent.click(scanBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Initialize Radar Scan/i }));
 
     await waitFor(() => {
-      // Expect fallback journals to appear
-      expect(screen.getByRole("heading", { name: /ACM Transactions on Computer Systems \(TOCS\)/i })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: /Journal of Systems Architecture/i })).toBeInTheDocument();
-      expect(screen.getByText(/Local Radar Synthesis Engine/i)).toBeInTheDocument();
+      expect(screen.getByText(/Journal suggestions unavailable: nothing was added/i)).toBeInTheDocument();
     });
+    expect(screen.queryByRole("heading", { name: /ACM Transactions on Computer Systems \(TOCS\)/i })).not.toBeInTheDocument();
   });
 
   it("filters discovered journals by text query and access model", async () => {
