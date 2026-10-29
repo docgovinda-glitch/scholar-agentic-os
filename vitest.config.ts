@@ -16,6 +16,8 @@ export default mergeConfig(
       // in afterEach, which doesn't happen automatically since test.globals
       // is off here.
       setupFiles: ['./src/testSetup.ts'],
+      // Playwright end-to-end specs run with `npm run test:e2e`, not vitest.
+      exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**'],
     },
   })
 );
