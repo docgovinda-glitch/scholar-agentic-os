@@ -1,7 +1,7 @@
 # Read-Only Production Verification Runbook (`PROD_CHECKS.md`)
 
 **Target Production Project**: `gfjhsijrwodjvkisouzw` (Supabase) & `srv-d9lgbn710e5c73dl8sk0` (Render)  
-**Safety Guarantee**: Every SQL query in this document is strictly **`SELECT`-only** against `pg_catalog` / `information_schema` / `supabase_migrations` / `storage`, and every CLI command is **read-only**. All SQL queries have been verified locally against `@electric-sql/pglite`. Do **not** run any `ALTER`, `DROP`, `INSERT`, `UPDATE`, or `DELETE` until the results below are reviewed.
+**Safety Guarantee**: Every SQL query in this document is strictly **`SELECT`-only** against `pg_catalog` / `information_schema` / `supabase_migrations` / `storage`, and every CLI command is **read-only**. Column names have been checked statically against repo SQL migrations (`sqlRunbooksVerification.test.ts`); live Postgres execution status is tracked in `STATUS.md`. Do **not** run any `ALTER`, `DROP`, `INSERT`, `UPDATE`, or `DELETE` until the results below are reviewed.
 
 ---
 
@@ -160,8 +160,24 @@ ORDER BY created_at DESC
 LIMIT 50;
 ```
 
-### Check 2.3 — Plaintext Credentials Stored in `api_credentials` and `user_cloud_integrations` (`F-07` / `F-08` Count Only — Never Select Secret Values)
-Counts how many rows exist in `api_credentials` and `user_cloud_integrations` without printing any key or token material.
+### Check 2.3 — Plaintext Credentials Stored in `api_credentials` and `user_cloud_integrations` (`F-11` Count Only — Never Select Secret Values)
+Counts how many rows and distinct affected users exist in `api_credentials` and `user_cloud_integrations` before running `20261028010000_purge_plaintext_credentials.sql`, without printing any key or token material.
+```sql
+SELECT
+  (SELECT COUNT(*) FROM public.api_credentials) AS api_credentials_rows,
+  (SELECT COUNT(DISTINCT user_id) FROM public.api_credentials) AS api_credentials_affected_users,
+  (SELECT COUNT(*) FROM public.user_cloud_integrations) AS cloud_integrations_rows,
+  (SELECT COUNT(DISTINCT user_id) FROM public.user_cloud_integrations) AS cloud_integrations_affected_users,
+  (
+    SELECT COUNT(DISTINCT user_id)
+    FROM (
+      SELECT user_id FROM public.api_credentials
+      UNION
+      SELECT user_id FROM public.user_cloud_integrations
+    ) u
+  ) AS total_distinct_affected_users;
+```
+
 ```sql
 SELECT
   'api_credentials' AS table_name,

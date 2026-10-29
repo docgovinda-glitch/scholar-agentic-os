@@ -232,20 +232,86 @@ describe("Hotfix 2 — Database, Storage, RPC, and Edge Function Lockdown (F-02,
       expect(goTrueCalls).toBe(2);
     });
 
-    it("enforces Turnstile verification on POST /api/auth/login when CLOUDFLARE_TURNSTILE_SECRET_KEY is set", async () => {
+    it("enforces Turnstile presence on POST /api/auth/login without double-burning single-use tokens in Express", async () => {
       process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY = "turnstile-secret-for-test";
+      let turnstileSiteverifyCalled = false;
+      let forwardedCaptchaToGoTrue: string | undefined;
+      let sbForwardedFor: string | null = null;
+      global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("challenges.cloudflare.com/turnstile")) {
+          turnstileSiteverifyCalled = true;
+          return new Response(JSON.stringify({ success: true }), { status: 200 });
+        }
+        if (url.includes("/auth/v1/token?grant_type=password")) {
+          const headers = new Headers(init?.headers);
+          sbForwardedFor = headers.get("Sb-Forwarded-For");
+          const parsedBody = JSON.parse(String(init?.body ?? "{}"));
+          forwardedCaptchaToGoTrue = parsedBody?.gotrue_meta_security?.captcha_token;
+          return new Response(JSON.stringify({ error_description: "Invalid login credentials" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify(null), { status: 200 });
+      }) as typeof fetch;
+
       try {
-        const res = await request(app)
+        const resMissing = await request(app)
           .post("/api/auth/login")
-          .set("User-Agent", "hotfix2-test-turnstile")
+          .set("X-Forwarded-For", "198.51.100.41, 173.245.48.10")
+          .set("CF-Connecting-IP", "198.51.100.41")
           .send({ identifier: "alice_user", password: "password123" });
 
-        expect(res.status).toBe(400);
-        expect(res.body.success).toBe(false);
-        expect(res.body.error).toContain("CAPTCHA");
+        expect(resMissing.status).toBe(400);
+        expect(resMissing.body.success).toBe(false);
+        expect(resMissing.body.error).toContain("CAPTCHA");
+
+        const resProvided = await request(app)
+          .post("/api/auth/login")
+          .set("X-Forwarded-For", "198.51.100.41, 173.245.48.10")
+          .set("CF-Connecting-IP", "198.51.100.41")
+          .send({ identifier: "alice_user", password: "password123", captchaToken: "cf-single-use-tok" });
+
+        expect(resProvided.status).toBe(401);
+        expect(turnstileSiteverifyCalled).toBe(false);
+        expect(forwardedCaptchaToGoTrue).toBe("cf-single-use-tok");
+        expect(sbForwardedFor).toBe("198.51.100.41");
       } finally {
         delete process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY;
       }
+    });
+
+    it("caps single-IP login attempts at 5 per 5 minutes (< GoTrue 30/5m default) and maps upstream GoTrue 429 uniformly", async () => {
+      let goTrueHits = 0;
+      global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/auth/v1/token?grant_type=password")) {
+          goTrueHits++;
+          return new Response(JSON.stringify({ msg: "over_request_rate_limit" }), {
+            status: 429,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify(null), { status: 200 });
+      }) as typeof fetch;
+
+      for (let i = 1; i <= 6; i++) {
+        const res = await request(app)
+          .post("/api/auth/login")
+          .set("X-Forwarded-For", `10.0.0.${i}, 198.51.100.88, 173.245.48.10`)
+          .set("CF-Connecting-IP", "198.51.100.88")
+          .send({ identifier: `probe_user_${i}`, password: "wrong" });
+
+        expect(res.status).toBe(429);
+        if (i <= 5) {
+          expect(res.body.code).toBe("UPSTREAM_AUTH_RATE_LIMIT");
+        } else {
+          expect(res.body.code).toBe("RATE_LIMIT_EXCEEDED");
+        }
+      }
+      // Exactly 5 requests from a single client IP can reach GoTrue in a 5-minute window (< 30 GoTrue default)
+      expect(goTrueHits).toBe(5);
     });
 
     it("checks identifier availability via POST /api/auth/check-availability using service_role", async () => {

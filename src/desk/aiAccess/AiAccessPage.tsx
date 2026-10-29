@@ -28,6 +28,7 @@ import {
   setLiveSearchGroundingEnabled,
   onLiveSearchGroundingChange,
 } from "../../services/liveSearchService";
+import CredentialResetNotice from "../security/CredentialResetNotice";
 
 /**
  * AI Access — the single source of truth for a user's AI provider and model configuration.
@@ -167,6 +168,7 @@ export default function AiAccessPage({
         </nav>
 
         <main className="min-w-0">
+          <CredentialResetNotice className="mb-4" />
           {access.error && (
             <div
               role="alert"

@@ -1,11 +1,14 @@
 import crypto from "node:crypto";
 import express from "express";
 import { verifyCaptchaToken } from "../src/middleware/captchaVerify.ts";
-import { rateLimit } from "../src/middleware/rateLimit.ts";
+import { getBaseIp, rateLimit } from "../src/middleware/rateLimit.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 
 export const UNIFORM_LOGIN_ERROR =
   "Invalid credentials. Please check your User ID, email, or mobile number and try again.";
+
+export const UPSTREAM_LOGIN_RATE_LIMIT_ERROR =
+  "Too many sign-in attempts right now. Please wait a minute and try again.";
 
 export type IdentifierType = "email" | "username" | "phone" | "unknown";
 
@@ -18,9 +21,15 @@ export function detectIdentifierType(rawIdentifier: string): IdentifierType {
   return "unknown";
 }
 
+// 5 attempts per 5 minutes per verified client IP: keeps any single attacker IP
+// at <= 5/30 (16.7%) of Supabase GoTrue's default 30 requests / 5 minutes
+// sign-in rate limit while recovering in 5 minutes for legitimate typos.
+export const AUTH_LOGIN_WINDOW_MS = 5 * 60 * 1000;
+export const AUTH_LOGIN_MAX_PER_WINDOW = 5;
+
 const authLoginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
+  windowMs: AUTH_LOGIN_WINDOW_MS,
+  max: AUTH_LOGIN_MAX_PER_WINDOW,
   limitBy: "ip",
 });
 
@@ -123,11 +132,20 @@ export function registerAuthRoutes(app: express.Express): void {
       });
     }
 
-    const captchaResult = await verifyCaptchaToken(captchaToken ?? "");
-    if (!captchaResult.success) {
+    // Cloudflare Turnstile tokens are single-use (see src/services/supabaseAuthService.ts:85-88).
+    // Do NOT consume the token via verifyCaptchaToken() in Express before calling GoTrue,
+    // because GoTrue validates gotrue_meta_security.captcha_token itself when Supabase Auth
+    // Attack Protection is enabled. Only fail fast here if a site key is configured and no
+    // token was provided at all.
+    const captchaRequired = Boolean(
+      process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY ||
+        process.env.CAPTCHA_SECRET_KEY ||
+        process.env.VITE_CAPTCHA_SITE_KEY
+    );
+    if (captchaRequired && !captchaToken) {
       return res.status(400).json({
         success: false,
-        error: captchaResult.error || "CAPTCHA verification failed",
+        error: "CAPTCHA token is required",
       });
     }
 
@@ -169,18 +187,27 @@ export function registerAuthRoutes(app: express.Express): void {
       // Always execute the GoTrue password-grant request even when the identifier
       // did not resolve to a registered account, equalizing network + hashing timing
       // and returning the exact same HTTP 401 status and message on every failure path.
+      //
+      // Forward verified client IP in `Sb-Forwarded-For` for Supabase Auth IP Address
+      // Forwarding (note: Supabase GoTrue honors `Sb-Forwarded-For` once the project uses
+      // a `sb_secret_...` key and enables Authentication -> Rate Limits -> IP Address Forwarding;
+      // while on legacy JWT `service_role`, raise GoTrue's sign-in rate limit on Supabase Pro).
+      const clientIp = getBaseIp(req);
       const baseUrl = config.supabaseUrl.replace(/\/+$/, "");
       const tokenRes = await fetch(`${baseUrl}/auth/v1/token?grant_type=password`, {
         method: "POST",
         headers: {
           apikey: config.serviceRoleKey,
+          Authorization: `Bearer ${config.serviceRoleKey}`,
           "Content-Type": "application/json",
+          ...(clientIp && clientIp !== "unknown" ? { "Sb-Forwarded-For": clientIp } : {}),
         },
         body: JSON.stringify({
           email: emailForGoTrue,
           password,
           ...(captchaToken ? { gotrue_meta_security: { captcha_token: captchaToken } } : {}),
         }),
+        signal: AbortSignal.timeout(15_000),
       });
 
       const tokenJson = (await tokenRes.json().catch(() => ({}))) as {
@@ -193,6 +220,17 @@ export function registerAuthRoutes(app: express.Express): void {
         error_description?: string;
         message?: string;
       };
+
+      // Return 429 uniformly (for both known and unknown identifiers) if upstream GoTrue
+      // hits its project/IP rate limit, rather than misleading legitimate users with 401.
+      if (tokenRes.status === 429) {
+        console.warn("[auth/login] Upstream Supabase Auth rate limit (429) reached");
+        return res.status(429).json({
+          success: false,
+          code: "UPSTREAM_AUTH_RATE_LIMIT",
+          error: UPSTREAM_LOGIN_RATE_LIMIT_ERROR,
+        });
+      }
 
       if (!hasResolvedEmail || !tokenRes.ok || !tokenJson.access_token || !tokenJson.user?.id) {
         return res.status(401).json({

@@ -2,7 +2,7 @@
 
 **Purpose**: Read-only forensic checks to detect any unauthorized access, backdoor persistence, privilege escalation, or quota abuse since **2026-08-04** (when commits `01f851f` and `28cfaa5` committed live credentials to the repository).  
 **Safety & Privacy Guarantee**:
-- Every SQL query below is strictly `SELECT`-only and has been executed and verified locally against the repository schema using `@electric-sql/pglite` (zero column or syntax errors).
+- Every SQL query below is strictly `SELECT`-only. Column names have been checked statically against repo SQL migrations (`sqlRunbooksVerification.test.ts`); live Postgres execution status is tracked in `STATUS.md`.
 - **Do NOT paste raw user lists (emails, phone numbers, or full names) into chat.** Paste back **only** row counts and any unrecognized/anomalous rows.
 
 ---
@@ -87,26 +87,26 @@ ORDER BY evtname;
 ### Check 1.4 — Non-Repo Triggers & Functions (Concrete Exclusion List Generated from Repo SQL)
 Scanning all base schemas (`supabase/*.sql`) and all migration files (`supabase/migrations/*.sql`) yields the exact exclusion list of legitimate repo-defined objects:
 - **14 Repo-Defined SQL Functions**:
-  1. `check_email_available` (`20260815120000_check_availability_functions.sql:52`)
-  2. `check_phone_available` (`20260815120000_check_availability_functions.sql:76`)
-  3. `check_username_available` (`20260815120000_check_availability_functions.sql:24`)
-  4. `deduct_credits` (`20260804000000_ai_access_and_Billing.sql:109`)
-  5. `email_for_identifier` (`20260815180000_unified_login_functions.sql:53`)
-  6. `email_for_phone_e164` (`20260815180000_unified_login_functions.sql:27`)
+  1. `check_email_available` (`supabase/migrations/20260815120000_duplicate_identifier_detection.sql:52`)
+  2. `check_phone_available` (`supabase/migrations/20260815120000_duplicate_identifier_detection.sql:76`)
+  3. `check_username_available` (`supabase/migrations/20260815120000_duplicate_identifier_detection.sql:24`)
+  4. `deduct_credits` (`supabase/schema_ai_engine.sql:494`, `supabase/schema_ai_engine.sql:636`)
+  5. `email_for_identifier` (`supabase/migrations/20260815180000_unified_login_functions.sql:53`)
+  6. `email_for_phone_e164` (`supabase/migrations/20260815180000_unified_login_functions.sql:27`)
   7. `email_for_username` (`supabase/schema.sql:143`)
-  8. `enforce_account_status_admin_only` (`20260813000000_unified_account_profile.sql:128`)
-  9. `grant_credits` (`20260804000000_ai_access_and_Billing.sql:187`)
-  10. `handle_new_user` (`supabase/schema.sql:104`, `20260814000000_account_system_repair.sql:55`)
-  11. `handle_project_delete_cascade` (`20260924180000_project_cascade_delete.sql:120`)
-  12. `match_project_evidence` (`supabase/phase4_migration.sql:46`, `20260728000000_relational_project_store.sql:113`)
-  13. `submit_id_document` (`20260813000000_unified_account_profile.sql:155`)
-  14. `update_modified_column` (`supabase/manuscript_schema.sql:33`)
+  8. `enforce_account_status_admin_only` (`supabase/schema.sql:210`, `supabase/migrations/20260811000000_code_review_fixes.sql:97`, `supabase/migrations/20260814000000_account_system_repair.sql:157`)
+  9. `grant_credits` (`supabase/schema_ai_engine.sql:566`)
+  10. `handle_new_user` (`supabase/schema.sql:104`, `supabase/migrations/20260813000000_unified_account_profile.sql:106`, `supabase/migrations/20260814000000_account_system_repair.sql:123`)
+  11. `handle_project_delete_cascade` (`supabase/migrations/20260924180000_project_cascade_delete.sql:127`)
+  12. `match_project_evidence` (`supabase/migrations/20260819160000_vector_rag.sql:11`)
+  13. `submit_id_document` (`supabase/migrations/20260813000000_unified_account_profile.sql:155`)
+  14. `update_modified_column` (`supabase/migrations/20260818162000_agentic_schema.sql:57`)
   *(Note: `deduct_scholar_credits` is also referenced in `server/src/aiEngine/creditEngine.ts` and is included in the SQL exclusion list below in case it was created manually in production.)*
 - **4 Repo-Defined SQL Triggers**:
-  1. `on_auth_user_created` (on `auth.users` → `public.handle_new_user()`)
-  2. `profiles_account_status_guard` (on `public.profiles` → `public.enforce_account_status_admin_only()`)
-  3. `tr_project_delete_cascade` (on `public.projects` → `public.handle_project_delete_cascade()`)
-  4. `update_manuscript_sections_modtime` (on `public.manuscript_sections` → `public.update_modified_column()`)
+  1. `on_auth_user_created` (`supabase/schema.sql:130`, `supabase/migrations/20260814000000_account_system_repair.sql:149` — on `auth.users` → `public.handle_new_user()`)
+  2. `profiles_account_status_guard` (`supabase/schema.sql:226`, `supabase/migrations/20260811000000_code_review_fixes.sql:113`, `supabase/migrations/20260814000000_account_system_repair.sql:173` — on `public.profiles` → `public.enforce_account_status_admin_only()`)
+  3. `tr_project_delete_cascade` (`supabase/migrations/20260924180000_project_cascade_delete.sql:177` — on `public.projects` → `public.handle_project_delete_cascade()`)
+  4. `update_manuscript_sections_modtime` (`supabase/migrations/20260818162000_agentic_schema.sql:65` — on `public.manuscript_sections` → `update_modified_column()`)
 - **Expected Supabase-Managed Storage Triggers** (built into Supabase Storage on `storage.objects` and `storage.prefixes`; normal if present):
   - `update_objects_updated_at`
   - `objects_insert_create_prefix`, `objects_update_create_prefix`, `objects_delete_delete_prefix`

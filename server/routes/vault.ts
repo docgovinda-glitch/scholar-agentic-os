@@ -13,7 +13,7 @@ const CLOUD_TOKEN_ENC_PREFIX = "enc:v1:";
 /**
  * Resolves the 32-byte AES-256-GCM key used by `encryptCloudToken` / `decryptCloudToken`.
  *
- * SECURITY NOTE (F-01 / F-07 / F-08):
+ * SECURITY NOTE (F-01 / F-11):
  * `encryptCloudToken` derives its key from `MASTER_KEY` / `CREDENTIAL_MASTER_KEY`
  * (or falls back to an HMAC of `SUPABASE_SERVICE_ROLE_KEY`). Because both
  * `MASTER_KEY` and `SUPABASE_SERVICE_ROLE_KEY` were exposed in git history (`F-01`),
@@ -986,6 +986,135 @@ router.get("/onedrive/files", requireAuth, async (req: Request, res: Response) =
   } catch (err: any) {
     res.status(500).json({ error: `Failed to fetch OneDrive files: ${err.message}` });
   }
+});
+
+/**
+ * GET /api/vault/cloud/connections
+ * Returns sanitized cloud-integration metadata (never raw or encrypted tokens)
+ * for the authenticated user.
+ */
+router.get("/cloud/connections", requireAuth, async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  if (!user?.id) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const config = getSupabaseRestConfig();
+  if (!config) {
+    return res.json({ connections: [] });
+  }
+  try {
+    const cloudTable = new SupabaseTable(config, "user_cloud_integrations");
+    const rows = (await cloudTable.request(
+      `?select=id,provider,account_email,account_name,connected_at&user_id=eq.${encodeURIComponent(user.id)}`,
+      { method: "GET" }
+    )) as Array<{
+      id: string;
+      provider: string;
+      account_email?: string | null;
+      account_name?: string | null;
+      connected_at?: string | null;
+    }>;
+    return res.json({
+      connections: Array.isArray(rows)
+        ? rows.map((r) => ({
+            id: r.id,
+            provider: r.provider,
+            accountEmail: r.account_email || "connected-account",
+            accountName: r.account_name || undefined,
+            connectedAt: r.connected_at || new Date().toISOString(),
+          }))
+        : [],
+    });
+  } catch {
+    return res.json({ connections: [] });
+  }
+});
+
+/**
+ * POST /api/vault/cloud/connections
+ * Stores a cloud integration connection for the authenticated user, encrypting
+ * any supplied access/refresh tokens with AES-256-GCM (`enc:v1:...`).
+ */
+router.post("/cloud/connections", requireAuth, async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  if (!user?.id) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const { provider, accountEmail, accountName, accessToken, refreshToken } = (req.body ?? {}) as {
+    provider?: string;
+    accountEmail?: string;
+    accountName?: string;
+    accessToken?: string;
+    refreshToken?: string;
+  };
+  if (!provider || !["google_drive", "onedrive", "dropbox", "zotero", "mendeley"].includes(provider)) {
+    return res.status(400).json({ error: "Valid cloud provider is required." });
+  }
+  const config = getSupabaseRestConfig();
+  if (!config) {
+    return res.status(503).json({ error: "Cloud integration store is not configured." });
+  }
+  try {
+    const encryptedAccess =
+      typeof accessToken === "string" && accessToken.trim().length > 0
+        ? encryptCloudToken(accessToken.trim())
+        : null;
+    const encryptedRefresh =
+      typeof refreshToken === "string" && refreshToken.trim().length > 0
+        ? encryptCloudToken(refreshToken.trim())
+        : null;
+
+    if ((accessToken && !encryptedAccess) || (refreshToken && !encryptedRefresh)) {
+      return res.status(500).json({ error: "Token encryption key is not configured." });
+    }
+
+    const payload: Record<string, unknown> = {
+      user_id: user.id,
+      provider,
+      account_email: accountEmail || user.email || "connected-account",
+      account_name: accountName || null,
+      updated_at: new Date().toISOString(),
+    };
+    if (encryptedAccess) payload.access_token = encryptedAccess;
+    if (encryptedRefresh) payload.refresh_token = encryptedRefresh;
+
+    const cloudTable = new SupabaseTable(config, "user_cloud_integrations");
+    await cloudTable.request("?on_conflict=user_id,provider", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: `Failed to save cloud connection: ${err.message}` });
+  }
+});
+
+/**
+ * DELETE /api/vault/cloud/connections/:provider
+ * Removes a cloud integration row for the authenticated user.
+ */
+router.delete("/cloud/connections/:provider", requireAuth, async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  if (!user?.id) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const provider = String(req.params.provider || "").trim();
+  if (!provider) {
+    return res.status(400).json({ error: "Provider is required." });
+  }
+  const config = getSupabaseRestConfig();
+  if (config) {
+    const cloudTable = new SupabaseTable(config, "user_cloud_integrations");
+    await cloudTable
+      .delete(`user_id=eq.${encodeURIComponent(user.id)}&provider=eq.${encodeURIComponent(provider)}`)
+      .catch(() => {});
+  }
+  return res.json({ success: true });
 });
 
 /**

@@ -1,181 +1,97 @@
 # Production Merge & Deployment Plan (`MERGE_PLAN.md`)
 
 > [!IMPORTANT]
-> **Why PRs #73–#79 Are Not Yet on `origin/main` (`206deb6`)**:
-> - PRs **#71** (`a6fd892`) and **#72** (`206deb6`) had `base: main` and are **live on `origin/main`**.
-> - PRs **#73–#79** were originally opened as a stacked chain (`#74 -> #73`, `#75 -> #74`, ..., `#79 -> #78`). When "Merge" was clicked on `#74`–`#79` in the GitHub UI, GitHub merged each child branch into its parent feature branch rather than into `main`.
-> - Reconciled branch `fix/credential-encryption-and-honest-byok-ui` (rebased cleanly onto `origin/main` `206deb6`) has been opened as **PR #80** (`https://github.com/docgovinda-glitch/scholar-agentic-os/pull/80`) targeting `base: main`, containing all work from Steps 3–9 plus every Section 2 and Section 3 fix from this review round.
+> **Current Live Production & `origin/main` Baseline (`cbf38da`, 2026-10-29)**:
+> - **PR #71** (`hotfix/containment-authz-memory-ssrf`) merged to `main` at `5a642a0` (`2026-10-28T10:02:52Z` by `docgovinda-glitch`).
+> - **PR #72** (`hotfix/db-storage-rpc-lockdown` — Hotfix 2 v1) merged to `main` at `206deb6` (`2026-10-28T10:03:17Z` by `docgovinda-glitch`).
+> - **PR #80** (`fix/credential-encryption-and-honest-byok-ui` — consolidated `#73`–`#79` + reconciliation fixes, head `0d5b0df`) **merged to `main` at `cbf38da` (`cbf38da8934a6aa0d8e6654063bb253729b64e78`) on `2026-10-29T04:58:43Z` by `docgovinda-glitch` and deployed to Render**.
+> - **Supabase Network Restrictions**: **ENABLED** (`2026-10-29`), allowing direct Postgres TCP connections (`5432`/`6543`) **only** from the owner's workstation IP (`/32`). Express, Edge Functions, and CI communicate exclusively over HTTPS (`PostgREST` / `GoTrue` / `Storage`).
 
-> [!WARNING]
-> **Mandatory Dependency Chain (`PR #76 → PR #77 → Hotfix 2 / PR #73`)**:
-> 1. **Hotfix 2 (`PR #73`)** moves login (`POST /api/auth/login`) and identifier availability checks (`POST /api/auth/check-availability`) to Express. Those endpoints **depend on `PR #77`'s hardened IP rate limiter** (`server/src/middleware/rateLimit.ts`) to prevent brute-force and account enumeration after `anon` RPC privileges are revoked.
-> 2. **`PR #77`** enables `app.set("trust proxy", 1)` and parses `X-Forwarded-For` from the right-most untrusted hop with Cloudflare CIDR verification, which **depends on `PR #76`'s `proxy-addr` upgrade**.
-> 3. Therefore, **`PR #76` and `PR #77` MUST land before or together with `Hotfix 2 (PR #73)`**.
-
----
-
-## Summary Matrix of All Deployment Steps
-
-| Step | PR / Branch | Base Branch | Rebase Status onto `origin/main` (`206deb6`) | Depends On | Required Env Vars before Merge | Prod Changes (App / DB / Edge Fn) |
-| :---: | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1** | **PR #71** (`hotfix/containment-authz-memory-ssrf`) | `main` | **Merged (`a6fd892`)** | None | `VITE_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `MAX_UPLOAD_MB=10` | Express App only |
-| **2** | **PR #72** (`fix/ci-blocking-and-node22-alignment`) | `main` | **Merged (`206deb6`)** | Step 1 | GitHub Actions: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `RENDER_DEPLOY_KEY` (`DATABASE_URL` removed from `deploy.yml`) | CI/CD workflows + Vitest `.env` isolation |
-| **3** | **PR #74** (`fix/containment-followup-clamp-and-ssrf-tests`) | `main` | **Rebased & Verified** | Step 1 | `MAX_UPLOAD_MB=10` (code clamps `Math.min(raw, 10)` even if env is `25`) | Express App (`uploadGuard.ts` hard 10 MB ceiling) + `HOTFIX_DEPLOY.md` |
-| **4** | **PR #76** (`fix/dependency-audit-and-exceljs`) | `main` | **Rebased & Verified** | Step 2 | None | Express App (`package.json`, `package-lock.json`, `spreadsheetParser.ts` → `exceljs`) |
-| **5** | **PR #77** (`fix/rate-limit-trust-proxy-and-memory-caps`) | `main` | **Rebased & Verified** | **Step 4 (`PR #76`)** | None | Express App (`server.ts` `trust proxy = 1`, `rateLimit.ts` right-most hop + Cloudflare CIDR check, `presentations.ts` `MAX_MEMORY_DECKS=100`) |
-| **6** | **Hotfix 2 / PR #73** (`hotfix/db-storage-rpc-lockdown`) | `main` | **Rebased & Verified** *(SQL unverified against live Supabase — no local Docker)* | **Step 4 (`PR #76`) + Step 5 (`PR #77`)** | Render: `VITE_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CLOUDFLARE_TURNSTILE_SECRET_KEY`<br>Edge Fn: `RESEND_API_KEY`, `ADMIN_EMAIL` | **1.** Express + SPA (`POST /api/auth/login`, `check-availability`, `signed-url`, `AccountSettingsScreen.tsx` notice)<br>**2.** SQL migration `20261028000000_hotfix2_db_storage_rpc_lockdown.sql`<br>**3.** Edge Fn `request-profile-update` (`410 Gone`) |
-| **7** | **PR #75** (`fix/remove-supabase-fallbacks-and-harden-proxy`) | `main` | **Rebased & Verified** | Step 2 | **MANDATORY**: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` **must** be set in both Render Env and GitHub Actions Secrets (app & build now fail closed if missing) | Express App + Vite build (`env.ts`, `supabaseRest.ts`, `supabaseProxy.ts`, `deploy.yml`) |
-| **8** | **PR #78** (`fix/ai-routes-auth-challenge-and-timeouts`) | `main` | **Rebased & Verified** | Step 5 | **MANDATORY**: Set `LLM_CHALLENGE_SECRET` (32-byte random hex/base64) and `MAIN_ADMIN_EMAIL` in Render Env | Express App (`ai.ts`, `llm.ts`, `auth.ts`, `requireAdmin.ts`, `server.ts` graceful shutdown, 15s outbound timeouts, SSE abort) |
-| **9** | **PR #79** (`fix/credential-encryption-and-honest-byok-ui`) | `main` | **Rebased & Verified** | Step 6 | Render: `MASTER_KEY` (32-byte base64) | **1.** Express + SPA (`vault.ts` `encryptCloudToken`, removal of server-side BYOK writes, honest BYOK UI copy)<br>**2.** SQL migration `20261028010000_purge_plaintext_credentials.sql` |
-| **10** | **Credential Rotation & History Scrub (`ROTATION_RUNBOOK.md`)** | `main` | Scheduled at Project End | Steps 1–9 | Fresh rotated values for all 7 leaked secrets (`ROTATION_RUNBOOK.md`) | Rotate all 7 credentials, re-wrap `platform_provider_credentials`, wipe `user_cloud_integrations`, run `git filter-repo` |
+> [!CAUTION]
+> **Critical `MASTER_KEY` & `LLM_CHALLENGE_SECRET` Rules**:
+> - **`MASTER_KEY` MUST remain set to the EXISTING production value** currently wrapping `public.platform_provider_credentials` (`server/src/aiEngine/credentialVault.ts:84-94`, `src/services/crypto/crypto.ts:104-115`). Setting a newly generated `MASTER_KEY` before running `scripts/rewrap-platform-credentials.ts` is **credential rotation** (deferred to project end per owner decision `F-01`) and **will make all existing `platform_provider_credentials` rows undecryptable (`DecryptionError`)**, breaking Premium AI requests.
+> - **`LLM_CHALLENGE_SECRET` MUST be newly generated** (`openssl rand -hex 32`), because it is a brand-new ephemeral HMAC signing secret for `/api/ai/agent` → `/api/llm` challenge tokens (`server/utils/llm.ts:35-45`) with zero stored database ciphertexts. Set `LLM_CHALLENGE_SECRET` on Render **before** merging follow-up PR `#81` (which enforces fail-closed production refusal to fall back to `SUPABASE_SERVICE_ROLE_KEY`).
 
 ---
 
-## Detailed Per-Step Execution, Verification & Rollback Guide
+## 1. Ordered Merge & Deployment Matrix
 
-### Step 1 & Step 2 — PR #71 & PR #72 (Already Merged on `origin/main` at `206deb6`)
-- **Status**: Merged into `main`.
-- **Action Required Now**: Run the post-deploy checks in [`HOTFIX_DEPLOY.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/HOTFIX_DEPLOY.md) Section 2 against `https://scholar.gkshah.com.np`, and delete the unused `DATABASE_URL` secret from GitHub Actions (`gh secret delete DATABASE_URL -R docgovinda-glitch/scholar-agentic-os`).
-
----
-
-### Step 3 — PR #74 (`fix/containment-followup-clamp-and-ssrf-tests`)
-- **Base Branch**: `main` | **Rebase Status**: Clean on `206deb6`.
-- **Prod Changes**:
-  - Updates [`server/src/middleware/uploadGuard.ts`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/server/src/middleware/uploadGuard.ts) so `HARD_MAX_UPLOAD_MB_CEILING = 10` (`Math.min(raw, 10)`). Even if `MAX_UPLOAD_MB=25` is set in Render's environment, uploads above `10 MB` are rejected with HTTP `413`.
-  - Adds SSRF depth tests (IPv4-mapped IPv6 `::ffff:127.0.0.1`, octal `0177.0.0.1`, hex `0x7f000001`, decimal `2130706433`, redirect hop to loopback, redirect loop cap) and updates `HOTFIX_DEPLOY.md`.
-- **Required Env Vars**: `MAX_UPLOAD_MB=10` (recommended in Render Dashboard, enforced in code regardless).
-- **Post-Deploy Checks**:
-  - Run `HOTFIX_DEPLOY.md` Check 4 (11 MB upload → `413` with `"maxUploadMb": 10`), Check 5 (SSRF → `400`), and Check 6b (real 1-page PDF → `200`).
-- **Rollback Step**: Render Dashboard 1-click rollback to `206deb6` (stateless, zero DB changes).
+| Order | PR / Step | Branch → Base | State & Commit SHA | Depends On | Env Vars / Config Needed | Prod Changes |
+| :---: | :--- | :--- | :---: | :--- | :--- | :--- |
+| **Done** | **PR #71** | `hotfix/containment-authz-memory-ssrf` → `main` | **MERGED (`5a642a0`)** | — | `MAX_UPLOAD_MB=10` (optional) | Express App: `requireAuth` on `/api/vault/*` & `/api/search/live`, project ownership checks (`F-05`, `F-06`), heavy-parse concurrency guard, `ssrfGuard` |
+| **Done** | **PR #72** | `hotfix/db-storage-rpc-lockdown` → `main` | **MERGED (`206deb6`)** | PR #71 | None | Express App v1 (`/api/auth/login`, `/api/auth/check-availability`, `/api/projects/:id/files/:fileId/signed-url`) + initial Hotfix 2 SQL in repo *(SQL NOT YET APPLIED)* |
+| **Done** | **PR #80** | `fix/credential-encryption-and-honest-byok-ui` → `main` | **MERGED & DEPLOYED (`cbf38da` / `0d5b0df`)** | PR #72 + Section 3 Env Vars | Existing `MASTER_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `MAIN_ADMIN_EMAIL` | `10 MB` hard upload ceiling, `exceljs` + `npm audit` upgrades (`F-12`), `trust proxy = 1` + Cloudflare CIDR IP verification (`F-09`), timeouts & `SIGTERM` shutdown (`F-17`), remove Supabase fallbacks & `/api/supabase` subpath allowlist (`F-07`, `F-10`), `requireAuth` on `/api/ai/*` (`F-08`), `encryptCloudToken` (`F-11`) — **Verify live with `POST_DEPLOY_80.md`** |
+| **Step 1** | **Follow-up PR #82** | `fix/post-80-verification-login-purge-notices` → `main` | **OPEN (Ready for Review)** | `origin/main` (`cbf38da`) + `LLM_CHALLENGE_SECRET` set on Render + Supabase Auth sign-in rate limit raised to `300 / 5m` | **NEW**: `LLM_CHALLENGE_SECRET` (`openssl rand -hex 32`) on Render | Single-use Turnstile passthrough on `POST /api/auth/login` (prevents double-spend `401` when both Render & GoTrue CAPTCHA are active), `5 req / 5 min` per-IP login cap + `Sb-Forwarded-For` + uniform upstream `429` handling, fail-closed `LLM_CHALLENGE_SECRET` in production (`F-13`), `/api/vault/cloud/connections` + `CredentialResetNotice` (`F-11`), `journalExportService.ts:106` CI timer guard, `STATUS.md`, `POST_DEPLOY_80.md`, `scripts/verify-local-supabase.sh` |
+| **Step 2** | **Edge Function Deploy (`F-04`)** | `supabase/functions/request-profile-update/index.ts` | **DEPLOYED & ACTIVE (v11, 2026-10-29)** | None (SPA already shows `TICKET-SEC-01` notice) | Existing Edge Function secrets (`ADMIN_EMAIL`, `RESEND_API_KEY`) | Deployed via `npx supabase functions deploy request-profile-update --project-ref gfjhsijrwodjvkisouzw --use-api`; returns HTTP `410 Gone` (`PROFILE_UPDATE_DISABLED`) and closes `F-04` |
+| **Step 3** | **DB Migrations (`F-02`, `F-03`, `F-11`, `F-14`)** *(Blocked on Section 3 Local Docker Verification)* | `20261028000000_hotfix2_...sql` + `20261028010000_purge_...sql` | **MARKED `UNVERIFIED`** *(do NOT apply until `./scripts/verify-local-supabase.sh` passes all 4 checks)* | Step 1 (PR #82 deployed) + Local Docker verification + Count-only `SELECT` + Encrypted `pg_dump` | Workstation `/32` IP allowed in Supabase Network Restrictions | **3a.** Run count-only `SELECT` & encrypted `pg_dump` (`HOTFIX2_DEPLOY.md`)<br>**3b.** Apply `20261028000000_hotfix2_db_storage_rpc_lockdown.sql` (`REVOKE`-only RPCs, private buckets, RLS on 3 tables)<br>**3c.** Apply `20261028010000_purge_plaintext_credentials.sql` (populates `security_credential_reset_notices` & purges plaintext `api_credentials` / `user_cloud_integrations`) |
+| **Step 4** | **Credential Rotation & History Scrub (`F-01`)** | `ROTATION_RUNBOOK.md` | Scheduled at Project End | Steps 1–3 | Fresh rotated values for all 7 secrets | Migrate to `sb_publishable_...` / `sb_secret_...`, enable Supabase Auth `IP Address Forwarding`, rotate DB password + `MASTER_KEY` (`scripts/rewrap-platform-credentials.ts`) + Resend/Cloudflare/Render/GitHub keys, run `git filter-repo` |
 
 ---
 
-### Step 4 — PR #76 (`fix/dependency-audit-and-exceljs`)
-- **Base Branch**: `main` | **Rebase Status**: Clean on `206deb6`.
-- **Explicit Dependency**: Must land before **Step 5 (`PR #77`)**.
-- **Prod Changes**:
-  - Patches `proxy-addr`, `multer`, `body-parser`, `undici`, `@tiptap/*`, `prosemirror-view`, `@xmldom/xmldom`, and `zod`.
-  - Replaces vulnerable `xlsx` package with `exceljs` in [`src/document_intelligence/parser/parsers/spreadsheetParser.ts`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/src/document_intelligence/parser/parsers/spreadsheetParser.ts).
-- **Required Env Vars**: None.
-- **Post-Deploy Checks**:
-  - `curl -sS https://scholar.gkshah.com.np/api/health` → `200 OK`.
-  - Upload a valid `.xlsx` and `.csv` file via `/api/vault/parse-file` with `Authorization: Bearer ${ALICE_TOKEN}` → `200 OK`.
-- **Rollback Step**: Render Dashboard 1-click rollback to previous deploy (stateless, zero DB changes).
+## 2. Environment Variables Required by `#80` (`cbf38da`) & Follow-up `#82` (With Exact Failure Symptoms)
+
+| Env Var Name | New or Existing? | Where to Set It | Exact Symptom / Error Message / Log Line If Missing (`origin/main` `cbf38da`) |
+| :--- | :---: | :--- | :--- |
+| **`VITE_SUPABASE_URL`** | **EXISTING** | **1.** Render Env *(also Docker build `ARG`, `Dockerfile:33-36`)*<br>**2.** GitHub Secrets (`deploy.yml:45`) | 1. **Build/Browser**: `isSupabaseConfigured()` returns `false` and `getSupabaseClient()` throws `"Supabase is not configured: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (see .env.example)..."` (`src/services/supabaseClient.ts:64-70`).<br>2. **`/api/supabase/*` Proxy**: HTTP `503` `{"error":"Service Unavailable","message":"Supabase upstream URL is not configured (set VITE_SUPABASE_URL or SUPABASE_URL)."}` (`server/routes/supabaseProxy.ts:65-70`).<br>3. **`POST /api/auth/login`**: HTTP `503` `{"success":false,"error":"Authentication service is not configured."}` (`server/routes/auth.ts:134-140`).<br>4. **`requireAuth` (when `SUPABASE_JWT_SECRET` also unset)**: logs `console.error("auth: VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set; refusing all authenticated requests")` and returns HTTP `500` `{"error":"Auth service not configured"}` (`server/src/middleware/auth.ts:293-296`).<br>5. **`getProjectStore()` in production (when `DATABASE_URL` also unset)**: throws `"[FATAL: Durable Persistence Required] Production cannot start with ephemeral in-memory project storage..."` (`src/services/store/projectStore.ts:149-155`). |
+| **`VITE_SUPABASE_ANON_KEY`** | **EXISTING** | **1.** Render Env (`Dockerfile:34-37`)<br>**2.** GitHub Secrets (`deploy.yml:46`) | **Browser**: `isSupabaseConfigured()` returns `false` (`src/services/supabaseClient.ts:47-49`) and `getSupabaseClient()` throws `"Supabase is not configured: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY..."` (`src/services/supabaseClient.ts:64-70`), breaking SPA auth/session hydration. |
+| **`SUPABASE_SERVICE_ROLE_KEY`** | **EXISTING** | Render Dashboard → `scholar-agentic-os` → Environment | 1. `getSupabaseRestConfig()` returns `null` (`server/src/supabaseRest.ts:37-41`): `POST /api/auth/login` & `/api/auth/check-availability` return HTTP `503` `{"success":false,"error":"Authentication service is not configured."}` (`server/routes/auth.ts:135-140,295-300`); `POST /api/projects/:id/files` and `GET .../signed-url` return HTTP `500` `{"error":"Supabase not configured"}` (`server/routes/project/files.ts:50-52,116-118`).<br>2. `GET /api/health` drops from `"persistenceMode": "supabase-rest"` to `"postgres"` or `"in-memory-EPHEMERAL"` (`server/routes/health.ts:13-15`), and if `DATABASE_URL` is set on Render, `projectStore.ts:144-146` falls through to direct Postgres (`createPgProjectStore`), which **fails to connect under Supabase Network Restrictions**. |
+| **`SUPABASE_JWT_SECRET`** | **EXISTING** | Render Dashboard → `scholar-agentic-os` → Environment | `verifyAccessToken()` (`server/src/middleware/auth.ts:167-173`) skips local HS256 verification and makes a live HTTPS `GET ${supabaseUrl}/auth/v1/user` call on every uncached token (8s timeout; returns HTTP `503` `{"error":"Could not verify your session right now. Please retry."}` on any GoTrue blip, `server/src/middleware/auth.ts:298-301`). |
+| **`MASTER_KEY`** | **EXISTING** *(MUST use existing value!)* | Render Dashboard → `scholar-agentic-os` → Environment | 1. **If missing**: `getMasterKeyFromEnv()` throws `MasterKeyNotConfiguredError("MASTER_KEY is not set. Generate one with services/crypto's generateMasterKeyBase64() and set it as a deployment secret — never commit it or paste it in chat.")` (`src/services/crypto/crypto.ts:105-111`), breaking all Premium AI routes (`server/src/aiEngine/credentialVault.ts:90`) and admin provider-key storage (`500`). Meanwhile `encryptCloudToken` (`server/routes/vault.ts:24-37`) falls back to `HMAC-SHA256(SUPABASE_SERVICE_ROLE_KEY, ...)`.<br>2. **If set to a NEW value before rotation**: `decrypt()` throws `DecryptionError("Decryption failed — wrong key, or the ciphertext was tampered with.")` (`src/services/crypto/crypto.ts:79`) on every `platform_provider_credentials` row. |
+| **`LLM_CHALLENGE_SECRET`** | **NEW** *(generate fresh `>=16` chars)* | Render Dashboard → `scholar-agentic-os` → Environment | 1. **In deployed `#80` (`cbf38da`)**: Does **not** error — `resolveLlmChallengeSecret()` (`server/utils/llm.ts:35-48`) silently falls back to `HMAC-SHA256(SUPABASE_SERVICE_ROLE_KEY || SUPABASE_JWT_SECRET, "scholar-core:llm-challenge-signing-key:v1")` (or ephemeral random bytes if both are unset).<br>2. **In follow-up PR `#81`**: Throws `Error("LLM_CHALLENGE_SECRET must be set (>= 16 chars) in production; refusing to fall back to SUPABASE_SERVICE_ROLE_KEY (F-13).")` (`server/utils/llm.ts:39-42`), returning HTTP `500` on `POST /api/ai/agent` and `POST /api/llm` (`requireChallenge: true`). **Set on Render before merging PR `#81`.** |
+| **`MAIN_ADMIN_EMAIL`** *(or `ADMIN_EMAIL`)* | **EXISTING** | Render Dashboard → `scholar-agentic-os` → Environment | `mainAdminEmail()` returns `null` (`server/src/middleware/requireAdmin.ts:66-69`): unless the user has an explicit row in `public.admin_users`, all `/api/admin/*` routes return HTTP `403` `{"error":"Admin access required"}`. |
+| **`CLOUDFLARE_TURNSTILE_SECRET_KEY`** *(or `CAPTCHA_SECRET_KEY`)* | **EXISTING / OPTIONAL** | Render Dashboard → `scholar-agentic-os` → Environment | `verifyCaptchaToken()` skips Turnstile verification (`{ success: true }`, `server/src/middleware/captchaVerify.ts:26-30`) on `POST /api/auth/verify-signup`. |
+| **`MAX_UPLOAD_MB`** | **EXISTING / OPTIONAL** | Render Dashboard → `scholar-agentic-os` → Environment | Safe default: `getMaxUploadMb()` returns `10` (`DEFAULT_MAX_UPLOAD_MB = 10`, clamped at `HARD_MAX_UPLOAD_MB_CEILING = 10` in `server/src/middleware/uploadGuard.ts:4-5,31-37`). |
 
 ---
 
-### Step 5 — PR #77 (`fix/rate-limit-trust-proxy-and-memory-caps`)
-- **Base Branch**: `main` | **Rebase Status**: Clean on `206deb6`.
-- **Explicit Dependency**: Depends on **Step 4 (`PR #76`)** (`proxy-addr` upgrade) and is a **mandatory prerequisite for Step 6 (`Hotfix 2 / PR #73`)**.
-- **Prod Changes**:
-  - Sets `app.set("trust proxy", 1)` in `server.ts`.
-  - Updates `getBaseIp(req)` in [`server/src/middleware/rateLimit.ts`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/server/src/middleware/rateLimit.ts#L143-L195) to inspect `X-Forwarded-For` from the **right-most hop** appended by Render, trusting `CF-Connecting-IP` (or `hops[hops.length - 2]`) **only** when the peer connecting to Render is verified to be within Cloudflare's published IPv4/IPv6 CIDR ranges (`isCloudflareIp`).
-  - Removes `User-Agent` from rate-limit bucket keys, caps `store` at `10,000` entries with `.unref()` on cleanup interval, and caps `memoryDecks` in `presentations.ts` at `100` entries.
-- **Required Env Vars**: None.
-- **Post-Deploy Checks**:
-  ```bash
-  # Send 6 rapid unauthenticated requests to /api/auth/verify-signup with rotating User-Agent and spoofed X-Forwarded-For:
-  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21; do
-    curl -sS -o /dev/null -w "Attempt $i -> %{http_code}\n" \
-      -X POST "https://scholar.gkshah.com.np/api/auth/verify-signup" \
-      -H "User-Agent: RotateBot/$i" \
-      -H "X-Forwarded-For: 203.0.113.$i" \
-      -H "Content-Type: application/json" \
-      -d '{}'
-  done
-  # Expected: Attempts 1..20 return 400; Attempt 21 returns 429 Too Many Requests.
-  ```
-- **Rollback Step**: Render Dashboard 1-click rollback to Step 4 deploy (stateless, zero DB changes).
+## 3. Spend-Cap & Billing Quota Checklist (Derived from Repo Provider Registry)
 
----
+Because `F-01` rotation is deferred to project end and `platform_provider_credentials` + `RESEND_API_KEY` remain active until rotation, enforce hard monthly spend caps / prepaid-only billing (no auto-recharge) on **every provider configured in `public.platform_provider_credentials`** as well as external paid infrastructure.
 
-### Step 6 — Hotfix 2 / PR #73 (`hotfix/db-storage-rpc-lockdown`)
-- **Base Branch**: `main` | **Rebase Status**: Clean on `206deb6`.
-- **Verification Caveat**: Marked **`UNVERIFIED AGAINST SUPABASE`** because Docker/Colima are not installed locally (`supabase start` could not be run). Verified via schema/column tests (`sqlRunbooksVerification.test.ts`) and Express/client unit tests (`hotfix2Lockdown.test.ts`).
-- **Explicit Dependency**: Requires **Step 4 (`PR #76`)** and **Step 5 (`PR #77`)** to be live first.
-- **Prod Changes (Strict 3-Substep Order from `HOTFIX2_DEPLOY.md`)**:
-  1. **6a — Deploy Express + SPA on Render First**: Adds `POST /api/auth/login` (identical `401` error message + constant-path GoTrue timing), `POST /api/auth/check-availability`, `GET /api/projects/:id/files/:fileId/signed-url`, and the `TICKET-SEC-01` notice in `AccountSettingsScreen.tsx`.
-  2. **6b — Take Encrypted `pg_dump` Backup & Apply SQL Migration in Supabase SQL Editor**: Run [`supabase/migrations/20261028000000_hotfix2_db_storage_rpc_lockdown.sql`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/migrations/20261028000000_hotfix2_db_storage_rpc_lockdown.sql) (enables RLS on `project_research_gaps`, `project_titles`, `project_journal_candidates`; sets all storage buckets `public = false`; drops `project_files_*` policies while keeping `id_documents_*_own` policies; revokes `PUBLIC, anon, authenticated` `EXECUTE` on the 6 account RPCs + `submit_id_document` with **zero** `CREATE OR REPLACE FUNCTION`).
-  3. **6c — Redeploy `request-profile-update` Edge Function**:
-     ```bash
-     npx supabase functions deploy request-profile-update --project-ref gfjhsijrwodjvkisouzw
-     ```
-     (Returns `HTTP 410 Gone` with `code: "PROFILE_UPDATE_DISABLED"` and never generates or returns `verificationKey`.)
-- **Required Env Vars**:
-  - Render: `VITE_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `CLOUDFLARE_TURNSTILE_SECRET_KEY`.
-  - Supabase Edge Functions: `RESEND_API_KEY`, `ADMIN_EMAIL`.
-- **Post-Deploy Checks**:
-  1. Run all 4 verification `SELECT` queries in [`HOTFIX2_DEPLOY.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/HOTFIX2_DEPLOY.md) Section 5.
-  2. Confirm direct `anon` RPC call is rejected with `401`/`403`:
-     ```bash
-     curl -sS -i -X POST "https://gfjhsijrwodjvkisouzw.supabase.co/rest/v1/rpc/email_for_username" \
-       -H "apikey: ${VITE_SUPABASE_ANON_KEY}" \
-       -H "Authorization: Bearer ${VITE_SUPABASE_ANON_KEY}" \
-       -H "Content-Type: application/json" \
-       -d '{"lookup_username":"admin"}'
-     # Expected: HTTP 401/403 permission denied for function email_for_username
-     ```
-  3. Confirm `POST https://scholar.gkshah.com.np/api/auth/login` signs in a valid test account (`200 OK`) and returns identical `401` responses for unknown username vs. wrong password without leaking the resolved email.
-  4. Confirm `request-profile-update` returns `HTTP 410 Gone`.
-- **Rollback Step**:
-  - If rolling back the Render app to Step 5, **first** run the Emergency Rollback SQL in `HOTFIX2_DEPLOY.md` Section 7 (`GRANT EXECUTE ON FUNCTION ... TO anon, authenticated;`) so browser login RPCs do not fail. (**Warning**: running that rollback SQL re-opens `F-14` PII enumeration.)
+Canonical source: **`CLOUD_PROVIDERS` in [`src/config/providerCatalog.ts`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/src/config/providerCatalog.ts#L159-L815)** (seeded into `public.ai_providers` by [`scripts/seedAiRegistry.ts`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/scripts/seedAiRegistry.ts#L20-L55)) defines **37 cloud AI providers**:
 
----
+| # | Provider ID (`providerCatalog.ts`) | Display Name | API Base URL | Action Required (If Active in `platform_provider_credentials`) |
+| :---: | :--- | :--- | :--- | :--- |
+| 1 | `gemini` | Google Gemini | `https://generativelanguage.googleapis.com/v1beta` | Set GCP Billing budget + API quota cap on Generative Language API |
+| 2 | `groq` | Groq | `https://api.groq.com/openai/v1` | Set monthly spend limit in Groq Console → Billing → Limits |
+| 3 | `cerebras` | Cerebras | `https://api.cerebras.ai/v1` | Set spend limit / disable auto-topup in Cerebras Cloud |
+| 4 | `openrouter` | OpenRouter | `https://openrouter.ai/api/v1` | Set per-key credit limit & disable auto-topup in OpenRouter → Keys |
+| 5 | `mistral` | Mistral AI | `https://api.mistral.ai/v1` | Set monthly usage cap in Mistral La Plateforme → Billing |
+| 6 | `zhipu` | Z.ai (GLM) | `https://open.bigmodel.cn/api/paas/v4` | Prepaid balance only; disable auto-recharge |
+| 7 | `huggingface` | Hugging Face | `https://router.huggingface.co/v1` | Set Inference Providers monthly spend cap in HF Billing |
+| 8 | `cloudflare` | Cloudflare Workers AI | *(account-scoped)* | Set Workers AI usage alert / cap (note: Cloudflare Global API Key leaked in `F-01`) |
+| 9 | `together` | Together AI | `https://api.together.xyz/v1` | Set monthly spend limit & disable auto-reload in Together Billing |
+| 10 | `fireworks` | Fireworks AI | `https://api.fireworks.ai/inference/v1` | Set monthly spend cap in Fireworks Account → Billing |
+| 11 | `deepinfra` | DeepInfra | `https://api.deepinfra.com/v1/openai` | Set spend limit & disable auto-topup in DeepInfra Billing |
+| 12 | `novita` | Novita AI | `https://api.novita.ai/v3/openai` | Disable auto-recharge on prepaid balance |
+| 13 | `hyperbolic` | Hyperbolic | `https://api.hyperbolic.xyz/v1` | Disable auto-topup on prepaid balance |
+| 14 | `nebius` | Nebius AI Studio | `https://api.studio.nebius.com/v1` | Set budget threshold limit in Nebius Billing |
+| 15 | `sambanova` | SambaNova | `https://api.sambanova.ai/v1` | Set spend cap / prepaid balance only |
+| 16 | `chutes` | Chutes AI | `https://llm.chutes.ai/v1` | Prepaid balance only |
+| 17 | `ai21` | AI21 Labs | `https://api.ai21.com/studio/v1` | Set monthly spend cap in AI21 Studio |
+| 18 | `moonshot` | Moonshot (Kimi) | `https://api.moonshot.ai/v1` | Prepaid balance only; disable auto-recharge |
+| 19 | `xai` | xAI (Grok) | `https://api.x.ai/v1` | Set monthly postpaid spend limit & disable auto-topup in xAI Console → Billing |
+| 20 | `deepseek` | DeepSeek | `https://api.deepseek.com` | Prepaid balance only; disable auto-topup in DeepSeek Platform |
+| 21 | `qwen` | Qwen (Alibaba) | `https://dashscope.aliyuncs.com/compatible-mode/v1` | Set Alibaba Cloud Model Studio / DashScope consumption quota cap |
+| 22 | `openai` | OpenAI | `https://api.openai.com/v1` | Set hard monthly budget limit & disable auto-recharge in OpenAI Platform → Limits |
+| 23 | `claude` | Anthropic Claude | `https://api.anthropic.com/v1` | Set monthly spend limit & disable auto-reload in Anthropic Console → Plans & Billing |
+| 24 | `cohere` | Cohere | `https://api.cohere.ai/v1` | Set billing spend limit in Cohere Dashboard |
+| 25 | `perplexity` | Perplexity | `https://api.perplexity.ai` | Disable auto-topup on API credit balance in Perplexity Settings → API |
+| 26 | `nvidia` | NVIDIA NIM | `https://integrate.api.nvidia.com/v1` | Credit-capped NGC / NIM pool only |
+| 27 | `scaleway` | Scaleway | `https://api.scaleway.ai/v1` | Set Scaleway Billing consumption alert / project quota |
+| 28 | `nscale` | Nscale | `https://inference.api.nscale.com/v1` | Prepaid credit cap only |
+| 29 | `inferencenet` | Inference.net | `https://api.inference.net/v1` | Prepaid credit cap; disable auto-reload |
+| 30 | `arliai` | Arli AI | `https://api.arliai.com/v1` | Prepaid tier cap only |
+| 31 | `upstage` | Upstage (Solar) | `https://api.upstage.ai/v1/solar` | Prepaid credit balance only |
+| 32 | `stepfun` | StepFun | `https://api.stepfun.com/v1` | Prepaid balance only |
+| 33 | `hunyuan` | Tencent Hunyuan | `https://api.hunyuan.cloud.tencent.com/v1` | Set Tencent Cloud billing cap / prepaid package |
+| 34 | `baseten` | Baseten | `https://inference.baseten.co/v1` | Set workspace billing cap in Baseten Settings |
+| 35 | `vercelgateway` | Vercel AI Gateway | `https://ai-gateway.vercel.sh/v1` | Set Spend Management hard pause limit in Vercel Team → Billing |
+| 36 | `minimax` | MiniMax | `https://api.minimaxi.com/v1` | Prepaid balance only |
+| 37 | `featherless` | Featherless AI | `https://api.featherless.ai/v1` | Fixed subscription tier (no metered overage) |
 
-### Step 7 — PR #75 (`fix/remove-supabase-fallbacks-and-harden-proxy`)
-- **Base Branch**: `main` | **Rebase Status**: Clean on `206deb6`.
-- **Prod Changes**:
-  - Removes hardcoded `https://gfjhsijrwodjvkisouzw.supabase.co` URL and `eyJ...` anon key fallbacks from `src/config/env.ts`, `server/src/supabaseRest.ts`, `server/routes/supabaseProxy.ts`, and `.github/workflows/deploy.yml`.
-  - Enforces subpath allowlist (`/auth/v1`, `/rest/v1`, `/storage/v1`, `/realtime/v1`, `/functions/v1`), IP rate limiting, and `rejectUnauthorized: true` TLS verification in `server/routes/supabaseProxy.ts`.
-- **Required Env Vars**:
-  - **Render Environment**: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` **MUST** be set (passed as Docker build args and runtime env vars).
-  - **GitHub Actions Secrets**: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` **MUST** be set (`gh secret list -R docgovinda-glitch/scholar-agentic-os`).
-- **Post-Deploy Checks**:
-  - `curl -sS -o /dev/null -w "%{http_code}\n" "https://scholar.gkshah.com.np/api/supabase/admin/v1/Forbidden"` → `403 Forbidden`.
-  - Load `https://scholar.gkshah.com.np` in browser and verify frontend initializes without missing-env error.
-- **Rollback Step**: Render Dashboard 1-click rollback to Step 6 deploy (stateless, zero DB changes).
-
----
-
-### Step 8 — PR #78 (`fix/ai-routes-auth-challenge-and-timeouts`)
-- **Base Branch**: `main` | **Rebase Status**: Clean on `206deb6`.
-- **Prod Changes**:
-  - Mounts `requireAuth` on `POST /api/ai/search`, `POST /api/ai/deep-research`, and `POST /api/ai/agent`, and binds `makeChallengeToken` strictly to `req.user.id` (ignoring `x-user-id` header).
-  - Requires dedicated `LLM_CHALLENGE_SECRET` in production (domain-separated from `SUPABASE_SERVICE_ROLE_KEY`).
-  - Fixes double-prefixed `/api/projects/:id/journal-compliance-report` route (`F-16`).
-  - Aligns `MAIN_ADMIN_EMAIL` and `ADMIN_EMAIL` across `requireAdmin.ts`, `render.yaml`, and `.env.example` (`F-15`).
-  - Adds `AbortSignal.timeout(15_000)` to outbound `fetch()` calls, `SIGTERM`/`SIGINT` graceful shutdown in `server.ts`, and `req.on("close")` SSE stream abort in `draftRoutes.ts` (`F-17`).
-- **Required Env Vars**:
-  - **Render Environment**: Set `LLM_CHALLENGE_SECRET` (`openssl rand -base64 32`) and confirm `MAIN_ADMIN_EMAIL` (or `ADMIN_EMAIL`) is set before merging.
-- **Post-Deploy Checks**:
-  - `curl -sS -o /dev/null -w "%{http_code}\n" -X POST "https://scholar.gkshah.com.np/api/ai/search" -H "Content-Type: application/json" -d '{"query":"test"}'` → `401 Unauthorized`.
-  - `curl -sS -o /dev/null -w "%{http_code}\n" -X POST "https://scholar.gkshah.com.np/api/ai/agent" -H "Content-Type: application/json" -d '{}'` → `401 Unauthorized`.
-  - Authenticated `POST /api/ai/agent` followed by `POST /api/ai/generate` with the returned `challengeToken` → `200 OK`.
-- **Rollback Step**: Render Dashboard 1-click rollback to Step 7 deploy (stateless, zero DB changes).
-
----
-
-### Step 9 — PR #79 (`fix/credential-encryption-and-honest-byok-ui`)
-- **Base Branch**: `main` | **Rebase Status**: Clean on `206deb6`.
-- **Important Security Caveat (`F-01` Dependency)**:
-  - `encryptCloudToken` in [`server/routes/vault.ts`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/server/routes/vault.ts#L13-L37) derives its AES-256-GCM key from `MASTER_KEY` / `CREDENTIAL_MASTER_KEY` (falling back to an HMAC of `SUPABASE_SERVICE_ROLE_KEY`). Because both `MASTER_KEY`/`ENCRYPTION_KEY` and `SUPABASE_SERVICE_ROLE_KEY` were leaked in `F-01`, **encryption at rest only provides real protection against an external attacker after Step 10 (`ROTATION_RUNBOOK.md`) rotates those keys**.
-- **Prod Changes**:
-  1. **9a — Deploy Express + SPA on Render**:
-     - Removes all server-side reads/writes to `public.api_credentials` (`storeProviderKey` / `forgetProviderKey` in `supabaseAuthService.ts` become local no-ops; BYOK keys remain purely in browser `sessionStorage`/`localStorage`).
-     - Updates UI disclosures in `AiSettingsPanel.tsx` and `UserProfileGate.tsx` to state honestly that personal BYOK keys stay in browser storage for the session and are transmitted over HTTPS to the Scholar Core backend on each AI request to relay the call to the upstream provider.
-     - Encrypts Google Drive, OneDrive, Zotero, and Mendeley OAuth tokens in `public.user_cloud_integrations` via `encryptCloudToken` (`enc:v1:...`) and strips `access_token`/`refresh_token` from `GET /api/vault/cloud/connections`.
-  2. **9b — Apply SQL Migration in Supabase SQL Editor**:
-     - Run [`supabase/migrations/20261028010000_purge_plaintext_credentials.sql`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/migrations/20261028010000_purge_plaintext_credentials.sql) to delete all existing plaintext rows in `public.api_credentials` and `public.user_cloud_integrations` and drop direct client policies on `public.user_cloud_integrations`, forcing users to reconnect cloud integrations cleanly.
-- **Required Env Vars**:
-  - Render: `MASTER_KEY` (32-byte base64 key).
-- **Post-Deploy Checks**:
-  - Run `PROD_CHECKS.md` Check `2.3` in Supabase SQL Editor and confirm `has_unencrypted_plaintext_rows = false` for both `api_credentials` and `user_cloud_integrations`.
-- **Rollback Step**: Render Dashboard 1-click rollback to Step 8 deploy (`decryptCloudToken` is backward-compatible; purged plaintext tokens require user reconnection either way).
-
----
-
-### Step 10 — End-of-Project Credential Rotation & Git History Scrub (`ROTATION_RUNBOOK.md`)
-- **When**: At project end per owner decision on `F-01`.
-- **Procedure**: Follow [`ROTATION_RUNBOOK.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/ROTATION_RUNBOOK.md) Steps 1–6 and Section 5 (`git filter-repo`), then send [`USER_NOTICE.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/USER_NOTICE.md) once the Pre-Send Verification Checklist in `USER_NOTICE.md` is 100% green.
-
+**Non-AI Paid / Quota-Bearing Services Referenced in Repo**:
+1. **Supabase (`gfjhsijrwodjvkisouzw`)**: Enable **Spend Cap = ON** on Supabase Pro (**Organization / Project Billing → Spend Cap**) so storage/egress cannot bill unbounded overages while `SUPABASE_SERVICE_ROLE_KEY` remains unrotated.
+2. **Resend (`RESEND_API_KEY` leaked in `F-01`, `supabase/functions/_shared/resend.ts:13`)**: Keep plan capped (or restrict sending domain / daily quota in Resend Dashboard) so an attacker holding `RESEND_API_KEY` cannot incur email overage charges or burn domain reputation.
+3. **Tavily (`TAVILY_API_KEY`, `supabase/functions/search-proxy/index.ts:14`)**: Keep hard monthly credit limit enabled in Tavily Dashboard (`API Keys → Limit`).
+4. **Render (`srv-d9lgbn710e5c73dl8sk0`, `render.yaml:6`)**: Locked on `plan: free` (`src/__tests__/render.costGuard.test.ts`).

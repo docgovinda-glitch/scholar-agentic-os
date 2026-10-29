@@ -4,6 +4,7 @@ import { getAiAccessStatus } from "../aiAccess/aiAccessApi";
 import { EDUCATION_LEVELS, USER_TYPES } from "../../config/accountSchema";
 import { Field, PhoneField, SelectField } from "../auth/AuthLayout";
 import { e164Problem, DEFAULT_COUNTRY_ISO2, findCountry } from "../../config/countries";
+import CredentialResetNotice from "../security/CredentialResetNotice";
 
 export type SettingsTab = "personal" | "security" | "subscription";
 
@@ -191,6 +192,9 @@ export default function AccountSettingsScreen({
             </svg>
           </button>
         </header>
+
+        {/* Affected-user security notice after plaintext credential/token purge (F-11) */}
+        <CredentialResetNotice className="mx-6 mt-3" />
 
         {/* Modal Body: Side Navigation + Content Panel */}
         <div className="flex flex-col md:flex-row flex-1 min-h-0">
