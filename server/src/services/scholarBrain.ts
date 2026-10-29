@@ -15,6 +15,7 @@
 
 import { completeWithFailover, streamWithFailover } from "../../../src/platform/gateway/gateway.ts";
 import type { CandidateProvider } from "../../../src/platform/gateway/types.ts";
+import { resolveClientAiConfig } from "../ai/clientAiConfig.ts";
 import { defaultPolicy } from "../../../src/platform/warden/policy.ts";
 import { recordConsent, type EgressPolicy } from "../../../src/platform/warden/warden.ts";
 import type { TaskClass } from "../../../src/platform/warden/types.ts";
@@ -164,51 +165,7 @@ export function extractTransientClientAiConfig(
   provider?: string;
   model?: string;
 } {
-  const headers = req?.headers ?? {};
-
-  const getHeader = (key: string): string | undefined => {
-    const val = headers[key.toLowerCase()];
-    if (Array.isArray(val)) return val[0];
-    return typeof val === "string" ? val : undefined;
-  };
-
-  const provider =
-    overrides?.provider ||
-    getHeader("x-ai-provider") ||
-    getHeader("x-provider");
-
-  const model =
-    overrides?.model ||
-    getHeader("x-ai-model") ||
-    getHeader("x-model");
-
-  const apiKey =
-    overrides?.apiKey ||
-    getHeader("x-ai-api-key") ||
-    getHeader("x-api-key");
-
-  const baseUrl =
-    overrides?.baseUrl ||
-    getHeader("x-ai-base-url") ||
-    getHeader("x-base-url");
-
-  const candidates: CandidateProvider[] = [];
-
-  const isLocalProvider =
-    provider === "ollama" ||
-    provider === "lmstudio" ||
-    provider === "localai" ||
-    provider === "vllm";
-
-  if (provider && (apiKey || baseUrl || isLocalProvider)) {
-    candidates.push({
-      provider: provider as CandidateProvider["provider"],
-      model: model || undefined,
-      apiKey: apiKey || (isLocalProvider ? "local-no-credential-required" : ""),
-      baseUrl: baseUrl || undefined,
-    });
-  }
-
+  const { candidates, provider, model } = resolveClientAiConfig(req?.headers, overrides);
   return { candidates, provider, model };
 }
 
