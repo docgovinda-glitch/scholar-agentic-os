@@ -41,6 +41,23 @@ jobs:
           sudo apt-get install -y --no-install-recommends libreoffice-impress poppler-utils fonts-liberation
           npx playwright install --with-deps chromium
 
+      # Decks use Georgia for serif text (quotes, editorial themes). Ubuntu has
+      # no Georgia, so both Chromium and LibreOffice would fall back to a much
+      # wider serif. Gelasio is metric-compatible with Georgia (SIL OFL).
+      - name: Install a Georgia-compatible font
+        run: |
+          mkdir -p ~/.fonts ~/.config/fontconfig
+          for spec in "0,400" "0,700" "1,400" "1,700"; do
+            url=$(curl -fsS "https://fonts.googleapis.com/css2?family=Gelasio:ital,wght@${spec}" | grep -o 'https://[^)]*\.ttf' | head -1)
+            curl -fsSL -o ~/.fonts/"Gelasio-${spec/,/-}.ttf" "$url"
+          done
+          cat > ~/.config/fontconfig/fonts.conf <<'XML'
+          <?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+          <fontconfig><alias binding="same"><family>Georgia</family><prefer><family>Gelasio</family></prefer></alias></fontconfig>
+          XML
+          fc-cache -f
+          fc-match Georgia
+
       - name: Start dev server
         run: |
           PORT=3000 npm run dev > dev-server.log 2>&1 &
