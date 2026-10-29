@@ -106,31 +106,21 @@ describe("Stage 4: Gap Selection (GapSelectionStage)", () => {
     expect(onAdvanceMock).toHaveBeenCalledWith("gap_identification");
   });
 
-  it("allows auto-synthesizing candidate gaps directly from Stage 4 empty state", async () => {
+  it("offers no way to synthesize invented gaps from the empty state", () => {
+    // Rewritten 2026-10-29: the empty state used to offer "Auto-Synthesize
+    // Gaps", which created locally invented gaps. It now points back to
+    // Gap Identification only.
     render(
       <GapSelectionStage
         stage="gap_selection"
-        projectId="proj-sel-101"
+        projectId="proj-gap-sel-101"
         project={mockProjectEmpty}
         onAdvance={vi.fn()}
       />
     );
-
-    const autoBtn = screen.getByRole("button", { name: /Auto-Synthesize Gaps/i });
-    fireEvent.click(autoBtn);
-
-    await waitFor(() => {
-      expect(screen.queryByText(/No Research Gaps Identified Yet/i)).not.toBeInTheDocument();
-      expect(screen.getAllByText(/PRIMARY ANCHOR/i).length).toBeGreaterThanOrEqual(1);
-    });
-
-    expect(api.saveIntakeAnswers).toHaveBeenCalledWith(
-      "proj-sel-101",
-      expect.objectContaining({
-        current_stage: "gap_selection",
-        selected_gap: expect.any(String),
-      })
-    );
+    expect(screen.getByText(/No Research Gaps Identified Yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Auto-Synthesize Gaps/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Go to Stage 3: Gap Identification/i })).toBeInTheDocument();
   });
 
   it("renders discovered gap cards with titles, scores, and typologies", () => {

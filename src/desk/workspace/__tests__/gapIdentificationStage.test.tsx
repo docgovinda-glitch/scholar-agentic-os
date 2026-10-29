@@ -255,7 +255,9 @@ describe("Stage 3: Gap Identification (GapIdentificationStage)", () => {
     expect(onAdvanceMock).toHaveBeenCalledWith("gap_selection");
   });
 
-  it("falls back to local heuristic synthesis when executeAgenticLLM throws", async () => {
+  it("adds no gaps and says so when the AI fails", async () => {
+    // Rewritten 2026-10-29: this used to assert locally synthesized gaps
+    // being saved on AI failure.
     (api.executeAgenticLLM as any).mockRejectedValue(new Error("AI quota exhausted or offline"));
 
     render(
@@ -267,22 +269,11 @@ describe("Stage 3: Gap Identification (GapIdentificationStage)", () => {
       />
     );
 
-    const runBtn = screen.getByRole("button", { name: /Run Gap Identification/i });
-    fireEvent.click(runBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Run Gap Identification/i }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: /Run Gap Identification/i })).not.toBeInTheDocument();
+      expect(screen.getAllByText(/Gap identification unavailable: nothing was added|AI quota exhausted or offline/i).length).toBeGreaterThan(0);
     });
-
-    expect(screen.getAllByText(/Candidate Research Gaps/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Empirical Gap/i)).toBeInTheDocument();
-
-    expect(api.saveIntakeAnswers).toHaveBeenCalledWith(
-      "proj-gap-101",
-      expect.objectContaining({
-        identified_gaps: expect.any(String),
-        current_stage: "gap_identification",
-      })
-    );
+    expect(api.saveIntakeAnswers).not.toHaveBeenCalled();
   });
 });
