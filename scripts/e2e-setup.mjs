@@ -29,10 +29,13 @@ async function ensure(email, password) {
   }
   const p = await fetch(`${SUPA}/rest/v1/profiles?id=eq.${id}`, {
     method: "PATCH",
-    headers: { ...headers, Prefer: "return=minimal" },
+    headers: { ...headers, Prefer: "return=representation" },
     body: JSON.stringify({ user_type: "student", education_level: "masters" }),
   });
-  if (!p.ok) throw new Error(`profile update failed for test account: HTTP ${p.status} ${await p.text()}`);
+  const rows = p.ok ? await p.json() : [];
+  if (!p.ok || rows.length !== 1 || rows[0].user_type !== "student") {
+    throw new Error(`profile update failed for test account: HTTP ${p.status}, ${rows.length} rows`);
+  }
   console.log(`ready: test account ${email.split("@")[0].slice(0, 1)}***`);
 }
 
