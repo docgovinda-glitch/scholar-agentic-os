@@ -134,44 +134,6 @@ export default function OriginalityCheckStage({
     };
   }, []);
 
-  // Resilient domain-aware offline fallback scanner
-  const generateFallbackReport = useCallback((): OriginalityReport => {
-    const flags: OriginalityFlag[] = [
-      {
-        id: "flag-01",
-        section: "Methodology",
-        issue: "Standard Mathematical Formulation Overlap",
-        severity: "low",
-        similarityPercentage: 2.8,
-        snippet: "We formulate the verification problem as a deterministic bipartite matching operator between assertions and empirical evidence.",
-        matchedSource: "IEEE Transactions on Information Theory (Vol. 69, Issue 4)",
-        suggestion: "Replace standard textbook phrasing with domain-specific parameterized definitions, or declare as standardized bipartite terminology.",
-        resolutionStatus: "unresolved",
-      },
-      {
-        id: "flag-02",
-        section: "Introduction",
-        issue: "Conventional Academic Phrasing Overlap",
-        severity: "low",
-        similarityPercentage: 1.6,
-        snippet: "In recent years, the rapid proliferation of generative multi-agent systems has underscored the necessity for rigorous evaluation.",
-        matchedSource: "ACM Computing Surveys (2023 Review Article)",
-        suggestion: "Recast opening claim with direct empirical grounding in the specific Byzantine failure conditions under evaluation.",
-        resolutionStatus: "unresolved",
-      },
-    ];
-
-    const overallScore = 96; // 96% original, 4.4% total overlap
-    return {
-      score: overallScore,
-      similarityIndex: 4,
-      thresholdLimit: targetTolerance,
-      scannedSourcesCount: 142850000,
-      integrityHash: `SHA-256: 7f8a9e2d3c4b1a0f9e8d7c6b5a4f3e2d1c0b9a8f`,
-      flags,
-      scannedAt: new Date().toISOString(),
-    };
-  }, [targetTolerance]);
 
   // Execute Agentic Originality Scan
   const startAgent = async () => {
@@ -182,31 +144,19 @@ export default function OriginalityCheckStage({
         id: "log-init-" + Date.now(),
         timestamp: new Date().toLocaleTimeString([], { hour12: false }),
         level: "info",
-        message: `Initializing Deep Academic Originality Scanner for "${workingTitle}"...`,
+        message: `Starting AI phrasing review for "${workingTitle}"…`,
       },
     ]);
 
-    const logsArray = [
-      "Generating 16-gram shingles across all manuscript sections...",
-      "Querying CrossRef, arXiv, PubMed, and Semantic Scholar corpora...",
-      "Executing embedding-space semantic overlap detection against 142M+ publications...",
-      `Checking similarity limits against ${targetJournal} policy (< ${targetTolerance}% threshold)...`,
-      "Filtering standard mathematical equations and discipline nomenclature...",
-      "Verifying proper attribution formatting for all approved Vault sources...",
-      "Compiling cryptographic academic integrity attestation ledger...",
-    ];
-
-    logIntervalRef.current = setInterval(() => {
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString() + Math.random(),
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "action",
-          message: logsArray[Math.floor(Math.random() * logsArray.length)],
-        },
-      ]);
-    }, 850);
+    setLogs((prev) => [
+      ...prev,
+      {
+        id: "log-wait-" + Date.now(),
+        timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+        level: "info",
+        message: "Waiting for the AI phrasing review…",
+      },
+    ]);
 
     try {
       await authedStreamFetch(
@@ -229,34 +179,45 @@ export default function OriginalityCheckStage({
             let parsedReport: OriginalityReport | null = null;
             const resData = data?.data;
 
-            if (resData && typeof resData === "object") {
-              const score = typeof resData.score === "number" ? resData.score : 95;
+            if (resData && typeof resData === "object" && typeof resData.score === "number") {
               const rawFlags = Array.isArray(resData.flags) ? resData.flags : [];
-              const parsedFlags: OriginalityFlag[] = rawFlags.map((f: any, idx: number) => ({
-                id: f.id || `flag-${idx + 1}`,
-                section: f.section || "Introduction",
-                issue: f.issue || "Structural Overlap",
-                severity: f.severity || "low",
-                similarityPercentage: f.similarity || 2.5,
-                snippet: f.snippet || "Synthesized academic statement",
-                matchedSource: f.matchedSource || "CrossRef Academic Corpus",
-                suggestion: f.suggestion || "Synthesize into active voice or cite primary literature.",
-                resolutionStatus: "unresolved",
-              }));
+              const parsedFlags: OriginalityFlag[] = rawFlags
+                .filter((f: any) => typeof f?.snippet === "string" && f.snippet.trim())
+                .map((f: any, idx: number) => ({
+                  id: f.id || `flag-${idx + 1}`,
+                  section: f.section || "Unspecified section",
+                  issue: f.issue || "Phrasing flagged by AI",
+                  severity: f.severity || "low",
+                  similarityPercentage: typeof f.similarity === "number" ? f.similarity : 0,
+                  snippet: f.snippet,
+                  matchedSource: f.matchedSource || "",
+                  suggestion: f.suggestion || "",
+                  resolutionStatus: "unresolved",
+                }));
 
               parsedReport = {
-                score,
-                similarityIndex: Math.max(1, 100 - score),
+                score: resData.score,
+                similarityIndex: Math.max(0, 100 - resData.score),
                 thresholdLimit: targetTolerance,
-                scannedSourcesCount: 142850000,
-                integrityHash: `SHA-256: 7f8a9e2d3c4b1a0f9e8d7c6b5a4f3e2d1c0b9a8f`,
+                // An AI review scans no corpus and produces no attestation.
+                scannedSourcesCount: 0,
+                integrityHash: "",
                 flags: parsedFlags,
                 scannedAt: new Date().toISOString(),
               };
             }
 
             if (!parsedReport) {
-              parsedReport = generateFallbackReport();
+              setLogs((prev) => [
+                ...prev,
+                {
+                  id: "log-empty-" + Date.now(),
+                  timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                  level: "error",
+                  message: "The AI review returned no usable result. Nothing was generated.",
+                },
+              ]);
+              return;
             }
 
             setReport(parsedReport);
@@ -266,21 +227,19 @@ export default function OriginalityCheckStage({
                 id: "log-done-" + Date.now(),
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                 level: "success",
-                message: `Originality scan complete: ${parsedReport.score}% unique. Passed ${targetJournal} limits.`,
+                message: `AI phrasing review complete: estimated ${parsedReport.score}% original phrasing. This is not a plagiarism check.`,
               },
             ]);
           } else if (event === "error") {
             clearTimer();
-            console.warn("Originality stream error, engaging domain-aware offline fallback scanner:", data);
-            const fallback = generateFallbackReport();
-            setReport(fallback);
+            console.warn("Originality review stream error:", data);
             setLogs((prev) => [
               ...prev,
               {
-                id: "log-fallback-" + Date.now(),
+                id: "log-fail-" + Date.now(),
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                level: "info",
-                message: `Engaged local originality scanner: ${fallback.score}% unique. Zero unauthorized plagiarism detected.`,
+                level: "error",
+                message: "AI phrasing review unavailable: nothing was generated. Connect an AI provider in AI Access, or try again.",
               },
             ]);
           }
@@ -288,16 +247,14 @@ export default function OriginalityCheckStage({
       );
     } catch (err: any) {
       clearTimer();
-      console.warn("Remote originality agent unavailable, activating local fallback scanner:", err);
-      const fallback = generateFallbackReport();
-      setReport(fallback);
+      console.warn("Originality review unavailable:", err);
       setLogs((prev) => [
         ...prev,
         {
-          id: "log-fallback-err-" + Date.now(),
+          id: "log-fail-" + Date.now(),
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "info",
-          message: `Engaged local originality scanner: ${fallback.score}% unique. Zero unauthorized plagiarism detected.`,
+          level: "error",
+          message: "AI phrasing review unavailable: nothing was generated. Connect an AI provider in AI Access, or try again.",
         },
       ]);
     } finally {
@@ -532,18 +489,18 @@ export default function OriginalityCheckStage({
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         <JournalStageInstructionBanner
           milestoneTitle="Milestone 7 · Integrity & Pre-Flight Audit"
-          stageLabel="Academic Originality & Cross-Corpus Overlap Scan"
-          description="N-gram semantic similarity scanner auditing section drafts against literature and preprints to detect unintentional verbatim phrasing and ensure academic voice uniqueness."
+          stageLabel="AI Phrasing Review"
+          description="An AI model reviews your section drafts for conventional or possibly unoriginal phrasing. It does not search published literature and is not a plagiarism check."
           instructions={[
-            "Click 'Begin Originality Scan' to trigger 16-gram overlap detection across all sections",
-            "Review detected similarity index and individual phrasing flags",
+            "Click 'Start AI Phrasing Review' to have the AI read all sections",
+            "Review the phrasing it flags",
             "Use one-click 'Auto-Paraphrase' to rewrite flagged conventional expressions",
-            "Confirm originality certification before proceeding to Draft Preview",
+            "Run your institution's similarity checker before submission",
           ]}
           targetJournal={project?.answers?.["selected_journal_name"] || project?.answers?.["target_journal"]}
           tips={[
             "Top journals flag manuscripts with >15% aggregate similarity or clusters of verbatim phrasing.",
-            "Standard mathematical definitions and bibliographies are filtered automatically.",
+            "This review cannot detect overlap with published work.",
           ]}
         />
 
@@ -567,7 +524,7 @@ export default function OriginalityCheckStage({
 
               <div className="text-center font-mono relative z-10">
                 <div className="font-bold text-sm text-[color:var(--text-primary)] mb-0.5">
-                  {isProcessing ? "SCANNING 142M+ DBs..." : "SCAN COMPLETE"}
+                  {isProcessing ? "AI REVIEW RUNNING…" : "AI REVIEW COMPLETE"}
                 </div>
                 <div className="text-[color:var(--text-muted)] text-xs uppercase tracking-wider">
                   Shingle Fingerprint
@@ -599,10 +556,10 @@ export default function OriginalityCheckStage({
               </div>
               <div>
                 <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
-                  Originality Score
+                  AI-estimated originality
                 </div>
                 <div className="text-base font-extrabold text-[color:var(--text-primary)]">
-                  {report.score >= 90 ? "Publication Safe" : "Action Needed"}
+                  {report.score >= 90 ? "Few phrasing concerns" : "Review flagged phrasing"}
                 </div>
               </div>
             </div>
@@ -619,20 +576,20 @@ export default function OriginalityCheckStage({
                 <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span>Below {report.thresholdLimit}% tolerance</span>
+                <span>Journal guideline: under {report.thresholdLimit}% similarity</span>
               </div>
             </div>
 
             {/* Databases scanned */}
             <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl p-5 shadow-xs">
               <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
-                Literature Corpora
+                Method
               </div>
-              <div className="text-2xl font-black text-[color:var(--text-primary)] mt-1">
-                142M+
+              <div className="text-base font-black text-[color:var(--text-primary)] mt-1">
+                AI model review
               </div>
               <div className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-                CrossRef, arXiv, PubMed, IEEE
+                No literature databases were searched
               </div>
             </div>
 
@@ -720,7 +677,7 @@ export default function OriginalityCheckStage({
               {filteredFlags.length === 0 ? (
                 <div className="p-8 text-center text-[color:var(--text-secondary)]">
                   {report.flags.length === 0
-                    ? "Zero plagiarism or semantic overlap detected across all scanned academic databases."
+                    ? "The AI review flagged no phrasing. This is not a plagiarism check against published literature."
                     : "No flags matching the current filter."}
                 </div>
               ) : (
@@ -846,18 +803,6 @@ export default function OriginalityCheckStage({
               )}
             </div>
 
-            {/* Cryptographic Attestation Footer */}
-            {report.integrityHash && (
-              <div className="p-4 bg-[color:var(--surface-sunken)] border-t border-[color:var(--border-subtle)] flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-mono text-[color:var(--text-muted)]">
-                <div className="flex items-center gap-2 truncate">
-                  <svg className="w-4 h-4 text-[color:var(--state-success)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                  <span className="truncate">Attestation: {report.integrityHash}</span>
-                </div>
-                <span>Certified: {new Date(report.scannedAt).toLocaleDateString()}</span>
-              </div>
-            )}
           </div>
         )}
 
@@ -870,10 +815,10 @@ export default function OriginalityCheckStage({
               </svg>
             </div>
             <h3 className="text-xl font-bold text-[color:var(--text-primary)]">
-              Ready for Academic Originality & Overlap Verification
+              AI Phrasing Review
             </h3>
             <p className="text-sm text-[color:var(--text-secondary)] mt-2 max-w-lg">
-              The Originality Agent will cross-examine your manuscript draft against 142M+ scientific publications across CrossRef, arXiv, and IEEE to certify zero plagiarism and verify journal tolerance compliance.
+              An AI model reads your draft and flags conventional or possibly unoriginal phrasing. It does not compare your text against published literature, so it is not a plagiarism check. Use your institution's similarity checker before submission.
             </p>
             <button
               onClick={startAgent}
@@ -882,7 +827,7 @@ export default function OriginalityCheckStage({
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
-              <span>Begin Originality Scan</span>
+              <span>Start AI Phrasing Review</span>
             </button>
           </div>
         )}
@@ -894,7 +839,7 @@ export default function OriginalityCheckStage({
           <div className="w-2.5 h-2.5 rounded-full bg-[color:var(--state-success)] animate-pulse" />
           <span className="text-xs font-mono text-[color:var(--text-secondary)]">
             {report
-              ? `${report.score}% Originality Score • Tolerance < ${report.thresholdLimit}% Overlap Passed`
+              ? `AI-estimated ${report.score}% original phrasing • not a plagiarism check`
               : "Scan pending"}
           </span>
         </div>
@@ -914,7 +859,7 @@ export default function OriginalityCheckStage({
               </>
             ) : (
               <>
-                <span>Confirm Originality Attestation & Proceed to Draft Preview</span>
+                <span>Proceed to Draft Preview</span>
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
