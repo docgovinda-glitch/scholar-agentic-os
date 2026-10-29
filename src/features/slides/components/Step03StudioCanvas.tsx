@@ -8,7 +8,10 @@
  * PowerPoint show.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Copy, ImagePlus, ImageOff, Minus, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Copy, GripVertical, ImagePlus, ImageOff, Minus, Plus, Redo2, Sparkles, Trash2, Undo2, Wand2 } from 'lucide-react';
+import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { CardContent, GammaLayout, SlideCard, SlideDeck } from '../types/slides';
 import InSlidePromptCopilot from './InSlidePromptCopilot';
 import { GammaSlide } from '../gamma/GammaCard';
@@ -23,7 +26,10 @@ import {
   writeCardContent,
 } from '../gamma/content';
 import { DEFAULT_DECK_THEME_ID, resolveDeckTheme } from '../gamma/theme';
-import { ExportPptxButton, LayoutGlyph, ThemeMenu } from '../gamma/StudioControls';
+import { ExportPptxButton, ThemeMenu } from '../gamma/StudioControls';
+import { autoDesignDeck } from '../gamma/composer';
+import { useDeckHistory } from '../gamma/useDeckHistory';
+import type { DeckTheme } from '../gamma/theme';
 
 export interface Step03StudioCanvasProps {
   deck: SlideDeck;
@@ -110,6 +116,74 @@ async function imageFileToDataUrl(file: File, maxSide = 1600): Promise<string> {
 
 const UNIT_LIMIT: Partial<Record<GammaLayout, number>> = { bento: 6, stats: 4, timeline: 5, comparison: 6, list: 6, split: 4 };
 
+interface ThumbProps {
+  slide: SlideCard;
+  index: number;
+  total: number;
+  active: boolean;
+  theme: DeckTheme;
+  onSelect: () => void;
+  onMove: (dir: -1 | 1) => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}
+
+/** One draggable card in the rail. Click selects; drag (or the grip + arrow keys) reorders. */
+function SortableThumb({ slide, index, total, active, theme, onSelect, onMove, onDuplicate, onDelete }: ThumbProps) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: slide.id });
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 20 : undefined }}
+      className={`group relative shrink-0 w-[168px] lg:w-auto ${isDragging ? 'opacity-80' : ''}`}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-current={active ? 'true' : undefined}
+        aria-label={`Slide ${index + 1}: ${slide.actionHeadline}`}
+        data-testid={`studio-thumb-${index}`}
+        className="w-full flex items-start gap-2 text-left cursor-pointer"
+        {...listeners}
+      >
+        <span className={`w-4 pt-1 text-[11px] tabular-nums text-right shrink-0 ${active ? 'text-neutral-900 dark:text-white font-semibold' : 'text-neutral-400'}`}>{index + 1}</span>
+        <span
+          className={`block flex-1 rounded-[10px] transition-shadow pointer-events-none ${
+            active ? 'ring-2 ring-neutral-900 dark:ring-neutral-100 ring-offset-2 ring-offset-[#F8F7F4] dark:ring-offset-[#171717]' : 'ring-1 ring-transparent group-hover:ring-neutral-900/20 dark:group-hover:ring-white/20'
+          }`}
+        >
+          <GammaSlide slide={slide} index={index} theme={theme} />
+        </span>
+      </button>
+      <div className="absolute right-1 top-1 hidden group-hover:flex group-focus-within:flex items-center gap-0.5 p-0.5 rounded-lg bg-white/95 dark:bg-[#212121]/95 shadow-sm ring-1 ring-neutral-900/10 dark:ring-white/10">
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          className={`${iconBtn} cursor-grab active:cursor-grabbing`}
+          title="Drag to reorder (or focus and use arrow keys)"
+          aria-label={`Reorder slide ${index + 1}`}
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </button>
+        <button type="button" className={iconBtn} title="Move up" aria-label={`Move slide ${index + 1} up`} disabled={index === 0} onClick={() => onMove(-1)}>
+          <ChevronUp className="w-3.5 h-3.5" />
+        </button>
+        <button type="button" className={iconBtn} title="Move down" aria-label={`Move slide ${index + 1} down`} disabled={index === total - 1} onClick={() => onMove(1)}>
+          <ChevronDown className="w-3.5 h-3.5" />
+        </button>
+        <button type="button" className={iconBtn} title="Duplicate" aria-label={`Duplicate slide ${index + 1}`} onClick={onDuplicate}>
+          <Copy className="w-3.5 h-3.5" />
+        </button>
+        <button type="button" className={iconBtn} title="Delete" aria-label={`Delete slide ${index + 1}`} onClick={onDelete}>
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </li>
+  );
+}
+
 export default function Step03StudioCanvas({ deck, onUpdateDeck, onPrevStep, onNextStep }: Step03StudioCanvasProps) {
   const [activeIndex, setActiveIndex] = useState(() => Math.min(deck.activeSlideIndex || 0, Math.max(0, deck.slides.length - 1)));
   const [showCopilot, setShowCopilot] = useState(false);
@@ -125,20 +199,45 @@ export default function Step03StudioCanvas({ deck, onUpdateDeck, onPrevStep, onN
     if (activeIndex > slides.length - 1 && slides.length > 0) setActiveIndex(slides.length - 1);
   }, [activeIndex, slides.length]);
 
+  const history = useDeckHistory(deck, onUpdateDeck);
+
   const commit = useCallback(
-    (nextSlides: SlideCard[], nextIndex = index) => {
-      onUpdateDeck({ ...deck, slides: renumber(nextSlides), activeSlideIndex: nextIndex, updatedAt: new Date().toISOString() });
+    (nextSlides: SlideCard[], nextIndex = index, kind?: string) => {
+      history.apply({ ...deck, slides: renumber(nextSlides), activeSlideIndex: nextIndex, updatedAt: new Date().toISOString() }, kind);
     },
-    [deck, index, onUpdateDeck],
+    [deck, index, history],
   );
 
   const updateSlide = useCallback(
-    (i: number, fn: (s: SlideCard) => SlideCard) => {
+    (i: number, fn: (s: SlideCard) => SlideCard, kind?: string) => {
       const next = [...slides];
       next[i] = fn(next[i]);
-      commit(next, i);
+      commit(next, i, kind);
     },
     [slides, commit],
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const from = slides.findIndex((s) => s.id === active.id);
+    const to = slides.findIndex((s) => s.id === over.id);
+    if (from < 0 || to < 0) return;
+    const wasActive = slides[index]?.id;
+    const next = arrayMove(slides, from, to);
+    const ni = Math.max(0, next.findIndex((s) => s.id === wasActive));
+    setActiveIndex(ni);
+    commit(next, ni);
+  };
+
+  // Every layout, rendered with this card's own content.
+  const layoutPreviews = useMemo(
+    () => (slides[index] ? GAMMA_LAYOUTS.map((l) => ({ ...l, slide: { ...slides[index], layoutType: l.id } as SlideCard })) : []),
+    [slides, index],
   );
 
   const select = (i: number) => {
@@ -250,7 +349,24 @@ export default function Step03StudioCanvas({ deck, onUpdateDeck, onPrevStep, onN
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ThemeMenu deck={deck} onUpdateDeck={onUpdateDeck} />
+          <div className="inline-flex items-center h-8 rounded-full ring-1 ring-neutral-900/10 dark:ring-white/10 overflow-hidden">
+            <button type="button" onClick={history.undo} disabled={!history.canUndo} title="Undo (⌘Z)" aria-label="Undo" className="h-8 w-8 inline-flex items-center justify-center text-neutral-600 dark:text-neutral-300 hover:bg-white dark:hover:bg-white/[0.05] disabled:opacity-30 cursor-pointer">
+              <Undo2 className="w-3.5 h-3.5" />
+            </button>
+            <button type="button" onClick={history.redo} disabled={!history.canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className="h-8 w-8 inline-flex items-center justify-center text-neutral-600 dark:text-neutral-300 hover:bg-white dark:hover:bg-white/[0.05] disabled:opacity-30 cursor-pointer">
+              <Redo2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => history.apply({ ...autoDesignDeck(deck), activeSlideIndex: index })}
+            title="Pick a layout for every card from its content"
+            data-testid="studio-auto-design-btn"
+            className={pillBtn}
+          >
+            <Wand2 className="w-3.5 h-3.5" /> Auto-design
+          </button>
+          <ThemeMenu deck={deck} onUpdateDeck={(d) => history.apply(d)} />
           <ExportPptxButton deck={deck} />
           <button
             type="button"
@@ -267,46 +383,26 @@ export default function Step03StudioCanvas({ deck, onUpdateDeck, onPrevStep, onN
       <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-6 items-start">
         {/* Thumbnail rail */}
         <aside aria-label="Slides" className="lg:sticky lg:top-0 space-y-2 lg:max-h-[calc(100vh-180px)] lg:overflow-y-auto lg:pr-1 -mr-1 order-2 lg:order-1">
-          <ol className="flex lg:flex-col gap-2.5 overflow-x-auto lg:overflow-visible pb-1">
-            {slides.map((s, i) => {
-              const active = i === index;
-              return (
-                <li key={s.id} className="group relative shrink-0 w-[168px] lg:w-auto">
-                  <button
-                    type="button"
-                    onClick={() => select(i)}
-                    aria-current={active ? 'true' : undefined}
-                    aria-label={`Slide ${i + 1}: ${s.actionHeadline}`}
-                    data-testid={`studio-thumb-${i}`}
-                    className="w-full flex items-start gap-2 text-left cursor-pointer"
-                  >
-                    <span className={`w-4 pt-1 text-[11px] tabular-nums text-right shrink-0 ${active ? 'text-neutral-900 dark:text-white font-semibold' : 'text-neutral-400'}`}>{i + 1}</span>
-                    <span
-                      className={`block flex-1 rounded-[10px] transition-shadow pointer-events-none ${
-                        active ? 'ring-2 ring-neutral-900 dark:ring-neutral-100 ring-offset-2 ring-offset-[#F8F7F4] dark:ring-offset-[#171717]' : 'ring-1 ring-transparent group-hover:ring-neutral-900/20 dark:group-hover:ring-white/20'
-                      }`}
-                    >
-                      <GammaSlide slide={s} index={i} theme={theme} />
-                    </span>
-                  </button>
-                  <div className="absolute right-1 top-1 hidden group-hover:flex items-center gap-0.5 p-0.5 rounded-lg bg-white/95 dark:bg-[#212121]/95 shadow-sm ring-1 ring-neutral-900/10 dark:ring-white/10">
-                    <button type="button" className={iconBtn} title="Move up" aria-label={`Move slide ${i + 1} up`} disabled={i === 0} onClick={() => moveCard(i, -1)}>
-                      <ChevronUp className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className={iconBtn} title="Move down" aria-label={`Move slide ${i + 1} down`} disabled={i === slides.length - 1} onClick={() => moveCard(i, 1)}>
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className={iconBtn} title="Duplicate" aria-label={`Duplicate slide ${i + 1}`} onClick={() => duplicateCard(i)}>
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className={iconBtn} title="Delete" aria-label={`Delete slide ${i + 1}`} onClick={() => deleteCard(i)}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={slides.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+              <ol className="flex lg:flex-col gap-2.5 overflow-x-auto lg:overflow-visible pb-1">
+                {slides.map((s, i) => (
+                  <SortableThumb
+                    key={s.id}
+                    slide={s}
+                    index={i}
+                    total={slides.length}
+                    active={i === index}
+                    theme={theme}
+                    onSelect={() => select(i)}
+                    onMove={(dir) => moveCard(i, dir)}
+                    onDuplicate={() => duplicateCard(i)}
+                    onDelete={() => deleteCard(i)}
+                  />
+                ))}
+              </ol>
+            </SortableContext>
+          </DndContext>
           <button
             type="button"
             onClick={addCard}
@@ -320,8 +416,8 @@ export default function Step03StudioCanvas({ deck, onUpdateDeck, onPrevStep, onN
 
         {/* Card + controls */}
         <section className="min-w-0 space-y-4 order-1 lg:order-2">
-          <div role="radiogroup" aria-label="Card layout" className="flex flex-wrap items-center gap-1.5" data-testid="studio-layout-picker">
-            {GAMMA_LAYOUTS.map((l) => {
+          <div role="radiogroup" aria-label="Card layout" className="grid grid-cols-3 sm:grid-cols-5 xl:grid-cols-9 gap-2" data-testid="studio-layout-picker">
+            {layoutPreviews.map((l) => {
               const active = l.id === layout;
               return (
                 <button
@@ -333,14 +429,16 @@ export default function Step03StudioCanvas({ deck, onUpdateDeck, onPrevStep, onN
                   title={l.hint}
                   data-testid={`layout-option-${l.id}`}
                   onClick={() => handleLayout(l.id)}
-                  className={`shrink-0 flex items-center gap-2 h-9 pl-1.5 pr-3 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
+                  className={`group text-left rounded-xl p-1 cursor-pointer transition-all ${
                     active
-                      ? 'bg-[#171717] text-[#F8F7F4] dark:bg-[#F8F7F4] dark:text-[#171717]'
-                      : 'text-neutral-600 dark:text-neutral-300 hover:bg-white dark:hover:bg-white/[0.06] ring-1 ring-neutral-900/[0.07] dark:ring-white/[0.07]'
+                      ? 'bg-white dark:bg-[#212121] ring-2 ring-neutral-900 dark:ring-neutral-100'
+                      : 'ring-1 ring-neutral-900/[0.07] dark:ring-white/[0.07] hover:bg-white dark:hover:bg-white/[0.04] hover:ring-neutral-900/20 dark:hover:ring-white/20'
                   }`}
                 >
-                  <LayoutGlyph layout={l.id} className="w-8 h-[22px]" />
-                  {l.label}
+                  <span className="block rounded-md overflow-hidden pointer-events-none" aria-hidden>
+                    <GammaSlide slide={l.slide} index={index} theme={theme} rounded={false} showNumber={false} />
+                  </span>
+                  <span className={`block px-0.5 pt-1 text-[11px] font-semibold truncate ${active ? 'text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400'}`}>{l.label}</span>
                 </button>
               );
             })}
@@ -428,7 +526,7 @@ export default function Step03StudioCanvas({ deck, onUpdateDeck, onPrevStep, onN
             <textarea
               id={`notes-${slide.id}`}
               value={slide.speakerNotes || ''}
-              onChange={(e) => updateSlide(index, (s) => ({ ...s, speakerNotes: e.target.value }))}
+              onChange={(e) => updateSlide(index, (s) => ({ ...s, speakerNotes: e.target.value }), `notes:${slide.id}`)}
               rows={3}
               placeholder="What you'll say on this card: the story, transitions, timing cues."
               className="mt-2 w-full resize-y bg-transparent text-sm leading-relaxed text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 focus:outline-none"

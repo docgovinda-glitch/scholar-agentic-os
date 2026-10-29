@@ -205,3 +205,41 @@ describe('pptx export', () => {
     expect(notes.length).toBe(5);
   });
 });
+
+describe('auto-design', () => {
+  it('picks layouts from content regardless of position and never changes text', async () => {
+    const { autoDesignDeck, composeDeckFromText } = await import('../composer');
+    const deck = composeDeckFromText(
+      `# Housing\nRemote work changed housing.\n## Method\nFirst, we collected listings. Then we measured jobs. Finally, we fitted a model.\n## Evidence\nRents fell 10% in cities while suburban rents rose 7%.`,
+      { slideCount: 6 },
+    );
+    // Move the method card to the front, then reset every layout to plain points.
+    const shuffled = { ...deck, slides: [deck.slides[1], deck.slides[0], deck.slides[2]].map((s) => ({ ...s, layoutType: 'list' as const })) };
+    const before = shuffled.slides.map((s) => JSON.stringify({ ...getCardContent(s) }));
+    const out = autoDesignDeck(shuffled);
+    expect(out.slides.map((s, i) => resolveLayout(s, i))).toEqual(['timeline', 'statement', 'stats']);
+    expect(out.slides.map((s) => JSON.stringify({ ...getCardContent(s) }))).toEqual(before);
+  });
+});
+
+describe('saved decks from earlier versions', () => {
+  // Every user-visible string in the legacy block model must survive into card content.
+  const strings = (v: unknown): string[] =>
+    typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(strings) : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : [];
+
+  it.each([
+    ['curated case-study deck', () => import('../../services/slideGenerator').then((m) => m.generateSlideDeck({ topic: 'Why Zappos pays new hires to quit (MN6094NI)' }))],
+    ['swiss editorial deck', () => import('../../services/slideGenerator').then((m) => m.decomposeToSwissEditorial({ topic: 'Plover migration' }))],
+    ['coursework extraction deck', () => import('../../services/slideGenerator').then((m) => m.extractSlidesFromAcademicText('# T\n## Context\nTools fail 84% of audits.\n- Risk one\n- Risk two\n## Results\nVerification reaches 100% accuracy.'))],
+  ])('%s loads without losing text', async (_name, load) => {
+    const legacy = await load();
+    expect(legacy.slides.length).toBeGreaterThan(0);
+    legacy.slides.forEach((s, i) => {
+      const contentText = JSON.stringify(getCardContent(s));
+      const blockText = strings(s.blocks).filter((t) => t.length > 2 && !/^(action-header|bullet-list|metric-callout|two-column|quote-evidence|image|split|hero|card|16:9|4:3|up|down|neutral)$/.test(t));
+      for (const t of blockText) expect(contentText, `slide ${i + 1}: "${t}"`).toContain(JSON.stringify(t.replace(/\s+/g, ' ').trim()).slice(1, -1));
+      // And it renders in its resolved layout.
+      expect(computeCardGeometry(getCardContent(s), resolveLayout(s, i), resolveDeckTheme('scholar-paper')).elements.length).toBeGreaterThan(0);
+    });
+  });
+});

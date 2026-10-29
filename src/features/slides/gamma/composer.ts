@@ -12,7 +12,7 @@
  *   is clearly an instruction to the author, not a claim.
  */
 import type { CardContent, CardItem, CardStat, GammaLayout, NarrativeFramework, SlideCard, SlideDeck } from '../types/slides';
-import { getCardContent, inferLayout, writeCardContent } from './content';
+import { getCardContent, inferLayout, resolveLayout, writeCardContent } from './content';
 import { DEFAULT_DECK_THEME_ID } from './theme';
 
 /* ------------------------------------------------------------------------ */
@@ -547,5 +547,38 @@ export function legacyDeckToGamma(deck: SlideDeck, sourceText = ''): SlideDeck {
     ...deck,
     // Keep the curated one-line outline summaries.
     slides: raw.map((r, i) => ({ ...writeCardContent(r.slide, r.content, layouts[i]), summary: r.slide.summary ?? r.content.lede })),
+  };
+}
+
+/**
+ * Auto-design: choose a layout for every card from its content (numbers →
+ * big numbers, ordered steps → timeline, two sides → comparison, quotes →
+ * quote, 3-6 short points → bento) and avoid runs of the same layout. Text is
+ * never changed; only layouts are.
+ */
+export function autoDesignDeck(deck: SlideDeck): SlideDeck {
+  const picked = deck.slides.map((s, i) => {
+    const c = getCardContent(s);
+    const textOnly = !c.items.length && !c.stats.length && !c.columns && !c.quote;
+    if (textOnly) {
+      // Covers stay covers; any other text-only card becomes a statement.
+      const current = resolveLayout(s, i);
+      return (current === 'title' || (i === 0 && current !== 'statement') ? 'title' : 'statement') as GammaLayout;
+    }
+    const sequential =
+      c.items.length >= 3 &&
+      (c.items.filter((it) => SEQUENCE_SENTENCE.test(it.title)).length >= 2 ||
+        SEQUENCE_HEADING.test(`${c.headline} ${c.eyebrow ?? ''}`));
+    if (sequential) return 'timeline' as GammaLayout;
+    const shortPoints = c.items.length >= 3 && c.items.length <= 6 && c.items.every((it) => words(it.title).length <= 10);
+    // Position-independent: a card with content never becomes a bare cover.
+    const base = inferLayout(c, 1);
+    return base === 'list' && shortPoints ? ('bento' as GammaLayout) : base;
+  });
+  const layouts = diversify(picked);
+  return {
+    ...deck,
+    slides: deck.slides.map((s, i) => writeCardContent(s, getCardContent(s), layouts[i])),
+    updatedAt: new Date().toISOString(),
   };
 }
