@@ -1,0 +1,63 @@
+name: Slide Visual Parity (web ↔ .pptx)
+
+# Renders every Presentation Studio card layout in light and dark themes in
+# Chromium, exports the same deck to .pptx, converts it with LibreOffice and
+# compares the two. Side-by-side images are uploaded as an artifact.
+on:
+  pull_request:
+    paths:
+      - 'src/features/slides/**'
+      - 'scripts/slide-parity/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/slide-parity.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: slide-parity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  parity:
+    name: Web card vs exported PowerPoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          HUSKY: '0'
+
+      - name: Install LibreOffice, poppler and Chromium
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-impress poppler-utils fonts-liberation
+          npx playwright install --with-deps chromium
+
+      - name: Start dev server
+        run: |
+          PORT=3000 npm run dev > dev-server.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/api/health > /dev/null; then echo "server up"; exit 0; fi
+            sleep 2
+          done
+          echo "dev server did not start"; cat dev-server.log; exit 1
+
+      - name: Compare web cards with exported .pptx
+        run: node scripts/slide-parity/run.mjs --base http://localhost:3000 --out artifacts/slide-parity
+
+      - name: Upload side-by-side images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slide-parity
+          path: artifacts/slide-parity
+          if-no-files-found: ignore
+          retention-days: 14
