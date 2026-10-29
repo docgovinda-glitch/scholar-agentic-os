@@ -473,26 +473,9 @@ reviewRoutes.post("/final-editor", async (req: express.Request<{ id: string }>, 
   }
 
   if (!textToPolish.trim()) {
-    textToPolish = `# ${project.answers?.["working_title"] || (project as { title?: string }).title || "Manuscript"}
-
-## Abstract
-Autonomous reasoning architectures demonstrate reproducible variance reduction across multi-agent benchmarks. However, established formalisms fail to guarantee deterministic convergence bounds in decentralized synthesis—inducing systemic failure modes under adversarial epistemic divergence. We introduce a deterministic verification operator that bounds latency and preserves provenance across distributed reasoning nodes.
-
-## 1. Introduction
-Multi-agent synthesis workflows require continuous verification to prevent cumulative hallucination cascade. In this paper, we formulate provable provenance bounds that guarantee convergence under bounded communication regimes.
-
-## 2. Methodology & Formal Bounds
-To substantiate tractability, we establish Lemma 1: Under symmetric sparse communication topologies, the bipartite matching operator terminates in O(V · E log V) steps, strictly bounding computational overhead and preventing algorithmic stall.
-
-## 3. Empirical Results
-Empirical evaluation against standard multi-agent benchmarks demonstrates a 94.2% fidelity rate (95% CI: [92.8%, 95.6%], p < 0.001). Runtime overhead remained bounded under 42ms per decision cycle up to n=128 participating agents.
-
-## 4. Discussion & Validity Threats
-Threats to Validity & Boundary Conditions: While our proofs hold under bounded Byzantine failure regimes (f < n/3), stochastic packet loss exceeding 35% induces graceful latency degradation rather than catastrophic divergence.
-
-## References
-1. Vaswani, A. et al. (2024). Empirical Grounding in Autonomous Academic Synthesis. Journal of AI Research, 45(2), 112-128.
-2. Lamport, L. et al. (2023). Addressing Methodological Latency in Distributed Consensus. Distributed Systems Review, 19(4), 401-419.`;
+    // Never polish a stand-in manuscript (this used to be a hardcoded demo
+    // paper with invented statistics and references).
+    return res.status(400).json({ error: "Nothing to edit yet: write or generate your manuscript sections first." });
   }
 
   // 1. Before telemetry
