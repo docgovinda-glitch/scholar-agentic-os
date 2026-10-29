@@ -159,13 +159,23 @@ describe("SQL Runbooks & Hotfix Migrations — Schema & Column Verification", ()
     }
   });
 
-  it("verifies 20261028010000_purge_plaintext_credentials.sql deletes plaintext rows in api_credentials and user_cloud_integrations", () => {
+  it("verifies 20261028010000_purge_plaintext_credentials.sql records affected users, deletes plaintext rows, and drops client policies (F-11)", () => {
     const purgeSql = fs.readFileSync(
       path.resolve(process.cwd(), "supabase/migrations/20261028010000_purge_plaintext_credentials.sql"),
       "utf8"
     );
-    expect(purgeSql).toContain("DELETE FROM public.api_credentials");
+    expect(purgeSql).toContain("CREATE TABLE IF NOT EXISTS public.security_credential_reset_notices");
+    expect(purgeSql).toContain("DELETE FROM public.api_credentials;");
     expect(purgeSql).toContain("DELETE FROM public.user_cloud_integrations");
+    expect(purgeSql).toContain("DROP POLICY IF EXISTS \"user_cloud_integrations_select_own\" ON public.user_cloud_integrations;");
     expect(purgeSql).toContain("DROP POLICY IF EXISTS \"Users can view own cloud integrations\" ON public.user_cloud_integrations;");
+
+    const noticeSrc = fs.readFileSync(
+      path.resolve(process.cwd(), "src/desk/security/CredentialResetNotice.tsx"),
+      "utf8"
+    );
+    expect(noticeSrc).toContain(
+      "Your saved API keys / Drive connection were removed for security. Please reconnect."
+    );
   });
 });

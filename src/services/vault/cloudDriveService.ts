@@ -37,47 +37,50 @@ export async function getConnectedCloudDrives(userId: string): Promise<CloudDriv
   if (isSupabaseConfigured()) {
     try {
       const supabase = getSupabaseClient();
-      // Check if active Supabase session has a fresh OAuth provider token to sync into user_cloud_integrations
+      let accessTokenHeader: string | null = null;
+      // Check if active Supabase session has a fresh OAuth provider token to sync via server encryption
       if (typeof supabase.auth?.getSession === "function") {
         try {
           const { data: sessionData } = await supabase.auth.getSession();
           const session = sessionData?.session;
-          if (session && session.user && session.provider_token) {
+          accessTokenHeader = session?.access_token ?? null;
+          if (session && session.user && session.provider_token && accessTokenHeader) {
             const providerName = session.user.app_metadata?.provider;
             const driveProvider: CloudDriveProvider = providerName === "azure" ? "onedrive" : "google_drive";
             const email = session.user.email || "connected-account";
             const name = (session.user.user_metadata?.full_name as string) || (session.user.user_metadata?.name as string);
 
-            // Do NOT persist raw OAuth access_token / refresh_token directly from the browser
-            // in plaintext (F-11). Server routes encrypt provider tokens with AES-256-GCM.
-            await supabase.from("user_cloud_integrations").upsert(
-              {
-                user_id: userId,
-                provider: driveProvider,
-                account_email: email,
-                account_name: name,
-                access_token: null,
-                refresh_token: null,
+            // Sync provider token strictly through the server endpoint so tokens are
+            // encrypted with AES-256-GCM (`enc:v1:...`) and never exposed via PostgREST (F-11).
+            await fetch("/api/vault/cloud/connections", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessTokenHeader}`,
               },
-              { onConflict: "user_id, provider" }
-            );
+              body: JSON.stringify({
+                provider: driveProvider,
+                accountEmail: email,
+                accountName: name,
+                accessToken: session.provider_token,
+                refreshToken: session.provider_refresh_token ?? undefined,
+              }),
+            });
           }
         } catch {}
       }
 
-      const { data, error } = await supabase
-        .from("user_cloud_integrations")
-        .select("id, provider, account_email, account_name, connected_at")
-        .eq("user_id", userId);
-
-      if (!error && data && data.length > 0) {
-        return data.map((d: any) => ({
-          id: d.id,
-          provider: d.provider as CloudDriveProvider,
-          accountEmail: d.account_email || "connected-account",
-          accountName: d.account_name || undefined,
-          connectedAt: d.connected_at,
-        }));
+      if (accessTokenHeader) {
+        const res = await fetch("/api/vault/cloud/connections", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${accessTokenHeader}` },
+        });
+        if (res.ok) {
+          const body = (await res.json()) as { connections?: CloudDriveAccount[] };
+          if (Array.isArray(body.connections) && body.connections.length > 0) {
+            return body.connections;
+          }
+        }
       }
     } catch {
       // Fallback to local storage
@@ -123,19 +126,26 @@ export async function connectCloudDrive(
   if (isSupabaseConfigured()) {
     try {
       const supabase = getSupabaseClient();
-      await supabase.from("user_cloud_integrations").upsert(
-        {
-          user_id: userId,
-          provider,
-          account_email: details.email,
-          account_name: details.name,
-          access_token: null,
-          refresh_token: null,
-        },
-        { onConflict: "user_id, provider" }
-      );
+      const { data: sessionData } = await supabase.auth.getSession();
+      const bearer = sessionData?.session?.access_token;
+      if (bearer) {
+        await fetch("/api/vault/cloud/connections", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${bearer}`,
+          },
+          body: JSON.stringify({
+            provider,
+            accountEmail: details.email,
+            accountName: details.name,
+            accessToken: details.accessToken,
+            refreshToken: details.refreshToken,
+          }),
+        });
+      }
     } catch (e) {
-      console.warn("Could not save cloud integration to Supabase, saving locally", e);
+      console.warn("Could not save cloud integration to server, saving locally", e);
     }
   }
 
@@ -155,7 +165,14 @@ export async function disconnectCloudDrive(userId: string, provider: CloudDriveP
   if (isSupabaseConfigured()) {
     try {
       const supabase = getSupabaseClient();
-      await supabase.from("user_cloud_integrations").delete().eq("user_id", userId).eq("provider", provider);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const bearer = sessionData?.session?.access_token;
+      if (bearer) {
+        await fetch(`/api/vault/cloud/connections/${encodeURIComponent(provider)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${bearer}` },
+        });
+      }
     } catch {}
   }
 

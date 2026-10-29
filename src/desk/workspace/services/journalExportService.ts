@@ -103,8 +103,11 @@ export function downloadBlob(blob: Blob, filename: string): void {
   window.document.body.appendChild(a);
   a.click();
   setTimeout(() => {
-    window.document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    if (typeof window === "undefined" || !window.document) return;
+    if (a.parentNode === window.document.body) {
+      window.document.body.removeChild(a);
+    }
+    window.URL?.revokeObjectURL?.(url);
   }, 100);
 }
 

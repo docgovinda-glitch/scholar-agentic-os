@@ -40,6 +40,7 @@ import {
   type DriveFileItem,
   type CloudDriveProvider,
 } from "../../services/vault/cloudDriveService";
+import CredentialResetNotice from "../security/CredentialResetNotice";
 
 export interface AddSourceModalProps {
   userId: string;
@@ -763,6 +764,9 @@ export default function AddSourceModal({
             ✕
           </button>
         </div>
+
+        {/* Affected-user security notice after plaintext credential/token purge (F-11) */}
+        <CredentialResetNotice className="mx-6 mt-3" />
 
         {/* Source Intake Selector Tabs */}
         <div className="flex border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 px-6 pt-2">

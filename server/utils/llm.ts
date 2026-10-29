@@ -32,17 +32,14 @@ export type LlmResponseLike = Partial<express.Response> & {
 
 const EPHEMERAL_BOOT_CHALLENGE_SECRET = crypto.randomBytes(32).toString("hex");
 
-function resolveLlmChallengeSecret(): string {
+export function resolveLlmChallengeSecret(): string {
   if (process.env.LLM_CHALLENGE_SECRET && process.env.LLM_CHALLENGE_SECRET.trim().length >= 16) {
     return process.env.LLM_CHALLENGE_SECRET.trim();
   }
-  const baseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_JWT_SECRET;
-  if (baseKey && baseKey.trim().length > 0) {
-    // Cryptographically domain-separated subkey via HMAC-SHA256
-    return crypto
-      .createHmac("sha256", baseKey.trim())
-      .update("scholar-core:llm-challenge-signing-key:v1")
-      .digest("hex");
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "LLM_CHALLENGE_SECRET must be set (>= 16 chars) in production; refusing to fall back to SUPABASE_SERVICE_ROLE_KEY (F-13)."
+    );
   }
   return EPHEMERAL_BOOT_CHALLENGE_SECRET;
 }
