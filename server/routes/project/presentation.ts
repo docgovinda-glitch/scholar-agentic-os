@@ -8,6 +8,7 @@ import {
 import { scholarBrain } from "../../src/services/scholarBrain.ts";
 import {
   memoryDecks,
+  setMemoryDeck,
   getDecksTable,
   PresentationDeckRow,
 } from "../presentations.ts";
@@ -545,7 +546,7 @@ Output strict JSON only:
         created_at: now,
         updated_at: now,
       };
-      memoryDecks.set(deckId, presentationRow);
+      setMemoryDeck(deckId, presentationRow);
 
       const table = getDecksTable();
       if (table) {
@@ -806,7 +807,7 @@ router.put(
       updated_at: now,
     };
 
-    memoryDecks.set(deckId, presentationRow);
+    setMemoryDeck(deckId, presentationRow);
 
     const table = getDecksTable();
     if (table) {
