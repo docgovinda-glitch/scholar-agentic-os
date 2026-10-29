@@ -62,7 +62,8 @@
     },
     "@vitejs/devtools-vitest": {
       "vitest": "^4.1.12"
-    }
+    },
+    "image-size": "^2.0.4"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.14",
