@@ -9,6 +9,7 @@ import { getProjectStore } from "../../../../src/services/store/projectStore.ts"
 import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig } from "../../../utils/llm.ts";
 import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
+import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import {
   auditDocumentLineByLine,
   runBriefScannerGraph,
@@ -42,7 +43,6 @@ import {
 import { conductAskScholarResearchForOutline } from "../../../../src/desk/assignment/services/scholarlyDiscoveryService.ts";
 import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
 import { classifyScopeBoundaries, stripLineTags } from "../../../../src/features/understand/services/scopeClassifier.ts";
-import { generateSectionDraft } from "../../../../src/features/drafting/services/sectionDraftingEngine.ts";
 import {
   isClassroomLogisticsLine,
   isTutorialOrShortQABrief,
@@ -244,23 +244,9 @@ ${tutorialOrPeelRules}`;
       effectiveDraft = draft?.trim() ? draft.trim() : "";
     }
 
+    // No template text: if the AI produced nothing, say so (P0-20).
     if (!effectiveDraft) {
-      effectiveDraft = generateSectionDraft({
-          sectionTitle,
-          assignmentQuestion: project.answers["assignment_question"] || "",
-          academicFunction: sectionGuidance,
-          targetWordCount,
-          academicLevel,
-          citationStyle,
-          thesis,
-          keyPoints,
-          boundSources: mappedCitationItems.map((e) => ({
-            title: e.claim || e.title || "Scholarly Resource",
-            citation: e.citation,
-            authors: e.authors,
-            year: typeof e.year === "number" ? String(e.year) : e.year,
-          })),
-        });
+      return sendAiFailure(res, new UnusableAiResponseError("section draft"), "Section draft");
     }
 
     // Deterministic Token Interceptor: strictly strips hallucinated references and compiles citations in project style
@@ -286,10 +272,7 @@ ${tutorialOrPeelRules}`;
     res.json({ draft: effectiveDraft });
   } catch (err: any) {
     if (err?.message === "RequireFrontendLLMException") return;
-    console.error("Section drafting error:", err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: err.message || "Failed to draft section" });
-    }
+    sendAiFailure(res, err, "Section draft");
   }
 });
 
@@ -313,11 +296,8 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     evidencePackPrompt,
   } = req.body || {};
 
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.flushHeaders?.();
-
+  // The event stream starts only once the AI has answered, so a missing AI
+  // can still be reported as a 426 hand-off or an error status (P0-20).
   try {
     const mappedSources: WebsiteCitationItem[] = (
       Array.isArray(boundSources) ? boundSources : []
@@ -431,24 +411,10 @@ Output ONLY the section text in clean academic Markdown prose.`;
       "drafting"
     );
 
-    let effectiveDraft = draft?.trim()
-      ? draft.trim()
-      : generateSectionDraft({
-          sectionTitle,
-          assignmentQuestion: assignmentTopic,
-          academicFunction,
-          targetWordCount,
-          academicLevel,
-          citationStyle,
-          thesis,
-          boundSources: mappedSources.map((s) => ({
-            title: s.title || "Scholarly Resource",
-            citation: s.citation,
-            authors: s.authors,
-            year: typeof s.year === "number" ? String(s.year) : s.year,
-          })),
-          revisionPrompt: revisionPrompt as any,
-        });
+    let effectiveDraft = draft?.trim() ?? "";
+    if (!effectiveDraft) {
+      return sendAiFailure(res, new UnusableAiResponseError("section draft"), "Section draft");
+    }
 
     // Pipe streamed draft through deterministic citation interceptor
     effectiveDraft = replaceBracketTokensWithDeterministicCitations(
@@ -470,6 +436,11 @@ Output ONLY the section text in clean academic Markdown prose.`;
       }
     }
 
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+
     const words = effectiveDraft.split(" ");
     for (let i = 0; i < words.length; i += 5) {
       const chunk = (i === 0 ? "" : " ") + words.slice(i, i + 5).join(" ");
@@ -479,8 +450,10 @@ Output ONLY the section text in clean academic Markdown prose.`;
     res.write("data: [DONE]\n\n");
     res.end();
   } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) return sendAiFailure(res, err, "Section draft");
     console.error("Stream section error:", err);
-    res.write(`data: ${JSON.stringify({ error: err.message || "Failed to stream section" })}\n\n`);
+    res.write(`data: ${JSON.stringify({ error: "The section draft stopped before it finished. Try again." })}\n\n`);
     res.write("data: [DONE]\n\n");
     res.end();
   }
