@@ -49,7 +49,7 @@ export function discoveredSourceToCanonical(source: Partial<DiscoveredSource>): 
   const authors: ReferenceAuthor[] =
     authorStrings.length > 0
       ? authorStrings.map((a, idx) => parseAuthorStringToCanonical(a, idx + 1))
-      : [{ firstName: "", lastName: source.isUserUploaded ? "Course Materials" : "Scholar", order: 1 }];
+      : [{ firstName: "", lastName: source.isUserUploaded ? "Course Materials" : "[Author unknown]", order: 1 }];
 
   let kind: ReferenceKind = "JournalArticle";
   if (source.type === "book") kind = "Book";
@@ -57,7 +57,8 @@ export function discoveredSourceToCanonical(source: Partial<DiscoveredSource>): 
   else if (source.type === "institutional" || source.type === "report") kind = "TechnicalReport";
   else if (source.type === "web") kind = "Website";
 
-  const containerSource = source.journal || source.publisher || "Academic Publication";
+  // A missing venue stays missing; it is never given a made-up name.
+  const containerSource = source.journal || source.publisher || "";
 
   return {
     kind,
@@ -66,7 +67,7 @@ export function discoveredSourceToCanonical(source: Partial<DiscoveredSource>): 
     source: containerSource,
     publisher: source.publisher,
     journal: source.journal,
-    year: source.year || "2024",
+    year: source.year || "n.d.",
     doi: source.doi,
     url: source.url,
   };
@@ -101,7 +102,7 @@ export function formatSourceInTextCitation(
   }
 
   // Graceful deterministic fallback
-  const year = source.year || "2024";
+  const year = source.year || "n.d.";
   const rawAuthors = (source as any).authors;
   const authorList = Array.isArray(rawAuthors)
     ? rawAuthors
@@ -159,12 +160,13 @@ export function formatSourceBibliography(
     ? rawAuthors.join(", ")
     : typeof rawAuthors === "string" && rawAuthors.trim()
     ? rawAuthors.trim()
-    : "Author, A.";
-  const yearStr = source.year || "2024";
+    : "[Author unknown]";
+  const yearStr = source.year || "n.d.";
   const titleStr = source.title ? `'${source.title}'` : "Untitled";
-  const venueStr = source.journal || source.publisher || "Academic Publication";
+  const venue = source.journal || source.publisher || "";
+  const venueStr = venue ? `, ${venue}` : "";
   const volStr = source.volumeIssue ? `, ${source.volumeIssue}` : "";
   const doiStr = source.doi ? `. doi: ${source.doi}` : source.url ? `. Available at: ${source.url}` : "";
 
-  return `${authorsStr} (${yearStr}) ${titleStr}, ${venueStr}${volStr}${doiStr}.`;
+  return `${authorsStr} (${yearStr}) ${titleStr}${venueStr}${volStr}${doiStr}.`;
 }

@@ -5,7 +5,7 @@
  */
 
 import type { CitationStyle, InTextOptions } from "../formattingEngine";
-import type { CanonicalReference, ReferenceAuthor } from "../model/reference";
+import { authorDateYear, type CanonicalReference, type ReferenceAuthor } from "../model/reference";
 
 // ============================================================================
 // APA 7 Formatter
@@ -26,12 +26,7 @@ export class APA7Formatter implements CitationStyle {
       return `${author}, ${options.position}`;
     }
 
-    if (reference.publicationDate) {
-      const year = reference.publicationDate.substring(0, 4);
-      return `(${author}, ${year})`;
-    }
-
-    return `( ${author} )`;
+    return `(${author}, ${authorDateYear(reference)})`;
   }
 
   formatBibliography(reference: CanonicalReference): string {
@@ -42,10 +37,7 @@ export class APA7Formatter implements CitationStyle {
     parts.push(authorPart);
 
     // Year
-    if (reference.publicationDate) {
-      const year = reference.publicationDate.substring(0, 4);
-      parts.push(`(${year}).`);
-    }
+    parts.push(`(${authorDateYear(reference)}).`);
 
     // Title
     parts.push(reference.title);

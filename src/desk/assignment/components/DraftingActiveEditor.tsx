@@ -290,7 +290,7 @@ export function DraftingActiveEditor({
       source.authors && source.authors[0]
         ? source.authors[0].split(",")[0].trim()
         : "Scholar";
-    const year = source.year || "2024";
+    const year = source.year || "n.d.";
     const citationString = ` (${author}, ${year})`;
 
     if (textareaRef.current) {
@@ -614,7 +614,7 @@ export function DraftingActiveEditor({
                 className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border border-neutral-200/60 dark:border-white/5"
                 title={s.title}
               >
-                {s.authors?.[0]?.split(",")[0] || "Source"} ({s.year || "2024"})
+                {s.authors?.[0]?.split(",")[0] || "Source"} ({s.year || "n.d."})
               </span>
             ))}
           </div>
@@ -704,7 +704,7 @@ export function DraftingActiveEditor({
               </div>
               {inspectedCitation.source ? (
                 <p className="text-[11px] text-blue-800/90 dark:text-blue-300/90 truncate max-w-xl">
-                  {inspectedCitation.source.title} ({inspectedCitation.source.year || "2024"}) —{" "}
+                  {inspectedCitation.source.title} ({inspectedCitation.source.year || "n.d."}) —{" "}
                   {inspectedCitation.source.journal || inspectedCitation.source.type || "Peer-Reviewed"}
                 </p>
               ) : (
@@ -1002,7 +1002,7 @@ export function DraftingActiveEditor({
                           s.authors && s.authors[0]
                             ? s.authors[0].split(",")[0].trim()
                             : "Scholar";
-                        const year = s.year || "2024";
+                        const year = s.year || "n.d.";
                         return (
                           <button
                             key={s.id}

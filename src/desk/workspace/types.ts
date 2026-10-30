@@ -302,7 +302,8 @@ export interface SmartEvidenceRow {
   citationToken: string;
   title: string;
   authors: string[];
-  year: number;
+  /** Publication year; undefined when the source does not record one (shown as "n.d."). */
+  year?: number;
   doi?: string;
   portal?: string;
   badge: string;

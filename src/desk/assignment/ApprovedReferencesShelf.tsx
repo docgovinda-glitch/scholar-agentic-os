@@ -42,7 +42,7 @@ export const ApprovedReferencesShelf: React.FC<ApprovedReferencesShelfProps> = (
       .map((s, idx) => {
         const inText = formatInTextCitation(s);
         const authors = s.authors?.join(", ") || "Unknown Author";
-        const year = s.year || "2024";
+        const year = s.year || "n.d.";
         const title = s.title;
         const venue = s.journal || s.publisher || "Academic Press";
         return `${idx + 1}. ${authors} (${year}). ${title}. ${venue}. In-text: ${inText}`;

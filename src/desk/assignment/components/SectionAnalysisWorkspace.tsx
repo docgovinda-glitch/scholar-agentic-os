@@ -238,7 +238,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
       sourceId: matchedSource?.id,
       sourceTitle: matchedSource?.title || "Scholarly Source",
       sourceAuthors: matchedSource?.authors || ["Scholar, A."],
-      sourceYear: matchedSource?.year || "2024",
+      sourceYear: matchedSource?.year || "n.d.",
       sourceJournal: matchedSource?.journal || "Academic Journal",
       citation: defaultCitation,
       interpretation: "Explain how this evidence substantiates your thesis...",
@@ -720,7 +720,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
                 </p>
                 <p className="text-[11px] text-neutral-600 dark:text-neutral-400">
                   {(traceabilityItem.source?.authors || traceabilityItem.synthesis.sourceAuthors || []).join(", ")} (
-                  {traceabilityItem.source?.year || traceabilityItem.synthesis.sourceYear || "2024"})
+                  {traceabilityItem.source?.year || traceabilityItem.synthesis.sourceYear || "n.d."})
                   {" · "}
                   <span className="italic">
                     {traceabilityItem.source?.journal || traceabilityItem.synthesis.sourceJournal || "Academic Press"}

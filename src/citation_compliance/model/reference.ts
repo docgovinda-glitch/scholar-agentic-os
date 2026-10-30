@@ -158,3 +158,15 @@ export interface CanonicalReference {
   /** Engine-produced numeric position within a reference list */
   _position?: number;
 }
+
+/**
+ * Year for author-date styles (APA, Harvard, Chicago author-date): the
+ * publication date's year, else the reference's own year, else "n.d." as those
+ * styles require. Never a made-up year.
+ */
+export function authorDateYear(reference: Pick<CanonicalReference, "publicationDate" | "year">): string {
+  const fromDate = reference.publicationDate?.match(/^\d{4}/)?.[0];
+  if (fromDate) return fromDate;
+  const fromYear = typeof reference.year === "string" ? reference.year.match(/^\d{4}/)?.[0] : undefined;
+  return fromYear ?? "n.d.";
+}

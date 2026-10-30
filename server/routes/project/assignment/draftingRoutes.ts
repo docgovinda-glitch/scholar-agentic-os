@@ -120,7 +120,7 @@ router.post("/draft-section", async (req: express.Request<{ id: string }>, res) 
         : typeof ev.author === "string"
         ? [ev.author]
         : ["Author"];
-      const year = (ev.year as string | number) || "2024";
+      const year = (ev.year as string | number) || "n.d.";
       const journal = (ev.journal as string) || (ev.venue as string) || undefined;
       const doi = (ev.doi as string) || undefined;
       const url = (ev.url as string) || undefined;
@@ -332,7 +332,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
         : typeof src.author === "string"
         ? [src.author]
         : ["Author"];
-      const year = (src.year as string | number) || "2024";
+      const year = (src.year as string | number) || "n.d.";
       const journal = (src.journal as string) || (src.venue as string) || (src.type as string) || undefined;
       const doi = (src.doi as string) || undefined;
       const url = (src.url as string) || undefined;

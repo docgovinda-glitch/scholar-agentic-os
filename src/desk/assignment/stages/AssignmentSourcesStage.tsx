@@ -60,14 +60,14 @@ export function formatHarvardCitation(source: Partial<DiscoveredSource>): string
       ? rawAuthors.join(", ")
       : typeof rawAuthors === "string" && rawAuthors.trim()
       ? rawAuthors.trim()
-      : "Author, A.";
-  const yearStr = source.year || "2024";
+      : "[Author unknown]";
+  const yearStr = source.year || "n.d.";
   const titleStr = source.title ? `'${source.title}'` : "Untitled";
-  const venueStr = source.journal || source.publisher || "Academic Publication";
+  const venueStr = source.journal || source.publisher || "";
   const volStr = source.volumeIssue ? `, ${source.volumeIssue}` : "";
   const doiStr = source.doi ? `. doi: ${source.doi}` : source.url ? `. Available at: ${source.url}` : "";
 
-  return `${authorsStr} (${yearStr}) ${titleStr}, ${venueStr}${volStr}${doiStr}.`;
+  return `${authorsStr} (${yearStr}) ${titleStr}${venueStr ? `, ${venueStr}` : ""}${volStr}${doiStr}.`;
 }
 
 
@@ -267,8 +267,8 @@ export default function AssignmentSourcesStage({
 
     const autoCitation =
       customForm.citation.trim() ||
-      `${customForm.authors || "Author"} (${customForm.year || "2024"}) '${customForm.title}', ${
-        customForm.journal || "Scholarly Publication"
+      `${customForm.authors || "[Author unknown]"} (${customForm.year || "n.d."}) '${customForm.title}'${
+        customForm.journal ? `, ${customForm.journal}` : ""
       }${customForm.volumeIssue ? `, ${customForm.volumeIssue}` : ""}${
         customForm.doi ? `. doi: ${customForm.doi}` : ""
       }.`;
@@ -276,8 +276,8 @@ export default function AssignmentSourcesStage({
     const newSource: DiscoveredSource = {
       id: `src-custom-${Date.now()}`,
       title: customForm.title.trim(),
-      authors: authorsList.length > 0 ? authorsList : ["Scholarly Author"],
-      year: customForm.year.trim() || "2024",
+      authors: authorsList,
+      year: customForm.year.trim() || "n.d.",
       type: customForm.type,
       journal: customForm.journal.trim(),
       volumeIssue: customForm.volumeIssue.trim(),

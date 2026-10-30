@@ -85,7 +85,7 @@ export default function EvidenceMatrixMode() {
               authors: Array.isArray(item.authors)
                 ? (item.authors as string[])
                 : [String(item.author || item.authors || "Anonymous")],
-              year: typeof item.year === "number" ? item.year : parseInt(String(item.year || "2024"), 10) || 2024,
+              year: typeof item.year === "number" ? item.year : parseInt(String(item.year ?? ""), 10) || undefined,
               doi: typeof item.doi === "string" ? item.doi : undefined,
               portal: typeof item.portal === "string" ? item.portal : "OpenAlex",
               badge: "Verified Scholarly Literature",
@@ -150,7 +150,7 @@ export default function EvidenceMatrixMode() {
               authors: Array.isArray(item.authors)
                 ? (item.authors as string[])
                 : [String(item.author || item.authors || "Anonymous")],
-              year: typeof item.year === "number" ? item.year : parseInt(String(item.year || "2024"), 10) || 2024,
+              year: typeof item.year === "number" ? item.year : parseInt(String(item.year ?? ""), 10) || undefined,
               doi: typeof item.doi === "string" ? item.doi : undefined,
               portal: typeof item.portal === "string" ? item.portal : "OpenAlex",
               badge: "Verified Scholarly Literature",
@@ -317,7 +317,7 @@ export default function EvidenceMatrixMode() {
       citationToken: `[CITE:${id}]`,
       title: normalizeUnicodeNFC(item.title),
       authors: item.authors || ["Author"],
-      year: item.year || 2024,
+      year: item.year,
       doi: item.doi,
       portal: typeof item.portal === "string" ? item.portal : "OpenAlex",
       badge: "Verified Scholarly Literature",
@@ -732,7 +732,7 @@ export default function EvidenceMatrixMode() {
                           {item.title}
                         </h4>
                         <p className="text-[11px] text-[color:var(--text-secondary)] mt-0.5">
-                          {item.authors?.join(", ") || "Scholarly Author"} ({item.year || 2024})
+                          {item.authors?.join(", ") || "[Author unknown]"} ({item.year ?? "n.d."})
                         </p>
                       </div>
 
@@ -872,7 +872,7 @@ export default function EvidenceMatrixMode() {
                           {row.title}
                         </span>
                         <span className="text-[11px] text-[color:var(--text-muted)] block">
-                          {row.authors.join(", ")} ({row.year})
+                          {row.authors.join(", ")} ({row.year ?? "n.d."})
                         </span>
                         {row.doi && (
                           <span className="text-[9px] font-mono text-[color:var(--text-secondary)] block">
@@ -1120,7 +1120,7 @@ export default function EvidenceMatrixMode() {
                   {inspectingItem.title}
                 </h3>
                 <p className="text-xs text-[color:var(--text-secondary)] mt-1">
-                  {inspectingItem.authors.join(", ")} ({inspectingItem.year})
+                  {inspectingItem.authors.join(", ")} ({inspectingItem.year ?? "n.d."})
                 </p>
                 {inspectingItem.doi && (
                   <p className="text-xs font-mono text-[color:var(--text-muted)] mt-0.5">

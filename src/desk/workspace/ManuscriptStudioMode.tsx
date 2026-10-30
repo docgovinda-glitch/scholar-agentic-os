@@ -151,7 +151,7 @@ export default function ManuscriptStudioMode() {
               authors: Array.isArray(item.authors)
                 ? (item.authors as string[])
                 : [String(item.author || item.authors || "Anonymous")],
-              year: typeof item.year === "number" ? item.year : parseInt(String(item.year || "2024"), 10) || 2024,
+              year: typeof item.year === "number" ? item.year : parseInt(String(item.year ?? ""), 10) || undefined,
               doi: typeof item.doi === "string" ? item.doi : undefined,
               portal: typeof item.portal === "string" ? item.portal : "OpenAlex",
               badge: "Verified Scholarly Literature",
@@ -178,7 +178,7 @@ export default function ManuscriptStudioMode() {
     citationToken: string;
     title: string;
     author: string;
-    year: number;
+    year?: number;
     badge: string;
     isUserData: boolean;
     extractedFindings: string;
@@ -283,14 +283,14 @@ export default function ManuscriptStudioMode() {
       if (matched) {
         // Format according to APA 7 standard
         const formatted = matched.isUserData
-          ? `${matched.author} (${matched.year}). ${matched.title} [Empirical Research Dataset]. Primary User Ingestion.`
-          : `${matched.author} (${matched.year}). ${matched.title}. Verified Scholarly Publication.`;
+          ? `${matched.author} (${matched.year ?? "n.d."}). ${matched.title} [Empirical Research Dataset]. Primary User Ingestion.`
+          : `${matched.author} (${matched.year ?? "n.d."}). ${matched.title}. Verified Scholarly Publication.`;
 
         entries.push({
           id: matched.id,
           token: tok,
           author: matched.author,
-          year: matched.year,
+          year: matched.year ?? "n.d.",
           title: matched.title,
           formattedCitation: formatted,
           isUserData: matched.isUserData,
@@ -355,7 +355,7 @@ export default function ManuscriptStudioMode() {
       const assigned = assignedEvidence.map((e) => ({
         id: e.id,
         authors: e.author,
-        year: e.year,
+        year: e.year ?? "n.d.",
         title: e.title,
         keyFindings: e.extractedFindings,
       }));
@@ -420,7 +420,7 @@ export default function ManuscriptStudioMode() {
           .map((e) => ({
             id: e.id,
             authors: e.author,
-            year: e.year,
+            year: e.year ?? "n.d.",
             title: e.title,
             keyFindings: e.extractedFindings,
           }));
@@ -1014,7 +1014,7 @@ export default function ManuscriptStudioMode() {
                         {item.title}
                       </h4>
                       <p className="text-[10px] text-[color:var(--text-secondary)] mt-0.5">
-                        {item.author} ({item.year})
+                        {item.author} ({item.year ?? "n.d."})
                       </p>
                     </div>
 

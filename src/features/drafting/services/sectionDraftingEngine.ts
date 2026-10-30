@@ -457,7 +457,7 @@ export function generateSectionDraft(params: SectionDraftParams): string {
     const hasSources = boundSources && boundSources.length > 0;
     const citations = (boundSources || []).map((s) => {
       const author = s.authors?.[0]?.split(",")[0] || "Author";
-      const year = s.year || "2024";
+      const year = s.year || "n.d.";
       return `(${author}, ${year})`;
     });
 

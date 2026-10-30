@@ -123,14 +123,13 @@ export function generateBibtex(references: AcademicExportOptions["references"] =
 
   return references
     .map((ref, idx) => {
-      const citeKey = ref.id || `ref_${idx + 1}_${(ref.authors?.[0] || "anon").toLowerCase().replace(/\W/g, "")}_${ref.year || "2024"}`;
+      const citeKey = ref.id || `ref_${idx + 1}_${(ref.authors?.[0] || "anon").toLowerCase().replace(/\W/g, "")}_${ref.year || "nd"}`;
       const authorList = (ref.authors && ref.authors.length > 0) ? ref.authors.join(" and ") : "Anonymous";
 
       return `@article{${citeKey},
   title = {${ref.title || "Untitled Document"}},
   author = {${authorList}},
-  year = {${ref.year || "2024"}},
-  journal = {${ref.journal || "Journal of Academic Research"}}${ref.doi ? `,\n  doi = {${ref.doi}}` : ""}${ref.volume ? `,\n  volume = {${ref.volume}}` : ""}${ref.pages ? `,\n  pages = {${ref.pages}}` : ""}
+  year = {${ref.year || "n.d."}}${ref.journal ? `,\n  journal = {${ref.journal}}` : ""}${ref.doi ? `,\n  doi = {${ref.doi}}` : ""}${ref.volume ? `,\n  volume = {${ref.volume}}` : ""}${ref.pages ? `,\n  pages = {${ref.pages}}` : ""}
 }`;
     })
     .join("\n\n");
@@ -555,7 +554,7 @@ export async function compileAcademicPdf(
           { text: `${ref.authors?.join(", ") || "Author"}. ` },
           { text: `"${ref.title}." ` },
           { text: `${ref.journal || "Publication"}, `, italics: true },
-          { text: `${ref.year || "2024"}` },
+          { text: `${ref.year || "n.d."}` },
           ref.doi ? { text: `, doi:${ref.doi}`, color: "#0284c7" } : "",
         ],
         fontSize: 9,
