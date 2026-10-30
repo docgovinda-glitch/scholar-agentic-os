@@ -150,7 +150,7 @@ Later PRs were opened by the agent and merged by it (owner-authorized) only afte
 | #134 | Accessibility (axe) on signed-in screens and workspaces, with fixes |
 | #135 | Keyboard focus visible on main screens; failed loads show an error with retry |
 | #136 | Credit functions refuse zero or negative amounts (P1-11) |
-| #137 | Unused Coursework template-draft generators removed |
+| #137 | Unused Coursework template-draft generators removed; screen-reader announcer timer cleared on unmount |
 | #138 | Handover: STATUS, audit, changelog, backlog, runbook |
 
 ---
