@@ -9,6 +9,7 @@ import type { CandidateProvider } from "../../src/platform/gateway/types.js";
 import { resolveClientAiConfig, type ClientAiConfig } from "../src/ai/clientAiConfig.ts";
 import { getEntitlement, isEntitlementActive } from "../src/aiEngine/entitlements.js";
 import { parseAndRepairLLMJson } from "../../src/shared/llmJsonParser.ts";
+import { InvalidLlmChallengeError } from "../src/ai/aiRouteErrors.ts";
 
 if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
   dotenv.config();
@@ -242,7 +243,7 @@ function handleFrontendLLMOverrideJSON(
   return null;
 }
 
-function createChallengeTokenForRequest(
+export function createChallengeTokenForRequest(
   req: LlmRequestLike,
   systemPrompt: string,
   userPrompt: string
@@ -256,6 +257,29 @@ function createChallengeTokenForRequest(
     promptHash,
     expiresAt: Date.now() + 15 * 60 * 1000,
   });
+}
+
+/**
+ * Reads a result the browser produced for a 426 hand-off. Returns null when the
+ * request carries no result; throws InvalidLlmChallengeError when the challenge
+ * does not match this user and exactly this prompt. Never writes to the response.
+ */
+export function readVerifiedBrowserResult(
+  req: LlmRequestLike,
+  systemPrompt: string,
+  userPrompt: string
+): string | null {
+  if (!req?.body || req.body.llmResult === undefined || req.body.llmResult === null) return null;
+  const token = typeof req.body.challengeToken === "string" ? req.body.challengeToken : "";
+  const userId = req.user?.id || (req.headers && req.headers["x-user-id"]) || "anonymous";
+  if (!token || !verifyLlmChallenge(token, String(userId), computePromptHash(systemPrompt, userPrompt))) {
+    throw new InvalidLlmChallengeError();
+  }
+  let content = req.body.llmResult as unknown;
+  if (typeof content === "object" && content !== null && typeof (content as { text?: unknown }).text === "string") {
+    content = (content as { text: string }).text;
+  }
+  return typeof content === "string" ? content : JSON.stringify(content);
 }
 
 export async function callOpenRouterJSON<T = any>(

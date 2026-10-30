@@ -114,6 +114,7 @@ ${strategy || "(not provided)"}`;
 
         const brainRes = await scholarBrain.complete({
           req,
+          browserFallback: true,
           taskClass: "verification",
           systemPrompt,
           userPrompt,
@@ -202,6 +203,7 @@ Output ONLY valid JSON.`;
 
         const brainRes = await scholarBrain.complete({
           req,
+          browserFallback: true,
           taskClass: "verification",
           systemPrompt,
           userPrompt: `Audit these Specific Aims:\n\n${aimsText}`,
@@ -317,6 +319,7 @@ ${evidenceLedger || "No external sources available."}
     try {
       const brainRes = await scholarBrain.complete({
         req,
+        browserFallback: true,
         taskClass: "drafting",
         systemPrompt,
         userPrompt: `${userPromptText}\n\nProject Title: ${title}\nAgency: ${agency || "not specified"}${mechanism ? ` (${mechanism})` : ""}\nSection: ${sectionTitle}`,
