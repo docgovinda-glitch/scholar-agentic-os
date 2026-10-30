@@ -8,6 +8,36 @@ vi.mock("../../src/middleware/auth.ts", () => ({
   },
 }));
 
+const { completeWithFailoverMock } = vi.hoisted(() => ({ completeWithFailoverMock: vi.fn() }));
+vi.mock("../../../src/platform/gateway/gateway.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../src/platform/gateway/gateway.ts")>()),
+  completeWithFailover: completeWithFailoverMock,
+}));
+
+/** Headers that give the request a (mocked) BYOK provider. */
+const AI_HEADERS = { "x-ai-provider": "openai", "x-ai-model": "gpt-4o-mini", "x-ai-api-key": "test-key" };
+
+/** A stand-in AI draft of about `words` words with varied sentence lengths. */
+function fakeAiDraft(lead: string, words: number): string {
+  const pool = [
+    "We analyze the evidence carefully.",
+    "This framing matters because the underlying behavior of the system shifts under different assumptions, and those assumptions are rarely stated explicitly in prior work.",
+    "Short claims need support.",
+    "Taken together, the sources suggest a coherent modeling approach that the remaining sections develop in more detail, with attention to limitations and scope.",
+    "Caveats remain.",
+  ];
+  const out: string[] = [lead];
+  let count = lead.split(/\s+/).length;
+  let i = 0;
+  while (count < words) {
+    const s = pool[i % pool.length];
+    out.push(s);
+    count += s.split(/\s+/).length;
+    i++;
+  }
+  return out.join(" ");
+}
+
 import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
@@ -29,6 +59,7 @@ const originalFetch = global.fetch;
 
 beforeEach(() => {
   __resetProjectStoreForTests();
+  completeWithFailoverMock.mockReset();
 });
 
 afterEach(() => {
@@ -221,9 +252,16 @@ describe("Journal Step A: Two-Pass Sub-Section Drafting & Exact Word-Count Contr
     ];
 
     const targetWords = 400;
+    completeWithFailoverMock.mockResolvedValue({
+      ok: true,
+      value: {
+        text: fakeAiDraft("Pramāṇa analysis grounds this sub-section [CITE:src_advaitic].", 395),
+      },
+    });
 
     const res = await request(app)
       .post(`/api/projects/${projectId}/agentic/draft-subsection`)
+      .set(AI_HEADERS)
       .send({
         sectionId: "sec-1",
         subSectionId: "sec-1-sub-1",
@@ -257,8 +295,64 @@ describe("Journal Step A: Two-Pass Sub-Section Drafting & Exact Word-Count Contr
     expect(content).not.toContain("[CITE:src_advaitic]");
     expect(content).toMatch(/Śaṅkara/);
 
-    // 5. High syntactic burstiness (CV > 0.25)
+    // 5. Burstiness telemetry is reported for the AI draft
     expect(res.body.burstinessMetrics).toBeDefined();
     expect(res.body.burstinessMetrics.isSufficientlyBurst).toBe(true);
+  });
+
+  it("draft-subsection with no AI provider returns 400 and writes nothing", async () => {
+    const projectId = await createTestProject();
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/agentic/draft-subsection`)
+      .send({ subSectionId: "sec-1-sub-1", subSectionTitle: "Background", targetWords: 400 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("ai_provider_required");
+    expect(completeWithFailoverMock).not.toHaveBeenCalled();
+    const saved = await getProjectStore().get(projectId);
+    expect(saved?.answers?.["drafted_subsections"]).toBeUndefined();
+  });
+
+  it("draft-subsection reports an AI failure instead of writing template prose", async () => {
+    const projectId = await createTestProject();
+    completeWithFailoverMock.mockResolvedValue({ ok: false, error: { message: "provider down" } });
+
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/agentic/draft-subsection`)
+      .set(AI_HEADERS)
+      .send({ subSectionId: "sec-1-sub-1", subSectionTitle: "Background", targetWords: 400 });
+
+    expect(res.status).toBe(502);
+    expect(res.body.code).toBe("ai_unavailable");
+    expect(JSON.stringify(res.body)).not.toMatch(/p < 0\.001/);
+    const saved = await getProjectStore().get(projectId);
+    expect(saved?.answers?.["drafted_subsections"]).toBeUndefined();
+  });
+
+  it("draft-subsection keeps a short AI draft as is when expansion fails (no filler)", async () => {
+    const projectId = await createTestProject();
+    const short = fakeAiDraft("A short real draft.", 120);
+    completeWithFailoverMock
+      .mockResolvedValueOnce({ ok: true, value: { text: short } })
+      .mockRejectedValueOnce(new Error("expansion failed"));
+
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/agentic/draft-subsection`)
+      .set(AI_HEADERS)
+      .send({ subSectionId: "sec-1-sub-1", subSectionTitle: "Background", targetWords: 400 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.actualWords).toBeLessThan(200);
+    expect(res.body.content).not.toMatch(/Empirical replication across independent experimental cohorts/);
+  });
+
+  it("draft-subsection requires a sub-section title", async () => {
+    const projectId = await createTestProject();
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/agentic/draft-subsection`)
+      .set(AI_HEADERS)
+      .send({ subSectionId: "sec-1-sub-1", targetWords: 400 });
+    expect(res.status).toBe(400);
+    expect(completeWithFailoverMock).not.toHaveBeenCalled();
   });
 });

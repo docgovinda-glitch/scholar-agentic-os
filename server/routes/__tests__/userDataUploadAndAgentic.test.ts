@@ -8,6 +8,36 @@ vi.mock("../../src/middleware/auth.ts", () => ({
   },
 }));
 
+const { completeWithFailoverMock } = vi.hoisted(() => ({ completeWithFailoverMock: vi.fn() }));
+vi.mock("../../../src/platform/gateway/gateway.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../src/platform/gateway/gateway.ts")>()),
+  completeWithFailover: completeWithFailoverMock,
+}));
+
+/** Headers that give the request a (mocked) BYOK provider. */
+const AI_HEADERS = { "x-ai-provider": "openai", "x-ai-model": "gpt-4o-mini", "x-ai-api-key": "test-key" };
+
+/** A stand-in AI draft of about `words` words with varied sentence lengths. */
+function fakeAiDraft(lead: string, words: number): string {
+  const pool = [
+    "We analyze the evidence carefully.",
+    "This framing matters because the underlying behavior of the system shifts under different assumptions, and those assumptions are rarely stated explicitly in prior work.",
+    "Short claims need support.",
+    "Taken together, the sources suggest a coherent modeling approach that the remaining sections develop in more detail, with attention to limitations and scope.",
+    "Caveats remain.",
+  ];
+  const out: string[] = [lead];
+  let count = lead.split(/\s+/).length;
+  let i = 0;
+  while (count < words) {
+    const s = pool[i % pool.length];
+    out.push(s);
+    count += s.split(/\s+/).length;
+    i++;
+  }
+  return out.join(" ");
+}
+
 import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
@@ -204,9 +234,13 @@ describe("Journal Rebuild Step B — Primary User Data Ingestion & Agentic Ledge
     };
     await store.save(proj);
 
-    // Call draft-subsection without mock external LLM (triggers deterministic pass)
+    completeWithFailoverMock.mockResolvedValue({
+      ok: true,
+      value: { text: fakeAiDraft("Decoding latency was measured directly [CITE:user_data_42].", 395) },
+    });
     const res = await request(app)
       .post("/api/projects/proj-user-data-5/agentic/draft-subsection")
+      .set(AI_HEADERS)
       .send({
         subSectionId: "sec-1-sub-1",
         subSectionTitle: "Empirical Hardware Performance",
@@ -221,7 +255,10 @@ describe("Journal Rebuild Step B — Primary User Data Ingestion & Agentic Ledge
     const content = res.body.content as string;
     const actualWords = res.body.actualWords as number;
 
-    // The citation ledger resolves user_data_42 to (Team, 2026) in APA 7
+    // The uploaded dataset is in the citation ledger the AI is given...
+    const sentPrompt = completeWithFailoverMock.mock.calls[0][0].systemPrompt as string;
+    expect(sentPrompt).toContain("user_data_42");
+    // ...and the ledger resolves user_data_42 to (Team, 2026) in APA 7
     expect(content).toContain("Team, 2026");
     expect(actualWords).toBeGreaterThanOrEqual(350);
   });
