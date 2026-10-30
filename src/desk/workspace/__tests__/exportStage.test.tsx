@@ -116,6 +116,25 @@ describe("Stage 25: Format & Export (ExportStage)", () => {
     expect(onAdvanceMock).not.toHaveBeenCalled();
   });
 
+  it("with no manuscript, says there is nothing to export and calls nothing", async () => {
+    render(
+      <ExportStage
+        stage="export"
+        projectId="proj-export-empty"
+        project={{ ...mockProject, answers: {} }}
+      />
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Generate Camera-Ready Package/i })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Nothing to export yet/i)).toBeInTheDocument();
+    });
+    expect(authedJsonFetch).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Camera-Ready Typesetting Complete/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nature Machine Intelligence/i)).not.toBeInTheDocument();
+  });
+
   it("allows switching academic template and recompiling", async () => {
     render(
       <ExportStage
