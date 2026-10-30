@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import { requireAuth } from "../src/middleware/auth.ts";
-import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic, handleFrontendLLMOverride, resolveRequestAiConfig, signLlmChallenge, computePromptHash } from "../utils/llm.ts";
+import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic, readVerifiedBrowserResult, resolveRequestAiConfig, signLlmChallenge, computePromptHash } from "../utils/llm.ts";
+import { InvalidLlmChallengeError } from "../src/ai/aiRouteErrors.ts";
 import { executeWebSearch, formatSearchResultsForPrompt } from "../src/research/webSearchEngine.ts";
 import { executeDeepResearch } from "../src/research/deepResearchEngine.ts";
 import { validateAndRefineCitations } from "../src/research/citationValidator.ts";
@@ -23,6 +24,27 @@ import type { VerifiedSourceItem } from "../src/utils/citationLockScrubber.ts";
 import { countExactWords } from "../src/utils/wordBudgetAllocator.ts";
 import { evaluateBurstiness } from "../src/utils/scholarlyVoiceGuard.ts";
 import { chunkAndRerankEvidence } from "../src/services/semanticRagEngine.ts";
+
+/**
+ * Ask Scholar's live web search, cached per query for 20 minutes so a request
+ * retried after the browser-AI hand-off (426) rebuilds the identical prompt and
+ * its challenge matches. A failed search is not cached.
+ */
+const ASK_SEARCH_TTL_MS = 20 * 60 * 1000;
+const askSearchCache = new Map<string, { at: number; value: Promise<Awaited<ReturnType<typeof executeWebSearch>>> }>();
+function cachedAskScholarWebSearch(query: string): Promise<Awaited<ReturnType<typeof executeWebSearch>>> {
+  const key = query.trim().toLowerCase();
+  const hit = askSearchCache.get(key);
+  if (hit && Date.now() - hit.at < ASK_SEARCH_TTL_MS) return hit.value;
+  const value = executeWebSearch(query, { maxResults: 6, fetchFullContent: true });
+  value.catch(() => askSearchCache.delete(key));
+  askSearchCache.set(key, { at: Date.now(), value });
+  if (askSearchCache.size > 200) {
+    const oldest = askSearchCache.keys().next().value;
+    if (oldest !== undefined) askSearchCache.delete(oldest);
+  }
+  return value;
+}
 
 /**
  * Intelligent Capability Determination:
@@ -322,7 +344,10 @@ export function registerAIRoutes(
         });
       };
 
-      const incomingLlmResult = handleFrontendLLMOverride(req, res);
+      // A browser-run answer (after a 426 hand-off) is verified only once this
+      // request's prompt is rebuilt, so the challenge is checked against it.
+      const hasBrowserResult = req.body?.llmResult !== undefined && req.body?.llmResult !== null;
+      let incomingLlmResult: string | null = null;
       const aiConfig = resolveRequestAiConfig(req);
       const candidates = getCandidates(req);
 
@@ -418,7 +443,10 @@ export function registerAIRoutes(
       }
 
       // ── Workflow: Deep Research Mode ──
-      if (mode === "deep-research" && !incomingLlmResult) {
+      if (mode === "deep-research" && hasBrowserResult) {
+        const deepSysPrompt = "You are Scholar Core Deep Research Agent. Provide an exhaustive, deeply researched academic synthesis with verified citations and structured sections.";
+        incomingLlmResult = readVerifiedBrowserResult(req, deepSysPrompt, effectivePrompt);
+      } else if (mode === "deep-research") {
         const deepSysPrompt = "You are Scholar Core Deep Research Agent. Provide an exhaustive, deeply researched academic synthesis with verified citations and structured sections.";
         if (candidates.length === 0) {
           return res.status(426).json({
@@ -501,7 +529,7 @@ export function registerAIRoutes(
 
       // 3. Process Web Search if required
       if (mode === "search" && canonicalSources.length < 3) {
-        const searchResponse = await executeWebSearch(effectivePrompt, { maxResults: 6, fetchFullContent: true });
+        const searchResponse = await cachedAskScholarWebSearch(effectivePrompt);
         citations = searchResponse.results;
         contextBlocks.push(`=== LIVE SCHOLARLY & WEB SEARCH RESULTS ===\n${formatSearchResultsForPrompt(searchResponse.results)}\n=== END OF SEARCH RESULTS ===`);
       }
@@ -561,6 +589,10 @@ Formatting & Academic Citation Rules:
 5. Conclude with a clean "## References & Evidence Base" section formatted according to ${styleDescription} listing the consulted sources.`;
       } else {
         assembledUserPrompt += effectivePrompt;
+      }
+
+      if (hasBrowserResult && incomingLlmResult === null) {
+        incomingLlmResult = readVerifiedBrowserResult(req, effectiveSystemPrompt, assembledUserPrompt);
       }
 
       // 6. Execute Agent with Multimodal & Model Failover Support
@@ -750,6 +782,9 @@ Formatting & Academic Citation Rules:
         verifiedSourcesCount: (validated.citations || []).length,
       });
     } catch (err) {
+      if (err instanceof InvalidLlmChallengeError) {
+        return res.status(403).json({ ok: false, error: err.message, code: "ai_challenge_invalid" });
+      }
       console.error("Agent execution error:", err);
       const message = err instanceof Error ? err.message : String(err);
       res.status(500).json({

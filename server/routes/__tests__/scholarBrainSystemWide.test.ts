@@ -210,6 +210,47 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
 
   // Arm 1: AskScholar & Deep Research Grounding
   describe("Arm 1: AskScholar & Deep Research Grounding (/api/ai/agent)", () => {
+    it("hands the prompt to the browser and accepts only an answer bound to that prompt (P1-10)", async () => {
+      const body = {
+        prompt: "What are the latest advances in non-Markovian quantum error mitigation?",
+        mode: "chat",
+        vaultSources: [{ id: "src_vault_1", title: "Benchmarking Non-Markovian Quantum Error Suppressions", authors: ["Finch, A."], year: 2023 }],
+      };
+      const first = await request(app).post("/api/ai/agent").send(body);
+      expect(first.status).toBe(426);
+      expect(first.body.requireFrontendLLM).toBe(true);
+      const { challengeToken, canonicalSources } = first.body;
+
+      // The browser's answer, sent back with the echoed sources (as authedJsonFetch does)
+      const ok = await request(app)
+        .post("/api/ai/agent")
+        .send({ ...body, canonicalSources, challengeToken, llmResult: "Mitigation improves with memory-aware decoders [CITE:src_vault_1]." });
+      expect(ok.status).toBe(200);
+      expect(ok.body.text).toContain("Finch");
+
+      // A token for this user but a different question is rejected
+      const swapped = await request(app)
+        .post("/api/ai/agent")
+        .send({ ...body, prompt: "Something else entirely about protein folding?", canonicalSources, challengeToken, llmResult: "anything" });
+      expect(swapped.status).toBe(403);
+      expect(swapped.body.code).toBe("ai_challenge_invalid");
+
+      // No token at all is rejected too
+      const unsigned = await request(app).post("/api/ai/agent").send({ ...body, canonicalSources, llmResult: "anything" });
+      expect(unsigned.status).toBe(403);
+    });
+
+    it("deep research hands off and verifies against the deep-research prompt", async () => {
+      const body = { prompt: "Survey the literature on coastal erosion modelling", mode: "deep-research" };
+      const first = await request(app).post("/api/ai/agent").send(body);
+      expect(first.status).toBe(426);
+      expect(first.body.mode).toBe("deep-research");
+      const ok = await request(app)
+        .post("/api/ai/agent")
+        .send({ ...body, canonicalSources: first.body.canonicalSources, challengeToken: first.body.challengeToken, llmResult: "A synthesis." });
+      expect(ok.status).toBe(200);
+    });
+
     it("executes multi-portal evidence retrieval and scrubs citations with APA 7 references", async () => {
       // Mock scholarBrain.complete to simulate grounded response with valid token
       const completeSpy = vi.spyOn(scholarBrain, "complete").mockResolvedValue({
