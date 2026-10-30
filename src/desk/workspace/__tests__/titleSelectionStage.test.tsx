@@ -213,7 +213,10 @@ describe("Stage 5: Title Suggestions (TitleSelectionStage)", () => {
     });
   });
 
-  it("falls back to local heuristic synthesis when executeAgenticLLM throws", async () => {
+  // Rewritten: the stage used to fill in keyword-template titles (claiming
+  // results such as "Overcomes Verification Barriers") when the AI failed, and
+  // this test asserted them. It now reports the failure and produces nothing.
+  it("shows an error and produces no titles when executeAgenticLLM throws", async () => {
     (api.executeAgenticLLM as any).mockRejectedValue(new Error("AI quota reached"));
 
     render(
@@ -225,20 +228,13 @@ describe("Stage 5: Title Suggestions (TitleSelectionStage)", () => {
       />
     );
 
-    const generateBtn = screen.getByRole("button", { name: /Generate Title Proposals/i });
-    fireEvent.click(generateBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Generate Title Proposals/i }));
 
-    await waitFor(() => {
-      expect(screen.queryByText(/Synthesize Publication-Ready Titles/i)).not.toBeInTheDocument();
-      expect(screen.getAllByRole("button", { name: /Adopt Title/i }).length).toBeGreaterThan(0);
-    });
-
-    expect(api.saveIntakeAnswers).toHaveBeenCalledWith(
+    expect(await screen.findByText(/Titles could not be generated \(AI quota reached\)/i)).toBeInTheDocument();
+    expect(screen.queryAllByRole("button", { name: /Adopt Title/i })).toHaveLength(0);
+    expect(api.saveIntakeAnswers).not.toHaveBeenCalledWith(
       "proj-title-101",
-      expect.objectContaining({
-        generated_titles: expect.any(String),
-        current_stage: "title_selection",
-      })
+      expect.objectContaining({ generated_titles: expect.any(String) })
     );
   });
 });

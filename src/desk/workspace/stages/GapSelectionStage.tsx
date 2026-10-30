@@ -5,7 +5,7 @@ import { STAGE_MAP } from "../types";
 import { saveIntakeAnswers } from "../../api";
 import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
-import { generateLocalGapFallback, type GapItem } from "../agentPrompts/gapPrompts";
+import { type GapItem } from "../agentPrompts/gapPrompts";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
 
 export default function GapSelectionStage({

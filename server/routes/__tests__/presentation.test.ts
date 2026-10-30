@@ -81,31 +81,19 @@ describe("Presentation Studio Endpoints (/api/projects/:id/presentation)", () =>
     expect(res.status).toBe(404);
   });
 
-  it("POST /qa-simulate returns structured referee scenarios with difficulty levels and rebuttal points", async () => {
+  // Replaces a test that asserted the fixed fallback Q&A set returned when no
+  // AI was configured (topic-independent questions with invented results).
+  // The route now asks for an AI provider instead (PRODUCT_AUDIT P0-11).
+  it("POST /qa-simulate asks for an AI provider instead of returning stand-in questions", async () => {
     const projectId = await createPresentationProject();
 
     const res = await request(app)
       .post(`/api/projects/${projectId}/presentation/qa-simulate`)
-      .send({
-        title: "Quantum Cognitive Paradigms in Autonomous Systems",
-        audienceFocus: "Peer-Review Referees & Oral Committee",
-      });
+      .send({ title: "Quantum Cognitive Paradigms in Autonomous Systems" });
 
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(Array.isArray(res.body.qaScenarios)).toBe(true);
-    expect(res.body.qaScenarios.length).toBeGreaterThanOrEqual(2);
-
-    for (const qa of res.body.qaScenarios) {
-      expect(qa.questionId).toBeTruthy();
-      expect(qa.audienceType).toBeTruthy();
-      expect(["moderate", "rigorous", "adversarial"]).toContain(qa.difficultyLevel);
-      expect(qa.questionText).toBeTruthy();
-      expect(qa.probingIntent).toBeTruthy();
-      expect(qa.suggestedAnswer).toBeTruthy();
-      expect(Array.isArray(qa.modelRebuttalStructure)).toBe(true);
-      expect(qa.modelRebuttalStructure.length).toBeGreaterThanOrEqual(2);
-    }
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("ai_provider_required");
+    expect(res.body.qaScenarios).toBeUndefined();
   });
 
   it("POST /qa-simulate 404s on nonexistent project", async () => {
