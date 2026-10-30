@@ -499,98 +499,87 @@ router.post("/:id/copilot", async (req: Request, res: Response) => {
     const lowerPrompt = prompt.toLowerCase();
     const mutatedSlide = JSON.parse(JSON.stringify(targetSlide));
 
-    // Handle Screenshot Reference Replication request
+    // Every branch below reuses only the slide's own text and the user's prompt:
+    // no stock bullets, comparisons or figures are added.
+    const ownBullets: string[] = (Array.isArray(mutatedSlide.blocks) ? mutatedSlide.blocks : [])
+      .filter((b: { type?: string; items?: unknown }) => b?.type === "bullet-list" && Array.isArray(b.items))
+      .flatMap((b: { items: unknown[] }) => b.items.filter((i): i is string => typeof i === "string" && i.trim().length > 0));
+    const ownHeader = (Array.isArray(mutatedSlide.blocks) ? mutatedSlide.blocks : []).find(
+      (b: { type?: string }) => b?.type === "action-header"
+    ) as { headline?: string; category?: string; subheadline?: string } | undefined;
+    const headerBlock = {
+      type: "action-header",
+      headline: mutatedSlide.actionHeadline || ownHeader?.headline || "",
+      category: ownHeader?.category || "",
+      subheadline: ownHeader?.subheadline || "",
+    };
+
+    // Image-split layout around a reference screenshot (layout only; the slide keeps its own text)
     if (referenceImage || lowerPrompt.includes("replicate") || lowerPrompt.includes("screenshot") || lowerPrompt.includes("clone slide")) {
-      const isSplit = !lowerPrompt.includes("2-column") && !lowerPrompt.includes("metric");
-      if (isSplit) {
-        mutatedSlide.layoutType = "image-split";
-        mutatedSlide.imageUrl = referenceImage || mutatedSlide.imageUrl || "";
-        mutatedSlide.imageCaption = "Synthesized replica from reference screenshot";
-        mutatedSlide.blocks = [
-          {
-            type: "action-header",
-            headline: mutatedSlide.actionHeadline || "Replicated Visual Synthesis",
-            category: "REFERENCE REPLICA · EMPIRICAL ARTIFACT",
-            subheadline: prompt.length < 90 ? prompt : "Exact architectural replica synthesized directly from attached reference screenshot",
-          },
-          {
-            type: "bullet-list",
-            items: [
-              "Visual layout structure mapped directly from reference screenshot",
-              "50/50 balance between visual evidence and core takeaways",
-              "Preserves spatial proportions and visual weight of original artifact",
-              "Full inline editing supported across headline and bullet copy",
-            ],
-          },
-          {
-            type: "image",
-            imageUrl: referenceImage || mutatedSlide.imageUrl || "",
-            caption: "Synthesized replica from reference screenshot",
-            layout: "split",
-            aspectRatio: "16:9",
-          },
-        ];
-      }
+      mutatedSlide.layoutType = "image-split";
+      mutatedSlide.imageUrl = referenceImage || mutatedSlide.imageUrl || "";
+      mutatedSlide.blocks = [
+        headerBlock,
+        ...(ownBullets.length > 0 ? [{ type: "bullet-list", items: ownBullets }] : []),
+        {
+          type: "image",
+          imageUrl: mutatedSlide.imageUrl,
+          caption: mutatedSlide.imageCaption || "",
+          layout: "split",
+          aspectRatio: "16:9",
+        },
+      ];
     }
-    // Handle 2-column comparative layout request
+    // 2-column layout: the slide's own points, split in two
     else if (lowerPrompt.includes("2-column") || lowerPrompt.includes("compare") || lowerPrompt.includes("comparison")) {
+      if (ownBullets.length < 2) {
+        return res.status(400).json({
+          error: "Add at least two points to this slide first; the comparison layout splits your own points into two columns.",
+        });
+      }
+      const half = Math.ceil(ownBullets.length / 2);
       mutatedSlide.layoutType = "two-column";
       mutatedSlide.blocks = [
-        {
-          type: "action-header",
-          headline: mutatedSlide.actionHeadline || "Comparative Synthesis",
-          category: "ANALYSIS · COMPARISON",
-          subheadline: "Evaluating mechanism trade-offs under empirical constraints",
-        },
+        headerBlock,
         {
           type: "two-column",
-          leftHeader: "Current Paradigm / Baseline",
-          leftPoints: ["Quadratic scaling complexity", "O(N) memory overhead", "Single-point vulnerability"],
-          rightHeader: "Proposed Quantum / Grounded Model",
-          rightPoints: ["Sub-exponential speedup", "Constant O(1) state footprint", "Fault-tolerant error mitigation"],
+          leftHeader: "",
+          leftPoints: ownBullets.slice(0, half),
+          rightHeader: "",
+          rightPoints: ownBullets.slice(half),
         },
       ];
     }
-    // Handle big metric callout request
-    else if (lowerPrompt.includes("metric") || lowerPrompt.includes("callout") || lowerPrompt.includes("4.2x") || lowerPrompt.includes("%")) {
-      mutatedSlide.layoutType = "metric-focus";
-      const metricMatch = prompt.match(/(\d+(\.\d+)?%?x?)/i);
-      const metricVal = metricMatch ? metricMatch[1] : "4.2x";
-      mutatedSlide.blocks = [
-        {
-          type: "action-header",
-          headline: mutatedSlide.actionHeadline || "High-Impact Empirical Benchmark",
-          category: "EMPIRICAL BENCHMARK",
-          subheadline: "Measurable acceleration verified across peer-review datasets",
-        },
-        {
-          type: "metric-callout",
-          value: metricVal,
-          label: "Performance Acceleration",
-          context: "Triangulated across 5,000 empirical test cases with p < 0.001 significance",
-        },
-      ];
-    }
-    // Handle condense into 6-word action bullets
-    else if (lowerPrompt.includes("condense") || lowerPrompt.includes("6-word") || lowerPrompt.includes("bullet")) {
-      mutatedSlide.layoutType = "bullets";
-      const bulletBlock = mutatedSlide.blocks.find((b: any) => b.type === "bullet-list");
-      if (bulletBlock && Array.isArray(bulletBlock.items)) {
-        bulletBlock.items = bulletBlock.items.slice(0, 6).map((item: string) => {
-          const words = item.split(/\s+/).filter(Boolean);
-          return words.slice(0, 6).join(" ");
-        });
-      } else {
-        mutatedSlide.blocks.push({
-          type: "bullet-list",
-          items: [
-            "Deterministic zero-hallucination citation verification",
-            "Multi-agent adversarial consensus protocol",
-            "Sub-second latency across 10k corpora",
-            "Cryptographic proof of reference provenance",
-          ],
+    // Big metric callout: only for a figure the user typed
+    else if (lowerPrompt.includes("metric") || lowerPrompt.includes("callout") || lowerPrompt.includes("%")) {
+      const metricMatch = prompt.match(/(\d+(?:\.\d+)?\s*(?:%|x\b)?)/i);
+      if (!metricMatch) {
+        return res.status(400).json({
+          error: "Include the figure to highlight, for example \"metric callout 42%\". Scholar Core never invents a number.",
         });
       }
+      mutatedSlide.layoutType = "metric-focus";
+      mutatedSlide.blocks = [
+        headerBlock,
+        {
+          type: "metric-callout",
+          value: metricMatch[1].replace(/\s+/g, ""),
+          label: "",
+          context: "",
+        },
+      ];
+    }
+    // Condense the slide's own bullets to 6 words each
+    else if (lowerPrompt.includes("condense") || lowerPrompt.includes("6-word") || lowerPrompt.includes("bullet")) {
+      const bulletBlock = mutatedSlide.blocks.find((b: any) => b.type === "bullet-list");
+      if (!bulletBlock || !Array.isArray(bulletBlock.items) || bulletBlock.items.length === 0) {
+        return res.status(400).json({ error: "This slide has no bullet points to condense." });
+      }
+      mutatedSlide.layoutType = "bullets";
+      bulletBlock.items = bulletBlock.items.slice(0, 6).map((item: string) => {
+        const words = item.split(/\s+/).filter(Boolean);
+        return words.slice(0, 6).join(" ");
+      });
     }
     // General transformation / headline refinement
     else {

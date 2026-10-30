@@ -60,7 +60,7 @@ export function makeMoreConcise(slide: SlideCard): SlideCard {
         .filter(Boolean);
       return {
         ...block,
-        items: items.length > 0 ? items : ['Core empirical finding condensed'],
+        items,
       };
     }
     if (block.type === 'two-column') {
@@ -99,7 +99,7 @@ export function convertToSplitImage(slide: SlideCard, imageUrl?: string): SlideC
     const newImageBlock: ImageBlock = {
       type: 'image',
       imageUrl: imageUrl || '',
-      caption: 'Analytical visual artifact',
+      caption: '',
     };
     // Place right after header if possible
     const headerIdx = blocks.findIndex((b) => b.type === 'action-header');
@@ -110,18 +110,7 @@ export function convertToSplitImage(slide: SlideCard, imageUrl?: string): SlideC
     }
   }
 
-  // Ensure bullet list exists for the text half
-  const hasBullets = blocks.some((b) => b.type === 'bullet-list' || b.type === 'two-column');
-  if (!hasBullets) {
-    blocks.push({
-      type: 'bullet-list',
-      items: [
-        'Visual artifact demonstrates strategic inflection point',
-        'Empirical verification aligns with observed cohort data',
-        'Direct architectural evidence supports primary hypothesis',
-      ],
-    });
-  }
+  // The text half keeps the slide's own points; none are invented.
 
   return {
     ...slide,
@@ -216,23 +205,16 @@ export function changeToTwoColumn(slide: SlideCard): SlideCard {
     leftPoints = existingBullets.slice(0, mid);
     rightPoints = existingBullets.slice(mid);
   } else {
-    leftPoints = [
-      'Legacy operational bottlenecks',
-      'Fragmented departmental silos',
-      'High latency manual handoffs',
-    ];
-    rightPoints = [
-      'Automated consensus architecture',
-      'Unified single-source ledger',
-      'Sub-second real-time telemetry',
-    ];
+    // Too few points to split: keep what there is and leave the other column for the user.
+    leftPoints = existingBullets;
+    rightPoints = [];
   }
 
   const twoColBlock: TwoColumnBlock = {
     type: 'two-column',
-    leftTitle: 'Baseline & Constraints',
+    leftTitle: '',
     leftPoints,
-    rightTitle: 'Strategic Target Architecture',
+    rightTitle: '',
     rightPoints,
   };
 
@@ -260,36 +242,14 @@ export function changeToTwoColumn(slide: SlideCard): SlideCard {
  * Replaces passive or weak headlines with decisive executive action statements.
  */
 export function strengthenActiveVoice(slide: SlideCard): SlideCard {
-  let headline = slide.actionHeadline || 'Transforming Strategic Architecture';
+  const headline = slide.actionHeadline || '';
 
-  // Common passive / weak patterns and active replacements
-  const passiveReplacements: Array<[RegExp, string]> = [
-    [/^(overview of|introduction to|background on|an analysis of)\s+/i, ''],
-    [/^(the\s+)?problem of\s+/i, 'Systemic Friction Mandates '],
-    [/^(the\s+)?importance of\s+/i, 'Accelerating '],
-    [/^(a\s+)?study on\s+/i, 'Empirical Evidence Proves '],
-    [/^(the\s+)?effects of\s+/i, 'How Strategic Shifts Unlock '],
-    [/^culture in\s+/i, 'Organizational Culture Anchors '],
-  ];
-
-  let strengthened = headline;
-  for (const [regex, replacement] of passiveReplacements) {
-    if (regex.test(strengthened)) {
-      strengthened = strengthened.replace(regex, replacement).trim();
-      break;
-    }
-  }
-
-  // Capitalize first character
+  // Strip weak topic openers so the headline leads with the subject. It never
+  // adds a claim ("proves", "drives outcomes") the user did not make.
+  const weakOpeners = /^(an?\s+)?(overview of|introduction to|background on|analysis of|study on|study of)\s+/i;
+  let strengthened = headline.replace(weakOpeners, '').trim();
   if (strengthened.length > 0) {
     strengthened = strengthened.charAt(0).toUpperCase() + strengthened.slice(1);
-  }
-
-  // If the headline didn't change and ends with no active verb, make it an active assertion
-  if (strengthened === headline) {
-    if (!/(\b(Drives|Accelerates|Transforms|Eliminates|Proves|Anchors|Mandates|Delivers)\b)/i.test(strengthened)) {
-      strengthened = `${strengthened.replace(/\.$/, '')} Drives Verifiable Outcomes`;
-    }
   }
 
   // Synchronize across ActionHeaderBlock
@@ -387,6 +347,14 @@ export async function executeSlidePrompt({
         }),
       });
 
+      if (response.status === 400) {
+        // The server declined (e.g. no figure given for a metric callout): say why, change nothing.
+        const data = await response.json().catch(() => ({}));
+        return {
+          mutatedSlide: currentSlide,
+          message: (data as { error?: string }).error || 'This change needs more content on the slide first.',
+        };
+      }
       if (response.ok) {
         const data = await response.json();
         if (data.mutatedSlide) {
