@@ -15,7 +15,7 @@
 4. Full encrypted `pg_dump` backups are impossible from the agent sandbox (HTTPS-only egress, no raw TCP to Postgres). Prod changes on 2026-10-29 were preceded by policy/grant/RLS snapshots only (`~/backups/*-20261029T104243Z.json`, agent machine). Supabase Pro daily backups are the restore path.
 5. **Deploy smoke secrets (optional): not set.** `deploy.yml` runs the production smoke suite after each deploy only when the `SMOKE_*` GitHub secrets exist. This session has no tool that can write repository secrets, so the step stays skipped. The suite is run by hand after deploys (`scripts/smoke-prod.sh`).
 
-## 0. Task checklist (status as of 2026-10-30 09:20Z)
+## 0. Task checklist (status as of 2026-10-30 18:30Z, handover)
 
 | Task | Status | Evidence |
 | :--- | :--- | :--- |
@@ -29,18 +29,18 @@
 | T7 Edge Function | DONE | v11 |
 | T8 Purge | DONE (order deviation) | |
 | T9 Migration reconciliation | PARTIAL | fresh-DB replay works with 2 documented workarounds (`authentic_id`, premium_requests order); schema diff vs production not possible from sandbox (no raw TCP for `pg_dump`) |
-| T10 Production readiness | PARTIAL | PR CI + audit gate, deploy waits for live commit + deep health + smoke, uptime workflow, Render health check path (#86); deploy check accepts a newer live commit that contains the run's commit (#99); branch protection, error tracking, rollback drill → owner/next |
+| T10 Production readiness | DONE (agent side) | PR CI + audit gate, deploy waits for live commit + deep health + smoke, uptime workflow, Render health check path (#86); deploy check accepts a newer live commit that contains the run's commit (#99). Owner-only: branch protection, error tracking account, rollback drill (§5) |
 | T11 AUDIT findings | PARTIAL | see section 3 |
 | B1 Product audit | FIRST PASS + AI map | `PRODUCT_AUDIT.md`; area g mapped in `docs/AI-CALL-MAP.md` (#94) |
-| P0 fabricated content | DONE (P0-1…P0-20) | #87–#89 (Coursework, Journal); #100, #101 (Thesis/Proposal); #104 (citations never invent year/author/venue, P0-7); #108 (audience Q&A, P0-11); #109 (journal titles); #110–#112 (Journal review, demo manuscripts, sub-section drafter); #113, #114 (slide copilot, theme picker that replaced decks); #115 (landing page, Swiss sample deck, coursework prompt); #121 (Presentation sidebar demo projects and "Aaditya" account); #130 (Coursework drafting wrote template text instead of the user's AI, P0-20). Details in `PRODUCT_AUDIT.md` |
-| B2 E2E harness | DONE | #91: Playwright, local Supabase in CI, smoke on every PR; 36 tests by #130, including a stand-in AI service for AI steps (#129) |
-| B3 One Brain | IN PROGRESS | map (#94); BYOK headers only on AI routes (#93); one header parser (#95); one Premium pipeline (#98); unused `/agent/literature` removed (#97); typed AI errors for Thesis/Proposal (#100). local model never called from the server (#106); scholarBrain routes hand off to browser-local AI with signed challenges (#116, step 2). Next: bind Ask Scholar challenge to its prompt (P1-10), deep-research hand-off, guardrails on llm.ts output, `brain.ts` contract |
-| B4 AI Access | IN PROGRESS | Premium scope stated truthfully (#96); every catalog provider has a working adapter, tested (#123); credit balance = ledger and limits enforced, checked against a real DB in CI (#125, P1-11 negative grant noted); premium requests act only on a pending request (#126, P1-12); platform keys encrypted with MASTER_KEY, never returned (#127). Next: providers/models/budgets CRUD tests |
-| B5 Workspaces | IN PROGRESS | real routes + honest errors (#100), practice room/worksheet (#101), starter no longer invents budget (#102); E2E per workspace: open, saved answers survive reload, no demo data, private (#128); each drafting step runs through the real AI path (#129); Coursework drafting uses the user's AI (#130). Next: versioning and export E2E |
-| B7 UI/UX pass | IN PROGRESS | every chunk < 500 kB, enforced in the build (#119: 918 → 379 kB); no pure #000000, lint-checked (#120); axe WCAG 2.1 A/AA + no sideways scroll at 375/768/1280 px with screenshots in CI (#121); phone layout fixes (#121, #122); no runtime-built Tailwind classes (checked). Next: hardcoded hex → tokens, loading/empty/error states, keyboard/focus pass |
-| B8 | TODO | |
+| P0 fabricated content / broken flows | DONE (P0-1…P0-21) | #87–#89 (Coursework, Journal); #100, #101 (Thesis/Proposal); #104 (citations never invent year/author/venue, P0-7); #108 (audience Q&A, P0-11); #109 (journal titles); #110–#112 (Journal review, demo manuscripts, sub-section drafter); #113, #114 (slide copilot, theme picker that replaced decks); #115 (landing page, Swiss sample deck, coursework prompt); #121 (Presentation sidebar demo projects and "Aaditya" account); #130 (Coursework drafting wrote template text instead of the user's AI, P0-20); #132 (Journal re-draft failed on a duplicate key, P0-21); #137 (unused template-draft generators removed). Details in `PRODUCT_AUDIT.md` |
+| B2 E2E harness | DONE | #91: Playwright, local Supabase in CI, smoke on every PR; 60 tests by #136, including a stand-in AI service for AI steps (#129), axe on signed-in screens (#134) and a keyboard spec (#135) |
+| B3 One Brain | IN PROGRESS | map (#94); BYOK headers only on AI routes (#93); one header parser (#95); one Premium pipeline (#98); unused `/agent/literature` removed (#97); typed AI errors for Thesis/Proposal (#100). local model never called from the server (#106); scholarBrain routes hand off to browser-local AI with signed challenges (#116, step 2); Ask Scholar challenge bound to its prompt (#118, P1-10). Not done (see §5): deep-research browser hand-off, output guardrails in `server/utils/llm.ts`, a single `brain.ts` contract |
+| B4 AI Access | IN PROGRESS | Premium scope stated truthfully (#96); every catalog provider has a working adapter, tested (#123); credit balance = ledger and limits enforced, checked against a real DB in CI (#125, P1-11 negative grant noted); premium requests act only on a pending request (#126, P1-12); platform keys encrypted with MASTER_KEY, never returned (#127); credit functions refuse zero/negative amounts, applied to production (#136, P1-11). Not done: admin providers/models/budgets CRUD tests; BYOK per real provider needs real keys (UNVERIFIED) |
+| B5 Workspaces | IN PROGRESS | real routes + honest errors (#100), practice room/worksheet (#101), starter no longer invents budget (#102); E2E per workspace: open, saved answers survive reload, no demo data, private (#128); each drafting step runs through the real AI path (#129); Coursework drafting uses the user's AI (#130); Journal re-draft keeps the previous version, Markdown/Word export, owner-only (#132). Not done: export E2E for Coursework/Thesis/Proposal; no screen shows saved versions (backlog) |
+| B7 UI/UX pass | DONE | every chunk < 500 kB, enforced in the build (#119: 918 → 379 kB); no pure #000000, lint-checked (#120); axe WCAG 2.1 A/AA + no sideways scroll at 375/768/1280 px with screenshots in CI (#121); phone layout fixes (#121, #122); no runtime-built Tailwind classes (checked); colour tokens instead of raw hex in app chrome, lint-checked (#133); axe on signed-in screens and all four workspaces, with fixes (#134); keyboard focus visible everywhere Tab reaches, failed loads show an error with retry (#135) |
+| B8 Final verification | DONE | CI E2E 60/60 and unit suites green on #136; production smoke 35/35 on `031ff13` (2026-10-30 18:16Z) and re-run after the final deploy (§1); final per-area status in `PRODUCT_AUDIT.md` |
 | B6 Presentation | DONE except One Brain (B3); decks persist (#85) | |
-| T12 Handover | TODO | |
+| T12 Handover | DONE (#138) | this file §4–§5; `RUNBOOK.md`, `CHANGELOG.md`, `ROTATION_RUNBOOK.md`, `USER_NOTICE.md` (draft, not sent), `PRODUCT_AUDIT.md`, `PRODUCT_BACKLOG.md` |
 
 ## 1. Deploy & production change ledger
 
@@ -62,6 +62,7 @@
 | 2026-10-29 16:56 → 2026-10-30 01:10 | Deploys #93–#101 (code only, no SQL, no env changes). Runs for #93–#96 were superseded by newer merges; production went straight to the newest `main` | | `/api/health?deep=1` healthy, database ok, commit `65bc226` (#100) at 01:07; #101 deploying | redeploy previous |
 | 2026-10-30 01:20 → 02:20 | Deploys #102, #103, #104 (code/docs only) | | health `commit` `d625217`; smoke 35/35 | redeploy previous |
 | 2026-10-30 02:30 | Supabase Auth `rate_limit_otp` 30 → 300 (Management API PATCH `config/auth`, owner-approved) | 30 | read-back 300; other `rate_limit_*` unchanged; smoke 35/35 | PATCH back to 30 |
+| 2026-10-30 18:15Z | SQL `20261030170000_credit_amount_must_be_positive` (#136) via Management API; recorded in `schema_migrations` | function defs snapshot `~/backups/credit-functions-20261030T181524Z.json` (agent machine) | `grant_credits(-1)` and `deduct_credits(0)` → 22023, no ledger rows; anon/authenticated execute still false | re-create both functions from the snapshot |
 
 ## T5 results (2026-10-29, read-only, `default_transaction_read_only = on`, counts only)
 
@@ -143,6 +144,14 @@ Later PRs were opened by the agent and merged by it (owner-authorized) only afte
 | #128 | E2E: every workspace opens, keeps saved answers, shows no demo data, stays private |
 | #129 | E2E: each workspace's drafting step through the real AI path (stand-in AI in CI) |
 | #130 | Coursework drafting: the user's AI or an honest error, never template text (P0-20) |
+| #131 | STATUS, audit and changelog after #124–#130 |
+| #132 | Journal: re-drafting no longer fails (P0-21); E2E for versions and export |
+| #133 | App chrome uses colour tokens instead of raw hex; lint check |
+| #134 | Accessibility (axe) on signed-in screens and workspaces, with fixes |
+| #135 | Keyboard focus visible on main screens; failed loads show an error with retry |
+| #136 | Credit functions refuse zero or negative amounts (P1-11) |
+| #137 | Unused Coursework template-draft generators removed |
+| #138 | Handover: STATUS, audit, changelog, backlog, runbook |
 
 ---
 
@@ -152,9 +161,9 @@ Later PRs were opened by the agent and merged by it (owner-authorized) only afte
 
 | Canonical ID (`AUDIT.md`) | Severity | Title (`AUDIT.md:13-31`) | Current Live / Repo Status |
 | :---: | :---: | :--- | :--- |
-| **`F-01`** | **BLOCKER** | 7 live production secrets committed in git history (`28cfaa5:INFRASTRUCTURE_REFERENCE.md`, `01f851f:scripts/setup-infrastructure.md` on `2026-08-04`) | **Accepted risk — owner decision, rotation scheduled at project end (`ROTATION_RUNBOOK.md`)**; direct Postgres mitigated by **Supabase Network Restrictions = ON (`2026-10-29`)** |
-| **`F-02`** | **BLOCKER** | 3 tables missing `ENABLE ROW LEVEL SECURITY` (`project_research_gaps`, `project_titles`, `project_journal_candidates`) | Migration `20261028000000_hotfix2` on `main` (`cbf38da`) — **NOT APPLIED (`UNVERIFIED` pending Section 3 Docker checks)** |
-| **`F-03`** | **BLOCKER** | `project-files` Storage bucket policies allow anonymous full read/write/update/delete; `id-documents` public flag | App signed-URL endpoint live on `main` (`#72`/`#80`); SQL migration on `main` — **NOT APPLIED (`UNVERIFIED` pending Section 3 Docker checks)** |
+| **`F-01`** | **BLOCKER** | 7 live production secrets committed in git history (`28cfaa5:INFRASTRUCTURE_REFERENCE.md`, `01f851f:scripts/setup-infrastructure.md` on `2026-08-04`) | **Accepted risk — owner decision, rotation at project end (`ROTATION_RUNBOOK.md`)**. Supabase Network Restrictions are set but allow `0.0.0.0/0` (read back 2026-10-30 18:20Z), so they do **not** mitigate the leaked database password |
+| **`F-02`** | **BLOCKER** | 3 tables missing `ENABLE ROW LEVEL SECURITY` (`project_research_gaps`, `project_titles`, `project_journal_candidates`) | **Applied** 2026-10-29 10:44Z (`20261028000000_hotfix2`, §1); anon read/write denied in the production smoke suite |
+| **`F-03`** | **BLOCKER** | `project-files` Storage bucket policies allow anonymous full read/write/update/delete; `id-documents` public flag | **Applied** 2026-10-29 10:44Z (hotfix2, §1); signed-URL endpoint live (#72/#80); anon bucket listing returns nothing in the production smoke suite; no `id-documents` bucket exists (T5) |
 | **`F-04`** | **BLOCKER** | `request-profile-update` Edge Function returns `verificationKey` in HTTP response when email delivery fails (`TICKET-SEC-01`) | **DEPLOYED & ACTIVE on Supabase (`v11`, `2026-10-29`)** — direct HTTP calls return HTTP `410 Gone` (`PROFILE_UPDATE_DISABLED`) and never leak `verificationKey`; SPA displays `TICKET-SEC-01` in-app notice |
 | **`F-05`** | **BLOCKER** | Unauthenticated heavy file parsing (`POST /api/vault/parse-file`) + 50 MB upload limits can OOM-kill 512 MB Render container | **LIVE on `main` (`#71` `5a642a0` + `#80` `cbf38da` hard `10 MB` code ceiling)** |
 | **`F-06`** | **BLOCKER** | Service-role project routes missing project ownership checks (`assignment/*`, `agentic/*`, `files`, `activity`, `parse-file`, `editor/*`, `critiques/:id/waive`) | **LIVE on `main` (`#71` `5a642a0`)** |
@@ -162,51 +171,52 @@ Later PRs were opened by the agent and merged by it (owner-authorized) only afte
 | **`F-08`** | **HIGH** | `POST /api/ai/search`, `POST /api/ai/deep-research`, and `POST /api/ai/agent` lack `requireAuth`; `llmChallenge` signed with unverified `x-user-id` | **LIVE on `main` (`#80` `cbf38da`)** |
 | **`F-09`** | **HIGH** | `rateLimit.ts` keys buckets by `${ip}:${User-Agent}` and `server.ts` lacks `app.set("trust proxy", 1)` | **LIVE on `main` (`#80` `cbf38da`: `trust proxy = 1` + right-most hop Cloudflare CIDR check)** |
 | **`F-10`** | **HIGH** | `/api/supabase/*` reverse proxy mounted before rate limiter, forwards all subpaths, disables TLS verification (`rejectUnauthorized: false`) on WS | **LIVE on `main` (`#80` `cbf38da`)** |
-| **`F-11`** | **HIGH** | Plaintext credentials stored in `api_credentials.encrypted_api_key` and `user_cloud_integrations` (`access_token`/`refresh_token`) | `encryptCloudToken` + stop server `api_credentials` writes **LIVE on `main` (`#80` `cbf38da`)**; `/api/vault/cloud/connections` + `CredentialResetNotice` in **PR `#81`**; purge SQL **`UNVERIFIED` pending Section 3 Docker checks** *(full cryptographic protection requires `F-01` rotation)* |
+| **`F-11`** | **HIGH** | Plaintext credentials stored in `api_credentials.encrypted_api_key` and `user_cloud_integrations` (`access_token`/`refresh_token`) | Server writes stopped and cloud tokens encrypted (#80); credential-reset notice live (#81); plaintext rows purged 2026-10-29 10:44Z (`20261028010000_purge`, §1). Full protection still depends on the F-01 rotation |
 | **`F-12`** | **HIGH** | 52 `npm audit` vulnerabilities including `proxy-addr` (Critical), `xlsx` (High, unpatched), `multer`, `@tiptap/core`, `prosemirror-view` | **LIVE on `main` (`#80` `cbf38da`: `xlsx` replaced with `exceljs`, `0` vulnerabilities)** |
-| **`F-13`** | **HIGH** | `LLM_CHALLENGE_SECRET` falls back to `SUPABASE_SERVICE_ROLE_KEY` / static string; `verifyLocalJwt` skips `role`/`aud` verification | JWT `role`/`aud` check + HMAC domain separation **LIVE on `main` (`#80` `cbf38da`)**; strict production refusal to fall back to `SUPABASE_SERVICE_ROLE_KEY` in **PR `#81`** |
-| **`F-14`** | **HIGH** | 6 `SECURITY DEFINER` RPCs granted to `anon` (`email_for_username`, `email_for_phone_e164`, `email_for_identifier`, `check_*_available`) | Server login & availability endpoints **LIVE on `main` (`#72`/`#80`)** + Turnstile/rate-limit hardening in **PR `#81`**; `REVOKE`-only SQL **`UNVERIFIED` pending Section 3 Docker checks** |
+| **`F-13`** | **HIGH** | `LLM_CHALLENGE_SECRET` falls back to `SUPABASE_SERVICE_ROLE_KEY` / static string; `verifyLocalJwt` skips `role`/`aud` verification | JWT `role`/`aud` check + HMAC domain separation **LIVE on `main` (`#80` `cbf38da`)**; strict production refusal to fall back to `SUPABASE_SERVICE_ROLE_KEY` live since **#81** (merged 2026-10-29) |
+| **`F-14`** | **HIGH** | 6 `SECURITY DEFINER` RPCs granted to `anon` (`email_for_username`, `email_for_phone_e164`, `email_for_identifier`, `check_*_available`) | Server login & availability endpoints **LIVE on `main` (`#72`/`#80`)** + Turnstile/rate-limit hardening live since **#81** (merged 2026-10-29); `REVOKE`-only SQL **`UNVERIFIED` pending Section 3 Docker checks** |
 | **`F-15`** | **MEDIUM** | Admin email configuration split across `MAIN_ADMIN_EMAIL`, `ADMIN_EMAIL`, and hardcoded SQL policies | **LIVE on `main` (`#80` `cbf38da`)** |
 | **`F-16`** | **MEDIUM** | Double-prefixed route mount bug: `GET /api/projects/:id/compliance/api/projects/:id/journal-compliance-report` | **LIVE on `main` (`#80` `cbf38da`)** |
 | **`F-17`** | **MEDIUM** | Outbound `fetch()` calls lack `AbortSignal.timeout()`, no `SIGTERM` handler, SSE lacks `req.on("close")` abort (`SYSTEM_MAP.md` `R-08`), `memoryDecks` unbounded | **LIVE on `main` (`#80` `cbf38da`)** |
-| **`F-18`** | **MEDIUM** | Render Free (512 MB RAM, 15m spin-down) + Supabase Free (no backups, 7d pause) | **Owner decided**: Render stays on Free; Supabase upgraded to Pro + Network Restrictions ON + manual encrypted `pg_dump` before migrations |
-| **`F-19`** | **MEDIUM** | Vitest loads local `.env` during test runs (`dotenv.config()`) and makes live network requests; Node 20/22 CI drift | **LIVE on `main` (`#80` `cbf38da`)** + `journalExportService.ts:106` async timer CI fix in **PR `#81`** |
+| **`F-18`** | **MEDIUM** | Render Free (512 MB RAM, 15m spin-down) + Supabase Free (no backups, 7d pause) | **Owner decided**: Render stays on Free; Supabase on Pro (daily backups). Network Restrictions allow all addresses (see F-01) |
+| **`F-19`** | **MEDIUM** | Vitest loads local `.env` during test runs (`dotenv.config()`) and makes live network requests; Node 20/22 CI drift | **LIVE on `main` (`#80` `cbf38da`)** + `journalExportService.ts:106` async timer CI fix live since **#81** (merged 2026-10-29) |
 
 ---
 
-## 4. Deliverables Ledger
+## 4. Handover documents
 
-| Deliverable Path | Last Commit on `origin/main` | Updated in PR `#81`? | Verification Status |
-| :--- | :---: | :---: | :--- |
-| [`SYSTEM_MAP.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/SYSTEM_MAP.md) | `0d5b0df` (merged in `cbf38da`) | No | Verified against repo (`R-08` cross-referenced with `F-17`) |
-| [`SETUP.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/SETUP.md) | `9d32796` (merged in `5a642a0`) | No | Verified in Phase 1 clean build + Docker `/api/health` baseline |
-| [`AUDIT.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/AUDIT.md) | `0d5b0df` (merged in `cbf38da`) | No | Canonical `F-01`–`F-19` ledger |
-| [`PROD_CHECKS.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/PROD_CHECKS.md) | `0d5b0df` (merged in `cbf38da`) | Yes | Static column verification passed (`sqlRunbooksVerification.test.ts`); **live Postgres execution `UNVERIFIED` pending Docker** |
-| [`COMPROMISE_CHECKS.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/COMPROMISE_CHECKS.md) | `0d5b0df` (merged in `cbf38da`) | Yes (exact file:line citations) | Static column verification passed (`sqlRunbooksVerification.test.ts`); **live Postgres execution `UNVERIFIED` pending Docker** |
-| [`HOTFIX_DEPLOY.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/HOTFIX_DEPLOY.md) | `bd20086` (merged in `cbf38da`) | No | Verified via `hotfixContainment.test.ts` (60 tests) |
-| [`HOTFIX2_DEPLOY.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/HOTFIX2_DEPLOY.md) | `0d5b0df` (merged in `cbf38da`) | Yes | App endpoints tested (`hotfix2Lockdown.test.ts`); **SQL migration `UNVERIFIED` pending Docker** |
-| [`POST_DEPLOY_80.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/POST_DEPLOY_80.md) | *(New in PR `#81`)* | **Yes (New)** | Live HTTP & UI checks for PR `#80` (`cbf38da`); zero production DB queries |
-| [`ROTATION_RUNBOOK.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/ROTATION_RUNBOOK.md) | `0d5b0df` (merged in `cbf38da`) | No | Scheduled at project end (`F-01` owner decision) |
-| [`USER_NOTICE.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/USER_NOTICE.md) | `0d5b0df` (merged in `cbf38da`) | Yes (git-verified dates) | Every date & SHA verified against `git log --all`; draft ready for owner review |
-| [`MERGE_PLAN.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/MERGE_PLAN.md) | `0d5b0df` (merged in `cbf38da`) | Yes (`#80` live + 37-provider caps) | Reflects `#80` live deploy, `MASTER_KEY` existing-value rule, and 37-provider spend-cap table |
-| [`STATUS.md`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/STATUS.md) | *(New in PR `#81`)* | **Yes (New)** | Single source of truth ledger (Standing Rule 0) |
-| [`scripts/verify-local-supabase.sh`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/scripts/verify-local-supabase.sh) | *(New in PR `#81`)* | **Yes (New)** | Automates Section 3 local Supabase verification (all 5 ordering workarounds + 4 checks) |
-| [`supabase/migrations/20261028000000_hotfix2_db_storage_rpc_lockdown.sql`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/migrations/20261028000000_hotfix2_db_storage_rpc_lockdown.sql) | `0d5b0df` (merged in `cbf38da`) | No (`REVOKE`-only v2 on `main`) | **`UNVERIFIED AGAINST SUPABASE`** — do NOT apply until Section 3 Docker checks pass |
-| [`supabase/migrations/20261028010000_purge_plaintext_credentials.sql`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/migrations/20261028010000_purge_plaintext_credentials.sql) | `0d5b0df` (merged in `cbf38da`) | Yes (`security_credential_reset_notices`) | **`UNVERIFIED AGAINST SUPABASE`** — do NOT apply until count-only `SELECT`, PR `#81` deploy, & Section 3 Docker checks pass |
+| Document | Purpose | State at handover |
+| :--- | :--- | :--- |
+| `STATUS.md` | task checklist, production change ledger with rollbacks, PR ledger, remaining risks | current (this file) |
+| `RUNBOOK.md` | deploy, check, roll back, database changes, env vars, auth limits, first checks when something breaks | current |
+| `CHANGELOG.md` | user-visible changes by PR | current through #137 |
+| `PRODUCT_AUDIT.md` | product findings (P0-1…P0-21, P1-1…P1-13) with fix PRs and the final status per area | current |
+| `PRODUCT_BACKLOG.md` | ideas outside the current product intent; nothing built until promoted | current |
+| `ROTATION_RUNBOOK.md` | credential rotation (F-01) and revoking the agent's own credentials (§7) | ready; **not executed** (owner decision, §5) |
+| `USER_NOTICE.md` | draft security notice to users | **draft, not sent**; send only after the pre-send checklist in that file and the rotation |
+| `docs/AI-CALL-MAP.md` | every AI call path and the One Brain plan | current through #118 |
+| `e2e/README.md` | how to run the end-to-end suite locally, including the stand-in AI | current |
 
----
+Earlier deliverables (`SYSTEM_MAP.md`, `SETUP.md`, `AUDIT.md`, `PROD_CHECKS.md`, `COMPROMISE_CHECKS.md`, `HOTFIX*_DEPLOY.md`, `POST_DEPLOY_80.md`, `MERGE_PLAN.md`) are historical records of the 2026-10-28/29 hotfixes; the migrations they describe are applied (§1).
 
-## 5. Open Decisions & Blocking Prerequisites
+## 5. Remaining risks and owner actions
 
-1. **Confirm Live Render Deploy SHA & Run `POST_DEPLOY_80.md`**:
-   - Confirm in **Render Dashboard → `scholar-agentic-os` (`srv-d9lgbn710e5c73dl8sk0`) → Events / Deploys** that the **`Live`** deploy badge shows `cbf38da` (or `0d5b0df`), and run `POST_DEPLOY_80.md` Checks 0–7.
-   - Note: If both Render `CLOUDFLARE_TURNSTILE_SECRET_KEY` and Supabase Auth CAPTCHA are enabled simultaneously, `POST /api/auth/login` in `cbf38da` will burn the single-use Turnstile token before GoTrue validates it — merge PR `#81` immediately (after setting `LLM_CHALLENGE_SECRET` on Render) to eliminate that double-spend.
-2. **Raise Supabase Auth Sign-In Rate Limit (`Authentication → Rate Limits`)**:
-   - Raise **Rate limit for sign-ups and sign-ins** from default `30 / 5 min` to **`300 / 5 min`** on Supabase Pro (`MERGE_PLAN.md` & Section 5 calculation).
-3. **Set `LLM_CHALLENGE_SECRET` on Render Before Merging PR `#81`**:
-   - Generate a fresh secret (`openssl rand -hex 32`) and add `LLM_CHALLENGE_SECRET` in Render Dashboard → Environment (`MASTER_KEY` MUST stay on its **EXISTING** value).
-4. **Deploy `request-profile-update` Edge Function (`F-04`)**:
-   - Run `npx supabase functions deploy request-profile-update --project-ref gfjhsijrwodjvkisouzw` so direct HTTP calls return `HTTP 410 Gone` (`POST_DEPLOY_80.md` Check 6B).
-5. **Local Docker / Colima Verification (Blocking Both SQL Migrations)**:
-   - Inside the Antigravity sandbox, `brew install colima docker` hit `HTTP 403 Forbidden` from `forward.http.proxy:3128` when fetching `https://go.dev/dl/go1.24.13.darwin-amd64.tar.gz` (required because Homebrew dropped Intel `x86_64` bottles in September 2026).
-   - Run `brew install colima docker libpq && ./scripts/verify-local-supabase.sh` in native macOS `Terminal.app` (outside the sandbox proxy) before applying `20261028000000_hotfix2` or `20261028010000_purge`.
+**Owner actions (the agent cannot or must not do these):**
+
+1. **Rotate the leaked credentials (F-01)** — Supabase database password, service-role key, and the others listed in `ROTATION_RUNBOOK.md` §1, then rewrite git history (§5 there). Deferred by the owner until the project is complete. Until then the old values remain valid and are in git history. Do **not** change `MASTER_KEY` without its re-wrap procedure (it encrypts stored credentials).
+2. **Revoke the agent's credentials** (`ROTATION_RUNBOOK.md` §7): the Supabase access token, Render API key and the GitHub access used for this work.
+3. **Branch protection on `main`** (require CI and E2E checks) — a GitHub setting the agent has no tool for.
+4. **Deploy smoke secrets (optional):** add the `SMOKE_*` repository secrets so `deploy.yml` runs the production smoke suite after each deploy.
+5. **Error tracking:** create an account (e.g. Sentry free tier) and add its DSN; listed in `PRODUCT_BACKLOG.md`.
+6. **Production schema diff (T9):** compare production's schema with a fresh replay (`scripts/db/replay-migrations.sh`); needs direct Postgres access, which the agent sandbox does not have.
+7. **Send `USER_NOTICE.md`** only after items 1 and the checklist in that file.
+
+**Known gaps (not blocking, recorded):**
+
+- B3: the deep-research browser hand-off, output guardrails in `server/utils/llm.ts`, and a single `brain.ts` contract are not done. Today every route either uses the user's own AI or returns an honest 426/400/502.
+- B4: real BYOK calls per provider, local runners and quota exhaustion are tested with mocks and a stand-in AI only (no real provider keys in CI). Admin CRUD for providers/models/budgets has no dedicated tests.
+- B5: export is tested end to end for Journal only; Coursework, Thesis and Proposal export are not covered by automated tests (UNVERIFIED). No screen shows saved versions (backlog).
+- P1-13 (development only): the server ignores a custom local-runner address.
+- Signup e-mail verification, password reset, ID upload, Zotero/Mendeley/Drive sync and the admin UI are not covered by automated tests (they need real inboxes or third-party accounts); see `PRODUCT_AUDIT.md` areas a, d, h.
+- The full vitest suite has ~18 tests in 5 files that need real credentials or network (`CLAUDE.md`); CI runs the rest.
+- Render free plan: cold starts (up to ~1 minute) and 512 MB RAM.
