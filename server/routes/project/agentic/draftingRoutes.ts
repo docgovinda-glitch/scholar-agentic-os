@@ -309,13 +309,6 @@ ${draftText}`;
 );
 
 // POST /api/projects/:id/agent/draft
-/**
- * Upsert on the table's natural key. Without on_conflict PostgREST matches on
- * the primary key (a fresh uuid), so saving a section a second time broke the
- * UNIQUE(project_id, section_name) constraint.
- */
-const SECTION_UPSERT = "?on_conflict=project_id,section_name";
-
 draftingRoutes.post("/draft", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
@@ -370,7 +363,7 @@ Return ONLY valid JSON in this exact format:
       for (const sec of result.data) {
         if (!sec || typeof sec !== "object") continue;
         const s = sec as Record<string, unknown>;
-        await table.request(SECTION_UPSERT, {
+        await table.request("", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates" },
           body: JSON.stringify({
@@ -575,7 +568,7 @@ draftingRoutes.put("/manuscript", async (req, res) => {
         }
 
         for (const sec of updates) {
-          await table.request(SECTION_UPSERT, {
+          await table.request("", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates" },
             body: JSON.stringify({
