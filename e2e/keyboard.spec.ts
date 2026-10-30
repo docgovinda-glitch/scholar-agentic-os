@@ -16,13 +16,33 @@ async function tabThrough(page: Page) {
     const info = await page.evaluate(() => {
       const el = document.activeElement as HTMLElement | null;
       if (!el || el === document.body) return null;
-      const s = getComputedStyle(el);
-      const outline = s.outlineStyle !== "none" && parseFloat(s.outlineWidth) > 0;
-      const ring = s.boxShadow && s.boxShadow !== "none";
+      // The indicator may sit on the control or on its container (a borderless
+      // field inside a card that rings while it has focus), up to 3 levels up.
+      // A container only counts if its outline/shadow changes when focus
+      // leaves, so a permanent drop shadow does not pass as a focus ring.
+      const look = (node: Element) => {
+        const s = getComputedStyle(node);
+        const outline = s.outlineStyle !== "none" && parseFloat(s.outlineWidth) > 0 ? `${s.outlineStyle} ${s.outlineWidth} ${s.outlineColor}` : "";
+        const shadow = s.boxShadow && s.boxShadow !== "none" ? s.boxShadow : "";
+        return { outline, shadow };
+      };
+      const chain: Element[] = [];
+      for (let n: Element | null = el, depth = 0; n && depth <= 3; n = n.parentElement, depth++) chain.push(n);
+      const focused = chain.map(look);
+      el.blur();
+      const blurred = chain.map(look);
+      el.focus();
+      let visibleOn: Element | null = null;
+      chain.forEach((n, i) => {
+        if (visibleOn) return;
+        const f = focused[i];
+        const changed = f.outline !== blurred[i].outline || f.shadow !== blurred[i].shadow;
+        if ((f.outline || f.shadow) && (i === 0 ? changed || f.outline : changed)) visibleOn = n;
+      });
       const r = el.getBoundingClientRect();
       const label = (el.getAttribute("aria-label") || el.textContent || el.getAttribute("placeholder") || "").trim().slice(0, 40);
       const id = `${el.tagName.toLowerCase()}#${el.id}.${String(el.className).split(" ").slice(0, 4).join(".")}|${label}`;
-      return { id, visible: Boolean(outline || ring), onScreen: r.width > 0 && r.height > 0 };
+      return { id, visible: Boolean(visibleOn), onScreen: r.width > 0 && r.height > 0 };
     });
     if (!info) continue;
     if (info.id === last) stuck++;

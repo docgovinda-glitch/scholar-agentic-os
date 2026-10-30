@@ -1981,7 +1981,7 @@ export default function ProjectListScreen({
                       addMainFiles(Array.from(e.dataTransfer.files));
                     }
                   }}
-                  className={`pointer-events-auto flex flex-col justify-between w-full rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 shadow-sm focus-within:border-neutral-400 dark:focus-within:border-white/20 p-3 transition-all duration-200 ${
+                  className={`pointer-events-auto flex flex-col justify-between w-full rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 shadow-sm focus-within:border-neutral-400 dark:focus-within:border-white/20 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] p-3 transition-all duration-200 ${
                     isDragging
                       ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10 dark:bg-blue-950/20"
                       : ""
@@ -3010,7 +3010,7 @@ export default function ProjectListScreen({
                   e.preventDefault();
                   handleSendGuideMessage();
                 }}
-                className="relative flex flex-col rounded-2xl bg-neutral-100/90 dark:bg-white/[0.06] p-2.5 shadow-xs border border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 focus-within:bg-white dark:focus-within:bg-ink-700 focus-within:shadow-md transition-all"
+                className="relative flex flex-col rounded-2xl bg-neutral-100/90 dark:bg-white/[0.06] p-2.5 shadow-xs border border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] focus-within:bg-white dark:focus-within:bg-ink-700 focus-within:shadow-md transition-all"
               >
                 <div className="w-full px-1">
                   <textarea
