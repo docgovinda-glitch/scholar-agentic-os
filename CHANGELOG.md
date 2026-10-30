@@ -5,6 +5,27 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-10-30
+
+### Honest output everywhere (no invented content)
+- **Thesis & Proposal review tools now work** (#100). The Viva simulator, cross-chapter audit, grant study-section review and specific-aims audit called routes that did not exist, so every user saw the same built-in results ("Top 8th Percentile", "94/100", "alignment 92"). They now call the real routes and show only the AI's answer. When the user's own input is missing, no AI is connected or the AI fails, the user sees a plain message saying why nothing was produced. Server-side heuristic scores, invented examiner names and template draft text were removed.
+- **Viva practice room and self-review worksheet** (#101). These replace demo content (fixed questions with invented figures, a word-count "grade", pre-filled reviewer praise, a percentile and a payline verdict).
+- **Citations never invent details** (#104). A missing year shows as "n.d." (APA, Harvard, Chicago author-date), a missing author as "[Author unknown]", and a missing venue is left out. Exports name the user's chosen target journal.
+- **Proposal starter** no longer fills in a budget, funder or grant type (#102).
+- **Journal & Coursework** (#87–#89): no invented references, citation counts, originality scores, audits, journals, gaps or drafts; each stage shows an honest unavailable state instead. The unused `/agent/literature` route, which asked an AI to "generate" sources, was removed (#97).
+
+### AI access
+- The user's own AI key is sent only to routes that run AI, not with every request (#93).
+- The AI Access page says which features Premium covers (#96).
+- A local model (Ollama, LM Studio, …) is never called from the deployed server, which cannot reach the user's computer (#106). Journal stages and Ask Scholar run the prompt in the browser instead. Server-only features say plainly that they need a cloud key.
+- Internal: one parser for AI request headers (#95), one Premium pipeline (#98), typed AI errors, and an AI call map (`docs/AI-CALL-MAP.md`, #94).
+
+### Reliability & operations
+- Presentation decks persist (`presentation_decks` table, #85).
+- Rate limiters no longer share one counter, which had caused spurious login 429s (#90). Supabase Auth's sign-up/sign-in limit was raised from 30 to 300 per 5 minutes (2026-10-30).
+- Added PR CI with a dependency audit, a deep health check (`/api/health?deep=1`), deploy verification against the live commit, a 15-minute uptime check (#86, #99), Playwright end-to-end tests in CI (#91), and a production smoke suite (`scripts/smoke-prod.sh`, #85).
+- Docs: `RUNBOOK.md` (deploy, check, roll back), agent-credential revocation in `ROTATION_RUNBOOK.md` §7.
+
 ## [Unreleased] - 2026-10-29
 
 ### Presentation Studio (OT-22): Gamma-style Slides & Keynotes with native PowerPoint export
