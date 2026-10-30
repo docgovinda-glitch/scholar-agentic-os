@@ -283,6 +283,7 @@ function ResearchWorkspaceInner({
               <button 
                 className="md:hidden p-2 -ml-2 rounded-lg text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors"
                 onClick={() => setStageNavOpen(true)}
+                aria-label="Open stages"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
@@ -520,7 +521,7 @@ function ResearchWorkspaceInner({
                 <button 
                   type="button" 
                   onClick={() => setContextPanelOpen(!contextPanelOpen)} 
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${contextPanelOpen ? 'bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)]' : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)]'}`}
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${contextPanelOpen ? 'bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)]' : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)]'}`}
                   title="Toggle AI Context Assistant"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -535,8 +536,10 @@ function ResearchWorkspaceInner({
                 <button 
                   type="button" 
                   onClick={() => setContextPanelOpen(!contextPanelOpen)} 
-                  className={`p-2 rounded-lg transition-colors cursor-pointer ${contextPanelOpen ? 'bg-[color:var(--accent)] text-white' : 'text-[color:var(--text-secondary)] bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)]'}`}
+                  className={`p-2 rounded-lg transition-colors cursor-pointer ${contextPanelOpen ? 'bg-[color:var(--accent)] text-[color:var(--text-inverse)]' : 'text-[color:var(--text-secondary)] bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)]'}`}
                   title="Toggle AI Context Panel"
+                  aria-label="Assistant panel"
+                  aria-pressed={contextPanelOpen}
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
@@ -545,6 +548,7 @@ function ResearchWorkspaceInner({
                 <button 
                   type="button" 
                   onClick={() => setMobileMenuOpen(true)}
+                  aria-label="Open menu"
                   className="p-2 rounded-lg bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] cursor-pointer"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -741,7 +745,7 @@ function ResearchWorkspaceInner({
           <div className={`
             absolute md:relative inset-y-0 right-0 z-40
             transform transition-transform duration-300 ease-in-out
-            ${contextPanelOpen ? 'translate-x-0' : 'translate-x-full md:hidden'}
+            ${contextPanelOpen ? 'translate-x-0' : 'hidden'}
             border-l border-[color:var(--border-subtle)] flex flex-col w-80 md:w-80 shrink-0 bg-[color:var(--surface-canvas)]
             h-full md:h-auto
           `}>

@@ -434,7 +434,7 @@ export default function DraftPreviewStage({
             <button
               onClick={startAgent}
               disabled={isProcessing}
-              className="px-5 py-2.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
             >
               {isProcessing ? (
                 <>
@@ -739,7 +739,7 @@ export default function DraftPreviewStage({
           <button
             onClick={handleAdvance}
             disabled={isProcessing || isSavingAdvance}
-            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
           >
             {isSavingAdvance ? (
               <>

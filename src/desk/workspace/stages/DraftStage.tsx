@@ -546,7 +546,7 @@ export default function DraftStage({
             type="button"
             onClick={startAgent}
             disabled={isProcessing}
-            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-white text-xs font-bold shadow-sm hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-xs font-bold shadow-sm hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
           >
             {isProcessing ? (
               <>
@@ -702,7 +702,7 @@ export default function DraftStage({
               <button
                 type="button"
                 onClick={startAgent}
-                className="px-6 py-3 rounded-xl bg-[color:var(--accent)] text-white text-xs font-bold shadow-md hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-2"
+                className="px-6 py-3 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-xs font-bold shadow-md hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -937,7 +937,7 @@ export default function DraftStage({
                       <button
                         type="button"
                         onClick={handleSaveSection}
-                        className="px-4 py-1.5 text-xs font-bold rounded-lg bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
+                        className="px-4 py-1.5 text-xs font-bold rounded-lg bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
                       >
                         Save Changes
                       </button>
@@ -1109,7 +1109,7 @@ export default function DraftStage({
             type="button"
             onClick={handleConfirmDraft}
             disabled={sections.length === 0 || isSaving}
-            className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-white hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
+            className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
           >
             {isSaving ? (
               <>

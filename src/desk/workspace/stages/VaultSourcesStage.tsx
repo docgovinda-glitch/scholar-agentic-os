@@ -636,7 +636,7 @@ export default function VaultSourcesStage({
             type="button"
             onClick={startScan}
             disabled={isProcessing}
-            className="px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-[color:var(--accent)] text-white text-xs sm:text-sm font-bold shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+            className="px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-xs sm:text-sm font-bold shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             {isProcessing ? (
               <>
@@ -812,7 +812,7 @@ export default function VaultSourcesStage({
                   <button
                     type="button"
                     onClick={startScan}
-                    className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-2"
+                    className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-2"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -1016,7 +1016,7 @@ export default function VaultSourcesStage({
                     onClick={() => setTypeFilter(filterKey)}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-lg capitalize transition-colors cursor-pointer ${
                       typeFilter === filterKey
-                        ? "bg-[color:var(--accent)] text-white shadow-xs"
+                        ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-xs"
                         : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)]"
                     }`}
                   >
@@ -1037,7 +1037,7 @@ export default function VaultSourcesStage({
                 <button
                   type="button"
                   onClick={() => setIsIngestModalOpen(true)}
-                  className="mt-4 px-4 py-2 rounded-lg bg-[color:var(--accent)] text-white text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
+                  className="mt-4 px-4 py-2 rounded-lg bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
                 >
                   + Ingest Primary Source into Vault
                 </button>
@@ -1092,7 +1092,7 @@ export default function VaultSourcesStage({
                           className={`px-3 py-1 text-xs font-semibold rounded cursor-pointer transition-colors ${
                             isSelected
                               ? "bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)] border border-[color:var(--state-success)]"
-                              : "bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)]"
+                              : "bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)]"
                           }`}
                         >
                           {isSelected ? "✓ Staged" : "+ Stage for Triage"}
@@ -1132,7 +1132,7 @@ export default function VaultSourcesStage({
                   <button
                     type="button"
                     onClick={() => setActiveTab("radar")}
-                    className="px-4 py-2 rounded-lg bg-[color:var(--accent)] text-white text-xs font-bold hover:bg-[color:var(--accent-hover)] cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-xs font-bold hover:bg-[color:var(--accent-hover)] cursor-pointer"
                   >
                     Open Archivist Radar
                   </button>
@@ -1222,7 +1222,7 @@ export default function VaultSourcesStage({
             type="button"
             onClick={handleProceedToTriage}
             disabled={isAdvancing}
-            className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-white hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
+            className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
           >
             {isAdvancing ? (
               <>
@@ -1322,7 +1322,7 @@ export default function VaultSourcesStage({
                 className={`px-5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
                   selectedSourceIds.has(inspectingSource.id)
                     ? "bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] border border-[color:var(--state-danger)]"
-                    : "bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)]"
+                    : "bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)]"
                 }`}
               >
                 {selectedSourceIds.has(inspectingSource.id) ? "Remove from Candidate Pool" : "Add to Candidate Pool"}
@@ -1476,7 +1476,7 @@ export default function VaultSourcesStage({
                 <button
                   type="submit"
                   disabled={isIngesting || !ingestForm.title.trim()}
-                  className="px-6 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors shadow-md cursor-pointer flex items-center gap-2"
+                  className="px-6 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors shadow-md cursor-pointer flex items-center gap-2"
                 >
                   {isIngesting ? "Ingesting..." : "Ingest & Stage Source"}
                 </button>

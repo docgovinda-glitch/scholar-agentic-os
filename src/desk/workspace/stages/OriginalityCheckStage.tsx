@@ -406,7 +406,7 @@ export default function OriginalityCheckStage({
             <button
               onClick={startAgent}
               disabled={isProcessing}
-              className="px-5 py-2.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
             >
               {isProcessing ? (
                 <>
@@ -618,7 +618,7 @@ export default function OriginalityCheckStage({
                   onClick={() => setActiveFilter("all")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
                     activeFilter === "all"
-                      ? "bg-[color:var(--accent)] text-white"
+                      ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)]"
                       : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] border border-[color:var(--border-subtle)]"
                   }`}
                 >
@@ -781,7 +781,7 @@ export default function OriginalityCheckStage({
                               <>
                                 <button
                                   onClick={() => handleParaphrase(flag.id)}
-                                  className="px-3 py-1 rounded text-xs font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
+                                  className="px-3 py-1 rounded text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
                                 >
                                   Apply AI Paraphrase
                                 </button>
@@ -822,7 +822,7 @@ export default function OriginalityCheckStage({
             </p>
             <button
               onClick={startAgent}
-              className="mt-6 px-6 py-3 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] transition-all flex items-center gap-2 cursor-pointer"
+              className="mt-6 px-6 py-3 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] transition-all flex items-center gap-2 cursor-pointer"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -848,7 +848,7 @@ export default function OriginalityCheckStage({
           <button
             onClick={handleAdvance}
             disabled={isProcessing || isSavingAdvance || !report}
-            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
           >
             {isSavingAdvance ? (
               <>

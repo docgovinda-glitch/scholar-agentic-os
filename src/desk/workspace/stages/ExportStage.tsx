@@ -490,7 +490,7 @@ export default function ExportStage({
                 type="button"
                 onClick={startAgent}
                 disabled={isProcessing}
-                className="px-5 py-2.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer font-sans"
+                className="px-5 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer font-sans"
               >
                 {isProcessing ? (
                   <>
@@ -733,7 +733,7 @@ export default function ExportStage({
               <button
                 type="button"
                 onClick={startAgent}
-                className="px-8 py-3.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer font-sans"
+                className="px-8 py-3.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer font-sans"
               >
                 Generate Camera-Ready Package
               </button>
@@ -808,7 +808,7 @@ export default function ExportStage({
                     type="button"
                     onClick={() => handleDownload("pdf")}
                     disabled={downloadingFormat === "pdf"}
-                    className="w-full py-2.5 px-3 rounded-xl bg-[color:var(--accent)] text-white text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                    className="w-full py-2.5 px-3 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
                   >
                     <span>{downloadingFormat === "pdf" ? "Exporting..." : "Download PDF"}</span>
                     <span>↓</span>

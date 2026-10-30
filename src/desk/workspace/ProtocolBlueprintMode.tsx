@@ -325,7 +325,7 @@ Preliminary Context: ${preliminaryContext || "General peer-reviewed scholarly co
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent)] text-white">
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent)] text-[color:var(--text-inverse)]">
                 Mode 1
               </span>
               <span className="text-xs font-semibold text-[color:var(--text-muted)]">
@@ -349,7 +349,7 @@ Preliminary Context: ${preliminaryContext || "General peer-reviewed scholarly co
             <button
               type="button"
               onClick={() => setMode("evidence")}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-2 cursor-pointer"
             >
               <span>Proceed to Mode 2: Evidence Matrix</span>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -473,7 +473,7 @@ Preliminary Context: ${preliminaryContext || "General peer-reviewed scholarly co
                           <span
                             className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
                               isSelected
-                                ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-white"
+                                ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--text-inverse)]"
                                 : "border-[color:var(--border-control)]"
                             }`}
                           >
@@ -531,22 +531,22 @@ Preliminary Context: ${preliminaryContext || "General peer-reviewed scholarly co
               )}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <input
                 id="working-title-input"
                 type="text"
                 value={workingTitle}
                 onChange={(e) => setWorkingTitle(e.target.value)}
                 placeholder="e.g. Scalable FPGA Decoders for Real-Time Surface Code Quantum Error Correction"
-                className="flex-1 bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-4 py-2 text-xs font-semibold text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)] outline-none transition-colors"
+                className="flex-1 min-w-0 basis-56 bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-4 py-2 text-xs font-semibold text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)] outline-none transition-colors"
               />
               <button
                 type="button"
                 onClick={handleLockTitleAndGap}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
                   isTitleLocked
-                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                    : "bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)]"
+                    ? "bg-emerald-600 text-[color:var(--text-inverse)] hover:bg-emerald-700"
+                    : "bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)]"
                 }`}
               >
                 {isTitleLocked ? "✓ Re-Lock Title & Gap" : "Lock Working Title & Gap"}

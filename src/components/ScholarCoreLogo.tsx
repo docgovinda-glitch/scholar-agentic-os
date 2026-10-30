@@ -74,7 +74,7 @@ export default function ScholarCoreLogo({
           SCHOLAR
         </span>
         <span
-          className="font-semibold text-[color:var(--text-secondary)] opacity-70"
+          className="font-semibold text-[color:var(--text-secondary)]"
           style={{ fontSize: `${text * 0.75}px` }}
         >
           CORE

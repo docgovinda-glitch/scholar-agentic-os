@@ -300,7 +300,7 @@ describe("Round 5: Context Panel Copilot Unification", () => {
 
       const input = screen.getByPlaceholderText("Ask Examiner a question...");
       fireEvent.change(input, { target: { value: "How is my grade predicted?" } });
-      const submitBtn = screen.getByRole("button", { name: "" }); // icon button
+      const submitBtn = screen.getByRole("button", { name: "Send" });
       fireEvent.click(submitBtn);
 
       await waitFor(() => {

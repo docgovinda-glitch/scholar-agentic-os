@@ -410,7 +410,7 @@ export default function JournalDiscoveryStage({
             type="button"
             onClick={startAgent}
             disabled={isProcessing}
-            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-white text-xs font-bold shadow-sm hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-xs font-bold shadow-sm hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
           >
             {isProcessing ? (
               <>
@@ -546,7 +546,7 @@ export default function JournalDiscoveryStage({
               <button
                 type="button"
                 onClick={startAgent}
-                className="px-6 py-3 rounded-xl bg-[color:var(--accent)] text-white text-xs font-bold shadow-md hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-2"
+                className="px-6 py-3 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-xs font-bold shadow-md hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -711,8 +711,8 @@ export default function JournalDiscoveryStage({
                         onClick={() => handleSelectJournal(journal)}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                           isSelected
-                            ? "bg-[color:var(--accent)] text-white shadow-xs"
-                            : "bg-[color:var(--surface-sunken)] text-[color:var(--text-primary)] hover:bg-[color:var(--accent)] hover:text-white border border-[color:var(--border-control)]"
+                            ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-xs"
+                            : "bg-[color:var(--surface-sunken)] text-[color:var(--text-primary)] hover:bg-[color:var(--accent)] hover:text-[color:var(--text-inverse)] border border-[color:var(--border-control)]"
                         }`}
                       >
                         {isSelected ? (
@@ -779,7 +779,7 @@ export default function JournalDiscoveryStage({
             type="button"
             onClick={handleConfirmJournal}
             disabled={!selectedJournalTitle || isSaving}
-            className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-white hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
+            className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
           >
             {isSaving ? (
               <>
@@ -904,7 +904,7 @@ export default function JournalDiscoveryStage({
                   handleSelectJournal(inspectingJournal);
                   setInspectingJournal(null);
                 }}
-                className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-white text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
+                className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
               >
                 Select as Target Journal
               </button>
@@ -1037,7 +1037,7 @@ export default function JournalDiscoveryStage({
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-white text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
+                className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
               >
                 Nominate &amp; Target Journal
               </button>

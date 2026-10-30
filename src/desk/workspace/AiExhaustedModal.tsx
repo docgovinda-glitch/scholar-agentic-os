@@ -65,7 +65,7 @@ export default function AiExhaustedModal({
               onClose();
               onOpenAiAccess();
             }}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-white text-xs font-bold shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-[color:var(--text-inverse)] text-xs font-bold shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <span>⚙️</span> Configure AI Access
           </button>

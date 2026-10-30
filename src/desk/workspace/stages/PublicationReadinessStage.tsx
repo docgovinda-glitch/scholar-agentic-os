@@ -495,7 +495,7 @@ export default function PublicationReadinessStage({
             <button
               onClick={startAgent}
               disabled={isProcessing}
-              className="px-5 py-2.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer font-sans"
+              className="px-5 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer font-sans"
             >
               {isProcessing ? (
                 <>
@@ -610,7 +610,7 @@ export default function PublicationReadinessStage({
 
             <button
               onClick={startAgent}
-              className="mt-8 px-8 py-3.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-base shadow-md hover:bg-[color:var(--accent-hover)] transition-all flex items-center gap-2.5 cursor-pointer font-sans"
+              className="mt-8 px-8 py-3.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-base shadow-md hover:bg-[color:var(--accent-hover)] transition-all flex items-center gap-2.5 cursor-pointer font-sans"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -1086,7 +1086,7 @@ export default function PublicationReadinessStage({
             <button
               onClick={handleAdvance}
               disabled={isSavingAdvance}
-              className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer font-sans"
+              className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer font-sans"
             >
               {isSavingAdvance ? (
                 <>

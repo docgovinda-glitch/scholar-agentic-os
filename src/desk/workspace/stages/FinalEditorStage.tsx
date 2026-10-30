@@ -434,7 +434,7 @@ export default function FinalEditorStage({
             <button
               onClick={handleAiPolish}
               disabled={isPolishing}
-              className="px-3.5 py-1.5 rounded-xl bg-[color:var(--accent)] text-white text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-50 font-sans shadow-xs"
+              className="px-3.5 py-1.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-50 font-sans shadow-xs"
               title="Discourse-level humanized copy-editing & term-locked polishing (Stage 23)"
             >
               {isPolishing ? (
@@ -975,7 +975,7 @@ export default function FinalEditorStage({
           <button
             onClick={handleSaveAndAdvance}
             disabled={isSaving}
-            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer font-sans"
+            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer font-sans"
           >
             {isSaving ? (
               <>

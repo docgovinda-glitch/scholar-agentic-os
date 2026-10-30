@@ -317,7 +317,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
                   type="button"
                   data-testid="confirm-dialog-confirm"
                   onClick={() => confirmState.resolve(true)}
-                  className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors cursor-pointer text-white shadow-sm ${
+                  className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors cursor-pointer text-[color:var(--text-inverse)] shadow-sm ${
                     confirmState.variant === "danger"
                       ? "bg-rose-600 hover:bg-rose-700"
                       : "bg-[color:var(--accent)] hover:opacity-90"

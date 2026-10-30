@@ -505,7 +505,7 @@ export default function EvidenceAnalysisStage({
             type="button"
             onClick={startAnalysis}
             disabled={isProcessing}
-            className="px-5 py-2 rounded-lg bg-[color:var(--accent)] text-white text-sm font-bold shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-2 cursor-pointer"
+            className="px-5 py-2 rounded-lg bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-sm font-bold shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-2 cursor-pointer"
           >
             {isProcessing ? (
               <>
@@ -635,7 +635,7 @@ export default function EvidenceAnalysisStage({
               <button
                 type="button"
                 onClick={startAnalysis}
-                className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-2"
+                className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -699,6 +699,7 @@ export default function EvidenceAnalysisStage({
                   <button
                     type="button"
                     onClick={() => setSearchQuery("")}
+                    aria-label="Clear search"
                     className="absolute right-2 top-1.5 text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] text-xs"
                   >
                     ✕
@@ -716,7 +717,7 @@ export default function EvidenceAnalysisStage({
                     onClick={() => setStrengthFilter(str)}
                     className={`px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
                       strengthFilter === str
-                        ? "bg-[color:var(--accent)] text-white shadow-xs"
+                        ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-xs"
                         : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)]"
                     }`}
                   >
@@ -855,7 +856,7 @@ export default function EvidenceAnalysisStage({
             type="button"
             onClick={handleProceed}
             disabled={isAdvancing}
-            className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-white hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
+            className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
           >
             {isAdvancing ? (
               <>
@@ -1025,7 +1026,7 @@ export default function EvidenceAnalysisStage({
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-colors shadow-xs cursor-pointer"
+                  className="px-6 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-colors shadow-xs cursor-pointer"
                 >
                   {isEditing ? "Save Cluster Changes" : "Save Argument Cluster"}
                 </button>

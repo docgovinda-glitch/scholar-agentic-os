@@ -88,7 +88,7 @@ export default function StageNavigation({
                 aria-current={isActive ? "page" : undefined}
                 className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
                   isActive
-                    ? "bg-[color:var(--accent)] text-white shadow-xs"
+                    ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-xs"
                     : "text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)]"
                 }`}
               >
@@ -164,7 +164,7 @@ export default function StageNavigation({
                   <span
                     className={`w-5 h-5 rounded-md flex items-center justify-center font-mono text-[10px] font-bold ${
                       isActive
-                        ? "bg-[color:var(--accent)] text-white"
+                        ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)]"
                         : "bg-[color:var(--surface-raised)] text-[color:var(--text-muted)] group-hover:text-[color:var(--text-primary)]"
                     }`}
                   >
@@ -178,7 +178,7 @@ export default function StageNavigation({
                 <span
                   className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider shrink-0 ${
                     isActive
-                      ? "bg-[color:var(--accent)] text-white"
+                      ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)]"
                       : status === "completed"
                       ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
                       : "text-[color:var(--text-muted)]"

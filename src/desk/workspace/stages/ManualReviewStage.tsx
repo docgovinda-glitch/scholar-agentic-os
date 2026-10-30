@@ -224,7 +224,7 @@ export default function ManualReviewStage({
             type="button"
             onClick={handleConfirm}
             disabled={isSaving}
-            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-white text-sm font-bold shadow-md hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all cursor-pointer flex items-center gap-2"
+            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-sm font-bold shadow-md hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all cursor-pointer flex items-center gap-2"
           >
             {isSaving ? (
               <>
@@ -406,7 +406,7 @@ export default function ManualReviewStage({
                 onClick={() => setActiveLedgerTab("matrix")}
                 className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
                   activeLedgerTab === "matrix"
-                    ? "bg-[color:var(--accent)] text-white shadow-xs"
+                    ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-xs"
                     : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)]"
                 }`}
               >
@@ -421,7 +421,7 @@ export default function ManualReviewStage({
                 onClick={() => setActiveLedgerTab("literature")}
                 className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
                   activeLedgerTab === "literature"
-                    ? "bg-[color:var(--accent)] text-white shadow-xs"
+                    ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-xs"
                     : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)]"
                 }`}
               >
@@ -436,7 +436,7 @@ export default function ManualReviewStage({
                 onClick={() => setActiveLedgerTab("datasets")}
                 className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
                   activeLedgerTab === "datasets"
-                    ? "bg-[color:var(--accent)] text-white shadow-xs"
+                    ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-xs"
                     : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)]"
                 }`}
               >
@@ -451,7 +451,7 @@ export default function ManualReviewStage({
                 onClick={() => setActiveLedgerTab("claims")}
                 className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
                   activeLedgerTab === "claims"
-                    ? "bg-[color:var(--accent)] text-white shadow-xs"
+                    ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-xs"
                     : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)]"
                 }`}
               >
@@ -693,7 +693,7 @@ export default function ManualReviewStage({
             type="button"
             onClick={handleConfirm}
             disabled={isSaving}
-            className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-white hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
+            className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
           >
             {isSaving ? (
               <>

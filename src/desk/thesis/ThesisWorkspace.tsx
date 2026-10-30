@@ -491,10 +491,11 @@ export default function ThesisWorkspace({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="apple-card p-4">
-                    <label className="text-xs font-bold text-primary block mb-1.5">
+                    <label htmlFor="thesis-title" className="text-xs font-bold text-primary block mb-1.5">
                       Dissertation Title
                     </label>
                     <input
+                      id="thesis-title"
                       type="text"
                       value={thesisData.title}
                       onChange={(e) => updateThesisField("title", e.target.value)}
@@ -503,10 +504,11 @@ export default function ThesisWorkspace({
                   </div>
 
                   <div className="apple-card p-4">
-                    <label className="text-xs font-bold text-primary block mb-1.5">
+                    <label htmlFor="thesis-framework" className="text-xs font-bold text-primary block mb-1.5">
                       Theoretical & Conceptual Framework
                     </label>
                     <input
+                      id="thesis-framework"
                       type="text"
                       placeholder="e.g., Socio-Technical Systems Theory, Bayesian Epistemology..."
                       value={thesisData.theoreticalFramework}
@@ -516,10 +518,11 @@ export default function ThesisWorkspace({
                   </div>
 
                   <div className="apple-card p-4">
-                    <label className="text-xs font-bold text-primary block mb-1.5">
+                    <label htmlFor="thesis-degree" className="text-xs font-bold text-primary block mb-1.5">
                       Degree Level
                     </label>
                     <select
+                      id="thesis-degree"
                       value={thesisData.degreeLevel}
                       onChange={(e) =>
                         updateThesisField(
@@ -536,10 +539,11 @@ export default function ThesisWorkspace({
                   </div>
 
                   <div className="apple-card p-4">
-                    <label className="text-xs font-bold text-primary block mb-1.5">
+                    <label htmlFor="thesis-word-budget" className="text-xs font-bold text-primary block mb-1.5">
                       Target Word Budget
                     </label>
                     <input
+                      id="thesis-word-budget"
                       type="number"
                       value={thesisData.targetWordCount}
                       onChange={(e) =>
@@ -627,6 +631,7 @@ export default function ThesisWorkspace({
                                 </div>
                               )}
                               <select
+                                aria-label={`Status of chapter ${idx + 1}`}
                                 value={ch.status}
                                 onChange={(e) => {
                                   const next = [...thesisData.chapters];

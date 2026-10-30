@@ -501,7 +501,7 @@ export default function EvidenceMatrixMode() {
             <button
               type="button"
               onClick={() => setMode("studio")}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-2 cursor-pointer"
             >
               <span>Proceed to Mode 3: Manuscript Studio</span>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -670,7 +670,7 @@ export default function EvidenceMatrixMode() {
                 type="button"
                 disabled={isSearching || !searchQuery.trim()}
                 onClick={handleExecuteSearch}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
               >
                 {isSearching ? (
                   <>
@@ -700,7 +700,7 @@ export default function EvidenceMatrixMode() {
                   onClick={() => setSelectedPortal(p)}
                   className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                     selectedPortal === p
-                      ? "bg-[color:var(--accent)] text-white"
+                      ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)]"
                       : "bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                   }`}
                 >
@@ -745,7 +745,7 @@ export default function EvidenceMatrixMode() {
                         <button
                           type="button"
                           onClick={() => handleAddSearchResult(item)}
-                          className="px-3 py-1 rounded-lg text-xs font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1"
+                          className="px-3 py-1 rounded-lg text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1"
                         >
                           <span>+ Add to Matrix</span>
                         </button>
@@ -1088,7 +1088,7 @@ export default function EvidenceMatrixMode() {
                 type="button"
                 disabled={!rawText.trim() || isUploadingFile}
                 onClick={handleDirectRawEntry}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer disabled:opacity-50"
               >
                 {isUploadingFile ? "Saving…" : "Save Primary Dataset"}
               </button>
