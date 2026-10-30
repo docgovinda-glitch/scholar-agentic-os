@@ -27,18 +27,23 @@ export function AriaLiveAnnouncer(): React.ReactElement {
   const [announcement, setAnnouncement] = useState<string>("");
 
   useEffect(() => {
+    // One pending timer at a time, cleared on unmount so it never sets state
+    // after the component is gone (the listener's return value is ignored).
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const handleAnnounce: AnnouncerListener = (msg) => {
       // Clear briefly so identical consecutive messages still trigger screen reader updates
       setAnnouncement("");
-      const timer = setTimeout(() => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = undefined;
         setAnnouncement(msg);
       }, 50);
-      return () => clearTimeout(timer);
     };
 
     listeners.add(handleAnnounce);
     return () => {
       listeners.delete(handleAnnounce);
+      if (timer) clearTimeout(timer);
     };
   }, []);
 
