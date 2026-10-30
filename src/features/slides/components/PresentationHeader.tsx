@@ -141,12 +141,16 @@ export default function PresentationHeader({
           <span className="text-neutral-400">· 6x6 Density</span>
         </div>
         {!hideAutosaveBadge && (
-          <WorkspaceAutosaveBadge
-            status={autosaveStatus}
-            version={projectVersion}
-            lastSavedTime={lastSavedTime || undefined}
-            className="hidden md:inline-flex whitespace-nowrap shrink-0"
-          />
+          // The badge sets its own display (inline-flex), which overrode `hidden`
+          // and overlapped the step switcher on phones; hide via a wrapper.
+          <span className="hidden md:inline-flex shrink-0" data-testid="presentation-autosave-slot">
+            <WorkspaceAutosaveBadge
+              status={autosaveStatus}
+              version={projectVersion}
+              lastSavedTime={lastSavedTime || undefined}
+              className="whitespace-nowrap shrink-0"
+            />
+          </span>
         )}
         {onOpenQaSimulator && (
           <button
