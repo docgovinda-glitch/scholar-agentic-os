@@ -784,10 +784,14 @@ function SubscriptionSection({ access }: { access: ReturnType<typeof useAiAccess
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState(false);
+
   function reload() {
-    getPremiumCatalog().then(setCatalog).catch(() => setCatalog(null));
-    getOfferedPlans().then(setPlans).catch(() => setPlans([]));
-    getMyPremiumRequest().then(setMyRequest).catch(() => setMyRequest(null));
+    setLoadError(false);
+    const failed = () => setLoadError(true);
+    getPremiumCatalog().then(setCatalog).catch(() => { setCatalog(null); failed(); });
+    getOfferedPlans().then(setPlans).catch(() => { setPlans([]); failed(); });
+    getMyPremiumRequest().then(setMyRequest).catch(() => { setMyRequest(null); failed(); });
   }
   useEffect(reload, []);
 
@@ -827,6 +831,15 @@ function SubscriptionSection({ access }: { access: ReturnType<typeof useAiAccess
         title="Subscription"
         blurb="AI paid for by Scholar Core. You never enter a key — requests run on Scholar Core's own infrastructure."
       />
+
+      {loadError && (
+        <div role="alert" className="rounded-[var(--radius-md)] border border-[color:var(--state-warning)] p-3 text-xs text-[color:var(--text-primary)] flex items-center justify-between gap-3">
+          <span>Some subscription details couldn't be loaded, so plans or your request may be missing below.</span>
+          <button type="button" onClick={reload} className="shrink-0 px-3 py-1 rounded-lg border border-[color:var(--border-control)] font-semibold hover:bg-[color:var(--surface-hover)] cursor-pointer">
+            Try again
+          </button>
+        </div>
+      )}
 
       <section
         className={`rounded-[var(--radius-md)] border p-4 ${
