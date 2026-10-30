@@ -812,8 +812,6 @@ export default function ThesisWorkspace({
 
             {currentStage === "viva_defense" && (
               <div className="flex flex-col gap-6">
-                <VivaVoceSimulator thesisData={thesisData} />
-
                 <div className="flex items-start justify-between pt-4 border-t border-border/70">
                   <div>
                     <h3 className="text-sm font-bold text-primary">
@@ -884,6 +882,8 @@ export default function ThesisWorkspace({
                     </div>
                   </div>
                 )}
+
+                <VivaVoceSimulator thesisData={thesisData} questions={vivaResults?.questions ?? []} />
               </div>
             )}
 

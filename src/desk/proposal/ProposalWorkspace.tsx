@@ -767,8 +767,8 @@ export default function ProposalWorkspace({
               <div className="flex flex-col gap-6">
                 <StudySectionScorer
                   proposalTitle={proposalData.title}
-                  fundingAgency={proposalData.fundingAgency || "NSF / NIH"}
-                  mechanism={proposalData.mechanism || "Standard Grant Track"}
+                  fundingAgency={proposalData.fundingAgency}
+                  mechanism={proposalData.mechanism}
                 />
 
                 <div className="flex items-start justify-between pt-4 border-t border-border/70">
