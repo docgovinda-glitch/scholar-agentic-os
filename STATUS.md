@@ -14,7 +14,7 @@
 3. No compromise indicators found in T5 (see below). No F1 containment beyond the reversible `is_username_approved` revoke.
 4. Full encrypted `pg_dump` backups are impossible from the agent sandbox (HTTPS-only egress, no raw TCP to Postgres). Prod changes on 2026-10-29 were preceded by policy/grant/RLS snapshots only (`~/backups/*-20261029T104243Z.json`, agent machine). Supabase Pro daily backups are the restore path.
 
-## 0. Task checklist (status as of 2026-10-29 15:30Z)
+## 0. Task checklist (status as of 2026-10-30 01:20Z)
 
 | Task | Status | Evidence |
 | :--- | :--- | :--- |
@@ -28,12 +28,15 @@
 | T7 Edge Function | DONE | v11 |
 | T8 Purge | DONE (order deviation) | |
 | T9 Migration reconciliation | PARTIAL | fresh-DB replay works with 2 documented workarounds (`authentic_id`, premium_requests order); schema diff vs production not possible from sandbox (no raw TCP for `pg_dump`) |
-| T10 Production readiness | PARTIAL | PR CI + audit gate, deploy waits for live commit + deep health + smoke, uptime workflow, Render health check path (#86); branch protection, error tracking, rollback drill → owner/next |
+| T10 Production readiness | PARTIAL | PR CI + audit gate, deploy waits for live commit + deep health + smoke, uptime workflow, Render health check path (#86); deploy check accepts a newer live commit that contains the run's commit (#99); branch protection, error tracking, rollback drill → owner/next |
 | T11 AUDIT findings | PARTIAL | see section 3 |
-| B1 Product audit | FIRST PASS | `PRODUCT_AUDIT.md` |
-| P0 fabricated content | DONE | #87, #88, #89 (Coursework + Journal: no invented sources, audits, originality, drafts, journals, gaps) |
+| B1 Product audit | FIRST PASS + AI map | `PRODUCT_AUDIT.md`; area g mapped in `docs/AI-CALL-MAP.md` (#94) |
+| P0 fabricated content | DONE (P0-1…P0-6, P0-8…P0-10); P0-7 partly | #87, #88, #89 (Coursework + Journal); #100 (Thesis/Proposal tools called missing routes and showed hardcoded reviews); #101 (demo content in Viva/Study-section panels) |
 | B2 E2E harness | DONE (first cut) | #91: Playwright, local Supabase in CI, 11 specs + smoke on every PR |
-| B3–B5, B7, B8 | TODO | |
+| B3 One Brain | IN PROGRESS | map (#94); BYOK headers only on AI routes (#93); one header parser (#95); one Premium pipeline (#98); unused `/agent/literature` removed (#97); typed AI errors for Thesis/Proposal (#100). Next: one failure contract (426 vs throw), guardrails on llm.ts output |
+| B4 AI Access | IN PROGRESS | Premium scope stated truthfully (#96) |
+| B5 Thesis/Proposal | IN PROGRESS | real routes + honest errors (#100), practice room/worksheet (#101), starter no longer invents budget (#102) |
+| B7, B8 | TODO | |
 | B6 Presentation | DONE except One Brain (B3); decks persist (#85) | |
 | T12 Handover | TODO | |
 
@@ -53,6 +56,8 @@
 | 12:35 | SQL `20261029030000_presentation_decks` (#85) | table absent; deck saves 503 | smoke 35/35 | drop table while empty |
 | 12:40 | Render health check path set to `/api/health` | empty | API read-back | clear field |
 | 13:10 → 15:05 | Deploys #86 (`d998166`), #87 (`33bd6e3`), #88 (`fc7085a`), #89+#90 (`823d11d`) | | health `commit` matches; `?deep=1` database ok | redeploy previous |
+| 15:14 → 15:50 | Deploys #91 (`5275aff`), #92 (`8193c6c`) | | deploy workflow green | redeploy previous |
+| 2026-10-29 16:56 → 2026-10-30 01:10 | Deploys #93–#101 (code only, no SQL, no env changes). Runs for #93–#96 were superseded by newer merges; production went straight to the newest `main` | | `/api/health?deep=1` healthy, database ok, commit `65bc226` (#100) at 01:07; #101 deploying | redeploy previous |
 
 ## T5 results (2026-10-29, read-only, `default_transaction_read_only = on`, counts only)
 
@@ -84,6 +89,28 @@
 | **#81** | `claude/jolly-mayer-k74uad` | `main` | **MERGED & DEPLOYED** (`2026-10-29T10:48Z`) | `ff330c3` (`1f52034`) | `docgovinda-glitch` (agent, owner-authorized) | **YES** | Slides & Keynotes Gamma card studio, native .pptx, deck ownership fail-closed, Slide Visual Parity CI, CI timer fix. |
 | **#82** | `fix/post-80-verification-login-purge-notices` | `main` | **MERGED & DEPLOYED** (`2026-10-29T11:00Z`) | `a8771bd` (`1b91e8c`) | `docgovinda-glitch` (agent, owner-authorized) | **YES** | Post-#80 hardening (Turnstile passthrough, login cap, fail-closed `LLM_CHALLENGE_SECRET`, cloud connections API, `CredentialResetNotice`); notice SQL moved to `20261029010000`. |
 | **#83** | `claude/jolly-mayer-k74uad` | `main` | **MERGED & DEPLOYED** (`2026-10-29T11:01Z`) | `efa5187` (`92c48c6`) | `docgovinda-glitch` (agent, owner-authorized) | **YES** | `20261029000000_reapply_premium_request_integrity.sql` (fresh-DB policy order fix; no-op in prod). |
+
+Later PRs were opened by the agent and merged by it (owner-authorized) only after CI passed. As of 2026-10-30 01:20Z all up to #100 are live; #101 is deploying and #102 is open.
+
+| PR # | Contents |
+| :---: | :--- |
+| #84 | Revoke legacy `is_username_approved`; T5 results |
+| #85 | `presentation_decks` table; production smoke suite |
+| #86 | PR CI, dependency audit, deep health check, deploy verification, uptime monitor |
+| #87, #88, #89 | Remove fabricated sources, audits, originality scores, drafts, journals, gaps (Coursework, Journal) |
+| #90 | Each rate limiter gets its own counter (login 429s) |
+| #91 | Playwright E2E against a local Supabase in CI |
+| #92 | STATUS update after #84–#91 |
+| #93 | User's AI key sent only to routes that run AI |
+| #94 | AI call map (`docs/AI-CALL-MAP.md`) |
+| #95 | One parser for client AI headers |
+| #96 | AI Access page states which features Premium covers |
+| #97 | Remove unused `/agent/literature` (asked an LLM to invent sources) |
+| #98 | One Premium pipeline (`server/src/ai/premium.ts`) |
+| #99 | Deploy check accepts a newer live commit containing the run's commit |
+| #100 | Thesis/Proposal tools use the real routes; no invented reviews or inputs (P0-9) |
+| #101 | Viva practice room and blank self-review worksheet; no demo reviews (P0-10) |
+| #102 | Proposal starter no longer invents budget, funder or mechanism (P1-9) |
 
 ---
 
