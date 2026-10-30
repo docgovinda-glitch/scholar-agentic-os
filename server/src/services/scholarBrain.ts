@@ -16,7 +16,7 @@
 import { completeWithFailover, streamWithFailover } from "../../../src/platform/gateway/gateway.ts";
 import type { CandidateProvider } from "../../../src/platform/gateway/types.ts";
 import { resolveClientAiConfig } from "../ai/clientAiConfig.ts";
-import { NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
+import { LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 import { defaultPolicy } from "../../../src/platform/warden/policy.ts";
 import { recordConsent, type EgressPolicy } from "../../../src/platform/warden/warden.ts";
 import type { TaskClass } from "../../../src/platform/warden/types.ts";
@@ -165,9 +165,10 @@ export function extractTransientClientAiConfig(
   candidates: CandidateProvider[];
   provider?: string;
   model?: string;
+  localModelBrowserOnly: boolean;
 } {
-  const { candidates, provider, model } = resolveClientAiConfig(req?.headers, overrides);
-  return { candidates, provider, model };
+  const { candidates, provider, model, localModelBrowserOnly } = resolveClientAiConfig(req?.headers, overrides);
+  return { candidates, provider, model, localModelBrowserOnly };
 }
 
 /**
@@ -256,13 +257,15 @@ export const scholarBrain = {
    * zero server keys, British/Oxford orthography, and NFC Unicode preservation.
    */
   async complete(options: ScholarBrainCompleteOptions): Promise<ScholarBrainCompleteResult> {
-    const { candidates, provider: resolvedProvider, model: resolvedModel } = extractTransientClientAiConfig(
-      options.req,
-      options.headers
-    );
+    const {
+      candidates,
+      provider: resolvedProvider,
+      model: resolvedModel,
+      localModelBrowserOnly,
+    } = extractTransientClientAiConfig(options.req, options.headers);
 
     if (candidates.length === 0) {
-      throw new NoClientAiProviderError();
+      throw localModelBrowserOnly ? new LocalModelUnreachableError() : new NoClientAiProviderError();
     }
 
     const dialect = options.dialect ?? "en-GB";
