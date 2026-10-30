@@ -49,7 +49,6 @@ import { isDeepEqual, safeFormatLabel, allocateWordsByMarks } from "../../../uti
 import { validateBriefFile } from "../../../services/documentParser";
 import { classifyScopeBoundaries, stripLineTags } from "../../../features/understand/services/scopeClassifier";
 import type { CourseworkExecutionMode, CourseworkProgressEvent } from "../../../features/coursework/types/orchestrator";
-import { executeDetailedAutonomousSynthesis } from "../../../features/coursework/services/courseworkOrchestrator";
 
 class DropzoneErrorBoundary extends React.Component<
   { children: React.ReactNode; onError?: (error: Error) => void },
