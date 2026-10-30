@@ -32,11 +32,11 @@
 | T10 Production readiness | PARTIAL | PR CI + audit gate, deploy waits for live commit + deep health + smoke, uptime workflow, Render health check path (#86); deploy check accepts a newer live commit that contains the run's commit (#99); branch protection, error tracking, rollback drill → owner/next |
 | T11 AUDIT findings | PARTIAL | see section 3 |
 | B1 Product audit | FIRST PASS + AI map | `PRODUCT_AUDIT.md`; area g mapped in `docs/AI-CALL-MAP.md` (#94) |
-| P0 fabricated content | DONE (P0-1…P0-19) | #87–#89 (Coursework, Journal); #100, #101 (Thesis/Proposal); #104 (citations never invent year/author/venue, P0-7); #108 (audience Q&A, P0-11); #109 (journal titles); #110–#112 (Journal review, demo manuscripts, sub-section drafter); #113, #114 (slide copilot, theme picker that replaced decks); #115 (landing page, Swiss sample deck, coursework prompt); #121 (Presentation sidebar demo projects and "Aaditya" account). Details in `PRODUCT_AUDIT.md` |
-| B2 E2E harness | DONE (first cut) | #91: Playwright, local Supabase in CI, 11 specs + smoke on every PR |
+| P0 fabricated content | DONE (P0-1…P0-20) | #87–#89 (Coursework, Journal); #100, #101 (Thesis/Proposal); #104 (citations never invent year/author/venue, P0-7); #108 (audience Q&A, P0-11); #109 (journal titles); #110–#112 (Journal review, demo manuscripts, sub-section drafter); #113, #114 (slide copilot, theme picker that replaced decks); #115 (landing page, Swiss sample deck, coursework prompt); #121 (Presentation sidebar demo projects and "Aaditya" account); #130 (Coursework drafting wrote template text instead of the user's AI, P0-20). Details in `PRODUCT_AUDIT.md` |
+| B2 E2E harness | DONE | #91: Playwright, local Supabase in CI, smoke on every PR; 36 tests by #130, including a stand-in AI service for AI steps (#129) |
 | B3 One Brain | IN PROGRESS | map (#94); BYOK headers only on AI routes (#93); one header parser (#95); one Premium pipeline (#98); unused `/agent/literature` removed (#97); typed AI errors for Thesis/Proposal (#100). local model never called from the server (#106); scholarBrain routes hand off to browser-local AI with signed challenges (#116, step 2). Next: bind Ask Scholar challenge to its prompt (P1-10), deep-research hand-off, guardrails on llm.ts output, `brain.ts` contract |
-| B4 AI Access | IN PROGRESS | Premium scope stated truthfully (#96); every catalog provider has a working adapter, tested (#123). Next: credits/ledger accuracy, premium request submit/withdraw/approve, admin CRUD |
-| B5 Thesis/Proposal | IN PROGRESS | real routes + honest errors (#100), practice room/worksheet (#101), starter no longer invents budget (#102) |
+| B4 AI Access | IN PROGRESS | Premium scope stated truthfully (#96); every catalog provider has a working adapter, tested (#123); credit balance = ledger and limits enforced, checked against a real DB in CI (#125, P1-11 negative grant noted); premium requests act only on a pending request (#126, P1-12); platform keys encrypted with MASTER_KEY, never returned (#127). Next: providers/models/budgets CRUD tests |
+| B5 Workspaces | IN PROGRESS | real routes + honest errors (#100), practice room/worksheet (#101), starter no longer invents budget (#102); E2E per workspace: open, saved answers survive reload, no demo data, private (#128); each drafting step runs through the real AI path (#129); Coursework drafting uses the user's AI (#130). Next: versioning and export E2E |
 | B7 UI/UX pass | IN PROGRESS | every chunk < 500 kB, enforced in the build (#119: 918 → 379 kB); no pure #000000, lint-checked (#120); axe WCAG 2.1 A/AA + no sideways scroll at 375/768/1280 px with screenshots in CI (#121); phone layout fixes (#121, #122); no runtime-built Tailwind classes (checked). Next: hardcoded hex → tokens, loading/empty/error states, keyboard/focus pass |
 | B8 | TODO | |
 | B6 Presentation | DONE except One Brain (B3); decks persist (#85) | |
@@ -136,6 +136,13 @@ Later PRs were opened by the agent and merged by it (owner-authorized) only afte
 | #121 | Presentation sidebar shows the user's own projects (P0-19); axe + responsive E2E |
 | #122 | Presentation header: save badge no longer overlaps the steps on phones |
 | #123 | Every AI Access provider has a working adapter (test) |
+| #124 | STATUS, audit and changelog after #118–#123 |
+| #125 | Credit balance matches the ledger; limits enforced (DB test in CI) |
+| #126 | Premium requests: approve/decline/withdraw act only on a pending request (P1-12) |
+| #127 | Admin platform keys stored encrypted, never returned, validated |
+| #128 | E2E: every workspace opens, keeps saved answers, shows no demo data, stays private |
+| #129 | E2E: each workspace's drafting step through the real AI path (stand-in AI in CI) |
+| #130 | Coursework drafting: the user's AI or an honest error, never template text (P0-20) |
 
 ---
 
