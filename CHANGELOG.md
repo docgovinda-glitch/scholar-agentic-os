@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A local model (Ollama, LM Studio, …) is never called from the deployed server, which cannot reach the user's computer (#106). Journal stages and Ask Scholar, and since #116 Thesis, Proposal and Presentation, run the prompt in the browser instead, with a signed challenge (for #116 routes, bound to the exact prompt). Remaining server-only features say plainly that they need a cloud key.
 - Internal: one parser for AI request headers (#95), one Premium pipeline (#98), typed AI errors, and an AI call map (`docs/AI-CALL-MAP.md`, #94).
 
+### Interface & accessibility
+- Presentation Studio's sidebar lists your own projects and your own account (it showed four sample projects and a sample profile to everyone) (#121).
+- Phones: the navigation starts closed and the studio header no longer overlaps (#121, #122).
+- No pure black anywhere; dark surfaces use the ink colour #171717 (#120).
+- Faster loads: the spreadsheet reader no longer ships a 918 kB library; every download chunk is under 500 kB (#119).
+- Accessibility checks (WCAG 2.1 A/AA) run on the public pages at phone, tablet and desktop widths on every change (#121).
+
 ### Reliability & operations
 - Presentation decks persist (`presentation_decks` table, #85).
 - Rate limiters no longer share one counter, which had caused spurious login 429s (#90). Supabase Auth's sign-up/sign-in limit was raised from 30 to 300 per 5 minutes (2026-10-30).
