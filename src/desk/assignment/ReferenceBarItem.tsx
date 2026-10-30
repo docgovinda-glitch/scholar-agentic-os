@@ -31,7 +31,7 @@ export interface ReferenceBarItemProps {
 }
 
 export function formatInTextCitation(source: DiscoveredSource): string {
-  const year = source.year || "2024";
+  const year = source.year || "n.d.";
   if (!source.authors || source.authors.length === 0) {
     const fallbackTitle = source.title ? source.title.split(" ").slice(0, 3).join(" ") : "Source";
     return `(${fallbackTitle}, ${year})`;

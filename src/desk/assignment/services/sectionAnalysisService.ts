@@ -103,7 +103,7 @@ export function buildSynthesisCard(
 ): SectionAnalyticalSynthesis {
   const citation = formatSourceInTextCitation(source, citationStyle);
   const authorsDisplay = source.authors && source.authors.length > 0 ? source.authors.join(", ") : "Scholar";
-  const yearDisplay = source.year || "2024";
+  const yearDisplay = source.year || "n.d.";
 
   // Check if source has extracted evidences (from user uploads)
   const userEvidence = source.extractedEvidences && source.extractedEvidences.length > 0 ? source.extractedEvidences[0] : null;

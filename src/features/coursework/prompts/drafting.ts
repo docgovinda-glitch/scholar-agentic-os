@@ -180,7 +180,7 @@ export function buildCourseworkSectionDraftingPrompt(params: BuildSectionPromptP
 
   const sourcesList = (params.boundSources || []).length > 0
     ? params.boundSources!
-        .map((s, idx) => `  - Source ${idx + 1}: "${s.title}" (${Array.isArray(s.authors) ? s.authors.join(", ") : s.authors || "Author"}, ${s.year || "2024"}) -> Use token ${s.citation || `[${idx + 1}]`}`)
+        .map((s, idx) => `  - Source ${idx + 1}: "${s.title}" (${Array.isArray(s.authors) ? s.authors.join(", ") : s.authors || "author unknown"}, ${s.year || "n.d."}) -> Use token ${s.citation || `[${idx + 1}]`}`)
         .join("\n")
     : "  - Ground claims using numbered bracket citation tokens like [1], [2] where empirical evidence is referenced.";
 

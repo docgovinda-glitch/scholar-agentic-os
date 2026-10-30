@@ -97,7 +97,7 @@ draftingRoutes.post(
           authors: Array.isArray(item.authors)
             ? (item.authors as string[])
             : String(item.author || item.authors || "Anonymous"),
-          year: typeof item.year === "number" ? item.year : String(item.year || "2024"),
+          year: typeof item.year === "number" ? item.year : String(item.year || "n.d."),
           title: String(item.title || "Scholarly Document"),
           doi: typeof item.doi === "string" ? item.doi : undefined,
           url: typeof item.url === "string" ? item.url : undefined,

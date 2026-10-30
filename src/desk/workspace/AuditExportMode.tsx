@@ -33,6 +33,8 @@ export default function AuditExportMode() {
   const effectiveProjectId = project?.projectId || projectId;
 
   const answers = useMemo(() => project?.answers || {}, [project?.answers]);
+  // The user's own choice; never a made-up journal name in their export.
+  const targetJournalName = String(answers.target_journal || "").trim() || "Target journal not yet selected";
 
   // Assembled manuscript markdown
   const manuscriptMarkdown = useMemo(() => {
@@ -427,7 +429,7 @@ export default function AuditExportMode() {
       try {
         await exportJournalToDocx({
           title,
-          targetJournal: layoutMode === "2-column-camera" ? "IEEE Transactions" : "Journal of Academic Research",
+          targetJournal: targetJournalName,
           template: layoutMode === "2-column-camera" ? "ieee" : "apa7",
           citationStyle,
           authors: [
@@ -513,7 +515,7 @@ export default function AuditExportMode() {
         const letterBlob = await exportRefereeLetterToDocx(
           title,
           authorName,
-          layoutMode === "2-column-camera" ? "IEEE Transactions" : "Journal of Academic Research",
+          targetJournalName,
           rebuttalMatrix
         );
         downloadBlob(letterBlob, "Referee_Response_Letter.docx");

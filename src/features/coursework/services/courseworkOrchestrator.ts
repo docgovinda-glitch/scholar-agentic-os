@@ -521,7 +521,7 @@ export async function executeMinimalDraftSection(
     id: s.id || `src-${idx + 1}`,
     title: s.title,
     authors: s.authors || ["Scholarly Author"],
-    year: String(s.year || "2024"),
+    year: String(s.year || "n.d."),
     citation: `[${idx + 1}]`,
     journal: s.journal,
     doi: s.doi,
@@ -735,7 +735,7 @@ export async function executeDetailedAutonomousSynthesis(
     url: s.url || (s.doi ? `https://doi.org/${s.doi}` : ""),
     title: s.title,
     authors: s.authors && s.authors.length > 0 ? s.authors : ["Scholarly Author"],
-    year: s.year || "2024",
+    year: s.year || "n.d.",
     journal: s.journal,
     doi: s.doi,
   }));
@@ -784,7 +784,7 @@ export async function executeDetailedAutonomousSynthesis(
       boundSources: boundSources.map((s, i) => ({
         title: s.title || "Scholarly Resource",
         authors: s.authors,
-        year: String(s.year || "2024"),
+        year: String(s.year || "n.d."),
         citation: `[${i + 1}]`,
       })),
       allDraftedSections: draftedSections,

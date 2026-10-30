@@ -1031,7 +1031,7 @@ function generateAcademicPeelProse(params: {
   // Format citations according to style
   const citations = sources.map((s) => {
     const author = s.authors && s.authors[0] ? s.authors[0].split(",")[0].trim() : "Scholar";
-    const year = s.year || "2024";
+    const year = s.year || "n.d.";
     return citationStyle.toLowerCase().includes("ieee")
       ? "[1]"
       : citationStyle.toLowerCase().includes("harvard")

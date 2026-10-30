@@ -709,7 +709,7 @@ export async function renderDocx(
     academicOptions?.references && academicOptions.references.length > 0
       ? academicOptions.references.map((r, idx) => {
           const authorStr = r.authors && r.authors.length > 0 ? r.authors.join(", ") : "Scholar OS Investigator";
-          const yearStr = r.year || "2024";
+          const yearStr = r.year || "n.d.";
           const titleStr = r.title || "Academic Study";
           const journalStr = r.journal || "Journal of Academic Synthesis";
           const doiStr = r.doi ? `https://doi.org/${r.doi}` : "";

@@ -383,7 +383,7 @@ export function registerAIRoutes(
             const canonicalRef: CanonicalReference = {
               kind: "JournalArticle",
               title: e.title,
-              source: e.venue || "Academic Publication",
+              source: e.venue || "",
               authors: e.authors.map((a, i) => {
                 const parts = a.trim().split(" ");
                 return {
@@ -490,7 +490,7 @@ export function registerAIRoutes(
           canonicalSources
             .map(
               (s, idx) =>
-                `[Source ${idx + 1}] (${s.id}) In-Text Citation: ${s.inTextCitation}\nTitle: "${s.title}"\nAuthors: ${s.authors.join(", ") || "Unknown Author"}\nYear: ${s.year || "n.d."}\nDOI: ${s.doi || "None"}\nVenue/Publisher: ${s.venue || "Academic Publication"}\nURL: ${s.url || "N/A"}`
+                `[Source ${idx + 1}] (${s.id}) In-Text Citation: ${s.inTextCitation}\nTitle: "${s.title}"\nAuthors: ${s.authors.join(", ") || "Unknown Author"}\nYear: ${s.year || "n.d."}\nDOI: ${s.doi || "None"}\nVenue/Publisher: ${s.venue || "not recorded"}\nURL: ${s.url || "N/A"}`
             )
             .join("\n\n") +
           `\n=== END OF EXCLUSIVE CITATION LEDGER ===`

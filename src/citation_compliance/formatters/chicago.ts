@@ -3,7 +3,7 @@
  */
 
 import type { CitationStyle, InTextOptions } from "../formattingEngine";
-import type { CanonicalReference } from "../model/reference";
+import { authorDateYear, type CanonicalReference } from "../model/reference";
 
 export class ChicagoFormatter implements CitationStyle {
   id = "chicago-author-date";
@@ -16,21 +16,18 @@ export class ChicagoFormatter implements CitationStyle {
     }
 
     const author = reference.authors[0].lastName;
-    if (reference.publicationDate) {
-      const year = reference.publicationDate.substring(0, 4);
-      if (options && options.locator) {
-        return "(" + author + " " + year + ", " + options.locator + ")";
-      }
-      return "(" + author + " " + year + ")";
+    const year = authorDateYear(reference);
+    if (options && options.locator) {
+      return "(" + author + " " + year + ", " + options.locator + ")";
     }
-    return "(" + author + ")";
+    return "(" + author + " " + year + ")";
   }
 
   formatBibliography(reference: CanonicalReference): string {
     const parts: string[] = [];
 
     if (reference.authors && reference.authors.length > 0) {
-      const authorNames = reference.authors.map((a) => a.lastName + ", " + a.firstName);
+      const authorNames = reference.authors.map((a) => (a.firstName ? a.lastName + ", " + a.firstName : a.lastName));
       parts.push(authorNames.join(", ") + ".");
     }
 
