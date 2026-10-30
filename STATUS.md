@@ -9,10 +9,11 @@
 
 ## OWNER ATTENTION (2026-10-29)
 
-1. **Reset the Supabase database password** (dashboard → Project Settings → Database). Network Restrictions were removed by the owner on 2026-10-29 and the old password is in git history (`F-01`). Then update `SUPABASE_DB_PASSWORD` in `~/.scholar-agent.env` / Render `DATABASE_URL`.
-2. **Raise Auth rate limit** "sign-ups and sign-ins" 30 → 300 / 5 min (dashboard → Authentication → Rate Limits). Not changed by the agent: the Management API field for this box could not be identified with certainty (`GET /v1/projects/{ref}/config/auth` returns `rate_limit_verify=30`, `rate_limit_otp=30`, `rate_limit_token_refresh=150`, …).
+1. **Supabase database password reset: deferred by the owner** (2026-10-30) until the project is complete. The old password is in git history (`F-01`) and Network Restrictions are off; the owner accepts that until then.
+2. **Auth rate limit raised: DONE** (2026-10-30 02:30Z, owner-approved). `rate_limit_otp` 30 → 300 per 5 min via the Management API. Supabase Auth's own code (`internal/api/apilimiter/apilimiter.go`) counts sign-ups, OTP, magic links and password-reset requests against `rate_limit_otp`, which is the dashboard's "sign-ups and sign-ins" box. Password sign-ins use `rate_limit_token_refresh` (150, unchanged). Emails stay capped separately by `rate_limit_email_sent` (30, unchanged).
 3. No compromise indicators found in T5 (see below). No F1 containment beyond the reversible `is_username_approved` revoke.
 4. Full encrypted `pg_dump` backups are impossible from the agent sandbox (HTTPS-only egress, no raw TCP to Postgres). Prod changes on 2026-10-29 were preceded by policy/grant/RLS snapshots only (`~/backups/*-20261029T104243Z.json`, agent machine). Supabase Pro daily backups are the restore path.
+5. **Deploy smoke secrets (optional): not set.** `deploy.yml` runs the production smoke suite after each deploy only when the `SMOKE_*` GitHub secrets exist. This session has no tool that can write repository secrets, so the step stays skipped. The suite is run by hand after deploys (`scripts/smoke-prod.sh`).
 
 ## 0. Task checklist (status as of 2026-10-30 01:20Z)
 
@@ -22,7 +23,7 @@
 | T1 Post-#80 verification | DONE | `scripts/smoke-prod.sh` (#85): production 35/35 after #85 |
 | T2 Doc corrections | DONE (#82) | |
 | T3 Local Supabase proof | DONE | `scripts/db/replay-migrations.sh` rebuilds a fresh DB from the repo (#91, used by CI) |
-| T4 Auth rate limits | PARTIAL | server cap 5/5 min (#82); limiter isolation bug fixed (#90); GoTrue limit raise → OWNER ATTENTION 2 |
+| T4 Auth rate limits | DONE | server cap 5/5 min (#82); limiter isolation bug fixed (#90); Supabase `rate_limit_otp` 30 → 300 (2026-10-30) |
 | T5 Prod read-only checks | DONE (#84) | no compromise indicators; legacy `is_username_approved` revoked |
 | T6 Hotfix 2 | DONE | |
 | T7 Edge Function | DONE | v11 |
@@ -58,6 +59,8 @@
 | 13:10 → 15:05 | Deploys #86 (`d998166`), #87 (`33bd6e3`), #88 (`fc7085a`), #89+#90 (`823d11d`) | | health `commit` matches; `?deep=1` database ok | redeploy previous |
 | 15:14 → 15:50 | Deploys #91 (`5275aff`), #92 (`8193c6c`) | | deploy workflow green | redeploy previous |
 | 2026-10-29 16:56 → 2026-10-30 01:10 | Deploys #93–#101 (code only, no SQL, no env changes). Runs for #93–#96 were superseded by newer merges; production went straight to the newest `main` | | `/api/health?deep=1` healthy, database ok, commit `65bc226` (#100) at 01:07; #101 deploying | redeploy previous |
+| 2026-10-30 01:20 → 02:20 | Deploys #102, #103, #104 (code/docs only) | | health `commit` `d625217`; smoke 35/35 | redeploy previous |
+| 2026-10-30 02:30 | Supabase Auth `rate_limit_otp` 30 → 300 (Management API PATCH `config/auth`, owner-approved) | 30 | read-back 300; other `rate_limit_*` unchanged; smoke 35/35 | PATCH back to 30 |
 
 ## T5 results (2026-10-29, read-only, `default_transaction_read_only = on`, counts only)
 
