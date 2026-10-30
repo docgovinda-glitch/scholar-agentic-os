@@ -282,16 +282,13 @@ export default function ProposalWorkspace({
       proposalData.title && proposalData.title !== "Untitled Research Proposal"
         ? proposalData.title
         : "Empirical Investigation of Proposed Research Architecture";
-    const agency = proposalData.fundingAgency || "National Science Foundation (NSF) / NIH";
-    const mechanism = proposalData.mechanism || "Standard Investigator Grant Track";
-    const budget = proposalData.targetBudgetUSD > 0 ? proposalData.targetBudgetUSD : 500000;
+    // The starter only scaffolds editable outline text. Funder, mechanism and
+    // budget are the user's facts, so they are never filled in for them.
+    const agency = proposalData.fundingAgency;
 
     const next: ProposalProjectData = {
       ...proposalData,
       title: topicTitle,
-      fundingAgency: agency,
-      mechanism,
-      targetBudgetUSD: budget,
       overarchingHypothesis:
         proposalData.overarchingHypothesis ||
         `We hypothesize that a rigorous empirical framework for ${topicTitle} will measurably improve reproducibility, domain validity, and analytical precision.`,
@@ -305,7 +302,7 @@ export default function ProposalWorkspace({
             ],
       significanceStatement:
         proposalData.significanceStatement ||
-        `Addresses foundational methodological gaps in ${topicTitle} aligned with ${agency} priorities.`,
+        `Addresses foundational methodological gaps in ${topicTitle}${agency ? ` aligned with ${agency} priorities` : ""}.`,
       innovationStatement:
         proposalData.innovationStatement ||
         `Introduces verifiable multi-stage evaluation and reproducible validation protocols.`,
