@@ -144,4 +144,18 @@ describe("ProposalWorkspace (OT-19 Grant & Research Proposal Engine)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/Connect an AI provider/i);
     expect(screen.queryByText(/Top 8th Percentile/i)).not.toBeInTheDocument();
   });
+
+  it("the blueprint starter never fills in a funder, mechanism or budget (P1-9)", async () => {
+    vi.spyOn(window, "fetch").mockImplementation(async () =>
+      new Response(JSON.stringify({ project: { id: "proj-proposal-2", title: "", intakeAnswers: {} } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    render(<ProposalWorkspace projectId="proj-proposal-2" />);
+    fireEvent.click(screen.getByTestId("generate-structured-blueprint-btn"));
+    expect(screen.getByText(/3 Aims Formulated/i)).toBeInTheDocument();
+    expect(screen.queryByText(/\$500,000|500,000/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Standard Investigator Grant Track/i)).not.toBeInTheDocument();
+  });
 });

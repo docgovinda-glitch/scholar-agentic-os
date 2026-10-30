@@ -34,7 +34,7 @@ Integrity rule used throughout: **anything a user could hand in or rely on must 
 | P1-5 | Offline OCR returns canned text in headless environments only (not reached by browsers). Keep it out of production paths. | `src/services/vault/ocrService.ts:141-165` |
 | P1-7 | **FIXED (retired)** — Unused server route `/agent/literature` still prompts an LLM to "generate" 15 sources. No client calls it (it is the canary in `serverAiIsolation.test.ts`); retire it with One Brain (B3). | `server/routes/project/agentic/evidenceRoutes.ts:15` |
 | P1-8 | Premium (server-held keys) applies only to journal requirements extraction, manuscript section generation, coherence, peer review, cover letter, anonymization and Studio refine. The staged workspaces need the user's own key. The AI Access page doesn't say which features Premium covers (B4). | `server/routes/project/core/projectHelpers.ts:219-775`, `server/routes/studio.ts:70`; `src/desk/aiAccess/AiAccessPage.tsx:1202` |
-| P1-9 | The Proposal "generate blueprint" starter fills a $500,000 budget and a generic hypothesis when fields are empty. It runs only on the user's click, but the budget is invented. | `src/desk/proposal/ProposalWorkspace.tsx` `handleGenerateBlueprintFromTopic` |
+| P1-9 | **FIXED** — The Proposal "generate blueprint" starter fills a $500,000 budget and a generic hypothesis when fields are empty. It runs only on the user's click, but the budget is invented. | `src/desk/proposal/ProposalWorkspace.tsx` `handleGenerateBlueprintFromTopic` |
 | P1-6 | Auth rate limit at Supabase is still the default 30 per 5 min (owner action, STATUS OWNER ATTENTION 2). | `GET /v1/projects/{ref}/config/auth` |
 
 ## Areas (a–j)
