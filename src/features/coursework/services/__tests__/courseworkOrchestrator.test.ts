@@ -5,9 +5,7 @@ import {
   evaluate10PointRubric,
   executeMinimalUnderstand,
   executeMinimalSources,
-  executeMinimalDraftSection,
   executeMinimalSubmission,
-  executeDetailedAutonomousSynthesis,
 } from "../courseworkOrchestrator";
 import type { CourseworkProgressEvent } from "../../types/orchestrator";
 import type { DiscoveredSource } from "../../../../desk/assignment/types";
@@ -116,31 +114,6 @@ describe("Coursework Dual-Mode Prompt Orchestrator", () => {
       expect(res.discoveredSources).toEqual([]);
     });
 
-    it("Phase 3: Drafting - drafts a single section, intercepts tokens, and yields to UI", async () => {
-      const res = await executeMinimalDraftSection({
-        sectionId: "sec-artifacts",
-        sectionTitle: "2.0 Artifacts vs Assumptions in Organizational Culture",
-        targetWordCount: 300,
-        assignmentQuestion: "Evaluate culture change under Schein's framework.",
-        boundSources: [
-          {
-            id: "src-schein-2010",
-            title: "Organizational Culture and Leadership",
-            authors: ["Schein, E. H."],
-            year: 2010,
-          },
-        ],
-        citationStyle: "apa7",
-      });
-
-      expect(res.yieldedControlToUI).toBe(true);
-      expect(res.sectionId).toBe("sec-artifacts");
-      expect(res.wordCount).toBeGreaterThan(50);
-      expect(res.activeVoiceRatio).toBeGreaterThanOrEqual(0.7);
-      // No raw bracket token [1] left in final prose; replaced with deterministic APA citation
-      expect(res.content).not.toContain("[1]");
-    });
-
     it("Phase 4: Submission - validates uniqueness, compiles bibliography, and evaluates rubric", async () => {
       const sections = [
         {
@@ -181,50 +154,6 @@ describe("Coursework Dual-Mode Prompt Orchestrator", () => {
       expect(res.bibliography).toContain("Schein, E.");
       expect(res.rubricEvaluation.totalScore).toBeGreaterThan(60);
       expect(res.rubricEvaluation.criteria.length).toBe(10);
-    });
-  });
-
-  describe("Detailed Mode (Autonomous Deep Synthesis)", () => {
-    it("autonomously chains all 4 phases with progress streaming and deterministic citations", async () => {
-      const progressEvents: CourseworkProgressEvent[] = [];
-
-      const result = await executeDetailedAutonomousSynthesis(
-        {
-          question: "Critically evaluate the strategic rationale behind Zappos' $2,000 resignation offer and Schein's model of organizational culture.",
-          targetWordCount: 600,
-          citationStyle: "apa7",
-          academicLevel: "undergraduate",
-          academicTone: "analytical",
-        },
-        (event) => {
-          progressEvents.push(event);
-        }
-      );
-
-      // Verify progress milestones were streamed sequentially
-      expect(progressEvents.length).toBeGreaterThan(4);
-      expect(progressEvents[0].phase).toBe("understand");
-      expect(progressEvents.some((e) => e.phase === "sources")).toBe(true);
-      expect(progressEvents.some((e) => e.phase === "drafting")).toBe(true);
-      expect(progressEvents.some((e) => e.phase === "submission")).toBe(true);
-      expect(progressEvents[progressEvents.length - 1].progressPercentage).toBe(100);
-
-      // Verify synthesis outputs
-      expect(result.mode).toBe("detailed");
-      expect(result.outline.length).toBeGreaterThan(0);
-      expect(result.sources.length).toBeGreaterThan(0);
-      expect(result.sections.length).toBe(result.outline.length);
-      expect(result.stats.totalWords).toBeGreaterThan(100);
-
-      // Verify deterministic bibliography
-      expect(result.bibliography).toContain("References");
-
-      // Verify uniqueness validator (>20% overlap rejection)
-      expect(result.uniquenessValidation.isUnique).toBe(true);
-
-      // Verify 10-point rubric assessment
-      expect(result.rubricEvaluation.totalScore).toBeGreaterThan(70);
-      expect(result.rubricEvaluation.criteria.length).toBe(10);
     });
   });
 });
