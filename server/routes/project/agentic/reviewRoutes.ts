@@ -1025,6 +1025,10 @@ reviewRoutes.get("/export/rebuttal-letter", async (req: express.Request<{ id: st
     undefined
   );
 
+  if (!rebuttalMatrix || rebuttalMatrix.length === 0) {
+    return res.status(400).json({ error: "Nothing to export yet: build your rebuttal matrix from the reviewers' critiques first." });
+  }
+
   const buffer = await renderRefereeResponseLetterDocx(
     {
       title: project.answers?.["working_title"] || (project as { title?: string }).title || "Academic Manuscript",
@@ -1060,6 +1064,10 @@ reviewRoutes.post("/export/rebuttal-letter", async (req: express.Request<{ id: s
       project.answers?.["rebuttal_matrix"],
       undefined
     );
+
+  if (!rebuttalMatrix || rebuttalMatrix.length === 0) {
+    return res.status(400).json({ error: "Nothing to export yet: build your rebuttal matrix from the reviewers' critiques first." });
+  }
 
   const buffer = await renderRefereeResponseLetterDocx(
     {

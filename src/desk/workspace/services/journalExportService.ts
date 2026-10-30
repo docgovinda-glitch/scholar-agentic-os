@@ -1020,17 +1020,11 @@ export async function exportRefereeLetterToDocx(
     })
   );
 
-  const items = rebuttalMatrix && rebuttalMatrix.length > 0 ? rebuttalMatrix : [
-    {
-      referee: "Methodologist",
-      lens: "Methodology & Benchmark Bounds",
-      section: "2. Methodology",
-      severity: "Major",
-      critique: "The latency bounds require empirical verification against physical decoding hardware.",
-      authorResponse: "We have incorporated empirical FPGA latency data from benchmark run user_data_101 directly verifying sub-microsecond bounds.",
-      revisionAction: "Updated Section 2 with hardware telemetry table and bound proofs.",
-    }
-  ];
+  // Only the author's own rebuttal matrix; never sample reviewer comments.
+  const items = rebuttalMatrix ?? [];
+  if (items.length === 0) {
+    throw new Error("Build your rebuttal matrix from the reviewers' critiques first.");
+  }
 
   items.forEach((item, idx) => {
     children.push(
