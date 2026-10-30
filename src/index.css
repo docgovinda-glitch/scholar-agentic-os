@@ -17,6 +17,9 @@
    ========================================================================= */
 
 @theme {
+  /* No pure black anywhere (B7): Tailwind's black utilities (bg-black,
+     text-black, bg-black/60 overlays) use the ink colour instead. */
+  --color-black: #171717;
   /* Warm, modern geometric sans-serif inspired by Airbnb: Plus Jakarta Sans / Inter */
   --font-sans: "Plus Jakarta Sans", "Inter", "Circular Std", "Circular", "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-serif: var(--font-sans);
@@ -47,7 +50,7 @@
   --bg-sidebar: #F7F5F0;      /* Warm sand */
   --bg-canvas: #F7F5F0;       /* Warm sand */
   --bg-card: #FFFFFF;         /* Pure white for elevated elements */
-  --bg-button-primary: #000000; 
+  --bg-button-primary: #171717; 
   --text-primary: #111111;
   --text-secondary: #52525B;  /* Zinc-600 */
   --text-button: #FFFFFF;
@@ -83,8 +86,8 @@
 
   /* Accent — High contrast Monochrome */
   --accent:          #111111;
-  --accent-hover:    #000000;
-  --accent-solid:    #000000;
+  --accent-hover:    #171717;
+  --accent-solid:    #171717;
   --accent-subtle:   #EFECE6;
   --accent-border:   #111111;
 
@@ -124,7 +127,7 @@
   --bg-sidebar: #F4F4F5;
   --bg-canvas: #FAFAFA;
   --bg-card: #FFFFFF;         /* Pure white for elevated elements */
-  --bg-button-primary: #000000; 
+  --bg-button-primary: #171717; 
   --text-primary: #111111;
   --text-secondary: #52525B;  /* Zinc-600 */
   --text-button: #FFFFFF;
@@ -160,8 +163,8 @@
 
   /* Accent — High contrast Monochrome */
   --accent:          #111111;
-  --accent-hover:    #000000;
-  --accent-solid:    #000000;
+  --accent-hover:    #171717;
+  --accent-solid:    #171717;
   --accent-subtle:   #EFECE6;
   --accent-border:   #111111;
 
@@ -201,7 +204,7 @@
     --bg-button-primary: #FFFFFF; 
     --text-primary: #ECECEC;
     --text-secondary: #9B9B9B;
-    --text-button: #000000;
+    --text-button: #171717;
     --border-subtle: #333333;
     --accent-success: #34D399;  /* Emerald-400 */
     --shadow-card: none;        /* No shadows in dark mode, rely on border/bg-color */
@@ -228,7 +231,7 @@
     --text-primary:    #ECECEC;
     --text-secondary:  #9B9B9B;
     --text-muted:      #8E8E93;
-    --text-inverse:    #000000;
+    --text-inverse:    #171717;
 
     --accent:          #ECECEC;
     --accent-hover:    #FFFFFF;
@@ -267,7 +270,7 @@
   --bg-button-primary: #FFFFFF; 
   --text-primary: #ECECEC;
   --text-secondary: #9B9B9B;
-  --text-button: #000000;
+  --text-button: #171717;
   --border-subtle: #333333;
   --accent-success: #34D399;  /* Emerald-400 */
   --shadow-card: none;        /* No shadows in dark mode, rely on border/bg-color */
@@ -294,7 +297,7 @@
   --text-primary:    #ECECEC;
   --text-secondary:  #9B9B9B;
   --text-muted:      #8E8E93;
-  --text-inverse:    #000000;
+  --text-inverse:    #171717;
 
   --accent:          #ECECEC;
   --accent-hover:    #FFFFFF;
@@ -331,7 +334,7 @@
   --bg-button-primary: #FFFFFF;
   --text-primary: #ECECEC;
   --text-secondary: #9B9B9B;
-  --text-button: #000000;
+  --text-button: #171717;
   --border-subtle: #333333;
   --accent-success: #34D399;
   --shadow-card: none;
@@ -352,7 +355,7 @@
   --text-primary: #ECECEC;
   --text-secondary: #9B9B9B;
   --text-muted: #8E8E93;
-  --text-inverse: #000000;
+  --text-inverse: #171717;
   --accent: #ECECEC;
   --accent-hover: #FFFFFF;
   --accent-solid: #FFFFFF;

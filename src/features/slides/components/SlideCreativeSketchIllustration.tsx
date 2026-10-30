@@ -809,7 +809,7 @@ export default function SlideCreativeSketchIllustration({
           {/* 2D Developer at Dual Monitor Workstation Sketch */}
           <g transform="translate(145, 20)">
             {/* Ultra-wide Monitor */}
-            <rect x="15" y="10" width="70" height="42" rx="3" fill={isDark ? '#000000' : '#1E293B'} stroke={strokeColor} strokeWidth="1.2" />
+            <rect x="15" y="10" width="70" height="42" rx="3" fill={isDark ? '#171717' : '#1E293B'} stroke={strokeColor} strokeWidth="1.2" />
             <rect x="18" y="13" width="64" height="36" rx="1.5" fill={fillBg} />
             {/* Monitor stand */}
             <line x1="50" y1="52" x2="50" y2="65" stroke={strokeColor} strokeWidth="2.5" />
