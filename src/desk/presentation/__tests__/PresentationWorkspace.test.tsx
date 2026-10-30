@@ -5,8 +5,20 @@ import "@testing-library/jest-dom/vitest";
 import React from "react";
 import PresentationWorkspace from "../PresentationWorkspace";
 
+// Signed out by default; individual tests sign in.
+const sessionMock = vi.hoisted(() => ({ value: { status: "signed-out" } as Record<string, unknown> }));
+vi.mock("../../useDeskSession", () => ({ useDeskSession: () => sessionMock.value }));
+const listProjectsMock = vi.hoisted(() => vi.fn());
+vi.mock("../../api/projectsApi", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../api/projectsApi")>()),
+  listProjects: listProjectsMock,
+}));
+
 describe("PresentationWorkspace", () => {
   beforeEach(() => {
+    sessionMock.value = { status: "signed-out" };
+    listProjectsMock.mockReset();
+    listProjectsMock.mockResolvedValue({ items: [] });
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ success: true, mutatedSlide: null }),
@@ -290,6 +302,23 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
     expect(screen.queryByTestId("ask-scholar-drawer")).not.toBeInTheDocument();
   });
 
+  it("sidebar lists the signed-in user's own projects and email, and no demo projects", async () => {
+    sessionMock.value = { status: "signed-in", userId: "u-1", email: "researcher@uni.example" };
+    listProjectsMock.mockResolvedValue({
+      items: [
+        { projectId: "p-1", outputTypeId: "OT-22", title: "Coastal erosion talk", answers: {} },
+        { projectId: "p-2", outputTypeId: "OT-10", answers: { title: "Wetland paper" } },
+      ],
+    });
+    render(<PresentationWorkspace projectId="proj-pres-sidebar" />);
+
+    expect(await screen.findByText("Coastal erosion talk")).toBeInTheDocument();
+    expect(screen.getByText("Wetland paper")).toBeInTheDocument();
+    expect(screen.getByTestId("user-profile-card")).toHaveTextContent("researcher@uni.example");
+    expect(screen.queryByText(/MN6094NI Developing Breakthrough Leadership/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Aaditya|aaditya@scholar\.io/)).not.toBeInTheDocument();
+  });
+
   it("integrates ScholarSidebar with active Presentation Studio pill and collapsible toggle", () => {
     render(<PresentationWorkspace projectId="proj-pres-sidebar" />);
 
@@ -301,7 +330,9 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
     expect(screen.getByRole("button", { name: /Knowledge Vault/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Manage AI Access/i })).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Search projects\.\.\./i)).toBeInTheDocument();
-    expect(screen.getByTestId("user-profile-card")).toBeInTheDocument();
+    // Signed out: no account card and no projects (never someone else's)
+    expect(screen.queryByTestId("user-profile-card")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-no-projects")).toHaveTextContent("No projects yet");
 
     // Presentation Studio item has active highlight
     const presStudioNavBtn = screen.getByRole("button", { name: "Presentation Studio" });
