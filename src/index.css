@@ -20,6 +20,27 @@
   /* No pure black anywhere (B7): Tailwind's black utilities (bg-black,
      text-black, bg-black/60 overlays) use the ink colour instead. */
   --color-black: #171717;
+
+  /* App-chrome palette (B7). Named so components use tokens, not raw hex;
+     values match the colours they replaced. Dark surfaces: ink-950 (deepest)
+     to ink-500. Danger: delete/destructive actions. */
+  --color-ink-950: #121212;
+  --color-ink-900: #151518;
+  --color-ink-850: #171717;
+  --color-ink-800: #18181B;
+  --color-ink-750: #1C1C1E;
+  --color-ink-700: #1E1E20;
+  --color-ink-650: #212121;
+  --color-ink-600: #252528;
+  --color-ink-500: #2C2C2E;
+  --color-paper-cool: #F8F9FA;
+  --color-paper-sand: #F7F5F0;
+  --color-paper-warm: #F8F7F4;
+  --color-paper-zinc: #F4F4F5;
+  --color-danger: #E60023;
+  --color-danger-strong: #AD081B;
+  --color-danger-soft: #FFEBEF;
+  --color-danger-muted: #FFD6DE;
   /* Warm, modern geometric sans-serif inspired by Airbnb: Plus Jakarta Sans / Inter */
   --font-sans: "Plus Jakarta Sans", "Inter", "Circular Std", "Circular", "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-serif: var(--font-sans);

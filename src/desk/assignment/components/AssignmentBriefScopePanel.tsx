@@ -165,7 +165,7 @@ export const AssignmentBriefScopePanel: React.FC<AssignmentBriefScopePanelProps>
   const bodyWords = Math.max(0, (targetWordCount || 2000) - introWords - conclWords);
 
   return (
-    <div className="rounded-2xl bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs p-4 sm:p-5 space-y-4">
+    <div className="rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs p-4 sm:p-5 space-y-4">
       {/* Hidden File Input for Brief Upload */}
       <input
         ref={briefFileInputRef}
@@ -298,7 +298,7 @@ export const AssignmentBriefScopePanel: React.FC<AssignmentBriefScopePanelProps>
               onClick={() => onUpdateAcademicLevel("undergraduate")}
               className={`py-1 text-[11px] font-semibold rounded-md transition-all cursor-pointer ${
                 academicLevel === "undergraduate"
-                  ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs"
+                  ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-2xs"
                   : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"
               }`}
             >
@@ -309,7 +309,7 @@ export const AssignmentBriefScopePanel: React.FC<AssignmentBriefScopePanelProps>
               onClick={() => onUpdateAcademicLevel("postgraduate")}
               className={`py-1 text-[11px] font-semibold rounded-md transition-all cursor-pointer ${
                 academicLevel === "postgraduate"
-                  ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs"
+                  ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-2xs"
                   : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"
               }`}
             >
@@ -328,7 +328,7 @@ export const AssignmentBriefScopePanel: React.FC<AssignmentBriefScopePanelProps>
             value={assignmentType}
             onChange={(e) => onUpdateAssignmentType(e.target.value as AssignmentType)}
             aria-label="Select assignment type"
-            className="w-full py-1 px-2 text-xs rounded-lg bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+            className="w-full py-1 px-2 text-xs rounded-lg bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
           >
             {Object.entries(ASSIGNMENT_TYPE_LABELS).map(([key, label]) => (
               <option key={key} value={key}>
@@ -348,7 +348,7 @@ export const AssignmentBriefScopePanel: React.FC<AssignmentBriefScopePanelProps>
             value={citationStyle}
             onChange={(e) => onUpdateCitationStyle(e.target.value)}
             aria-label="Select citation style"
-            className="w-full py-1 px-2 text-xs rounded-lg bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+            className="w-full py-1 px-2 text-xs rounded-lg bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
           >
             {CITATION_STYLES.map((cs) => (
               <option key={cs.id} value={cs.id}>
@@ -392,7 +392,7 @@ export const AssignmentBriefScopePanel: React.FC<AssignmentBriefScopePanelProps>
                 min={200}
                 max={50000}
                 step={100}
-                className="w-20 px-2 py-0.5 rounded border border-neutral-300 dark:border-white/20 text-xs font-mono bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white"
+                className="w-20 px-2 py-0.5 rounded border border-neutral-300 dark:border-white/20 text-xs font-mono bg-white dark:bg-ink-750 text-neutral-900 dark:text-white"
               />
               <button
                 type="button"
@@ -409,7 +409,7 @@ export const AssignmentBriefScopePanel: React.FC<AssignmentBriefScopePanelProps>
       {/* Rubric Guidance & Command Verbs Modal Drawer */}
       {showRubricModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl p-6 space-y-5">
+          <div className="bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl p-6 space-y-5">
             <div className="flex items-center justify-between border-b border-neutral-200/80 dark:border-white/10 pb-4">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">

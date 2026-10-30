@@ -177,11 +177,11 @@ export default function ScholarAgenticDashboard() {
 
   return (
     // Phase 2: Root Layout (Full-screen flex container persistent shell)
-    <div className="flex h-screen w-full overflow-hidden bg-[#171717] font-sans text-neutral-200 antialiased selection:bg-neutral-100 selection:text-[#171717]">
+    <div className="flex h-screen w-full overflow-hidden bg-ink-850 font-sans text-neutral-200 antialiased selection:bg-neutral-100 selection:text-ink-850">
       
       {/* Left Sidebar Navigation Component */}
       <aside
-        className={`h-full flex flex-col justify-between border-r border-white/10 bg-[#1C1C1E] text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
+        className={`h-full flex flex-col justify-between border-r border-white/10 bg-ink-750 text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
           isLeftSidebarOpen ? "w-[260px]" : "w-0 border-r-0 overflow-hidden"
         }`}
       >
@@ -333,7 +333,7 @@ export default function ScholarAgenticDashboard() {
 
                   {isMenuOpen && (
                     <div
-                      className="absolute right-2 top-8 z-50 w-44 rounded-xl bg-[#1C1C1E] border border-white/10 shadow-xl py-1.5 text-xs text-neutral-300 animate-in fade-in zoom-in-95 duration-100"
+                      className="absolute right-2 top-8 z-50 w-44 rounded-xl bg-ink-750 border border-white/10 shadow-xl py-1.5 text-xs text-neutral-300 animate-in fade-in zoom-in-95 duration-100"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
@@ -383,7 +383,7 @@ export default function ScholarAgenticDashboard() {
         </div>
 
         {/* Bottom User Area */}
-        <div className="p-3 border-t border-white/10 text-xs text-neutral-400 bg-[#1C1C1E] flex items-center justify-between">
+        <div className="p-3 border-t border-white/10 text-xs text-neutral-400 bg-ink-750 flex items-center justify-between">
           <div className="flex items-center gap-2 truncate">
             <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
               S
@@ -394,10 +394,10 @@ export default function ScholarAgenticDashboard() {
       </aside>
 
       {/* Dynamic Central Content (main container strictly controlled by activeView) */}
-      <main className="flex-1 overflow-y-auto relative flex flex-col transition-all duration-300 ease-in-out bg-[#171717] text-neutral-200">
+      <main className="flex-1 overflow-y-auto relative flex flex-col transition-all duration-300 ease-in-out bg-ink-850 text-neutral-200">
         
         {/* Module 3.1: Global Utility Header */}
-        <header className="sticky top-0 z-30 flex items-center justify-between px-8 py-3.5 bg-[#171717]/85 backdrop-blur-md border-b border-white/10">
+        <header className="sticky top-0 z-30 flex items-center justify-between px-8 py-3.5 bg-ink-850/85 backdrop-blur-md border-b border-white/10">
           <div className="flex items-center gap-3">
             {!isLeftSidebarOpen && (
               <button

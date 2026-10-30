@@ -926,7 +926,7 @@ export default function AssignmentSourcesStage({
                 data-testid="view-evidence-vault-btn"
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   activeMainView === "vault"
-                    ? "bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white shadow-xs"
+                    ? "bg-white dark:bg-ink-750 text-neutral-900 dark:text-white shadow-xs"
                     : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
               >
@@ -939,7 +939,7 @@ export default function AssignmentSourcesStage({
                 data-testid="view-ai-analysis-btn"
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   activeMainView === "analysis"
-                    ? "bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white shadow-xs"
+                    ? "bg-white dark:bg-ink-750 text-neutral-900 dark:text-white shadow-xs"
                     : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
               >
@@ -978,7 +978,7 @@ export default function AssignmentSourcesStage({
       {isDiscoveringInitial && allMasterSources.length === 0 ? (
         <div
           data-testid="sources-discovering-state"
-          className="bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-2xl p-8 sm:p-12 shadow-xs dark:shadow-none"
+          className="bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-2xl p-8 sm:p-12 shadow-xs dark:shadow-none"
         >
           <div className="flex flex-col items-center justify-center space-y-4 py-8">
             <div className="relative">
@@ -996,7 +996,7 @@ export default function AssignmentSourcesStage({
       ) : allMasterSources.length === 0 ? (
         <div
           data-testid="sources-empty-state"
-          className="bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-2xl p-8 sm:p-12 shadow-xs dark:shadow-none space-y-6"
+          className="bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-2xl p-8 sm:p-12 shadow-xs dark:shadow-none space-y-6"
         >
           <div className="max-w-xl space-y-2">
             <h2 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">
@@ -1061,7 +1061,7 @@ export default function AssignmentSourcesStage({
       ) : (
         <>
           {/* Section 1: Course Materials & Syllabus Upload (Sleek Collapsible Card) */}
-          <div className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] p-4 transition-all shadow-2xs">
+          <div className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 p-4 transition-all shadow-2xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <span className="p-2.5 rounded-xl bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 shrink-0">
@@ -1150,7 +1150,7 @@ export default function AssignmentSourcesStage({
                   aria-label="Compact Bar View"
                   className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
                     viewMode === "bar"
-                      ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                      ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                       : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                   }`}
                 >
@@ -1164,7 +1164,7 @@ export default function AssignmentSourcesStage({
                   aria-label="Detailed Cards"
                   className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
                     viewMode === "card"
-                      ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                      ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                       : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                   }`}
                 >
@@ -1211,7 +1211,7 @@ export default function AssignmentSourcesStage({
                       }
                     }}
                     placeholder="Ask AI to find specific sources (e.g. 'empirical studies on...', 'counter-arguments to...', '2024–2026 data')"
-                    className="w-full pl-10 pr-4 py-2 rounded-xl text-xs bg-white dark:bg-[#1C1C1E] border border-purple-200 dark:border-purple-900/40 focus:border-purple-500 text-neutral-900 dark:text-white placeholder-neutral-400 outline-none shadow-2xs"
+                    className="w-full pl-10 pr-4 py-2 rounded-xl text-xs bg-white dark:bg-ink-750 border border-purple-200 dark:border-purple-900/40 focus:border-purple-500 text-neutral-900 dark:text-white placeholder-neutral-400 outline-none shadow-2xs"
                   />
                 </div>
                 <button
@@ -1418,7 +1418,7 @@ export default function AssignmentSourcesStage({
                   className={`px-3 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-1.5 transition-colors cursor-pointer ${
                     showAdvancedFilters || activeFilterCount > 0
                       ? "border-neutral-900 dark:border-white bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold"
-                      : "border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-neutral-600 dark:text-neutral-300 hover:border-neutral-300"
+                      : "border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-600 dark:text-neutral-300 hover:border-neutral-300"
                   }`}
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -1435,7 +1435,7 @@ export default function AssignmentSourcesStage({
                   onClick={handleReCurateForPrompt}
                   disabled={isFindingMore}
                   title="Re-curate literature specifically for your active assignment prompt"
-                  className="px-2.5 py-1.5 rounded-xl text-xs font-medium border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-neutral-600 dark:text-neutral-300 hover:border-neutral-300 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-medium border border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-600 dark:text-neutral-300 hover:border-neutral-300 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isFindingMore ? "animate-spin" : ""}`} />
                   <span className="hidden sm:inline">Re-curate</span>
@@ -1445,7 +1445,7 @@ export default function AssignmentSourcesStage({
 
             {/* Expandable Custom Reference Creation Form */}
             {isAddingCustom && (
-              <div className="p-5 rounded-2xl border-2 border-neutral-900 dark:border-white bg-white dark:bg-[#1C1C1E] shadow-md space-y-4 animate-in fade-in duration-150">
+              <div className="p-5 rounded-2xl border-2 border-neutral-900 dark:border-white bg-white dark:bg-ink-750 shadow-md space-y-4 animate-in fade-in duration-150">
                 <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-3">
                   <div className="flex items-center gap-2">
                     <Plus className="w-4 h-4 text-emerald-600" />
@@ -1608,7 +1608,7 @@ export default function AssignmentSourcesStage({
                       aria-label="Source Type"
                       value={selectedType}
                       onChange={(e) => setSelectedType(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
                     >
                       <option value="all">All Source Types</option>
                       <option value="journal">Peer-Reviewed Journals</option>
@@ -1629,7 +1629,7 @@ export default function AssignmentSourcesStage({
                       aria-label="Role in Assignment"
                       value={selectedRole}
                       onChange={(e) => setSelectedRole(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
                     >
                       <option value="all">All Assignment Roles</option>
                       <option value="Empirical evidence">Empirical Evidence</option>
@@ -1651,7 +1651,7 @@ export default function AssignmentSourcesStage({
                       aria-label="Research Methodology"
                       value={selectedMethodology}
                       onChange={(e) => setSelectedMethodology(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
                     >
                       <option value="all">All Methodologies</option>
                       <option value="Empirical Study">Empirical Study</option>
@@ -1675,7 +1675,7 @@ export default function AssignmentSourcesStage({
                       aria-label="Publication Year"
                       value={selectedYearRange}
                       onChange={(e) => setSelectedYearRange(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
                     >
                       <option value="all">All Publication Years</option>
                       <option value="2026">Latest (2026)</option>
@@ -1695,7 +1695,7 @@ export default function AssignmentSourcesStage({
                       aria-label="Sort Order"
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as any)}
-                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white outline-none cursor-pointer"
                     >
                       <option value="relevance">Question Alignment & Recency (Default)</option>
                       <option value="year">Newest First (2026 First)</option>
@@ -1799,7 +1799,7 @@ export default function AssignmentSourcesStage({
                   <button
                     type="button"
                     onClick={handleCopyAllReferences}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-[#1C1C1E] border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-ink-750 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
                   >
                     {copiedAll ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-emerald-600" />}
                     <span>{copiedAll ? "Copied All!" : "Copy Bibliography"}</span>
@@ -1874,7 +1874,7 @@ export default function AssignmentSourcesStage({
                 onClick={handleFindMoreLiterature}
                 disabled={isFindingMore}
                 data-testid="find-more-literature-btn"
-                className="px-6 py-3 rounded-full text-xs font-semibold border border-neutral-300 dark:border-white/20 bg-white dark:bg-[#1C1C1E] text-neutral-800 dark:text-white hover:bg-neutral-50 dark:hover:bg-white/5 hover:border-neutral-400 transition-all cursor-pointer flex items-center gap-2 shadow-xs dark:shadow-none disabled:opacity-50"
+                className="px-6 py-3 rounded-full text-xs font-semibold border border-neutral-300 dark:border-white/20 bg-white dark:bg-ink-750 text-neutral-800 dark:text-white hover:bg-neutral-50 dark:hover:bg-white/5 hover:border-neutral-400 transition-all cursor-pointer flex items-center gap-2 shadow-xs dark:shadow-none disabled:opacity-50"
               >
                 {isFindingMore ? (
                   <>
@@ -1897,7 +1897,7 @@ export default function AssignmentSourcesStage({
       )}
 
       {/* Phase 2 Exit Gate Banner & Actions */}
-      <div className="rounded-2xl p-6 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs dark:shadow-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-5">
+      <div className="rounded-2xl p-6 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs dark:shadow-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-5">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">

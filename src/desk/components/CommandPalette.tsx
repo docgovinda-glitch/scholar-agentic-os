@@ -279,7 +279,7 @@ export function CommandPalette({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl rounded-2xl bg-white dark:bg-[#1E1E22] border border-neutral-200 dark:border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[80vh]"
+        className="w-full max-w-xl rounded-2xl bg-white dark:bg-ink-700 border border-neutral-200 dark:border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[80vh]"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >

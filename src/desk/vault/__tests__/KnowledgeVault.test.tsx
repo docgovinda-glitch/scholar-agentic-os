@@ -185,7 +185,7 @@ describe("KnowledgeVault component", () => {
 
     // Click confirm delete
     const confirmBtn = within(dialog).getByRole("button", { name: "Delete" });
-    expect(confirmBtn).toHaveClass("text-[#E60023]");
+    expect(confirmBtn).toHaveClass("text-danger");
     fireEvent.click(confirmBtn);
 
     await waitFor(() => {

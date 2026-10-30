@@ -56,7 +56,7 @@ export default function LiveSourcesDrawer({
           {sources.map((src, i) => (
             <div
               key={i}
-              className="p-3 rounded-lg bg-white dark:bg-[#18181B] border border-neutral-200/80 dark:border-white/10 shadow-2xs space-y-1.5 transition-all hover:border-sky-300 dark:hover:border-sky-700"
+              className="p-3 rounded-lg bg-white dark:bg-ink-800 border border-neutral-200/80 dark:border-white/10 shadow-2xs space-y-1.5 transition-all hover:border-sky-300 dark:hover:border-sky-700"
               data-testid={`live-source-card-${i}`}
             >
               <div className="flex items-start justify-between gap-2">

@@ -50,7 +50,7 @@ export const CuratedSourceCompactView: React.FC<CuratedSourceCompactViewProps> =
             className={`rounded-xl border transition-all duration-150 p-2.5 sm:px-4 sm:py-2.5 ${
               isApproved
                 ? "border-emerald-500/50 bg-emerald-500/[0.03] dark:border-emerald-500/40 dark:bg-emerald-500/[0.04]"
-                : "border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] hover:border-neutral-300 dark:hover:border-white/20"
+                : "border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 hover:border-neutral-300 dark:hover:border-white/20"
             }`}
           >
             <div className="flex items-center justify-between gap-3">
@@ -169,7 +169,7 @@ export const CuratedSourceCompactView: React.FC<CuratedSourceCompactViewProps> =
                       Extracted Evidence ({source.extractedEvidences.length}):
                     </span>
                     {source.extractedEvidences.map((ev, eIdx) => (
-                      <div key={ev.id || eIdx} className="p-2 rounded bg-white dark:bg-[#1C1C1E] text-xs">
+                      <div key={ev.id || eIdx} className="p-2 rounded bg-white dark:bg-ink-750 text-xs">
                         <span className="font-mono text-[10px] text-blue-600 dark:text-blue-400 font-semibold block mb-0.5">
                           📍 {ev.sourceLocation || `Excerpt ${eIdx + 1}`}
                         </span>

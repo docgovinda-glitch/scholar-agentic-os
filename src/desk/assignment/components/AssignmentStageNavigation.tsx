@@ -92,7 +92,7 @@ export default function AssignmentStageNavigation({
 
   return (
     <nav
-      className={`w-full bg-white dark:bg-[#1C1C1E] border-b border-neutral-200/80 dark:border-white/10 px-4 pt-1 pb-2.5 sm:px-6 flex items-center justify-between gap-4 shrink-0 transition-colors z-10 ${className}`}
+      className={`w-full bg-white dark:bg-ink-750 border-b border-neutral-200/80 dark:border-white/10 px-4 pt-1 pb-2.5 sm:px-6 flex items-center justify-between gap-4 shrink-0 transition-colors z-10 ${className}`}
       aria-label="Assignment Workflow Phases"
     >
       {/* Horizontal Progress Stepper (4 steps in Minimal, 5 steps in Detailed) */}

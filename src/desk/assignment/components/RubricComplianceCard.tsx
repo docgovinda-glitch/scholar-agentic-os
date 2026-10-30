@@ -14,7 +14,7 @@ export function RubricComplianceCard({
 }: RubricComplianceCardProps) {
   if (isLoading) {
     return (
-      <div className="rounded-2xl p-6 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4 animate-pulse">
+      <div className="rounded-2xl p-6 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4 animate-pulse">
         <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-4">
           <div className="h-5 w-44 bg-neutral-200 dark:bg-white/10 rounded" />
           <div className="h-6 w-24 bg-neutral-200 dark:bg-white/10 rounded-full" />
@@ -30,7 +30,7 @@ export function RubricComplianceCard({
 
   if (!report) {
     return (
-      <div className="rounded-2xl p-6 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs text-center space-y-4">
+      <div className="rounded-2xl p-6 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs text-center space-y-4">
         <div className="w-12 h-12 rounded-full bg-neutral-100 dark:bg-white/5 text-neutral-400 dark:text-neutral-500 mx-auto flex items-center justify-center">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -75,7 +75,7 @@ export function RubricComplianceCard({
     : "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20";
 
   return (
-    <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
+    <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
       {/* Header with Predicted Grade & Readiness */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 dark:border-white/5 pb-5">
         <div className="space-y-1">

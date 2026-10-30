@@ -288,7 +288,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
               id="citation-style-select"
               value={citationStyle}
               onChange={(e) => handleStyleChange(e.target.value)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-white/15 bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white outline-none cursor-pointer"
+              className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-white/15 bg-white dark:bg-ink-750 text-neutral-900 dark:text-white outline-none cursor-pointer"
             >
               {CITATION_STYLES.map((style) => (
                 <option key={style.id} value={style.id}>
@@ -314,7 +314,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
       {/* Main Dual-Column Analysis Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Outline Section Selector (lg:col-span-4) */}
-        <div className="lg:col-span-4 rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] p-4 space-y-3 shadow-2xs">
+        <div className="lg:col-span-4 rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 p-4 space-y-3 shadow-2xs">
           <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-2.5">
             <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-neutral-400" />
@@ -367,7 +367,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
           {activeSection ? (
             <div className="space-y-4">
               {/* Active Section Header Card */}
-              <div className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] p-5 shadow-2xs space-y-3">
+              <div className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 p-5 shadow-2xs space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -430,7 +430,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
                     return (
                       <div
                         key={card.id}
-                        className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] p-5 shadow-xs space-y-4 transition-all"
+                        className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 p-5 shadow-xs space-y-4 transition-all"
                       >
                         {/* Card Header: Claim Number & Quick Actions */}
                         <div className="flex items-center justify-between gap-3 border-b border-neutral-100 dark:border-white/5 pb-3">
@@ -662,7 +662,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
       {traceabilityItem && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div
-            className="w-full max-w-lg bg-white dark:bg-[#1C1C1E] border border-neutral-200/90 dark:border-white/15 rounded-2xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+            className="w-full max-w-lg bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/15 rounded-2xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-3">
@@ -757,7 +757,7 @@ export const SectionAnalysisWorkspace: React.FC<SectionAnalysisWorkspaceProps> =
       )}
 
       {/* Phase 2 Bottom Action Bar */}
-      <div className="rounded-2xl p-6 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-5">
+      <div className="rounded-2xl p-6 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-5">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">

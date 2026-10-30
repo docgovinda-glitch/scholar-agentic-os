@@ -38,7 +38,7 @@ export default function AppLayout({
 
   return (
     <div
-      className={`flex h-screen w-full overflow-hidden bg-[#F7F5F0] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200 ${className}`}
+      className={`flex h-screen w-full overflow-hidden bg-paper-sand dark:bg-ink-850 text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200 ${className}`}
       data-testid="app-layout"
     >
       {/* Scholar Core Left Navigation Rail */}

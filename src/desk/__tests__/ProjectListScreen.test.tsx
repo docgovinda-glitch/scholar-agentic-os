@@ -207,7 +207,7 @@ describe("the search bar & delete confirmation modal", () => {
     // Primary action: text "Delete" option in Pinterest red font (#E60023), without any logo/icon
     const confirmDeleteBtn = within(dialog).getByRole("button", { name: "Delete" });
     expect(confirmDeleteBtn).toBeInTheDocument();
-    expect(confirmDeleteBtn).toHaveClass("text-[#E60023]");
+    expect(confirmDeleteBtn).toHaveClass("text-danger");
     expect(confirmDeleteBtn).toHaveTextContent("Delete");
     expect(confirmDeleteBtn.querySelector("svg")).not.toBeInTheDocument();
   });
@@ -628,14 +628,14 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(within(dialog).getByText("Create an account")).toBeInTheDocument();
   });
 
-  it("applies elevated bg-white dark:bg-[#1C1C1E] background, subtle border-neutral-200/90 dark:border-white/10 borders, and high contrast text to workspace template cards", async () => {
+  it("applies elevated bg-white dark:bg-ink-750 background, subtle border-neutral-200/90 dark:border-white/10 borders, and high contrast text to workspace template cards", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     const assignmentHeading = await screen.findByRole("heading", { name: "Coursework & Essays" });
     const assignmentCard = assignmentHeading.closest("button")!;
     expect(assignmentCard.className).toContain("bg-white");
-    expect(assignmentCard.className).toContain("dark:bg-[#1C1C1E]");
+    expect(assignmentCard.className).toContain("dark:bg-ink-750");
     expect(assignmentCard.className).toContain("border-neutral-200/90");
     expect(assignmentCard.className).toContain("dark:border-white/10");
     expect(assignmentHeading.className).toContain("dark:text-white");
@@ -646,7 +646,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     const journalHeading = screen.getByRole("heading", { name: "Journal Article" });
     const journalCard = journalHeading.closest("button")!;
     expect(journalCard.className).toContain("bg-white");
-    expect(journalCard.className).toContain("dark:bg-[#1C1C1E]");
+    expect(journalCard.className).toContain("dark:bg-ink-750");
     expect(journalCard.className).toContain("border-neutral-200/90");
     expect(journalCard.className).toContain("dark:border-white/10");
     expect(journalHeading.className).toContain("dark:text-white");
@@ -657,7 +657,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     const proposalHeading = screen.getByRole("heading", { name: "Research Proposal" });
     const proposalCard = proposalHeading.closest("button")!;
     expect(proposalCard.className).toContain("bg-white");
-    expect(proposalCard.className).toContain("dark:bg-[#1C1C1E]");
+    expect(proposalCard.className).toContain("dark:bg-ink-750");
     expect(proposalCard.className).toContain("border-neutral-200/90");
     expect(proposalCard.className).toContain("dark:border-white/10");
     expect(proposalHeading.className).toContain("dark:text-white");
@@ -668,7 +668,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     const presentationHeading = screen.getByRole("heading", { name: "Slides & Keynotes" });
     const presentationCard = presentationHeading.closest("button")!;
     expect(presentationCard.className).toContain("bg-white");
-    expect(presentationCard.className).toContain("dark:bg-[#1C1C1E]");
+    expect(presentationCard.className).toContain("dark:bg-ink-750");
     expect(presentationCard.className).toContain("border-neutral-200/90");
     expect(presentationCard.className).toContain("dark:border-white/10");
     expect(presentationHeading.className).toContain("dark:text-white");
@@ -683,8 +683,8 @@ describe("landing workspace hero & academic workspace cards", () => {
 
     // 1. Dark mode canvas enforcement
     const mainCanvas = screen.getByRole("main");
-    expect(mainCanvas.className).toContain("bg-[#F8F9FA]");
-    expect(mainCanvas.className).toContain("dark:bg-[#171717]");
+    expect(mainCanvas.className).toContain("bg-paper-cool");
+    expect(mainCanvas.className).toContain("dark:bg-ink-850");
     expect(mainCanvas.className).not.toContain("bg-[var(--bg-canvas)]");
 
     // 2. Shared Container Alignment & Bottom Docking
@@ -707,7 +707,7 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(promptForm.className).toContain("border-neutral-200/90");
     expect(promptForm.className).toContain("dark:border-white/10");
     expect(promptForm.className).toContain("bg-white");
-    expect(promptForm.className).toContain("dark:bg-[#1C1C1E]");
+    expect(promptForm.className).toContain("dark:bg-ink-750");
     expect(promptForm.className).toContain("shadow-sm");
     expect(promptForm.className).not.toContain("shadow-lg");
     expect(promptForm.className).not.toContain("shadow-xl");

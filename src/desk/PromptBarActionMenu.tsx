@@ -57,7 +57,7 @@ export function PromptBarActionMenu({
         <div
           role="menu"
           aria-label="Prompt options menu"
-          className="absolute bottom-full mb-2 left-0 z-50 w-56 p-1.5 rounded-2xl bg-white dark:bg-[#212121] border border-neutral-200 dark:border-white/10 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+          className="absolute bottom-full mb-2 left-0 z-50 w-56 p-1.5 rounded-2xl bg-white dark:bg-ink-650 border border-neutral-200 dark:border-white/10 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
         >
           <button
             type="button"

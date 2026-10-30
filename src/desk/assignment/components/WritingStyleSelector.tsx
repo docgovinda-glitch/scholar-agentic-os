@@ -221,13 +221,13 @@ export default function WritingStyleSelector({
           value={currentPreset}
           onChange={(e) => handleSelect(e.target.value as WritingStylePreset)}
           onFocus={handleFocus}
-          className="w-full max-w-lg bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-3 pr-10 text-sm text-neutral-900 dark:text-neutral-100 shadow-xs dark:shadow-none hover:border-neutral-300 dark:hover:border-white/20 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white appearance-none"
+          className="w-full max-w-lg bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-xl px-4 py-3 pr-10 text-sm text-neutral-900 dark:text-neutral-100 shadow-xs dark:shadow-none hover:border-neutral-300 dark:hover:border-white/20 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white appearance-none"
         >
           {WRITING_STYLE_OPTIONS.map((opt) => (
             <option
               key={opt.id}
               value={opt.id}
-              className="bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-neutral-100 py-1"
+              className="bg-white dark:bg-ink-750 text-neutral-900 dark:text-neutral-100 py-1"
             >
               {opt.title} — {opt.description}
             </option>
@@ -281,7 +281,7 @@ export default function WritingStyleSelector({
                 onChange={(e) => handleTextChange(e.target.value)}
                 rows={5}
                 placeholder="Paste an excerpt from an essay or paper you have previously written. The drafting engine will analyze your syntactic rhythm, transition words, and vocabulary choice..."
-                className="w-full bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-xl p-3 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all resize-y leading-relaxed font-sans"
+                className="w-full bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-xl p-3 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all resize-y leading-relaxed font-sans"
               />
             </div>
 
@@ -305,7 +305,7 @@ export default function WritingStyleSelector({
                 className={`border border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all h-[126px] ${
                   isDragOver
                     ? "border-neutral-900 dark:border-white bg-neutral-100 dark:bg-white/10"
-                    : "border-neutral-300 dark:border-white/15 bg-white dark:bg-[#1C1C1E] hover:border-neutral-400"
+                    : "border-neutral-300 dark:border-white/15 bg-white dark:bg-ink-750 hover:border-neutral-400"
                 }`}
               >
                 {customFileName ? (

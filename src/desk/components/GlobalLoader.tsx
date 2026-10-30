@@ -7,7 +7,7 @@ export default function GlobalLoader({
     <div
       role="status"
       aria-live="polite"
-      className="min-h-[60vh] w-full flex flex-col items-center justify-center p-8 bg-[#171717] text-neutral-400 select-none"
+      className="min-h-[60vh] w-full flex flex-col items-center justify-center p-8 bg-ink-850 text-neutral-400 select-none"
     >
       <div className="w-full max-w-2xl mx-auto space-y-6 animate-pulse">
         {/* Header Skeleton */}
@@ -17,7 +17,7 @@ export default function GlobalLoader({
         </div>
 
         {/* Content Skeleton Card */}
-        <div className="p-6 rounded-2xl bg-[#1C1C1E] border border-white/5 space-y-4">
+        <div className="p-6 rounded-2xl bg-ink-750 border border-white/5 space-y-4">
           <div className="h-4 w-3/4 bg-white/10 rounded-md" />
           <div className="space-y-2">
             <div className="h-3 w-full bg-white/5 rounded-md" />

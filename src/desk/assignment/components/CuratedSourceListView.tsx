@@ -83,7 +83,7 @@ export const CuratedSourceListView: React.FC<CuratedSourceListViewProps> = ({
             className={`p-4 sm:p-5 rounded-2xl border transition-all duration-150 ${
               isApproved
                 ? "border-emerald-500/50 bg-emerald-500/[0.03] dark:border-emerald-500/40 dark:bg-emerald-500/[0.04]"
-                : "border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] hover:border-neutral-300 dark:hover:border-white/20"
+                : "border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 hover:border-neutral-300 dark:hover:border-white/20"
             }`}
           >
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -178,7 +178,7 @@ export const CuratedSourceListView: React.FC<CuratedSourceListViewProps> = ({
                     </div>
                     <div className="space-y-1.5">
                       {evidences.map((ev, eIdx) => (
-                        <div key={ev.id || eIdx} className="p-2.5 rounded-lg bg-white dark:bg-[#1C1C1E] border border-neutral-200/60 dark:border-white/10 text-xs space-y-1">
+                        <div key={ev.id || eIdx} className="p-2.5 rounded-lg bg-white dark:bg-ink-750 border border-neutral-200/60 dark:border-white/10 text-xs space-y-1">
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
                               📍 {ev.sourceLocation || `Excerpt ${eIdx + 1}`}

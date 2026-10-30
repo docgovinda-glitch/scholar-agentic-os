@@ -62,7 +62,7 @@ export function DraftingSectionIndex({
   return (
     <aside
       aria-label="Section Index"
-      className={`flex flex-col bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-xs transition-colors ${className}`}
+      className={`flex flex-col bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-xs transition-colors ${className}`}
     >
       {/* Header & Section Progress */}
       <div className="pb-4 border-b border-neutral-100 dark:border-white/5 space-y-2">
@@ -255,7 +255,7 @@ export function DraftingSectionIndex({
                         setEditingSectionId(null);
                       }
                     }}
-                    className="w-full text-xs font-semibold px-2 py-1 rounded bg-white dark:bg-[#252528] border border-neutral-300 dark:border-white/20 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                    className="w-full text-xs font-semibold px-2 py-1 rounded bg-white dark:bg-ink-600 border border-neutral-300 dark:border-white/20 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
                     autoFocus
                   />
                   <button

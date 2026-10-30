@@ -117,7 +117,7 @@ export default function UserAccountMenu({
           type="button"
           onClick={() => onOpenAuth?.("signin")}
           aria-label="Sign in"
-          className="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl border border-slate-200/80 dark:border-neutral-800 bg-white dark:bg-[#18181A] hover:bg-slate-50 dark:hover:bg-neutral-800 text-[var(--text-primary)] transition-all cursor-pointer text-left shadow-2xs group font-sans"
+          className="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl border border-slate-200/80 dark:border-neutral-800 bg-white dark:bg-ink-800 hover:bg-slate-50 dark:hover:bg-neutral-800 text-[var(--text-primary)] transition-all cursor-pointer text-left shadow-2xs group font-sans"
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="w-7 h-7 rounded-lg bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs">

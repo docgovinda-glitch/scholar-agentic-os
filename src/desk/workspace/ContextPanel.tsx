@@ -422,7 +422,7 @@ export default function ContextPanel({
                       type="button"
                       onClick={() => handleSend(action)}
                       data-testid={`copilot-action-pill-${idx}`}
-                      className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-all text-left text-xs cursor-pointer shadow-2xs dark:shadow-none"
+                      className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-all text-left text-xs cursor-pointer shadow-2xs dark:shadow-none"
                     >
                       <span className="font-medium">{action}</span>
                       <svg className="w-3.5 h-3.5 text-neutral-400 shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -481,7 +481,7 @@ export default function ContextPanel({
                 type="button"
                 onClick={() => handleSend(action)}
                 data-testid={`copilot-chat-chip-${idx}`}
-                className="text-xs px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-all text-left cursor-pointer"
+                className="text-xs px-2.5 py-1 rounded-lg bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-all text-left cursor-pointer"
               >
                 {action}
               </button>

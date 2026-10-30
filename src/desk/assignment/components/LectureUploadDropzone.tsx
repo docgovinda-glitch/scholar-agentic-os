@@ -551,7 +551,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                 <div
                   key={doc.id}
                   data-testid={`uploaded-file-${doc.id}`}
-                  className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] p-4 sm:p-5 shadow-xs transition-all hover:border-neutral-300 dark:hover:border-white/20 space-y-4"
+                  className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 p-4 sm:p-5 shadow-xs transition-all hover:border-neutral-300 dark:hover:border-white/20 space-y-4"
                 >
                   {/* Top Card Identity Bar */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-100 dark:border-white/5">
@@ -745,7 +745,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                           onClick={() => setInspectTab(doc.id, "extracted")}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
                             currentTab === "extracted"
-                              ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
+                              ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-xs font-semibold"
                               : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                           }`}
                         >
@@ -758,7 +758,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                           onClick={() => setInspectTab(doc.id, "used")}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
                             currentTab === "used"
-                              ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
+                              ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-xs font-semibold"
                               : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                           }`}
                         >
@@ -771,7 +771,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
                           onClick={() => setInspectTab(doc.id, "original")}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
                             currentTab === "original"
-                              ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-xs font-semibold"
+                              ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-xs font-semibold"
                               : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                           }`}
                         >
@@ -1055,7 +1055,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
       {/* Web Link Modal */}
       {showUrlModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-md bg-white dark:bg-[#1C1C1E] rounded-3xl p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 text-left">
+          <div className="w-full max-w-md bg-white dark:bg-ink-750 rounded-3xl p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 text-left">
             <div className="flex items-center gap-2 mb-2">
               <Globe className="w-4 h-4 text-sky-500" />
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
@@ -1108,7 +1108,7 @@ export const LectureUploadDropzone: React.FC<LectureUploadDropzoneProps> = ({
       {/* Paste Text Modal */}
       {showTextModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-[#1C1C1E] rounded-3xl p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 text-left">
+          <div className="w-full max-w-lg bg-white dark:bg-ink-750 rounded-3xl p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 text-left">
             <div className="flex items-center gap-2 mb-2">
               <FileCode className="w-4 h-4 text-slate-500" />
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white">

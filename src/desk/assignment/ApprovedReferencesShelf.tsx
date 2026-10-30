@@ -60,7 +60,7 @@ export const ApprovedReferencesShelf: React.FC<ApprovedReferencesShelfProps> = (
     <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center pointer-events-none ${className}`}>
       {/* Expanded Reference Drawer */}
       {isExpanded && (
-        <div className="w-[92vw] max-w-3xl mb-3 bg-white/98 dark:bg-[#1C1C1E]/98 backdrop-blur-xl border border-neutral-200/90 dark:border-white/15 rounded-2xl p-4 shadow-2xl space-y-3 pointer-events-auto animate-in fade-in slide-in-from-bottom-3 duration-200">
+        <div className="w-[92vw] max-w-3xl mb-3 bg-white/98 dark:bg-ink-750/98 backdrop-blur-xl border border-neutral-200/90 dark:border-white/15 rounded-2xl p-4 shadow-2xl space-y-3 pointer-events-auto animate-in fade-in slide-in-from-bottom-3 duration-200">
           <div className="flex items-center justify-between pb-2.5 border-b border-neutral-100 dark:border-white/5">
             <div className="flex items-center gap-2">
               <span className="p-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -131,7 +131,7 @@ export const ApprovedReferencesShelf: React.FC<ApprovedReferencesShelfProps> = (
             setIsExpanded((prev) => !prev);
           }
         }}
-        className="dock-capsule bg-white/95 dark:bg-[#1C1C1E]/95 backdrop-blur-md border border-neutral-200/80 dark:border-white/15 rounded-full px-5 py-2.5 shadow-lg flex items-center gap-4 pointer-events-auto cursor-pointer hover:border-neutral-300 dark:hover:border-white/25 active:scale-[0.99] transition-all select-none"
+        className="dock-capsule bg-white/95 dark:bg-ink-750/95 backdrop-blur-md border border-neutral-200/80 dark:border-white/15 rounded-full px-5 py-2.5 shadow-lg flex items-center gap-4 pointer-events-auto cursor-pointer hover:border-neutral-300 dark:hover:border-white/25 active:scale-[0.99] transition-all select-none"
       >
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />

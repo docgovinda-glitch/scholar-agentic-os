@@ -222,7 +222,7 @@ export function AssignmentSubmissionStage({
 
   const renderCitationCoverage = () => (
     approvedSources.length > 0 ? (
-      <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4">
+      <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <LinkIcon className="w-4 h-4 text-teal-500" />
@@ -275,7 +275,7 @@ export function AssignmentSubmissionStage({
   );
 
   const renderPackagingControls = () => (
-    <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4">
+    <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 dark:border-white/5 pb-4">
         <div className="space-y-1">
           <h3 className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-white">
@@ -307,7 +307,7 @@ export function AssignmentSubmissionStage({
                 value={studentName}
                 onChange={(e) => setStudentName(e.target.value)}
                 placeholder="Candidate Name"
-                className="w-full bg-white dark:bg-[#252528] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
+                className="w-full bg-white dark:bg-ink-600 border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
               />
             </div>
             <div className="space-y-1">
@@ -317,7 +317,7 @@ export function AssignmentSubmissionStage({
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
                 placeholder="e.g. SCH-2026-X01"
-                className="w-full bg-white dark:bg-[#252528] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
+                className="w-full bg-white dark:bg-ink-600 border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
               />
             </div>
             <div className="space-y-1">
@@ -327,7 +327,7 @@ export function AssignmentSubmissionStage({
                 value={courseName}
                 onChange={(e) => setCourseName(e.target.value)}
                 placeholder="e.g. POLI3002 International Security"
-                className="w-full bg-white dark:bg-[#252528] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
+                className="w-full bg-white dark:bg-ink-600 border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
               />
             </div>
             <div className="space-y-1">
@@ -337,7 +337,7 @@ export function AssignmentSubmissionStage({
                 value={institutionName}
                 onChange={(e) => setInstitutionName(e.target.value)}
                 placeholder="e.g. University Faculty"
-                className="w-full bg-white dark:bg-[#252528] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
+                className="w-full bg-white dark:bg-ink-600 border border-neutral-200/80 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-900 dark:text-white"
               />
             </div>
           </div>
@@ -417,7 +417,7 @@ export function AssignmentSubmissionStage({
       </div>
 
       {/* Phase 4 Header / Overview Bar */}
-      <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
+      <div className="rounded-2xl p-6 sm:p-7 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-100 dark:border-white/5 pb-5">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
