@@ -108,3 +108,17 @@ To change a limit:
 - `PRODUCT_AUDIT.md`: product findings (P0/P1) and their fix PRs.
 - `ROTATION_RUNBOOK.md`: credential rotation, including the agent's own credentials (§7).
 - `CHANGELOG.md`: user-visible changes.
+
+## 9. Tests
+
+| What | Command | Where it runs |
+| :--- | :--- | :--- |
+| Typecheck, contrast, CSP hash, no pure black, no raw hex classes | `npm run lint` | pre-commit, CI |
+| Unit and route tests | `npm test` (or `npx vitest run <file>`) | CI (`ci.yml`) |
+| Build with chunk budget (< 500 kB per chunk) | `npm run build` | CI |
+| End-to-end (Playwright) on a local Supabase, with a stand-in AI | see `e2e/README.md` | CI (`e2e.yml`) on every PR |
+| Credit ledger checks on a real database | `psql "$DB_URL" -f scripts/db/test-credits.sql` (local only) | CI (`e2e.yml`) |
+| Production smoke suite (35 checks, uses two test accounts) | `scripts/smoke-prod.sh` | by hand after a deploy, or in `deploy.yml` when the `SMOKE_*` secrets exist |
+
+The end-to-end suite covers sign-in, project privacy, each workspace (open, save, reload, no demo data, AI drafting with and without the user's AI), Journal versions and export, the Presentation studio, accessibility (axe, WCAG 2.1 A/AA) at 375/768/1280 px and keyboard focus.
+

@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Journal review, editor and export** (#109–#112). Peer review no longer saves canned referee critiques or pre-written "addressed" responses. Titles, drafts, previews and exports no longer fall back to demo manuscripts with invented results, a default journal ("Nature Machine Intelligence") or checks marked passed without data. The sub-section drafter reports an AI failure instead of writing template prose that cited the user's real sources for invented findings.
 - **Presentations** (#108, #113–#115). The audience Q&A starts empty, with no invented questions. The slide copilot uses only the slide's own text and the figure the user types. **Applying a theme now changes only the look**: before, it replaced the deck with five template slides with invented metrics and dropped any slide after the fifth. Swiss Editorial is a theme only, not a sample bird-survey deck.
 - **Coursework drafting uses your AI** (#130). The Drafting stage never sent your AI settings, so every section was written by a template generator, padded with a repeated filler sentence and shown as if streamed by the AI. Sections now come from your AI (or the browser hand-off); if it is not connected or fails, the stage says why and leaves the section as it was.
+- **Journal re-drafting works** (#132). Drafting the manuscript a second time failed on a duplicate-section error; the previous draft is now kept as a version.
+- **Old template generators removed** (#137). Unused code that could write template essays (including a hard-coded Zappos/Schein essay) is gone.
 - **Landing page** (#115). The demo is labelled as an illustration with fictional sources. "Verified to the standard of Nature" and "100% cryptographic citation provenance" are replaced with what the app does.
 
 ### AI access
@@ -23,11 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The AI Access page says which features Premium covers (#96).
 - A local model (Ollama, LM Studio, …) is never called from the deployed server, which cannot reach the user's computer (#106). Journal stages and Ask Scholar, and since #116 Thesis, Proposal and Presentation, run the prompt in the browser instead, with a signed challenge (for #116 routes, bound to the exact prompt). Remaining server-only features say plainly that they need a cloud key.
 - Premium requests can be approved or declined only while pending, and only once; withdrawing with nothing pending says so (#126). Admin-entered platform keys are stored encrypted with the existing master key and never shown again (#127).
+- Credit balances can't be changed by a zero or negative amount, enforced in the database (#136).
 - Internal: one parser for AI request headers (#95), one Premium pipeline (#98), typed AI errors, and an AI call map (`docs/AI-CALL-MAP.md`, #94).
 
 ### Interface & accessibility
 - Presentation Studio's sidebar lists your own projects and your own account (it showed four sample projects and a sample profile to everyone) (#121).
 - Phones: the navigation starts closed and the studio header no longer overlaps (#121, #122).
+- Accessibility checks now cover the signed-in screens and all four workspaces at phone and desktop widths. Fixes: labelled Thesis fields, named icon buttons, accent buttons readable in dark mode, stronger dark-mode muted text, workspace headers that fit a phone (#134).
+- Every control reached with Tab shows a visible focus ring; the prompt box's card rings while it has focus (#135).
+- If projects, the vault or subscription details fail to load, the screen says so and offers Try again instead of looking empty (#135).
+- Colours in the app's own screens come from named tokens, not raw hex (#133).
 - No pure black anywhere; dark surfaces use the ink colour #171717 (#120).
 - Faster loads: the spreadsheet reader no longer ships a 918 kB library; every download chunk is under 500 kB (#119).
 - Accessibility checks (WCAG 2.1 A/AA) run on the public pages at phone, tablet and desktop widths on every change (#121).
