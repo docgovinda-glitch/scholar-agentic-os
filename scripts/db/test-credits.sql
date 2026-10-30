@@ -48,6 +48,23 @@ begin
 end;
 $$;
 
+-- Zero and negative amounts are refused (P1-11).
+do $$
+declare
+  u uuid := gen_random_uuid();
+  refused int := 0;
+begin
+  insert into auth.users (id, email) values (u, 'credits-neg-' || u || '@example.test');
+  begin perform public.grant_credits(u, -5, 'admin_grant', null); exception when invalid_parameter_value then refused := refused + 1; end;
+  begin perform public.grant_credits(u, 0, 'admin_grant', null); exception when invalid_parameter_value then refused := refused + 1; end;
+  begin perform public.deduct_credits(u, -5, null, null, 'usage', gen_random_uuid(), null, null); exception when invalid_parameter_value then refused := refused + 1; end;
+  if refused <> 3 then raise exception 'expected 3 refused calls, got %', refused; end if;
+  perform 1 from public.credit_ledger where user_id = u;
+  if found then raise exception 'refused calls must not write the ledger'; end if;
+  raise notice 'credits: zero/negative amounts refused';
+end;
+$$;
+
 -- Only the service role may move credits.
 do $$
 begin
