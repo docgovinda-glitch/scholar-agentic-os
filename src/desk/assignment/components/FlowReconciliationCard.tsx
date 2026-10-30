@@ -20,7 +20,7 @@ export function FlowReconciliationCard({ audit, onReRunAudit, isAuditing }: Flow
   const isOptimal = audit.score >= 90;
 
   return (
-    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/80 dark:border-white/10 shadow-xs overflow-hidden flex flex-col h-full">
+    <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 shadow-xs overflow-hidden flex flex-col h-full">
       <div className="px-5 py-4 border-b border-neutral-100 dark:border-white/5 flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${hasIssues ? "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400" : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"}`}>
@@ -79,7 +79,7 @@ export function FlowReconciliationCard({ audit, onReRunAudit, isAuditing }: Flow
         )}
       </div>
 
-      <div className="p-4 border-t border-neutral-100 dark:border-white/5 bg-white dark:bg-[#1C1C1E]">
+      <div className="p-4 border-t border-neutral-100 dark:border-white/5 bg-white dark:bg-ink-750">
         <button
           type="button"
           onClick={onReRunAudit}

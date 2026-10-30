@@ -330,10 +330,10 @@ export default function PresentationWorkspace({
   if (deck === null) {
     return (
       <div
-        className="min-h-screen bg-[#F8F7F4] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 p-6 flex flex-col justify-center items-center"
+        className="min-h-screen bg-paper-warm dark:bg-ink-850 text-neutral-900 dark:text-neutral-100 p-6 flex flex-col justify-center items-center"
         data-testid="slide-card-empty-state"
       >
-        <div className="max-w-xl w-full bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl border border-neutral-200/80 dark:border-white/10 shadow-xl space-y-6 text-center">
+        <div className="max-w-xl w-full bg-white dark:bg-ink-750 p-8 rounded-3xl border border-neutral-200/80 dark:border-white/10 shadow-xl space-y-6 text-center">
           <div className="text-4xl">📄</div>
           <div className="space-y-1">
             <h2 className="text-xl font-bold">No Coursework Content Loaded</h2>
@@ -394,7 +394,7 @@ export default function PresentationWorkspace({
 
   return (
     <div
-      className="flex h-screen w-full overflow-hidden bg-[#F8F7F4] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200"
+      className="flex h-screen w-full overflow-hidden bg-paper-warm dark:bg-ink-850 text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200"
       data-testid="presentation-workspace"
     >
       {/* Left Sidebar Shell */}
@@ -495,7 +495,7 @@ export default function PresentationWorkspace({
 
       {/* Right Collapsible Ask Scholar Drawer */}
       {isAskScholarOpen && (
-        <aside className="w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] flex flex-col h-full shadow-lg z-20 transition-all duration-300">
+        <aside className="w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 flex flex-col h-full shadow-lg z-20 transition-all duration-300">
           <AskScholarPresentationDrawer
             deck={deck}
             onUpdateDeck={handleUpdateDeck}

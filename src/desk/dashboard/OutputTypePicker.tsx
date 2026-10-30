@@ -67,7 +67,7 @@ export function ChooseOutputType({
     <div className="max-w-6xl mx-auto py-6 animate-fade-in font-sans">
       <button
         onClick={onCancel}
-        className="mb-8 inline-flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-all px-4 py-2 rounded-full bg-neutral-100 dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 shadow-sm cursor-pointer font-sans"
+        className="mb-8 inline-flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-all px-4 py-2 rounded-full bg-neutral-100 dark:bg-ink-750 border border-neutral-200 dark:border-white/10 shadow-sm cursor-pointer font-sans"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -82,7 +82,7 @@ export function ChooseOutputType({
       </div>
 
       {!types ? (
-        <div className="flex items-center justify-center py-20 border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-[#1C1C1E] rounded-2xl shadow-sm">
+        <div className="flex items-center justify-center py-20 border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-ink-750 rounded-2xl shadow-sm">
           <div className="w-8 h-8 border-2 border-neutral-400 dark:border-white/40 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (

@@ -1268,7 +1268,7 @@ export default function ProjectListScreen({
   }
 
   return (
-    <div className="h-screen w-full flex overflow-hidden bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-white font-sans selection:bg-neutral-100 selection:text-[#171717]">
+    <div className="h-screen w-full flex overflow-hidden bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-white font-sans selection:bg-neutral-100 selection:text-ink-850">
       {/* Mobile Backdrop Overlay */}
       {mobileMenuOpen && (
         <div
@@ -1280,7 +1280,7 @@ export default function ProjectListScreen({
 
       {/* Left Sidebar (Navigation Pane) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
           mobileMenuOpen
             ? "translate-x-0 w-[260px] shadow-2xl"
             : "-translate-x-full md:translate-x-0 " + (isSidebarOpen ? "w-[260px]" : "w-0 border-r-0 overflow-hidden")
@@ -1546,7 +1546,7 @@ export default function ProjectListScreen({
                           ref={recentMenuRef}
                           className={`absolute ${
                             isNearBottom ? "bottom-full mb-1" : "top-full mt-1"
-                          } right-0 z-50 shadow-xl rounded-xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 p-1 min-w-[180px] animate-in fade-in duration-150 text-neutral-700 dark:text-neutral-300`}
+                          } right-0 z-50 shadow-xl rounded-xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 p-1 min-w-[180px] animate-in fade-in duration-150 text-neutral-700 dark:text-neutral-300`}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button
@@ -1600,7 +1600,7 @@ export default function ProjectListScreen({
         </div>
 
         {/* Bottom Section */}
-        <div className="flex-shrink-0 p-3 border-t border-neutral-200 dark:border-white/10 flex flex-col justify-between gap-2 w-[260px] bg-white dark:bg-[#1C1C1E] h-[114px]">
+        <div className="flex-shrink-0 p-3 border-t border-neutral-200 dark:border-white/10 flex flex-col justify-between gap-2 w-[260px] bg-white dark:bg-ink-750 h-[114px]">
           {/* Action Row: Settings Navigation Item + Minimal Icon-Only Theme Toggle */}
           <div className="flex items-center justify-between gap-1.5">
             {onOpenAccountSettings && (
@@ -1656,10 +1656,10 @@ export default function ProjectListScreen({
       <main className={`${
         isLandingPage && isAiSidebarOpen
           ? "hidden"
-          : "flex-1 flex flex-col h-screen w-full bg-[#F8F9FA] dark:bg-[#171717] overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out"
+          : "flex-1 flex flex-col h-screen w-full bg-paper-cool dark:bg-ink-850 overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out"
       }`}>
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
-        <div className="apple-glass-header sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-[#F8F9FA]/85 dark:bg-[#171717]/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
+        <div className="apple-glass-header sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-paper-cool/85 dark:bg-ink-850/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
           <div className="flex items-center gap-3">
             {/* Mobile Drawer Trigger Button */}
             <button
@@ -1779,7 +1779,7 @@ export default function ProjectListScreen({
                 {welcomeVisible && (
                   <div
                     role="status"
-                    className="w-full rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] p-5 flex items-start justify-between gap-4 shadow-sm"
+                    className="w-full rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 p-5 flex items-start justify-between gap-4 shadow-sm"
                   >
                     <div className="flex items-start gap-4">
                       <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-gray-100 text-neutral-900 dark:text-gray-900 flex items-center justify-center flex-shrink-0 shadow-xs">
@@ -1845,7 +1845,7 @@ export default function ProjectListScreen({
                                 handleCreate(tile.id);
                               }}
                               disabled={isOtherBooting}
-                              className={`apple-card group bg-white dark:bg-[#1C1C1E] border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
+                              className={`apple-card group bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
                                 isOtherBooting
                                   ? "opacity-50 cursor-not-allowed"
                                   : isBootingThis
@@ -1922,7 +1922,7 @@ export default function ProjectListScreen({
             </div>
 
             {/* Main AI Prompt Bar — Parallel to the line above settings */}
-            <div className="sticky bottom-0 z-20 w-full relative pointer-events-none flex flex-col justify-start bg-gradient-to-t from-[#F8F9FA] dark:from-[#171717] via-[#F8F9FA]/95 dark:via-[#171717]/95 to-transparent px-4 pb-3">
+            <div className="sticky bottom-0 z-20 w-full relative pointer-events-none flex flex-col justify-start bg-gradient-to-t from-paper-cool dark:from-ink-850 via-paper-cool/95 dark:via-ink-850/95 to-transparent px-4 pb-3">
               <div className="w-full max-w-4xl mx-auto relative pointer-events-auto flex flex-col items-center">
                 {/* Contextual Clarification when Ask Scholar is Open */}
                 {isAiSidebarOpen && (
@@ -1961,7 +1961,7 @@ export default function ProjectListScreen({
                       addMainFiles(Array.from(e.dataTransfer.files));
                     }
                   }}
-                  className={`pointer-events-auto flex flex-col justify-between w-full rounded-2xl bg-white dark:bg-[#1C1C1E] border border-neutral-200/90 dark:border-white/10 shadow-sm focus-within:border-neutral-400 dark:focus-within:border-white/20 p-3 transition-all duration-200 ${
+                  className={`pointer-events-auto flex flex-col justify-between w-full rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 shadow-sm focus-within:border-neutral-400 dark:focus-within:border-white/20 p-3 transition-all duration-200 ${
                     isDragging
                       ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10 dark:bg-blue-950/20"
                       : ""
@@ -2092,7 +2092,7 @@ export default function ProjectListScreen({
             ? { width: `min(${aiSidebarWidth}px, 100vw)` }
             : undefined
         }
-        className={`h-full bg-white dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 flex flex-col relative transition-all duration-300 ease-in-out ${
+        className={`h-full bg-white dark:bg-ink-800 text-neutral-800 dark:text-neutral-200 flex flex-col relative transition-all duration-300 ease-in-out ${
           isAiSidebarOpen
             ? isLandingPage
               ? "flex-1 w-full min-w-0 border-none shadow-none z-20 translate-x-0"
@@ -2120,7 +2120,7 @@ export default function ProjectListScreen({
         {isAiSidebarOpen && (
           <div className="h-full flex flex-col w-full">
             {/* Sidebar Header with glassmorphism & elevated badge */}
-            <header className="px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/95 dark:bg-[#18181B]/95 backdrop-blur-md sticky top-0 z-20">
+            <header className="px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/95 dark:bg-ink-800/95 backdrop-blur-md sticky top-0 z-20">
               <div className="flex items-center gap-3">
                 {isLandingPage && (
                   <>
@@ -2156,7 +2156,7 @@ export default function ProjectListScreen({
                   <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500/10 via-indigo-500/10 to-purple-500/10 dark:from-sky-500/20 dark:via-indigo-500/20 dark:to-purple-500/20 border border-sky-500/20 dark:border-white/10 flex items-center justify-center shadow-2xs">
                     <ScholarCoreLogo size="sm" withText={false} className="scale-85" />
                   </div>
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-[#18181B]" title="AI Online" />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-ink-800" title="AI Online" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -2251,7 +2251,7 @@ export default function ProjectListScreen({
             </header>
 
             {/* Horizontally Scrolling Suggested Questions (Module 3.3) */}
-            <div className="relative border-b border-neutral-200/80 dark:border-white/10 shrink-0 bg-neutral-50/70 dark:bg-[#151518]/70">
+            <div className="relative border-b border-neutral-200/80 dark:border-white/10 shrink-0 bg-neutral-50/70 dark:bg-ink-900/70">
               <div className={`overflow-x-auto scrollbar-hide flex items-center gap-2 px-4 py-2.5 ${isLandingPage ? "max-w-4xl mx-auto" : ""}`}>
                 {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
                   <button
@@ -2319,7 +2319,7 @@ export default function ProjectListScreen({
                               handleCreate(tile.id);
                             }}
                             disabled={isOtherBooting}
-                            className={`group bg-white dark:bg-[#1C1C1E] border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
+                            className={`group bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
                               isOtherBooting
                                 ? "opacity-50 cursor-not-allowed"
                                 : isBootingThis
@@ -2894,7 +2894,7 @@ export default function ProjectListScreen({
             </div>
 
             {/* Pinned Floating Input Component (Module 3.4) */}
-            <div className="p-3.5 bg-white/95 dark:bg-[#18181B]/95 backdrop-blur-md border-t border-neutral-200/80 dark:border-white/10 shrink-0">
+            <div className="p-3.5 bg-white/95 dark:bg-ink-800/95 backdrop-blur-md border-t border-neutral-200/80 dark:border-white/10 shrink-0">
               <div className={isLandingPage ? "w-full max-w-4xl mx-auto" : "w-full"}>
               {/* Status & Reset Bar */}
               <div className="flex items-center justify-between px-1 mb-2">
@@ -2990,7 +2990,7 @@ export default function ProjectListScreen({
                   e.preventDefault();
                   handleSendGuideMessage();
                 }}
-                className="relative flex flex-col rounded-2xl bg-neutral-100/90 dark:bg-white/[0.06] p-2.5 shadow-xs border border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 focus-within:bg-white dark:focus-within:bg-[#1E1E20] focus-within:shadow-md transition-all"
+                className="relative flex flex-col rounded-2xl bg-neutral-100/90 dark:bg-white/[0.06] p-2.5 shadow-xs border border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 focus-within:bg-white dark:focus-within:bg-ink-700 focus-within:shadow-md transition-all"
               >
                 <div className="w-full px-1">
                   <textarea
@@ -3088,7 +3088,7 @@ export default function ProjectListScreen({
           onClick={() => !deletingId && setProjectToDelete(null)}
         >
           <div
-            className="w-full max-w-md rounded-3xl bg-white dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 p-7 shadow-2xl relative text-left animate-in zoom-in-95 duration-150"
+            className="w-full max-w-md rounded-3xl bg-white dark:bg-ink-750 border border-neutral-200 dark:border-white/10 p-7 shadow-2xl relative text-left animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Title */}
@@ -3116,11 +3116,11 @@ export default function ProjectListScreen({
                 type="button"
                 disabled={deletingId !== null}
                 onClick={handleConfirmDelete}
-                className="px-5 py-2.5 rounded-full text-sm font-bold text-[#E60023] hover:text-[#AD081B] bg-[#E60023]/15 hover:bg-[#E60023]/25 transition-all cursor-pointer disabled:opacity-50 font-sans flex items-center justify-center"
+                className="px-5 py-2.5 rounded-full text-sm font-bold text-danger hover:text-danger-strong bg-danger/15 hover:bg-danger/25 transition-all cursor-pointer disabled:opacity-50 font-sans flex items-center justify-center"
               >
                 {deletingId ? (
                   <>
-                    <span className="w-3.5 h-3.5 border-2 border-[#E60023] border-t-transparent rounded-full animate-spin mr-2" />
+                    <span className="w-3.5 h-3.5 border-2 border-danger border-t-transparent rounded-full animate-spin mr-2" />
                     <span>Deleting...</span>
                   </>
                 ) : (

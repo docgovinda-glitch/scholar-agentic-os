@@ -76,8 +76,8 @@ export default class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-[color:var(--surface-canvas,#F7F5F0)] dark:bg-[#121212] px-4 py-12 text-slate-900 dark:text-slate-100 font-sans">
-          <div className="max-w-md w-full bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-neutral-800 rounded-3xl p-8 shadow-xl text-center flex flex-col items-center">
+        <div className="min-h-screen flex items-center justify-center bg-[color:var(--surface-canvas,#F7F5F0)] dark:bg-ink-950 px-4 py-12 text-slate-900 dark:text-slate-100 font-sans">
+          <div className="max-w-md w-full bg-white dark:bg-ink-750 border border-slate-200 dark:border-neutral-800 rounded-3xl p-8 shadow-xl text-center flex flex-col items-center">
             <div className="w-12 h-12 rounded-2xl bg-slate-900 dark:bg-white flex items-center justify-center mb-6 shadow-sm">
               <ScholarCoreLogo size="md" className="text-white dark:text-slate-900" />
             </div>

@@ -330,7 +330,7 @@ export function AssignmentDraftingStage({
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 text-neutral-900 dark:text-neutral-100">
       {/* Top Phase Header with Live Word Count Progress Bar */}
-      <header className="rounded-2xl p-6 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4">
+      <header className="rounded-2xl p-6 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -364,7 +364,7 @@ export function AssignmentDraftingStage({
                 }
               }}
               aria-label="Present Presentation"
-              className="rounded-full px-4 py-1.5 text-sm font-medium border border-neutral-200/80 bg-white hover:bg-neutral-50 text-neutral-900 dark:border-white/10 dark:bg-[#1C1C1E] dark:hover:bg-neutral-800 dark:text-neutral-100 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+              className="rounded-full px-4 py-1.5 text-sm font-medium border border-neutral-200/80 bg-white hover:bg-neutral-50 text-neutral-900 dark:border-white/10 dark:bg-ink-750 dark:hover:bg-neutral-800 dark:text-neutral-100 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
               <span>📽️</span>
               <span>Present Presentation</span>
@@ -569,7 +569,7 @@ export function AssignmentDraftingStage({
 
           {/* Live Bibliography Section */}
           {approvedSources.length > 0 && (
-            <div className="mt-6 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs overflow-hidden">
+            <div className="mt-6 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs overflow-hidden">
               <div className="px-5 py-3 border-b border-neutral-100 dark:border-white/5 flex items-center gap-2 bg-neutral-50/50 dark:bg-white/[0.02]">
                 <Book className="w-4 h-4 text-emerald-500" />
                 <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Live Bibliography</h3>
@@ -585,7 +585,7 @@ export function AssignmentDraftingStage({
       </div>
 
       {/* Phase 3 Exit Gate Bottom Card */}
-      <footer className="rounded-2xl p-5 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <footer className="rounded-2xl p-5 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <button
           type="button"
           onClick={handleBack}
@@ -643,7 +643,7 @@ export function AssignmentDraftingStage({
       {/* Fullscreen Presentation Overlay */}
       {(showPresentation || showKeynote) && (presentationDeck || keynoteDeck) && (
         <div
-          className="fixed inset-0 z-50 bg-[#F7F5F0] dark:bg-[#171717] overflow-auto flex flex-col justify-center animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 bg-paper-sand dark:bg-ink-850 overflow-auto flex flex-col justify-center animate-in fade-in duration-200"
           data-testid="drafting-keynote-overlay"
         >
           <SlideCanvas

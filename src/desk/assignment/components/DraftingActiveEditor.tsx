@@ -233,7 +233,7 @@ export function DraftingActiveEditor({
 
   if (!section) {
     return (
-      <div className="flex-1 flex items-center justify-center p-12 text-center bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-2xl shadow-xs">
+      <div className="flex-1 flex items-center justify-center p-12 text-center bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-2xl shadow-xs">
         <div className="space-y-2 max-w-sm">
           <FileText className="w-8 h-8 text-neutral-400 mx-auto" />
           <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
@@ -410,7 +410,7 @@ export function DraftingActiveEditor({
 
   if (isZenMode) {
     return (
-      <div className="fixed inset-0 z-50 bg-white dark:bg-[#1C1C1E] flex flex-col items-center py-12 overflow-y-auto animate-in fade-in duration-300">
+      <div className="fixed inset-0 z-50 bg-white dark:bg-ink-750 flex flex-col items-center py-12 overflow-y-auto animate-in fade-in duration-300">
         <div className="w-full max-w-3xl px-6">
           <div className="flex items-center justify-between mb-8 text-neutral-400">
             <h2 className="text-sm font-medium tracking-wide">FOCUS MODE</h2>
@@ -484,7 +484,7 @@ export function DraftingActiveEditor({
   return (
     <article
       aria-label="Active Section Editor"
-      className={`flex flex-col bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-2xl shadow-xs overflow-hidden transition-colors ${className}`}
+      className={`flex flex-col bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-2xl shadow-xs overflow-hidden transition-colors ${className}`}
     >
       {/* Header Bar */}
       <header className="px-5 py-4 border-b border-neutral-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-neutral-50/50 dark:bg-white/[0.02]">
@@ -524,7 +524,7 @@ export function DraftingActiveEditor({
                 type="text"
                 value={titleInput}
                 onChange={(e) => setTitleInput(e.target.value)}
-                className="text-sm sm:text-base font-semibold px-2 py-0.5 rounded bg-white dark:bg-[#252528] border border-neutral-300 dark:border-white/20 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                className="text-sm sm:text-base font-semibold px-2 py-0.5 rounded bg-white dark:bg-ink-600 border border-neutral-300 dark:border-white/20 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
                 autoFocus
               />
               <button
@@ -746,7 +746,7 @@ export function DraftingActiveEditor({
       )}
 
       {/* Inline Section Action Controls Toolbar */}
-      <div className="px-5 py-2.5 border-b border-neutral-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-[#1C1C1E]">
+      <div className="px-5 py-2.5 border-b border-neutral-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-ink-750">
         <div className="flex items-center gap-1.5 flex-wrap">
           {/* Deepen Analysis */}
           <button
@@ -862,7 +862,7 @@ export function DraftingActiveEditor({
                 }
               }}
               placeholder="Guide AI for this section... (e.g. 'Contrast with empirical studies from 2023', 'Emphasize policy implications', 'Add critical counter-argument')"
-              className="w-full pl-8 pr-20 py-1.5 text-xs bg-white dark:bg-[#252528] border border-neutral-200/80 dark:border-white/10 rounded-xl text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all shadow-2xs font-sans"
+              className="w-full pl-8 pr-20 py-1.5 text-xs bg-white dark:bg-ink-600 border border-neutral-200/80 dark:border-white/10 rounded-xl text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all shadow-2xs font-sans"
             />
             <button
               type="button"
@@ -899,7 +899,7 @@ export function DraftingActiveEditor({
                 setCustomDirective(chip.prompt);
                 onStreamSection?.(chip.prompt);
               }}
-              className="px-2 py-0.5 rounded-md bg-white dark:bg-[#252528] border border-neutral-200/70 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-300 dark:border-white/20 transition-all shrink-0 cursor-pointer disabled:opacity-40"
+              className="px-2 py-0.5 rounded-md bg-white dark:bg-ink-600 border border-neutral-200/70 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-300 dark:border-white/20 transition-all shrink-0 cursor-pointer disabled:opacity-40"
             >
               + {chip.label}
             </button>
@@ -992,7 +992,7 @@ export function DraftingActiveEditor({
                 </button>
 
                 {showCitationDropdown && (
-                  <div className="absolute right-0 mt-1 w-72 max-h-56 overflow-y-auto rounded-xl bg-white dark:bg-[#222225] border border-neutral-200 dark:border-white/15 shadow-xl z-30 p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="absolute right-0 mt-1 w-72 max-h-56 overflow-y-auto rounded-xl bg-white dark:bg-ink-650 border border-neutral-200 dark:border-white/15 shadow-xl z-30 p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
                     <div className="px-2 py-1 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
                       Select Source to Cite:
                     </div>
@@ -1046,7 +1046,7 @@ export function DraftingActiveEditor({
 
             {/* Tone Enhancer Diff Overlay */}
             {toneEnhancement && (
-              <div className="absolute inset-x-4 bottom-4 p-4 rounded-xl bg-white dark:bg-[#2A2A2C] border border-indigo-200 dark:border-indigo-900/50 shadow-2xl z-20 animate-in slide-in-from-bottom-4">
+              <div className="absolute inset-x-4 bottom-4 p-4 rounded-xl bg-white dark:bg-ink-500 border border-indigo-200 dark:border-indigo-900/50 shadow-2xl z-20 animate-in slide-in-from-bottom-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-semibold text-sm">
                     <Sparkles className="w-4 h-4" />
@@ -1057,7 +1057,7 @@ export function DraftingActiveEditor({
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="p-3 rounded-lg bg-neutral-50 dark:bg-[#1C1C1E] border border-neutral-200 dark:border-white/10 text-sm line-through opacity-70">
+                  <div className="p-3 rounded-lg bg-neutral-50 dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-sm line-through opacity-70">
                     {toneEnhancement.original}
                   </div>
                   <div className="p-3 rounded-lg bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/30 text-sm text-indigo-900 dark:text-indigo-100">

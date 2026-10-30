@@ -27,7 +27,7 @@ export function JournalStageInstructionBanner({
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="rounded-2xl p-5 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4">
+    <div className="rounded-2xl p-5 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1.5 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">

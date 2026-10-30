@@ -105,7 +105,7 @@ export default function ScholarSidebar({
     <>
       <aside
         data-testid="scholar-sidebar"
-        className={`h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out z-30 ${
+        className={`h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out z-30 ${
           isCollapsed ? 'w-0 border-r-0 overflow-hidden opacity-0' : 'w-[260px] opacity-100'
         } ${className}`}
         aria-label="Scholar Core Navigation Sidebar"
@@ -287,7 +287,7 @@ export default function ScholarSidebar({
         </div>
 
         {/* Bottom Footer: Settings, Global Theme Toggle & User Profile Card */}
-        <div className="flex-shrink-0 p-3 border-t border-neutral-200 dark:border-white/10 flex flex-col justify-between gap-2.5 w-[260px] bg-white dark:bg-[#1C1C1E]">
+        <div className="flex-shrink-0 p-3 border-t border-neutral-200 dark:border-white/10 flex flex-col justify-between gap-2.5 w-[260px] bg-white dark:bg-ink-750">
           {/* Action Row: Settings + Theme Switcher */}
           <div className="flex items-center justify-between gap-1.5">
             <button

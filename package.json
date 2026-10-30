@@ -9,7 +9,7 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
     "verify:chunks": "node scripts/verify-chunk-budget.mjs",
-    "lint": "tsc --noEmit && node scripts/verify-contrast.mjs && node scripts/verify-csp-hash.mjs && node scripts/verify-no-pure-black.mjs",
+    "lint": "tsc --noEmit && node scripts/verify-contrast.mjs && node scripts/verify-csp-hash.mjs && node scripts/verify-no-pure-black.mjs && node scripts/verify-no-raw-hex-classes.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "migrate:users-to-supabase": "tsx scripts/migrate-users-to-supabase.ts",

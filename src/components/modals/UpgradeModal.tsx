@@ -63,7 +63,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl dark:shadow-none max-w-md w-full mx-auto relative animate-in zoom-in-95 duration-150 font-sans"
+        className="bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl dark:shadow-none max-w-md w-full mx-auto relative animate-in zoom-in-95 duration-150 font-sans"
       >
         {/* Close Button */}
         <button

@@ -21,7 +21,7 @@ const AssignmentSubmissionStage = React.lazy(() => import("./stages/AssignmentSu
 // Lightweight minimalist skeleton placeholders conforming to light/dark themes
 export function PhaseNavSkeleton() {
   return (
-    <div className="w-full h-12 px-4 py-2 bg-white dark:bg-[#1C1C1E] border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between gap-4 animate-pulse">
+    <div className="w-full h-12 px-4 py-2 bg-white dark:bg-ink-750 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between gap-4 animate-pulse">
       <div className="flex items-center gap-2">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="h-7 w-28 bg-neutral-200/60 dark:bg-white/5 rounded-full" />
@@ -35,7 +35,7 @@ export function PhaseNavSkeleton() {
 export function MainStageSkeleton() {
   return (
     <div className="max-w-4xl mx-auto p-6 sm:p-8 space-y-8 animate-pulse text-neutral-400">
-      <div className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
+      <div className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
         <div className="border-b border-neutral-100 dark:border-white/5 pb-4 space-y-2">
           <div className="h-6 w-60 bg-neutral-200 dark:bg-white/10 rounded-lg" />
           <div className="h-3.5 w-96 max-w-full bg-neutral-200/70 dark:bg-white/5 rounded" />
@@ -54,15 +54,15 @@ export function MainStageSkeleton() {
 
 export function AiTutorSkeleton() {
   return (
-    <div className="w-full h-full p-4 space-y-4 bg-[#F4F4F5] dark:bg-[#1C1C1E] border-l border-neutral-200/80 dark:border-white/10 animate-pulse text-neutral-400">
+    <div className="w-full h-full p-4 space-y-4 bg-paper-zinc dark:bg-ink-750 border-l border-neutral-200/80 dark:border-white/10 animate-pulse text-neutral-400">
       <div className="flex items-center justify-between pb-3 border-b border-neutral-200/80 dark:border-white/10">
         <div className="h-4 w-24 bg-neutral-200 dark:bg-white/10 rounded" />
         <div className="h-4 w-12 bg-neutral-200 dark:bg-white/5 rounded" />
       </div>
-      <div className="h-24 w-full bg-white dark:bg-[#2C2C2E] rounded-xl border border-neutral-200/60 dark:border-white/10" />
+      <div className="h-24 w-full bg-white dark:bg-ink-500 rounded-xl border border-neutral-200/60 dark:border-white/10" />
       <div className="space-y-2 pt-2">
-        <div className="h-16 w-full bg-white dark:bg-[#2C2C2E] rounded-xl border border-neutral-200/60 dark:border-white/10" />
-        <div className="h-16 w-full bg-white dark:bg-[#2C2C2E] rounded-xl border border-neutral-200/60 dark:border-white/10" />
+        <div className="h-16 w-full bg-white dark:bg-ink-500 rounded-xl border border-neutral-200/60 dark:border-white/10" />
+        <div className="h-16 w-full bg-white dark:bg-ink-500 rounded-xl border border-neutral-200/60 dark:border-white/10" />
       </div>
     </div>
   );
@@ -80,7 +80,7 @@ export function AssignmentSourcesPlaceholder() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 sm:p-8 space-y-8 text-neutral-900 dark:text-neutral-100">
-      <div className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
+      <div className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 dark:border-white/5 pb-5">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -200,7 +200,7 @@ export function AssignmentDraftingPlaceholder() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 sm:p-8 space-y-8 text-neutral-900 dark:text-neutral-100">
-      <div className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
+      <div className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 dark:border-white/5 pb-5">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -305,7 +305,7 @@ export function AssignmentSubmissionPlaceholder() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 sm:p-8 space-y-8 text-neutral-900 dark:text-neutral-100">
-      <div className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
+      <div className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 dark:border-white/5 pb-5">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -474,7 +474,7 @@ function AssignmentWorkspaceInner({
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#F8F9FA] dark:bg-[#171717] p-6 text-center text-neutral-800 dark:text-neutral-200">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-paper-cool dark:bg-ink-850 p-6 text-center text-neutral-800 dark:text-neutral-200">
         <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-2">
           <span className="text-2xl">⚠️</span>
         </div>
@@ -495,8 +495,8 @@ function AssignmentWorkspaceInner({
   // Immediate page load renders lightweight structural shell conforming to current theme
   if (isLoading || !project) {
     return (
-      <div className="h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 overflow-hidden">
-        <div className="bg-white dark:bg-[#1C1C1E] z-20 shrink-0">
+      <div className="h-screen flex flex-col bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-neutral-100 overflow-hidden">
+        <div className="bg-white dark:bg-ink-750 z-20 shrink-0">
           <div className="flex items-center justify-between px-4 sm:px-6 h-11 gap-4">
             <div className="flex items-center gap-2.5 min-w-0">
               <button
@@ -524,11 +524,11 @@ function AssignmentWorkspaceInner({
 
         <PhaseNavSkeleton />
 
-        <div className="flex-1 flex overflow-hidden relative bg-[#F8F9FA] dark:bg-[#171717]">
-          <main className="flex-1 h-full overflow-y-auto bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100">
+        <div className="flex-1 flex overflow-hidden relative bg-paper-cool dark:bg-ink-850">
+          <main className="flex-1 h-full overflow-y-auto bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-neutral-100">
             <MainStageSkeleton />
           </main>
-          <div className="w-80 lg:w-96 shrink-0 h-full overflow-y-auto hidden sm:block bg-[#F4F4F5] dark:bg-[#1C1C1E] border-l border-neutral-200/80 dark:border-white/10">
+          <div className="w-80 lg:w-96 shrink-0 h-full overflow-y-auto hidden sm:block bg-paper-zinc dark:bg-ink-750 border-l border-neutral-200/80 dark:border-white/10">
             <AiTutorSkeleton />
           </div>
         </div>
@@ -577,7 +577,7 @@ function AssignmentWorkspaceInner({
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100 overflow-hidden">
+    <div className="h-screen flex flex-col bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-neutral-100 overflow-hidden">
       {/* Shared Apple-Grade Studio Chrome Bar */}
       <AppleStudioHeader
         deliverableCode="OT-01"
@@ -621,7 +621,7 @@ function AssignmentWorkspaceInner({
       />
 
       {/* Minimalist Workspace Header */}
-      <header className="bg-white dark:bg-[#1C1C1E] z-20 shrink-0">
+      <header className="bg-white dark:bg-ink-750 z-20 shrink-0">
         <div className="flex items-center justify-between px-4 sm:px-6 pt-2.5 pb-1 gap-4">
           <div className="flex items-center gap-2.5 min-w-0">
             {/* Apple/Notion-Style Clean Back Button */}
@@ -651,7 +651,7 @@ function AssignmentWorkspaceInner({
                 onKeyDown={handleTitleKeyDown}
                 aria-label="Assignment Title"
                 title="Click to edit assignment title"
-                className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 bg-transparent hover:bg-neutral-200/50 dark:hover:bg-white/5 focus:bg-white dark:focus:bg-[#1C1C1E] border border-transparent hover:border-neutral-200/80 dark:hover:border-white/10 focus:border-neutral-300 dark:focus:border-white/20 rounded-lg px-2 py-1 focus:outline-none transition-all truncate cursor-text"
+                className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 bg-transparent hover:bg-neutral-200/50 dark:hover:bg-white/5 focus:bg-white dark:focus:bg-ink-750 border border-transparent hover:border-neutral-200/80 dark:hover:border-white/10 focus:border-neutral-300 dark:focus:border-white/20 rounded-lg px-2 py-1 focus:outline-none transition-all truncate cursor-text"
               />
               <button
                 type="button"
@@ -682,7 +682,7 @@ function AssignmentWorkspaceInner({
                 onClick={() => setExecutionMode("minimal")}
                 className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer flex items-center gap-1.5 ${
                   executionMode === "minimal"
-                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
+                    ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white font-semibold shadow-2xs"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
                 title="Minimal (Quick Flow): 4 steps (01 Extract → 02 Sources → 03 Drafting → 04 Submission) — AI automatically structures your outline and word budgets"
@@ -696,7 +696,7 @@ function AssignmentWorkspaceInner({
                 onClick={() => setExecutionMode("detailed")}
                 className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer flex items-center gap-1.5 ${
                   executionMode === "detailed"
-                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
+                    ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white font-semibold shadow-2xs"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
                 title="Detailed (Guided Architect): 5 steps (01 Extract → 02 Understand → 03 Sources → 04 Drafting → 05 Submission) — Review thesis angles, narrative roadmap, and fine-tune section headings before finding sources"
@@ -729,9 +729,9 @@ function AssignmentWorkspaceInner({
       <AssignmentStageNavigation />
 
       {/* Workspace Body: Center Content & Collapsible Right Socratic Tutor Drawer */}
-      <div className="flex-1 flex overflow-hidden relative bg-[#F8F9FA] dark:bg-[#171717]">
+      <div className="flex-1 flex overflow-hidden relative bg-paper-cool dark:bg-ink-850">
         {/* Center Column: Active Phase View Canvas */}
-        <main className="flex-1 h-full overflow-y-auto bg-[#F8F9FA] dark:bg-[#171717] text-neutral-900 dark:text-neutral-100">
+        <main className="flex-1 h-full overflow-y-auto bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-neutral-100">
           <React.Suspense fallback={<MainStageSkeleton />}>
             {renderActivePhase()}
           </React.Suspense>

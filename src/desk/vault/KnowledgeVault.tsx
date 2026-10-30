@@ -342,7 +342,7 @@ export default function KnowledgeVault({
   return (
     <div className="min-h-screen flex flex-col bg-[var(--bg-canvas)] text-[var(--text-primary)] font-sans antialiased">
       {/* Knowledge Vault Top Navigation Header */}
-      <header className="sticky top-0 z-30 px-4 sm:px-6 py-3 bg-white/95 dark:bg-[#1C1C1E]/95 backdrop-blur-md border-b border-gray-200 dark:border-neutral-800">
+      <header className="sticky top-0 z-30 px-4 sm:px-6 py-3 bg-white/95 dark:bg-ink-750/95 backdrop-blur-md border-b border-gray-200 dark:border-neutral-800">
         <div className="max-w-6xl mx-auto w-full flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 flex items-center justify-center shadow-xs flex-shrink-0">
@@ -371,7 +371,7 @@ export default function KnowledgeVault({
                 onClick={() => setActiveTab("projects")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === "projects"
-                    ? "bg-white dark:bg-[#171717] text-gray-900 dark:text-gray-100 shadow-xs"
+                    ? "bg-white dark:bg-ink-850 text-gray-900 dark:text-gray-100 shadow-xs"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                 }`}
               >
@@ -389,7 +389,7 @@ export default function KnowledgeVault({
                 onClick={() => setActiveTab("sources")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === "sources"
-                    ? "bg-white dark:bg-[#171717] text-gray-900 dark:text-gray-100 shadow-xs"
+                    ? "bg-white dark:bg-ink-850 text-gray-900 dark:text-gray-100 shadow-xs"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                 }`}
               >
@@ -402,7 +402,7 @@ export default function KnowledgeVault({
                 onClick={() => setActiveTab("settings")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === "settings"
-                    ? "bg-white dark:bg-[#171717] text-gray-900 dark:text-gray-100 shadow-xs"
+                    ? "bg-white dark:bg-ink-850 text-gray-900 dark:text-gray-100 shadow-xs"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                 }`}
               >
@@ -430,7 +430,7 @@ export default function KnowledgeVault({
             {/* Completion & Tracking Summary Bar */}
             {projects && projects.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                <div className="p-4 rounded-xl border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-[#1C1C1E] shadow-2xs flex flex-col justify-between min-h-[104px]">
+                <div className="p-4 rounded-xl border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-ink-750 shadow-2xs flex flex-col justify-between min-h-[104px]">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       Active Projects
@@ -445,7 +445,7 @@ export default function KnowledgeVault({
                   </span>
                 </div>
 
-                <div className="p-4 rounded-xl border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-[#1C1C1E] shadow-2xs flex flex-col justify-between min-h-[104px]">
+                <div className="p-4 rounded-xl border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-ink-750 shadow-2xs flex flex-col justify-between min-h-[104px]">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       Quality Gates
@@ -460,7 +460,7 @@ export default function KnowledgeVault({
                   </span>
                 </div>
 
-                <div className="p-4 rounded-xl border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-[#1C1C1E] shadow-2xs flex flex-col justify-between min-h-[104px]">
+                <div className="p-4 rounded-xl border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-ink-750 shadow-2xs flex flex-col justify-between min-h-[104px]">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       Overall Progress Average
@@ -494,7 +494,7 @@ export default function KnowledgeVault({
                     placeholder="Search projects..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-9 rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#1C1C1E] pl-10 pr-9 text-xs font-normal text-[var(--text-primary)] placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-neutral-700 transition-all shadow-2xs"
+                    className="w-full h-9 rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-ink-750 pl-10 pr-9 text-xs font-normal text-[var(--text-primary)] placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-neutral-700 transition-all shadow-2xs"
                   />
                   {searchQuery && (
                     <button
@@ -523,7 +523,7 @@ export default function KnowledgeVault({
                     data-testid="project-view-card-btn"
                     className={`h-full px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                       projectViewMode === "card"
-                        ? "bg-white dark:bg-[#171717] text-gray-900 dark:text-gray-100 shadow-2xs"
+                        ? "bg-white dark:bg-ink-850 text-gray-900 dark:text-gray-100 shadow-2xs"
                         : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                     }`}
                   >
@@ -539,7 +539,7 @@ export default function KnowledgeVault({
                     data-testid="project-view-list-btn"
                     className={`h-full px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                       projectViewMode === "list"
-                        ? "bg-white dark:bg-[#171717] text-gray-900 dark:text-gray-100 shadow-2xs"
+                        ? "bg-white dark:bg-ink-850 text-gray-900 dark:text-gray-100 shadow-2xs"
                         : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                     }`}
                   >
@@ -557,7 +557,7 @@ export default function KnowledgeVault({
                   className={`h-7 px-3 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 border font-sans shrink-0 ${
                     selectedTypeFilter === "all"
                       ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100 shadow-2xs"
-                      : "bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-800 shadow-2xs"
+                      : "bg-white dark:bg-ink-750 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-800 shadow-2xs"
                   }`}
                 >
                   <span className="whitespace-nowrap">All</span>
@@ -583,7 +583,7 @@ export default function KnowledgeVault({
                       className={`h-7 px-3 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 border font-sans shrink-0 ${
                         isActive
                           ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100 shadow-2xs"
-                          : "bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-800 shadow-2xs"
+                          : "bg-white dark:bg-ink-750 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-800 shadow-2xs"
                       }`}
                     >
                       <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
@@ -607,12 +607,12 @@ export default function KnowledgeVault({
 
             {/* Detailed Projects Data Table & Cards */}
             {loading ? (
-              <div className="flex flex-col justify-center items-center py-20 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-sm">
+              <div className="flex flex-col justify-center items-center py-20 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-ink-750 rounded-2xl shadow-sm">
                 <div className="w-8 h-8 border-2 border-gray-900 dark:border-gray-100 border-t-transparent rounded-full animate-spin mb-4" />
                 <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Loading projects...</span>
               </div>
             ) : error ? (
-              <div className="flex flex-col justify-center items-center py-16 text-center border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#1C1C1E] rounded-2xl p-8 shadow-sm">
+              <div className="flex flex-col justify-center items-center py-16 text-center border border-gray-200 dark:border-neutral-800 bg-white dark:bg-ink-750 rounded-2xl p-8 shadow-sm">
                 <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1">Failed to load projects</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mb-4 leading-relaxed">{error}</p>
                 <button
@@ -623,7 +623,7 @@ export default function KnowledgeVault({
                 </button>
               </div>
             ) : !projects || projects.length === 0 ? (
-              <div className="text-center py-16 px-6 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-sm flex flex-col items-center">
+              <div className="text-center py-16 px-6 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-ink-750 rounded-2xl shadow-sm flex flex-col items-center">
                 <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-neutral-800 flex items-center justify-center text-gray-400 mb-4">
                   <Layers className="w-6 h-6" />
                 </div>
@@ -639,7 +639,7 @@ export default function KnowledgeVault({
                 </button>
               </div>
             ) : filteredProjects.length === 0 ? (
-              <div className="p-12 text-center rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#1C1C1E] shadow-sm">
+              <div className="p-12 text-center rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-ink-750 shadow-sm">
                 <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                   No projects match "{searchQuery}"
                 </p>
@@ -665,7 +665,7 @@ export default function KnowledgeVault({
                     <div
                       key={project.projectId}
                       data-testid={`project-list-item-${project.projectId}`}
-                      className="group border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-[#1C1C1E] rounded-2xl p-4 sm:px-5 sm:py-4 shadow-sm hover:shadow-md hover:border-gray-300 dark:hover:border-neutral-700 transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                      className="group border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-ink-750 rounded-2xl p-4 sm:px-5 sm:py-4 shadow-sm hover:shadow-md hover:border-gray-300 dark:hover:border-neutral-700 transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-4"
                     >
                       {/* Left Side: Icon, Badges, Heading */}
                       <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
@@ -720,7 +720,7 @@ export default function KnowledgeVault({
                                   }}
                                   placeholder={getProjectHeadingPlaceholder(project)}
                                   autoFocus
-                                  className="flex-1 px-3 py-1 text-sm font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-[#121212] border border-blue-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                  className="flex-1 px-3 py-1 text-sm font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-ink-950 border border-blue-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                 />
                                 <button
                                   type="button"
@@ -812,7 +812,7 @@ export default function KnowledgeVault({
                               e.stopPropagation();
                               setProjectToDelete(project);
                             }}
-                            className="px-3 py-1.5 rounded-xl text-xs font-bold text-[#E60023] hover:text-[#AD081B] bg-[#FFEBEF] dark:bg-[#E60023]/15 hover:bg-[#FFD6DE] dark:hover:bg-[#E60023]/25 border border-[#E60023]/20 transition-all cursor-pointer"
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold text-danger hover:text-danger-strong bg-danger-soft dark:bg-danger/15 hover:bg-danger-muted dark:hover:bg-danger/25 border border-danger/20 transition-all cursor-pointer"
                             title="Delete Project"
                             aria-label="Delete Project"
                           >
@@ -838,7 +838,7 @@ export default function KnowledgeVault({
                   return (
                     <div
                       key={project.projectId}
-                      className="group border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-[#1C1C1E] rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-gray-300 dark:hover:border-neutral-700 transition-all flex flex-col justify-between"
+                      className="group border border-gray-200/90 dark:border-neutral-800 bg-white dark:bg-ink-750 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-gray-300 dark:hover:border-neutral-700 transition-all flex flex-col justify-between"
                     >
                       <div className="w-full text-left">
                         {/* Top Row: Format Icon, Badges, and Gate Counter */}
@@ -895,7 +895,7 @@ export default function KnowledgeVault({
                                 }}
                                 placeholder={getProjectHeadingPlaceholder(project)}
                                 autoFocus
-                                className="flex-1 px-3 py-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-[#121212] border border-blue-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                className="flex-1 px-3 py-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-ink-950 border border-blue-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                               />
                               <button
                                 type="button"
@@ -989,7 +989,7 @@ export default function KnowledgeVault({
                             e.stopPropagation();
                             setProjectToDelete(project);
                           }}
-                          className="px-3 py-1.5 rounded-xl text-xs font-bold text-[#E60023] hover:text-[#AD081B] bg-[#FFEBEF] dark:bg-[#E60023]/15 hover:bg-[#FFD6DE] dark:hover:bg-[#E60023]/25 border border-[#E60023]/20 transition-all cursor-pointer"
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold text-danger hover:text-danger-strong bg-danger-soft dark:bg-danger/15 hover:bg-danger-muted dark:hover:bg-danger/25 border border-danger/20 transition-all cursor-pointer"
                           title="Delete Project"
                           aria-label="Delete Project"
                         >
@@ -1038,7 +1038,7 @@ export default function KnowledgeVault({
           aria-labelledby="delete-modal-title"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150"
         >
-          <div className="w-full max-w-md bg-white dark:bg-[#1C1C1E] rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-neutral-800 text-left">
+          <div className="w-full max-w-md bg-white dark:bg-ink-750 rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-neutral-800 text-left">
             <h3 id="delete-modal-title" className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
               Delete Project
             </h3>
@@ -1058,7 +1058,7 @@ export default function KnowledgeVault({
                 type="button"
                 onClick={handleConfirmDelete}
                 disabled={isDeleting}
-                className="px-5 py-2 rounded-full text-xs font-bold text-[#E60023] hover:text-[#AD081B] bg-[#FFEBEF] dark:bg-[#E60023]/15 hover:bg-[#FFD6DE] dark:hover:bg-[#E60023]/25 border border-[#E60023]/20 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                className="px-5 py-2 rounded-full text-xs font-bold text-danger hover:text-danger-strong bg-danger-soft dark:bg-danger/15 hover:bg-danger-muted dark:hover:bg-danger/25 border border-danger/20 transition-all cursor-pointer shadow-xs disabled:opacity-50"
               >
                 {isDeleting ? "Deleting..." : "Delete"}
               </button>

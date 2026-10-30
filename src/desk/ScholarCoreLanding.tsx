@@ -282,10 +282,10 @@ export default function ScholarCoreLanding({
   const selectedAgent = AGENT_ROLES.find((a) => a.id === activeAgent) ?? AGENT_ROLES[0];
 
   return (
-    <div className="min-h-screen bg-[#F7F5F0] text-neutral-900 font-sans antialiased relative overflow-x-hidden selection:bg-neutral-900 selection:text-white">
+    <div className="min-h-screen bg-paper-sand text-neutral-900 font-sans antialiased relative overflow-x-hidden selection:bg-neutral-900 selection:text-white">
       {/* Top Header */}
       <header
-        className={`fixed top-0 inset-x-0 z-40 bg-[#F7F5F0]/90 backdrop-blur-md border-b border-neutral-200/80 transition-all duration-200 ${
+        className={`fixed top-0 inset-x-0 z-40 bg-paper-sand/90 backdrop-blur-md border-b border-neutral-200/80 transition-all duration-200 ${
           scrolled ? "py-2.5 shadow-xs" : "py-3 md:py-4"
         }`}
       >
@@ -362,7 +362,7 @@ export default function ScholarCoreLanding({
 
         {/* Mobile Dropdown */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-[#F7F5F0]/95 backdrop-blur-md border-b border-neutral-200 px-6 py-4 flex flex-col gap-3 text-sm font-medium">
+          <div className="md:hidden bg-paper-sand/95 backdrop-blur-md border-b border-neutral-200 px-6 py-4 flex flex-col gap-3 text-sm font-medium">
             <a
               href="#formats-explorer"
               onClick={() => setMobileMenuOpen(false)}
@@ -1016,7 +1016,7 @@ export default function ScholarCoreLanding({
       </main>
 
       {/* FOOTER */}
-      <footer className="border-t border-neutral-200/80 py-8 px-6 bg-[#F7F5F0]">
+      <footer className="border-t border-neutral-200/80 py-8 px-6 bg-paper-sand">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-600">
           <div className="flex items-center gap-3">
             <div className="w-7 h-7 rounded-lg bg-neutral-900 text-white flex items-center justify-center shadow-2xs">

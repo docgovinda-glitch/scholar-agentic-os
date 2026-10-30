@@ -195,7 +195,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
   const barContent = (
     <div
       data-testid={hasUploadedDetails ? undefined : `curated-source-${source.id}`}
-      className={`relative h-11 px-3.5 flex items-center justify-between gap-3 bg-white dark:bg-[#1C1C1E] border rounded-xl shadow-2xs dark:shadow-none transition-all group ${
+      className={`relative h-11 px-3.5 flex items-center justify-between gap-3 bg-white dark:bg-ink-750 border rounded-xl shadow-2xs dark:shadow-none transition-all group ${
         isApproved
           ? "border-emerald-500/50 bg-emerald-500/[0.02] dark:border-emerald-500/30 dark:bg-emerald-500/[0.03] hover:border-emerald-500/70"
           : "border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20"
@@ -349,7 +349,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
       {isEditing && (
         <div
           ref={popoverRef}
-          className="absolute right-0 top-12 z-50 p-4 w-80 sm:w-96 bg-white dark:bg-[#1C1C1E] border border-neutral-200/90 dark:border-white/15 rounded-2xl shadow-xl space-y-3 animate-in fade-in zoom-in-95 duration-150"
+          className="absolute right-0 top-12 z-50 p-4 w-80 sm:w-96 bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/15 rounded-2xl shadow-xl space-y-3 animate-in fade-in zoom-in-95 duration-150"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-2">
@@ -477,7 +477,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
                 {evidences.map((ev, eIdx) => (
                   <div
                     key={ev.id || eIdx}
-                    className="p-2.5 rounded-lg bg-white dark:bg-[#1C1C1E] border border-neutral-200/60 dark:border-white/10 text-xs space-y-1"
+                    className="p-2.5 rounded-lg bg-white dark:bg-ink-750 border border-neutral-200/60 dark:border-white/10 text-xs space-y-1"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-400">

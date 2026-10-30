@@ -111,7 +111,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
   return (
     <div
       data-testid={`curated-source-${source.id}`}
-      className={`relative p-5 rounded-2xl border transition-all duration-200 flex flex-col justify-between space-y-4 bg-white dark:bg-[#1C1C1E] shadow-xs ${
+      className={`relative p-5 rounded-2xl border transition-all duration-200 flex flex-col justify-between space-y-4 bg-white dark:bg-ink-750 shadow-xs ${
         isApproved
           ? "border-emerald-500/60 ring-1 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/10"
           : "border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20"
@@ -335,7 +335,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
                 value={noteText}
                 onChange={(e) => setNoteText(e.target.value)}
                 placeholder="Add research guidance, e.g.: 'Use this source primarily for the discussion of economic security in 2.2'..."
-                className="w-full text-xs p-2.5 rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full text-xs p-2.5 rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 rows={2}
               />
               <div className="flex items-center justify-end gap-2">

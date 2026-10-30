@@ -1455,7 +1455,7 @@ export default function AssignmentUnderstandStage({
 
       {understandStep === "brief_input" ? (
         /* Unified Assignment Setup Box (Fallback Intake Mode) */
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-5">
+        <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 dark:border-white/5 pb-3">
             <div>
               <h2 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-white">
@@ -1476,7 +1476,7 @@ export default function AssignmentUnderstandStage({
                   }}
                   className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer ${
                     executionMode === "minimal"
-                      ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
+                      ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white font-semibold shadow-2xs"
                       : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                   }`}
                 >
@@ -1490,7 +1490,7 @@ export default function AssignmentUnderstandStage({
                   }}
                   className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer ${
                     executionMode === "detailed"
-                      ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
+                      ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white font-semibold shadow-2xs"
                       : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                   }`}
                 >
@@ -1509,7 +1509,7 @@ export default function AssignmentUnderstandStage({
                   onClick={() => setIntakeTab("paste")}
                   className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     intakeTab === "paste"
-                      ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                      ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                       : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                   }`}
                 >
@@ -1520,7 +1520,7 @@ export default function AssignmentUnderstandStage({
                   onClick={() => setIntakeTab("upload")}
                   className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                     intakeTab === "upload"
-                      ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                      ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                       : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                   }`}
                 >
@@ -1621,7 +1621,7 @@ export default function AssignmentUnderstandStage({
                   aria-label="Academic Level"
                   value={localLevel}
                   onChange={(e) => handleLevelChange(e.target.value as AcademicLevel)}
-                  className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                  className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
                 >
                   {ACADEMIC_LEVEL_OPTIONS.map((opt) => (
                     <option key={opt.id} value={opt.id}>
@@ -1666,7 +1666,7 @@ export default function AssignmentUnderstandStage({
                   aria-label="Assignment Type"
                   value={localType}
                   onChange={(e) => handleTypeChange(e.target.value as AssignmentType)}
-                  className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                  className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
                 >
                   {ASSIGNMENT_TYPE_OPTIONS.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -1693,7 +1693,7 @@ export default function AssignmentUnderstandStage({
                   aria-label="Citation Style"
                   value={localCitation}
                   onChange={(e) => handleCitationChange(e.target.value)}
-                  className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
+                  className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
                 >
                   {CITATION_STYLES.map((st) => (
                     <option key={st.id} value={st.id}>
@@ -1727,7 +1727,7 @@ export default function AssignmentUnderstandStage({
                   value={localTone}
                   onChange={(e) => handleToneChange(e.target.value)}
                   onFocus={dispatchToneAssistantSuggestions}
-                  className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                  className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
                 >
                   {WRITING_TONE_OPTIONS.map((tn) => (
                     <option key={tn.id} value={tn.id}>
@@ -1757,7 +1757,7 @@ export default function AssignmentUnderstandStage({
                     handleTargetWordCountChange(Math.max(100, current - 250));
                   }}
                   aria-label="Decrease target word count"
-                  className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+                  className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-500 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
                   title="Decrease by 250 words"
                 >
                   −
@@ -1790,7 +1790,7 @@ export default function AssignmentUnderstandStage({
                     }}
                     aria-label="Target Word Count"
                     placeholder="2000"
-                    className="w-full min-w-[115px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none whitespace-nowrap h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2 text-center text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums shadow-2xs"
+                    className="w-full min-w-[115px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none whitespace-nowrap h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-2 text-center text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums shadow-2xs"
                   />
                 </div>
                 <button
@@ -1800,7 +1800,7 @@ export default function AssignmentUnderstandStage({
                     handleTargetWordCountChange(Math.min(50000, current + 250));
                   }}
                   aria-label="Increase target word count"
-                  className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+                  className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-500 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
                   title="Increase by 250 words"
                 >
                   +
@@ -1863,7 +1863,7 @@ export default function AssignmentUnderstandStage({
         /* Step 2: Understand 4 Human-Centered Cards */
         <div className="space-y-6 animate-in fade-in duration-200">
           {/* Top Locked Brief Summary Bar */}
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/80 dark:border-white/10 p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-4 sm:p-5 shadow-xs space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-neutral-100 dark:border-white/5">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
@@ -1922,7 +1922,7 @@ export default function AssignmentUnderstandStage({
           {/* ========================================================
               CARD 1: Plain-English Assignment Deconstruction
              ======================================================== */}
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-4">
+          <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-3">
               <div className="space-y-0.5">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-blue-600 dark:text-blue-400">
@@ -2019,7 +2019,7 @@ export default function AssignmentUnderstandStage({
           {/* ========================================================
               CARD 2: Thesis & Stance Selector (Pick Your Angle)
              ======================================================== */}
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-4">
+          <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-3">
               <div className="space-y-0.5">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-purple-600 dark:text-purple-400">
@@ -2056,7 +2056,7 @@ export default function AssignmentUnderstandStage({
                     className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
                       isSelected
                         ? "border-purple-500 bg-purple-50/40 dark:bg-purple-950/20 ring-1 ring-purple-500 shadow-2xs"
-                        : "border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] hover:border-neutral-300 dark:hover:border-white/20"
+                        : "border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 hover:border-neutral-300 dark:hover:border-white/20"
                     }`}
                   >
                     <div>
@@ -2135,7 +2135,7 @@ export default function AssignmentUnderstandStage({
           {/* ========================================================
               CARD 3: Visual Storyline Roadmap (Zero Math Anxiety)
              ======================================================== */}
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-4">
+          <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 dark:border-white/5 pb-3">
               <div className="space-y-0.5">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-600 dark:text-emerald-400">
@@ -2254,7 +2254,7 @@ export default function AssignmentUnderstandStage({
           {/* ========================================================
               CARD 4: Clean Grading Checklist (Must Include vs. Avoid)
              ======================================================== */}
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-4">
+          <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-3">
               <div className="space-y-0.5">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-amber-600 dark:text-amber-400">
@@ -2553,7 +2553,7 @@ export default function AssignmentUnderstandStage({
           {/* ========================================================
               BOTTOM NAVIGATION BAR & PHASE 3 CONNECTION
              ======================================================== */}
-          <div className="p-4 sm:p-5 rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="p-4 sm:p-5 rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
             <div>
               <button
                 type="button"

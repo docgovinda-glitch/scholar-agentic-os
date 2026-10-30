@@ -643,7 +643,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                 onClick={() => handleModeChange("minimal")}
                 className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer flex items-center gap-1.5 ${
                   executionMode === "minimal"
-                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
+                    ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white font-semibold shadow-2xs"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
                 title="Minimal (Quick Flow): Auto-Outline"
@@ -657,7 +657,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                 onClick={() => handleModeChange("detailed")}
                 className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer flex items-center gap-1.5 ${
                   executionMode === "detailed"
-                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white font-semibold shadow-2xs"
+                    ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white font-semibold shadow-2xs"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
                 title="Detailed (Guided Architect): Custom Thesis & Roadmap"
@@ -695,7 +695,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
       </div>
 
       {/* Unified Assignment Setup Box (Step 1: Brief Input) */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-5">
+      <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-5">
         {/* Assignment Question Section */}
         <div className="space-y-2.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -705,7 +705,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                 onClick={() => setIntakeTab("paste")}
                 className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   intakeTab === "paste"
-                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                    ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
               >
@@ -716,7 +716,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                 onClick={() => setIntakeTab("upload")}
                 className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                   intakeTab === "upload"
-                    ? "bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                    ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white shadow-2xs font-semibold"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
               >
@@ -849,7 +849,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                         <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider block mb-1">
                           Extracted Brief Question / Prompt:
                         </span>
-                        <p className="text-xs text-neutral-700 dark:text-neutral-300 line-clamp-3 bg-white dark:bg-[#2C2C2E] p-3 rounded-lg border border-neutral-200/60 dark:border-white/10 font-mono">
+                        <p className="text-xs text-neutral-700 dark:text-neutral-300 line-clamp-3 bg-white dark:bg-ink-500 p-3 rounded-lg border border-neutral-200/60 dark:border-white/10 font-mono">
                           {localQuestion}
                         </p>
                       </div>
@@ -897,7 +897,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalLevel(val);
                   saveAnswers({ academic_level: val, academicLevel: val });
                 }}
-                className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
               >
                 {ACADEMIC_LEVEL_OPTIONS.map((lvl) => (
                   <option key={lvl.id} value={lvl.id}>
@@ -961,7 +961,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                     academic_tone: matchedTone,
                   });
                 }}
-                className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
               >
                 {ASSIGNMENT_TYPE_OPTIONS.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -992,7 +992,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalCitation(val);
                   saveAnswers({ citation_style: val, citationStyle: val });
                 }}
-                className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
+                className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
               >
                 {CITATION_STYLES.map((st) => (
                   <option key={st.id} value={st.id}>
@@ -1023,7 +1023,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   setLocalTone(val);
                   saveAnswers({ writing_tone: val, writingTone: val });
                 }}
-                className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
+                className="w-full h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs capitalize"
               >
                 {WRITING_TONE_OPTIONS.map((tn) => (
                   <option key={tn.id} value={tn.id}>
@@ -1055,7 +1055,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   saveAnswers({ word_count: next, word_limit: next, targetWordCount: next });
                 }}
                 aria-label="Decrease target word count"
-                className="h-8 w-7.5 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+                className="h-8 w-7.5 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-500 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
                 title="Decrease by 250 words"
               >
                 −
@@ -1093,7 +1093,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   }}
                   aria-label="Target Word Count"
                   placeholder="2,000 words"
-                  className="w-full min-w-[115px] whitespace-nowrap h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all font-semibold shadow-2xs text-center tabular-nums"
+                  className="w-full min-w-[115px] whitespace-nowrap h-8 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all font-semibold shadow-2xs text-center tabular-nums"
                 />
               </div>
               <button
@@ -1105,7 +1105,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                   saveAnswers({ word_count: next, word_limit: next, targetWordCount: next });
                 }}
                 aria-label="Increase target word count"
-                className="h-8 w-7.5 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+                className="h-8 w-7.5 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-500 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
                 title="Increase by 250 words"
               >
                 +

@@ -72,7 +72,7 @@ function SortableHeadingWrapper({ id, children }: { id: string; children: React.
         {...attributes}
         {...listeners}
         title="Drag to reorder"
-        className="absolute -left-2 sm:-left-3.5 top-4 p-0.5 cursor-grab active:cursor-grabbing text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hidden sm:group-hover/sortable:flex items-center justify-center transition-colors bg-white dark:bg-[#2C2C2E] border border-neutral-200 dark:border-white/10 rounded shadow-sm z-20"
+        className="absolute -left-2 sm:-left-3.5 top-4 p-0.5 cursor-grab active:cursor-grabbing text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hidden sm:group-hover/sortable:flex items-center justify-center transition-colors bg-white dark:bg-ink-500 border border-neutral-200 dark:border-white/10 rounded shadow-sm z-20"
       >
         <GripVertical className="w-3.5 h-3.5" />
       </div>
@@ -280,7 +280,7 @@ export function DynamicStructurePlanner({
             type="button"
             onClick={() => onTargetWordCountChange?.(Math.max(100, (Number(targetWordCount) || 2000) - 250))}
             aria-label="Decrease target word count"
-            className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+            className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-500 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
             title="Decrease by 250 words"
           >
             −
@@ -297,7 +297,7 @@ export function DynamicStructurePlanner({
                 onTargetWordCountChange?.(isNaN(val) ? 0 : Math.min(50000, Math.max(0, val)));
               }}
               aria-label="Target Word Count"
-              className="w-32 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-xl px-3 py-1.5 text-right text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums pr-12 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="w-32 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-xl px-3 py-1.5 text-right text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white tabular-nums pr-12 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               placeholder="e.g. 2000"
             />
             <span className="pointer-events-none absolute right-3 text-xs font-medium text-neutral-400">
@@ -308,7 +308,7 @@ export function DynamicStructurePlanner({
             type="button"
             onClick={() => onTargetWordCountChange?.(Math.min(50000, (Number(targetWordCount) || 2000) + 250))}
             aria-label="Increase target word count"
-            className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
+            className="h-8 w-8 rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-500 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs font-semibold text-sm shrink-0"
             title="Increase by 250 words"
           >
             +
@@ -402,7 +402,7 @@ export function DynamicStructurePlanner({
         </div>
 
         {/* Introduction & Core Working Thesis (tailored to writing tone) */}
-        <div className="p-3.5 sm:px-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E20] shadow-xs space-y-2">
+        <div className="p-3.5 sm:px-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-700 shadow-xs space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-6 h-6 rounded-md bg-purple-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
@@ -439,7 +439,7 @@ export function DynamicStructurePlanner({
               : [];
 
           return (
-            <div className="p-3.5 sm:px-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E20] shadow-xs space-y-2.5">
+            <div className="p-3.5 sm:px-4 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-700 shadow-xs space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-md bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-[11px] font-bold flex items-center justify-center shrink-0">
@@ -489,7 +489,7 @@ export function DynamicStructurePlanner({
                     }
                   }}
                   placeholder="+ Add framework or model (Press Enter)..."
-                  className="text-xs px-2.5 py-1 rounded-lg bg-neutral-50/80 dark:bg-white/[0.02] border border-dashed border-neutral-300 dark:border-white/15 text-neutral-800 dark:text-neutral-200 placeholder-neutral-400 focus:outline-none focus:border-neutral-500 focus:bg-white dark:focus:bg-[#2C2C2E] transition-colors min-w-[200px]"
+                  className="text-xs px-2.5 py-1 rounded-lg bg-neutral-50/80 dark:bg-white/[0.02] border border-dashed border-neutral-300 dark:border-white/15 text-neutral-800 dark:text-neutral-200 placeholder-neutral-400 focus:outline-none focus:border-neutral-500 focus:bg-white dark:focus:bg-ink-500 transition-colors min-w-[200px]"
                   aria-label="Add theoretical framework"
                 />
               </div>
@@ -510,7 +510,7 @@ export function DynamicStructurePlanner({
                 return (
                   <SortableHeadingWrapper key={heading.id} id={heading.id}>
                     <div
-                      className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E20] shadow-xs overflow-hidden transition-all group/heading"
+                      className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-700 shadow-xs overflow-hidden transition-all group/heading"
                     >
                 {/* Main Heading Header */}
                 <div className="p-3.5 sm:p-4 bg-neutral-100/70 dark:bg-white/[0.04] border-b border-neutral-200/60 dark:border-white/5 space-y-3">
@@ -540,7 +540,7 @@ export function DynamicStructurePlanner({
                   <div className="flex items-center justify-between gap-3 flex-wrap pt-0.5 text-xs">
                     {/* Left: Word count stepper & percentage */}
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg p-0.5 shadow-2xs">
+                      <div className="flex items-center gap-1 bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 rounded-lg p-0.5 shadow-2xs">
                         <button
                           type="button"
                           onClick={() => handleAdjustHeadingWords(heading.id, -50)}
@@ -675,25 +675,25 @@ export function DynamicStructurePlanner({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                       {heading.purpose && (
-                        <div className="p-2.5 rounded-lg bg-white dark:bg-[#2C2C2E] border border-neutral-200/70 dark:border-white/10 space-y-0.5">
+                        <div className="p-2.5 rounded-lg bg-white dark:bg-ink-500 border border-neutral-200/70 dark:border-white/10 space-y-0.5">
                           <strong className="text-[10px] uppercase text-neutral-500 font-bold block">Purpose &amp; Objective</strong>
                           <p className="text-[11px] text-neutral-800 dark:text-neutral-200">{heading.purpose}</p>
                         </div>
                       )}
                       {heading.evidenceRequired && (
-                        <div className="p-2.5 rounded-lg bg-white dark:bg-[#2C2C2E] border border-neutral-200/70 dark:border-white/10 space-y-0.5">
+                        <div className="p-2.5 rounded-lg bg-white dark:bg-ink-500 border border-neutral-200/70 dark:border-white/10 space-y-0.5">
                           <strong className="text-[10px] uppercase text-neutral-500 font-bold block">Empirical Evidence Required</strong>
                           <p className="text-[11px] text-neutral-800 dark:text-neutral-200">{heading.evidenceRequired}</p>
                         </div>
                       )}
                       {heading.counterarguments && heading.counterarguments.length > 0 && (
-                        <div className="p-2.5 rounded-lg bg-white dark:bg-[#2C2C2E] border border-neutral-200/70 dark:border-white/10 space-y-0.5">
+                        <div className="p-2.5 rounded-lg bg-white dark:bg-ink-500 border border-neutral-200/70 dark:border-white/10 space-y-0.5">
                           <strong className="text-[10px] uppercase text-neutral-500 font-bold block">Competing Perspectives &amp; Debates</strong>
                           <p className="text-[11px] text-neutral-800 dark:text-neutral-200">{heading.counterarguments.join(" | ")}</p>
                         </div>
                       )}
                       {heading.expectedContribution && (
-                        <div className="p-2.5 rounded-lg bg-white dark:bg-[#2C2C2E] border border-neutral-200/70 dark:border-white/10 space-y-0.5">
+                        <div className="p-2.5 rounded-lg bg-white dark:bg-ink-500 border border-neutral-200/70 dark:border-white/10 space-y-0.5">
                           <strong className="text-[10px] uppercase text-neutral-500 font-bold block">Contribution to Thesis</strong>
                           <p className="text-[11px] text-neutral-800 dark:text-neutral-200">{heading.expectedContribution}</p>
                         </div>
@@ -711,7 +711,7 @@ export function DynamicStructurePlanner({
                           {heading.scholarlySources.map((src, sIdx) => (
                             <div
                               key={sIdx}
-                              className="p-2 rounded-lg bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 shadow-2xs space-y-1"
+                              className="p-2 rounded-lg bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 shadow-2xs space-y-1"
                             >
                               <div className="flex items-start justify-between gap-1.5">
                                 <span className="text-xs font-semibold text-neutral-900 dark:text-white line-clamp-1">
@@ -822,7 +822,7 @@ export function DynamicStructurePlanner({
                                     handleExactWords(sub.id, parseInt(e.target.value, 10) || 0)
                                   }
                                   aria-label={`Word count for ${sub.title}`}
-                                  className="w-20 bg-white dark:bg-[#2C2C2E] border border-neutral-200/90 dark:border-white/10 rounded-md px-2 py-1 text-right text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white pr-6 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="w-20 bg-white dark:bg-ink-500 border border-neutral-200/90 dark:border-white/10 rounded-md px-2 py-1 text-right text-xs font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white pr-6 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                                 <span className="pointer-events-none absolute right-1.5 text-[10px] text-neutral-400">
                                   w
@@ -928,7 +928,7 @@ export function DynamicStructurePlanner({
                                       notifyChange(updated);
                                     }}
                                     placeholder="Focus argument or evidence point..."
-                                    className="flex-1 text-xs py-0.5 px-1.5 rounded bg-transparent border border-transparent hover:border-neutral-200 dark:hover:border-white/10 focus:border-neutral-400 dark:focus:border-white/20 focus:bg-white dark:focus:bg-[#2C2C2E] text-neutral-800 dark:text-neutral-200 transition-colors"
+                                    className="flex-1 text-xs py-0.5 px-1.5 rounded bg-transparent border border-transparent hover:border-neutral-200 dark:hover:border-white/10 focus:border-neutral-400 dark:focus:border-white/20 focus:bg-white dark:focus:bg-ink-500 text-neutral-800 dark:text-neutral-200 transition-colors"
                                   />
                                   <button
                                     type="button"
@@ -978,7 +978,7 @@ export function DynamicStructurePlanner({
                                 notifyChange(updated);
                               }}
                               placeholder="e.g. Focus on empirical evidence from 2022-2025..."
-                              className="w-full text-xs p-2 rounded-lg bg-white dark:bg-[#2C2C2E] border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
+                              className="w-full text-xs p-2 rounded-lg bg-white dark:bg-ink-500 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/20"
                             />
                             {sub.guidance && (
                               <p className="text-[11px] text-neutral-500 dark:text-neutral-400 italic">
@@ -1024,7 +1024,7 @@ export function DynamicStructurePlanner({
                                   {sub.scholarlySources.map((src, sIdx) => (
                                     <div
                                       key={sIdx}
-                                      className="p-1.5 rounded bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 text-[10px] flex items-center justify-between gap-2"
+                                      className="p-1.5 rounded bg-white dark:bg-ink-500 border border-neutral-200/80 dark:border-white/10 text-[10px] flex items-center justify-between gap-2"
                                     >
                                       <div className="truncate">
                                         <strong className="text-neutral-800 dark:text-neutral-200">{src.citation}</strong>
@@ -1057,7 +1057,7 @@ export function DynamicStructurePlanner({
         {/* Add Main Heading Button / Form */}
         <div className="pt-1">
           {isAddingHeading ? (
-            <div className="p-3.5 rounded-xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1E1E20] space-y-2.5 animate-in fade-in duration-150">
+            <div className="p-3.5 rounded-xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-700 space-y-2.5 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                   New Main Analytical Heading

@@ -220,7 +220,7 @@ export default function SectionBudgetPlanner({
             return (
               <div
                 key={section.id}
-                className="flex items-center justify-between gap-3 p-2.5 sm:px-3.5 rounded-lg bg-white dark:bg-[#2C2C2E]/60 border border-neutral-200/70 dark:border-white/5 shadow-2xs group hover:border-neutral-300 dark:hover:border-white/15 transition-all"
+                className="flex items-center justify-between gap-3 p-2.5 sm:px-3.5 rounded-lg bg-white dark:bg-ink-500/60 border border-neutral-200/70 dark:border-white/5 shadow-2xs group hover:border-neutral-300 dark:hover:border-white/15 transition-all"
               >
                 {/* Title */}
                 <div className="flex-1 min-w-0 flex items-center gap-2">
@@ -290,7 +290,7 @@ export default function SectionBudgetPlanner({
         {/* Section Creation Controls */}
         <div className="pt-2">
           {isAddingSection ? (
-            <div className="p-3 rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#2C2C2E] space-y-2.5 animate-in fade-in duration-150">
+            <div className="p-3 rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-500 space-y-2.5 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                   Define New Section

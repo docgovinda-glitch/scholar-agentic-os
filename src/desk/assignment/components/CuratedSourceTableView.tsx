@@ -95,7 +95,7 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
     : sources;
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-xs dark:shadow-none">
+    <div className="overflow-x-auto rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 shadow-xs dark:shadow-none">
       <table className="w-full text-left text-xs border-collapse min-w-[860px]" data-testid="curated-sources-table">
         <thead>
           <tr className="border-b border-neutral-200 dark:border-white/10 bg-neutral-50/70 dark:bg-white/[0.02] text-neutral-600 dark:text-neutral-400 font-semibold uppercase tracking-wider text-[10px]">
@@ -344,7 +344,7 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                     <td colSpan={10} className="py-3 px-4 sm:px-6">
                       <div className="space-y-2 text-xs">
                         {/* Question-Driven Role & Alignment */}
-                        <div className="bg-white dark:bg-[#1C1C1E] p-3 rounded-xl border border-neutral-200/60 dark:border-white/5 space-y-1.5">
+                        <div className="bg-white dark:bg-ink-750 p-3 rounded-xl border border-neutral-200/60 dark:border-white/5 space-y-1.5">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
                             <span className="font-semibold text-neutral-900 dark:text-white flex items-center gap-1.5">
                               <Sparkles className="w-3.5 h-3.5 text-blue-500" />
@@ -363,7 +363,7 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                         </div>
                         {/* Extracted Evidence for Uploaded Source */}
                         {source.isUserUploaded && source.extractedEvidences && source.extractedEvidences.length > 0 && (
-                          <div className="bg-white dark:bg-[#1C1C1E] p-3 rounded-xl border border-neutral-200/60 dark:border-white/5 space-y-2">
+                          <div className="bg-white dark:bg-ink-750 p-3 rounded-xl border border-neutral-200/60 dark:border-white/5 space-y-2">
                             <span className="font-semibold text-neutral-900 dark:text-white block">
                               Extracted Evidence & Used References ({source.extractedEvidences.length}):
                             </span>
@@ -391,7 +391,7 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                           </div>
                         )}
 
-                        <div className="flex items-start gap-2 bg-white dark:bg-[#1C1C1E] p-3 rounded-xl border border-neutral-200/60 dark:border-white/5">
+                        <div className="flex items-start gap-2 bg-white dark:bg-ink-750 p-3 rounded-xl border border-neutral-200/60 dark:border-white/5">
                           <Sparkles className="w-3.5 h-3.5 text-neutral-500 mt-0.5 shrink-0" />
                           <div>
                             <span className="font-semibold text-neutral-900 dark:text-white">
@@ -404,7 +404,7 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                         </div>
 
                         {source.abstract && (
-                          <div className="text-neutral-600 dark:text-neutral-400 italic bg-white dark:bg-[#1C1C1E] p-3 rounded-xl border border-neutral-200/60 dark:border-white/5 leading-relaxed">
+                          <div className="text-neutral-600 dark:text-neutral-400 italic bg-white dark:bg-ink-750 p-3 rounded-xl border border-neutral-200/60 dark:border-white/5 leading-relaxed">
                             <span className="font-semibold not-italic text-neutral-900 dark:text-white block mb-1">
                               Abstract:
                             </span>
