@@ -789,9 +789,9 @@ export function registerManuscriptAndGateRoutes(
           mdContent += "\n\n## APPENDIX: POINT-BY-POINT REFEREE REBUTTAL MATRIX\n\n";
           matrix.forEach((item: { refereeRole?: string; referee?: string; lens?: string; section?: string; critiqueSummary?: string; critique?: string; authorResponse?: string; revisionAction?: string }, idx: number) => {
             mdContent += `### Item ${idx + 1}: ${item.refereeRole || item.referee || "Referee Critique"} (${item.lens || item.section || "General"})\n`;
-            mdContent += `**Critique**: ${item.critiqueSummary || item.critique || "Critique noted."}\n\n`;
-            mdContent += `**Author Response**: ${item.authorResponse || "Addressed in manuscript."}\n\n`;
-            mdContent += `**Revision Action**: ${item.revisionAction || "Updated corresponding section."}\n\n`;
+            mdContent += `**Critique**: ${item.critiqueSummary || item.critique || ""}\n\n`;
+            mdContent += `**Author Response**: ${item.authorResponse || "[not yet written]"}\n\n`;
+            mdContent += `**Revision Action**: ${item.revisionAction || "[not yet written]"}\n\n`;
           });
         }
       }
