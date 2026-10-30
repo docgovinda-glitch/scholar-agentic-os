@@ -707,7 +707,7 @@ export default function ScholarCoreLanding({
                           </div>
                           <div>
                             <span className="font-bold text-xs text-neutral-900 block">
-                              Integrity Gate: ZERO Hallucination Confirmed
+                              Example: sentence matched to a quoted passage
                             </span>
                             <span className="text-xs text-neutral-500 leading-normal font-normal">
                               Assertion supported by verified vault vectors with exact page bounds.
