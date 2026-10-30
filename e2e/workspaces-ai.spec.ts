@@ -122,3 +122,68 @@ test("Journal (OT-10): the manuscript draft is written by the user's AI and kept
     expect(String(reread.json?.answers?.manuscript_draft ?? "")).toContain(MARKER);
   });
 });
+
+// Server-side tables (manuscript_versions) have no client policies; the test
+// reads them with the LOCAL stack's service role, never production.
+const LOCAL_SUPABASE_URL = process.env.E2E_SUPABASE_URL;
+const LOCAL_SERVICE_ROLE = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY;
+
+async function serviceSelect(table: string, filter: string): Promise<Array<Record<string, unknown>>> {
+  const res = await fetch(`${LOCAL_SUPABASE_URL}/rest/v1/${table}?${filter}`, {
+    headers: { apikey: LOCAL_SERVICE_ROLE!, Authorization: `Bearer ${LOCAL_SERVICE_ROLE}` },
+  });
+  expect(res.status).toBe(200);
+  return (await res.json()) as Array<Record<string, unknown>>;
+}
+
+test("Journal (OT-10): drafting again keeps the previous draft as a version", async ({ page }) => {
+  test.skip(!LOCAL_SUPABASE_URL || !LOCAL_SERVICE_ROLE, "E2E_SUPABASE_URL / E2E_SUPABASE_SERVICE_ROLE_KEY not set");
+  await withProject(page, "OT-10", { title: "E2E journal versions" }, async (id) => {
+    for (const round of [1, 2]) {
+      const res = await api(page, "POST", `/api/projects/${id}/agentic/draft`, {}, AI_HEADERS);
+      expect(res.status, `round ${round}: ${res.text.slice(0, 300)}`).toBe(200);
+      expect(res.text, `round ${round}`).toContain("event: done");
+      expect(res.text, `round ${round}: ${res.text.slice(-400)}`).not.toContain("event: error");
+    }
+    const sections = await serviceSelect("manuscript_sections", `project_id=eq.${id}&select=section_name,content`);
+    expect(sections).toHaveLength(1);
+    expect(String(sections[0].content)).toContain(MARKER);
+    const versions = await serviceSelect("manuscript_versions", `project_id=eq.${id}&select=section_name,content`);
+    expect(versions.length).toBeGreaterThanOrEqual(1);
+    expect(String(versions[0].content)).toContain(MARKER);
+  });
+});
+
+test("Journal (OT-10): the drafted manuscript exports to Markdown and Word, for its owner only", async ({ page, browser }) => {
+  await withProject(page, "OT-10", { title: "E2E journal export" }, async (id) => {
+    // Nothing drafted yet: export says so instead of producing an empty file.
+    const empty = await api(page, "POST", `/api/projects/${id}/export/markdown`, {});
+    expect(empty.status).toBe(400);
+
+    const drafted = await api(page, "POST", `/api/projects/${id}/agentic/draft`, {}, AI_HEADERS);
+    expect(drafted.status).toBe(200);
+
+    const md = await api(page, "POST", `/api/projects/${id}/export/markdown`, {});
+    expect(md.status, md.text.slice(0, 300)).toBe(200);
+    expect(md.text).toContain(MARKER);
+    expect(md.text).toContain("Introduction");
+
+    const docx = await page.evaluate(async (path) => {
+      const key = Object.keys(localStorage).find((k) => k.startsWith("sb-") && k.endsWith("-auth-token"));
+      const token = key ? JSON.parse(localStorage.getItem(key) || "{}").access_token : undefined;
+      const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: "{}" });
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      return { status: res.status, type: res.headers.get("content-type") || "", magic: String.fromCharCode(bytes[0], bytes[1]), size: bytes.length };
+    }, `/api/projects/${id}/export/docx`);
+    expect(docx.status).toBe(200);
+    expect(docx.magic).toBe("PK"); // a .docx is a zip
+    expect(docx.size).toBeGreaterThan(1000);
+
+    const other = await browser.newContext({ storageState: AUTH_FILES.B });
+    const otherPage = await other.newPage();
+    await otherPage.goto("/projects");
+    const peek = await api(otherPage, "POST", `/api/projects/${id}/export/markdown`, {});
+    expect(peek.status).toBe(404);
+    await other.close();
+  });
+});

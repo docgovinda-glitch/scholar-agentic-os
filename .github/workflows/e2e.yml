@@ -68,6 +68,8 @@ jobs:
         run: npx playwright test
         env:
           E2E_STUB_AI_URL: http://localhost:1234
+          E2E_SUPABASE_URL: ${{ env.API_URL }}
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
       - name: Production smoke suite against the local stack
         run: node scripts/smoke-prod.mjs --setup --base http://localhost:3000
         env:
