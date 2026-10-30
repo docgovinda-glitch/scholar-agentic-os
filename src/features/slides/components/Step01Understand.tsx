@@ -15,7 +15,6 @@ import {
 import type { SlideDeck, NarrativeFramework, PresentationScopeBoundaries } from '../types/slides';
 import {
   generateSlideDeck,
-  decomposeToSwissEditorial,
   PRESENTATION_STYLE_PROFILES,
 } from '../services/slideGenerator';
 import { classifyPresentationScope } from '../services/presentationScopeClassifier';
@@ -162,10 +161,11 @@ export default function Step01Understand({
       if (textToUse && textToUse.trim().length > 40) {
         // Build cards from the user's own text; figures only if they are in it.
         generatedDeck = composeDeckFromText(textToUse, { ...composeOpts, title: topicToUse || undefined });
-      } else if (isSwiss || isCuratedCase) {
-        const legacy = isSwiss
-          ? decomposeToSwissEditorial({ topic: topicToUse, text: textToUse, framework: selectedFramework, slideCount: Number(slideCount), presentationStyle: selectedFramework, audienceLevel })
-          : generateSlideDeck({ topic: topicToUse, text: textToUse, framework: selectedFramework, slideCount: Number(slideCount), presentationStyle: selectedFramework, audienceLevel });
+      } else if (isCuratedCase) {
+        // The Swiss Editorial look is only a theme (applied below); its old
+        // sample deck (a plover field report with fixed figures) is never used
+        // as the content of someone else's topic.
+        const legacy = generateSlideDeck({ topic: topicToUse, text: textToUse, framework: selectedFramework, slideCount: Number(slideCount), presentationStyle: selectedFramework, audienceLevel });
         // Curated decks are trusted content: keep every figure they carry.
         generatedDeck = legacyDeckToGamma(legacy, JSON.stringify(legacy.slides));
       } else {

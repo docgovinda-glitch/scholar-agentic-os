@@ -267,14 +267,8 @@ export async function extractThemeFromImage(fileOrDataUrl: File | string): Promi
           textSecondary,
           textMuted,
           fontFamily,
-          previewKpis:
-            archetype === 'data-ledger'
-              ? [
-                  { value: '142.0', label: 'Primary Index', sub: 'Calculated' },
-                  { value: '118', label: 'Active Cohort', sub: 'Verified' },
-                  { value: '+18.0%', label: 'Empirical Lift', sub: 'p < 0.01' },
-                ]
-              : undefined,
+          // No sample KPIs: an extracted theme carries colours and type only.
+          previewKpis: undefined,
         });
       } catch (err) {
         reject(err);
