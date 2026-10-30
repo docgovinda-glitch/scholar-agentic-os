@@ -78,6 +78,20 @@ test("Coursework (OT-01): a section is drafted by the user's AI", async ({ page 
   });
 });
 
+test("Coursework (OT-01): the Drafting stage's streamed section comes from the user's AI", async ({ page }) => {
+  await withProject(page, "OT-01", { title: "E2E coursework stream", assignment_question: "Discuss group work." }, async (id) => {
+    const res = await api(page, "POST", `/api/projects/${id}/assignment/stream-section`, { sectionTitle: "Introduction", targetWordCount: 300 }, AI_HEADERS);
+    expect(res.status, res.text.slice(0, 300)).toBe(200);
+    expect(res.text).toContain(MARKER);
+    expect(res.text).not.toMatch(/supplementary elaboration|Zappos|Schein/i);
+
+    // Without the user's AI there is no stream of stand-in text, only the hand-off.
+    const noAi = await api(page, "POST", `/api/projects/${id}/assignment/stream-section`, { sectionTitle: "Introduction", targetWordCount: 300 });
+    expect(noAi.status).toBe(426);
+    expect(noAi.json?.requireFrontendLLM).toBe(true);
+  });
+});
+
 test("Thesis (OT-09): a chapter is drafted by the user's AI", async ({ page }) => {
   await withProject(page, "OT-09", { title: "E2E thesis" }, async (id) => {
     const res = await api(page, "POST", `/api/projects/${id}/thesis/draft-chapter`, { chapterTitle: "Introduction", targetWords: 150 }, AI_HEADERS);

@@ -66,6 +66,7 @@ export function AssignmentDraftingStage({
   } = useAssignmentWorkspace();
 
   const [streamingChunk, setStreamingChunk] = useState<string>("");
+  const [draftError, setDraftError] = useState<string | null>(null);
   const [activeStreamingSectionId, setActiveStreamingSectionId] = useState<string | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isTuning, setIsTuning] = useState(false);
@@ -175,6 +176,7 @@ export function AssignmentDraftingStage({
       setActiveSectionId(sec.id);
       setActiveStreamingSectionId(sec.id);
       setGeneratingSection(sec.id, true);
+      setDraftError(null);
       setStreamingChunk(sec.draftContent || "");
 
       // ── Evidence Pack Construction (Production Spec §4.1–4.3) ──
@@ -240,12 +242,12 @@ export function AssignmentDraftingStage({
           },
           onError: (err) => {
             console.error("Section streaming failed:", err);
-            setActiveStreamingSectionId(null);
-            setGeneratingSection(sec.id, false);
           },
         });
       } catch (err) {
-        console.error("Error generating section:", err);
+        // Keep whatever the section had before; never fill it with stand-in text.
+        setDraftError(`"${sec.title}" was not drafted: ${err instanceof Error ? err.message : String(err)}`);
+        setStreamingChunk("");
         setActiveStreamingSectionId(null);
         setGeneratingSection(sec.id, false);
       }
@@ -592,6 +594,13 @@ export function AssignmentDraftingStage({
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>← Back to Sources & Evidence</span>
         </button>
+
+        {draftError && (
+          <div role="alert" className="flex items-start gap-2 text-xs text-[var(--text-primary)] bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl px-3 py-2 max-w-md">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <span>{draftError}</span>
+          </div>
+        )}
 
         {/* Gate Status Feedback */}
         <div className="flex-1 flex items-center justify-center text-center px-4">

@@ -1,6 +1,6 @@
 import express from "express";
 import { callOpenRouterText } from "../utils/llm.ts";
-import { generateSectionDraft } from "../../src/features/drafting/services/sectionDraftingEngine.ts";
+import { sendAiFailure, UnusableAiResponseError } from "../src/ai/aiRouteErrors.ts";
 import { getProjectStore } from "../../src/services/store/projectStore.ts";
 import { requireAuth } from "../src/middleware/auth.ts";
 
@@ -120,44 +120,20 @@ Output ONLY clean academic markdown prose.`;
       "drafting"
     );
 
-    if (draftText && typeof draftText === "string" && draftText.trim().length > 50) {
-      return res.json({
-        success: true,
-        draft: draftText.trim(),
-        sectionTitle,
-        wordCount: draftText.trim().split(/\s+/).filter(Boolean).length,
-      });
-    }
+    const text = typeof draftText === "string" ? draftText.trim() : "";
+    // No template text: an empty answer is reported, not filled in (P0-20).
+    if (!text) return sendAiFailure(res, new UnusableAiResponseError("section draft"), "Section draft");
+    return res.json({
+      success: true,
+      draft: text,
+      sectionTitle,
+      wordCount: text.split(/\s+/).filter(Boolean).length,
+    });
   } catch (err: any) {
-    if (err?.message === "RequireFrontendLLMException") {
-      // Graceful fallback to deterministic topic-grounded generation
-    } else {
-      console.warn("Drafting route LLM fallback:", err?.message);
-    }
+    // The 426 browser hand-off was already sent.
+    if (err?.message === "RequireFrontendLLMException") return;
+    return sendAiFailure(res, err, "Section draft");
   }
-
-  // Deterministic topic-grounded synthesis fallback
-  const fallbackDraft = generateSectionDraft({
-    sectionTitle,
-    assignmentQuestion: effectiveQuestion,
-    academicFunction,
-    targetWordCount,
-    academicLevel,
-    citationStyle,
-    thesis,
-    keyPoints,
-    boundSources,
-    revisionPrompt,
-    allDraftedSections,
-  });
-
-  return res.json({
-    success: true,
-    draft: fallbackDraft,
-    sectionTitle,
-    wordCount: fallbackDraft.split(/\s+/).filter(Boolean).length,
-    isFallback: true,
-  });
 });
 
 export function registerDraftingRoutes(app: express.Express): void {
