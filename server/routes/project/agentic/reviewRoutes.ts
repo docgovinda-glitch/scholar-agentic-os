@@ -23,8 +23,7 @@ import type { AcademicTemplate } from "../../../../src/app/export/academicPdfCom
 import { getSupabaseRestConfig, SupabaseTable } from "../../../src/supabaseRest.ts";
 import {
   getProjectSafe,
-  generateFiveRefereeCritiques,
-  generatePointByPointRebuttalMatrix,
+  buildRebuttalMatrixFromCritiques,
   reconcileManuscriptCitations,
   manuscriptToCanonicalDocument,
 } from "./helpers.ts";
@@ -130,7 +129,10 @@ Return ONLY valid JSON in this exact format:
         };
       });
     } else {
-      critiquesData = generateFiveRefereeCritiques(project);
+      // No stand-in critiques: nothing is saved and the user sees why.
+      res.write(`event: error\ndata: ${JSON.stringify({ message: "The AI returned no usable reviewer critiques. Nothing was saved. Try again." })}\n\n`);
+      res.end();
+      return;
     }
 
     // Insert into Supabase peer_review_critiques with strict lens and feedback validation
@@ -237,11 +239,11 @@ reviewRoutes.post("/rebuttal-matrix", async (req: express.Request<{ id: string }
       }
 
       if (critiques.length === 0) {
-        critiques = generateFiveRefereeCritiques(project);
+        return res.status(400).json({ error: "Run the peer review first: there are no reviewer critiques to respond to." });
       }
 
-      // Generate Point-by-Point Rebuttal Matrix
-      matrix = generatePointByPointRebuttalMatrix(critiques, project);
+      // One row per real critique; responses are the author's (or the AI's, below).
+      matrix = buildRebuttalMatrixFromCritiques(critiques);
     }
 
     // If live AI is available and not in test mode, enrich author responses and diffs
@@ -353,10 +355,7 @@ reviewRoutes.get("/rebuttal-matrix", async (req: express.Request<{ id: string }>
       if (project.answers?.["peer_review_critiques"]) {
         critiques = safeParseAnswerField<AcademicCritiqueItem[]>(project.answers["peer_review_critiques"], []);
       }
-      if (critiques.length === 0) {
-        critiques = generateFiveRefereeCritiques(project);
-      }
-      matrix = generatePointByPointRebuttalMatrix(critiques, project);
+      matrix = buildRebuttalMatrixFromCritiques(critiques);
     }
 
     res.json({ ok: true, data: matrix });
@@ -611,7 +610,7 @@ reviewRoutes.post("/publication-readiness", async (req: express.Request<{ id: st
     reqJournal ||
     project.answers?.["selected_journal_name"] ||
     project.answers?.["target_journal"] ||
-    "Nature Machine Intelligence";
+    "";
 
   // 1. Get or synthesize CanonicalDocument
   let manuscriptText =
@@ -628,33 +627,9 @@ reviewRoutes.post("/publication-readiness", async (req: express.Request<{ id: st
     }
   }
 
+  // No demo manuscript is ever substituted for the user's own text.
   if (!manuscriptText) {
-    manuscriptText = `# ${project.answers?.["working_title"] || (project as { title?: string }).title || "Manuscript"}
-
-## Abstract
-Autonomous reasoning verification under provable bounds across distributed reasoning architectures.
-
-## 1. Introduction
-Multi-agent synthesis workflows require continuous verification to prevent cumulative hallucination cascade.
-
-## 2. Methodology & Formal Bounds
-Under Lemma 1, asymptotic complexity is bounded at O(|C| · |E| log |V|) via top-k candidate thresholding.
-
-## 3. Empirical Results
-Empirical evaluation against standard benchmarks demonstrates a 94.2% fidelity rate (95% CI: [92.8%, 95.6%], p < 0.001).
-
-## 4. Discussion & Validity Threats
-The empirical results confirm that bounded multi-agent consensus achieves provable stability.
-
-## Declarations
-Data Availability: All data deposited under DOI 10.5281/zenodo.10824.
-Code Availability: Code available at repository under MIT license.
-Conflict of Interest: The authors declare no competing interests.
-Author Contributions: Lead Author conceived the study and wrote the manuscript.
-AI-Assisted Technologies: Scholar Agentic OS was utilized for formal verification and orthographic styling in accordance with 2026 ICMJE/COPE guidelines.
-
-## References
-1. Vaswani, A. et al. (2024). Empirical Grounding in Autonomous Academic Synthesis. Journal of AI Research, 45(2), 112-128.`;
+    return res.status(400).json({ error: "Nothing to check yet: write or generate your manuscript first." });
   }
 
   const doc = manuscriptToCanonicalDocument(
@@ -934,26 +909,9 @@ reviewRoutes.post("/export", async (req: express.Request<{ id: string }>, res) =
     }
   }
 
+  // No demo manuscript is ever substituted for the user's own text.
   if (!textToExport.trim()) {
-    textToExport = `# ${project.answers?.["working_title"] || (project as { title?: string }).title || "Manuscript"}
-
-## Abstract
-Autonomous reasoning verification under provable bounds across distributed reasoning architectures.
-
-## 1. Introduction
-Multi-agent synthesis workflows require continuous verification to prevent cumulative hallucination cascade.
-
-## 2. Methodology & Formal Bounds
-Under Lemma 1, asymptotic complexity is bounded at O(|C| · |E| log |V|) via top-k candidate thresholding.
-
-## 3. Empirical Results
-Empirical evaluation against standard benchmarks demonstrates a 94.2% fidelity rate (95% CI: [92.8%, 95.6%], p < 0.001).
-
-## 4. Discussion & Validity Threats
-The empirical results confirm that bounded multi-agent consensus achieves provable stability.
-
-## References
-1. Vaswani, A. et al. (2024). Empirical Grounding in Autonomous Academic Synthesis. Journal of AI Research, 45(2), 112-128.`;
+    return res.status(400).json({ error: "Nothing to export yet: write or generate your manuscript first." });
   }
 
   // If includeRebuttalAppendix is enabled, append Rebuttal Matrix Appendix
@@ -961,8 +919,8 @@ The empirical results confirm that bounded multi-agent consensus achieves provab
     let rebuttalMatrix = safeParseAnswerField<RebuttalMatrixItem[]>(project.answers?.["rebuttal_matrix"], []);
 
     if (rebuttalMatrix.length === 0) {
-      const critiques = generateFiveRefereeCritiques(project);
-      rebuttalMatrix = generatePointByPointRebuttalMatrix(critiques, project);
+      const critiques = safeParseAnswerField<AcademicCritiqueItem[]>(project.answers?.["peer_review_critiques"], []);
+      rebuttalMatrix = buildRebuttalMatrixFromCritiques(critiques);
     }
 
     textToExport += "\n\n## Appendix: Peer Review Synthesis & Point-by-Point Rebuttal Matrix\n\n";
