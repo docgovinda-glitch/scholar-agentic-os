@@ -1,11 +1,12 @@
 /**
  * Document Intelligence Engine - Spreadsheet Parser
  *
- * Production-quality tabular data parser using ExcelJS (and deterministic CSV/TSV fallback).
+ * Tabular data parser: .xlsx via a small JSZip-based reader (`xlsxReader.ts`), CSV/TSV directly.
  * Extracts sheet names, row counts, formatted samples, and summaries with NFC Unicode normalization.
  */
 
 import type { Parser, ParserMetadata, DocumentInput, ParserOperationResult, ParserResult } from "../types";
+import { readXlsx } from "./xlsxReader";
 
 function parseDelimitedText(text: string, delimiter: string): string[][] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
@@ -32,20 +33,6 @@ function parseDelimitedText(text: string, delimiter: string): string[][] {
     cells.push(current.trim());
     return cells;
   });
-}
-
-function formatCellValue(cellValue: unknown): string {
-  if (cellValue === null || cellValue === undefined) return "";
-  if (typeof cellValue === "object") {
-    const obj = cellValue as Record<string, unknown>;
-    if ("result" in obj && obj.result !== undefined) return String(obj.result).trim();
-    if ("text" in obj && typeof obj.text === "string") return obj.text.trim();
-    if (Array.isArray(obj.richText)) {
-      return obj.richText.map((part: any) => part?.text || "").join("").trim();
-    }
-    if (cellValue instanceof Date) return cellValue.toISOString();
-  }
-  return String(cellValue).trim();
 }
 
 export class SpreadsheetParser implements Parser {
@@ -94,23 +81,10 @@ export class SpreadsheetParser implements Parser {
       let totalRows = 0;
 
       if (isZipXlsx) {
-        const excelJsModule = await import("exceljs");
-        const ExcelJS = ((excelJsModule as any).default || excelJsModule) as typeof import("exceljs");
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(buffer as any);
-
-        workbook.worksheets.forEach((worksheet, idx) => {
-          const sheetName = worksheet.name || `Sheet${idx + 1}`;
+        const sheets = await readXlsx(new Uint8Array(buffer));
+        sheets.forEach(({ name, rows }, idx) => {
+          const sheetName = name || `Sheet${idx + 1}`;
           sheetNames.push(sheetName);
-
-          const rows: string[][] = [];
-          worksheet.eachRow({ includeEmpty: false }, (row) => {
-            const values = Array.isArray(row.values) ? row.values.slice(1) : [];
-            const formatted = values.map(formatCellValue).filter(Boolean);
-            if (formatted.length > 0) {
-              rows.push(formatted);
-            }
-          });
 
           totalRows += rows.length;
           const sheetLines: string[] = [`[Sheet: ${sheetName}] (${rows.length} rows)`];
