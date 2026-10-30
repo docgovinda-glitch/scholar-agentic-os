@@ -8,7 +8,6 @@ import { JournalStageInstructionBanner } from "../JournalStageInstructionBanner"
 import {
   buildTitlePrompts,
   buildTitlePolishPrompt,
-  generateLocalTitleFallback,
   type TitleItem,
 } from "../agentPrompts/titlePrompts";
 import { parseJsonFromLlm } from "../../../utils/jsonParser";
@@ -159,11 +158,7 @@ export default function TitleSelectionStage({
       let data: TitleItem[] = parsedData && Array.isArray(parsedData.data) ? parsedData.data : [];
 
       if (data.length === 0) {
-        data = generateLocalTitleFallback({
-          projectAnswers: project?.answers || {},
-          targetJournal: targetJournal || undefined,
-          customStyle: customDirective,
-        });
+        throw new Error("The AI returned no title proposals.");
       }
 
       setResults(data);
@@ -190,37 +185,16 @@ export default function TitleSelectionStage({
     } catch (err: any) {
       const errMsg = err.message || "Failed to generate titles.";
 
-      const fallbackTitles = generateLocalTitleFallback({
-        projectAnswers: project?.answers || {},
-        targetJournal: targetJournal || undefined,
-        customStyle: customDirective,
-      });
-
-      setResults(fallbackTitles);
-
-      try {
-        const updated = await saveIntakeAnswers(projectId, {
-          generated_titles: JSON.stringify(fallbackTitles),
-          current_stage: "title_selection",
-        });
-        setProject(updated);
-      } catch (saveErr) {
-        console.warn("[TitleSelectionStage] Failed to persist fallback titles:", saveErr);
-      }
-
+      // No template titles: the user sees that nothing was generated.
+      setResults([]);
+      setError(`Titles could not be generated (${errMsg}). Nothing was produced. Try again, or write your own title below.`);
       setLogs((prev) => [
         ...prev,
         {
-          id: Date.now().toString() + "fallback",
+          id: Date.now().toString() + "error",
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "warning",
-          message: `ℹ️ Local synthesis activated (${errMsg}): ${fallbackTitles.length} publication-grade title proposals generated.`,
-        },
-        {
-          id: Date.now().toString() + "done2",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `✓ Title proposals ready for evaluation and adoption.`,
+          level: "error",
+          message: `✕ Title generation failed: ${errMsg}`,
         },
       ]);
     } finally {
