@@ -79,22 +79,35 @@ async function createStageProject(answers: Record<string, unknown> = {}): Promis
 }
 
 describe("Stages 20-22: 5-Referee Peer Review & Point-by-Point Rebuttal Matrix", () => {
-  it("generates and retrieves 5-referee rebuttal matrix bridging Methodologist, Domain Specialist, Biostatistician, Synthesizer, Formal Editor", async () => {
-    const projectId = await createStageProject();
+  // Rewritten for P0-12: with no critiques the route used to invent five canned
+  // referee critiques and pre-written "addressed" author responses, and this test
+  // asserted them. The matrix is now built only from the project's real critiques,
+  // with the author's response left for the author.
+  it("builds the rebuttal matrix from the project's own critiques and persists author revisions", async () => {
+    const empty = await createStageProject();
+    const none = await request(app).get(`/api/projects/${empty}/agent/rebuttal-matrix`);
+    expect(none.status).toBe(200);
+    expect(none.body.data).toEqual([]);
+    const noCritiques = await request(app).post(`/api/projects/${empty}/agent/rebuttal-matrix`).send({});
+    expect(noCritiques.status).toBe(400);
 
-    // 1. Fetch default rebuttal matrix
+    const projectId = await createStageProject({
+      peer_review_critiques: JSON.stringify([
+        { id: "c1", refereeRole: "Methodologist", critiqueLens: "Rigor", section: "Methods", severity: "Major", critique: "Sample size is not justified." },
+        { id: "c2", refereeRole: "Formal Editor", critiqueLens: "Style", section: "Abstract", severity: "Minor", critique: "Abstract exceeds 250 words." },
+      ]),
+    });
     const getRes = await request(app).get(`/api/projects/${projectId}/agent/rebuttal-matrix`);
     expect(getRes.status).toBe(200);
-    expect(getRes.body.ok).toBe(true);
-    expect(Array.isArray(getRes.body.data)).toBe(true);
-    expect(getRes.body.data.length).toBe(5);
-
-    const roles = getRes.body.data.map((item: { refereeRole: string }) => item.refereeRole);
-    expect(roles).toContain("Methodologist");
-    expect(roles).toContain("Domain Specialist");
-    expect(roles).toContain("Biostatistician");
-    expect(roles).toContain("Synthesizer");
-    expect(roles).toContain("Formal Editor");
+    expect(getRes.body.data.map((r: { critique: string }) => r.critique)).toEqual([
+      "Sample size is not justified.",
+      "Abstract exceeds 250 words.",
+    ]);
+    for (const row of getRes.body.data) {
+      expect(row.authorResponse).toBe("");
+      expect(row.status).toBe("pending");
+      expect(row.diff).toBeUndefined();
+    }
 
     // 2. Persist custom author revisions to the rebuttal matrix
     const customMatrix = [

@@ -252,167 +252,24 @@ export function reconcileManuscriptCitations(
 }
 
 /**
- * 5-Referee Adversarial Peer Review Critique Generator:
- * Generates grounded scholarly critiques across the 5 referee personas:
- * Methodologist, Domain Specialist, Biostatistician, Synthesizer, Formal Editor.
+ * One rebuttal row per real reviewer critique. Author response and revision
+ * action stay empty for the author (or the AI, when available) to fill in:
+ * nothing is marked addressed and no edit is proposed on the author's behalf.
  */
-export function generateFiveRefereeCritiques(project: ProjectRecord): AcademicCritiqueItem[] {
-  const targetJournal =
-    project.answers?.["selected_journal_name"] ||
-    project.answers?.["target_journal"] ||
-    "Nature Machine Intelligence";
-  const anchorGap = (() => {
-    const gaps = project.answers?.["identified_gaps"];
-    if (gaps) {
-      const parsed = safeParseAnswerField<Array<{ title?: string; description?: string }>>(gaps, []);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed[0].title || parsed[0].description || "Primary research gap";
-      }
-    }
-    return "Primary research gap";
-  })();
-
-  return [
-    {
-      id: "crit-ref-01",
-      referee: "Methodologist",
-      lens: "Methodological Rigor & Experimental Design",
-      section: "Section 2: Methodology",
-      severity: "Major",
-      feedback: `The asymptotic complexity bound for the proposed operator assumes balanced partition cardinality. In asymmetric or adversarial topologies, worst-case runtime must be explicitly bounded with candidate pruning heuristics to guarantee algorithmic stability under "${anchorGap}".`,
-      revisionDirective:
-        "Formalize Lemma 1 stating the pruned search complexity under top-k candidate thresholding and specify boundary conditions.",
-      waived: false,
-    },
-    {
-      id: "crit-ref-02",
-      referee: "Domain Specialist",
-      lens: "Domain Alignment & Literature Grounding",
-      section: "Section 1: Introduction",
-      severity: "Moderate",
-      feedback: `The transition between the problem formulation addressing "${anchorGap}" and the formal analytical model in Section 2 is abrupt. Readers of ${targetJournal} require an intermediate conceptual bridge explaining why conventional baseline architectures induce cumulative epistemic divergence.`,
-      revisionDirective:
-        "Introduce a transitional paragraph motivating the necessity of deterministic verification over greedy heuristic baselines.",
-      waived: false,
-    },
-    {
-      id: "crit-ref-03",
-      referee: "Biostatistician",
-      lens: "Quantitative Rigor & Telemetry Calibration",
-      section: "Section 3: Empirical Results",
-      severity: "Major",
-      feedback:
-        "The reported variance reduction metrics rely on aggregate test suite averages without confidence intervals or statistical power indicators. Exact 95% bootstrap confidence intervals [92.8%, 95.6%] and standard errors must be explicitly reported.",
-      revisionDirective:
-        "Report exact 95% bootstrap confidence intervals and p-values (p < 0.001) for all empirical benchmarks in Table 1.",
-      waived: false,
-    },
-    {
-      id: "crit-ref-04",
-      referee: "Synthesizer",
-      lens: "Cross-Source Synthesis & Validity Threats",
-      section: "Section 4: Discussion",
-      severity: "Moderate",
-      feedback:
-        "The manuscript does not adequately analyze boundary conditions and threats to validity when input vault sources contain contradictory empirical claims or under stochastic network dropouts.",
-      revisionDirective:
-        "Add a dedicated 'Threats to Validity: Epistemic Disagreement Handling' subsection delineating boundary conditions.",
-      waived: false,
-    },
-    {
-      id: "crit-ref-05",
-      referee: "Formal Editor",
-      lens: "Scholarly Voice, Orthography & Standards Compliance",
-      section: "Manuscript-wide & Declarations",
-      severity: "Minor",
-      feedback: `Residual colloquial phrases and inconsistent orthography detract from the scholarly register. Publication standards for ${targetJournal} require strict British English (-ise, -our, -re), zero AI cliché tokens, and explicit 2026 ICMJE/COPE Data Availability and Code Availability DOIs.`,
-      revisionDirective:
-        "Enforce British English conventions, purge colloquial cliché tokens, and append formal 2026 ICMJE/COPE declarations.",
-      waived: false,
-    },
-  ];
-}
-
-/**
- * Point-by-Point Referee Rebuttal Matrix Generator:
- * Maps each critique from Methodologist, Domain Specialist, Biostatistician, Synthesizer,
- * and Formal Editor to an authoritative author response and manuscript revision action.
- */
-export function generatePointByPointRebuttalMatrix(
-  critiques: AcademicCritiqueItem[],
-  project: ProjectRecord
-): RebuttalMatrixItem[] {
-  const responses: Record<
-    RefereeRole,
-    { response: string; action: string; diff: { find: string; replace: string } }
-  > = {
-    Methodologist: {
-      response:
-        "We thank the Methodologist for this essential critique. We have formalized Lemma 1, explicitly demonstrating that top-k candidate thresholding bounds worst-case asymptotic runtime at O(|C| · |E| log |V|), preventing latency stalls across asymmetric topologies.",
-      action: "Formalized Lemma 1 and explicit parameter bounds in Section 2 (Methodology).",
-      diff: {
-        find: "The computational complexity is assumed to scale linearly across participating agents under symmetric communications.",
-        replace:
-          "Under Lemma 1, asymptotic complexity is bounded at O(|C| · |E| log |V|) via top-k candidate thresholding, guaranteeing bounded runtime under asymmetric partitions.",
-      },
-    },
-    "Domain Specialist": {
-      response:
-        "We concur with the Domain Specialist. We have inserted an intermediate conceptual bridge contextualizing why conventional vector-space baselines fail to preserve provenance, grounding our operator within recent findings in the target journal literature.",
-      action: "Inserted transitional conceptual bridge paragraph in Section 1 (Introduction).",
-      diff: {
-        find: "Autonomous reasoning architectures demonstrate an average variance reduction.",
-        replace:
-          "Autonomous reasoning architectures demonstrate reproducible variance reduction; however, conventional nearest-neighbor retrieval mechanisms fail to preserve deterministic provenance under epistemic divergence.",
-      },
-    },
-    Biostatistician: {
-      response:
-        "The Biostatistician's feedback has been fully incorporated. We have calibrated Section 3 to report exact 95% bootstrap confidence intervals [92.8%, 95.6%] with p < 0.001 and standard error bars across all benchmark comparisons.",
-      action: "Updated Section 3 telemetry and Table 1 with exact 95% CI and significance thresholds.",
-      diff: {
-        find: "Evaluation against synthetic benchmark suites indicates a 94.2% fidelity rate.",
-        replace:
-          "Evaluation against synthetic benchmark suites indicates a 94.2% fidelity rate (95% CI: [92.8%, 95.6%], p < 0.001), corroborating the theoretical stability bounds.",
-      },
-    },
-    Synthesizer: {
-      response:
-        "We appreciate the Synthesizer's constructive guidance. We have added a dedicated 'Threats to Validity & Boundary Conditions' subsection detailing how conflicting vault evidence is resolved through deterministic cross-entropy ranking.",
-      action: "Appended dedicated 'Threats to Validity & Boundary Conditions' subsection to Section 4.",
-      diff: {
-        find: "The empirical results confirm that bounded multi-agent consensus achieves provable stability.",
-        replace:
-          "The empirical results confirm that bounded multi-agent consensus achieves provable stability; under stochastic packet loss exceeding 35%, graceful degradation is observed rather than catastrophic divergence.",
-      },
-    },
-    "Formal Editor": {
-      response:
-        "We have rigorously addressed the Formal Editor's mandate. All manuscript text has been polished to adhere to British English orthography (-ise, -our, -re), all residual cliché tokens have been purged, and complete 2026 ICMJE/COPE declarations have been appended.",
-      action: "Applied Stage 23 Final Editor polishing and appended formal 2026 ICMJE Declarations.",
-      diff: {
-        find: "Further research is necessary to evaluate high-noise sensor regimes.",
-        replace:
-          "Further inquiry is warranted to examine sensor noise regimes. Declarations: Data Availability and Code Availability DOIs are deposited in the institutional repository under Zenodo.",
-      },
-    },
-  };
-
+export function buildRebuttalMatrixFromCritiques(critiques: AcademicCritiqueItem[]): RebuttalMatrixItem[] {
   return critiques.map((c, idx) => {
-    const refereeStr = c.referee || c.refereeRole || "Methodologist";
-    const preset = (responses as Record<string, typeof responses.Methodologist>)[refereeStr] || responses.Methodologist;
+    const referee = c.referee || c.refereeRole || "Reviewer";
     return {
       id: `reb-${idx + 1}`,
-      referee: refereeStr,
-      refereeRole: c.refereeRole || refereeStr,
+      referee,
+      refereeRole: c.refereeRole || referee,
       lens: c.lens || c.critiqueLens || "",
       section: c.section,
       critique: c.feedback || c.critique || "",
       severity: c.severity,
-      authorResponse: c.authorNote || preset.response,
-      revisionAction: c.revisionDirective || preset.action,
-      diff: preset.diff,
-      status: c.waived ? "waived" : "addressed",
+      authorResponse: c.authorNote || "",
+      revisionAction: c.revisionDirective || "",
+      status: c.waived ? "waived" : "pending",
     };
   });
 }

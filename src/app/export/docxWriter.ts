@@ -804,29 +804,8 @@ export async function renderRefereeResponseLetterDocx(
   const title = norm(metadata.title || "Academic Manuscript");
   const author = norm(metadata.author || "Lead Investigator");
 
-  const matrix =
-    academicOptions?.rebuttalMatrix && academicOptions.rebuttalMatrix.length > 0
-      ? academicOptions.rebuttalMatrix
-      : [
-          {
-            referee: "Methodologist",
-            lens: "Methodology & Benchmark Bounds",
-            section: "2. Methodology",
-            severity: "Major",
-            critique: "The latency bounds require empirical verification against physical decoding hardware.",
-            authorResponse: "We have incorporated empirical FPGA latency data from benchmark run user_data_101 directly verifying sub-microsecond bounds.",
-            revisionAction: "Updated Section 2 with hardware telemetry table and bound proofs.",
-          },
-          {
-            referee: "Domain Specialist",
-            lens: "Surface Code Syndromes",
-            section: "3. Results",
-            severity: "Moderate",
-            critique: "Clarify the distinction between CSS and non-CSS syndrome decoding thresholds.",
-            authorResponse: "We have explicitly differentiated the syndrome decoding thresholds and included comparison equations.",
-            revisionAction: "Revised Section 3.2 paragraphs 2-4 with explicit mathematical notation.",
-          },
-        ];
+  // Only the author's own rebuttal matrix; never sample reviewer comments.
+  const matrix = academicOptions?.rebuttalMatrix ?? [];
 
   const children: (Paragraph | Table)[] = [];
 
