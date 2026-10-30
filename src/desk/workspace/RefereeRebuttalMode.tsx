@@ -314,7 +314,7 @@ export default function RefereeRebuttalMode() {
             <button
               type="button"
               onClick={() => setMode("audit_export")}
-              className="px-4 py-1.5 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-1.5 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
               <span>Proceed to Mode 5: Audit</span>
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -347,7 +347,7 @@ export default function RefereeRebuttalMode() {
               type="button"
               disabled={isSimulatingReview}
               onClick={handleSimulateReview}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shrink-0 shadow-sm"
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shrink-0 shadow-sm"
             >
               {isSimulatingReview ? (
                 <>
@@ -676,7 +676,7 @@ export default function RefereeRebuttalMode() {
               <button
                 type="button"
                 onClick={handleCopyRebuttalLetter}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-white cursor-pointer shadow-sm flex items-center gap-1.5"
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-[color:var(--text-inverse)] cursor-pointer shadow-sm flex items-center gap-1.5"
               >
                 <span>{copiedLetter ? "✓ Copied to Clipboard!" : "Copy Rebuttal Letter"}</span>
               </button>

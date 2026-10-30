@@ -36,7 +36,19 @@ async function api(page: Page, method: string, path: string, body?: unknown) {
 async function check(page: Page, label: string, width: number, testInfo: import("@playwright/test").TestInfo) {
   await page.waitForLoadState("networkidle");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(overflow, `${label} scrolls sideways at ${width}px`).toBeLessThanOrEqual(1);
+  // Name the widest elements that stick out, so a failure says what to fix.
+  const culprits =
+    overflow > 1
+      ? await page.evaluate(() =>
+          Array.from(document.querySelectorAll("body *"))
+            .map((el) => ({ el, r: el.getBoundingClientRect() }))
+            .filter(({ r }) => r.right > window.innerWidth + 1 && r.width > 0)
+            .sort((a, b) => b.r.right - a.r.right)
+            .slice(0, 6)
+            .map(({ el, r }) => `${el.tagName.toLowerCase()}.${String(el.className).split(" ").slice(0, 6).join(".")} right=${Math.round(r.right)} w=${Math.round(r.width)}`)
+        )
+      : [];
+  expect(overflow, `${label} scrolls sideways at ${width}px: ${culprits.join(" | ")}`).toBeLessThanOrEqual(1);
 
   const shot = testInfo.outputPath(`${label}-${width}.png`);
   await page.screenshot({ path: shot, fullPage: true });
@@ -44,7 +56,10 @@ async function check(page: Page, label: string, width: number, testInfo: import(
 
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   const summary = results.violations.map(
-    (v) => `${v.impact} ${v.id} (${v.nodes.length}): ${v.help} → ${v.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(", ")}`
+    (v) =>
+      `${v.impact} ${v.id} (${v.nodes.length}): ${v.help} → ${v.nodes
+        .map((n) => `${n.target.join(" ")}${v.id === "color-contrast" ? ` [${(n.any[0]?.message || "").slice(0, 90)}]` : ""}`)
+        .join(" | ")}`
   );
   expect(summary, `axe violations on ${label} at ${width}px`).toEqual([]);
 }

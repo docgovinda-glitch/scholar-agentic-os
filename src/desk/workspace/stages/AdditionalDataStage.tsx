@@ -388,7 +388,7 @@ export default function AdditionalDataStage({
               onClick={() => setActiveTab("upload")}
               className={`px-4 py-2 font-semibold text-xs rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === "upload"
-                  ? "bg-[color:var(--accent)] text-white shadow-xs"
+                  ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-xs"
                   : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)]"
               }`}
             >
@@ -403,7 +403,7 @@ export default function AdditionalDataStage({
               onClick={() => setActiveTab("paste")}
               className={`px-4 py-2 font-semibold text-xs rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === "paste"
-                  ? "bg-[color:var(--accent)] text-white shadow-xs"
+                  ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-xs"
                   : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)]"
               }`}
             >
@@ -522,7 +522,7 @@ export default function AdditionalDataStage({
                 <button
                   type="submit"
                   disabled={busy || !pasteName.trim() || !pasteContent.trim()}
-                  className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-white text-xs font-bold hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors shadow-xs cursor-pointer flex items-center gap-2"
+                  className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-xs font-bold hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors shadow-xs cursor-pointer flex items-center gap-2"
                 >
                   + Attach Data to Manuscript
                 </button>
@@ -648,7 +648,7 @@ export default function AdditionalDataStage({
             type="button"
             onClick={handleProceed}
             disabled={isAdvancing}
-            className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-white hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
+            className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
           >
             {isAdvancing ? (
               <>

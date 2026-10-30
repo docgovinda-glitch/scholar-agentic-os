@@ -585,7 +585,7 @@ export default function ManuscriptStudioMode() {
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
                 isZenFocus
-                  ? "bg-[color:var(--accent)] text-white border-[color:var(--accent)]"
+                  ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] border-[color:var(--accent)]"
                   : "bg-[color:var(--surface-sunken)] border-[color:var(--border-control)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
               }`}
               title="Toggle Zen Focus Writing (Collapse Sidebars)"
@@ -609,7 +609,7 @@ export default function ManuscriptStudioMode() {
             <button
               type="button"
               onClick={() => setMode("referee")}
-              className="px-4 py-1.5 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-1.5 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
               <span>Proceed to Mode 4: Referee</span>
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -653,7 +653,7 @@ export default function ManuscriptStudioMode() {
                 type="button"
                 disabled={isDraftingActiveSubSection || isSequentialRunning}
                 onClick={handleDraftActiveSubSection}
-                className="w-full px-3 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                className="w-full px-3 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
               >
                 {isDraftingActiveSubSection ? (
                   <>
@@ -837,7 +837,7 @@ export default function ManuscriptStudioMode() {
                   onClick={() => setIsDiacriticPopoverOpen(!isDiacriticPopoverOpen)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1 ${
                     isDiacriticPopoverOpen
-                      ? "bg-[color:var(--accent)] text-white border-[color:var(--accent)]"
+                      ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] border-[color:var(--accent)]"
                       : "bg-[color:var(--surface-sunken)] border-[color:var(--border-control)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
                   }`}
                   title="Insert IAST scholarly diacritics (ā, ī, ū, ṛ, ś, etc.)"
@@ -857,7 +857,7 @@ export default function ManuscriptStudioMode() {
                           key={item.char}
                           type="button"
                           onClick={() => handleInsertDiacritic(item.char)}
-                          className="p-1 rounded bg-[color:var(--surface-sunken)] hover:bg-[color:var(--accent)] hover:text-white font-serif text-sm font-bold transition-colors cursor-pointer text-center"
+                          className="p-1 rounded bg-[color:var(--surface-sunken)] hover:bg-[color:var(--accent)] hover:text-[color:var(--text-inverse)] font-serif text-sm font-bold transition-colors cursor-pointer text-center"
                           title={item.label}
                         >
                           {item.char}
@@ -1026,7 +1026,7 @@ export default function ManuscriptStudioMode() {
                       <button
                         type="button"
                         onClick={() => handleInsertCitation(item.citationToken)}
-                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1 shadow-xs"
                       >
                         <span>+ Insert Citation</span>
                       </button>

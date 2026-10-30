@@ -1326,7 +1326,7 @@ export default function DefinitionStage({
                     <button
                       type="button"
                       onClick={addAuthor}
-                      className="px-4 py-2 text-xs font-bold text-white bg-[color:var(--accent)] rounded-full cursor-pointer hover:bg-[color:var(--accent-hover)]"
+                      className="px-4 py-2 text-xs font-bold text-[color:var(--text-inverse)] bg-[color:var(--accent)] rounded-full cursor-pointer hover:bg-[color:var(--accent-hover)]"
                     >
                       Add Lead Author
                     </button>

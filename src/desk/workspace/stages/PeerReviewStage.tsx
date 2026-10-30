@@ -433,7 +433,7 @@ export default function PeerReviewStage({
             <button
               onClick={startAgent}
               disabled={isProcessing}
-              className="px-5 py-2.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer font-sans"
+              className="px-5 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer font-sans"
             >
               {isProcessing ? (
                 <>
@@ -636,7 +636,7 @@ export default function PeerReviewStage({
                   onClick={() => setStatusFilter("all")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
                     statusFilter === "all"
-                      ? "bg-[color:var(--accent)] text-white"
+                      ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)]"
                       : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] border border-[color:var(--border-subtle)]"
                   }`}
                 >
@@ -814,7 +814,7 @@ export default function PeerReviewStage({
                             />
                             <button
                               onClick={() => handleSaveAuthorNote(crit.id)}
-                              className="px-3 py-1 bg-[color:var(--accent)] text-white text-xs font-bold rounded cursor-pointer"
+                              className="px-3 py-1 bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-xs font-bold rounded cursor-pointer"
                             >
                               Save Note
                             </button>
@@ -866,7 +866,7 @@ export default function PeerReviewStage({
             </p>
             <button
               onClick={startAgent}
-              className="mt-6 px-6 py-3 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] transition-all flex items-center gap-2 cursor-pointer"
+              className="mt-6 px-6 py-3 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] transition-all flex items-center gap-2 cursor-pointer"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -892,7 +892,7 @@ export default function PeerReviewStage({
           <button
             onClick={handleAdvance}
             disabled={isProcessing || isSavingAdvance || critiques.length === 0}
-            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-white font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
           >
             {isSavingAdvance ? (
               <>

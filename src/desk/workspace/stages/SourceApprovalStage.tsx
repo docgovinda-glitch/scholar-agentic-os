@@ -458,7 +458,7 @@ export default function SourceApprovalStage({
                   onClick={() => setActiveTab("pending")}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     activeTab === "pending"
-                      ? "bg-[color:var(--accent)] text-white shadow-xs"
+                      ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-xs"
                       : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)]"
                   }`}
                 >
@@ -470,7 +470,7 @@ export default function SourceApprovalStage({
                   onClick={() => setActiveTab("approved")}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     activeTab === "approved"
-                      ? "bg-[color:var(--accent)] text-white shadow-xs"
+                      ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-xs"
                       : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)]"
                   }`}
                 >
@@ -482,7 +482,7 @@ export default function SourceApprovalStage({
                   onClick={() => setActiveTab("discarded")}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     activeTab === "discarded"
-                      ? "bg-[color:var(--accent)] text-white shadow-xs"
+                      ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-xs"
                       : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)]"
                   }`}
                 >
@@ -639,7 +639,7 @@ export default function SourceApprovalStage({
                               type="button"
                               onClick={() => handleApprove(source, currentRole)}
                               disabled={isSaving}
-                              className="px-4 py-1.5 text-xs font-bold rounded-lg bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
+                              className="px-4 py-1.5 text-xs font-bold rounded-lg bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
                             >
                               ✓ Approve Source
                             </button>
@@ -859,7 +859,7 @@ export default function SourceApprovalStage({
           type="button"
           onClick={handleProceed}
           disabled={isAdvancing}
-          className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-white hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] focus:ring-offset-2 disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
+          className="rounded-xl bg-[color:var(--accent)] px-8 py-3 text-sm font-bold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] focus:ring-offset-2 disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
         >
           {isAdvancing ? (
             <>
@@ -947,7 +947,7 @@ export default function SourceApprovalStage({
                     handleApprove(inspectingSource);
                     setInspectingSource(null);
                   }}
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] cursor-pointer"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] cursor-pointer"
                 >
                   ✓ Approve Source
                 </button>

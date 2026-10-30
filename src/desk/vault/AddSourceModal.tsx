@@ -981,7 +981,7 @@ export default function AddSourceModal({
                                 onClick={() => handleSelectDriveFile(file, "google_drive", true)}
                                 className={`px-2.5 py-0.5 text-[10px] font-semibold rounded-[var(--radius-sm)] transition-colors cursor-pointer ${
                                   isSelected
-                                    ? "bg-[color:var(--accent)] text-white"
+                                    ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)]"
                                     : "text-[color:var(--accent)] hover:bg-[color:var(--accent-subtle)]"
                                 }`}
                               >
@@ -1164,7 +1164,7 @@ export default function AddSourceModal({
                                 onClick={() => handleSelectDriveFile(file, "onedrive", true)}
                                 className={`px-2.5 py-0.5 text-[10px] font-semibold rounded-[var(--radius-sm)] transition-colors cursor-pointer ${
                                   isSelected
-                                    ? "bg-[color:var(--accent)] text-white"
+                                    ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)]"
                                     : "text-[color:var(--accent)] hover:bg-[color:var(--accent-subtle)]"
                                 }`}
                               >
@@ -1226,7 +1226,7 @@ export default function AddSourceModal({
                         type="button"
                         onClick={() => handleDirectCloudLink("onedrive")}
                         disabled={!directCloudLink.trim()}
-                        className="px-3 py-1.5 bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-white text-xs font-semibold rounded-[var(--radius-sm)] disabled:opacity-50 cursor-pointer"
+                        className="px-3 py-1.5 bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-[color:var(--text-inverse)] text-xs font-semibold rounded-[var(--radius-sm)] disabled:opacity-50 cursor-pointer"
                       >
                         Fetch Link
                       </button>
@@ -1677,7 +1677,7 @@ export default function AddSourceModal({
                             aria-label={`${isSelected ? "Remove from" : "Assign to"} ${p}`}
                             className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
                               isSelected
-                                ? "bg-[color:var(--accent)] border-[color:var(--accent)] text-white font-bold shadow-xs"
+                                ? "bg-[color:var(--accent)] border-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold shadow-xs"
                                 : "bg-[color:var(--surface-raised)] border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:border-[color:var(--border-strong)] hover:text-[color:var(--text-primary)]"
                             }`}
                           >
@@ -1704,7 +1704,7 @@ export default function AddSourceModal({
                         {selectedProjects.map((p) => (
                           <span
                             key={p}
-                            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-[color:var(--accent)] text-white font-medium"
+                            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-medium"
                           >
                             <span>📁 {p}</span>
                             <button

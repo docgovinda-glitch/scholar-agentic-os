@@ -442,7 +442,7 @@ export default function ContextPanel({
                   </div>
                   <div className={`text-sm p-3 rounded-lg max-w-[90%] whitespace-pre-wrap leading-relaxed ${
                     msg.role === "user" 
-                      ? "bg-[color:var(--accent)] text-white rounded-tr-none" 
+                      ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] rounded-tr-none" 
                       : "bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-tl-none text-[color:var(--text-primary)]"
                   }`}>
                     {msg.content}
@@ -534,8 +534,9 @@ export default function ContextPanel({
             />
             <button 
               type="submit"
+              aria-label="Send"
               disabled={!inputValue.trim() || isTyping}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[color:var(--accent)] text-white flex items-center justify-center hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors cursor-pointer"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[color:var(--accent)] text-[color:var(--text-inverse)] flex items-center justify-center hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors cursor-pointer"
             >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M12 5l7 7-7 7" />
