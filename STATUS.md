@@ -90,7 +90,7 @@
 | **#82** | `fix/post-80-verification-login-purge-notices` | `main` | **MERGED & DEPLOYED** (`2026-10-29T11:00Z`) | `a8771bd` (`1b91e8c`) | `docgovinda-glitch` (agent, owner-authorized) | **YES** | Post-#80 hardening (Turnstile passthrough, login cap, fail-closed `LLM_CHALLENGE_SECRET`, cloud connections API, `CredentialResetNotice`); notice SQL moved to `20261029010000`. |
 | **#83** | `claude/jolly-mayer-k74uad` | `main` | **MERGED & DEPLOYED** (`2026-10-29T11:01Z`) | `efa5187` (`92c48c6`) | `docgovinda-glitch` (agent, owner-authorized) | **YES** | `20261029000000_reapply_premium_request_integrity.sql` (fresh-DB policy order fix; no-op in prod). |
 
-Later PRs were opened by the agent and merged by it (owner-authorized) only after CI passed. As of 2026-10-30 01:20Z all up to #100 are live; #101 is deploying and #102 is open.
+Later PRs were opened by the agent and merged by it (owner-authorized) only after CI passed. As of 2026-10-30 01:20Z all are merged; #100 is confirmed live, #101 and #102 deploy through the normal pipeline.
 
 | PR # | Contents |
 | :---: | :--- |
