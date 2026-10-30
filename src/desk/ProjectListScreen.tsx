@@ -214,6 +214,8 @@ export default function ProjectListScreen({
   }, [location.pathname, navigate]);
 
   const [projects, setProjects] = useState<ProjectView[] | null>(null);
+  // A failed list load is shown as an error, never as "no projects" (B7).
+  const [projectsLoadError, setProjectsLoadError] = useState<string | null>(null);
   const deletedProjectIdsRef = useRef<Set<string>>(new Set());
 
   // Initialize from sessionStorage to prevent zombie project resurrection across fast reloads/nav
@@ -496,6 +498,7 @@ export default function ProjectListScreen({
 
   const load = useCallback(() => {
     setError(null);
+    setProjectsLoadError(null);
     if (!userEmail) {
       setProjects([]);
       return;
@@ -512,7 +515,8 @@ export default function ProjectListScreen({
         setProjects(uniqueItems);
       })
       .catch(() => {
-        setProjects([]);
+        // Keep whatever is already listed; say the refresh failed.
+        setProjectsLoadError("Couldn't load your projects. Check your connection and try again.");
       });
   }, [userEmail]);
 
@@ -1453,6 +1457,22 @@ export default function ProjectListScreen({
               <span>Ask Scholar</span>
             </button>
           </div>
+
+          {userEmail && projectsLoadError && (
+            <div role="alert" className="mt-6 mx-1 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 px-3 py-2.5 text-xs text-[color:var(--text-primary)] flex flex-col gap-2">
+              <span>{projectsLoadError}</span>
+              <button
+                type="button"
+                onClick={load}
+                className="self-start px-3 py-1 rounded-lg border border-[color:var(--border-control)] font-semibold hover:bg-[color:var(--surface-hover)] cursor-pointer"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+          {userEmail && projects === null && !projectsLoadError && (
+            <p role="status" className="mt-6 px-3 text-xs text-[color:var(--text-secondary)]">Loading your projects…</p>
+          )}
 
           {/* Projects Section: Render only when logged in and active projects exist */}
           {userEmail && projects && projects.length > 0 && (

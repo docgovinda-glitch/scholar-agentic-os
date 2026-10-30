@@ -1353,3 +1353,17 @@ describe("prompt isolation & rich markdown rendering", () => {
     expect(screen.getByText(/\{\"status\": \"ok\"\}/)).toBeInTheDocument();
   });
 });
+
+describe("project list load failure (B7)", () => {
+  it("says the list could not load and retries, instead of showing no projects", async () => {
+    listProjects.mockRejectedValueOnce(new Error("network down")).mockResolvedValueOnce({ items: [SAMPLE_PROJECT] });
+    listOutputTypes.mockResolvedValue({ items: TYPES });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    expect(await screen.findByText(/Couldn't load your projects/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await waitFor(() => expect(screen.queryByText(/Couldn't load your projects/)).not.toBeInTheDocument());
+    expect(listProjects).toHaveBeenCalledTimes(2);
+  });
+});
