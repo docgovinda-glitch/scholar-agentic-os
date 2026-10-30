@@ -95,7 +95,8 @@ export default function DraftStage({
   }, [project.answers]);
 
   const targetJournal =
-    project.answers?.["target_journal"] || "ACM Transactions on Computer Systems (TOCS)";
+    project.answers?.["target_journal"] || "";
+  const journalLabel = targetJournal || "your target journal";
 
   const journalConstraints = useMemo(() => {
     return safeParseAnswerField<{ citation_style?: string; max_words?: number | string; [key: string]: unknown }>(project.answers?.["journal_constraints"], {});
@@ -161,7 +162,7 @@ export default function DraftStage({
         id: Date.now().toString() + "-1",
         timestamp: new Date().toLocaleTimeString([], { hour12: false }),
         level: "info",
-        message: `Initializing Multi-Agent Academic Drafter Pipeline for "${targetJournal}"...`,
+        message: `Initializing Multi-Agent Academic Drafter Pipeline for "${journalLabel}"...`,
       },
       {
         id: Date.now().toString() + "-2",
@@ -173,7 +174,7 @@ export default function DraftStage({
         id: Date.now().toString() + "-3",
         timestamp: new Date().toLocaleTimeString([], { hour12: false }),
         level: "action",
-        message: `Agent [Drafter]: Assembling manuscript sections adhering to ${targetJournal} constraints...`,
+        message: `Agent [Drafter]: Assembling manuscript sections adhering to ${journalLabel} constraints...`,
       },
     ]);
 
@@ -528,7 +529,7 @@ export default function DraftStage({
                 Phase III: Drafting • Stage 17 of 25
               </span>
               <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[color:var(--surface-sunken)] text-[color:var(--accent)] font-semibold border border-[color:var(--border-subtle)]">
-                Target: {targetJournal}
+                Target: {journalLabel}
               </span>
             </div>
             <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mt-1">
@@ -694,7 +695,7 @@ export default function DraftStage({
                 Ready to Assemble Manuscript Draft
               </h3>
               <p className="text-xs text-[color:var(--text-secondary)] max-w-md mx-auto mt-2 leading-relaxed">
-                The Multi-Agent Drafting Pipeline will synthesize your approved evidence claims, primary telemetry, and section taxonomy for <strong className="text-[color:var(--text-primary)] font-serif">{targetJournal}</strong> into a publication-grade first draft.
+                The Multi-Agent Drafting Pipeline will synthesize your approved evidence claims, primary telemetry, and section taxonomy for <strong className="text-[color:var(--text-primary)] font-serif">{journalLabel}</strong> into a publication-grade first draft.
               </p>
             </div>
             <div className="flex justify-center gap-3">
