@@ -291,7 +291,21 @@ describe("Journal Rebuild Step D — Backend .docx, .pdf & Rebuttal Compilers", 
       expect(res.body.length).toBeGreaterThan(1000);
     });
 
+    // The letter used to be filled with sample reviewer comments when the project
+    // had no rebuttal matrix; it now needs the author's own (PRODUCT_AUDIT P0-12).
     it("GET /api/projects/:id/agent/export/rebuttal-letter returns 200 with Referee_Response_Letter.docx attachment", async () => {
+      const empty = await request(app).get(`/api/projects/${projId}/agent/export/rebuttal-letter`);
+      expect(empty.status).toBe(400);
+
+      const saved = await request(app)
+        .post(`/api/projects/${projId}/agent/rebuttal-matrix`)
+        .send({
+          matrix: [
+            { id: "r1", referee: "Methodologist", critique: "Justify the sample size.", authorResponse: "We added a power analysis.", severity: "Major", section: "Methods", lens: "Rigor", status: "addressed" },
+          ],
+        });
+      expect(saved.status).toBe(200);
+
       const res = await request(app)
         .get(`/api/projects/${projId}/agent/export/rebuttal-letter`)
         .buffer(true)
@@ -307,10 +321,17 @@ describe("Journal Rebuild Step D — Backend .docx, .pdf & Rebuttal Compilers", 
       expect(res.body.length).toBeGreaterThan(1000);
     });
 
+    // The export used to compile a demo manuscript (invented results and
+    // references) when the project had none; it now needs the user's own text
+    // (PRODUCT_AUDIT P0-12), so the test supplies it and checks the empty case.
     it("POST /api/projects/:id/agent/export returns 200 JSON with rebuttalLetterUrl", async () => {
+      const empty = await request(app).post(`/api/projects/${projId}/agent/export`).send({ format: "docx" });
+      expect(empty.status).toBe(400);
+      expect(empty.body.error).toMatch(/Nothing to export yet/);
+
       const res = await request(app)
         .post(`/api/projects/${projId}/agent/export`)
-        .send({ format: "docx" });
+        .send({ format: "docx", manuscript: "# My paper\n\n## Introduction\nOwn text." });
 
       expect(res.status).toBe(200);
       expect(res.body.ok).toBe(true);
