@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### AI access
 - The user's own AI key is sent only to routes that run AI, not with every request (#93).
 - The AI Access page says which features Premium covers (#96).
-- A local model (Ollama, LM Studio, …) is never called from the deployed server, which cannot reach the user's computer (#106). Journal stages, and since #116 Thesis, Proposal and Presentation, run the prompt in the browser instead, with a signed challenge so the server accepts only the answer to its own prompt. Remaining server-only features say plainly that they need a cloud key.
+- A local model (Ollama, LM Studio, …) is never called from the deployed server, which cannot reach the user's computer (#106). Journal stages and Ask Scholar, and since #116 Thesis, Proposal and Presentation, run the prompt in the browser instead, with a signed challenge (for #116 routes, bound to the exact prompt). Remaining server-only features say plainly that they need a cloud key.
 - Internal: one parser for AI request headers (#95), one Premium pipeline (#98), typed AI errors, and an AI call map (`docs/AI-CALL-MAP.md`, #94).
 
 ### Reliability & operations
