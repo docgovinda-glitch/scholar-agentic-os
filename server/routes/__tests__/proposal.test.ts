@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 export const TEST_USER_ID = "11111111-1111-4111-8111-111111111111";
 vi.mock("../../src/middleware/auth.ts", () => ({
@@ -13,6 +13,20 @@ import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetRateLimitStore } from "../../src/middleware/rateLimit.ts";
 import { __setEnabledOutputTypesForTests } from "../outputTypeAccess.ts";
+import { scholarBrain } from "../../src/services/scholarBrain.ts";
+
+const AI = { "x-ai-provider": "openai", "x-ai-api-key": "sk-test-not-real" };
+
+function mockBrain(parsedJson: unknown) {
+  return vi.spyOn(scholarBrain, "complete").mockResolvedValue({
+    text: JSON.stringify(parsedJson),
+    parsedJson,
+    provider: "openai",
+    model: "test",
+    wordCount: 10,
+    burstinessMetrics: { averageLength: 18, variance: 6, burstinessScore: 0.3, isSufficientlyBurst: true },
+  });
+}
 
 describe("Proposal Endpoints (/api/projects/:id/proposal)", () => {
   beforeEach(() => {
@@ -20,6 +34,7 @@ describe("Proposal Endpoints (/api/projects/:id/proposal)", () => {
     __resetRateLimitStore();
     __setEnabledOutputTypesForTests("all");
   });
+  afterEach(() => vi.restoreAllMocks());
 
   async function createProposalProject(): Promise<string> {
     const res = await request(app)
@@ -28,50 +43,61 @@ describe("Proposal Endpoints (/api/projects/:id/proposal)", () => {
     return res.body.projectId;
   }
 
-  it("POST /study-section-simulate returns structured NIH/NSF criteria evaluation", async () => {
+  // Replaces a test that asserted the keyword-heuristic review (fixed "Outstanding"
+  // investigator and "Exceptional Infrastructure" verdicts, a computed percentile),
+  // shown whenever AI failed. The route now returns only the AI's review or an
+  // honest error (PRODUCT_AUDIT P0-9).
+  it("POST /study-section-simulate returns the AI panel's review of the user's proposal", async () => {
     const projectId = await createProposalProject();
-
-    const payload = {
-      title: "Autonomous Cryptographic Verification of Scholarly Literature",
-      agency: "NSF / NIH Joint Informatics",
-      mechanism: "R01 / Research Project Grant",
-      specificAims: [
-        "Aim 1: Formulate deterministic citation verification protocols achieving 99.8% precision.",
-        "Aim 2: Construct multi-agent peer review pipelines across 5 distinct reviewer archetypes.",
-        "Aim 3: Conduct double-blind trials across 1,000 biomedical review manuscripts.",
+    const brain = mockBrain({
+      overallImpactScore: "3.1",
+      recommendationForFunding: "Revise and resubmit",
+      studySectionMembers: [{ role: "Primary Reviewer", verdict: "Moderate" }],
+      criteria: [
+        { criterion: "Significance", score: 3, verdict: "Good", critique: "c", recommendation: "r" },
+        { criterion: "Approach", score: 12, verdict: "out of range" },
       ],
-      significance: "Addresses the hypothesis that Bayesian multi-agent debate eliminates synthetic citation hallucinations.",
-      strategy: "Includes explicit pitfall mitigation and alternative statistical pipelines.",
-    };
+    });
 
     const res = await request(app)
       .post(`/api/projects/${projectId}/proposal/study-section-simulate`)
-      .send(payload);
+      .set(AI)
+      .send({
+        title: "Autonomous Cryptographic Verification of Scholarly Literature",
+        agency: "NSF",
+        mechanism: "R01",
+        specificAims: ["Aim 1: Formulate deterministic citation verification protocols."],
+      });
 
     expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.title).toContain("Autonomous Cryptographic Verification");
-    expect(res.body.agency).toBe("NSF / NIH Joint Informatics");
-    expect(res.body.overallImpactScore).toMatch(/\d\.\d/);
-    expect(res.body.recommendationForFunding).toBeTruthy();
-    expect(res.body.studySectionMembers.length).toBeGreaterThanOrEqual(3);
+    expect(res.body.agency).toBe("NSF");
+    expect(res.body.overallImpactScore).toBe("3.1");
+    // A criterion outside the 1-9 scale is dropped, never clamped or defaulted.
+    expect(res.body.criteria).toEqual([
+      { criterion: "Significance", score: 3, verdict: "Good", critique: "c", recommendation: "r" },
+    ]);
+    expect(String(brain.mock.calls[0][0].userPrompt)).toContain("deterministic citation verification");
+  });
 
-    // Verify all 5 core NIH/NSF criteria are evaluated
-    const criteriaNames = res.body.criteria.map((c: any) => c.criterion);
-    expect(criteriaNames).toContain("Significance");
-    expect(criteriaNames).toContain("Investigator(s)");
-    expect(criteriaNames).toContain("Innovation");
-    expect(criteriaNames).toContain("Approach");
-    expect(criteriaNames).toContain("Environment");
+  it("POST /study-section-simulate asks for the user's own aims instead of inventing them", async () => {
+    const projectId = await createProposalProject();
+    const brain = mockBrain({});
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/proposal/study-section-simulate`)
+      .set(AI)
+      .send({ title: "No aims yet" });
+    expect(res.status).toBe(400);
+    expect(brain).not.toHaveBeenCalled();
+  });
 
-    // Verify each criterion has valid score on 1-9 scale, critique, and recommendation
-    for (const c of res.body.criteria) {
-      expect(c.score).toBeGreaterThanOrEqual(1.0);
-      expect(c.score).toBeLessThanOrEqual(9.0);
-      expect(c.verdict).toBeTruthy();
-      expect(c.critique).toBeTruthy();
-      expect(c.recommendation).toBeTruthy();
-    }
+  it("POST /study-section-simulate asks the user to connect a provider when none is set", async () => {
+    const projectId = await createProposalProject();
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/proposal/study-section-simulate`)
+      .send({ title: "T", specificAims: ["Aim 1"] });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("ai_provider_required");
+    expect(res.body.criteria).toBeUndefined();
   });
 
   it("POST /study-section-simulate 404s when project does not exist (IDOR protection)", async () => {
@@ -84,32 +110,29 @@ describe("Proposal Endpoints (/api/projects/:id/proposal)", () => {
     expect(res.status).toBe(404);
   });
 
-  it("POST /aims-audit evaluates Specific Aims text against structural grant standards", async () => {
+  // Replaces a test that asserted the regex-based fallback checks (shown as an AI
+  // audit whenever AI failed). The route now returns only the AI's checks or an
+  // honest error (PRODUCT_AUDIT P0-9).
+  it("POST /aims-audit returns the AI's checks for the user's aims", async () => {
     const projectId = await createProposalProject();
-
-    const aimsText = `Specific Aims:
-Our central hypothesis is that multi-agent consensus protocols eliminate synthetic citation hallucinations with sub-second latency.
-Aim 1: Construct a deterministic zero-hallucination verification engine achieving 99.9% precision (p < 0.001) across 10,000 benchmark articles.
-Aim 2: Implement multi-agent debate topologies evaluating empirical claims without single-point dependencies.
-Aim 3: Validate translational utility across federated health archives.`;
-
+    mockBrain({ checks: [{ name: "Overarching Hypothesis Stated", status: "passed", detail: "Clear hypothesis." }] });
     const res = await request(app)
       .post(`/api/projects/${projectId}/proposal/aims-audit`)
-      .send({ aimsText });
-
+      .set(AI)
+      .send({ aimsText: "Our central hypothesis is that consensus protocols reduce citation errors. Aim 1: build it." });
     expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(Array.isArray(res.body.checks)).toBe(true);
-    expect(res.body.checks.length).toBeGreaterThanOrEqual(4);
+    expect(res.body.checks).toEqual([{ name: "Overarching Hypothesis Stated", status: "passed", detail: "Clear hypothesis." }]);
+  });
 
-    const checkNames = res.body.checks.map((chk: any) => chk.name);
-    expect(checkNames).toContain("Overarching Hypothesis Stated");
-    expect(checkNames).toContain("Aim Structural Independence");
-    expect(checkNames).toContain("Quantifiable Deliverables & Benchmarks");
-
-    // Overarching hypothesis should pass given the provided text
-    const hypothesisCheck = res.body.checks.find((c: any) => c.name === "Overarching Hypothesis Stated");
-    expect(hypothesisCheck.status).toBe("passed");
+  it("POST /aims-audit reports a failed AI call and returns no checks", async () => {
+    const projectId = await createProposalProject();
+    vi.spyOn(scholarBrain, "complete").mockRejectedValue(new Error("timeout"));
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/proposal/aims-audit`)
+      .set(AI)
+      .send({ aimsText: "Our central hypothesis is that consensus protocols reduce citation errors. Aim 1: build it." });
+    expect(res.status).toBe(502);
+    expect(res.body.checks).toBeUndefined();
   });
 
   it("POST /aims-audit 404s when project does not exist", async () => {

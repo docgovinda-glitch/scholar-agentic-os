@@ -6,58 +6,47 @@ import "@testing-library/jest-dom/vitest";
 import ProposalWorkspace from "../ProposalWorkspace";
 
 describe("ProposalWorkspace (OT-19 Grant & Research Proposal Engine)", () => {
+  let failNext = false;
   beforeEach(() => {
+    failNext = false;
     vi.restoreAllMocks();
     vi.spyOn(window, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
 
-      if (url.includes("/proposal/audit-aims")) {
+      // Mocks follow the real server routes and response shapes. The old mocks
+      // used paths the server never had (/audit-aims, /simulate-review), so in
+      // production the workspace always fell back to hardcoded results (P0-9).
+      if (url.includes("/proposal/aims-audit")) {
+        if (failNext) {
+          return new Response(JSON.stringify({ error: "Specific aims audit could not be generated: the AI provider failed or returned an unusable answer. Nothing was produced. Try again.", code: "ai_unavailable" }), { status: 502, headers: { "Content-Type": "application/json" } });
+        }
         return new Response(
           JSON.stringify({
-            projectId: "proj-proposal-1",
+            success: true,
             checks: [
-              {
-                name: "Central Hypothesis Testability",
-                status: "passed",
-                detail: "Directional hypothesis contains falsifiable empirical outcomes.",
-              },
-              {
-                name: "Aim Independence & Decoupling",
-                status: "passed",
-                detail: "Specific Aims evaluated for sequential dependency risk.",
-              },
+              { name: "Central Hypothesis Testability", status: "warn", detail: "The hypothesis is descriptive." },
             ],
-            auditedAt: new Date().toISOString(),
           }),
           { status: 200, headers: { "Content-Type": "application/json" } }
         );
       }
 
-      if (url.includes("/proposal/simulate-review")) {
+      if (url.includes("/proposal/study-section-simulate")) {
+        if (failNext) {
+          return new Response(JSON.stringify({ error: "Connect an AI provider (your own key or a local model) in AI Access to run this.", code: "ai_provider_required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+        }
         return new Response(
           JSON.stringify({
-            projectId: "proj-proposal-1",
+            success: true,
+            title: "Empirical Grant Architecture Study",
             agency: "NSF / NIH Joint Informatics Program",
             mechanism: "R01 / CAREER Grant Track",
-            overallImpactScore: "18 (2.0 NIH Scale — High Impact / Fundable Tier)",
-            recommendationForFunding: "High Priority for Funding (Top 8th Percentile)",
+            overallImpactScore: "3.4",
+            recommendationForFunding: "Revise and resubmit",
+            studySectionMembers: [],
             criteria: [
-              {
-                criterion: "Significance",
-                score: 2,
-                verdict: "Outstanding",
-                critique: "Addresses an urgent empirical bottleneck in scientific reproducibility.",
-                recommendation: "Quantify projected cost savings for large-scale biomedical meta-analyses.",
-              },
-              {
-                criterion: "Approach",
-                score: 2,
-                verdict: "Strong",
-                critique: "Three-aim structure is well-isolated with clear statistical power.",
-                recommendation: "Add contingency mitigation if Aim 2 latency exceeds 500ms.",
-              },
+              { criterion: "Significance", score: 3, verdict: "Good", critique: "Clear gap.", recommendation: "Quantify impact." },
             ],
-            auditedAt: new Date().toISOString(),
           }),
           { status: 200, headers: { "Content-Type": "application/json" } }
         );
@@ -112,33 +101,47 @@ describe("ProposalWorkspace (OT-19 Grant & Research Proposal Engine)", () => {
     ).toBeInTheDocument();
   });
 
-  it("executes Specific Aims compliance audit against backend endpoint", async () => {
+  it("executes Specific Aims compliance audit against the real route", async () => {
     render(<ProposalWorkspace projectId="proj-proposal-1" />);
 
-    const auditBtn = screen.getByRole("button", { name: /Audit Aims Structure/i });
-    fireEvent.click(auditBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Audit Aims Structure/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/Specific Aims Compliance Check/i)).toBeInTheDocument();
-      expect(screen.getByText(/Central Hypothesis Testability/i)).toBeInTheDocument();
+      expect(screen.getByText(/The hypothesis is descriptive/i)).toBeInTheDocument();
     });
   });
 
-  it("runs Study Section adversarial review simulation and displays impact score", async () => {
+  it("shows why the aims audit failed and no stand-in checks", async () => {
+    failNext = true;
+    render(<ProposalWorkspace projectId="proj-proposal-1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Audit Aims Structure/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Nothing was produced/i);
+    expect(screen.queryByText(/Specific Aims Compliance Check/i)).not.toBeInTheDocument();
+  });
+
+  it("runs the study section review against the real route and shows the AI's score", async () => {
     render(<ProposalWorkspace projectId="proj-proposal-1" />);
 
     fireEvent.click(screen.getByRole("button", { name: /8\. Study Section Scorer/i }));
-
-    const simBtn = screen.getByRole("button", { name: /Run Study Section Simulation/i });
-    fireEvent.click(simBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Run Study Section Simulation/i }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/18 \(2\.0 NIH Scale — High Impact \/ Fundable Tier\)/i)
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/High Priority for Funding \(Top 8th Percentile\)/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText("3.4")).toBeInTheDocument();
+      expect(screen.getByText(/Revise and resubmit/i)).toBeInTheDocument();
     });
+  });
+
+  it("shows why the review could not run and no stand-in panel", async () => {
+    failNext = true;
+    render(<ProposalWorkspace projectId="proj-proposal-1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /8\. Study Section Scorer/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Run Study Section Simulation/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Connect an AI provider/i);
+    expect(screen.queryByText(/Top 8th Percentile/i)).not.toBeInTheDocument();
   });
 });

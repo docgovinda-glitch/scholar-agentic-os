@@ -6,56 +6,57 @@ import "@testing-library/jest-dom/vitest";
 import ThesisWorkspace from "../ThesisWorkspace";
 
 describe("ThesisWorkspace (OT-09 Thesis & Dissertation Studio)", () => {
+  let failNext = false;
   beforeEach(() => {
+    failNext = false;
     vi.restoreAllMocks();
     vi.spyOn(window, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
 
-      if (url.includes("/thesis/audit-chapters")) {
+      // Mocks follow the real server routes and response shapes. The old mocks
+      // used paths the server never had (/audit-chapters, /simulate-viva), so in
+      // production the workspace always fell back to hardcoded results (P0-9).
+      if (url.includes("/thesis/chapter-audit")) {
+        if (failNext) {
+          return new Response(JSON.stringify({ error: "Connect an AI provider (your own key or a local model) in AI Access to run this.", code: "ai_provider_required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+        }
         return new Response(
           JSON.stringify({
-            projectId: "proj-thesis-1",
-            alignmentScore: 95,
-            coherenceStatus: "Strong Cross-Chapter Threading",
-            crossChapterChecks: [
-              {
-                check: "Research Question Threading (Ch. 1 → Ch. 5)",
-                status: "passed",
-                detail: "All 3 Research Questions map cleanly to empirical findings.",
-              },
-              {
-                check: "Methodological Alignment (Ch. 2 → Ch. 3)",
-                status: "passed",
-                detail: "Theoretical constructs operationalized in research instruments.",
-              },
-            ],
-            auditedAt: new Date().toISOString(),
+            success: true,
+            audit: {
+              totalChapters: 2,
+              alignmentScore: 61,
+              coherenceStatus: "Findings not yet linked",
+              crossChapterChecks: [
+                { check: "Research Question Threading (Ch. 1 → Ch. 5)", status: "warn", details: "RQ2 has no findings yet." },
+              ],
+            },
+            chapterSummaries: [],
           }),
           { status: 200, headers: { "Content-Type": "application/json" } }
         );
       }
 
-      if (url.includes("/thesis/simulate-viva")) {
+      if (url.includes("/thesis/viva-simulate")) {
+        if (failNext) {
+          return new Response(JSON.stringify({ error: "Viva examiner questions could not be generated: the AI provider failed or returned an unusable answer. Nothing was produced. Try again.", code: "ai_unavailable" }), { status: 502, headers: { "Content-Type": "application/json" } });
+        }
         return new Response(
           JSON.stringify({
-            projectId: "proj-thesis-1",
-            degreeLevel: "PhD Dissertation",
-            examinerPersona: "External Examiner Panel (Chair & Methodological Specialist)",
-            examinerRigorScore: "94/100 (Rigorous PhD Defense Standard)",
+            success: true,
+            title: "Empirical Systems Dissertation",
+            examinerPersona: "Senior External Examiner, Computational Neuroscience",
+            examinerRigorScore: "High",
             questions: [
               {
                 id: "viva-q1",
                 category: "Theoretical Originality & Epistemology",
                 examinerQuestion:
-                  "How does your theoretical framework resolve the tension between classical discrete symbolic models and continuous neural field dynamics?",
-                assessmentFocus: "Tests conceptual synthesis and defense of core assumptions.",
-                suggestedRebuttalStructure: [
-                  "Define the scope boundary where classical symbolic models break down.",
-                  "Cite Chapter 2 matrix synthesis and empirical validation in Chapter 4.",
-                ],
+                  "How does your theoretical framework resolve the tension between symbolic models and neural field dynamics?",
+                assessmentFocus: "Tests conceptual synthesis.",
+                suggestedRebuttalStructure: ["Define the scope boundary.", "Point to your Chapter 2 synthesis."],
               },
             ],
-            generatedAt: new Date().toISOString(),
           }),
           { status: 200, headers: { "Content-Type": "application/json" } }
         );
@@ -111,37 +112,49 @@ describe("ThesisWorkspace (OT-09 Thesis & Dissertation Studio)", () => {
     ).toBeInTheDocument();
   });
 
-  it("executes Cross-Chapter Alignment Audit in Chapter 5", async () => {
+  it("executes Cross-Chapter Alignment Audit in Chapter 5 against the real route", async () => {
     render(<ThesisWorkspace projectId="proj-thesis-1" />);
 
     fireEvent.click(screen.getByRole("button", { name: /5\. Discussion & Audit/i }));
-
-    const auditBtn = screen.getByRole("button", { name: /Run Cross-Chapter Audit/i });
-    fireEvent.click(auditBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Run Cross-Chapter Audit/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/95% · Strong Cross-Chapter Threading/i)).toBeInTheDocument();
-      expect(
-        screen.getByText(/Research Question Threading \(Ch\. 1 → Ch\. 5\)/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/61% · Findings not yet linked/i)).toBeInTheDocument();
+      expect(screen.getByText(/Research Question Threading \(Ch\. 1 → Ch\. 5\)/i)).toBeInTheDocument();
     });
   });
 
-  it("runs Viva Voce Defense Simulator and generates external examiner questions", async () => {
+  it("shows why the audit could not run and no stand-in score", async () => {
+    failNext = true;
+    render(<ThesisWorkspace projectId="proj-thesis-1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /5\. Discussion & Audit/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Run Cross-Chapter Audit/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Connect an AI provider/i);
+    expect(screen.queryByText(/Structural Alignment Score/i)).not.toBeInTheDocument();
+  });
+
+  it("runs the Viva Voce simulator against the real route and shows the AI's questions", async () => {
     render(<ThesisWorkspace projectId="proj-thesis-1" />);
 
     fireEvent.click(screen.getByRole("button", { name: /6\. Viva Voce Simulator/i }));
-
-    const launchBtn = screen.getByRole("button", { name: /Launch Examiner Simulation/i });
-    fireEvent.click(launchBtn);
+    fireEvent.click(screen.getByRole("button", { name: /Launch Examiner Simulation/i }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/External Examiner Panel \(Chair & Methodological Specialist\)/i)
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/94\/100 \(Rigorous PhD Defense Standard\)/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Senior External Examiner, Computational Neuroscience/i)).toBeInTheDocument();
+      expect(screen.getByText(/resolve the tension between symbolic models/i)).toBeInTheDocument();
     });
+  });
+
+  it("shows why the viva simulation failed and no stand-in questions", async () => {
+    failNext = true;
+    render(<ThesisWorkspace projectId="proj-thesis-1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /6\. Viva Voce Simulator/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Launch Examiner Simulation/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Nothing was produced/i);
+    expect(screen.queryByText(/Simulated Examiner Persona/i)).not.toBeInTheDocument();
   });
 });
