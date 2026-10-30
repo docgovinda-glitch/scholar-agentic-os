@@ -438,7 +438,7 @@ export default function ThemeLibraryGrid({
                   />
                 </div>
 
-                {/* One-Click 5-Slide Progression Trigger Button */}
+                {/* Apply theme to the whole deck (content unchanged) */}
                 <div className="w-full pt-1 border-t border-neutral-100 dark:border-white/5">
                   <button
                     type="button"
@@ -451,10 +451,10 @@ export default function ThemeLibraryGrid({
                       }
                     }}
                     className="w-full py-1.5 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-900/40 text-[11px] font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    title="Apply 5 unique slide archetypes: Cover, Synthesis, 2D Sketch, Metrics, Roadmap"
+                    title="Apply this theme to every slide; your content stays as it is"
                   >
                     <Sparkles className="w-3 h-3 text-amber-500" />
-                    <span>Apply 5-Slide Progression</span>
+                    <span>Apply Theme to Deck</span>
                   </button>
                 </div>
               </div>

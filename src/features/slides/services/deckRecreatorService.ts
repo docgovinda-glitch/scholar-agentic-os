@@ -2,7 +2,7 @@ import type { SlideDeck, SlideCard } from '../types/slides';
 import type { SlideTheme, CustomTheme, SlideThemeId } from '../types/themes';
 import { calculateContrastRatio, isWcagAA } from '../types/themes';
 import { extractSlidesFromAcademicText } from './semanticSlideExtractor';
-import { apply5SlideDeckProgression } from './deckProgressionService';
+import { applyDeckTheme } from './deckProgressionService';
 import {
   extractThemeFromImage,
   generateThemeFromPrompt,
@@ -138,7 +138,7 @@ export async function recreateDeckFromFile(
     baseDeck.title = detectedTitle;
     baseDeck.id = existingDeck?.id || `deck-recreated-${Date.now()}`;
 
-    const progressionDeck = apply5SlideDeckProgression(
+    const progressionDeck = applyDeckTheme(
       { ...baseDeck, themeId: compiledTheme.id as SlideThemeId, customTheme },
       compiledTheme.id as SlideThemeId,
       customTheme
@@ -151,7 +151,7 @@ export async function recreateDeckFromFile(
       fileName: file.name,
       wordCount,
       detectedTitle,
-      summary: `Extracted visual color palette (${compiledTheme.mode} mode, accent ${compiledTheme.accent}) and created 5 presentation slides from image.`,
+      summary: `Extracted visual color palette (${compiledTheme.mode} mode, accent ${compiledTheme.accent}) and created ${progressionDeck.slides.length} slides from the text in the image.`,
     };
   }
 
@@ -272,7 +272,7 @@ export async function recreateDeckFromFile(
   baseDeck.title = detectedTitle;
   baseDeck.id = existingDeck?.id || `deck-recreated-${Date.now()}`;
 
-  const progressionDeck = apply5SlideDeckProgression(
+  const progressionDeck = applyDeckTheme(
     { ...baseDeck, themeId: compiledTheme.id as SlideThemeId, customTheme },
     compiledTheme.id as SlideThemeId,
     customTheme
@@ -285,6 +285,6 @@ export async function recreateDeckFromFile(
     fileName: file.name,
     wordCount,
     detectedTitle,
-    summary: `Parsed ${wordCount} words from ${file.name}, extracted design theme, and generated 5 progression slides ready to edit.`,
+    summary: `Parsed ${wordCount} words from ${file.name}, extracted design theme, and created ${progressionDeck.slides.length} slides from your text, ready to edit.`,
   };
 }

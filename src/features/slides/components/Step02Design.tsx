@@ -6,7 +6,7 @@ import ThemeScreenshotCloner from './ThemeScreenshotCloner';
 import ThemeLibraryGrid from './ThemeLibraryGrid';
 import CustomThemeStudio from './CustomThemeStudio';
 import type { BestSlideDesign } from '../data/bestSlideDesigns100';
-import { apply5SlideDeckProgression } from '../services/deckProgressionService';
+import { applyDeckTheme } from '../services/deckProgressionService';
 import { createBlankSheetDeck } from '../services/blankSheetService';
 import { DECK_THEMES, DEFAULT_DECK_THEME_ID, resolveDeckTheme, type DeckTheme } from '../gamma/theme';
 import { GammaSlide } from '../gamma/GammaCard';
@@ -397,7 +397,7 @@ export default function Step02Design({ deck, onUpdateDeck, onPrevStep, onNextSte
               if (design) {
                 const r = calculateContrastRatio(design.accent, design.cardBg);
                 onUpdateDeck(
-                  apply5SlideDeckProgression(deck, themeId, {
+                  applyDeckTheme(deck, themeId, {
                     name: design.name,
                     accentColor: design.accent,
                     fontPairing: design.fontFamily === 'serif' ? 'Newsreader Serif' : 'Inter',
@@ -415,7 +415,7 @@ export default function Step02Design({ deck, onUpdateDeck, onPrevStep, onNextSte
                   }),
                 );
               } else {
-                onUpdateDeck(apply5SlideDeckProgression(deck, themeId));
+                onUpdateDeck(applyDeckTheme(deck, themeId));
               }
             }}
           />

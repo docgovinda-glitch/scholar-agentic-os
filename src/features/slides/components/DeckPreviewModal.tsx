@@ -71,11 +71,11 @@ export default function DeckPreviewModal({
                 onClose();
               }}
               className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
-              title="Apply This Design (5-Slide Deck)"
+              title="Apply This Design"
               aria-label="Apply This Design"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>Apply This Design (5-Slide Deck)</span>
+              <span>Apply This Design</span>
             </button>
             <button
               type="button"
