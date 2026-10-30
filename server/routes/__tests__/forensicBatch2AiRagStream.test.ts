@@ -406,9 +406,23 @@ describe("Batch 2: Multi-Chapter Gating in Thesis Workspace (Fix 2.5)", () => {
     expect(gateRes.body.chapterSummaries.length).toBeGreaterThan(0);
     expect(gateRes.body).toHaveProperty("allChaptersReadyForG6");
 
+    // The audit used to fall back to a heuristic score when no AI was configured,
+    // and this test relied on that. The route now needs a real AI answer
+    // (PRODUCT_AUDIT P0-9), so the answer is mocked; the gate summaries it
+    // returns alongside are still the deterministic ones under test here.
+    vi.spyOn(scholarBrain, "complete").mockResolvedValue({
+      text: "",
+      parsedJson: { totalChapters: 2, alignmentScore: 70, coherenceStatus: "ok", crossChapterChecks: [] },
+      provider: "openai",
+      model: "test",
+      wordCount: 0,
+      burstinessMetrics: { averageLength: 0, variance: 0, burstinessScore: 0, isSufficientlyBurst: false },
+    });
     const auditRes = await request(app)
       .post(`/api/projects/${projectId}/thesis/chapter-audit`)
       .set("Authorization", "Bearer valid-token")
+      .set("x-ai-provider", "openai")
+      .set("x-ai-api-key", "sk-test-not-real")
       .send({
         chapters: [
           { chapterNumber: 1, title: "Introduction", wordCount: 4000, targetWordCount: 5000, status: "drafting" },

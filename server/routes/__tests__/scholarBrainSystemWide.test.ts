@@ -344,155 +344,165 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
   });
 
   // Arm 3: Research Proposal OT-19
+  // These routes used to fall back to keyword-heuristic scores and template prose
+  // whenever the AI call failed ("mock-provider" always fails), and the old tests
+  // asserted that invented output. They now return the AI's own answer or an
+  // honest error (PRODUCT_AUDIT P0-9), so the AI answer is mocked here.
+  function mockBrain(parsedJson: unknown, text = JSON.stringify(parsedJson)) {
+    return vi.spyOn(scholarBrain, "complete").mockResolvedValue({
+      text,
+      parsedJson,
+      provider: "mock-provider",
+      model: "mock-model",
+      wordCount: text.split(/\s+/).length,
+      burstinessMetrics: { averageLength: 18, variance: 6, burstinessScore: 0.3, isSufficientlyBurst: true },
+    });
+  }
+  const aiHeaders = { "x-ai-provider": "mock-provider", "x-ai-model": "mock-model", "x-ai-api-key": "test-key" };
+
   describe("Arm 3: Research Proposal OT-19 (/study-section-simulate, /aims-audit & /draft-section)", () => {
-    it("POST /study-section-simulate returns 1.0-9.0 criterion scoring and panel verdicts", async () => {
+    it("POST /study-section-simulate returns the AI panel's scores for the stored proposal", async () => {
       const projectId = await createTestProposalProject("proj-proposal-sim-test");
+      const brain = mockBrain({
+        overallImpactScore: "2.4",
+        recommendationForFunding: "Fundable with revision",
+        criteria: [
+          { criterion: "Significance", score: 2, verdict: "Strong", critique: "c1", recommendation: "r1" },
+          { criterion: "Approach", score: 3, verdict: "Good", critique: "c2", recommendation: "r2" },
+          { criterion: "Innovation", verdict: "no score given" },
+        ],
+      });
 
       const res = await request(app)
         .post(`/api/projects/${projectId}/proposal/study-section-simulate`)
-        .set("x-ai-provider", "mock-provider")
-        .set("x-ai-model", "mock-model")
-        .set("x-ai-api-key", "test-key")
+        .set(aiHeaders)
         .send({});
 
       expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.agency).toContain("NIH");
-      expect(res.body.overallImpactScore).toBeDefined();
-      expect(res.body.recommendationForFunding).toBeDefined();
-      expect(Array.isArray(res.body.criteria)).toBe(true);
-      expect(res.body.criteria.length).toBe(5);
-
-      const criteriaNames = res.body.criteria.map((c: { criterion: string }) => c.criterion);
-      expect(criteriaNames).toContain("Significance");
-      expect(criteriaNames).toContain("Investigator(s)");
-      expect(criteriaNames).toContain("Innovation");
-      expect(criteriaNames).toContain("Approach");
-      expect(criteriaNames).toContain("Environment");
-
-      // Verify NIH 1.0-9.0 numeric range
-      for (const crit of res.body.criteria) {
-        expect(crit.score).toBeGreaterThanOrEqual(1.0);
-        expect(crit.score).toBeLessThanOrEqual(9.0);
-      }
+      expect(res.body.overallImpactScore).toBe("2.4");
+      expect(res.body.agency).toBe("NIH");
+      // The user's stored aims reach the AI; a criterion without a score is dropped, never defaulted.
+      expect(String(brain.mock.calls[0][0].userPrompt)).toContain("CRISPR-dCas9");
+      expect(res.body.criteria.map((c: { criterion: string }) => c.criterion)).toEqual(["Significance", "Approach"]);
     });
 
-    it("POST /aims-audit evaluates Specific Aims structural independence and hypothesis clarity", async () => {
+    it("POST /aims-audit returns the AI's checks and never shows an unknown status as a pass", async () => {
       const projectId = await createTestProposalProject("proj-proposal-aims-test");
+      mockBrain({
+        checks: [
+          { name: "Overarching Hypothesis Stated", status: "passed", detail: "d1" },
+          { name: "Aim Structural Independence", status: "maybe", detail: "d2" },
+        ],
+      });
 
       const res = await request(app)
         .post(`/api/projects/${projectId}/proposal/aims-audit`)
-        .set("x-ai-provider", "mock-provider")
-        .set("x-ai-model", "mock-model")
-        .set("x-ai-api-key", "test-key")
+        .set(aiHeaders)
         .send({
           aimsText: "Specific Aim 1: Elucidate CRISPR-dCas9 demethylation in iPSC models. Specific Aim 2: Quantify off-target effects. Specific Aim 3: Deliver via lipid nanoparticles.",
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(Array.isArray(res.body.checks)).toBe(true);
-      expect(res.body.checks.length).toBeGreaterThanOrEqual(3);
-
-      for (const check of res.body.checks) {
-        expect(["passed", "warn", "fail"]).toContain(check.status);
-        expect(check.name).toBeDefined();
-        expect(check.detail).toBeDefined();
-      }
+      expect(res.body.checks).toEqual([
+        { name: "Overarching Hypothesis Stated", status: "passed", detail: "d1" },
+        { name: "Aim Structural Independence", status: "warn", detail: "d2" },
+      ]);
     });
 
-    it("POST /draft-section drafts grounded proposal section with verified APA 7 bibliography", async () => {
+    it("POST /draft-section returns the AI draft, and a 502 with no text when the AI fails", async () => {
       const projectId = await createTestProposalProject("proj-proposal-draft-test");
+      mockBrain(undefined, "The significance of this work rests on [CITE:src_vault_1].");
 
-      const res = await request(app)
+      const ok = await request(app)
         .post(`/api/projects/${projectId}/proposal/draft-section`)
-        .set("x-ai-provider", "mock-provider")
-        .set("x-ai-model", "mock-model")
-        .set("x-ai-api-key", "test-key")
-        .send({
-          sectionTitle: "Significance",
-          targetWords: 350,
-          citationStyle: "apa7",
-          dialect: "en-GB",
-        });
+        .set(aiHeaders)
+        .send({ sectionTitle: "Significance", targetWords: 350, citationStyle: "apa7", dialect: "en-GB" });
+      expect(ok.status).toBe(200);
+      expect(ok.body.sectionTitle).toBe("Significance");
+      expect(ok.body.content).toContain("significance of this work");
 
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.sectionTitle).toBe("Significance");
-      expect(res.body.content).toBeDefined();
-      expect(res.body.wordCount).toBeGreaterThan(0);
-      expect(res.body.burstinessMetrics).toBeDefined();
+      vi.spyOn(scholarBrain, "complete").mockRejectedValue(new Error("provider 500"));
+      const failed = await request(app)
+        .post(`/api/projects/${projectId}/proposal/draft-section`)
+        .set(aiHeaders)
+        .send({ sectionTitle: "Significance" });
+      expect(failed.status).toBe(502);
+      expect(failed.body.code).toBe("ai_unavailable");
+      expect(failed.body.content).toBeUndefined();
     });
   });
 
   // Arm 4: Thesis & Dissertation OT-09/OT-07
   describe("Arm 4: Thesis & Dissertation OT-09/OT-07 (/viva-simulate, /chapter-audit & /draft-chapter)", () => {
-    it("POST /viva-simulate returns senior examiner persona and rigorous adversarial defense questions", async () => {
+    it("POST /viva-simulate returns the AI examiner questions for the stored thesis", async () => {
       const projectId = await createTestThesisProject("proj-thesis-viva-test");
+      const brain = mockBrain({
+        examinerPersona: "Senior External Examiner, Machine Learning",
+        examinerRigorScore: "High",
+        questions: [
+          { id: "q1", category: "Method", examinerQuestion: "Why temperature scaling?", assessmentFocus: "f", suggestedRebuttalStructure: ["a", "b"] },
+          { id: "q2", category: "Empty", examinerQuestion: "" },
+        ],
+      });
 
       const res = await request(app)
         .post(`/api/projects/${projectId}/thesis/viva-simulate`)
-        .set("x-ai-provider", "mock-provider")
-        .set("x-ai-model", "mock-model")
-        .set("x-ai-api-key", "test-key")
+        .set(aiHeaders)
         .send({});
 
       expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.examinerPersona).toBeDefined();
-      expect(res.body.examinerRigorScore).toContain("Viva Voce Standard");
-      expect(Array.isArray(res.body.questions)).toBe(true);
-      expect(res.body.questions.length).toBeGreaterThanOrEqual(3);
-
-      const q1 = res.body.questions[0];
-      expect(q1.category).toBeDefined();
-      expect(q1.examinerQuestion).toBeDefined();
-      expect(q1.assessmentFocus).toBeDefined();
-      expect(Array.isArray(q1.suggestedRebuttalStructure)).toBe(true);
+      expect(res.body.examinerPersona).toBe("Senior External Examiner, Machine Learning");
+      expect(res.body.questions).toHaveLength(1);
+      expect(res.body.questions[0].examinerQuestion).toBe("Why temperature scaling?");
+      expect(String(brain.mock.calls[0][0].userPrompt)).toContain("temperature scaling degrade");
     });
 
-    it("POST /chapter-audit evaluates cross-chapter consistency and structural proportion", async () => {
+    it("POST /chapter-audit returns the AI audit with the deterministic gate summaries", async () => {
       const projectId = await createTestThesisProject("proj-thesis-audit-test");
+      mockBrain({
+        totalChapters: 2,
+        alignmentScore: 64,
+        coherenceStatus: "Gaps between chapters 1 and 2",
+        crossChapterChecks: [{ check: "RQ propagation", status: "fail", details: "RQ2 is never answered." }],
+      });
 
       const res = await request(app)
         .post(`/api/projects/${projectId}/thesis/chapter-audit`)
-        .set("x-ai-provider", "mock-provider")
-        .set("x-ai-model", "mock-model")
-        .set("x-ai-api-key", "test-key")
-        .send({});
-
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.audit).toBeDefined();
-      expect(res.body.audit.alignmentScore).toBeGreaterThanOrEqual(70);
-      expect(res.body.audit.coherenceStatus).toBeDefined();
-      expect(Array.isArray(res.body.audit.crossChapterChecks)).toBe(true);
-      expect(res.body.audit.crossChapterChecks.length).toBeGreaterThanOrEqual(4);
-    });
-
-    it("POST /draft-chapter drafts grounded doctoral chapter with verified bibliography and word metrics", async () => {
-      const projectId = await createTestThesisProject("proj-thesis-draft-test");
-
-      const res = await request(app)
-        .post(`/api/projects/${projectId}/thesis/draft-chapter`)
-        .set("x-ai-provider", "mock-provider")
-        .set("x-ai-model", "mock-model")
-        .set("x-ai-api-key", "test-key")
+        .set(aiHeaders)
         .send({
-          chapterNumber: 2,
-          chapterTitle: "Critical Literature Review",
-          targetWords: 500,
-          citationStyle: "apa7",
-          dialect: "en-GB",
+          chapters: [
+            { chapterNumber: 1, title: "Introduction", wordCount: 4000, targetWordCount: 6000, status: "drafting" },
+            { chapterNumber: 2, title: "Literature Review", wordCount: 2000, targetWordCount: 12000, status: "drafting" },
+          ],
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.chapterNumber).toBe(2);
-      expect(res.body.chapterTitle).toBe("Critical Literature Review");
-      expect(res.body.content).toBeDefined();
-      expect(res.body.wordCount).toBeGreaterThan(0);
-      expect(res.body.burstinessMetrics).toBeDefined();
+      expect(res.body.audit.alignmentScore).toBe(64);
+      expect(res.body.audit.crossChapterChecks).toEqual([
+        { check: "RQ propagation", status: "fail", details: "RQ2 is never answered." },
+      ]);
+      expect(Array.isArray(res.body.chapterSummaries)).toBe(true);
+    });
+
+    it("POST /draft-chapter returns the AI draft, and a 502 with no text when the AI fails", async () => {
+      const projectId = await createTestThesisProject("proj-thesis-draft-test");
+      mockBrain(undefined, "Calibration has been studied extensively [CITE:src_vault_1].");
+
+      const ok = await request(app)
+        .post(`/api/projects/${projectId}/thesis/draft-chapter`)
+        .set(aiHeaders)
+        .send({ chapterNumber: 2, chapterTitle: "Critical Literature Review", targetWords: 500, citationStyle: "apa7", dialect: "en-GB" });
+      expect(ok.status).toBe(200);
+      expect(ok.body.chapterNumber).toBe(2);
+      expect(ok.body.content).toContain("Calibration has been studied");
+
+      vi.spyOn(scholarBrain, "complete").mockRejectedValue(new Error("provider 500"));
+      const failed = await request(app)
+        .post(`/api/projects/${projectId}/thesis/draft-chapter`)
+        .set(aiHeaders)
+        .send({ chapterNumber: 2, chapterTitle: "Critical Literature Review" });
+      expect(failed.status).toBe(502);
+      expect(failed.body.content).toBeUndefined();
     });
   });
 
