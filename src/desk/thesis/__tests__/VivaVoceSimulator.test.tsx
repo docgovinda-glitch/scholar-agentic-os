@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
+// Rewritten for P0-10: the old tests asserted fixed demo questions from named
+// fictional examiners and a word-count "AI Defense Coach" grade. The component
+// now practises only questions generated from the user's thesis and never
+// scores an answer.
 import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
-import VivaVoceSimulator from "../components/VivaVoceSimulator";
+import VivaVoceSimulator, { type VivaPracticeQuestion } from "../components/VivaVoceSimulator";
 import type { ThesisProjectData } from "../types";
 
-const mockThesis: ThesisProjectData = {
+const thesis: ThesisProjectData = {
   projectId: "proj-thesis-test",
   title: "Quantum Cognitive Paradigms in Autonomous Systems",
   degreeLevel: "PhD Dissertation",
@@ -15,45 +19,50 @@ const mockThesis: ThesisProjectData = {
   currentWordCount: 15000,
   theoreticalFramework: "Dynamic Neural Field Theory",
   researchQuestions: ["How does non-Markovian memory alter error correction?"],
-  methodologicalDesign: "Triangulated Empirical Benchmarking",
-  supervisorNotes: "Focus on formalizing Chapter 3.",
+  methodologicalDesign: "Simulation",
+  supervisorNotes: "",
   chapters: [],
 };
 
-describe("VivaVoceSimulator", () => {
-  it("renders committee archetypes, questions list, and defense drafter", () => {
-    render(<VivaVoceSimulator thesisData={mockThesis} />);
+const questions: VivaPracticeQuestion[] = [
+  {
+    id: "q1",
+    category: "Theory",
+    examinerQuestion: "Why does non-Markovian memory matter for error correction?",
+    assessmentFocus: "Conceptual grounding",
+    suggestedRebuttalStructure: ["State the mechanism.", "Point to Chapter 4 evidence."],
+  },
+  {
+    id: "q2",
+    category: "Method",
+    examinerQuestion: "How did you validate the simulator?",
+    assessmentFocus: "",
+    suggestedRebuttalStructure: [],
+  },
+];
 
-    expect(screen.getByTestId("viva-voce-simulator")).toBeInTheDocument();
-    expect(screen.getByText(/Doctoral Viva Voce & Oral Defense Committee Simulator/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Prof\. Eleanor Vance/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Active Committee Questions/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Structure your defense/i)).toBeInTheDocument();
+describe("VivaVoceSimulator (practice room)", () => {
+  it("shows an empty state and no demo questions before any are generated", () => {
+    render(<VivaVoceSimulator thesisData={thesis} questions={[]} />);
+    expect(screen.getByTestId("viva-practice-empty")).toBeInTheDocument();
+    expect(screen.queryByText(/Eleanor Vance|Arthur Sterling|4\.2x/i)).not.toBeInTheDocument();
   });
 
-  it("filters questions by examiner archetype", () => {
-    render(<VivaVoceSimulator thesisData={mockThesis} />);
+  it("lists the generated questions and switches between them", () => {
+    render(<VivaVoceSimulator thesisData={thesis} questions={questions} />);
+    expect(screen.getByText(/Examiner questions \(2\)/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Why does non-Markovian memory matter/i).length).toBeGreaterThanOrEqual(1);
 
-    const select = screen.getByRole("combobox");
-    fireEvent.change(select, { target: { value: "contrarian" } });
-
-    expect(screen.getAllByText(/Prof\. Arthur Sterling/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/If we remove the non-Markovian memory component/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /How did you validate the simulator/i }));
+    expect(screen.getByRole("button", { name: /How did you validate the simulator/i })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("enters defense response and evaluates with AI Defense Coach", async () => {
-    render(<VivaVoceSimulator thesisData={mockThesis} />);
-
-    const textarea = screen.getByPlaceholderText(/Structure your defense/i);
-    fireEvent.change(textarea, {
-      target: { value: "In Chapter 3, we mitigated bias by employing double-blind empirical benchmarking with ground truth data." },
-    });
-
-    const evalBtn = screen.getByRole("button", { name: /Evaluate Defense Response →/i });
-    fireEvent.click(evalBtn);
-
-    expect(await screen.findByText(/Projected Defense Outcome/i)).toBeInTheDocument();
-    expect(screen.getByText(/Defense Strengths:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Rebuttal Refinements:/i)).toBeInTheDocument();
+  it("lets the user draft an answer and tick the checklist, and never scores it", () => {
+    render(<VivaVoceSimulator thesisData={thesis} questions={questions} />);
+    fireEvent.change(screen.getByLabelText(/Your answer/i), { target: { value: "Because memory kernels persist." } });
+    const box = screen.getByRole("checkbox", { name: /State the mechanism/i });
+    fireEvent.click(box);
+    expect(box).toBeChecked();
+    expect(screen.queryByText(/\/100|Pass|Projected Defense Outcome/i)).not.toBeInTheDocument();
   });
 });
