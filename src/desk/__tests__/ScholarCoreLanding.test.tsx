@@ -49,18 +49,22 @@ describe("ScholarCoreLanding", () => {
     expect(screen.getByLabelText(/^Email/i)).toBeInTheDocument();
   });
 
-  it("allows interactive citation verification in live demo", () => {
+  it("allows interactive citation verification in the demo, labelled as an illustration", () => {
     render(
       <MemoryRouter>
         <ScholarCoreLanding />
       </MemoryRouter>
     );
 
-    const citationBtn = screen.getByText(/\[1\] Nature Biotech 2024/i);
+    expect(screen.getByText(/Illustrative example: sample text, not real sources/i)).toBeInTheDocument();
+    const citationBtn = screen.getByText(/\[1\] Source A 2024/i);
     fireEvent.click(citationBtn);
 
     expect(screen.getByText(/Knowledge Vault Provenance Inspector/i)).toBeInTheDocument();
-    expect(screen.getByText(/99\.4% Provenance Match/i)).toBeInTheDocument();
-    expect(screen.getByText(/ZERO Hallucination Confirmed/i)).toBeInTheDocument();
+    expect(screen.getByText(/Exact quote found/i)).toBeInTheDocument();
+    // No real journal is credited with an invented quote, and no unprovable claims.
+    expect(screen.queryByText(/Nature Biotech/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/cryptographic/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ZERO Hallucination/i)).not.toBeInTheDocument();
   });
 });

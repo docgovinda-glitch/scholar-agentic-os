@@ -195,6 +195,28 @@ describe('Step01Understand (Zero-Ghost Rule, Scope Cards & Presentation Style)',
     ).not.toBeInTheDocument();
   });
 
+  it('a Swiss Editorial deck gets the theme, not the sample plover report with fixed figures', () => {
+    const handleUpdate = vi.fn();
+    render(
+      <Step01Understand
+        deck={{ ...emptyDeck, themeId: 'swiss-editorial' }}
+        onUpdateDeck={handleUpdate}
+        onNextStep={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/Presentation Topic/i), {
+      target: { value: 'Municipal climate adaptation budgets' },
+    });
+    fireEvent.click(screen.getByLabelText(/Save & Generate Outline/i));
+
+    expect(handleUpdate).toHaveBeenCalled();
+    const generated = handleUpdate.mock.calls[0][0] as SlideDeck;
+    expect(generated.themeId).toBe('swiss-editorial');
+    const text = JSON.stringify(generated.slides);
+    expect(text).not.toMatch(/Plover|Tidal Flat|99\.4%|14,800/);
+  });
+
   it('binds Presentation Style dropdown and generates dynamic question-to-slide outline', () => {
     const handleUpdate = vi.fn();
     render(
