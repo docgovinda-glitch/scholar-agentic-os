@@ -147,8 +147,10 @@ export default function ExportStage({
   }, [project?.answers]);
 
   const targetJournal = useMemo(() => {
-    return project?.answers?.["selected_journal_name"] || "Nature Machine Intelligence";
+    return project?.answers?.["selected_journal_name"] || project?.answers?.["target_journal"] || "";
   }, [project?.answers]);
+
+  const journalLabel = targetJournal || "your target journal";
 
   const anchorGap = useMemo(() => {
     try {
@@ -156,13 +158,13 @@ export default function ExportStage({
       if (gaps) {
         const parsed = JSON.parse(gaps);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed[0].title || parsed[0].description || "Deterministic provenance verification";
+          return parsed[0].title || parsed[0].description || "";
         }
       }
     } catch {
       // Ignore
     }
-    return "Deterministic provenance verification";
+    return "";
   }, [project?.answers]);
 
   // Derive initial template based on selected target journal
@@ -256,37 +258,8 @@ export default function ExportStage({
     }
 
     // 4. Domain-aware default fallback
-    const isTopicBftOrAgents =
-      workingTitle.toLowerCase().includes("byzantine") ||
-      workingTitle.toLowerCase().includes("provenance") ||
-      workingTitle.toLowerCase().includes("autonomous") ||
-      anchorGap.toLowerCase().includes("provenance") ||
-      anchorGap.toLowerCase().includes("byzantine");
-
-    if (isTopicBftOrAgents) {
-      return `# ${workingTitle}\n\n## Abstract\nAutonomous scientific reasoning synthesis under provable bounds.`;
-    }
-
-    return `# ${workingTitle}
-
-## Abstract
-This paper presents a formal computational and analytical investigation of "${workingTitle}". Addressing the core research gap regarding "${anchorGap}", we develop a verifiable mathematical and observational model demonstrating robust alignment and high-confidence convergence. The findings fulfill camera-ready standards for publication in ${targetJournal}.
-
-## 1. Introduction
-Rigorous investigation of "${workingTitle}" demands systematic modeling bridging foundational domain evidence and computational verification. Previous scholarship has highlighted the absence of integrated frameworks addressing "${anchorGap}". Here, we establish an axiomatic, end-to-end analytical architecture.
-
-## 2. Theoretical Framework & Methodology
-We formalize the core mathematical formulations, constraining analytical parameters within empirical bounds. The verification pipeline guarantees bounded variance across comparative textual and observational test suites.
-
-## 3. Empirical Results & Comparative Analysis
-Evaluation across primary source corpora indicates verified concordance (p < 0.001) across all modeled divisions. Empirical precision demonstrates reproducible stability, verifying the theoretical assertions against target journal criteria.
-
-## 4. Discussion & Concluding Remarks
-Our results demonstrate that rigorous computational modeling resolves long-standing questions regarding "${anchorGap}". Boundary conditions and sensitivity thresholds confirm model robustness across diverse operational regimes.
-
-## 5. References
-1. Foundational Source Corpus (2024). Critical Scholarly Edition and Textual Concordance.
-2. Computational Methods in Domain Analysis (2023). Journal of Advanced Scholarly Modeling.`;
+    // No demo manuscript: nothing is exported until the author has a draft.
+    return "";
   }, [project?.answers, workingTitle, anchorGap, targetJournal]);
 
   const wordCount = useMemo(() => {
@@ -295,6 +268,10 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
 
   // Start typesetting engine
   const startAgent = async () => {
+    if (!manuscriptContent.trim()) {
+      setError("Nothing to export yet: write or draft your manuscript first.");
+      return;
+    }
     setIsProcessing(true);
     setResults(null);
     setError(null);
@@ -323,23 +300,14 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
       }
 
       setResults(resJson.data || resJson || { success: true, template: selectedTemplate });
-    } catch {
-      // Resilient local typesetting completion fallback
-      setResults({
-        success: true,
-        template: selectedTemplate,
-        citationStyle,
-        includeRebuttalAppendix,
-        pdfUrl: `/downloads/${projectId}_camera_ready.pdf`,
-        latexUrl: `/downloads/${projectId}_latex.zip`,
-        typstUrl: `/downloads/${projectId}_typst.typ`,
-        docxUrl: `/downloads/${projectId}_manuscript.docx`,
-        markdownUrl: `/downloads/${projectId}_manuscript.md`,
-      });
+    } catch (err) {
+      // No pretend success: the user sees that typesetting failed.
+      setResults(null);
+      setError(err instanceof Error ? err.message : "Typesetting failed. Try again.");
     } finally {
       clearTimer();
       setScanProgress(100);
-      setActiveTask("Camera-Ready Typesetting Complete");
+      setActiveTask("");
       setIsProcessing(false);
     }
   };
@@ -434,7 +402,7 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
             sections: parsedSections,
           });
         } else {
-          const header = `% Scholar Agentic OS — Camera-Ready Export (${format.toUpperCase()})\n% Venue: ${targetJournal}\n% Template: ${selectedTemplate}\n% Citation Style: ${citationStyle}\n% Title: ${workingTitle}\n% Timestamp: ${new Date().toISOString()}\n\n`;
+          const header = `% Scholar Agentic OS — Camera-Ready Export (${format.toUpperCase()})\n% Venue: ${journalLabel}\n% Template: ${selectedTemplate}\n% Citation Style: ${citationStyle}\n% Title: ${workingTitle}\n% Timestamp: ${new Date().toISOString()}\n\n`;
           const blob = new Blob([header + manuscriptContent], { type: meta.mime });
           downloadBlob(blob, `${meta.name}_${selectedTemplate}.${meta.ext}`);
         }
@@ -570,7 +538,7 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
 
           <div className="flex items-center gap-1.5 bg-[color:var(--surface-sunken)] px-2.5 py-1 rounded-md border border-[color:var(--border-subtle)] shrink-0">
             <span className="text-[color:var(--text-muted)]">Venue:</span>
-            <span className="font-medium text-[color:var(--accent)]">{targetJournal}</span>
+            <span className="font-medium text-[color:var(--accent)]">{targetJournal || "Not chosen"}</span>
           </div>
 
           <div className="flex items-center gap-1.5 bg-[color:var(--surface-sunken)] px-2.5 py-1 rounded-md border border-[color:var(--border-subtle)] shrink-0 max-w-xs truncate">
@@ -598,7 +566,7 @@ Our results demonstrate that rigorous computational modeling resolves long-stand
           <JournalStageInstructionBanner
             milestoneTitle="Milestone 9 · Camera-Ready Typesetting & Export"
             stageLabel="Multi-Format Publication Typesetting & Dossier Export"
-            description={`Generate camera-ready submission packages formatted strictly to ${targetJournal} guidelines across Microsoft Word DOCX, PDF preview, LaTeX archive, and Typst formats.`}
+            description={`Generate camera-ready submission packages formatted strictly to ${journalLabel} guidelines across Microsoft Word DOCX, PDF preview, LaTeX archive, and Typst formats.`}
             instructions={[
               `Select your target venue layout profile (e.g., ${currentTpl.name})`,
               "Click 'Generate Camera-Ready Package' to typeset equations, tables, and references",

@@ -93,18 +93,20 @@ export default function PublicationReadinessStage({
   }, [project?.answers]);
 
   const targetJournal = useMemo(() => {
-    return project?.answers?.["selected_journal_name"] || "Nature Machine Intelligence";
+    return project?.answers?.["selected_journal_name"] || project?.answers?.["target_journal"] || "";
   }, [project?.answers]);
+
+  const journalLabel = targetJournal || "your target journal";
 
   const anchorGap = useMemo(() => {
     const gaps = project?.answers?.["identified_gaps"];
     if (gaps) {
       const parsed = safeParseAnswerField<any[]>(gaps, []);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed[0].title || parsed[0].description || "Deterministic provenance verification";
+        return parsed[0].title || parsed[0].description || "";
       }
     }
-    return "Deterministic provenance verification";
+    return "";
   }, [project?.answers]);
 
   // Derived Manuscript draft and word count
@@ -539,7 +541,7 @@ export default function PublicationReadinessStage({
 
           <div className="flex items-center gap-1.5 bg-[color:var(--surface-sunken)] px-2.5 py-1 rounded-md border border-[color:var(--border-subtle)] shrink-0">
             <span className="text-[color:var(--text-muted)]">Venue:</span>
-            <span className="font-medium text-[color:var(--accent)]">{targetJournal}</span>
+            <span className="font-medium text-[color:var(--accent)]">{targetJournal || "Not chosen"}</span>
           </div>
 
           <div className="flex items-center gap-1.5 bg-[color:var(--surface-sunken)] px-2.5 py-1 rounded-md border border-[color:var(--border-subtle)] shrink-0 max-w-xs truncate">
@@ -566,7 +568,7 @@ export default function PublicationReadinessStage({
         <JournalStageInstructionBanner
           milestoneTitle="Milestone 9 · Camera-Ready Typesetting & Export"
           stageLabel="Pre-Flight Submission Compliance & Integrity Gate"
-          description={`Execute multi-dimensional compliance verification against ${targetJournal} editorial rubrics, auditing word budgets, citation provenance, and required declarations.`}
+          description={`Execute multi-dimensional compliance verification against ${journalLabel} editorial rubrics, auditing word budgets, citation provenance, and required declarations.`}
           instructions={[
             "Run automated compliance audit against target journal submission standards",
             "Audit word quotas, structured abstract bounds, and section completeness",
@@ -603,7 +605,7 @@ export default function PublicationReadinessStage({
               Ready for Final Submission Compliance Audit
             </h3>
             <p className="text-[color:var(--text-secondary)] text-base max-w-xl mt-2 font-sans">
-              Perform pre-flight verification against {targetJournal} author guidelines. The engine assesses word limits, citation verification, section hierarchies, and double-blind formatting.
+              Perform pre-flight verification against {journalLabel} author guidelines. The engine assesses word limits, citation verification, section hierarchies, and double-blind formatting.
             </p>
 
             <button
@@ -709,7 +711,7 @@ export default function PublicationReadinessStage({
                     Manuscript Cleared for Formal Submission
                   </h3>
                   <p className="text-xs text-[color:var(--text-secondary)] mt-1 font-sans max-w-xl">
-                    All mandatory criteria satisfied for {targetJournal}. Provenance links, word counts, and structural formatting meet camera-ready standards.
+                    All mandatory criteria satisfied for {journalLabel}. Provenance links, word counts, and structural formatting meet camera-ready standards.
                   </p>
                 </div>
               </div>
@@ -857,7 +859,7 @@ export default function PublicationReadinessStage({
               </div>
 
               <span className="text-xs font-mono text-[color:var(--text-muted)]">
-                Standard: {targetJournal} Guidelines
+                Standard: {journalLabel} Guidelines
               </span>
             </div>
 

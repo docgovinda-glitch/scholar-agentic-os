@@ -111,8 +111,10 @@ export default function RevisionStage({
   }, [project?.answers]);
 
   const targetJournal = useMemo(() => {
-    return project?.answers?.["selected_journal_name"] || "Nature Machine Intelligence";
+    return project?.answers?.["selected_journal_name"] || project?.answers?.["target_journal"] || "";
   }, [project?.answers]);
+
+  const journalLabel = targetJournal || "your target journal";
 
   const anchorGap = useMemo(() => {
     try {
@@ -577,7 +579,7 @@ export default function RevisionStage({
 
           <div className="flex items-center gap-1.5 bg-[color:var(--surface-sunken)] px-2.5 py-1 rounded-md border border-[color:var(--border-subtle)] shrink-0">
             <span className="text-[color:var(--text-muted)]">Venue:</span>
-            <span className="font-medium text-[color:var(--accent)]">{targetJournal}</span>
+            <span className="font-medium text-[color:var(--accent)]">{targetJournal || "Not chosen"}</span>
           </div>
 
           <div className="flex items-center gap-1.5 bg-[color:var(--surface-sunken)] px-2.5 py-1 rounded-md border border-[color:var(--border-subtle)] shrink-0 max-w-xs truncate">
@@ -1062,7 +1064,7 @@ export default function RevisionStage({
                     {workingTitle}
                   </h3>
                   <div className="flex items-center gap-4 text-xs text-[color:var(--text-secondary)] mt-2 font-sans">
-                    <span>Target Venue: <strong className="text-[color:var(--text-primary)]">{targetJournal}</strong></span>
+                    <span>Target Venue: <strong className="text-[color:var(--text-primary)]">{journalLabel}</strong></span>
                     <span>Total Length: <strong className="text-[color:var(--state-success)]">{revisedWordCount} words</strong></span>
                     <span>Patches Applied: <strong className="text-[color:var(--accent)]">{acceptedPatchesCount}</strong></span>
                   </div>

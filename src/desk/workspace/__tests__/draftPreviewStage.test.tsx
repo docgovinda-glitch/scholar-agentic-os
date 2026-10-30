@@ -116,7 +116,8 @@ describe("Stage 20: Manuscript Assembly & Pre-Review Inspection (DraftPreviewSta
     expect(screen.getByText(/Grounding Foundation:/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Provable Provenance Bounds in Autonomous Scientific Reasoning/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Nature Machine Intelligence/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/98% Certified/i)).toBeInTheDocument();
+    // The badge shows the project's own originality score, with no "certified" claim.
+    expect(screen.getByText(/^98%$/)).toBeInTheDocument();
 
     // Author block in preview
     expect(screen.getByText(/Dr\. Eleanor Vance/i)).toBeInTheDocument();
@@ -136,8 +137,28 @@ describe("Stage 20: Manuscript Assembly & Pre-Review Inspection (DraftPreviewSta
     expect(screen.getByText(/Primary Evidence & Vault Corpus/i)).toBeInTheDocument();
     expect(screen.getByText(/Target Journal Formatting Rules/i)).toBeInTheDocument();
     expect(screen.getByText(/Structural Section Completeness/i)).toBeInTheDocument();
-    expect(screen.getByText(/100% Citation Provenance Audit/i)).toBeInTheDocument();
+    expect(screen.getByText(/Citation Provenance Audit/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 claims in your citation audit/i)).toBeInTheDocument();
+    expect(screen.getByText(/98% originality \(from your originality check\)/i)).toBeInTheDocument();
     expect(screen.getByText(/Academic Originality & Overlap Clearance/i)).toBeInTheDocument();
+  });
+
+  it("shows an empty project as empty: no demo manuscript, journal or passed checks", () => {
+    render(
+      <DraftPreviewStage
+        stage="draft_preview"
+        projectId="proj-preview-empty"
+        project={{ ...mockProject, answers: {} }}
+      />
+    );
+
+    expect(screen.queryByText(/Vaswani/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nature Machine Intelligence/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/28\.4%|98\.6%/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Not checked/i)).toBeInTheDocument();
+    expect(screen.getByText(/Citation audit not run yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Originality check not run yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/No manuscript sections yet/i)).toBeInTheDocument();
   });
 
   it("renders dual-column outline navigator and allows jumping across sections", () => {
