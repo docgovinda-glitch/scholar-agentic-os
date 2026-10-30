@@ -18,8 +18,6 @@ import { getSupabaseRestConfig, SupabaseTable } from "../../../src/supabaseRest.
 import {
   allocateWordBudget,
   countExactWords,
-  generateDeterministicSubSectionDraft,
-  expandDeterministicDraft,
   type ManuscriptTemplate,
   type WordBudgetBlueprint,
 } from "../../../src/utils/wordBudgetAllocator.ts";
@@ -31,6 +29,7 @@ import {
 import { chunkAndRerankEvidence } from "../../../src/services/semanticRagEngine.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import { getProjectSafe } from "./helpers.ts";
+import { NoClientAiProviderError, sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import type { UserDatasetRecord, DraftSubSectionRequestBody } from "./types.ts";
 
 export const draftingRoutes = express.Router({ mergeParams: true });
@@ -77,7 +76,10 @@ draftingRoutes.post(
 
     const sectionId = req.body?.sectionId || "sec-1";
     const subSectionId = req.body?.subSectionId || "sec-1-sub-1";
-    const subSectionTitle = req.body?.subSectionTitle || "Foundational Problem Domain";
+    const subSectionTitle = String(req.body?.subSectionTitle || "").trim();
+    if (!subSectionTitle) {
+      return res.status(400).json({ error: "Name the sub-section to draft first." });
+    }
     const targetWords =
       typeof req.body?.targetWords === "number" && req.body.targetWords > 0
         ? req.body.targetWords
@@ -158,13 +160,12 @@ CRITICAL CITATION RULES:
     const userPrompt = `Draft the scholarly sub-section "${subSectionTitle}".
 Research Context:
 - Working Title: ${project.answers?.["working_title"] || (project as { title?: string }).title || project.projectId || "Scholarly Manuscript"}
-- Core Research Problem: ${project.answers?.["core_problem"] || "Investigating empirical variance and structural bounds."}
+- Core Research Problem: ${project.answers?.["core_problem"] || "(not provided)"}
 ${req.body?.contextPrompt ? `- Author Guidance: ${req.body.contextPrompt}` : ""}
 ${req.body?.thesisStatement ? `- Thesis Statement: ${req.body.thesisStatement}` : ""}
 Target Word Budget: ${targetWords} words.`;
 
     const candidates = getCandidates(req);
-    const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
     const wantsStream = req.headers.accept?.includes("text/event-stream") || req.query.stream === "true";
     if (wantsStream) {
@@ -181,75 +182,60 @@ Target Word Budget: ${targetWords} words.`;
       return;
     }
 
+    // Pass 1 needs a real AI draft. Without one, nothing is written: no template
+    // prose (which would put invented findings next to the user's real sources).
+    if (candidates.length === 0) {
+      return sendAiFailure(res, new NoClientAiProviderError(), "Sub-section draft");
+    }
+
     let draftText = "";
-
-    if (candidates.length > 0 && !isTest) {
-      try {
-        const response = await completeWithFailover(
-          {
-            taskClass: "drafting",
-            systemPrompt,
-            userPrompt,
-            segments: [{ label: "subSection", text: userPrompt }],
-          },
-          { candidates },
-          buildAuthorizedPolicy(candidates)
-        );
-        if (response.ok && response.value?.text) {
-          draftText = response.value.text;
-        }
-      } catch (e) {
-        console.warn("Pass 1 AI Gateway draft failed, falling back to deterministic synthesis", e);
-      }
-    }
-
-    // Fallback if AI inference didn't yield text
-    if (!draftText.trim()) {
-      draftText = generateDeterministicSubSectionDraft(
-        subSectionTitle,
-        assignedSources,
-        targetWords,
-        targetDialect,
-        req.body?.contextPrompt
+    try {
+      const response = await completeWithFailover(
+        {
+          taskClass: "drafting",
+          systemPrompt,
+          userPrompt,
+          segments: [{ label: "subSection", text: userPrompt }],
+        },
+        { candidates },
+        buildAuthorizedPolicy(candidates)
       );
+      if (!response.ok || !response.value?.text?.trim()) {
+        throw new UnusableAiResponseError("sub-section draft");
+      }
+      draftText = response.value.text;
+    } catch (e) {
+      return sendAiFailure(res, e, "Sub-section draft");
     }
 
-    // 4. Pass 2 (Deterministic Word-Count Controller)
+    // 4. Pass 2: if the draft is more than 8% short, ask the AI to expand it.
+    // If that fails, the shorter real draft is kept; it is never padded with filler.
     const wordCountPass1 = countExactWords(draftText);
-
-    // If word count is more than 8% below targetWords, execute Evidence-Grounded Expansion Pass
     if (wordCountPass1 < targetWords * 0.92) {
       const deficit = targetWords - wordCountPass1;
-
-      if (candidates.length > 0 && !isTest) {
-        try {
-          const expansionPrompt = `The preceding draft for "${subSectionTitle}" is ${wordCountPass1} words, which is below the target budget of ${targetWords} words.
+      try {
+        const expansionPrompt = `The preceding draft for "${subSectionTitle}" is ${wordCountPass1} words, which is below the target budget of ${targetWords} words.
 Expand this draft by approximately ${deficit} words by providing a deeper methodological comparison and critical synthesis of the registered sources: ${assignedSources.map((s) => `[CITE:${s.id}]`).join(", ")}.
 Ensure the final text lands within ±5% of ${targetWords} words without conversational filler or cliché repetitions.
 
 Existing Draft:
 ${draftText}`;
 
-          const expansionResponse = await completeWithFailover(
-            {
-              taskClass: "refinement",
-              systemPrompt,
-              userPrompt: expansionPrompt,
-              segments: [{ label: "expansion", text: expansionPrompt }],
-            },
-            { candidates },
-            buildAuthorizedPolicy(candidates)
-          );
-          if (expansionResponse.ok && expansionResponse.value?.text && expansionResponse.value.text.trim().length > 0) {
-            draftText = expansionResponse.value.text;
-          }
-        } catch (e) {
-          console.warn("Pass 2 AI expansion failed, applying deterministic expansion", e);
-          draftText = expandDeterministicDraft(draftText, assignedSources, deficit, targetDialect);
+        const expansionResponse = await completeWithFailover(
+          {
+            taskClass: "refinement",
+            systemPrompt,
+            userPrompt: expansionPrompt,
+            segments: [{ label: "expansion", text: expansionPrompt }],
+          },
+          { candidates },
+          buildAuthorizedPolicy(candidates)
+        );
+        if (expansionResponse.ok && expansionResponse.value?.text && expansionResponse.value.text.trim().length > 0) {
+          draftText = expansionResponse.value.text;
         }
-      } else {
-        // Offline / test deterministic expansion
-        draftText = expandDeterministicDraft(draftText, assignedSources, deficit, targetDialect);
+      } catch (e) {
+        console.warn("Pass 2 AI expansion failed; keeping the shorter draft", e instanceof Error ? e.message : e);
       }
     }
 
