@@ -30,7 +30,7 @@ import {
   isWcagAA,
   resolveSlideTheme,
 } from '../types/themes';
-import { apply5SlideDeckProgression } from '../services/deckProgressionService';
+import { applyDeckTheme } from '../services/deckProgressionService';
 import {
   getStoredCustomThemes,
   saveCustomThemeToStorage,
@@ -232,7 +232,7 @@ export default function CustomThemeStudio({
     };
     onUpdateDeck(updated);
     if (onApplyTheme) onApplyTheme(theme);
-    showToast(`✓ Applied "${theme.name}" to your 5 presentation slides!`);
+    showToast(`✓ Applied "${theme.name}" to your deck`);
   };
 
   // Blank Sheet action: resets to pure minimal slate for freeform design in Step 03 Studio Canvas
@@ -916,19 +916,19 @@ export default function CustomThemeStudio({
                   swatch: [theme.canvasBg, theme.cardBg, theme.accent],
                   source: 'custom',
                 };
-                const updatedDeck = apply5SlideDeckProgression(
+                const updatedDeck = applyDeckTheme(
                   { ...deck, customTheme: customThemeData },
                   'sand-academic',
                   customThemeData
                 );
                 onUpdateDeck(updatedDeck);
                 if (onApplyTheme) onApplyTheme(theme);
-                showToast('Applied 5-slide progression (Cover, Synthesis, 2D Framework, Metrics, Roadmap)!');
+                showToast(`✓ Applied "${theme.name}" to your deck; your slides are unchanged`);
               }}
               className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs sm:text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
             >
               <Sparkles className="w-4 h-4 text-amber-300" />
-              Apply 5-Slide Progression with Custom Theme
+              Apply Custom Theme to Deck
             </button>
             <button
               type="button"
