@@ -1,11 +1,11 @@
 import { Router, Request, Response } from "express";
 import { asyncRoute, loadOwnedProject, getSharedStore } from "../project.ts";
-import { getCandidates } from "../../utils/llm.ts";
 import {
   sanitizeScholarlyText,
   normalizeUnicodeNFC,
 } from "../../src/utils/scholarlyVoiceGuard.ts";
 import { scholarBrain, type CitationStyleKey } from "../../src/services/scholarBrain.ts";
+import { sendAiFailure, UnusableAiResponseError } from "../../src/ai/aiRouteErrors.ts";
 import type { VerifiedSourceItem } from "../../src/utils/citationLockScrubber.ts";
 import { countExactWords } from "../../src/utils/wordBudgetAllocator.ts";
 
@@ -45,149 +45,12 @@ export interface AimsAuditResponse {
   checks: AimsAuditCheck[];
 }
 
-interface ProposalInputData {
-  title: string;
-  specificAims: string[];
-  significance: string;
-  strategy?: string;
-  agency: string;
-  mechanism?: string;
-  budget?: number;
-}
 
-/**
- * Deterministic heuristic study section evaluator based on actual proposal text characteristics.
- */
-function computeHeuristicStudySection(input: ProposalInputData): StudySectionSimulationResult {
-  const aimsJoined = input.specificAims.join(" ");
-  const aimsCount = input.specificAims.length;
-  const hasHypothesis = /hypothesis|hypothesi[sz]e|we predict|mechanistic rationale/i.test(input.significance + " " + aimsJoined);
-  const hasQuantitativeDeliverables = /\d+%|\bp\s*<|\bcohort\b|\bsample size\b|\bn\s*=\s*\d+|\bbenchmark\b/i.test(aimsJoined);
-  const hasMitigation = /pitfall|alternative|risk|contingency|fallback|limitation/i.test(input.strategy || aimsJoined);
 
-  // Compute realistic NIH-style scores (1.0 = exceptional, 5.0 = average, 9.0 = poor)
-  const significanceScore = hasHypothesis ? 1.6 : 3.2;
-  const approachScore = (hasQuantitativeDeliverables && hasMitigation) ? 1.9 : (hasQuantitativeDeliverables ? 2.5 : 3.8);
-  const innovationScore = /novel|first-in-class|paradigm shift|unprecedented|breakthrough/i.test(input.significance + " " + aimsJoined) ? 1.7 : 2.4;
-  const investigatorScore = 1.5; // Benchmark standard
-  const environmentScore = 1.3;
-
-  const criteria: ProposalCriterionResult[] = [
-    {
-      criterion: "Significance",
-      score: significanceScore,
-      verdict: significanceScore <= 2.0 ? "High Impact" : "Moderate Impact",
-      critique: hasHypothesis
-        ? "The proposal addresses a foundational bottleneck in existing literature with articulate clinical or theoretical significance."
-        : "Whilst the research topic is timely, the overarching theoretical necessity requires sharper articulation of clinical or computational urgency.",
-      recommendation: hasHypothesis
-        ? "Explicitly quantify long-term economic and operational ramifications in paragraph two."
-        : "Formulate a decisive overarching hypothesis that directly resolves an acknowledged literature void.",
-    },
-    {
-      criterion: "Investigator(s)",
-      score: investigatorScore,
-      verdict: "Outstanding",
-      critique: "The investigative team demonstrates requisite domain specialization and technical capability to execute the proposed work packages.",
-      recommendation: "Ensure cross-institutional collaboration agreements and core facility allocations are appended to the appendix.",
-    },
-    {
-      criterion: "Innovation",
-      score: innovationScore,
-      verdict: innovationScore <= 2.0 ? "Highly Novel" : "Solid Methodological Extension",
-      critique: innovationScore <= 2.0
-        ? "Introduces a non-incremental, paradigm-shifting approach superseding descriptive observational conventions."
-        : "The proposed workflows represent incremental progress over standard protocols rather than a transformative paradigm shift.",
-      recommendation: "Differentiate experimental pipeline distinctly from concurrent benchmark literature.",
-    },
-    {
-      criterion: "Approach",
-      score: approachScore,
-      verdict: approachScore <= 2.0 ? "Methodologically Rigorous" : "Feasible With Moderate Exposure",
-      critique: hasMitigation
-        ? `Aims 1 through ${aimsCount || 3} present clean operational demarcations with thoughtful pitfall mitigation procedures.`
-        : `Aims formulation is technically viable, but secondary deliverables exhibit potential dependencies without explicit fallback protocols if preliminary milestones stall.`,
-      recommendation: hasMitigation
-        ? "Include exact statistical power calculations for all downstream confirmatory arms."
-        : "Incorporate an explicit alternative methodology matrix addressing potential null outcomes in Aim 1.",
-    },
-    {
-      criterion: "Environment",
-      score: environmentScore,
-      verdict: "Exceptional Infrastructure",
-      critique: "Institutional compute infrastructure, library archives, and laboratory access provide an ideal environment for project completion.",
-      recommendation: "Reiterate high-performance computing availability in budget justification.",
-    },
-  ];
-
-  const avgScore = (criteria.reduce((acc, c) => acc + c.score, 0) / criteria.length).toFixed(1);
-  const numScore = parseFloat(avgScore);
-  const isCompetitive = numScore <= 2.2;
-
-  return {
-    success: true,
-    title: input.title,
-    agency: input.agency,
-    overallImpactScore: `${avgScore} (Top ${Math.round(numScore * 6)}th Percentile - ${isCompetitive ? "Highly Competitive" : "Fundable with Revision"})`,
-    recommendationForFunding: isCompetitive ? "Approved for Award Consideration" : "Fundable Pending Milestone Revisions",
-    studySectionMembers: [
-      { role: "Primary Reviewer (Domain Specialist)", verdict: `Strong Endorsement (Score: ${(numScore - 0.2).toFixed(1)})` },
-      { role: "Secondary Reviewer (Methodologist)", verdict: `Approved with Methodological Clarifications (Score: ${(numScore + 0.3).toFixed(1)})` },
-      { role: "Tertiary Reviewer (Biostatistician/Data Auditor)", verdict: `Statistical Power Calculation Validated (Score: ${(numScore).toFixed(1)})` },
-    ],
-    criteria,
-  };
-}
-
-/**
- * Deterministic AST/rule-based Aims auditor evaluating Specific Aims text.
- */
-function computeHeuristicAimsAudit(aimsText: string): AimsAuditCheck[] {
-  const text = aimsText.trim();
-  const wordCount = text.split(/\s+/).filter(Boolean).length;
-
-  const hasCentralHypothesis = /\b(hypothesis|hypothesi[sz]e|we predict|central premise|postulate)\b/i.test(text);
-  const hasQuantifiableDeliverables = /\b(\d+%|\bp\s*<|\bAUC\b|\bprecision\b|\brecall\b|\blatency\b|\bsample size\b|\bn\s*=\s*\d+)\b/i.test(text);
-  const hasAimHeaders = /\bAim\s*[1-9]\b|\bObjective\s*[1-9]\b/i.test(text);
-  const hasCascadingRisk = /\b(contingent upon Aim 1|dependent on Aim 1 results|if Aim 1 succeeds)\b/i.test(text);
-
-  return [
-    {
-      name: "Overarching Hypothesis Stated",
-      status: hasCentralHypothesis ? "passed" : "warn",
-      detail: hasCentralHypothesis
-        ? "Clear overarching scientific hypothesis identified to anchor all proposed sub-aims."
-        : "Explicit hypothesis phrasing missing; replace descriptive intention with a testable hypothesis.",
-    },
-    {
-      name: "Aim Structural Independence",
-      status: hasCascadingRisk ? "fail" : "passed",
-      detail: hasCascadingRisk
-        ? "Cascading risk detected: downstream aims appear tightly coupled to preliminary success without contingency."
-        : "Aims are logically linked yet methodologically independent, eliminating catastrophic cascade failure risk.",
-    },
-    {
-      name: "Quantifiable Deliverables & Benchmarks",
-      status: hasQuantifiableDeliverables ? "passed" : "warn",
-      detail: hasQuantifiableDeliverables
-        ? "Concrete verifiable metrics (e.g. error thresholds, precision, or sample benchmarks) defined."
-        : "Deliverables are predominantly descriptive; introduce quantifiable success thresholds.",
-    },
-    {
-      name: "Specific Aims Page Length Budget",
-      status: wordCount >= 300 && wordCount <= 750 ? "passed" : wordCount > 750 ? "warn" : "fail",
-      detail: wordCount >= 300 && wordCount <= 750
-        ? `Conforms cleanly to the standard 1-page executive format (~${wordCount} words; recommended 500-650).`
-        : wordCount > 750
-        ? `Exceeds 1-page word limit (~${wordCount} words; tighten executive framing to under 650 words).`
-        : `Under standard length (~${wordCount} words; expand background deficit, hypothesis, and specific deliverables).`,
-    },
-  ];
-}
 
 /**
  * POST /api/projects/:projectId/proposal/study-section-simulate
- * Evaluates proposal text and aims against NIH/NSF criteria using AI with strict schema fallback.
+ * Evaluates proposal text and aims against NIH/NSF criteria using AI. With no usable AI answer it says so; it never scores the proposal itself.
  */
 router.post(
   "/study-section-simulate",
@@ -197,32 +60,25 @@ router.post(
     if (!record) return;
 
     const body = req.body || {};
-    const title = (body.title || record.answers?.title || "Untitled Proposal").trim();
-    const specificAims: string[] = Array.isArray(body.specificAims) && body.specificAims.length > 0
-      ? body.specificAims
-      : Array.isArray(record.answers?.specificAims)
-      ? record.answers.specificAims
-      : [
-          "Aim 1: Establish deterministic verification protocols.",
-          "Aim 2: Construct multi-agent empirical assessment pipelines.",
-        ];
-    const significance = (body.significance || record.answers?.significanceStatement || "").trim();
-    const strategy = (body.strategy || record.answers?.strategy || "").trim();
-    const agency = (body.agency || record.answers?.fundingAgency || "NIH / NSF").trim();
-    const mechanism = (body.mechanism || record.answers?.mechanism || "R01 / Research Grant").trim();
+    const title = String(body.title || record.answers?.title || "").trim();
+    const specificAims: string[] = (
+      Array.isArray(body.specificAims) && body.specificAims.length > 0
+        ? body.specificAims
+        : Array.isArray(record.answers?.specificAims)
+        ? record.answers.specificAims
+        : []
+    ).filter((a: unknown): a is string => typeof a === "string" && a.trim().length > 0);
+    const significance = String(body.significance || record.answers?.significanceStatement || "").trim();
+    const strategy = String(body.strategy || record.answers?.strategy || "").trim();
+    const agency = String(body.agency || record.answers?.fundingAgency || "").trim();
+    const mechanism = String(body.mechanism || record.answers?.mechanism || "").trim();
 
-    const proposalInput: ProposalInputData = {
-      title,
-      specificAims,
-      significance,
-      strategy,
-      agency,
-      mechanism,
-    };
+    // The review is of the user's own proposal; never of placeholder aims.
+    if (!title || specificAims.length === 0) {
+      return res.status(400).json({ error: "Add your proposal title and at least one specific aim first." });
+    }
 
-    const candidates = getCandidates(req);
-
-    if (candidates.length > 0) {
+    {
       try {
         const systemPrompt = `You are an NIH/NSF Study Section Scientific Review Officer and Primary Reviewer.
 Evaluate the grant proposal and return a strictly formatted JSON object matching this schema:
@@ -245,16 +101,16 @@ Evaluate the grant proposal and return a strictly formatted JSON object matching
 Return ONLY valid JSON. Zero markdown backticks, zero conversational preambles.`;
 
         const userPrompt = `Evaluate this grant proposal:
-Agency: ${agency} (${mechanism})
+Agency: ${agency || "not specified"}${mechanism ? ` (${mechanism})` : ""}
 Title: ${title}
 Specific Aims:
 ${specificAims.map((aim, idx) => `${idx + 1}. ${aim}`).join("\n")}
 
 Significance Statement:
-${significance || "Standard academic significance specified."}
+${significance || "(not provided)"}
 
 Research Strategy / Methodological Deficit:
-${strategy || "Triangulated empirical approach."}`;
+${strategy || "(not provided)"}`;
 
         const brainRes = await scholarBrain.complete({
           req,
@@ -272,31 +128,35 @@ ${strategy || "Triangulated empirical approach."}`;
           criteria?: ProposalCriterionResult[];
         } | null;
 
-        if (parsed && Array.isArray(parsed.criteria) && parsed.overallImpactScore) {
-          return res.json({
-            success: true,
-            title,
-            agency,
-            overallImpactScore: normalizeUnicodeNFC(sanitizeScholarlyText(parsed.overallImpactScore)),
-            recommendationForFunding: normalizeUnicodeNFC(sanitizeScholarlyText(parsed.recommendationForFunding || "Approved for Consideration")),
-            studySectionMembers: parsed.studySectionMembers || [],
-            criteria: parsed.criteria.map((c) => ({
-              criterion: c.criterion,
-              score: typeof c.score === "number" ? c.score : 2.0,
-              verdict: normalizeUnicodeNFC(sanitizeScholarlyText(c.verdict || "Satisfactory")),
-              critique: normalizeUnicodeNFC(sanitizeScholarlyText(c.critique || "")),
-              recommendation: normalizeUnicodeNFC(sanitizeScholarlyText(c.recommendation || "")),
-            })),
-          });
+        // A criterion without a real 1-9 score is dropped, never given a default one.
+        const criteria = Array.isArray(parsed?.criteria)
+          ? parsed.criteria.filter(
+              (c) => typeof c.score === "number" && c.score >= 1 && c.score <= 9 && typeof c.criterion === "string"
+            )
+          : [];
+        if (!parsed?.overallImpactScore || criteria.length === 0) {
+          throw new UnusableAiResponseError("study section review");
         }
+        return res.json({
+          success: true,
+          title,
+          agency,
+          mechanism,
+          overallImpactScore: normalizeUnicodeNFC(sanitizeScholarlyText(parsed.overallImpactScore)),
+          recommendationForFunding: normalizeUnicodeNFC(sanitizeScholarlyText(parsed.recommendationForFunding || "")),
+          studySectionMembers: Array.isArray(parsed.studySectionMembers) ? parsed.studySectionMembers : [],
+          criteria: criteria.map((c) => ({
+            criterion: c.criterion,
+            score: c.score,
+            verdict: normalizeUnicodeNFC(sanitizeScholarlyText(c.verdict || "")),
+            critique: normalizeUnicodeNFC(sanitizeScholarlyText(c.critique || "")),
+            recommendation: normalizeUnicodeNFC(sanitizeScholarlyText(c.recommendation || "")),
+          })),
+        });
       } catch (err) {
-        console.warn("[proposal.ts] AI Study Section evaluation failed, engaging heuristic fallback:", err);
+        return sendAiFailure(res, err, "Study section review");
       }
     }
-
-    // Deterministic heuristic fallback
-    const result = computeHeuristicStudySection(proposalInput);
-    return res.json(result);
   })
 );
 
@@ -311,13 +171,17 @@ router.post(
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
 
-    const aimsText: string = req.body?.aimsText || (
+    const aimsText: string = String(req.body?.aimsText || (
       Array.isArray(record.answers?.specificAims)
         ? record.answers.specificAims.join("\n")
         : ""
-    );
+    )).trim();
 
-    if (aimsText && aimsText.trim().length > 30) {
+    if (aimsText.length < 30) {
+      return res.status(400).json({ error: "Write your hypothesis and specific aims (at least a sentence) before auditing them." });
+    }
+
+    {
       try {
         const systemPrompt = `You are an expert NIH/NSF grant consultant. Audit the submitted Specific Aims text and output a JSON array of check items:
 {
@@ -347,25 +211,25 @@ Output ONLY valid JSON.`;
         const raw = brainRes.parsedJson || (brainRes.text ? JSON.parse(brainRes.text.replace(/```json/g, "").replace(/```/g, "").trim()) : null);
         const parsed = raw as { checks?: Array<{ name?: unknown; status?: unknown; detail?: unknown }> } | null;
 
-        if (parsed && Array.isArray(parsed.checks) && parsed.checks.length > 0) {
-          return res.json({
-            success: true,
-            checks: parsed.checks.map((chk: { name?: unknown; status?: unknown; detail?: unknown }) => ({
-              name: sanitizeScholarlyText(typeof chk.name === "string" ? chk.name : "Aims Criterion"),
-              status: (typeof chk.status === "string" && ["passed", "warn", "fail"].includes(chk.status))
-                ? (chk.status as "passed" | "warn" | "fail")
-                : "passed",
-              detail: sanitizeScholarlyText(typeof chk.detail === "string" ? chk.detail : ""),
-            })),
-          });
-        }
+        const checks = Array.isArray(parsed?.checks)
+          ? parsed.checks.filter((chk) => typeof chk.name === "string" && chk.name.trim().length > 0)
+          : [];
+        if (checks.length === 0) throw new UnusableAiResponseError("aims audit");
+        return res.json({
+          success: true,
+          checks: checks.map((chk) => ({
+            name: sanitizeScholarlyText(chk.name as string),
+            // An unrecognised status is never shown as a pass.
+            status: (typeof chk.status === "string" && ["passed", "warn", "fail"].includes(chk.status))
+              ? (chk.status as "passed" | "warn" | "fail")
+              : "warn",
+            detail: sanitizeScholarlyText(typeof chk.detail === "string" ? chk.detail : ""),
+          })),
+        });
       } catch (err) {
-        console.warn("[proposal.ts] AI Aims Audit failed, engaging heuristic fallback:", err);
+        return sendAiFailure(res, err, "Specific aims audit");
       }
     }
-
-    const checks = computeHeuristicAimsAudit(aimsText);
-    return res.json({ success: true, checks });
   })
 );
 
@@ -380,15 +244,18 @@ router.post(
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
 
-    const sectionTitle: string = String(req.body?.sectionTitle || "Specific Aims").trim();
+    const sectionTitle: string = String(req.body?.sectionTitle || "").trim();
     const targetWords: number = typeof req.body?.targetWords === "number" ? req.body.targetWords : 500;
     const citationStyle: CitationStyleKey = (req.body?.citationStyle as CitationStyleKey) || "apa7";
     const dialect = req.body?.dialect === "en-US" ? "en-US" : "en-GB";
 
     const answers = (record.answers || {}) as Record<string, unknown>;
-    const title = String(answers.title || answers.working_title || "Scholarly Research Proposal");
-    const agency = String(answers.agency || "NIH");
-    const mechanism = String(answers.mechanism || "R01");
+    const title = String(answers.title || answers.working_title || "").trim();
+    const agency = String(answers.agency || answers.fundingAgency || "");
+    const mechanism = String(answers.mechanism || "");
+    if (!title || !sectionTitle) {
+      return res.status(400).json({ error: "Add your proposal title and the section title before drafting." });
+    }
     const userPromptText = req.body?.prompt
       ? String(req.body.prompt)
       : `Draft the ${sectionTitle} section for this grant application.`;
@@ -452,7 +319,7 @@ ${evidenceLedger || "No external sources available."}
         req,
         taskClass: "drafting",
         systemPrompt,
-        userPrompt: `${userPromptText}\n\nProject Title: ${title}\nAgency: ${agency} (${mechanism})\nSection: ${sectionTitle}`,
+        userPrompt: `${userPromptText}\n\nProject Title: ${title}\nAgency: ${agency || "not specified"}${mechanism ? ` (${mechanism})` : ""}\nSection: ${sectionTitle}`,
         dialect,
         stripCliches: true,
       });
@@ -482,34 +349,7 @@ ${evidenceLedger || "No external sources available."}
         model: brainRes.model,
       });
     } catch (err) {
-      console.warn("[proposal.ts] AI Draft Section failed, using structured template fallback:", err);
-
-      const fallbackText = normalizeUnicodeNFC(
-        sanitizeScholarlyText(
-          `## ${sectionTitle}\n\nThe proposed research investigates ${title} to address critical gaps under ${agency} ${mechanism} funding priorities. Specifically, this study evaluates fundamental theoretical mechanisms and establishes rigorous empirical protocols for reproducible inquiry.\n\nPreliminary investigations substantiate feasibility, methodological robustness, and translational potential across the target domain.`,
-          { dialect }
-        )
-      );
-
-      return res.json({
-        success: true,
-        sectionTitle,
-        agency,
-        mechanism,
-        content: fallbackText,
-        bibliography: "",
-        wordCount: countExactWords(fallbackText),
-        burstinessMetrics: {
-          averageLength: 18,
-          variance: 4,
-          burstinessScore: 0.22,
-          isSufficientlyBurst: true,
-        },
-        citedSourcesCount: 0,
-        strippedCitations: [],
-        provider: "deterministic-heuristic",
-        model: "proposal-template-v1",
-      });
+      return sendAiFailure(res, err, "Proposal section draft");
     }
   })
 );

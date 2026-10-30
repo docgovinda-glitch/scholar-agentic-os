@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import StudySectionScorer from "./components/StudySectionScorer";
 import {
-  authedJsonFetch,
+  auditSpecificAims,
   getProject,
   saveIntakeAnswers,
   simulateStudySectionReview,
@@ -158,11 +158,13 @@ export default function ProposalWorkspace({
   // Interactive backend states
   const [auditLoading, setAuditLoading] = useState(false);
   const [aimsAuditChecks, setAimsAuditChecks] = useState<
-    Array<{ name: string; status: "passed" | "warn" | "failed"; detail: string }> | null
+    Array<{ name: string; status: "passed" | "warn" | "fail"; detail: string }> | null
   >(null);
+  const [aimsAuditError, setAimsAuditError] = useState<string | null>(null);
 
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewResults, setReviewResults] = useState<StudySectionSimulationResponse | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   const isFirstMount = useRef(true);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -315,35 +317,17 @@ export default function ProposalWorkspace({
 
   async function handleAuditAims() {
     setAuditLoading(true);
+    setAimsAuditError(null);
     try {
-      const res = await authedJsonFetch(
-        `/api/projects/${encodeURIComponent(projectId)}/proposal/audit-aims`,
-        "POST",
-        {
-          overarchingHypothesis: proposalData.overarchingHypothesis,
-          specificAims: proposalData.specificAims,
-          fundingAgency: proposalData.fundingAgency,
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setAimsAuditChecks(data.checks || []);
-      } else {
-        throw new Error("Fallback audit");
-      }
-    } catch {
-      setAimsAuditChecks([
-        {
-          name: "Central Hypothesis Testability",
-          status: proposalData.overarchingHypothesis.length > 30 ? "passed" : "warn",
-          detail: "Directional hypothesis contains falsifiable empirical outcomes.",
-        },
-        {
-          name: "Aim Independence & Decoupling",
-          status: proposalData.specificAims.length >= 2 ? "passed" : "warn",
-          detail: `${proposalData.specificAims.length} Specific Aims evaluated for sequential dependency risk.`,
-        },
-      ]);
+      const aimsText = [proposalData.overarchingHypothesis, ...proposalData.specificAims]
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .join("\n");
+      setAimsAuditChecks(await auditSpecificAims(projectId, aimsText));
+    } catch (err) {
+      // Never show stand-in checks: the user sees that nothing was audited.
+      setAimsAuditChecks(null);
+      setAimsAuditError(err instanceof Error ? err.message : "The aims audit could not be run.");
     } finally {
       setAuditLoading(false);
     }
@@ -351,47 +335,32 @@ export default function ProposalWorkspace({
 
   async function handleSimulateStudySection() {
     setReviewLoading(true);
+    setReviewError(null);
     try {
       const data = await simulateStudySectionReview(projectId, {
         title: proposalData.title,
-        fundingAgency: proposalData.fundingAgency,
+        agency: proposalData.fundingAgency,
         mechanism: proposalData.mechanism,
-        overarchingHypothesis: proposalData.overarchingHypothesis,
         specificAims: proposalData.specificAims,
-        significanceStatement: proposalData.significanceStatement,
-        innovationStatement: proposalData.innovationStatement,
-        targetBudgetUSD: proposalData.targetBudgetUSD,
+        significance: [
+          proposalData.overarchingHypothesis,
+          proposalData.significanceStatement,
+          proposalData.innovationStatement,
+        ]
+          .map((t) => t.trim())
+          .filter(Boolean)
+          .join("\n\n"),
       });
       setReviewResults(data);
-    } catch {
-      setReviewResults({
-        projectId,
-        agency: proposalData.fundingAgency || "Grant Review Panel",
-        mechanism: proposalData.mechanism || "Standard Track",
-        overallImpactScore: "18 (2.0 NIH Scale — High Impact / Fundable Tier)",
-        recommendationForFunding: "High Priority for Funding (Top 8th Percentile)",
-        criteria: [
-          {
-            criterion: "Significance",
-            score: 2,
-            verdict: "Outstanding",
-            critique: "Addresses an urgent empirical bottleneck in scientific reproducibility.",
-            recommendation: "Quantify projected cost savings for large-scale biomedical meta-analyses.",
-          },
-          {
-            criterion: "Approach",
-            score: 2,
-            verdict: "Strong",
-            critique: "Three-aim structure is well-isolated with clear statistical power.",
-            recommendation: "Add contingency mitigation if Aim 2 latency exceeds 500ms.",
-          },
-        ],
-        auditedAt: new Date().toISOString(),
-      });
+    } catch (err) {
+      // Never show a stand-in review panel.
+      setReviewResults(null);
+      setReviewError(err instanceof Error ? err.message : "The study section review could not be run.");
     } finally {
       setReviewLoading(false);
     }
   }
+
 
   const isBlankProposal =
     proposalData.specificAims.length === 0 &&
@@ -589,6 +558,12 @@ export default function ProposalWorkspace({
                     {auditLoading ? "Auditing Aims…" : "Audit Aims Structure"}
                   </button>
                 </div>
+
+                {aimsAuditError && (
+                  <p role="alert" className="text-xs text-[color:var(--state-danger)]">
+                    {aimsAuditError}
+                  </p>
+                )}
 
                 {aimsAuditChecks && (
                   <div className="apple-card p-4 space-y-2">
@@ -814,6 +789,12 @@ export default function ProposalWorkspace({
                     {reviewLoading ? "Convening Review Panel…" : "Run Study Section Simulation →"}
                   </button>
                 </div>
+
+                {reviewError && (
+                  <p role="alert" className="text-xs text-[color:var(--state-danger)]">
+                    {reviewError}
+                  </p>
+                )}
 
                 {reviewResults && (
                   <div className="flex flex-col gap-4">

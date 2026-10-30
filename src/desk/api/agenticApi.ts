@@ -430,19 +430,63 @@ export interface StudySectionSimulationResponse {
   auditedAt: string;
 }
 
+/** Reads the server's own error message so the user sees why nothing was produced. */
+async function apiError(res: Response, fallback: string): Promise<Error> {
+  try {
+    const body = (await res.json()) as { error?: unknown };
+    if (typeof body.error === "string" && body.error.trim()) return new Error(body.error);
+  } catch {
+    // Non-JSON error body.
+  }
+  return new Error(`${fallback} (HTTP ${res.status}).`);
+}
+
+export interface StudySectionReviewRequest {
+  title: string;
+  agency?: string;
+  mechanism?: string;
+  specificAims: string[];
+  significance?: string;
+  strategy?: string;
+}
+
 export async function simulateStudySectionReview(
   projectId: string,
-  payload: Record<string, unknown>
+  payload: StudySectionReviewRequest
 ): Promise<StudySectionSimulationResponse> {
   const res = await authedJsonFetch(
-    `/api/projects/${encodeURIComponent(projectId)}/proposal/simulate-review`,
+    `/api/projects/${encodeURIComponent(projectId)}/proposal/study-section-simulate`,
     "POST",
     payload
   );
-  if (!res.ok) {
-    throw new Error(`Failed to simulate study section review: HTTP ${res.status}`);
-  }
-  return res.json();
+  if (!res.ok) throw await apiError(res, "The study section review could not be run");
+  const body = (await res.json()) as Omit<StudySectionSimulationResponse, "projectId" | "auditedAt">;
+  return {
+    projectId,
+    agency: body.agency ?? "",
+    mechanism: body.mechanism ?? "",
+    overallImpactScore: body.overallImpactScore,
+    recommendationForFunding: body.recommendationForFunding ?? "",
+    criteria: Array.isArray(body.criteria) ? body.criteria : [],
+    auditedAt: new Date().toISOString(),
+  };
+}
+
+export interface AimsAuditCheckItem {
+  name: string;
+  status: "passed" | "warn" | "fail";
+  detail: string;
+}
+
+export async function auditSpecificAims(projectId: string, aimsText: string): Promise<AimsAuditCheckItem[]> {
+  const res = await authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/proposal/aims-audit`,
+    "POST",
+    { aimsText }
+  );
+  if (!res.ok) throw await apiError(res, "The aims audit could not be run");
+  const body = (await res.json()) as { checks?: AimsAuditCheckItem[] };
+  return Array.isArray(body.checks) ? body.checks : [];
 }
 
 export interface VivaQuestionItem {
@@ -462,19 +506,33 @@ export interface VivaSimulationResponse {
   generatedAt: string;
 }
 
+export interface VivaSimulationRequest {
+  title: string;
+  degreeLevel?: string;
+  researchQuestions: string[];
+  theoreticalFramework?: string;
+  methodology?: string;
+}
+
 export async function simulateVivaDefense(
   projectId: string,
-  payload: Record<string, unknown>
+  payload: VivaSimulationRequest
 ): Promise<VivaSimulationResponse> {
   const res = await authedJsonFetch(
-    `/api/projects/${encodeURIComponent(projectId)}/thesis/simulate-viva`,
+    `/api/projects/${encodeURIComponent(projectId)}/thesis/viva-simulate`,
     "POST",
     payload
   );
-  if (!res.ok) {
-    throw new Error(`Failed to simulate Viva Voce defense: HTTP ${res.status}`);
-  }
-  return res.json();
+  if (!res.ok) throw await apiError(res, "The viva simulation could not be run");
+  const body = (await res.json()) as Pick<VivaSimulationResponse, "examinerPersona" | "examinerRigorScore" | "questions">;
+  return {
+    projectId,
+    degreeLevel: payload.degreeLevel ?? "",
+    examinerPersona: body.examinerPersona ?? "",
+    examinerRigorScore: body.examinerRigorScore ?? "",
+    questions: Array.isArray(body.questions) ? body.questions : [],
+    generatedAt: new Date().toISOString(),
+  };
 }
 
 export interface ThesisChapterAuditResponse {
@@ -496,18 +554,45 @@ export interface ThesisChapterAuditResponse {
   auditedAt: string;
 }
 
+export interface ThesisChapterAuditRequest {
+  chapters: Array<{
+    chapterNumber: number;
+    title: string;
+    wordCount: number;
+    targetWordCount: number;
+    status: string;
+  }>;
+}
+
 export async function auditThesisChapters(
   projectId: string,
-  payload: Record<string, unknown>
+  payload: ThesisChapterAuditRequest
 ): Promise<ThesisChapterAuditResponse> {
   const res = await authedJsonFetch(
-    `/api/projects/${encodeURIComponent(projectId)}/thesis/audit-chapters`,
+    `/api/projects/${encodeURIComponent(projectId)}/thesis/chapter-audit`,
     "POST",
     payload
   );
-  if (!res.ok) {
-    throw new Error(`Failed to audit thesis chapters: HTTP ${res.status}`);
-  }
-  return res.json();
+  if (!res.ok) throw await apiError(res, "The chapter audit could not be run");
+  const body = (await res.json()) as {
+    audit?: {
+      alignmentScore: number;
+      coherenceStatus: string;
+      crossChapterChecks: Array<{ check: string; status: "passed" | "warn" | "fail"; details: string }>;
+    };
+    chapterSummaries?: ThesisChapterAuditResponse["chapterSummaries"];
+  };
+  if (!body.audit) throw new Error("The chapter audit returned no result.");
+  return {
+    projectId,
+    alignmentScore: body.audit.alignmentScore,
+    coherenceStatus: body.audit.coherenceStatus,
+    crossChapterChecks: body.audit.crossChapterChecks.map((c) => ({
+      ...c,
+      status: c.status === "fail" ? "failed" : c.status,
+    })),
+    chapterSummaries: body.chapterSummaries,
+    auditedAt: new Date().toISOString(),
+  };
 }
 
