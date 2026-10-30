@@ -24,23 +24,23 @@ const SAMPLE_CITATIONS: Record<number, CitationInfo> = {
   1: {
     id: 1,
     label: "[1]",
-    source: "High-efficiency in vivo base editing in primate models",
+    source: "Example source A (illustrative)",
     year: 2024,
-    journal: "Nature Biotechnology, 42(3), 312-324",
-    quote: "Observed a 4.2-fold reduction in double-strand break translocations compared to standard SpCas9 nuclease controls (p < 0.001) across all targeted loci.",
+    journal: "Example journal: not a real publication",
+    quote: "The passage in your own PDF that supports this sentence appears here, quoted word for word.",
     page: "Page 14, Paragraph 3",
-    confidence: "99.4% Provenance Match",
+    confidence: "Exact quote found",
     badgeColor: "text-emerald-700 bg-emerald-50 border-emerald-200",
   },
   2: {
     id: 2,
     label: "[2]",
-    source: "Epigenetic durability of prime editing in human hematopoietic stem cells",
+    source: "Example source B (illustrative)",
     year: 2023,
-    journal: "Cell Stem Cell, 30(8), 1042-1055",
-    quote: "Long-term engraftment in xenograft models demonstrated sustained target allele conversion without detectable off-target chromosomal rearrangements.",
+    journal: "Example journal: not a real publication",
+    quote: "A second supporting passage from a source in your Knowledge Vault, with its page and figure reference.",
     page: "Page 8, Figure 4B",
-    confidence: "98.8% Provenance Match",
+    confidence: "Exact quote found",
     badgeColor: "text-emerald-700 bg-emerald-50 border-emerald-200",
   },
 };
@@ -49,7 +49,7 @@ const AGENT_ROLES = [
   {
     id: "auditor",
     name: "Citation Auditor",
-    title: "100% Provenance Verification",
+    title: "Provenance Verification",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -57,7 +57,7 @@ const AGENT_ROLES = [
     ),
     badge: "Active guard",
     description: "Scans every sentence against your private Knowledge Vault. Flags unsupported assertions or paraphrasing drift before publication.",
-    critique: "Claim #4 verified against Chen et al. (2024) [PDF p.14]. Direct quote concordance 99.4%. Zero hallucination detected.",
+    critique: "Example: Claim #4 matches a quoted passage in Source A [PDF p.14]. Claim #7 has no supporting source and is flagged.",
     status: "PASS",
   },
   {
@@ -71,7 +71,7 @@ const AGENT_ROLES = [
     ),
     badge: "Peer review",
     description: "Evaluates sample sizes, control groups, statistical tests, and study limitations according to international CONSORT/STROBE/PRISMA standards.",
-    critique: "Cohort size (n=142) satisfies power calculation (β=0.80, α=0.05). Bonferroni correction correctly applied for multiple comparisons.",
+    critique: "Example: Sample size is reported but no power calculation is given. Multiple comparisons are made without a stated correction.",
     status: "VALIDATED",
   },
   {
@@ -85,7 +85,7 @@ const AGENT_ROLES = [
     ),
     badge: "Style engine",
     description: "Maintains high-impact scholarly prose, eliminates colloquialisms, and balances active vs passive voice based on your chosen target discipline.",
-    critique: "Calculated Flesch-Kincaid Grade Level: 14.8. Register matches Nature Biotechnology editorial benchmark across Sections 1-4.",
+    critique: "Example: Readability and register are checked against your target journal's style, section by section.",
     status: "OPTIMIZED",
   },
   {
@@ -99,7 +99,7 @@ const AGENT_ROLES = [
     ),
     badge: "Publisher gate",
     description: "Enforces target journal word counts, required headings, abstract structured constraints, and citation formatting (APA, IEEE, Vancouver, Nature).",
-    critique: "Word count: 3,840 / 4,500 limit. Abstract structured into Background, Methods, Results, Conclusion. References formatted in Nature style.",
+    critique: "Example: Word count checked against your journal's limit; abstract headings and reference style checked against its guidelines.",
     status: "COMPLIANT",
   },
 ];
@@ -431,13 +431,13 @@ export default function ScholarCoreLanding({
           {/* Main Hero Header */}
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-center mb-4 leading-[1.1] text-neutral-900 max-w-5xl">
             Research at the speed of thought. <br className="hidden sm:inline" />
-            <span className="text-neutral-600">Verified to the standard of Nature.</span>
+            <span className="text-neutral-600">Every claim traced to your own sources.</span>
           </h1>
 
           <p className="text-base sm:text-lg text-neutral-600 text-center max-w-3xl mx-auto mb-8 leading-relaxed font-normal">
             From raw literature search and PDF extraction to publication-ready manuscripts with{" "}
             <strong className="text-neutral-900 font-semibold">
-              100% cryptographic citation provenance
+              citations checked against the sources in your vault
             </strong>
             , multi-agent editorial review, and strict journal compliance.
           </p>
@@ -565,7 +565,7 @@ export default function ScholarCoreLanding({
           <div className="max-w-6xl mx-auto">
             <div className="text-center max-w-2xl mx-auto mb-10">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-neutral-200 bg-white text-xs font-semibold text-neutral-700 shadow-2xs">
-                Live interactive workspace
+                Illustrative example: sample text, not real sources
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-900 mt-3">
                 Click any citation to verify provenance
@@ -591,7 +591,7 @@ export default function ScholarCoreLanding({
                     Quality gate: 5/5 passed
                   </span>
                   <span className="px-2.5 py-0.5 rounded-full bg-neutral-900 text-white text-xs font-medium">
-                    Target: Nature Biotech
+                    Target: your journal
                   </span>
                 </div>
               </div>
@@ -627,7 +627,7 @@ export default function ScholarCoreLanding({
                               : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200/80 border border-neutral-200/80"
                           }`}
                         >
-                          [1] Nature Biotech 2024
+                          [1] Source A 2024
                         </button>
                         .
                       </p>
@@ -645,7 +645,7 @@ export default function ScholarCoreLanding({
                               : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200/80 border border-neutral-200/80"
                           }`}
                         >
-                          [2] Cell Stem Cell 2023
+                          [2] Source B 2023
                         </button>
                         . These parameters substantiate clinical viability for downstream therapeutic translation.
                       </p>
@@ -950,7 +950,7 @@ export default function ScholarCoreLanding({
                       <td className="p-4 font-semibold text-neutral-900 border-r border-neutral-100">Citation Provenance</td>
                       <td className="p-4 text-center text-neutral-500 border-r border-neutral-100 font-normal">Hallucinates fake papers</td>
                       <td className="p-4 text-center text-neutral-500 border-r border-neutral-100 font-normal">Stores PDFs only</td>
-                      <td className="p-4 text-center font-bold text-neutral-900 bg-neutral-50/80">100% Cryptographic Match</td>
+                      <td className="p-4 text-center font-bold text-neutral-900 bg-neutral-50/80">Checked against your vault sources</td>
                     </tr>
                     <tr>
                       <td className="p-4 font-semibold text-neutral-900 border-r border-neutral-100">Academic Workspaces</td>

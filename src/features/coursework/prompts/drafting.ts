@@ -55,7 +55,7 @@ export const ARCHETYPE_TRANSITION_NGRAMS: Record<string, string[]> = {
     "the empirical findings demonstrate",
     "multivariate panel regressions indicate",
     "controlling for baseline covariates",
-    "statistically significant correlation (p < 0.01)",
+    "the reported association, as stated in the source,",
     "robustness tests confirm that",
     "these experimental results corroborate"
   ],
