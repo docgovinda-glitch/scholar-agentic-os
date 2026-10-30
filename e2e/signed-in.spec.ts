@@ -85,14 +85,6 @@ test("a saved presentation deck reloads, and another user cannot read it", async
   await api(page, "DELETE", `/api/presentations/${deckId}`);
 });
 
-test("signing out ends the session", async ({ browser }) => {
-  // Separate context so signing out doesn't affect other tests' saved session.
-  const { context, page } = await newSession(browser, AUTH_FILES.A);
-  await expect(page.getByText(A.email!).first()).toBeVisible();
-  await page.getByText(A.email!).first().click(); // account menu
-  await page.getByRole("button", { name: /^Sign Out$/i }).first().click();
-  await page.getByRole("button", { name: /^Sign Out$/i }).last().click(); // confirm dialog
-  await expect(page.getByText(A.email!)).toHaveCount(0);
-  expect((await api(page, "GET", "/api/projects")).status).toBe(401);
-  await context.close();
-});
+// "signing out ends the session" lives in zz-sign-out.spec.ts so it runs last:
+// signing out revokes every session of account A, including the saved one
+// the other signed-in specs use.
