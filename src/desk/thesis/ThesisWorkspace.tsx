@@ -150,10 +150,12 @@ export default function ThesisWorkspace({
   // Interactive backend states
   const [vivaLoading, setVivaLoading] = useState(false);
   const [vivaResults, setVivaResults] = useState<VivaSimulationResponse | null>(null);
+  const [vivaError, setVivaError] = useState<string | null>(null);
 
   const [auditLoading, setAuditLoading] = useState(false);
   const [chapterAuditResults, setChapterAuditResults] =
     useState<ThesisChapterAuditResponse | null>(null);
+  const [auditError, setAuditError] = useState<string | null>(null);
 
   const isFirstMount = useRef(true);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -334,36 +336,20 @@ export default function ThesisWorkspace({
 
   async function handleSimulateViva() {
     setVivaLoading(true);
+    setVivaError(null);
     try {
       const data = await simulateVivaDefense(projectId, {
         title: thesisData.title,
         degreeLevel: thesisData.degreeLevel,
-        fieldOfStudy: thesisData.fieldOfStudy,
         researchQuestions: thesisData.researchQuestions,
         theoreticalFramework: thesisData.theoreticalFramework,
-        methodologicalDesign: thesisData.methodologicalDesign,
+        methodology: thesisData.methodologicalDesign,
       });
       setVivaResults(data);
-    } catch {
-      setVivaResults({
-        projectId,
-        degreeLevel: thesisData.degreeLevel,
-        examinerPersona: "External Examiner Panel (Chair & Methodological Specialist)",
-        examinerRigorScore: "94/100 (Rigorous PhD Defense Standard)",
-        questions: [
-          {
-            id: "viva-q1",
-            category: "Theoretical Originality & Epistemology",
-            examinerQuestion: `How does your framework in "${thesisData.title}" resolve tensions between competing domain paradigms?`,
-            assessmentFocus: "Tests conceptual synthesis and defense of core assumptions.",
-            suggestedRebuttalStructure: [
-              "Define the scope boundary where classical assumptions break down.",
-              "Point to Chapter 2 literature synthesis and Chapter 4 empirical validation.",
-            ],
-          },
-        ],
-        generatedAt: new Date().toISOString(),
-      });
+    } catch (err) {
+      // Never show stand-in questions: the user sees that nothing was generated.
+      setVivaResults(null);
+      setVivaError(err instanceof Error ? err.message : "The viva simulation could not be run.");
     } finally {
       setVivaLoading(false);
     }
@@ -371,36 +357,18 @@ export default function ThesisWorkspace({
 
   async function handleRunChapterAudit() {
     setAuditLoading(true);
+    setAuditError(null);
     try {
-      const data = await auditThesisChapters(projectId, {
-        chapters: thesisData.chapters,
-        researchQuestions: thesisData.researchQuestions,
-        theoreticalFramework: thesisData.theoreticalFramework,
-      });
+      const data = await auditThesisChapters(projectId, { chapters: thesisData.chapters });
       setChapterAuditResults(data);
-    } catch {
-      setChapterAuditResults({
-        projectId,
-        alignmentScore: 92,
-        coherenceStatus: "Strong Cross-Chapter Threading",
-        crossChapterChecks: [
-          {
-            check: "Research Question Threading (Ch. 1 → Ch. 5)",
-            status: "passed",
-            details: `All ${thesisData.researchQuestions.length || 3} Research Questions map cleanly to empirical chapters.`,
-          },
-          {
-            check: "Methodological Alignment (Ch. 2 → Ch. 3)",
-            status: "passed",
-            details: "Theoretical constructs operationalized in research instruments.",
-          },
-        ],
-        auditedAt: new Date().toISOString(),
-      });
+    } catch (err) {
+      setChapterAuditResults(null);
+      setAuditError(err instanceof Error ? err.message : "The chapter audit could not be run.");
     } finally {
       setAuditLoading(false);
     }
   }
+
 
   const progressPercent = Math.min(
     100,
@@ -796,6 +764,12 @@ export default function ThesisWorkspace({
                   </button>
                 </div>
 
+                {auditError && (
+                  <p role="alert" className="text-xs text-[color:var(--state-danger)]">
+                    {auditError}
+                  </p>
+                )}
+
                 {chapterAuditResults && (
                   <div className="apple-card p-5 space-y-4">
                     <div>
@@ -859,6 +833,12 @@ export default function ThesisWorkspace({
                   </button>
                 </div>
 
+                {vivaError && (
+                  <p role="alert" className="text-xs text-[color:var(--state-danger)]">
+                    {vivaError}
+                  </p>
+                )}
+
                 {vivaResults && (
                   <div className="flex flex-col gap-4">
                     <div className="apple-card p-4">
@@ -868,9 +848,11 @@ export default function ThesisWorkspace({
                       <h4 className="text-sm font-bold text-primary mt-1">
                         {vivaResults.examinerPersona}
                       </h4>
-                      <p className="text-xs text-secondary mt-0.5">
-                        Rigor Level: {vivaResults.examinerRigorScore}
-                      </p>
+                      {vivaResults.examinerRigorScore && (
+                        <p className="text-xs text-secondary mt-0.5">
+                          Rigor Level: {vivaResults.examinerRigorScore}
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-4">

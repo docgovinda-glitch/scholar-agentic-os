@@ -16,6 +16,7 @@
 import { completeWithFailover, streamWithFailover } from "../../../src/platform/gateway/gateway.ts";
 import type { CandidateProvider } from "../../../src/platform/gateway/types.ts";
 import { resolveClientAiConfig } from "../ai/clientAiConfig.ts";
+import { NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 import { defaultPolicy } from "../../../src/platform/warden/policy.ts";
 import { recordConsent, type EgressPolicy } from "../../../src/platform/warden/warden.ts";
 import type { TaskClass } from "../../../src/platform/warden/types.ts";
@@ -261,9 +262,7 @@ export const scholarBrain = {
     );
 
     if (candidates.length === 0) {
-      throw new Error(
-        "Client-Owned AI Routing Required: No active transient AI credentials detected in request headers (x-ai-provider, x-ai-api-key, or local base URL). Server-side fallback keys are strictly prohibited."
-      );
+      throw new NoClientAiProviderError();
     }
 
     const dialect = options.dialect ?? "en-GB";
