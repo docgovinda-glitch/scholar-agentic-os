@@ -74,7 +74,7 @@ describe("Presentation Studio REST API Routes (/api/presentations)", () => {
     expect(updateRes.body.deck.theme_id).toBe("deep-charcoal");
   });
 
-  it("POST /api/presentations/:id/copilot mutates slide to 2-column comparative layout", async () => {
+  it("POST /api/presentations/:id/copilot refuses a comparison for a slide with no points of its own", async () => {
     const copilotRes = await request(app)
       .post("/api/presentations/deck-test-1/copilot")
       .send({
@@ -82,13 +82,33 @@ describe("Presentation Studio REST API Routes (/api/presentations)", () => {
         prompt: "Make this slide a 2-column comparative case study",
       });
 
+    expect(copilotRes.status).toBe(400);
+    expect(copilotRes.body.error).toMatch(/at least two points/i);
+  });
+
+  it("POST /api/presentations/:id/copilot splits the slide's own points into a 2-column layout", async () => {
+    const ownPoints = ["Manual review takes two weeks", "Errors found late", "Automated checks run nightly", "Errors found early"];
+    const copilotRes = await request(app)
+      .post("/api/presentations/deck-test-1/copilot")
+      .send({
+        slideIndex: 0,
+        prompt: "Make this slide a 2-column comparative case study",
+        currentSlide: {
+          id: "slide-1",
+          order: 1,
+          actionHeadline: "Review Process",
+          blocks: [{ type: "bullet-list", items: ownPoints }],
+        },
+      });
+
     expect(copilotRes.status).toBe(200);
     expect(copilotRes.body.success).toBe(true);
     expect(copilotRes.body.mutatedSlide.layoutType).toBe("two-column");
-    expect(copilotRes.body.mutatedSlide.blocks.some((b: any) => b.type === "two-column")).toBe(true);
+    const col = copilotRes.body.mutatedSlide.blocks.find((b: any) => b.type === "two-column");
+    expect([...col.leftPoints, ...col.rightPoints]).toEqual(ownPoints);
   });
 
-  it("POST /api/presentations/:id/copilot mutates slide to big metric focus", async () => {
+  it("POST /api/presentations/:id/copilot mutates slide to big metric focus using the user's own figure", async () => {
     const copilotRes = await request(app)
       .post("/api/presentations/deck-test-1/copilot")
       .send({
@@ -99,7 +119,19 @@ describe("Presentation Studio REST API Routes (/api/presentations)", () => {
     expect(copilotRes.status).toBe(200);
     expect(copilotRes.body.success).toBe(true);
     expect(copilotRes.body.mutatedSlide.layoutType).toBe("metric-focus");
-    expect(copilotRes.body.mutatedSlide.blocks.some((b: any) => b.type === "metric-callout")).toBe(true);
+    const metric = copilotRes.body.mutatedSlide.blocks.find((b: any) => b.type === "metric-callout");
+    expect(metric.value).toBe("4.2x");
+    // No invented sample size or significance attached to the figure
+    expect(JSON.stringify(copilotRes.body.mutatedSlide)).not.toMatch(/p < 0\.001|5,000/);
+  });
+
+  it("POST /api/presentations/:id/copilot refuses a metric callout without a figure", async () => {
+    const copilotRes = await request(app)
+      .post("/api/presentations/deck-test-1/copilot")
+      .send({ slideIndex: 0, prompt: "Turn this into a metric callout" });
+
+    expect(copilotRes.status).toBe(400);
+    expect(copilotRes.body.error).toMatch(/never invents a number/i);
   });
 
   it("DELETE /api/presentations/:id removes presentation deck", async () => {

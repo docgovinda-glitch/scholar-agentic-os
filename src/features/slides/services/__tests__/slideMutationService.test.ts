@@ -145,4 +145,34 @@ describe('slideMutationService', () => {
     });
     expect(compareRes.mutatedSlide.layoutType).toBe('two-column');
   });
+
+  describe('never invents slide content', () => {
+    const emptySlide: SlideCard = {
+      id: 'slide-empty',
+      order: 1,
+      actionHeadline: 'A study on rural clinic wait times',
+      layoutType: 'bullets',
+      framework: 'Standard-Narrative',
+      blocks: [{ type: 'action-header', headline: 'A study on rural clinic wait times', category: '', subheadline: '' }],
+    } as SlideCard;
+
+    it('headline editing strips weak openers without adding claims', () => {
+      const out = strengthenActiveVoice(emptySlide);
+      expect(out.actionHeadline).toBe('Rural clinic wait times');
+      expect(out.actionHeadline).not.toMatch(/proves|drives|verifiable/i);
+    });
+
+    it('2-column with too few points invents no comparison', () => {
+      const out = changeToTwoColumn(emptySlide);
+      const col = out.blocks.find((b) => b.type === 'two-column');
+      expect(col && col.type === 'two-column' ? [...col.leftPoints, ...col.rightPoints] : null).toEqual([]);
+    });
+
+    it('split image adds no stock bullets or caption', () => {
+      const out = convertToSplitImage(emptySlide);
+      expect(out.blocks.some((b) => b.type === 'bullet-list')).toBe(false);
+      const img = out.blocks.find((b) => b.type === 'image');
+      expect(img && img.type === 'image' ? img.caption : null).toBe('');
+    });
+  });
 });
