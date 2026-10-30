@@ -72,8 +72,10 @@ export default function FinalEditorStage({
   }, [project?.answers]);
 
   const targetJournal = useMemo(() => {
-    return project?.answers?.["selected_journal_name"] || "Nature Machine Intelligence";
+    return project?.answers?.["selected_journal_name"] || project?.answers?.["target_journal"] || "";
   }, [project?.answers]);
+
+  const journalLabel = targetJournal || "your target journal";
 
   const anchorGap = useMemo(() => {
     try {
@@ -81,13 +83,13 @@ export default function FinalEditorStage({
       if (gaps) {
         const parsed = JSON.parse(gaps);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed[0].title || parsed[0].description || "Deterministic provenance verification";
+          return parsed[0].title || parsed[0].description || "";
         }
       }
     } catch {
       // Ignore
     }
-    return "Deterministic provenance verification";
+    return "";
   }, [project?.answers]);
 
   // Initial Content Compilation
@@ -132,57 +134,8 @@ export default function FinalEditorStage({
       }
     }
 
-    // 4. Fallback default draft
-    const isTopicBftOrAgents =
-      workingTitle.toLowerCase().includes("byzantine") ||
-      workingTitle.toLowerCase().includes("provenance") ||
-      workingTitle.toLowerCase().includes("autonomous") ||
-      anchorGap.toLowerCase().includes("provenance") ||
-      anchorGap.toLowerCase().includes("byzantine");
-
-    if (isTopicBftOrAgents) {
-      return `# ${workingTitle}
-
-## Abstract
-Autonomous reasoning architectures demonstrate reproducible variance reduction across multi-agent benchmarks. However, established formalisms fail to guarantee deterministic convergence bounds in decentralized synthesis—inducing systemic failure modes under adversarial epistemic divergence. We introduce a deterministic verification operator that bounds latency and preserves provenance across distributed reasoning nodes.
-
-## 1. Introduction
-Multi-agent synthesis workflows require continuous verification to prevent cumulative hallucination cascade. In this paper, we formulate provable provenance bounds that guarantee convergence under bounded communication regimes.
-
-## 2. Methodology & Formal Bounds
-To substantiate tractability, we establish Lemma 1: Under symmetric sparse communication topologies, the bipartite matching operator terminates in O(V · E log V) steps, strictly bounding computational overhead and preventing algorithmic stall.
-
-## 3. Empirical Results
-Empirical evaluation against standard multi-agent benchmarks demonstrates a 94.2% fidelity rate (95% CI: [92.8%, 95.6%], p < 0.001). Runtime overhead remained bounded under 42ms per decision cycle up to n=128 participating agents.
-
-## 4. Discussion & Validity Threats
-Threats to Validity & Boundary Conditions: While our proofs hold under bounded Byzantine failure regimes (f < n/3), stochastic packet loss exceeding 35% induces graceful latency degradation rather than catastrophic divergence.
-
-## 5. References
-1. Vaswani, A. et al. (2024). Empirical Grounding in Autonomous Academic Synthesis. Journal of AI Research, 45(2), 112-128.
-2. Lamport, L. et al. (2023). Addressing Methodological Latency in Distributed Consensus. Distributed Systems Review, 19(4), 401-419.`;
-    }
-
-    return `# ${workingTitle}
-
-## Abstract
-This study investigates "${workingTitle}", directly addressing the empirical and theoretical gap regarding "${anchorGap}". By formalizing a rigorous computational framework evaluated against established domain parameters, we demonstrate significant concordance and variance reduction. Our findings provide deterministic verification boundaries suitable for camera-ready publication in ${targetJournal}.
-
-## 1. Introduction
-Scholarly exploration of this domain requires formal synthesis and systematic modeling. Prior literature has observed persistent challenges regarding "${anchorGap}". In this paper, we develop an integrated computational model that formalizes foundational textual and mathematical axioms into a verified analytical pipeline.
-
-## 2. Theoretical Framework & Methodology
-We formalize the core methodology by establishing verifiable mathematical mappings across primary source constraints and observational metrics. Let formal parameters be bounded under empirical tolerance thresholds, ensuring reproducible convergence across comparative benchmarks.
-
-## 3. Empirical Concordance & Results
-Systematic comparative evaluation against verified corpus evidence demonstrates high concordance (p < 0.001) across all modeled divisions. Measured parameter alignment exhibits minimal variance, substantiating the theoretical hypotheses under target venue standards.
-
-## 4. Discussion & Boundary Conditions
-Our findings substantiate the structural validity of the proposed model while delineating boundary conditions and sensitivity limits. We discuss implications for future multidisciplinary research and reproducible scholarly attestation in ${targetJournal}.
-
-## 5. References
-1. Core Foundational Source Corpus (2024). Verified Scholarly Edition and Textual Attestation.
-2. Analytical Benchmark Studies in Computational Modeling (2023). Academic Review of Research Methodologies.`;
+    // No demo manuscript: an empty project stays empty until the author writes or drafts.
+    return "";
   }, [project?.answers, workingTitle, anchorGap, targetJournal]);
 
   const [content, setContent] = useState<string>(compileInitialDraft);
@@ -564,7 +517,7 @@ Our findings substantiate the structural validity of the proposed model while de
 
           <div className="flex items-center gap-1.5 bg-[color:var(--surface-sunken)] px-2.5 py-1 rounded-md border border-[color:var(--border-subtle)] shrink-0">
             <span className="text-[color:var(--text-muted)]">Venue:</span>
-            <span className="font-medium text-[color:var(--accent)]">{targetJournal}</span>
+            <span className="font-medium text-[color:var(--accent)]">{targetJournal || "Not chosen"}</span>
           </div>
 
           <div className="flex items-center gap-1.5 bg-[color:var(--surface-sunken)] px-2.5 py-1 rounded-md border border-[color:var(--border-subtle)] shrink-0 max-w-xs truncate">
@@ -863,7 +816,7 @@ Our findings substantiate the structural validity of the proposed model while de
             <div className="mt-6 p-3 rounded-xl bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-xs space-y-1">
               <span className="font-bold text-[color:var(--text-primary)] block">Target Guidelines</span>
               <p className="text-[color:var(--text-muted)] text-[11px] leading-relaxed">
-                {targetJournal}: max 4,500 words, structured abstract, Vancouver or APA citation register.
+                Check {journalLabel}'s author guidelines for its word limit, abstract format and citation style.
               </p>
             </div>
           </aside>

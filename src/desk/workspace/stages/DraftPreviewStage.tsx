@@ -40,7 +40,7 @@ export default function DraftPreviewStage({
   const workingTitle =
     project?.answers?.["working_title"] ||
     project?.answers?.["title"] ||
-    "Autonomous Scholar Article";
+    "";
 
   const anchorGapId = project?.answers?.["anchor_gap_id"];
   const identifiedGaps = useMemo(() => {
@@ -58,7 +58,7 @@ export default function DraftPreviewStage({
   const targetJournal =
     project?.answers?.["selected_journal_name"] ||
     project?.answers?.["target_journal"] ||
-    "Target Academic Journal";
+    "";
 
   const approvedVaultSources = useMemo(() => {
     const appr = safeParseAnswerField<any[]>(project?.answers?.["approved_vault_sources"], []);
@@ -81,7 +81,9 @@ export default function DraftPreviewStage({
   }, [project?.answers]);
 
   const originalityScore = useMemo(() => {
-    return project?.answers?.["originality_score"] || "96";
+    // Only a score from the user's own originality check; never a default.
+    const raw = project?.answers?.["originality_score"];
+    return raw === undefined || raw === null || raw === "" ? null : String(raw);
   }, [project?.answers]);
 
   const citationReport = useMemo(() => {
@@ -153,39 +155,8 @@ export default function DraftPreviewStage({
       });
     }
 
-    // Default fallback manuscript
-    return [
-      {
-        title: "Abstract",
-        content: `Contemporary scientific research environments increasingly leverage autonomous language models for literature synthesis, hypothesis generation, and theoretical modeling. However, the persistent absence of deterministic provenance verification threatens scholarly credibility (${anchorGap}). Here, we propose a provable attribution framework evaluated against rigorous empirical benchmarks. Our findings demonstrate a 28.4% variance reduction in latent hallucination while accelerating synthesis throughput by 3.4x. These empirical boundaries fulfill top-tier editorial criteria for publication in ${targetJournal}.`,
-        wordCount: 185,
-      },
-      {
-        title: "1. Introduction",
-        content: `The rapid emergence of agentic reasoning architectures has fundamentally altered the paradigm of computational scientific discovery. As demonstrated across recent literature [1], autonomous agents can autonomously traverse citation networks, extract factual claims, and synthesize multidisciplinary research matrices. Nonetheless, the challenge of epistemic disconnection—wherein synthesized claims cannot be deterministically mapped back to verified evidentiary roots—remains an acute bottleneck. In this paper, we formalize the claim-to-evidence provenance matrix and evaluate its mathematical correctness.`,
-        wordCount: 680,
-      },
-      {
-        title: "2. Methodology",
-        content: `We formalize the manuscript synthesis pipeline through a multi-tiered tripartite architecture: (i) Vault Grounding, (ii) Vector Provenance Attestation, and (iii) Zero-Hallucination Gate Verification. Let C denote the set of synthesized manuscript assertions and E denote the corpus of verified Knowledge Vault evidence. We construct the bipartite projection operator P: C -> E over confidence threshold tau >= 0.95. Claims falling below tau are flagged for manual researcher adjudication before final assembly.`,
-        wordCount: 1120,
-      },
-      {
-        title: "3. Empirical Results & Evaluation",
-        content: `To evaluate the proposed architecture, we benchmarked performance across 50,000 synthesized tokens. The system demonstrated a verified citation provenance rate of 98.6%, significantly outperforming conventional ungrounded baseline frameworks (64.2%). Latency benchmarks confirm an average end-to-end section compilation time of 4.2 seconds under distributed multi-agent load, preserving high fidelity and Zero-Plagiarism compliance.`,
-        wordCount: 940,
-      },
-      {
-        title: "4. Discussion & Concluding Remarks",
-        content: `Our findings establish that autonomous academic workflows can attain publication-grade integrity when bounded by deterministic provenance verifiers. By integrating Knowledge Vault anchors with iterative originality auditing, scientific pipelines eliminate hallucinated citations without sacrificing generation fluidity. Future work will investigate real-time formal theorem validation during in-situ drafting sessions.`,
-        wordCount: 520,
-      },
-      {
-        title: "References",
-        content: `[1] Vaswani, A. et al. (2024). Empirical Grounding in Autonomous Academic Synthesis. Nature Machine Intelligence.\n[2] Kaplan, J. & Henighan, T. (2023). Provable Provenance Bounds in Scientific Language Generation. ACM Computing Surveys.\n[3] Lamport, L. et al. (2023). Addressing Methodological Latency in Distributed Consensus. IEEE Transactions on Information Theory.`,
-        wordCount: 160,
-      },
-    ];
+    // No demo manuscript: an empty project previews as empty.
+    return [];
   }, [rawSections, results?.content, anchorGap, targetJournal]);
 
   const totalWords = useMemo(() => {
@@ -203,22 +174,22 @@ export default function DraftPreviewStage({
         id: "check-title",
         label: "Manuscript Specification Charter",
         phase: "Phase I",
-        status: "passed",
-        detail: `Working title sealed: "${workingTitle}"`,
+        status: workingTitle ? "passed" : "pending",
+        detail: workingTitle ? `Working title: "${workingTitle}"` : "No working title yet",
       },
       {
         id: "check-evidence",
         label: "Primary Evidence & Vault Corpus",
         phase: "Phase II",
-        status: "passed",
-        detail: `${approvedVaultSources.length + approvedExternalSources.length} Approved primary & external sources`,
+        status: approvedVaultSources.length + approvedExternalSources.length > 0 ? "passed" : "pending",
+        detail: `${approvedVaultSources.length + approvedExternalSources.length} approved primary & external sources`,
       },
       {
         id: "check-venue",
         label: "Target Journal Formatting Rules",
         phase: "Phase III",
-        status: "passed",
-        detail: `Rubric mapped for ${targetJournal}`,
+        status: targetJournal ? "passed" : "pending",
+        detail: targetJournal ? `Target journal: ${targetJournal}` : "No target journal chosen yet",
       },
       {
         id: "check-sections",
@@ -229,17 +200,23 @@ export default function DraftPreviewStage({
       },
       {
         id: "check-provenance",
-        label: "100% Citation Provenance Audit",
+        label: "Citation Provenance Audit",
         phase: "Phase III",
-        status: "passed",
-        detail: `${citationReport.length > 0 ? citationReport.length : "Full"} claims verified against Vault corpus`,
+        status: citationReport.length > 0 ? "passed" : "pending",
+        detail:
+          citationReport.length > 0
+            ? `${citationReport.length} claims in your citation audit`
+            : "Citation audit not run yet",
       },
       {
         id: "check-originality",
         label: "Academic Originality & Overlap Clearance",
         phase: "Phase III",
-        status: Number(originalityScore) >= 90 ? "passed" : "advisory",
-        detail: `${originalityScore}% Originality Score certified (< 15% overlap limit)`,
+        status: originalityScore === null ? "pending" : Number(originalityScore) >= 90 ? "passed" : "advisory",
+        detail:
+          originalityScore === null
+            ? "Originality check not run yet"
+            : `${originalityScore}% originality (from your originality check)`,
       },
     ];
   }, [workingTitle, approvedVaultSources, approvedExternalSources, targetJournal, parsedSections, totalWords, citationReport, originalityScore]);
@@ -260,7 +237,7 @@ export default function DraftPreviewStage({
 
     const logsArray = [
       "Compiling parsed sections into cohesive manuscript hierarchy...",
-      `Applying ${targetJournal} typographical formatting styles...`,
+      `Applying ${targetJournal || "journal"} typographical formatting styles...`,
       "Formatting author affiliations, abstract callout, and keywords...",
       "Generating numerical cross-references and mathematical block alignments...",
       "Rendering dual-mode preprint layout and outline indices...",
@@ -490,18 +467,18 @@ export default function DraftPreviewStage({
           <div className="flex items-center gap-1.5 bg-[color:var(--surface-sunken)] px-2.5 py-1 rounded-md border border-[color:var(--border-subtle)] shrink-0 max-w-xs truncate">
             <span className="text-[color:var(--text-muted)]">Title:</span>
             <span className="font-medium text-[color:var(--text-primary)] truncate" title={workingTitle}>
-              {workingTitle}
+              {workingTitle || "Untitled"}
             </span>
           </div>
 
           <div className="flex items-center gap-1.5 bg-[color:var(--surface-sunken)] px-2.5 py-1 rounded-md border border-[color:var(--border-subtle)] shrink-0">
             <span className="text-[color:var(--text-muted)]">Venue:</span>
-            <span className="font-medium text-[color:var(--accent)]">{targetJournal}</span>
+            <span className="font-medium text-[color:var(--accent)]">{targetJournal || "Not chosen"}</span>
           </div>
 
           <div className="flex items-center gap-1.5 bg-[color:var(--surface-sunken)] px-2.5 py-1 rounded-md border border-[color:var(--border-subtle)] shrink-0">
             <span className="text-[color:var(--text-muted)]">Originality:</span>
-            <span className="font-medium text-[color:var(--state-success)]">{originalityScore}% Certified</span>
+            <span className="font-medium text-[color:var(--state-success)]">{originalityScore === null ? "Not checked" : `${originalityScore}%`}</span>
           </div>
 
           <div className="flex items-center gap-1.5 bg-[color:var(--surface-sunken)] px-2.5 py-1 rounded-md border border-[color:var(--border-subtle)] shrink-0">
@@ -752,7 +729,9 @@ export default function DraftPreviewStage({
         <div className="flex items-center gap-3">
           <div className="w-2.5 h-2.5 rounded-full bg-[color:var(--state-success)] animate-pulse" />
           <span className="text-xs font-mono text-[color:var(--text-secondary)]">
-            Phase III Complete • Manuscript Fully Assembled ({totalWords.toLocaleString()} words across {parsedSections.length} sections)
+            {parsedSections.length === 0
+              ? "No manuscript sections yet"
+              : `Manuscript assembled (${totalWords.toLocaleString()} words across ${parsedSections.length} sections)`}
           </span>
         </div>
 
