@@ -70,7 +70,7 @@ router.post(
     ).filter((a: unknown): a is string => typeof a === "string" && a.trim().length > 0);
     const significance = String(body.significance || record.answers?.significanceStatement || "").trim();
     const strategy = String(body.strategy || record.answers?.strategy || "").trim();
-    const agency = String(body.agency || record.answers?.fundingAgency || "").trim();
+    const agency = String(body.agency || record.answers?.fundingAgency || record.answers?.agency || "").trim();
     const mechanism = String(body.mechanism || record.answers?.mechanism || "").trim();
 
     // The review is of the user's own proposal; never of placeholder aims.
