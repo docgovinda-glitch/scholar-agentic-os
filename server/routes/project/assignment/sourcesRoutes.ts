@@ -41,7 +41,6 @@ import {
 } from "../../../../src/desk/assignment/services/outlineService.ts";
 import { sanitizeBrief } from "../../../../src/features/understand/services/briefSanitizer.ts";
 import { classifyScopeBoundaries, stripLineTags } from "../../../../src/features/understand/services/scopeClassifier.ts";
-import { generateSectionDraft } from "../../../../src/features/drafting/services/sectionDraftingEngine.ts";
 import {
   isClassroomLogisticsLine,
   isTutorialOrShortQABrief,
