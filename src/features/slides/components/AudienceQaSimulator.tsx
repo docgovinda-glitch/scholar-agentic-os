@@ -48,43 +48,9 @@ export default function AudienceQaSimulator({
   const [difficulty, setDifficulty] = useState<'moderate' | 'rigorous' | 'adversarial'>('rigorous');
   const [selectedSlide, setSelectedSlide] = useState<number>(0); // 0 = entire deck
   const [isLoading, setIsLoading] = useState(false);
-  const [questions, setQuestions] = useState<AudienceQaQuestion[]>(() => {
-    if (savedQuestions && savedQuestions.length > 0) return savedQuestions;
-    return [
-      {
-        id: 'qa-default-1',
-        persona: 'Methodological Referee',
-        difficulty: 'rigorous',
-        targetSlideNumber: 3,
-        question:
-          'How do you establish causal identification given the observational structure of your empirical dataset?',
-        intent: 'Probing whether candidate can demarcate true causality from spurious correlation.',
-        suggestedAnswer:
-          'We employed difference-in-differences combined with entropy balancing across pre-intervention observation periods.',
-        modelRebuttalPoints: [
-          'Pre-intervention parallel trends tests yielded p > 0.40 across all baseline cohorts.',
-          'Placebo intervention tests show zero artificial lift across non-treated groups.',
-          'Robustness checks with Oster bounding verify that unobservable selection bias is negligible.',
-        ],
-      },
-      {
-        id: 'qa-default-2',
-        persona: 'Defense Committee Chair',
-        difficulty: 'adversarial',
-        targetSlideNumber: 4,
-        question:
-          'If we remove the proposed architectural pipeline, how much of your reported efficiency gain remains statistically distinguishable from zero?',
-        intent: 'Ablation pressure test to isolate the single core contribution to academic knowledge.',
-        suggestedAnswer:
-          'Ablation trials demonstrate that removing our core engine degrades turnaround fidelity by 74%, proving statistical necessity.',
-        modelRebuttalPoints: [
-          'Systematic ablation tables in Section 4 isolate each component independently.',
-          'Bonferroni-adjusted t-tests confirm p < 0.001 significance over standard heuristic baselines.',
-          'Reproducible evaluation seeds are deposited in the Knowledge Vault ledger.',
-        ],
-      },
-    ];
-  });
+  // Starts with the user's saved questions or nothing; never demo questions.
+  const [questions, setQuestions] = useState<AudienceQaQuestion[]>(() => savedQuestions ?? []);
+  const [error, setError] = useState<string | null>(null);
 
   const [expandedRebuttals, setExpandedRebuttals] = useState<Record<string, boolean>>({});
   const [userPracticeAnswers, setUserPracticeAnswers] = useState<Record<string, string>>({});
@@ -112,6 +78,7 @@ export default function AudienceQaSimulator({
 
   const handleSimulate = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const res = await authedJsonFetch(
         `/api/projects/${encodeURIComponent(projectId)}/presentation/qa-simulate`,
@@ -144,53 +111,17 @@ export default function AudienceQaSimulator({
           return;
         }
       }
-      throw new Error('API simulation returned empty');
-    } catch {
-      // Deterministic client fallback grounded in active slide deck
-      const activeSlideTitle =
-        selectedSlide > 0 && deck.slides[selectedSlide - 1]
-          ? deck.slides[selectedSlide - 1].actionHeadline
-          : deck.title;
-
-      const fallback: AudienceQaQuestion[] = [
-        {
-          id: `qa-sim-${Date.now()}-1`,
-          persona:
-            difficulty === 'adversarial'
-              ? 'Hostile Defense Referee'
-              : difficulty === 'rigorous'
-              ? 'Empirical Methodologist'
-              : 'Conference Discussant',
-          difficulty,
-          targetSlideNumber: selectedSlide > 0 ? selectedSlide : 2,
-          question: `Regarding "${activeSlideTitle}": What theoretical boundary conditions limit the generalizability of these findings outside your tested corpus?`,
-          intent: 'Testing candidate self-awareness of methodological boundaries and scope limitations.',
-          suggestedAnswer:
-            'Our claims are strictly demarcated to peer-reviewed scholarly corpora and verified Knowledge Vault evidence, mitigating out-of-distribution drift.',
-          modelRebuttalPoints: [
-            'Empirical scope boundaries are formally documented in the leave-behind dossier.',
-            'Sensitivity analyses across heterogeneous benchmarks demonstrate consistent stability.',
-            'Cross-domain validation is explicitly slated for future study with preregistered protocols.',
-          ],
-        },
-        {
-          id: `qa-sim-${Date.now()}-2`,
-          persona: 'Theoretical Synthesizer',
-          difficulty,
-          targetSlideNumber: selectedSlide > 0 ? selectedSlide : Math.min(3, deck.slides.length || 1),
-          question: `How does your framework prevent confirmation bias when selecting evidentiary citations for "${deck.title}"?`,
-          intent: 'Scrutinizing evidence provenance and potential selection artifacts.',
-          suggestedAnswer:
-            'We enforce zero-hallucination cryptographic evidence ledgers where all citations must resolve to verified primary repositories.',
-          modelRebuttalPoints: [
-            '100% of cited claims are anchored in the immutable Evidence Ledger with cryptographic hashes.',
-            'Double-blind negative controls confirm that unverified claims are blocked by the system gates.',
-          ],
-        },
-      ];
-
-      setQuestions(fallback);
-      if (onSaveQuestions) onSaveQuestions(fallback);
+      let message = 'No audience questions were generated. Try again.';
+      try {
+        const body = (await res.json()) as { error?: unknown };
+        if (typeof body.error === 'string' && body.error.trim()) message = body.error;
+      } catch {
+        // keep the generic message
+      }
+      throw new Error(message);
+    } catch (err) {
+      // No stand-in questions: the user sees why nothing was generated.
+      setError(err instanceof Error ? err.message : 'No audience questions were generated. Try again.');
     } finally {
       setIsLoading(false);
     }
@@ -331,6 +262,16 @@ export default function AudienceQaSimulator({
 
         {/* Questions & Defense Rehearsal Body */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
+          {error && (
+            <p role="alert" className="text-xs text-red-700 dark:text-red-300">
+              {error}
+            </p>
+          )}
+          {questions.length === 0 && !error && (
+            <p className="text-xs text-neutral-500 dark:text-neutral-400" data-testid="qa-empty">
+              No questions yet. Choose a rigour level and generate questions from your deck.
+            </p>
+          )}
           {questions.map((q, idx) => {
             const isRebuttalOpen = !!expandedRebuttals[q.id];
             const currentAnswer = userPracticeAnswers[q.id] || '';
