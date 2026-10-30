@@ -26,12 +26,17 @@ async function tabThrough(page: Page) {
         const shadow = s.boxShadow && s.boxShadow !== "none" ? s.boxShadow : "";
         return { outline, shadow };
       };
+      // Jump CSS transitions to their end so a ring that fades in is measured.
+      const settle = () => document.getAnimations().forEach((a) => { try { a.finish(); } catch { /* infinite */ } });
       const chain: Element[] = [];
       for (let n: Element | null = el, depth = 0; n && depth <= 3; n = n.parentElement, depth++) chain.push(n);
+      settle();
       const focused = chain.map(look);
       el.blur();
+      settle();
       const blurred = chain.map(look);
       el.focus();
+      settle();
       let visibleOn: Element | null = null;
       chain.forEach((n, i) => {
         if (visibleOn) return;
