@@ -99,6 +99,16 @@ describe("KnowledgeVault component", () => {
     expect(await screen.findByTestId("mock-source-library")).toBeInTheDocument();
   });
 
+  it("a failed project load shows the error with a retry, not an empty vault (B7)", async () => {
+    listProjects.mockReset();
+    listProjects.mockRejectedValueOnce(new Error("network down")).mockResolvedValueOnce({ items: SAMPLE_PROJECTS });
+    render(<KnowledgeVault userId="user-123" initialTab="projects" onClose={vi.fn()} onOpenProject={vi.fn()} />);
+
+    expect(await screen.findByText("Failed to load projects")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry Connection" }));
+    expect(await screen.findByText("Genome Editing in Marine Diatoms")).toBeInTheDocument();
+  });
+
   it("filters projects by search query in the Vault", async () => {
     render(
       <KnowledgeVault

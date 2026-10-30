@@ -135,7 +135,8 @@ export default function KnowledgeVault({
     setError(null);
     try {
       const [projRes, typeRes] = await Promise.all([
-        listProjects().catch(() => ({ items: [] as ProjectView[] })),
+        // A failed project load surfaces as the error state below, not as "no projects" (B7).
+        listProjects(),
         listOutputTypes().catch(() => ({ items: [] as OutputTypeSummary[] })),
       ]);
       let items = projRes?.items || [];

@@ -214,6 +214,8 @@ export default function ProjectListScreen({
   }, [location.pathname, navigate]);
 
   const [projects, setProjects] = useState<ProjectView[] | null>(null);
+  // A failed list load is shown as an error, never as "no projects" (B7).
+  const [projectsLoadError, setProjectsLoadError] = useState<string | null>(null);
   const deletedProjectIdsRef = useRef<Set<string>>(new Set());
 
   // Initialize from sessionStorage to prevent zombie project resurrection across fast reloads/nav
@@ -496,6 +498,7 @@ export default function ProjectListScreen({
 
   const load = useCallback(() => {
     setError(null);
+    setProjectsLoadError(null);
     if (!userEmail) {
       setProjects([]);
       return;
@@ -512,7 +515,8 @@ export default function ProjectListScreen({
         setProjects(uniqueItems);
       })
       .catch(() => {
-        setProjects([]);
+        // Keep whatever is already listed; say the refresh failed.
+        setProjectsLoadError("Couldn't load your projects. Check your connection and try again.");
       });
   }, [userEmail]);
 
@@ -1454,6 +1458,22 @@ export default function ProjectListScreen({
             </button>
           </div>
 
+          {userEmail && projectsLoadError && (
+            <div role="alert" className="mt-6 mx-1 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 px-3 py-2.5 text-xs text-[color:var(--text-primary)] flex flex-col gap-2">
+              <span>{projectsLoadError}</span>
+              <button
+                type="button"
+                onClick={load}
+                className="self-start px-3 py-1 rounded-lg border border-[color:var(--border-control)] font-semibold hover:bg-[color:var(--surface-hover)] cursor-pointer"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+          {userEmail && projects === null && !projectsLoadError && (
+            <p role="status" className="mt-6 px-3 text-xs text-[color:var(--text-secondary)]">Loading your projects…</p>
+          )}
+
           {/* Projects Section: Render only when logged in and active projects exist */}
           {userEmail && projects && projects.length > 0 && (
             <div className="flex-1 overflow-hidden flex flex-col min-h-0">
@@ -1961,7 +1981,7 @@ export default function ProjectListScreen({
                       addMainFiles(Array.from(e.dataTransfer.files));
                     }
                   }}
-                  className={`pointer-events-auto flex flex-col justify-between w-full rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 shadow-sm focus-within:border-neutral-400 dark:focus-within:border-white/20 p-3 transition-all duration-200 ${
+                  className={`pointer-events-auto flex flex-col justify-between w-full rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 shadow-sm focus-within:border-neutral-400 dark:focus-within:border-white/20 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] p-3 transition-all duration-200 ${
                     isDragging
                       ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10 dark:bg-blue-950/20"
                       : ""
@@ -2990,7 +3010,7 @@ export default function ProjectListScreen({
                   e.preventDefault();
                   handleSendGuideMessage();
                 }}
-                className="relative flex flex-col rounded-2xl bg-neutral-100/90 dark:bg-white/[0.06] p-2.5 shadow-xs border border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 focus-within:bg-white dark:focus-within:bg-ink-700 focus-within:shadow-md transition-all"
+                className="relative flex flex-col rounded-2xl bg-neutral-100/90 dark:bg-white/[0.06] p-2.5 shadow-xs border border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] focus-within:bg-white dark:focus-within:bg-ink-700 focus-within:shadow-md transition-all"
               >
                 <div className="w-full px-1">
                   <textarea
