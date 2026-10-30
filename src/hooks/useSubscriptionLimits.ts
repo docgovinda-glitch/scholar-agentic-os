@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getProfile } from "../services/supabaseAuthService";
 import { getAiAccessStatus } from "../desk/aiAccess/aiAccessApi";
 
@@ -62,6 +62,9 @@ export function useSubscriptionLimits(options?: SubscriptionLimitOptions): Subsc
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  // The lookups are async; a component that unmounts before they finish must
+  // not receive state updates (React warns, and test environments error).
+  const mountedRef = useRef(true);
 
   const fetchEntitlements = useCallback(async () => {
     try {
@@ -111,6 +114,7 @@ export function useSubscriptionLimits(options?: SubscriptionLimitOptions): Subsc
         }
       }
 
+      if (!mountedRef.current) return;
       setIsAdmin(determinedAdmin);
       setIsPremium(determinedPremium);
       setRole(userRole);
@@ -118,7 +122,7 @@ export function useSubscriptionLimits(options?: SubscriptionLimitOptions): Subsc
     } catch {
       // Fail closed gracefully to free tier, or maintain existing state
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) setIsLoading(false);
     }
   }, [
     options?.roleOverride,
@@ -128,7 +132,11 @@ export function useSubscriptionLimits(options?: SubscriptionLimitOptions): Subsc
   ]);
 
   useEffect(() => {
+    mountedRef.current = true;
     fetchEntitlements();
+    return () => {
+      mountedRef.current = false;
+    };
   }, [fetchEntitlements]);
 
   // Derived limits
