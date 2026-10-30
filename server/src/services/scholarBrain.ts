@@ -16,7 +16,12 @@
 import { completeWithFailover, streamWithFailover } from "../../../src/platform/gateway/gateway.ts";
 import type { CandidateProvider } from "../../../src/platform/gateway/types.ts";
 import { resolveClientAiConfig } from "../ai/clientAiConfig.ts";
-import { LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
+import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
+import {
+  createChallengeTokenForRequest,
+  readVerifiedBrowserResult,
+  type LlmRequestLike,
+} from "../../utils/llm.ts";
 import { defaultPolicy } from "../../../src/platform/warden/policy.ts";
 import { recordConsent, type EgressPolicy } from "../../../src/platform/warden/warden.ts";
 import type { TaskClass } from "../../../src/platform/warden/types.ts";
@@ -71,6 +76,10 @@ export interface ClientAiHeaders {
 
 export interface ScholarBrainAiRequestLike {
   headers?: Record<string, string | string[] | undefined>;
+  body?: unknown;
+  user?: { id?: string };
+  originalUrl?: string;
+  url?: string;
 }
 
 export interface ScholarBrainCompleteOptions {
@@ -85,6 +94,12 @@ export interface ScholarBrainCompleteOptions {
   responseFormat?: "text" | "json";
   temperature?: number;
   maxTokens?: number;
+  /**
+   * When the user's only AI is a local model (which the server cannot reach),
+   * hand the exact prompt to their browser with a signed challenge (426) instead
+   * of failing. The route must build the same prompt on the retried request.
+   */
+  browserFallback?: boolean;
 }
 
 export interface StreamPromptConfig {
@@ -248,6 +263,41 @@ function parseAuthorsForCitation(authors: string[] | string): ReferenceAuthor[] 
 }
 
 /**
+ * Live discovery results, cached per query for 20 minutes. Besides saving
+ * network calls, this keeps a route's prompt identical when the browser-local
+ * AI hand-off (426) retries the same request, so its signed prompt hash matches.
+ */
+const LIVE_DISCOVERY_TTL_MS = 20 * 60 * 1000;
+const LIVE_DISCOVERY_MAX_ENTRIES = 200;
+type LiveDraft = Awaited<ReturnType<typeof discoverMultiPortalSources>>[number];
+const liveDiscoveryCache = new Map<string, { at: number; results: Promise<LiveDraft[]> }>();
+
+export function __clearLiveDiscoveryCacheForTests(): void {
+  liveDiscoveryCache.clear();
+}
+
+function cachedLiveDiscovery(query: string, maxResults: number): Promise<LiveDraft[]> {
+  const key = `${maxResults}|${query.trim().toLowerCase()}`;
+  const now = Date.now();
+  const hit = liveDiscoveryCache.get(key);
+  if (hit && now - hit.at < LIVE_DISCOVERY_TTL_MS) return hit.results;
+
+  const results = Promise.all([
+    discoverMultiPortalSources(query, maxResults),
+    discoverEuropePmcSources(query, Math.min(10, Math.ceil(maxResults / 3))),
+  ]).then(([multi, epmc]) => [...multi, ...epmc] as LiveDraft[]);
+  // A failed lookup is not cached, so the next request retries it.
+  results.catch(() => liveDiscoveryCache.delete(key));
+
+  liveDiscoveryCache.set(key, { at: now, results });
+  if (liveDiscoveryCache.size > LIVE_DISCOVERY_MAX_ENTRIES) {
+    const oldest = liveDiscoveryCache.keys().next().value;
+    if (oldest !== undefined) liveDiscoveryCache.delete(oldest);
+  }
+  return results;
+}
+
+/**
  * Canonical scholarBrain Orchestrator Object
  */
 export const scholarBrain = {
@@ -264,7 +314,8 @@ export const scholarBrain = {
       localModelBrowserOnly,
     } = extractTransientClientAiConfig(options.req, options.headers);
 
-    if (candidates.length === 0) {
+    const useBrowser = candidates.length === 0 && localModelBrowserOnly && options.browserFallback === true;
+    if (candidates.length === 0 && !useBrowser) {
       throw localModelBrowserOnly ? new LocalModelUnreachableError() : new NoClientAiProviderError();
     }
 
@@ -278,14 +329,28 @@ export const scholarBrain = {
       ? `${voicePrompt}\n\n[TASK DIRECTIVES]\n${options.systemPrompt}`
       : voicePrompt;
 
+    const taskClass: TaskClass = options.taskClass ?? "drafting";
+
+    let rawText: string;
+    if (useBrowser) {
+      const req = (options.req ?? {}) as LlmRequestLike;
+      const browserText = readVerifiedBrowserResult(req, fullSystemPrompt, options.userPrompt);
+      if (browserText === null) {
+        throw new BrowserAiRequiredError({
+          challengeToken: createChallengeTokenForRequest(req, fullSystemPrompt, options.userPrompt),
+          systemPrompt: fullSystemPrompt,
+          userPrompt: options.userPrompt,
+          taskType: "reasoning",
+        });
+      }
+      rawText = browserText;
+    } else {
     let policy: EgressPolicy = defaultPolicy();
     for (const c of candidates) {
       if (c.apiKey) {
         policy = recordConsent(policy, c.provider);
       }
     }
-
-    const taskClass: TaskClass = options.taskClass ?? "drafting";
 
     const gatewayResult = await completeWithFailover(
       {
@@ -305,7 +370,8 @@ export const scholarBrain = {
       throw new Error(`scholarBrain AI Execution Error: ${gatewayResult.error.message}`);
     }
 
-    const rawText = gatewayResult.value.text;
+    rawText = gatewayResult.value.text;
+    }
     const guarded = applyScholarGuardrails(rawText, {
       orthography: dialect === "en-US" ? "us" : "british",
       stripCliches: options.stripCliches ?? true,
@@ -321,7 +387,7 @@ export const scholarBrain = {
       text: normalizedText,
       rawResponse: rawText,
       parsedJson,
-      provider: resolvedProvider || candidates[0]?.provider || "client-ai",
+      provider: useBrowser ? "browser-local" : resolvedProvider || candidates[0]?.provider || "client-ai",
       model: resolvedModel || candidates[0]?.model || "client-model",
       wordCount: guarded.wordCount,
       burstinessMetrics: {
@@ -635,12 +701,7 @@ export const scholarBrain = {
     const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
     if (!isTest) {
       try {
-        const [multiPortalResults, europePmcResults] = await Promise.all([
-          discoverMultiPortalSources(query, maxResults),
-          discoverEuropePmcSources(query, Math.min(10, Math.ceil(maxResults / 3))),
-        ]);
-
-      const combinedLive = [...multiPortalResults, ...europePmcResults];
+      const combinedLive = await cachedLiveDiscovery(query, maxResults);
 
       let externalCounter = 1;
       for (const draft of combinedLive) {

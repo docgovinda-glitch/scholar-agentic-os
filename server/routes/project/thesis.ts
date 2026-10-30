@@ -132,6 +132,7 @@ ${researchQuestions.map((q, idx) => `${idx + 1}. ${q}`).join("\n")}${evidenceBri
 
       const brainRes = await scholarBrain.complete({
         req,
+        browserFallback: true,
         taskClass: "verification",
         systemPrompt,
         userPrompt,
@@ -253,6 +254,7 @@ ${chapters.map((c) => `Ch ${c.chapterNumber}: "${c.title}" (${c.wordCount}/${c.t
 
       const brainRes = await scholarBrain.complete({
         req,
+        browserFallback: true,
         taskClass: "verification",
         systemPrompt,
         userPrompt,
@@ -426,6 +428,7 @@ ${evidenceLedger || "No external sources available."}
     try {
       const brainRes = await scholarBrain.complete({
         req,
+        browserFallback: true,
         taskClass: "drafting",
         systemPrompt,
         userPrompt: `${userPromptText}\n\nThesis Title: ${title}\nDegree: ${degreeLevel}\nChapter ${chapterNumber}: ${chapterTitle}`,

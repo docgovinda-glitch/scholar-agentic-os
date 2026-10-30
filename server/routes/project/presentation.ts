@@ -6,7 +6,13 @@ import {
   normalizeUnicodeNFC,
 } from "../../src/utils/scholarlyVoiceGuard.ts";
 import { scholarBrain } from "../../src/services/scholarBrain.ts";
-import { sendAiFailure, UnusableAiResponseError } from "../../src/ai/aiRouteErrors.ts";
+import {
+  BrowserAiRequiredError,
+  InvalidLlmChallengeError,
+  sendAiFailure,
+  UnusableAiResponseError,
+} from "../../src/ai/aiRouteErrors.ts";
+import { resolveClientAiConfig } from "../../src/ai/clientAiConfig.ts";
 import {
   memoryDecks,
   setMemoryDeck,
@@ -342,8 +348,10 @@ router.post(
     }).catch(() => []);
 
     const candidates = getCandidates(req);
+    // A local model only the user's browser can reach still gets the AI deck (426 hand-off).
+    const browserLocalAi = resolveClientAiConfig(req.headers).localModelBrowserOnly;
 
-    if (candidates.length > 0) {
+    if (candidates.length > 0 || browserLocalAi) {
       try {
         const systemPrompt = `You design presentation decks in the style of Gamma: each slide is a visual card, not a wall of bullets.
 Write a ${requestedSlides}-card deck for the given topic and material.
@@ -413,6 +421,7 @@ Output strict JSON only:
 
         const brainRes = await scholarBrain.complete({
           req,
+          browserFallback: true,
           taskClass: "verification",
           systemPrompt,
           userPrompt,
@@ -442,6 +451,10 @@ Output strict JSON only:
           generatedBy = "ai-gateway";
         }
       } catch (aiErr) {
+        // The browser hand-off is not a failure: pass it (or a bad challenge) to the client.
+        if (aiErr instanceof BrowserAiRequiredError || aiErr instanceof InvalidLlmChallengeError) {
+          return sendAiFailure(res, aiErr, "Presentation deck");
+        }
         console.warn("[project/presentation.ts] AI deck generation fallback:", aiErr);
       }
     }
@@ -596,6 +609,7 @@ Grounded Evidence: ${JSON.stringify(evidence.map((e) => ({ title: e.title, token
 
         const brainRes = await scholarBrain.complete({
           req,
+          browserFallback: true,
           taskClass: "verification",
           systemPrompt,
           userPrompt,
