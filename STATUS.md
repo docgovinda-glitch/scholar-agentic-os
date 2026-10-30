@@ -15,7 +15,7 @@
 4. Full encrypted `pg_dump` backups are impossible from the agent sandbox (HTTPS-only egress, no raw TCP to Postgres). Prod changes on 2026-10-29 were preceded by policy/grant/RLS snapshots only (`~/backups/*-20261029T104243Z.json`, agent machine). Supabase Pro daily backups are the restore path.
 5. **Deploy smoke secrets (optional): not set.** `deploy.yml` runs the production smoke suite after each deploy only when the `SMOKE_*` GitHub secrets exist. This session has no tool that can write repository secrets, so the step stays skipped. The suite is run by hand after deploys (`scripts/smoke-prod.sh`).
 
-## 0. Task checklist (status as of 2026-10-30 01:20Z)
+## 0. Task checklist (status as of 2026-10-30 07:30Z)
 
 | Task | Status | Evidence |
 | :--- | :--- | :--- |
@@ -32,9 +32,9 @@
 | T10 Production readiness | PARTIAL | PR CI + audit gate, deploy waits for live commit + deep health + smoke, uptime workflow, Render health check path (#86); deploy check accepts a newer live commit that contains the run's commit (#99); branch protection, error tracking, rollback drill → owner/next |
 | T11 AUDIT findings | PARTIAL | see section 3 |
 | B1 Product audit | FIRST PASS + AI map | `PRODUCT_AUDIT.md`; area g mapped in `docs/AI-CALL-MAP.md` (#94) |
-| P0 fabricated content | DONE (P0-1…P0-6, P0-8…P0-10); P0-7 partly | #87, #88, #89 (Coursework + Journal); #100 (Thesis/Proposal tools called missing routes and showed hardcoded reviews); #101 (demo content in Viva/Study-section panels) |
+| P0 fabricated content | DONE (P0-1…P0-18) | #87–#89 (Coursework, Journal); #100, #101 (Thesis/Proposal); #104 (citations never invent year/author/venue, P0-7); #108 (audience Q&A, P0-11); #109 (journal titles); #110–#112 (Journal review, demo manuscripts, sub-section drafter); #113, #114 (slide copilot, theme picker that replaced decks); #115 (landing page, Swiss sample deck, coursework prompt). Details in `PRODUCT_AUDIT.md` |
 | B2 E2E harness | DONE (first cut) | #91: Playwright, local Supabase in CI, 11 specs + smoke on every PR |
-| B3 One Brain | IN PROGRESS | map (#94); BYOK headers only on AI routes (#93); one header parser (#95); one Premium pipeline (#98); unused `/agent/literature` removed (#97); typed AI errors for Thesis/Proposal (#100). Next: one failure contract (426 vs throw), guardrails on llm.ts output |
+| B3 One Brain | IN PROGRESS | map (#94); BYOK headers only on AI routes (#93); one header parser (#95); one Premium pipeline (#98); unused `/agent/literature` removed (#97); typed AI errors for Thesis/Proposal (#100). local model never called from the server (#106); scholarBrain routes hand off to browser-local AI with signed challenges (#116, step 2). Next: Ask Scholar / search hand-off, guardrails on llm.ts output, `brain.ts` contract |
 | B4 AI Access | IN PROGRESS | Premium scope stated truthfully (#96) |
 | B5 Thesis/Proposal | IN PROGRESS | real routes + honest errors (#100), practice room/worksheet (#101), starter no longer invents budget (#102) |
 | B7, B8 | TODO | |
@@ -93,7 +93,7 @@
 | **#82** | `fix/post-80-verification-login-purge-notices` | `main` | **MERGED & DEPLOYED** (`2026-10-29T11:00Z`) | `a8771bd` (`1b91e8c`) | `docgovinda-glitch` (agent, owner-authorized) | **YES** | Post-#80 hardening (Turnstile passthrough, login cap, fail-closed `LLM_CHALLENGE_SECRET`, cloud connections API, `CredentialResetNotice`); notice SQL moved to `20261029010000`. |
 | **#83** | `claude/jolly-mayer-k74uad` | `main` | **MERGED & DEPLOYED** (`2026-10-29T11:01Z`) | `efa5187` (`92c48c6`) | `docgovinda-glitch` (agent, owner-authorized) | **YES** | `20261029000000_reapply_premium_request_integrity.sql` (fresh-DB policy order fix; no-op in prod). |
 
-Later PRs were opened by the agent and merged by it (owner-authorized) only after CI passed. As of 2026-10-30 01:20Z all are merged; #100 is confirmed live, #101 and #102 deploy through the normal pipeline.
+Later PRs were opened by the agent and merged by it (owner-authorized) only after CI passed. As of 2026-10-30 07:30Z all are merged and deploy through the normal pipeline (`/api/health` reported `051113e` at 07:26Z, with #114 and #116 deploying).
 
 | PR # | Contents |
 | :---: | :--- |
@@ -114,6 +114,20 @@ Later PRs were opened by the agent and merged by it (owner-authorized) only afte
 | #100 | Thesis/Proposal tools use the real routes; no invented reviews or inputs (P0-9) |
 | #101 | Viva practice room and blank self-review worksheet; no demo reviews (P0-10) |
 | #102 | Proposal starter no longer invents budget, funder or mechanism (P1-9) |
+| #103 | STATUS update after #93–#102 |
+| #104 | Citations never invent a year, author or venue (P0-7); no state updates after unmount in `useSubscriptionLimits` |
+| #105 | STATUS: auth rate limit raised; password reset deferred by owner |
+| #106 | Never call a user's local model from the deployed server |
+| #107 | `RUNBOOK.md`, agent-credential revocation (`ROTATION_RUNBOOK.md` §7), `CHANGELOG.md` |
+| #108 | Audience Q&A never shows invented questions (P0-11) |
+| #109 | Journal title stage shows an error, not template titles |
+| #110 | Journal: no canned referee critiques, rebuttals or demo manuscript (P0-12) |
+| #111 | Journal: no demo manuscripts, assumed journals or pre-passed checks (P0-13) |
+| #112 | Journal sub-section drafter never writes template prose (P0-14) |
+| #113 | Slide copilot never adds invented points, comparisons or figures (P0-15) |
+| #114 | Applying a slide theme keeps the user's slides (P0-16) |
+| #115 | Landing page, Swiss theme and coursework prompt: no invented citations or figures (P0-17, P0-18) |
+| #116 | Thesis, Proposal and Presentation run on browser-local AI (B3 step 2) |
 
 ---
 
