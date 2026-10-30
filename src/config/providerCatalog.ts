@@ -501,7 +501,7 @@ export const CLOUD_PROVIDERS = [
     getKeyUrl: "https://console.x.ai/",
     description: "xAI's Grok models via an OpenAI-compatible endpoint.",
     icon: "✕",
-    color: "#000000",
+    color: "#171717",
   },
 
   // ── Primarily paid (listed because users may already hold a key) ────────
@@ -772,7 +772,7 @@ export const CLOUD_PROVIDERS = [
     getKeyUrl: "https://vercel.com/dashboard/ai-gateway",
     description: "One key routing to many providers, with automatic failover between them.",
     icon: "▲",
-    color: "#000000",
+    color: "#171717",
   },
   {
     id: "minimax",
