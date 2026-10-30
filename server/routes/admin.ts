@@ -227,6 +227,17 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   // ── Premium requests: the approval queue ─────────────────────────────
+  /** 404 when the request is gone, 409 when it was already decided or withdrawn. */
+  async function premiumRequestNotPending(
+    requests: SupabaseTable<Record<string, unknown>>,
+    id: string,
+    res: express.Response
+  ) {
+    const row = await requests.selectOne(`id=eq.${id}`);
+    if (!row) return res.status(404).json({ error: "That request no longer exists." });
+    return res.status(409).json({ error: `That request is already ${String(row.status)}.`, status: row.status });
+  }
+
   admin.get("/premium-requests", async (req, res) => {
     const requests = new SupabaseTable<Record<string, unknown>>(restConfig(), "premium_requests");
     const profiles = new SupabaseTable<Record<string, unknown>>(restConfig(), "profiles");
@@ -260,16 +271,25 @@ export function registerAdminRoutes(app: express.Express): void {
     if (!planId) return res.status(400).json({ error: "planId is required." });
 
     const requests = new SupabaseTable<Record<string, unknown>>(restConfig(), "premium_requests");
-    const row = await requests.selectOne(`id=eq.${encodeURIComponent(req.params.id)}`);
-    if (!row) return res.status(404).json({ error: "That request no longer exists." });
+    const id = encodeURIComponent(req.params.id);
 
-    await grantPremium(String(row.user_id), planId, expiry ?? null, actor(req));
-    await requests.update(`id=eq.${encodeURIComponent(req.params.id)}`, {
+    // Claim the request only while it is still pending, so a withdrawn,
+    // declined or already-approved request can never grant Premium (again).
+    const [claimed] = await requests.updateReturning(`id=eq.${id}&status=eq.pending`, {
       status: "approved",
       decided_by: actor(req),
       decided_at: new Date().toISOString(),
-      decision_note: note ?? null,
+      decision_note: typeof note === "string" ? note.slice(0, 1000) : null,
     });
+    if (!claimed) return premiumRequestNotPending(requests, id, res);
+
+    try {
+      await grantPremium(String(claimed.user_id), planId, expiry ?? null, actor(req));
+    } catch (err) {
+      // Put the request back so it can be decided again; nothing was granted.
+      await requests.update(`id=eq.${id}`, { status: "pending", decided_by: null, decided_at: null, decision_note: null });
+      throw err;
+    }
     await writeAuditLog(actor(req), "approve_premium_request", "premium_request", req.params.id, { planId });
     res.json({ success: true });
   });
@@ -278,12 +298,14 @@ export function registerAdminRoutes(app: express.Express): void {
     if (!requireScopeInline(req, res, "manage_premium")) return;
     const { note } = req.body as { note?: string };
     const requests = new SupabaseTable<Record<string, unknown>>(restConfig(), "premium_requests");
-    await requests.update(`id=eq.${encodeURIComponent(req.params.id)}`, {
+    const id = encodeURIComponent(req.params.id);
+    const [declined] = await requests.updateReturning(`id=eq.${id}&status=eq.pending`, {
       status: "declined",
       decided_by: actor(req),
       decided_at: new Date().toISOString(),
-      decision_note: note ?? null,
+      decision_note: typeof note === "string" ? note.slice(0, 1000) : null,
     });
+    if (!declined) return premiumRequestNotPending(requests, id, res);
     await writeAuditLog(actor(req), "decline_premium_request", "premium_request", req.params.id, {});
     res.json({ success: true });
   });

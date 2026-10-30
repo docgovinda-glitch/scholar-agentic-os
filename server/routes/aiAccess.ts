@@ -1,7 +1,7 @@
 import express from "express";
 import { requireAuth, type AuthenticatedUser } from "../src/middleware/auth";
 import { asyncHandler } from "../src/middleware/asyncHandler";
-import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest";
+import { getSupabaseRestConfig, SupabaseRestError, SupabaseTable } from "../src/supabaseRest";
 import { getEntitlement, isEntitlementActive } from "../src/aiEngine/entitlements";
 import { getEffectiveQuota } from "../src/aiEngine/quotaEngine";
 import { selectProvider, type RoutingContext, type TaskType } from "../src/aiEngine/omniRouter";
@@ -223,12 +223,20 @@ export function registerAiAccessRoutes(app: express.Express): void {
       const existing = await requests.selectOne(`user_id=eq.${encodeURIComponent(userId(req))}&status=eq.pending`);
       if (existing) return res.status(409).json({ error: "You already have a Premium request waiting for a decision." });
 
-      await requests.insert({
-        user_id: userId(req),
-        requested_plan_id: planId ?? null,
-        note: typeof note === "string" && note.trim() ? note.trim().slice(0, 1000) : null,
-        status: "pending",
-      });
+      try {
+        await requests.insert({
+          user_id: userId(req),
+          requested_plan_id: typeof planId === "string" && planId.trim() ? planId.trim().slice(0, 100) : null,
+          note: typeof note === "string" && note.trim() ? note.trim().slice(0, 1000) : null,
+          status: "pending",
+        });
+      } catch (err) {
+        // Two requests at once: the partial unique index rejects the second.
+        if (err instanceof SupabaseRestError && err.status === 409) {
+          return res.status(409).json({ error: "You already have a Premium request waiting for a decision." });
+        }
+        throw err;
+      }
       res.json({ success: true });
     })
   );
@@ -238,10 +246,13 @@ export function registerAiAccessRoutes(app: express.Express): void {
     "/premium-request",
     asyncHandler(async (req, res) => {
       const requests = new SupabaseTable<Record<string, unknown>>(restConfig(), "premium_requests");
-      await requests.update(`user_id=eq.${encodeURIComponent(userId(req))}&status=eq.pending`, {
+      const withdrawn = await requests.updateReturning(`user_id=eq.${encodeURIComponent(userId(req))}&status=eq.pending`, {
         status: "withdrawn",
         decided_at: new Date().toISOString(),
       });
+      if (withdrawn.length === 0) {
+        return res.status(404).json({ error: "You have no pending Premium request to withdraw." });
+      }
       res.json({ success: true });
     })
   );

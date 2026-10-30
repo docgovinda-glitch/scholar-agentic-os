@@ -131,6 +131,20 @@ export class SupabaseTable<Row extends Record<string, unknown>> {
     });
   }
 
+  /**
+   * Update and return the rows that changed. Use it for a conditional update
+   * (e.g. "status=eq.pending") to learn whether the update applied: an empty
+   * result means no row matched, so another request got there first.
+   */
+  async updateReturning(filter: string, patch: Partial<Row>): Promise<Row[]> {
+    const rows = (await this.request(`?${filter}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(patch),
+    })) as Row[] | null;
+    return rows ?? [];
+  }
+
   async delete(filter: string): Promise<void> {
     await this.request(`?${filter}`, {
       method: "DELETE",
