@@ -411,32 +411,21 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
     expect(screen.getAllByText(/Empirical Lift: 4\.2x Faster Synthesis/i).length).toBeGreaterThan(0);
   });
 
-  it("opens Audience Q&A Simulator modal, renders referee questions, and reveals model defense arguments", async () => {
+  // Rewritten for P0-11: the simulator no longer opens with demo referee
+  // questions (they carried invented results); it opens empty until the user
+  // generates questions from their deck.
+  it("opens the Audience Q&A Simulator empty, with no demo questions, and closes it", async () => {
     render(<PresentationWorkspace projectId="proj-qa-test" initialStep="studio" />);
 
-    // Open Q&A Simulator
-    const qaBtn = screen.getByTestId("open-qa-simulator-btn");
-    fireEvent.click(qaBtn);
+    fireEvent.click(screen.getByTestId("open-qa-simulator-btn"));
 
     expect(screen.getByTestId("audience-qa-simulator-modal")).toBeInTheDocument();
     expect(screen.getByText(/Audience Q&A & Defense Simulator/i)).toBeInTheDocument();
     expect(screen.getByText(/Referee Rigor/i)).toBeInTheDocument();
+    expect(screen.getByTestId("qa-empty")).toBeInTheDocument();
+    expect(screen.queryByTestId("qa-question-card-0")).not.toBeInTheDocument();
 
-    // Verify initial referee question is displayed
-    expect(screen.getByText(/Methodological Referee/i)).toBeInTheDocument();
-    expect(screen.getByTestId("qa-question-card-0")).toBeInTheDocument();
-
-    // Reveal model rebuttal arguments
-    const revealBtn = screen.getAllByRole("button", { name: /Reveal Model Defense & Rebuttal Points/i })[0];
-    fireEvent.click(revealBtn);
-
-    expect(screen.getByText(/Candidate Model Response:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Key Grounded Evidence Points:/i)).toBeInTheDocument();
-
-    // Close the simulator
-    const doneBtn = screen.getByRole("button", { name: /Done Rehearsing/i });
-    fireEvent.click(doneBtn);
-
+    fireEvent.click(screen.getByRole("button", { name: /Done Rehearsing/i }));
     expect(screen.queryByTestId("audience-qa-simulator-modal")).not.toBeInTheDocument();
   });
 });

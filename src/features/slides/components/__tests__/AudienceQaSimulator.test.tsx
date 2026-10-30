@@ -57,7 +57,7 @@ describe('AudienceQaSimulator', () => {
     });
   });
 
-  it('renders Audience Q&A Simulator modal with initial referee questions and WCAG compliant badges', () => {
+  it('renders the Audience Q&A Simulator empty, with no demo questions', () => {
     const handleClose = vi.fn();
     render(
       <AudienceQaSimulator
@@ -71,7 +71,9 @@ describe('AudienceQaSimulator', () => {
     expect(screen.getByTestId('audience-qa-simulator-modal')).toBeInTheDocument();
     expect(screen.getByText(/Audience Q&A & Defense Simulator/i)).toBeInTheDocument();
     expect(screen.getByText(/AI Referee Engine/i)).toBeInTheDocument();
-    expect(screen.getByText(/Methodological Referee/i)).toBeInTheDocument();
+    // Opens empty: no demo questions (PRODUCT_AUDIT P0-11).
+    expect(screen.getByTestId('qa-empty')).toBeInTheDocument();
+    expect(screen.queryByText(/Methodological Referee|74%|p > 0\.40/i)).not.toBeInTheDocument();
 
     // Verify difficulty selector has moderate, rigorous, adversarial options
     const difficultySelect = screen.getByLabelText(/Referee Rigor/i);
@@ -120,33 +122,50 @@ describe('AudienceQaSimulator', () => {
   });
 
   it('toggles model defense arguments and permits typing practice responses', async () => {
+    // Uses the user's saved questions; the demo questions this test relied on were removed (P0-11).
     render(
       <AudienceQaSimulator
         projectId="proj-qa-1"
         deck={mockDeck}
         isOpen={true}
         onClose={vi.fn()}
+        savedQuestions={[
+          {
+            id: 'qa-saved-1',
+            persona: 'Methodologist',
+            difficulty: 'rigorous',
+            targetSlideNumber: 2,
+            question: 'Why this sampling frame?',
+            intent: 'Scope',
+            suggestedAnswer: 'Because the population is defined by enrolment.',
+            modelRebuttalPoints: ['State the inclusion rule.'],
+          },
+        ]}
       />
     );
 
-    // Type a practice verbal answer
     const textarea = screen.getAllByPlaceholderText(/Type or dictate your verbal response/i)[0];
-    fireEvent.change(textarea, {
-      target: { value: 'We mitigated confounding variance through entropy balancing.' },
-    });
-    expect(textarea).toHaveValue('We mitigated confounding variance through entropy balancing.');
+    fireEvent.change(textarea, { target: { value: 'We sampled every enrolled student.' } });
+    expect(textarea).toHaveValue('We sampled every enrolled student.');
 
-    // Reveal model arguments
-    const revealBtn = screen.getAllByRole('button', { name: /Reveal Model Defense & Rebuttal Points/i })[0];
-    fireEvent.click(revealBtn);
-
+    fireEvent.click(screen.getAllByRole('button', { name: /Reveal Model Defense & Rebuttal Points/i })[0]);
     expect(screen.getByText(/Candidate Model Response:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Key Grounded Evidence Points:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Placebo intervention tests show zero artificial lift/i)).toBeInTheDocument();
+    expect(screen.getByText(/State the inclusion rule\./i)).toBeInTheDocument();
 
-    // Toggle hide
-    const hideBtn = screen.getByRole('button', { name: /Hide Model Defense Arguments/i });
-    fireEvent.click(hideBtn);
+    fireEvent.click(screen.getByRole('button', { name: /Hide Model Defense Arguments/i }));
     expect(screen.queryByText(/Candidate Model Response:/i)).not.toBeInTheDocument();
+  });
+
+  it('shows why no questions were generated instead of stand-in questions', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Connect an AI provider (your own key or a local model) in AI Access to run this.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    render(<AudienceQaSimulator projectId="proj-qa-1" deck={mockDeck} isOpen={true} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId('run-qa-simulation-btn'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Connect an AI provider/i);
+    expect(screen.queryByText(/cryptographic hashes|boundary conditions limit/i)).not.toBeInTheDocument();
   });
 });
