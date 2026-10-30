@@ -50,6 +50,8 @@ jobs:
         env:
           SUPABASE_URL: ${{ env.API_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
+      - name: Start the stand-in AI service
+        run: nohup node e2e/stub-ai/server.mjs > stub-ai.log 2>&1 &
       - name: Start the app
         run: |
           PORT=3000 NODE_ENV=development \
@@ -64,6 +66,8 @@ jobs:
           cat dev-server.log; exit 1
       - name: Run E2E tests
         run: npx playwright test
+        env:
+          E2E_STUB_AI_URL: http://localhost:1234
       - name: Production smoke suite against the local stack
         run: node scripts/smoke-prod.mjs --setup --base http://localhost:3000
         env:
@@ -83,5 +87,6 @@ jobs:
             artifacts/e2e-report
             artifacts/e2e-results
             dev-server.log
+            stub-ai.log
           if-no-files-found: ignore
           retention-days: 14
