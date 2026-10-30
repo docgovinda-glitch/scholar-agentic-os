@@ -15,7 +15,7 @@
 4. Full encrypted `pg_dump` backups are impossible from the agent sandbox (HTTPS-only egress, no raw TCP to Postgres). Prod changes on 2026-10-29 were preceded by policy/grant/RLS snapshots only (`~/backups/*-20261029T104243Z.json`, agent machine). Supabase Pro daily backups are the restore path.
 5. **Deploy smoke secrets (optional): not set.** `deploy.yml` runs the production smoke suite after each deploy only when the `SMOKE_*` GitHub secrets exist. This session has no tool that can write repository secrets, so the step stays skipped. The suite is run by hand after deploys (`scripts/smoke-prod.sh`).
 
-## 0. Task checklist (status as of 2026-10-30 07:30Z)
+## 0. Task checklist (status as of 2026-10-30 09:20Z)
 
 | Task | Status | Evidence |
 | :--- | :--- | :--- |
@@ -32,12 +32,13 @@
 | T10 Production readiness | PARTIAL | PR CI + audit gate, deploy waits for live commit + deep health + smoke, uptime workflow, Render health check path (#86); deploy check accepts a newer live commit that contains the run's commit (#99); branch protection, error tracking, rollback drill → owner/next |
 | T11 AUDIT findings | PARTIAL | see section 3 |
 | B1 Product audit | FIRST PASS + AI map | `PRODUCT_AUDIT.md`; area g mapped in `docs/AI-CALL-MAP.md` (#94) |
-| P0 fabricated content | DONE (P0-1…P0-18) | #87–#89 (Coursework, Journal); #100, #101 (Thesis/Proposal); #104 (citations never invent year/author/venue, P0-7); #108 (audience Q&A, P0-11); #109 (journal titles); #110–#112 (Journal review, demo manuscripts, sub-section drafter); #113, #114 (slide copilot, theme picker that replaced decks); #115 (landing page, Swiss sample deck, coursework prompt). Details in `PRODUCT_AUDIT.md` |
+| P0 fabricated content | DONE (P0-1…P0-19) | #87–#89 (Coursework, Journal); #100, #101 (Thesis/Proposal); #104 (citations never invent year/author/venue, P0-7); #108 (audience Q&A, P0-11); #109 (journal titles); #110–#112 (Journal review, demo manuscripts, sub-section drafter); #113, #114 (slide copilot, theme picker that replaced decks); #115 (landing page, Swiss sample deck, coursework prompt); #121 (Presentation sidebar demo projects and "Aaditya" account). Details in `PRODUCT_AUDIT.md` |
 | B2 E2E harness | DONE (first cut) | #91: Playwright, local Supabase in CI, 11 specs + smoke on every PR |
 | B3 One Brain | IN PROGRESS | map (#94); BYOK headers only on AI routes (#93); one header parser (#95); one Premium pipeline (#98); unused `/agent/literature` removed (#97); typed AI errors for Thesis/Proposal (#100). local model never called from the server (#106); scholarBrain routes hand off to browser-local AI with signed challenges (#116, step 2). Next: bind Ask Scholar challenge to its prompt (P1-10), deep-research hand-off, guardrails on llm.ts output, `brain.ts` contract |
-| B4 AI Access | IN PROGRESS | Premium scope stated truthfully (#96) |
+| B4 AI Access | IN PROGRESS | Premium scope stated truthfully (#96); every catalog provider has a working adapter, tested (#123). Next: credits/ledger accuracy, premium request submit/withdraw/approve, admin CRUD |
 | B5 Thesis/Proposal | IN PROGRESS | real routes + honest errors (#100), practice room/worksheet (#101), starter no longer invents budget (#102) |
-| B7, B8 | TODO | |
+| B7 UI/UX pass | IN PROGRESS | every chunk < 500 kB, enforced in the build (#119: 918 → 379 kB); no pure #000000, lint-checked (#120); axe WCAG 2.1 A/AA + no sideways scroll at 375/768/1280 px with screenshots in CI (#121); phone layout fixes (#121, #122); no runtime-built Tailwind classes (checked). Next: hardcoded hex → tokens, loading/empty/error states, keyboard/focus pass |
+| B8 | TODO | |
 | B6 Presentation | DONE except One Brain (B3); decks persist (#85) | |
 | T12 Handover | TODO | |
 
@@ -93,7 +94,7 @@
 | **#82** | `fix/post-80-verification-login-purge-notices` | `main` | **MERGED & DEPLOYED** (`2026-10-29T11:00Z`) | `a8771bd` (`1b91e8c`) | `docgovinda-glitch` (agent, owner-authorized) | **YES** | Post-#80 hardening (Turnstile passthrough, login cap, fail-closed `LLM_CHALLENGE_SECRET`, cloud connections API, `CredentialResetNotice`); notice SQL moved to `20261029010000`. |
 | **#83** | `claude/jolly-mayer-k74uad` | `main` | **MERGED & DEPLOYED** (`2026-10-29T11:01Z`) | `efa5187` (`92c48c6`) | `docgovinda-glitch` (agent, owner-authorized) | **YES** | `20261029000000_reapply_premium_request_integrity.sql` (fresh-DB policy order fix; no-op in prod). |
 
-Later PRs were opened by the agent and merged by it (owner-authorized) only after CI passed. As of 2026-10-30 07:30Z all are merged and deploy through the normal pipeline (`/api/health` reported `051113e` at 07:26Z, with #114 and #116 deploying).
+Later PRs were opened by the agent and merged by it (owner-authorized) only after CI passed. As of 2026-10-30 09:20Z all are merged and deploy through the normal pipeline (`/api/health` reported `051113e` at 07:26Z, with #114 and #116 deploying).
 
 | PR # | Contents |
 | :---: | :--- |
@@ -128,6 +129,13 @@ Later PRs were opened by the agent and merged by it (owner-authorized) only afte
 | #114 | Applying a slide theme keeps the user's slides (P0-16) |
 | #115 | Landing page, Swiss theme and coursework prompt: no invented citations or figures (P0-17, P0-18) |
 | #116 | Thesis, Proposal and Presentation run on browser-local AI (B3 step 2) |
+| #117 | STATUS, audit and changelog after #103–#116 |
+| #118 | Ask Scholar binds the browser-AI challenge to its prompt (P1-10) |
+| #119 | Read .xlsx without ExcelJS; every chunk under 500 kB, enforced in the build |
+| #120 | No pure #000000 anywhere; lint check |
+| #121 | Presentation sidebar shows the user's own projects (P0-19); axe + responsive E2E |
+| #122 | Presentation header: save badge no longer overlaps the steps on phones |
+| #123 | Every AI Access provider has a working adapter (test) |
 
 ---
 
