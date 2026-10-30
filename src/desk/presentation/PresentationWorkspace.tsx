@@ -14,7 +14,9 @@ import { authedFetch, getProject, saveIntakeAnswers } from '../api';
 import { DEFAULT_DECK_THEME_ID } from '../../features/slides/gamma/theme';
 import { composeDeckFromText, composeDeckFromTopic } from '../../features/slides/gamma/composer';
 import { normalizeDeck } from '../../features/slides/gamma/content';
-import ScholarSidebar from '../../components/navigation/ScholarSidebar';
+import ScholarSidebar, { type ScholarSidebarProject } from '../../components/navigation/ScholarSidebar';
+import { useDeskSession } from '../useDeskSession';
+import { listProjects } from '../api/projectsApi';
 import GammaPlayer from '../../features/slides/gamma/GammaPlayer';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 
@@ -44,7 +46,40 @@ export default function PresentationWorkspace({
   const computedInitialStep =
     initialStep ?? (initialDeck || (initialCourseworkText && initialCourseworkText.trim()) ? 'studio' : 'understand');
   const [currentStep, setCurrentStep] = useState<PresentationStudioStep>(computedInitialStep);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Phones start with the navigation closed so the studio gets the full width.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 768
+  );
+  // The sidebar shows the signed-in user's own projects and email, nothing else.
+  const session = useDeskSession();
+  const sessionEmail =
+    session.status === 'signed-in' || session.status === 'email-verified' ? session.email : null;
+  const signedIn = session.status === 'signed-in' || session.status === 'email-verified';
+  const [sidebarProjects, setSidebarProjects] = useState<ScholarSidebarProject[]>([]);
+  useEffect(() => {
+    if (!signedIn) {
+      setSidebarProjects([]);
+      return;
+    }
+    let cancelled = false;
+    listProjects()
+      .then(({ items }) => {
+        if (cancelled) return;
+        setSidebarProjects(
+          items.map((p) => ({
+            id: p.projectId,
+            title: p.title || p.answers?.title || 'Untitled project',
+            type: p.outputTypeId === 'OT-22' ? 'presentation' : 'document',
+          }))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setSidebarProjects([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn]);
   const [showLivePlayer, setShowLivePlayer] = useState(false);
   const [playerStartIndex, setPlayerStartIndex] = useState(0);
   const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('saved');
@@ -377,6 +412,9 @@ export default function PresentationWorkspace({
         onOpenSettings={onOpenAccountSettings}
         onOpenVault={onOpenVault}
         onOpenAiAccess={onOpenAiAccess}
+        projects={sidebarProjects}
+        userName={sessionEmail ? sessionEmail.split('@')[0] : undefined}
+        userEmail={sessionEmail ?? undefined}
       />
 
       {/* Main Workspace Column */}

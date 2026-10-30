@@ -22,13 +22,16 @@ export default function AppLayout({
   activeItem = 'presentation',
   isSidebarCollapsed,
   onToggleSidebar,
-  userName = 'Aaditya',
-  userEmail = 'aaditya@scholar.io',
+  userName,
+  userEmail,
   onNavigate,
   onNewProject,
   className = '',
 }: AppLayoutProps) {
-  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  // Phones start with the navigation closed so the page gets the full width.
+  const [internalCollapsed, setInternalCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 768
+  );
 
   const collapsed = isSidebarCollapsed !== undefined ? isSidebarCollapsed : internalCollapsed;
   const toggleSidebar = onToggleSidebar || (() => setInternalCollapsed((prev) => !prev));

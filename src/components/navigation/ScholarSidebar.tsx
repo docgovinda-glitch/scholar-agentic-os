@@ -34,17 +34,14 @@ export interface ScholarSidebarProps {
   onOpenAiAccess?: () => void;
   onOpenSettings?: () => void;
   onOpenAskScholar?: () => void;
+  /** The signed-in user's own projects. Empty (the default) shows "No projects yet". */
+  projects?: ScholarSidebarProject[];
+  /** The signed-in user. Without one, no account card is shown. */
   userName?: string;
   userEmail?: string;
   className?: string;
 }
 
-const DEFAULT_PROJECT_HISTORY: ScholarSidebarProject[] = [
-  { id: 'proj-1', title: 'MN6094NI Developing Breakthrough Leadership', type: 'presentation', isPinned: true },
-  { id: 'proj-2', title: 'Why Zappos Pays New Hires to Quit', type: 'presentation' },
-  { id: 'proj-3', title: 'Corporate Governance & Executive Risk', type: 'document' },
-  { id: 'proj-4', title: 'Empirical Multi-Agent Verification', type: 'research' },
-];
 
 export default function ScholarSidebar({
   isCollapsed = false,
@@ -56,8 +53,9 @@ export default function ScholarSidebar({
   onOpenAiAccess,
   onOpenSettings,
   onOpenAskScholar,
-  userName = 'Aaditya',
-  userEmail = 'aaditya@scholar.io',
+  projects = [],
+  userName,
+  userEmail,
   className = '',
 }: ScholarSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,7 +97,7 @@ export default function ScholarSidebar({
     }
   };
 
-  const filteredProjects = DEFAULT_PROJECT_HISTORY.filter((p) =>
+  const filteredProjects = projects.filter((p) =>
     p.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -260,6 +258,11 @@ export default function ScholarSidebar({
 
             {/* Scrollable Project History List */}
             <div className="flex-1 overflow-y-auto space-y-1 pr-1 pb-3 min-h-0 text-[13px]">
+              {filteredProjects.length === 0 && (
+                <p className="px-2.5 py-2 text-xs text-neutral-500 dark:text-neutral-400" data-testid="sidebar-no-projects">
+                  {projects.length === 0 ? "No projects yet" : "No matching projects"}
+                </p>
+              )}
               {filteredProjects.map((p) => (
                 <button
                   key={p.id}
@@ -316,19 +319,23 @@ export default function ScholarSidebar({
             </button>
           </div>
 
-          {/* User Profile Card (Aaditya) */}
+          {/* Account card: only for a signed-in user */}
+          {(userName || userEmail) && (
           <div
             className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl bg-neutral-50 dark:bg-white/5 border border-neutral-200/60 dark:border-white/5"
             data-testid="user-profile-card"
           >
             <div className="w-7 h-7 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center text-[11px] font-bold shrink-0">
-              {userName.slice(0, 2).toUpperCase()}
+              {(userName || userEmail || "?").slice(0, 2).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-neutral-900 dark:text-white truncate">{userName}</p>
-              <p className="text-[10px] text-neutral-500 dark:text-neutral-400 truncate">{userEmail}</p>
+              <p className="text-xs font-semibold text-neutral-900 dark:text-white truncate">{userName || userEmail}</p>
+              {userName && userEmail && (
+                <p className="text-[10px] text-neutral-500 dark:text-neutral-400 truncate">{userEmail}</p>
+              )}
             </div>
           </div>
+          )}
         </div>
       </aside>
     </>
