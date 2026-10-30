@@ -38,7 +38,7 @@
 | B4 AI Access | IN PROGRESS | Premium scope stated truthfully (#96); every catalog provider has a working adapter, tested (#123); credit balance = ledger and limits enforced, checked against a real DB in CI (#125, P1-11 negative grant noted); premium requests act only on a pending request (#126, P1-12); platform keys encrypted with MASTER_KEY, never returned (#127); credit functions refuse zero/negative amounts, applied to production (#136, P1-11). Not done: admin providers/models/budgets CRUD tests; BYOK per real provider needs real keys (UNVERIFIED) |
 | B5 Workspaces | IN PROGRESS | real routes + honest errors (#100), practice room/worksheet (#101), starter no longer invents budget (#102); E2E per workspace: open, saved answers survive reload, no demo data, private (#128); each drafting step runs through the real AI path (#129); Coursework drafting uses the user's AI (#130); Journal re-draft keeps the previous version, Markdown/Word export, owner-only (#132). Not done: export E2E for Coursework/Thesis/Proposal; no screen shows saved versions (backlog) |
 | B7 UI/UX pass | DONE | every chunk < 500 kB, enforced in the build (#119: 918 → 379 kB); no pure #000000, lint-checked (#120); axe WCAG 2.1 A/AA + no sideways scroll at 375/768/1280 px with screenshots in CI (#121); phone layout fixes (#121, #122); no runtime-built Tailwind classes (checked); colour tokens instead of raw hex in app chrome, lint-checked (#133); axe on signed-in screens and all four workspaces, with fixes (#134); keyboard focus visible everywhere Tab reaches, failed loads show an error with retry (#135) |
-| B8 Final verification | DONE | CI E2E 60/60 and unit suites green on #136; production smoke 35/35 on `031ff13` (2026-10-30 18:16Z) and re-run after the final deploy (§1); final per-area status in `PRODUCT_AUDIT.md` |
+| B8 Final verification | DONE | CI E2E 60/60 and unit suites green on #136; production smoke 35/35 on `031ff13` (2026-10-30 18:16Z) and 35/35 again on `afcba5d` after the final deploy (§1); final per-area status in `PRODUCT_AUDIT.md` |
 | B6 Presentation | DONE except One Brain (B3); decks persist (#85) | |
 | T12 Handover | DONE (#138) | this file §4–§5; `RUNBOOK.md`, `CHANGELOG.md`, `ROTATION_RUNBOOK.md`, `USER_NOTICE.md` (draft, not sent), `PRODUCT_AUDIT.md`, `PRODUCT_BACKLOG.md` |
 
@@ -63,6 +63,7 @@
 | 2026-10-30 01:20 → 02:20 | Deploys #102, #103, #104 (code/docs only) | | health `commit` `d625217`; smoke 35/35 | redeploy previous |
 | 2026-10-30 02:30 | Supabase Auth `rate_limit_otp` 30 → 300 (Management API PATCH `config/auth`, owner-approved) | 30 | read-back 300; other `rate_limit_*` unchanged; smoke 35/35 | PATCH back to 30 |
 | 2026-10-30 18:15Z | SQL `20261030170000_credit_amount_must_be_positive` (#136) via Management API; recorded in `schema_migrations` | function defs snapshot `~/backups/credit-functions-20261030T181524Z.json` (agent machine) | `grant_credits(-1)` and `deduct_credits(0)` → 22023, no ledger rows; anon/authenticated execute still false | re-create both functions from the snapshot |
+| 2026-10-30 18:47Z | Final check after #137 deployed (live `afcba5d`; #138 is docs only) | — | production smoke 35/35 (`scripts/smoke-prod.sh`); `/api/health` healthy | n/a |
 
 ## T5 results (2026-10-29, read-only, `default_transaction_read_only = on`, counts only)
 
