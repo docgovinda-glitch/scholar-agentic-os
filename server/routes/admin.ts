@@ -501,16 +501,24 @@ export function registerAdminRoutes(app: express.Express): void {
 
   admin.post("/platform-credentials", async (req, res) => {
     if (!requireScopeInline(req, res, "manage_providers")) return;
-    const { providerId, label, credential } = req.body as { providerId: string; label?: string; credential: string };
-    if (!providerId || !credential) return res.status(400).json({ error: "providerId and credential are required." });
-    await storeCredential(providerId, label ?? "default", credential, actor(req));
+    const { providerId, label, credential } = (req.body ?? {}) as { providerId?: unknown; label?: unknown; credential?: unknown };
+    if (typeof providerId !== "string" || !providerId.trim() || typeof credential !== "string" || !credential.trim()) {
+      return res.status(400).json({ error: "providerId and credential are required." });
+    }
+    if (providerId.length > 100 || credential.length > 4096 || (label !== undefined && (typeof label !== "string" || label.length > 100))) {
+      return res.status(400).json({ error: "providerId and label must be at most 100 characters, the credential at most 4096." });
+    }
+    await storeCredential(providerId.trim(), typeof label === "string" && label.trim() ? label.trim() : "default", credential.trim(), actor(req));
     await writeAuditLog(actor(req), "store_platform_credential", "ai_provider", providerId, { label });
     res.json({ success: true });
   });
 
   admin.patch("/platform-credentials/:id/status", async (req, res) => {
     if (!requireScopeInline(req, res, "manage_providers")) return;
-    const { status } = req.body as { status: "active" | "disabled" | "error" };
+    const { status } = (req.body ?? {}) as { status?: unknown };
+    if (status !== "active" && status !== "disabled" && status !== "error") {
+      return res.status(400).json({ error: "status must be active, disabled or error." });
+    }
     await setCredentialStatus(req.params.id, status);
     await writeAuditLog(actor(req), "update_platform_credential_status", "platform_credential", req.params.id, { status });
     res.json({ success: true });
