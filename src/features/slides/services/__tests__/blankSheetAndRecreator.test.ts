@@ -115,7 +115,7 @@ describe('deckRecreatorService', () => {
     expect(result.fileName).toBe('energy_presentation.html');
   });
 
-  it('recreates a 5-beat deck from markdown / text file', async () => {
+  it('recreates a deck from markdown / text file using only its sections', async () => {
     const mdContent = `
 # Autonomous Supply Chain Architecture
 
@@ -135,7 +135,12 @@ Phase 1 port integrations followed by regional depot automation.
     const file = new File([mdContent], 'supply_chain_deck.md', { type: 'text/markdown' });
     const result = await recreateDeckFromFile(file);
 
-    expect(result.deck.slides).toHaveLength(5);
+    // One slide per section of the user's file, built from their own text.
+    expect(result.deck.slides).toHaveLength(4);
+    const deckText = JSON.stringify(result.deck.slides);
+    expect(deckText).toContain('Multi-Modal Routing Engine');
+    expect(deckText).not.toMatch(/Molecular Purity|12,450|84\.2%/);
+    expect(result.summary).toContain('created 4 slides');
     expect(result.detectedTitle).toBe('Autonomous Supply Chain Architecture');
     expect(result.customTheme).toBeDefined();
   });

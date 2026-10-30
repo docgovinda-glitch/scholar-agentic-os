@@ -1,106 +1,66 @@
 import { describe, it, expect } from 'vitest';
-import {
-  CANVA_GAMMA_5_BEATS,
-  apply5SlideDeckProgression,
-  is5SlideProgression,
-} from '../deckProgressionService';
+import { CANVA_GAMMA_5_BEATS, applyDeckTheme, is5SlideProgression } from '../deckProgressionService';
 import type { SlideDeck } from '../../types/slides';
 
 describe('deckProgressionService', () => {
-  const initialDeck: SlideDeck = {
+  const userDeck: SlideDeck = {
     id: 'test-deck',
-    title: 'Enterprise Digital Transformation',
-    topic: 'Enterprise Digital Transformation',
+    title: 'Rural Clinic Wait Times',
+    topic: 'Rural Clinic Wait Times',
     sourceModule: 'presentation-studio',
-    slides: [
-      {
-        id: 's1',
-        order: 1,
-        actionHeadline: 'Legacy Systems Cause Inefficiencies',
-        blocks: [],
-        speakerNotes: '',
-        framework: 'Standard-Narrative',
-      },
-    ],
-    activeSlideIndex: 0,
+    themeId: 'sand-academic',
+    slides: Array.from({ length: 7 }, (_, i) => ({
+      id: `s${i + 1}`,
+      order: i + 1,
+      actionHeadline: `My slide ${i + 1}`,
+      blocks: [{ type: 'bullet-list' as const, items: [`My own point ${i + 1}`] }],
+      speakerNotes: `My notes ${i + 1}`,
+      framework: 'Standard-Narrative' as const,
+    })),
+    activeSlideIndex: 3,
   };
 
-  it('defines 5 distinct Canva & Gamma progression beats', () => {
-    expect(CANVA_GAMMA_5_BEATS).toHaveLength(5);
-    expect(CANVA_GAMMA_5_BEATS[0].layoutType).toBe('cover');
-    expect(CANVA_GAMMA_5_BEATS[1].layoutType).toBe('two-column');
-    expect(CANVA_GAMMA_5_BEATS[2].layoutType).toBe('framework');
-    expect(CANVA_GAMMA_5_BEATS[3].layoutType).toBe('metric-focus');
-    expect(CANVA_GAMMA_5_BEATS[4].layoutType).toBe('categories');
+  it('describes the 5-beat structure without default content', () => {
+    expect(CANVA_GAMMA_5_BEATS.map((b) => b.layoutType)).toEqual([
+      'cover',
+      'two-column',
+      'framework',
+      'metric-focus',
+      'categories',
+    ]);
+    expect(JSON.stringify(CANVA_GAMMA_5_BEATS)).not.toMatch(/\d+(\.\d+)?%/);
   });
 
-  it('formats deck into 5 distinct slides with bespoke archetypes for McKinsey', () => {
-    const updated = apply5SlideDeckProgression(initialDeck, 'mckinsey-pyramid');
+  it('applying a library theme changes only the theme and keeps every slide', () => {
+    const updated = applyDeckTheme(userDeck, 'mckinsey-pyramid');
 
-    expect(updated.slides).toHaveLength(5);
-    expect(is5SlideProgression(updated)).toBe(true);
-
-    // Slide 1: Cover
-    expect(updated.slides[0].layoutType).toBe('cover');
-    expect(updated.slides[0].order).toBe(1);
-
-    // Slide 2: Two-column synthesis
-    expect(updated.slides[1].layoutType).toBe('two-column');
-    const twoColBlock = updated.slides[1].blocks.find((b) => b.type === 'two-column');
-    expect(twoColBlock).toBeDefined();
-
-    // Slide 3: 2D Signature Framework
-    expect(updated.slides[2].layoutType).toBe('framework');
-    expect(updated.slides[2].actionHeadline).toContain('Pyramid');
-    const imageBlock = updated.slides[2].blocks.find((b) => b.type === 'image');
-    expect(imageBlock).toBeDefined();
-    if (imageBlock && imageBlock.type === 'image') {
-      expect(imageBlock.imageUrl).toBe(''); // triggers 2D sketch illustration
-    }
-
-    // Slide 4: Metric Proof
-    expect(updated.slides[3].layoutType).toBe('metric-focus');
-    const metricBlock = updated.slides[3].blocks.find((b) => b.type === 'metric-callout');
-    expect(metricBlock).toBeDefined();
-
-    // Slide 5: Roadmap
-    expect(updated.slides[4].layoutType).toBe('categories');
-    expect(updated.slides[4].pillars).toHaveLength(3);
-    expect(updated.slides[4].pillars?.[0].title).toBe('Phase 01: Foundation');
+    expect(updated.themeId).toBe('mckinsey-pyramid');
+    // Same slides, same order, same content: nothing replaced, nothing dropped.
+    expect(updated.slides).toEqual(userDeck.slides);
+    expect(updated.activeSlideIndex).toBe(3);
+    expect(updated.title).toBe('Rural Clinic Wait Times');
   });
 
-  it('formats deck with BCG growth-share matrix details for BCG theme', () => {
-    const updated = apply5SlideDeckProgression(initialDeck, 'bcg-growth-share-matrix');
-    expect(updated.slides[2].actionHeadline).toContain('BCG');
+  it('applying a custom theme stores it and keeps the slides', () => {
+    const custom = { name: 'Mine', accentColor: '#225588' } as unknown as NonNullable<SlideDeck['customTheme']>;
+    const updated = applyDeckTheme(userDeck, undefined, custom);
+    expect(updated.customTheme).toBe(custom);
+    expect(updated.themeId).toBe('sand-academic');
+    expect(updated.slides).toEqual(userDeck.slides);
   });
 
-  it('formats deck with Apple silicon details for Cupertino theme', () => {
-    const updated = apply5SlideDeckProgression(initialDeck, 'apple-cupertino-minimal');
-    expect(updated.slides[2].actionHeadline).toContain('Cupertino');
+  it('adds no invented figures to a deck', () => {
+    const updated = applyDeckTheme(userDeck, 'apple-cupertino-minimal');
+    expect(JSON.stringify(updated.slides)).not.toMatch(/p < 0\.001|99\.99%|12,450|\+84\.2%/);
   });
 
-  it('preserves existing custom headlines if present', () => {
-    const deckWithHeadlines: SlideDeck = {
-      ...initialDeck,
-      slides: [
-        {
-          id: 's1',
-          order: 1,
-          actionHeadline: 'User Custom Cover Headline For Transformation',
-          blocks: [],
-          speakerNotes: '',
-          framework: 'Standard-Narrative',
-        },
-      ],
+  it('is5SlideProgression checks layout order only', () => {
+    expect(is5SlideProgression(userDeck)).toBe(false);
+    const layouts = ['cover', 'two-column', 'framework', 'metric-focus', 'categories'] as const;
+    const fiveBeat: SlideDeck = {
+      ...userDeck,
+      slides: userDeck.slides.slice(0, 5).map((s, i) => ({ ...s, layoutType: layouts[i] })),
     };
-
-    const updated = apply5SlideDeckProgression(deckWithHeadlines, 'deloitte-digital-transformation');
-    expect(updated.slides[0].actionHeadline).toBe('User Custom Cover Headline For Transformation');
-  });
-
-  it('correctly evaluates is5SlideProgression', () => {
-    expect(is5SlideProgression(initialDeck)).toBe(false);
-    const updated = apply5SlideDeckProgression(initialDeck, 'minimal-slate');
-    expect(is5SlideProgression(updated)).toBe(true);
+    expect(is5SlideProgression(fiveBeat)).toBe(true);
   });
 });
