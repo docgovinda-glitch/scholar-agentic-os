@@ -143,7 +143,9 @@ describe("ThesisWorkspace (OT-09 Thesis & Dissertation Studio)", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Senior External Examiner, Computational Neuroscience/i)).toBeInTheDocument();
-      expect(screen.getByText(/resolve the tension between symbolic models/i)).toBeInTheDocument();
+      // Shown in the examiner panel and again in the practice room.
+      expect(screen.getAllByText(/resolve the tension between symbolic models/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.queryByTestId("viva-practice-empty")).not.toBeInTheDocument();
     });
   });
 
