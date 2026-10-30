@@ -6,6 +6,7 @@ import {
   normalizeUnicodeNFC,
 } from "../../src/utils/scholarlyVoiceGuard.ts";
 import { scholarBrain } from "../../src/services/scholarBrain.ts";
+import { sendAiFailure, UnusableAiResponseError } from "../../src/ai/aiRouteErrors.ts";
 import {
   memoryDecks,
   setMemoryDeck,
@@ -212,69 +213,6 @@ function generateProjectDerivedFallbackDeck(
   ];
 }
 
-/**
- * Deterministic heuristic audience questions generator.
- */
-function generateFallbackQAScenarios(
-  projectTitle: string,
-  researchQuestions: string[]
-): AudienceQuestion[] {
-  const safeTitle = normalizeUnicodeNFC(projectTitle || "Autonomous Scientific Verification");
-
-  return [
-    {
-      questionId: "qa-1",
-      audienceType: "Senior Conference Referee & Methodologist",
-      difficultyLevel: "adversarial",
-      targetedSlideNumber: 3,
-      targetedTopic: "Threats to Internal Validity & Confounding Prompts",
-      questionText: `In your experimental design for ${safeTitle}, how did you disentangle genuine multi-agent consensus from shared latent token biases in your underlying language models?`,
-      probingIntent:
-        "Probing whether multi-agent agreement is merely an artifact of correlated model pretraining rather than true epistemic verification.",
-      suggestedAnswer:
-        "Thank you for that critical question. We explicitly mitigated shared latent bias by employing heterogeneous model architectures across divergent tokenisers and training corpora, enforcing orthogonal temperature distributions, and validating outputs against deterministic regex DOI resolvers.",
-      modelRebuttalStructure: [
-        "Acknowledge the risk of latent token bias across homogenous model weights.",
-        "Demonstrate use of heterogeneous model families (e.g. Claude + Gemini + Llama).",
-        "Reference Table 3's ablation trials where deterministic DOI resolvers caught 100% of correlated hallucinations.",
-      ],
-    },
-    {
-      questionId: "qa-2",
-      audienceType: "Theoretical Synthesizer & Session Chair",
-      difficultyLevel: "rigorous",
-      targetedSlideNumber: 2,
-      targetedTopic: "Epistemological Scope Boundaries",
-      questionText: `Your framework treats empirical verification as a deterministic constraint. Does this approach risk excluding qualitative, interpretivist scholarship where consensus is inherently dialectical?`,
-      probingIntent:
-        "Testing the philosophical boundaries and humility of the model when applied outside strict quantitative natural sciences.",
-      suggestedAnswer:
-        "An essential distinction. Our deterministic gates govern bibliographic attribution and source provenance—factual existence and textual fidelity. Dialectical tensions and qualitative nuances are preserved rather than flattened, providing scholars with transparent evidence trails for debate.",
-      modelRebuttalStructure: [
-        "Demarcate factual provenance from interpretive synthesis.",
-        "Clarify that qualitative argumentation is preserved within the dialectical review lens.",
-        "Reaffirm that human supervisor agency remains the final arbiter of philosophical synthesis.",
-      ],
-    },
-    {
-      questionId: "qa-3",
-      audienceType: "Applied Systems & Translation Critic",
-      difficultyLevel: "moderate",
-      targetedSlideNumber: 4,
-      targetedTopic: "Computational Latency & Federated Scaling",
-      questionText: `Given your 4.2x turnaround acceleration, what is the wall-clock compute overhead and token cost when evaluating a full 50,000-word doctoral monograph?`,
-      probingIntent:
-        "Testing whether the proposed system is economically and computationally viable for actual university libraries or publishing houses.",
-      suggestedAnswer:
-        "Because our claim ledger decomposes text into parallel independent blocks, monograph evaluation runs in under 4 minutes across distributed workers, with an amortised cloud inference cost under $0.85 per dissertation.",
-      modelRebuttalStructure: [
-        "State exact empirical benchmarks: 3.8 minutes wall-clock time for 50,000 words.",
-        "Explain parallel chunk decomposition that prevents O(N^2) quadratic context explosion.",
-        "Highlight open-source local inference options (Ollama / vLLM) for zero-cost university deployments.",
-      ],
-    },
-  ];
-}
 
 
 function buildSlideDeckFromItems(
@@ -587,19 +525,19 @@ router.post(
     const projectTitle = normalizeUnicodeNFC(rawTitle);
 
     const answers = (record.answers || {}) as Record<string, unknown>;
-    const researchQuestions: string[] = Array.isArray(answers.researchQuestions)
-      ? (answers.researchQuestions as string[])
-      : [
-          (answers.overarchingHypothesis as string) ||
-            "How do grounded multi-agent architectures mitigate hallucinations?",
-        ];
+    // Only the user's own research questions; never a placeholder question.
+    const researchQuestions: string[] = (
+      Array.isArray(answers.researchQuestions)
+        ? (answers.researchQuestions as string[])
+        : typeof answers.overarchingHypothesis === "string"
+        ? [answers.overarchingHypothesis]
+        : []
+    ).filter((q) => typeof q === "string" && q.trim().length > 0);
 
     let qaScenarios: AudienceQuestion[] | null = null;
-    let generatedBy: "ai-gateway" | "heuristic-fallback" = "heuristic-fallback";
+    const generatedBy = "ai-gateway" as const;
 
-    const candidates = getCandidates(req);
-
-    if (candidates.length > 0) {
+    {
       try {
         const rawQaSources = Array.isArray(record.evidenceLedger?.sources) ? record.evidenceLedger.sources : [];
         const qaVaultSources = rawQaSources.map((s) => ({
@@ -679,21 +617,16 @@ Grounded Evidence: ${JSON.stringify(evidence.map((e) => ({ title: e.title, token
             suggestedAnswer: normalizeUnicodeNFC(sanitizeScholarlyText((q.suggestedAnswer as string) || "")),
             modelRebuttalStructure: Array.isArray(q.modelRebuttalStructure)
               ? q.modelRebuttalStructure.map((r: unknown) => normalizeUnicodeNFC(sanitizeScholarlyText(String(r))))
-              : [
-                  "Acknowledge the premise directly",
-                  "Cite empirical findings and statistical significance",
-                  "Highlight boundary conditions and reproducible verification",
-                ],
+              : [],
           }));
-          generatedBy = "ai-gateway";
+        }
+        if (!qaScenarios || qaScenarios.every((q) => !q.questionText)) {
+          throw new UnusableAiResponseError("audience questions");
         }
       } catch (aiErr) {
-        console.warn("[project/presentation.ts] AI Q&A simulation fallback:", aiErr);
+        // No stand-in questions: the user sees that nothing was generated.
+        return sendAiFailure(res, aiErr, "Audience questions");
       }
-    }
-
-    if (!qaScenarios) {
-      qaScenarios = generateFallbackQAScenarios(projectTitle, researchQuestions);
     }
 
     const response: QASimulateResponse = {
