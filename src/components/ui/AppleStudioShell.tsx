@@ -215,7 +215,7 @@ export function AppleStudioHeader({
         role="tablist"
         aria-label="Studio cognitive stages"
         data-testid="apple-studio-stage-pills"
-        className="apple-segmented-pill shrink-0 overflow-x-auto max-w-full"
+        className="apple-segmented-pill min-w-0 shrink md:shrink-0 overflow-x-auto max-w-full"
       >
         {APPLE_STUDIO_STAGES.map((stage) => {
           const Icon = PHASE_ICONS[stage.id];
@@ -230,6 +230,7 @@ export function AppleStudioHeader({
               role="tab"
               aria-selected={isActive}
               aria-disabled={isLocked}
+              aria-label={stage.label}
               data-testid={`apple-stage-pill-${stage.id}`}
               onClick={() => {
                 if (!isLocked) onPhaseSelect(stage.id);
@@ -244,7 +245,8 @@ export function AppleStudioHeader({
               }`}
             >
               <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-accent" : "text-tertiary"}`} />
-              <span>{stage.label}</span>
+              {/* Icons only on phones; the tab keeps its name via aria-label. */}
+              <span className="hidden sm:inline">{stage.label}</span>
             </button>
           );
         })}

@@ -531,14 +531,14 @@ Preliminary Context: ${preliminaryContext || "General peer-reviewed scholarly co
               )}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <input
                 id="working-title-input"
                 type="text"
                 value={workingTitle}
                 onChange={(e) => setWorkingTitle(e.target.value)}
                 placeholder="e.g. Scalable FPGA Decoders for Real-Time Surface Code Quantum Error Correction"
-                className="flex-1 bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-4 py-2 text-xs font-semibold text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)] outline-none transition-colors"
+                className="flex-1 min-w-0 basis-56 bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-4 py-2 text-xs font-semibold text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)] outline-none transition-colors"
               />
               <button
                 type="button"

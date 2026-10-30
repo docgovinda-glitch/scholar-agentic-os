@@ -251,7 +251,7 @@
 
     --text-primary:    #ECECEC;
     --text-secondary:  #9B9B9B;
-    --text-muted:      #8E8E93;
+    --text-muted:      #A1A1AA; /* 4.5:1+ on dark hover and accent-tinted surfaces (axe, #134) */
     --text-inverse:    #171717;
 
     --accent:          #ECECEC;
@@ -317,7 +317,7 @@
 
   --text-primary:    #ECECEC;
   --text-secondary:  #9B9B9B;
-  --text-muted:      #8E8E93;
+  --text-muted:      #A1A1AA; /* 4.5:1+ on dark hover and accent-tinted surfaces (axe, #134) */
   --text-inverse:    #171717;
 
   --accent:          #ECECEC;
@@ -375,7 +375,7 @@
   --border-strong: #A3A3A3;
   --text-primary: #ECECEC;
   --text-secondary: #9B9B9B;
-  --text-muted: #8E8E93;
+  --text-muted: #A1A1AA;
   --text-inverse: #171717;
   --accent: #ECECEC;
   --accent-hover: #FFFFFF;

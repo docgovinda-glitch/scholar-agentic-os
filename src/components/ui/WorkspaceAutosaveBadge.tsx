@@ -83,7 +83,7 @@ export function WorkspaceAutosaveBadge({
       />
       <span>{statusLabel}</span>
       {lastSavedTime && !isSaving && (
-        <span className="opacity-70 font-normal">({lastSavedTime})</span>
+        <span className="font-normal">({lastSavedTime})</span>
       )}
       {version !== undefined && (
         <span

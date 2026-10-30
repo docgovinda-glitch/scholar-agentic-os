@@ -741,7 +741,7 @@ function ResearchWorkspaceInner({
           <div className={`
             absolute md:relative inset-y-0 right-0 z-40
             transform transition-transform duration-300 ease-in-out
-            ${contextPanelOpen ? 'translate-x-0' : 'translate-x-full md:hidden'}
+            ${contextPanelOpen ? 'translate-x-0' : 'hidden'}
             border-l border-[color:var(--border-subtle)] flex flex-col w-80 md:w-80 shrink-0 bg-[color:var(--surface-canvas)]
             h-full md:h-auto
           `}>
