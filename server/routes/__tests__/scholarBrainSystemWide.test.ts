@@ -319,27 +319,32 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       }
     });
 
-    it("POST /qa-simulate generates grounded referee personas and structured rebuttal guides", async () => {
+    // The route used to return a fixed, topic-independent Q&A set (with invented
+    // results) whenever the AI call failed, and this test asserted it. It now
+    // returns only the AI's questions (PRODUCT_AUDIT P0-11), so the answer is mocked.
+    it("POST /qa-simulate returns the AI's referee questions, and a 502 with none when the AI fails", async () => {
       const projectId = await createTestPresentationProject("proj-presentation-qa-test");
+      mockBrain({
+        qaScenarios: [
+          { questionId: "qa-1", audienceType: "Methodologist", difficultyLevel: "rigorous", targetedSlideNumber: 2, questionText: "Why this sample?", probingIntent: "p", suggestedAnswer: "s", modelRebuttalStructure: ["a", "b"] },
+        ],
+      });
 
-      const res = await request(app)
+      const ok = await request(app)
         .post(`/api/projects/${projectId}/presentation/qa-simulate`)
-        .set("x-ai-provider", "mock-provider")
-        .set("x-ai-model", "mock-model")
-        .set("x-ai-api-key", "test-key")
+        .set(aiHeaders)
         .send({});
+      expect(ok.status).toBe(200);
+      expect(ok.body.qaScenarios).toHaveLength(1);
+      expect(ok.body.qaScenarios[0].questionText).toBe("Why this sample?");
 
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(Array.isArray(res.body.qaScenarios)).toBe(true);
-      expect(res.body.qaScenarios.length).toBeGreaterThanOrEqual(3);
-
-      const firstQ = res.body.qaScenarios[0];
-      expect(firstQ.audienceType).toBeDefined();
-      expect(firstQ.questionText).toBeDefined();
-      expect(firstQ.modelRebuttalStructure).toBeDefined();
-      expect(Array.isArray(firstQ.modelRebuttalStructure)).toBe(true);
-      expect(firstQ.modelRebuttalStructure.length).toBeGreaterThanOrEqual(2);
+      vi.spyOn(scholarBrain, "complete").mockRejectedValue(new Error("provider 500"));
+      const failed = await request(app)
+        .post(`/api/projects/${projectId}/presentation/qa-simulate`)
+        .set(aiHeaders)
+        .send({});
+      expect(failed.status).toBe(502);
+      expect(failed.body.qaScenarios).toBeUndefined();
     });
   });
 
