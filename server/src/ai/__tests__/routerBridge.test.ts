@@ -1,0 +1,91 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import express from "express";
+import request from "supertest";
+import { aiRouteDecorator, configureRouterBridge } from "../routerBridge";
+import { callOpenRouterText, streamOpenRouterText } from "../../../utils/llm";
+import { CircuitBreaker, MemoryBreakerStore } from "../../../../src/platform/router/circuitBreaker";
+import { ProviderHttpError } from "../../../../src/platform/router/errors";
+import type { AdapterChunk, Candidate, ProviderAdapter } from "../../../../src/platform/router/types";
+
+process.env.LLM_CHALLENGE_SECRET = "test-challenge-secret";
+const SECRET = "sk-test-SECRET-1234567890";
+const calls: string[] = [];
+const fake: ProviderAdapter = {
+  async *stream(c: Candidate): AsyncIterable<AdapterChunk> {
+    calls.push(`${c.provider}:${c.model}`);
+    if (c.model.startsWith("bad")) throw new ProviderHttpError(503, "Overloaded right now");
+    yield { type: "text", text: `ok from ${c.model}` };
+    yield { type: "usage", inputTokens: 3, outputTokens: 2 };
+  },
+};
+const ring = (e: unknown[]) => Buffer.from(JSON.stringify(e)).toString("base64url");
+
+function app() {
+  const a = express();
+  a.use(express.json());
+  a.use(aiRouteDecorator);
+  a.post("/step", async (req, res) => {
+    try {
+      const text = await callOpenRouterText(req, res, "system", "user prompt", undefined, "drafting");
+      res.json({ text });
+    } catch (e) {
+      if ((e as Error).message === "RequireFrontendLLMException") return;
+      res.status(502).json({ error: (e as Error).message });
+    }
+  });
+  a.post("/stream", async (req, res) => {
+    const text = await streamOpenRouterText(req, res, "system", "user prompt", undefined, "drafting").catch((e) => { res.write(`event: error\ndata: ${JSON.stringify({ message: e.message })}\n\n`); return undefined; });
+    if (text !== undefined) res.write(`event: done\ndata: ${JSON.stringify({ text })}\n\n`);
+    res.end();
+  });
+  return a;
+}
+
+beforeEach(() => {
+  calls.length = 0;
+  configureRouterBridge({ adapters: { openai: fake, anthropic: fake, google: fake }, breaker: new CircuitBreaker(new MemoryBreakerStore()), premium: undefined });
+});
+
+describe("existing AI steps through the router", () => {
+  it("fails over across the user's keys and reports it in aiRoute, without echoing keys", async () => {
+    const res = await request(app()).post("/step").set("x-ai-keyring", ring([{ provider: "openai", model: "bad-1", apiKey: SECRET }, { provider: "anthropic", model: "good-1", apiKey: SECRET }])).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.text).toBe("ok from good-1");
+    expect(res.body.aiRoute.answeredBy).toEqual({ label: "good-1 · your key", lane: "byok" });
+    expect(res.body.aiRoute.notices.map((n: { kind: string }) => n.kind)).toContain("fallback");
+    expect(JSON.stringify(res.body)).not.toContain(SECRET);
+  });
+
+  it("legacy single-provider headers still work (gemini → google)", async () => {
+    const res = await request(app()).post("/step").set({ "x-ai-provider": "gemini", "x-ai-model": "flash-x", "x-ai-api-key": SECRET }).send({});
+    expect(res.body.text).toBe("ok from flash-x");
+    expect(calls).toEqual(["google:flash-x"]);
+  });
+
+  it("no AI connected keeps the browser hand-off (426 with a signed challenge)", async () => {
+    const res = await request(app()).post("/step").send({});
+    expect(res.status).toBe(426);
+    expect(res.body).toMatchObject({ requireFrontendLLM: true, systemPrompt: "system", userPrompt: "user prompt" });
+    expect(res.body.challengeToken).toBeTruthy();
+  });
+
+  it("a provider failure is never silently handed to the browser: all keys failing is an error", async () => {
+    const res = await request(app()).post("/step").set("x-ai-keyring", ring([{ provider: "openai", model: "bad-only", apiKey: SECRET }])).send({});
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/All models failed.*Overloaded/);
+  });
+
+  it("a local model next in line is handed to the browser", async () => {
+    const res = await request(app()).post("/step").set("x-ai-keyring", ring([{ provider: "openai", model: "bad-1", apiKey: SECRET }, { provider: "ollama", model: "llama" }])).send({});
+    expect(res.status).toBe(426);
+  });
+
+  it("streaming steps forward the switch as log and route events", async () => {
+    const res = await request(app()).post("/stream").set("x-ai-keyring", ring([{ provider: "openai", model: "bad-1", apiKey: SECRET }, { provider: "anthropic", model: "good-1", apiKey: SECRET }]))
+      .send({}).buffer(true).parse((r, cb) => { let d = ""; r.on("data", (c: Buffer) => (d += c)); r.on("end", () => cb(null, d)); });
+    const text = res.body as string;
+    expect(text).toMatch(/event: log\ndata: .*Switched from bad-1 · your key to good-1 · your key/);
+    expect(text).toContain('event: route');
+    expect(text).toContain('"text":"ok from good-1"');
+  });
+});

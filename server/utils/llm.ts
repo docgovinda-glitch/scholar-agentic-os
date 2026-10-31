@@ -10,6 +10,8 @@ import { resolveClientAiConfig, type ClientAiConfig } from "../src/ai/clientAiCo
 import { getEntitlement, isEntitlementActive } from "../src/aiEngine/entitlements.js";
 import { parseAndRepairLLMJson } from "../../src/shared/llmJsonParser.ts";
 import { InvalidLlmChallengeError } from "../src/ai/aiRouteErrors.ts";
+import { chainFor, NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../src/ai/routerBridge.ts";
+import type { RouterEvent } from "../../src/platform/router/types.ts";
 
 if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
   dotenv.config();
@@ -282,68 +284,60 @@ export function readVerifiedBrowserResult(
   return typeof content === "string" ? content : JSON.stringify(content);
 }
 
+// ── Unified router (src/platform/router) ────────────────────────────────────
+// Every text call below runs through one chain per request: Premium (when
+// entitled) → the user's keys → their local model. A provider failure moves to
+// the next model with a visible event; the browser hand-off (426) happens only
+// when no server-side model is connected or the next model is a local one.
+
+const routerTask = toRouterTask;
+
+async function routeOrHandOff(
+  req: LlmRequestLike,
+  res: LlmResponseLike,
+  systemPrompt: string,
+  userPrompt: string,
+  taskType: string,
+  opts: { stream?: boolean; onEvent?: (ev: RouterEvent) => void; signal?: AbortSignal } = {}
+): Promise<string> {
+  try {
+    return await routedText(req as unknown as express.Request, { task: routerTask(taskType), systemPrompt, userPrompt, onEvent: opts.onEvent, signal: opts.signal });
+  } catch (err) {
+    if (err instanceof NoAiConnectedError || err instanceof RouterHandoffError) {
+      if (!res.headersSent) {
+        const challengeToken = createChallengeTokenForRequest(req, systemPrompt, userPrompt);
+        res.status(426).json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType, ...(opts.stream ? { stream: true } : {}) });
+      }
+      throw new Error("RequireFrontendLLMException");
+    }
+    throw err;
+  }
+}
+
+/** Router events for a stream: tokens as `chunk`, routing changes as `log` and `route`. */
+function streamEventSink(sendEvent: (event: string, data: unknown) => void, onToken: (t: string) => void) {
+  return (ev: RouterEvent) => {
+    if (ev.type === "token") { onToken(ev.text); sendEvent("chunk", { token: ev.text }); return; }
+    if (ev.type === "fallback") sendEvent("log", { message: `⚠ Switched from ${ev.fromLabel} to ${ev.toLabel}: ${ev.message}` });
+    if (ev.type === "retry") sendEvent("log", { message: `↻ ${ev.message}. Retrying in ${Math.ceil(ev.waitMs / 1000)}s` });
+    if (ev.type === "candidate_skipped") sendEvent("log", { message: `Skipped ${ev.label}: ${ev.detail}` });
+    if (ev.type === "attempt_start") sendEvent("log", { message: `> ${ev.label}` });
+    if (ev.type !== "metrics") sendEvent("route", ev);
+  };
+}
+
 export async function callOpenRouterJSON<T = any>(
   req: LlmRequestLike,
   res: LlmResponseLike,
   systemPrompt: string,
   userPrompt: string,
-  model?: string,
+  _model?: string,
   taskType: string = "reasoning"
 ): Promise<T> {
   const override = handleFrontendLLMOverrideJSON(req, res, systemPrompt, userPrompt);
   if (override) return override as T;
-
-  const aiConfig = resolveRequestAiConfig(req);
-  const targetModel = model || aiConfig.model;
-  const serverAuthorized = await isServerAiAuthorized(req);
-  const rawCandidates = serverAuthorized ? aiConfig.candidates : [];
-  const candidates = rawCandidates.map((c) => ({
-    ...c,
-    model: c.model || targetModel || undefined,
-  }));
-
-  const challengeToken = createChallengeTokenForRequest(req, systemPrompt, userPrompt);
-
-  if (candidates.length === 0) {
-    if (!res.headersSent) {
-      res
-        .status(426)
-        .json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
-    }
-    throw new Error("RequireFrontendLLMException");
-  }
-
-  try {
-    const result = await completeWithFailover(
-      {
-        taskClass: mapTaskType(taskType),
-        systemPrompt,
-        userPrompt,
-        responseFormat: "json",
-        segments: [{ label: "Input", text: userPrompt }],
-      },
-      { candidates },
-      buildAuthorizedPolicy(candidates)
-    );
-
-    if (!result.ok) {
-      throw new Error(result.error.message || "AI Agent Generation Failed");
-    }
-
-    const text = result.value.text;
-    return parseJsonFromLlm<T>(text) as T;
-  } catch (err: unknown) {
-    const typedErr = err as { status?: number; message?: string };
-    if (typedErr?.status === 403 || typedErr?.message?.includes("challenge token")) {
-      throw err;
-    }
-    if (!res.headersSent) {
-      res
-        .status(426)
-        .json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
-    }
-    throw new Error("RequireFrontendLLMException");
-  }
+  const text = await routeOrHandOff(req, res, systemPrompt, userPrompt, taskType);
+  return parseJsonFromLlm<T>(text) as T;
 }
 
 export async function callOpenRouterText(
@@ -351,58 +345,58 @@ export async function callOpenRouterText(
   res: LlmResponseLike,
   systemPrompt: string,
   userPrompt: string,
-  model?: string,
+  _model?: string,
   taskType: string = "reasoning"
 ): Promise<string> {
   const override = handleFrontendLLMOverride(req, res, systemPrompt, userPrompt);
   if (override) return override;
+  return routeOrHandOff(req, res, systemPrompt, userPrompt, taskType);
+}
 
-  const aiConfig = resolveRequestAiConfig(req);
-  const targetModel = model || aiConfig.model;
-  const serverAuthorized = await isServerAiAuthorized(req);
-  const rawCandidates = serverAuthorized ? aiConfig.candidates : [];
-  const candidates = rawCandidates.map((c) => ({
-    ...c,
-    model: c.model || targetModel || undefined,
-  }));
-
-  const challengeToken = createChallengeTokenForRequest(req, systemPrompt, userPrompt);
-
-  if (candidates.length === 0) {
+async function streamThroughRouter(
+  req: LlmRequestLike,
+  res: LlmResponseLike,
+  systemPrompt: string,
+  userPrompt: string,
+  taskType: string
+): Promise<string | undefined> {
+  // Decide the chain before opening the stream, so "no AI" and "your local
+  // model goes first" are still a 426 hand-off with the prompt.
+  const handOff = () => {
     if (!res.headersSent) {
-      res
-        .status(426)
-        .json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
+      res.status(426).json({ requireFrontendLLM: true, challengeToken: createChallengeTokenForRequest(req, systemPrompt, userPrompt), systemPrompt, userPrompt, taskType, stream: true });
     }
-    throw new Error("RequireFrontendLLMException");
-  }
-
+    return undefined;
+  };
   try {
-    const result = await completeWithFailover(
-      {
-        taskClass: mapTaskType(taskType),
-        systemPrompt,
-        userPrompt,
-        segments: [{ label: "Input", text: userPrompt }],
-      },
-      { candidates },
-      buildAuthorizedPolicy(candidates)
-    );
-    if (!result.ok) {
-      throw new Error(result.error.message || "AI Agent Generation Failed");
+    const chain = await chainFor(req as never, routerTask(taskType));
+    if (chain[0]?.runsIn === "browser") return handOff();
+  } catch (err) {
+    if (err instanceof NoAiConnectedError) return handOff();
+    throw err;
+  }
+  if (!res.headersSent && res.writeHead) {
+    res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+  }
+  const sendEvent = (event: string, data: unknown) => { res.write?.(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+  const streamAbort = new AbortController();
+  const onClose = () => { if (!(res as { writableFinished?: boolean }).writableFinished) streamAbort.abort(); };
+  (res as any)?.on?.("close", onClose);
+  let full = "";
+  try {
+    full = await routedText(req as unknown as express.Request, {
+      task: routerTask(taskType), systemPrompt, userPrompt, signal: streamAbort.signal,
+      onEvent: streamEventSink(sendEvent, (t) => { full += t; }),
+    });
+    return full;
+  } catch (err) {
+    if (err instanceof RouterHandoffError) {
+      sendEvent("error", { message: `${err.message}. Open the app on that device or choose a cloud model in AI Access.` });
+      return undefined;
     }
-    return result.value.text;
-  } catch (err: unknown) {
-    const typedErr = err as { status?: number; message?: string };
-    if (typedErr?.status === 403 || typedErr?.message?.includes("challenge token")) {
-      throw err;
-    }
-    if (!res.headersSent) {
-      res
-        .status(426)
-        .json({ requireFrontendLLM: true, challengeToken, systemPrompt, userPrompt, taskType });
-    }
-    throw new Error("RequireFrontendLLMException");
+    throw err;
+  } finally {
+    (res as any)?.off?.("close", onClose);
   }
 }
 
@@ -411,101 +405,15 @@ export async function streamOpenRouterJSON(
   res: LlmResponseLike,
   systemPrompt: string,
   userPrompt: string,
-  model?: string,
+  _model?: string,
   taskType: string = "reasoning"
 ) {
   const override = handleFrontendLLMOverrideJSON(req, res, systemPrompt, userPrompt);
   if (override) return override;
-
-  const aiConfig = resolveRequestAiConfig(req);
-  const targetModel = model || aiConfig.model;
-  const serverAuthorized = await isServerAiAuthorized(req);
-  const rawCandidates = serverAuthorized ? aiConfig.candidates : [];
-  const candidates = rawCandidates.map((c) => ({
-    ...c,
-    model: c.model || targetModel || undefined,
-  }));
-
-  const challengeToken = createChallengeTokenForRequest(req, systemPrompt, userPrompt);
-
-  if (candidates.length === 0) {
-    if (!res.headersSent) {
-      res.status(426).json({
-        requireFrontendLLM: true,
-        challengeToken,
-        systemPrompt,
-        userPrompt,
-        taskType,
-        stream: true,
-      });
-    }
-    return;
-  }
-
-  if (!res.headersSent && res.writeHead) {
-    res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    });
-  }
-
-  const sendEvent = (event: string, data: unknown) => {
-    res.write?.(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-  };
-
-  sendEvent("log", { message: "> Initializing Agent Framework..." });
-
-  let fullContent = "";
-  const streamAbort = new AbortController();
-  const onClose = () => streamAbort.abort();
-  (req as any)?.on?.("close", onClose);
-
-  try {
-    const result = await streamWithFailover(
-      {
-        taskClass: mapTaskType(taskType),
-        systemPrompt,
-        userPrompt,
-        responseFormat: "json",
-        segments: [{ label: "Input", text: userPrompt }],
-        signal: streamAbort.signal,
-      },
-      (chunk: string) => {
-        if (streamAbort.signal.aborted) return;
-        fullContent += chunk;
-        sendEvent("chunk", { token: chunk });
-      },
-      { candidates },
-      buildAuthorizedPolicy(candidates)
-    );
-
-    if (!result.ok) {
-      throw new Error(result.error.message || "AI Agent Generation Failed");
-    }
-
-    sendEvent("log", { message: "> Parsing final JSON..." });
-    return parseJsonFromLlm(fullContent);
-  } catch (err: unknown) {
-    const typedErr = err as { status?: number; message?: string };
-    if (typedErr?.status === 403 || typedErr?.message?.includes("challenge token")) {
-      throw err;
-    }
-    if (!res.headersSent) {
-      res.status(426).json({
-        requireFrontendLLM: true,
-        challengeToken,
-        systemPrompt,
-        userPrompt,
-        taskType,
-        stream: true,
-      });
-      return;
-    }
-    throw err;
-  } finally {
-    (req as any)?.off?.("close", onClose);
-  }
+  const text = await streamThroughRouter(req, res, systemPrompt, userPrompt, taskType);
+  if (text === undefined) return undefined;
+  res.write?.(`event: log\ndata: ${JSON.stringify({ message: "> Parsing final JSON..." })}\n\n`);
+  return parseJsonFromLlm(text);
 }
 
 export async function streamOpenRouterText(
@@ -513,98 +421,12 @@ export async function streamOpenRouterText(
   res: LlmResponseLike,
   systemPrompt: string,
   userPrompt: string,
-  model?: string,
+  _model?: string,
   taskType: string = "reasoning"
 ) {
   const override = handleFrontendLLMOverride(req, res, systemPrompt, userPrompt);
   if (override) return override;
-
-  const aiConfig = resolveRequestAiConfig(req);
-  const targetModel = model || aiConfig.model;
-  const serverAuthorized = await isServerAiAuthorized(req);
-  const rawCandidates = serverAuthorized ? aiConfig.candidates : [];
-  const candidates = rawCandidates.map((c) => ({
-    ...c,
-    model: c.model || targetModel || undefined,
-  }));
-
-  const challengeToken = createChallengeTokenForRequest(req, systemPrompt, userPrompt);
-
-  if (candidates.length === 0) {
-    if (!res.headersSent) {
-      res.status(426).json({
-        requireFrontendLLM: true,
-        challengeToken,
-        systemPrompt,
-        userPrompt,
-        taskType,
-        stream: true,
-      });
-    }
-    return;
-  }
-
-  if (!res.headersSent && res.writeHead) {
-    res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    });
-  }
-
-  const sendEvent = (event: string, data: unknown) => {
-    res.write?.(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-  };
-
-  sendEvent("log", { message: "> Initializing Agent Framework..." });
-
-  let fullContent = "";
-  const streamAbort = new AbortController();
-  const onClose = () => streamAbort.abort();
-  (req as any)?.on?.("close", onClose);
-
-  try {
-    const result = await streamWithFailover(
-      {
-        taskClass: mapTaskType(taskType),
-        systemPrompt,
-        userPrompt,
-        segments: [{ label: "Input", text: userPrompt }],
-        signal: streamAbort.signal,
-      },
-      (chunk: string) => {
-        if (streamAbort.signal.aborted) return;
-        fullContent += chunk;
-        sendEvent("chunk", { token: chunk });
-      },
-      { candidates },
-      buildAuthorizedPolicy(candidates)
-    );
-    if (!result.ok) {
-      throw new Error(result.error.message || "AI Agent Generation Failed");
-    }
-
-    return fullContent;
-  } catch (err: unknown) {
-    const typedErr = err as { status?: number; message?: string };
-    if (typedErr?.status === 403 || typedErr?.message?.includes("challenge token")) {
-      throw err;
-    }
-    if (!res.headersSent) {
-      res.status(426).json({
-        requireFrontendLLM: true,
-        challengeToken,
-        systemPrompt,
-        userPrompt,
-        taskType,
-        stream: true,
-      });
-      return;
-    }
-    throw err;
-  } finally {
-    (req as any)?.off?.("close", onClose);
-  }
+  return streamThroughRouter(req, res, systemPrompt, userPrompt, taskType);
 }
 
 export interface MultimodalAgenticOptions {
