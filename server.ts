@@ -32,6 +32,8 @@ import {
 } from "./src/config/providerCatalog.ts";
 import http from "node:http";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
+import { registerAiRunRoutes } from "./server/routes/aiRun.ts";
+import { premiumPort } from "./server/src/ai/premiumPort.ts";
 import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerDraftingRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerPresentationRoutes, registerSupabaseProxy, registerSupabaseWsProxy } from "./server/routes/index.ts";
 
 if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
@@ -325,6 +327,9 @@ citationStyleRegistry.register(new VancouverFormatter());
 registerHealthRoutes(app);
 registerAdminRoutes(app);
 registerAuthRoutes(app);
+// Unified AI router: one streaming endpoint for every feature (src/platform/router).
+app.use(["/api/ai/run", "/api/ai/models"], aiAbuseLimit);
+registerAiRunRoutes(app, { premium: premiumPort });
 registerAIRoutes(app, aiAbuseLimit, citationStyleRegistry);
 registerStudioRoutes(app, studioLimit);
 registerProjectRoutes(app, projectLimit);

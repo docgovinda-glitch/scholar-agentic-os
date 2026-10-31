@@ -1,12 +1,14 @@
 import type { RouterEvent } from "./types";
 
 /** Minimal shapes so this compiles without framework types; Express req/res satisfy them. */
-interface SseRequest { on(event: "close", fn: () => void): void }
+type SseRequest = unknown;
 interface SseResponse {
   writeHead(status: number, headers: Record<string, string>): void;
   write(chunk: string): boolean;
   end(): void;
   flushHeaders?(): void;
+  on(event: "close", fn: () => void): void;
+  readonly writableFinished?: boolean;
 }
 
 /**
@@ -16,7 +18,10 @@ interface SseResponse {
  */
 export async function pipeToSse(req: SseRequest, res: SseResponse, run: (signal: AbortSignal) => AsyncGenerator<RouterEvent>): Promise<void> {
   const ctl = new AbortController();
-  req.on("close", () => ctl.abort(new Error("client closed")));
+  // The *response* closing before we finished means the client went away.
+  // (A request emits "close" as soon as its body is read, so it can't be used.)
+  res.on("close", () => { if (!res.writableFinished) ctl.abort(new Error("client closed")); });
+  void req;
   res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" });
   res.flushHeaders?.();
   const heartbeat = setInterval(() => res.write(": ping\n\n"), 15_000);
