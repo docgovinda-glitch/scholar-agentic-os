@@ -4,15 +4,11 @@ process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
 process.env.OPENROUTER_API_KEY = "test-openrouter-key";
 
-// Mock the gateway so tests don't make real HTTP calls.
+// Mock the AI call (router bridge) so tests don't make real HTTP calls.
 // The mock is set up before the module under test is imported.
-const mockCompleteWithFailover = vi.fn();
-vi.mock("../../../../src/platform/gateway/gateway.js", () => ({
-  completeWithFailover: mockCompleteWithFailover,
-  streamWithFailover: vi.fn(),
-}));
-vi.mock("../../../../src/platform/warden/policy.js", () => ({
-  defaultPolicy: () => ({}),
+const mockRoutedCompletion = vi.fn();
+vi.mock("../../ai/routerBridge.ts", () => ({
+  routedCompletion: mockRoutedCompletion,
 }));
 
 const { runOpportunityResearch } = await import("../opportunityAgent");
@@ -21,7 +17,7 @@ const originalFetch = global.fetch;
 afterEach(() => {
   global.fetch = originalFetch;
   vi.restoreAllMocks();
-  mockCompleteWithFailover.mockReset();
+  mockRoutedCompletion.mockReset();
 });
 
 /** Helper: stub the search-proxy and gateway synthesis result. */
@@ -48,7 +44,7 @@ function mockDeps(opts: { searchResults?: any[]; geminiText?: string; insertedRo
   }) as unknown as typeof fetch;
 
   if (results.length > 0) {
-    mockCompleteWithFailover.mockResolvedValue({ result: { text: geminiText } });
+    mockRoutedCompletion.mockResolvedValue(geminiText);
   }
 }
 

@@ -268,7 +268,8 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
 
       const res = await request(app)
         .post("/api/ai/agent")
-        .set("x-ai-provider", "mock-provider")
+        // A real provider name: the router reads only providers it can route to.
+        .set("x-ai-provider", "openai")
         .set("x-ai-model", "mock-model")
         .set("x-ai-api-key", "test-key")
         .send({
@@ -296,6 +297,26 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       expect(res.body.burstinessMetrics).toBeDefined();
 
       completeSpy.mockRestore();
+    });
+
+    it("a failing provider is reported (502), not silently handed to the browser", async () => {
+      const completeSpy = vi.spyOn(scholarBrain, "complete").mockRejectedValue(new Error("provider 500"));
+      const res = await request(app)
+        .post("/api/ai/agent")
+        .set("x-ai-provider", "openai")
+        .set("x-ai-model", "mock-model")
+        .set("x-ai-api-key", "test-key")
+        .send({ prompt: "Explain conformal prediction briefly.", mode: "chat" });
+      expect(res.status).toBe(502);
+      expect(res.body.code).toBe("ai_unavailable");
+      expect(res.body.requireFrontendLLM).toBeUndefined();
+      completeSpy.mockRestore();
+    });
+
+    it("deep research with no AI connected asks for a provider before any retrieval", async () => {
+      const res = await request(app).post("/api/ai/deep-research").send({ topic: "Coastal erosion modelling" });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe("ai_provider_required");
     });
 
     it("attaches 1-click deliverable handoff payload for academic format launching", async () => {
