@@ -17,10 +17,9 @@
 import type { NextFunction, Request, Response } from "express";
 import { route } from "../../../src/platform/router/router.ts";
 import { CircuitBreaker, MemoryBreakerStore } from "../../../src/platform/router/circuitBreaker.ts";
-import { defaultAdapters } from "../../../src/platform/router/adapters.ts";
 import type { Candidate, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, TaskClass } from "../../../src/platform/router/types.ts";
 import { keyringToCandidates, parseKeyring, type KeyringEntry, type PremiumPort } from "../../routes/aiRun.ts";
-import { createAiFetch, screenCandidates } from "./aiEndpointGuard.ts";
+import { screenCandidates, serverAdapters } from "./aiEndpointGuard.ts";
 import { LocalModelUnreachableError, NoClientAiProviderError } from "./aiRouteErrors.ts";
 
 const ROUTER_TASK: Record<string, TaskClass> = {
@@ -48,7 +47,7 @@ export class NoAiConnectedError extends Error {
 }
 
 interface BridgeDeps { adapters: Partial<Record<ProviderId, ProviderAdapter>>; breaker: CircuitBreaker; premium?: PremiumPort }
-let deps: BridgeDeps = { adapters: defaultAdapters(createAiFetch()), breaker: new CircuitBreaker(new MemoryBreakerStore()) };
+let deps: BridgeDeps = { adapters: serverAdapters(), breaker: new CircuitBreaker(new MemoryBreakerStore()) };
 export function configureRouterBridge(next: Partial<BridgeDeps>): void { deps = { ...deps, ...next }; }
 
 const PROVIDER_ALIAS: Record<string, ProviderId> = { custom: "custom", gemini: "google", google: "google", openai: "openai", anthropic: "anthropic", groq: "groq", deepseek: "deepseek", mistral: "mistral", ollama: "ollama", lmstudio: "lmstudio" };

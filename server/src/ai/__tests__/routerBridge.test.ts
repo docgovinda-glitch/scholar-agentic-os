@@ -75,9 +75,29 @@ describe("existing AI steps through the router", () => {
     expect(res.body.error).toMatch(/All models failed.*Overloaded/);
   });
 
-  it("a local model next in line is handed to the browser", async () => {
-    const res = await request(app()).post("/step").set("x-ai-keyring", ring([{ provider: "openai", model: "bad-1", apiKey: SECRET }, { provider: "ollama", model: "llama" }])).send({});
-    expect(res.status).toBe(426);
+  it("on a deployed server, a local model next in line is handed to the browser", async () => {
+    const saved = process.env.ALLOW_SERVER_LOCAL_AI;
+    process.env.ALLOW_SERVER_LOCAL_AI = "false"; // as in production
+    try {
+      const res = await request(app()).post("/step").set("x-ai-keyring", ring([{ provider: "openai", model: "bad-1", apiKey: SECRET }, { provider: "ollama", model: "llama" }])).send({});
+      expect(res.status).toBe(426);
+    } finally {
+      if (saved === undefined) delete process.env.ALLOW_SERVER_LOCAL_AI; else process.env.ALLOW_SERVER_LOCAL_AI = saved;
+    }
+  });
+
+  it("where the server can reach local models (development, self-hosted), it calls them itself", async () => {
+    const saved = process.env.ALLOW_SERVER_LOCAL_AI;
+    process.env.ALLOW_SERVER_LOCAL_AI = "true";
+    configureRouterBridge({ adapters: { openai: fake, lmstudio: fake } });
+    try {
+      const res = await request(app()).post("/step").set({ "x-ai-provider": "lmstudio", "x-ai-model": "stub" }).send({});
+      expect(res.status).toBe(200);
+      expect(res.body.text).toBe("ok from stub");
+      expect(res.body.aiRoute.answeredBy.lane).toBe("local");
+    } finally {
+      if (saved === undefined) delete process.env.ALLOW_SERVER_LOCAL_AI; else process.env.ALLOW_SERVER_LOCAL_AI = saved;
+    }
   });
 
   it("streaming steps forward the switch as log and route events", async () => {

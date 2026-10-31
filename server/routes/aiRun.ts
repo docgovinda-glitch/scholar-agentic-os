@@ -17,14 +17,14 @@ import { createHash, randomUUID } from "node:crypto";
 import type express from "express";
 import { z } from "zod";
 import { requireAuth } from "../src/middleware/auth.ts";
+import { serverCanReachLocalModels } from "../src/ai/clientAiConfig.ts";
 import { route, type RouterOptions } from "../../src/platform/router/router.ts";
 import { pipeToSse } from "../../src/platform/router/sseBridge.ts";
 import { CircuitBreaker, MemoryBreakerStore } from "../../src/platform/router/circuitBreaker.ts";
-import { defaultAdapters } from "../../src/platform/router/adapters.ts";
 import { assignBadges, curateModels, type MeasuredSpeed } from "../../src/platform/router/modelCuration.ts";
 import { listLiveModels, ModelListError } from "../../src/platform/router/modelListers.ts";
 import type { Candidate, ProviderId, RouteRequest, RouterEvent } from "../../src/platform/router/types.ts";
-import { AiEndpointBlockedError, createAiFetch, screenCandidates } from "../src/ai/aiEndpointGuard.ts";
+import { AiEndpointBlockedError, createAiFetch, screenCandidates, serverAdapters } from "../src/ai/aiEndpointGuard.ts";
 
 const PROVIDERS = ["openai", "anthropic", "google", "groq", "deepseek", "mistral", "ollama", "lmstudio", "webllm", "custom"] as const;
 const LOCAL = new Set<ProviderId>(["ollama", "lmstudio", "webllm"]);
@@ -100,7 +100,9 @@ export function keyringToCandidates(entries: KeyringEntry[]): Candidate[] {
     label: e.label ?? `${e.model}${LOCAL.has(e.provider) ? " on your device" : " · your key"}`,
     contextWindow: e.contextWindow ?? DEFAULT_CONTEXT,
     maxOutputTokens: e.maxOutputTokens ?? DEFAULT_MAX_OUT,
-    runsIn: LOCAL.has(e.provider) ? "browser" : "server",
+    // A local runner runs where it is reachable: on this server in development
+    // or a self-hosted install (ALLOW_SERVER_LOCAL_AI), otherwise in the browser.
+    runsIn: LOCAL.has(e.provider) && !(e.provider !== "webllm" && serverCanReachLocalModels()) ? "browser" : "server",
     credential: LOCAL.has(e.provider) ? (e.baseUrl ? { baseUrl: e.baseUrl } : undefined) : { apiKey: e.apiKey, baseUrl: e.baseUrl },
   }));
 }
@@ -125,7 +127,7 @@ const MODEL_CACHE_MS = 6 * 60 * 60_000;
 
 export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}): void {
   const aiFetch = createAiFetch();
-  const adapters = deps.adapters ?? defaultAdapters(aiFetch);
+  const adapters = deps.adapters ?? serverAdapters();
   const breaker = deps.breaker ?? new CircuitBreaker(new MemoryBreakerStore());
   const listModels = deps.listModels ?? listLiveModels;
 

@@ -17,7 +17,9 @@ import http from "node:http";
 import https from "node:https";
 import { Readable } from "node:stream";
 import { createRebindingSafeLookup, validateSafeUrl } from "../../utils/ssrfGuard.ts";
-import type { Candidate } from "../../../src/platform/router/types.ts";
+import type { Candidate, ProviderAdapter, ProviderId } from "../../../src/platform/router/types.ts";
+import { defaultAdapters, ollamaAdapter, openAiCompatibleAdapter } from "../../../src/platform/router/adapters.ts";
+import { serverCanReachLocalModels } from "./clientAiConfig.ts";
 
 export const PROVIDER_API_HOSTS: ReadonlySet<string> = new Set([
   "api.openai.com",
@@ -60,7 +62,8 @@ export async function screenCandidates(candidates: Candidate[]): Promise<{ kept:
   const blocked: Array<{ label: string; reason: string }> = [];
   for (const c of candidates) {
     const baseUrl = c.credential?.baseUrl;
-    if (c.runsIn !== "server" || !baseUrl) { kept.push(c); continue; }
+    // Local runners on the server are governed by serverCanReachLocalModels (serverAdapters).
+    if (c.runsIn !== "server" || !baseUrl || c.lane === "local") { kept.push(c); continue; }
     const check = await checkAiEndpoint(baseUrl);
     if (check.ok) kept.push(c);
     else blocked.push({ label: c.label, reason: check.reason });
@@ -116,4 +119,23 @@ function pinnedRequest(url: URL, init: RequestInit | undefined, allowedIps: Set<
     if (typeof body === "string") req.write(body);
     req.end();
   });
+}
+
+/**
+ * Adapters for server-side calls. Cloud providers use the guarded fetch.
+ * Local runners (Ollama, LM Studio) run on the server only where it can reach
+ * them: development, or a self-hosted install that set
+ * ALLOW_SERVER_LOCAL_AI=true. Anywhere else such a call is refused; the
+ * router hands local models to the user's browser instead.
+ */
+export function serverAdapters(baseFetch: typeof fetch = fetch): Partial<Record<ProviderId, ProviderAdapter>> {
+  const localFetch = ((input: Parameters<typeof fetch>[0], init?: RequestInit) =>
+    serverCanReachLocalModels()
+      ? baseFetch(input, init)
+      : Promise.reject(new AiEndpointBlockedError("this server can't reach a model on your computer"))) as typeof fetch;
+  return {
+    ...defaultAdapters(createAiFetch(baseFetch)),
+    lmstudio: openAiCompatibleAdapter(localFetch),
+    ollama: ollamaAdapter(localFetch),
+  };
 }
