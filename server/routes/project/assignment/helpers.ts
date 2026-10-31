@@ -1,3 +1,4 @@
+import { routedCompletion } from "../../../src/ai/routerBridge.ts";
 import type { ProjectRecord } from "../../../../src/services/store/types.ts";
 import express from "express";
 import { createUploadInstance } from "../../../src/middleware/uploadGuard.ts";
@@ -8,8 +9,7 @@ import {
   normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig } from "../../../utils/llm.ts";
-import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
+import { callOpenRouterJSON, callOpenRouterText, resolveRequestAiConfig } from "../../../utils/llm.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import { rejectClientCredentials } from "../../../src/middleware/rejectClientCredentials.ts";
 import {
@@ -328,22 +328,17 @@ export async function deriveSemanticAcademicTitle(
   }
 
   try {
-    const candidates = getCandidates(req);
-    if (candidates.length > 0 && process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+    if (req && process.env.NODE_ENV !== "test" && !process.env.VITEST) {
       const prompt = `Generate a concise, academic title (3 to 7 words, e.g. "Quantum Computing Cryptographic Architectures", "Algorithmic Bias in Healthcare") based on this assignment brief. Output ONLY the plain text title, with NO punctuation, NO quotes, NO explanation:\n\n${briefText.slice(0, 1500)}`;
-      const response = await completeWithFailover(
-        {
-          taskClass: "summarisation",
-          systemPrompt: "You are an expert academic research registrar. Craft a concise, formal academic title (3-7 words).",
-          userPrompt: prompt,
-          segments: [{ label: "Brief", text: briefText.slice(0, 1500) }],
-        },
-        { candidates },
-        buildAuthorizedPolicy(candidates)
-      );
+      const text = await routedCompletion(req, {
+        task: "fast",
+        systemPrompt: "You are an expert academic research registrar. Craft a concise, formal academic title (3-7 words).",
+        userPrompt: prompt,
+        maxOutputTokens: 64,
+      });
 
-      if (response.ok && response.value?.text) {
-        const candidate = response.value.text
+      if (text) {
+        const candidate = text
           .trim()
           .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
           .replace(/^(?:title|topic)[:\s\-–]+/i, "")

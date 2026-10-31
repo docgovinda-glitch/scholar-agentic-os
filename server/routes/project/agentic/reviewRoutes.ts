@@ -1,12 +1,10 @@
+import { routedCompletion } from "../../../src/ai/routerBridge.ts";
 import express from "express";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
 import { safeParseAnswerField } from "../../../../src/shared/projectStateSchema.ts";
 import {
   streamOpenRouterJSON,
-  getCandidates,
-  buildAuthorizedPolicy,
 } from "../../../utils/llm.ts";
-import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
   sanitizeScholarlyText,
@@ -247,10 +245,9 @@ reviewRoutes.post("/rebuttal-matrix", async (req: express.Request<{ id: string }
     }
 
     // If live AI is available and not in test mode, enrich author responses and diffs
-    const candidates = getCandidates(req);
     const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
-    if (candidates.length > 0 && !isTest) {
+    if (!isTest) {
       try {
         const systemPrompt = `${buildScholarlyVoiceSystemPrompt({ discipline: "Peer Review Rebuttal Synthesis" })}
 You are an expert principal investigator composing a Point-by-Point Author Rebuttal Letter and Revision Matrix responding to peer reviewers.
@@ -272,20 +269,14 @@ Return ONLY valid JSON matching this schema:
     }
   ]
 }`;
-        const response = await completeWithFailover(
-          {
-            taskClass: "verification",
-            systemPrompt,
-            userPrompt: `Generate structured point-by-point rebuttal matrix for these peer critiques:\n${JSON.stringify(critiques)}`,
-            responseFormat: "json",
-            segments: [{ label: "critiques", text: JSON.stringify(critiques) }],
-          },
-          { candidates },
-          buildAuthorizedPolicy(candidates)
-        );
+        const text = await routedCompletion(req, {
+          task: "reasoning",
+          systemPrompt,
+          userPrompt: `Generate structured point-by-point rebuttal matrix for these peer critiques:\n${JSON.stringify(critiques)}`,
+        });
 
-        if (response.ok && response.value?.text) {
-          const raw = response.value.text.replace(/```json/g, "").replace(/```/g, "").trim();
+        if (text) {
+          const raw = text.replace(/```json/g, "").replace(/```/g, "").trim();
           const parsed = JSON.parse(raw);
           if (parsed && Array.isArray(parsed.matrix) && parsed.matrix.length > 0) {
             matrix = parsed.matrix;
@@ -482,11 +473,10 @@ reviewRoutes.post("/final-editor", async (req: express.Request<{ id: string }>, 
   const bannedBefore = detectBannedTokens(textToPolish);
 
   // 2. Term-Locked Humanization via AI Gateway or deterministic fallback
-  const candidates = getCandidates(req);
   const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
   let polished = "";
-  if (candidates.length > 0 && !isTest) {
+  if (!isTest) {
     try {
       const systemPrompt = `${buildScholarlyVoiceSystemPrompt({ dialect: targetDialect, lockedTerms })}
 You are an elite academic copy-editor performing a Stage 23 Final Editorial Pass over a scholarly manuscript.
@@ -497,20 +487,11 @@ CRITICAL MANDATES:
 4. ORTHOGRAPHY & UNICODE: Enforce British English (-ise, -our, -re, modelling) and maintain NFC Unicode / IAST diacritic integrity.
 Return ONLY the polished manuscript text without code block wrappers.`;
 
-      const response = await completeWithFailover(
-        {
-          taskClass: "refinement",
-          systemPrompt,
-          userPrompt: `Polish this scholarly manuscript:\n\n${textToPolish}`,
-          segments: [{ label: "manuscript", text: textToPolish }],
-        },
-        { candidates },
-        buildAuthorizedPolicy(candidates)
-      );
-
-      if (response.ok && response.value?.text) {
-        polished = response.value.text.trim();
-      }
+      polished = (await routedCompletion(req, {
+        task: "drafting",
+        systemPrompt,
+        userPrompt: `Polish this scholarly manuscript:\n\n${textToPolish}`,
+      })).trim();
     } catch (e) {
       console.warn("AI Final Editor gateway call failed, using deterministic copy-editor:", e);
     }

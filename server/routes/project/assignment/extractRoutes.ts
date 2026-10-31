@@ -1,3 +1,4 @@
+import { routedCompletion } from "../../../src/ai/routerBridge.ts";
 import express from "express";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
@@ -6,8 +7,7 @@ import {
   normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig } from "../../../utils/llm.ts";
-import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
+import { callOpenRouterJSON, callOpenRouterText, resolveRequestAiConfig } from "../../../utils/llm.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
   auditDocumentLineByLine,
@@ -447,7 +447,6 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       ...(updatedTitle ? { title: updatedTitle, assignment_title: updatedTitle } : {}),
     };
 
-    const candidates = getCandidates(req);
     const structure = await generateAiEnhancedOutline({
       question,
       assignmentType: assignmentType as any,
@@ -458,24 +457,9 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       timeoutMs: 25000,
       llmCaller: async (sys, usr) => {
         try {
-          const response = await completeWithFailover(
-            {
-              taskClass: "drafting",
-              systemPrompt: sys,
-              userPrompt: usr,
-              responseFormat: "json",
-              segments: [{ label: "Brief", text: usr }],
-            },
-            { candidates },
-            buildAuthorizedPolicy(candidates)
-          );
-          if (response.ok) {
-            return response.value?.text || "";
-          }
-          console.warn("completeWithFailover non-ok in assignment outline:", response.error);
-          return "";
+          return await routedCompletion(req, { task: "drafting", systemPrompt: sys, userPrompt: usr });
         } catch (llmErr) {
-          console.warn("completeWithFailover exception in assignment outline:", llmErr);
+          console.warn("AI outline call failed:", llmErr instanceof Error ? llmErr.message : llmErr);
           return "";
         }
       }

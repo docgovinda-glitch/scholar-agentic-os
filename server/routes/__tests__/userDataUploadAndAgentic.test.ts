@@ -8,11 +8,22 @@ vi.mock("../../src/middleware/auth.ts", () => ({
   },
 }));
 
-const { completeWithFailoverMock } = vi.hoisted(() => ({ completeWithFailoverMock: vi.fn() }));
-vi.mock("../../../src/platform/gateway/gateway.ts", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../src/platform/gateway/gateway.ts")>()),
-  completeWithFailover: completeWithFailoverMock,
-}));
+// The route's AI call goes through the router bridge. The mock keeps the real
+// "is any AI connected?" check and replaces only the provider call.
+const { aiCallMock } = vi.hoisted(() => ({ aiCallMock: vi.fn() }));
+vi.mock("../../src/ai/routerBridge.ts", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../src/ai/routerBridge.ts")>();
+  const { NoClientAiProviderError } = await import("../../src/ai/aiRouteErrors.ts");
+  return {
+    ...real,
+    routedCompletion: async (req: Parameters<typeof real.routedCompletion>[0], call: Parameters<typeof real.routedCompletion>[1]) => {
+      if ((await real.aiAvailability(req, call.task)) === "none") throw new NoClientAiProviderError();
+      const r = await aiCallMock({ systemPrompt: call.systemPrompt, userPrompt: call.userPrompt, task: call.task });
+      if (!r?.ok) throw new Error(r?.error?.message ?? "AI call failed");
+      return r.value.text as string;
+    },
+  };
+});
 
 /** Headers that give the request a (mocked) BYOK provider. */
 const AI_HEADERS = { "x-ai-provider": "openai", "x-ai-model": "gpt-4o-mini", "x-ai-api-key": "test-key" };
@@ -234,7 +245,7 @@ describe("Journal Rebuild Step B — Primary User Data Ingestion & Agentic Ledge
     };
     await store.save(proj);
 
-    completeWithFailoverMock.mockResolvedValue({
+    aiCallMock.mockResolvedValue({
       ok: true,
       value: { text: fakeAiDraft("Decoding latency was measured directly [CITE:user_data_42].", 395) },
     });
@@ -256,7 +267,7 @@ describe("Journal Rebuild Step B — Primary User Data Ingestion & Agentic Ledge
     const actualWords = res.body.actualWords as number;
 
     // The uploaded dataset is in the citation ledger the AI is given...
-    const sentPrompt = completeWithFailoverMock.mock.calls[0][0].systemPrompt as string;
+    const sentPrompt = aiCallMock.mock.calls[0][0].systemPrompt as string;
     expect(sentPrompt).toContain("user_data_42");
     // ...and the ledger resolves user_data_42 to (Team, 2026) in APA 7
     expect(content).toContain("Team, 2026");

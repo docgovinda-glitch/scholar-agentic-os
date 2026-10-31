@@ -96,11 +96,17 @@ describe("POST /api/ai/run", () => {
     expect(own.body).toContain("answer from own-model");
   });
 
-  it("local models are handed to the browser instead of being dropped", async () => {
-    const res = await request(app()).post("/api/ai/run")
-      .set("x-ai-keyring", keyring([{ provider: "ollama", model: "llama-local" }]))
-      .send(body).buffer(true).parse((r, cb) => { let d = ""; r.on("data", (c: Buffer) => (d += c)); r.on("end", () => cb(null, d)); });
-    expect(events(res.body as string)).toEqual(["route_start", "handoff"]);
+  it("on a deployed server, local models are handed to the browser instead of being dropped", async () => {
+    const saved = process.env.ALLOW_SERVER_LOCAL_AI;
+    process.env.ALLOW_SERVER_LOCAL_AI = "false"; // as in production
+    try {
+      const res = await request(app()).post("/api/ai/run")
+        .set("x-ai-keyring", keyring([{ provider: "ollama", model: "llama-local" }]))
+        .send(body).buffer(true).parse((r, cb) => { let d = ""; r.on("data", (c: Buffer) => (d += c)); r.on("end", () => cb(null, d)); });
+      expect(events(res.body as string)).toEqual(["route_start", "handoff"]);
+    } finally {
+      if (saved === undefined) delete process.env.ALLOW_SERVER_LOCAL_AI; else process.env.ALLOW_SERVER_LOCAL_AI = saved;
+    }
   });
 });
 

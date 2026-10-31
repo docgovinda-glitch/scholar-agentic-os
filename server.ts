@@ -34,6 +34,7 @@ import http from "node:http";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
 import { registerAiRunRoutes } from "./server/routes/aiRun.ts";
 import { premiumPort } from "./server/src/ai/premiumPort.ts";
+import { aiRouteDecorator, configureRouterBridge } from "./server/src/ai/routerBridge.ts";
 import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerDraftingRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerPresentationRoutes, registerSupabaseProxy, registerSupabaseWsProxy } from "./server/routes/index.ts";
 
 if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
@@ -330,6 +331,10 @@ registerAuthRoutes(app);
 // Unified AI router: one streaming endpoint for every feature (src/platform/router).
 app.use(["/api/ai/run", "/api/ai/models"], aiAbuseLimit);
 registerAiRunRoutes(app, { premium: premiumPort });
+// Every other AI call site runs through the same router (server/src/ai/routerBridge.ts);
+// their JSON responses carry an `aiRoute` summary of which model answered and why.
+configureRouterBridge({ premium: premiumPort });
+app.use(["/api/ai", "/api/drafting", "/api/projects/:id/agent", "/api/projects/:id/agentic", "/api/projects/:id/assignment", "/api/projects/:id/thesis", "/api/projects/:id/proposal", "/api/projects/:id/presentation", "/api/presentations"], aiRouteDecorator);
 registerAIRoutes(app, aiAbuseLimit, citationStyleRegistry);
 registerStudioRoutes(app, studioLimit);
 registerProjectRoutes(app, projectLimit);

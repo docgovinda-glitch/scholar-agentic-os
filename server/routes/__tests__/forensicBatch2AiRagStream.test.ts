@@ -30,6 +30,10 @@ import {
   mapTaskTypeToTaskClass,
 } from "../../../src/shared/aiTypes.ts";
 import { scholarBrain } from "../../src/services/scholarBrain.ts";
+import { configureRouterBridge } from "../../src/ai/routerBridge.ts";
+import { createAiFetch } from "../../src/ai/aiEndpointGuard.ts";
+import { defaultAdapters } from "../../../src/platform/router/adapters.ts";
+import type { AdapterChunk, ProviderAdapter } from "../../../src/platform/router/types.ts";
 import { catalog } from "../../../src/app/atlas/atlas.ts";
 import { initialProjectGateState, evaluateAllChaptersGating } from "../../../src/app/conductor/conductor.ts";
 import { emptyDocument } from "../../../src/domain/document/model.ts";
@@ -306,27 +310,40 @@ describe("Batch 2: Semantic RAG Engine (Fix 1.8 & 1.9)", () => {
 });
 
 describe("Batch 2: SSE Streaming & ScholarBrain (Fix 1.9)", () => {
-  it("streams status and chunk events with proper headers", async () => {
+  // scholarBrain.stream runs through the AI router. A stub provider stands in
+  // for the user's key so the SSE contract is tested without a network.
+  const stub: ProviderAdapter = {
+    async *stream(): AsyncIterable<AdapterChunk> {
+      yield { type: "text", text: "Chapter four synthesises the empirical results. " };
+      yield { type: "text", text: "The effect held across both cohorts." };
+      yield { type: "usage", inputTokens: 40, outputTokens: 14 };
+      yield { type: "finish", reason: "stop" };
+    },
+  };
+  const keyringHeader = Buffer.from(JSON.stringify([{ provider: "openai", model: "stub-model", apiKey: "test-key" }])).toString("base64url");
+  afterEach(() => configureRouterBridge({ adapters: defaultAdapters(createAiFetch()) }));
+
+  const capture = () => {
     const writtenData: string[] = [];
     const headers: Record<string, string> = {};
-
     const mockRes = {
-      setHeader: (key: string, value: string) => {
-        headers[key] = value;
-      },
-      write: (data: string) => {
-        writtenData.push(data);
-      },
+      setHeader: (key: string, value: string) => { headers[key] = value; },
+      write: (data: string) => { writtenData.push(data); },
       end: () => {},
     } as unknown as Response;
+    return { writtenData, headers, mockRes };
+  };
 
+  it("streams status, chunk and done events with proper headers", async () => {
+    configureRouterBridge({ adapters: { openai: stub } });
+    const { writtenData, headers, mockRes } = capture();
     const mockReq = {
       user: { id: TEST_USER_ID, email: "researcher@oxford.ac.uk" },
+      headers: { "x-ai-keyring": keyringHeader },
       body: {},
       query: {},
     };
 
-    // We can test scholarBrain.stream directly
     await scholarBrain.stream(
       mockReq,
       {
@@ -343,8 +360,19 @@ describe("Batch 2: SSE Streaming & ScholarBrain (Fix 1.9)", () => {
 
     const joinedStream = writtenData.join("");
     expect(joinedStream).toContain("event: status");
+    expect(joinedStream).toContain("event: chunk");
     expect(joinedStream).toContain("event: done");
     expect(joinedStream).toContain('"wordCount"');
+    expect(joinedStream).toContain("both cohorts");
+  });
+
+  it("with no AI connected it streams an error, never a simulated draft", async () => {
+    const { writtenData, mockRes } = capture();
+    await scholarBrain.stream({ user: { id: TEST_USER_ID }, headers: {}, body: {}, query: {} }, { prompt: "Draft chapter 4." }, mockRes).catch(() => undefined);
+    const joinedStream = writtenData.join("");
+    expect(joinedStream).toContain("event: error");
+    expect(joinedStream).not.toContain("event: done");
+    expect(joinedStream).not.toMatch(/simulated/i);
   });
 });
 

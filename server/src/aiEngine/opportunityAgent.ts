@@ -27,9 +27,9 @@
  */
 
 import { getSupabaseRestConfig, SupabaseTable } from "../supabaseRest";
-import { completeWithFailover } from "../../../src/platform/gateway/gateway.js";
-import { defaultPolicy } from "../../../src/platform/warden/policy.js";
-import { getCandidates } from "../../utils/llm.js";
+import type express from "express";
+import { routedCompletion } from "../ai/routerBridge.ts";
+import { LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 
 interface RawOpportunity {
   providerName: string;
@@ -132,35 +132,18 @@ SEARCH RESULTS:
 
 async function synthesize(
   searchResults: Array<{ title: string; url: string; content: string }>,
-  req?: any
+  req?: express.Request
 ): Promise<RawOpportunity[]> {
   if (searchResults.length === 0) return [];
-
-  const candidates = getCandidates(req);
-  if (candidates.length === 0) {
-    if (process.env.NODE_ENV === "test" || Boolean(process.env.VITEST)) {
-      candidates.push({ provider: "mock-test", apiKey: "test-key" });
-    } else {
-      throw new Error("No AI provider configured. Provide BYOK or Local AI credentials.");
-    }
-  }
 
   const resultsText = searchResults.map((r, i) => `[${i + 1}] ${r.title}\nURL: ${r.url}\n${r.content.slice(0, 1500)}\n`).join("\n");
 
   try {
-    const result = await completeWithFailover(
-      {
-        taskClass: "discovery",
-        systemPrompt: SYNTHESIS_PROMPT,
-        userPrompt: resultsText,
-        responseFormat: "json",
-        segments: [{ label: "SearchResults", text: resultsText }]
-      },
-      { candidates },
-      defaultPolicy()
-    );
-
-    const rawText = result.ok ? result.value.text : ((result as any).result?.text ?? "");
+    const rawText = await routedCompletion(req ?? ({ headers: {} } as express.Request), {
+      task: "fast",
+      systemPrompt: SYNTHESIS_PROMPT,
+      userPrompt: resultsText,
+    });
     if (!rawText) return [];
     const cleaned = rawText.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
     try {
@@ -169,8 +152,10 @@ async function synthesize(
     } catch {
       return [];
     }
-  } catch (err: any) {
-    console.warn("[OpportunityAgent] Synthesis failed:", err.message);
+  } catch (err: unknown) {
+    // "No AI connected" is the admin's to fix; it is reported, not counted as zero findings.
+    if (err instanceof NoClientAiProviderError || err instanceof LocalModelUnreachableError) throw err;
+    console.warn("[OpportunityAgent] Synthesis failed:", err instanceof Error ? err.message : err);
     return [];
   }
 }
@@ -180,7 +165,7 @@ async function synthesize(
  * unreviewed ai_opportunities row. Returns the count stored so the calling
  * admin route can report it.
  */
-export async function runOpportunityResearch(query: string, req?: any): Promise<number> {
+export async function runOpportunityResearch(query: string, req?: express.Request): Promise<number> {
   const results = await searchWeb(query);
   const opportunities = await synthesize(results, req);
   if (opportunities.length === 0) return 0;

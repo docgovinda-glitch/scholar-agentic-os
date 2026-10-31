@@ -13,6 +13,7 @@
  * 5. Deterministic Mark-Weighted Word Allocator: Proportional allocation across assignment questions.
  */
 
+import { NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
 import { completeWithFailover, streamWithFailover } from "../../../src/platform/gateway/gateway.ts";
 import type { CandidateProvider } from "../../../src/platform/gateway/types.ts";
 import { resolveClientAiConfig } from "../ai/clientAiConfig.ts";
@@ -307,18 +308,6 @@ export const scholarBrain = {
    * zero server keys, British/Oxford orthography, and NFC Unicode preservation.
    */
   async complete(options: ScholarBrainCompleteOptions): Promise<ScholarBrainCompleteResult> {
-    const {
-      candidates,
-      provider: resolvedProvider,
-      model: resolvedModel,
-      localModelBrowserOnly,
-    } = extractTransientClientAiConfig(options.req, options.headers);
-
-    const useBrowser = candidates.length === 0 && localModelBrowserOnly && options.browserFallback === true;
-    if (candidates.length === 0 && !useBrowser) {
-      throw localModelBrowserOnly ? new LocalModelUnreachableError() : new NoClientAiProviderError();
-    }
-
     const dialect = options.dialect ?? "en-GB";
     const voicePrompt = buildScholarlyVoiceSystemPrompt({
       dialect,
@@ -329,48 +318,46 @@ export const scholarBrain = {
       ? `${voicePrompt}\n\n[TASK DIRECTIVES]\n${options.systemPrompt}`
       : voicePrompt;
 
-    const taskClass: TaskClass = options.taskClass ?? "drafting";
+    // Explicit settings (options.headers) read as the legacy x-ai-* headers.
+    const o = options.headers;
+    const explicit: Record<string, string> = {};
+    if (o?.provider) explicit["x-ai-provider"] = o.provider;
+    if (o?.model) explicit["x-ai-model"] = o.model;
+    if (o?.apiKey) explicit["x-ai-api-key"] = o.apiKey;
+    if (o?.baseUrl) explicit["x-ai-base-url"] = o.baseUrl;
+    const baseReq = options.req ?? {};
+    const req = (Object.keys(explicit).length ? { ...baseReq, headers: { ...(baseReq.headers ?? {}), ...explicit } } : (options.req ?? { headers: {} })) as LlmRequestLike;
+    const browserPayload = () => ({
+      challengeToken: createChallengeTokenForRequest(req, fullSystemPrompt, options.userPrompt),
+      systemPrompt: fullSystemPrompt,
+      userPrompt: options.userPrompt,
+      taskType: "reasoning",
+    });
 
+    // A browser-run answer for exactly this prompt (verified challenge) is used as is.
+    const browserText = readVerifiedBrowserResult(req, fullSystemPrompt, options.userPrompt);
     let rawText: string;
-    if (useBrowser) {
-      const req = (options.req ?? {}) as LlmRequestLike;
-      const browserText = readVerifiedBrowserResult(req, fullSystemPrompt, options.userPrompt);
-      if (browserText === null) {
-        throw new BrowserAiRequiredError({
-          challengeToken: createChallengeTokenForRequest(req, fullSystemPrompt, options.userPrompt),
-          systemPrompt: fullSystemPrompt,
-          userPrompt: options.userPrompt,
-          taskType: "reasoning",
-        });
-      }
+    let answeredBy = "browser-local";
+    if (browserText !== null) {
       rawText = browserText;
     } else {
-    let policy: EgressPolicy = defaultPolicy();
-    for (const c of candidates) {
-      if (c.apiKey) {
-        policy = recordConsent(policy, c.provider);
+      try {
+        rawText = await routedText(req as unknown as import("express").Request, {
+          task: toRouterTask(options.taskClass ?? "drafting"),
+          systemPrompt: fullSystemPrompt,
+          userPrompt: options.userPrompt,
+          temperature: options.temperature,
+          maxOutputTokens: options.maxTokens,
+        });
+        answeredBy = (req as { aiRoute?: { answeredBy?: { label: string } } }).aiRoute?.answeredBy?.label ?? "router";
+      } catch (err) {
+        if (err instanceof NoAiConnectedError) throw new NoClientAiProviderError();
+        if (err instanceof RouterHandoffError) {
+          if (options.browserFallback) throw new BrowserAiRequiredError(browserPayload());
+          throw new LocalModelUnreachableError();
+        }
+        throw new Error(`scholarBrain AI Execution Error: ${(err as Error).message}`);
       }
-    }
-
-    const gatewayResult = await completeWithFailover(
-      {
-        taskClass,
-        systemPrompt: fullSystemPrompt,
-        userPrompt: options.userPrompt,
-        segments: [{ label: "Input", text: options.userPrompt }],
-        responseFormat: options.responseFormat === "json" ? "json" : undefined,
-        temperature: options.temperature,
-        maxTokens: options.maxTokens,
-      },
-      { candidates },
-      policy
-    );
-
-    if (!gatewayResult.ok) {
-      throw new Error(`scholarBrain AI Execution Error: ${gatewayResult.error.message}`);
-    }
-
-    rawText = gatewayResult.value.text;
     }
     const guarded = applyScholarGuardrails(rawText, {
       orthography: dialect === "en-US" ? "us" : "british",
@@ -387,8 +374,8 @@ export const scholarBrain = {
       text: normalizedText,
       rawResponse: rawText,
       parsedJson,
-      provider: useBrowser ? "browser-local" : resolvedProvider || candidates[0]?.provider || "client-ai",
-      model: resolvedModel || candidates[0]?.model || "client-model",
+      provider: answeredBy,
+      model: answeredBy,
       wordCount: guarded.wordCount,
       burstinessMetrics: {
         averageLength: guarded.averageSentenceLength,
@@ -434,63 +421,36 @@ export const scholarBrain = {
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
 
-    let candidates: CandidateProvider[] = [];
-    if (req) {
-      candidates = getCandidates(req);
-    }
-
-    let policy: EgressPolicy = defaultPolicy();
-    for (const c of candidates) {
-      if (c.apiKey) {
-        policy = recordConsent(policy, c.provider);
-      }
-    }
-
     const fullSystemPrompt = buildScholarlyVoiceSystemPrompt({ dialect }) + "\n\n" + effectiveSystemPrompt;
     let fullText = "";
 
     const streamAbort = new AbortController();
-    const onClose = () => streamAbort.abort();
-    req?.on?.("close", onClose);
+    const onClose = () => { if (!res.writableFinished) streamAbort.abort(); };
+    res?.on?.("close", onClose);
 
     try {
       sendSSE("status", { message: "Generating scholarly draft via streaming..." });
 
-      if (candidates.length > 0) {
-        const streamResult = await streamWithFailover(
-          {
-            taskClass,
-            systemPrompt: fullSystemPrompt,
-            userPrompt: effectiveUserPrompt,
-            segments: [{ label: "Input", text: effectiveUserPrompt }],
-            temperature,
-            maxTokens,
-            signal: streamAbort.signal,
-          },
-          (chunk: string) => {
+      // No AI connected is an error the user can act on, never a simulated draft.
+      fullText = await routedText(req ?? { headers: {} }, {
+        task: toRouterTask(taskClass),
+        systemPrompt: fullSystemPrompt,
+        userPrompt: effectiveUserPrompt,
+        temperature,
+        maxOutputTokens: maxTokens,
+        signal: streamAbort.signal,
+        onEvent: (ev) => {
+          if (ev.type === "token") {
             if (streamAbort.signal.aborted) return;
-            fullText += chunk;
-            sendSSE("chunk", { token: chunk, accumulatedLength: fullText.length });
-            if (onChunk) onChunk(chunk);
-          },
-          { candidates },
-          policy
-        );
-
-        if (!streamResult.ok) {
-          throw new Error(streamResult.error?.message || "Stream failover failed");
-        }
-      } else {
-        // Fallback simulation chunking for offline/test environments
-        const fallbackWords = effectiveUserPrompt.split(/\s+/).slice(0, 50).join(" ");
-        const simulatedText = `[Simulated Academic Stream]: Synthetic draft exploring ${fallbackWords}. Rigorous empirical analysis corroborates the operational bounds.`;
-        for (const token of simulatedText.split(" ")) {
-          const chunk = token + " ";
-          fullText += chunk;
-          sendSSE("chunk", { token: chunk, accumulatedLength: fullText.length });
-          if (onChunk) onChunk(chunk);
-        }
-      }
+            sendSSE("chunk", { token: ev.text });
+            if (onChunk) onChunk(ev.text);
+            return;
+          }
+          if (ev.type === "fallback") sendSSE("status", { message: `Switched from ${ev.fromLabel} to ${ev.toLabel}: ${ev.message}` });
+          if (ev.type === "retry") sendSSE("status", { message: `${ev.message}. Retrying in ${Math.ceil(ev.waitMs / 1000)}s` });
+          if (ev.type !== "metrics") sendSSE("route", ev);
+        },
+      });
 
       const guardrails = applyScholarGuardrails(fullText, {
         orthography: dialect === "en-US" ? "us" : "british",
@@ -518,7 +478,7 @@ export const scholarBrain = {
       }
       throw err;
     } finally {
-      req?.off?.("close", onClose);
+      res?.off?.("close", onClose);
     }
   },
 

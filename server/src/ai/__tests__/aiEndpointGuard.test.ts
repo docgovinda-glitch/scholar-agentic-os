@@ -72,4 +72,19 @@ describe("AI endpoint guard", () => {
     await aiFetch("https://api.anthropic.com/v1/messages", { method: "POST", body: "{}" });
     expect(base).toHaveBeenCalledOnce();
   });
+
+  it("local runners on the server are refused unless the server may reach them", async () => {
+    const { serverAdapters } = await import("../aiEndpointGuard.ts");
+    const saved = process.env.ALLOW_SERVER_LOCAL_AI;
+    process.env.ALLOW_SERVER_LOCAL_AI = "false";
+    const base = vi.fn<typeof fetch>();
+    try {
+      const adapters = serverAdapters(base);
+      const run = adapters.ollama!.stream(cand({ lane: "local", provider: "ollama", credential: { baseUrl: "http://localhost:11434" } }), { requestId: "r", task: "fast", messages: [{ role: "user", content: "hi" }], desiredOutputTokens: 10, minOutputTokens: 1 }, 10, new AbortController().signal);
+      await expect((async () => { for await (const _ of run) { /* drain */ } })()).rejects.toBeInstanceOf(AiEndpointBlockedError);
+      expect(base).not.toHaveBeenCalled();
+    } finally {
+      if (saved === undefined) delete process.env.ALLOW_SERVER_LOCAL_AI; else process.env.ALLOW_SERVER_LOCAL_AI = saved;
+    }
+  });
 });

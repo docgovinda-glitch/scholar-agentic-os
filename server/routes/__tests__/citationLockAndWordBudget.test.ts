@@ -8,11 +8,22 @@ vi.mock("../../src/middleware/auth.ts", () => ({
   },
 }));
 
-const { completeWithFailoverMock } = vi.hoisted(() => ({ completeWithFailoverMock: vi.fn() }));
-vi.mock("../../../src/platform/gateway/gateway.ts", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../src/platform/gateway/gateway.ts")>()),
-  completeWithFailover: completeWithFailoverMock,
-}));
+// The route's AI call goes through the router bridge. The mock keeps the real
+// "is any AI connected?" check and replaces only the provider call.
+const { aiCallMock } = vi.hoisted(() => ({ aiCallMock: vi.fn() }));
+vi.mock("../../src/ai/routerBridge.ts", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../src/ai/routerBridge.ts")>();
+  const { NoClientAiProviderError } = await import("../../src/ai/aiRouteErrors.ts");
+  return {
+    ...real,
+    routedCompletion: async (req: Parameters<typeof real.routedCompletion>[0], call: Parameters<typeof real.routedCompletion>[1]) => {
+      if ((await real.aiAvailability(req, call.task)) === "none") throw new NoClientAiProviderError();
+      const r = await aiCallMock({ systemPrompt: call.systemPrompt, userPrompt: call.userPrompt, task: call.task });
+      if (!r?.ok) throw new Error(r?.error?.message ?? "AI call failed");
+      return r.value.text as string;
+    },
+  };
+});
 
 /** Headers that give the request a (mocked) BYOK provider. */
 const AI_HEADERS = { "x-ai-provider": "openai", "x-ai-model": "gpt-4o-mini", "x-ai-api-key": "test-key" };
@@ -59,7 +70,7 @@ const originalFetch = global.fetch;
 
 beforeEach(() => {
   __resetProjectStoreForTests();
-  completeWithFailoverMock.mockReset();
+  aiCallMock.mockReset();
 });
 
 afterEach(() => {
@@ -252,7 +263,7 @@ describe("Journal Step A: Two-Pass Sub-Section Drafting & Exact Word-Count Contr
     ];
 
     const targetWords = 400;
-    completeWithFailoverMock.mockResolvedValue({
+    aiCallMock.mockResolvedValue({
       ok: true,
       value: {
         text: fakeAiDraft("Pramāṇa analysis grounds this sub-section [CITE:src_advaitic].", 395),
@@ -308,14 +319,14 @@ describe("Journal Step A: Two-Pass Sub-Section Drafting & Exact Word-Count Contr
 
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("ai_provider_required");
-    expect(completeWithFailoverMock).not.toHaveBeenCalled();
+    expect(aiCallMock).not.toHaveBeenCalled();
     const saved = await getProjectStore().get(projectId);
     expect(saved?.answers?.["drafted_subsections"]).toBeUndefined();
   });
 
   it("draft-subsection reports an AI failure instead of writing template prose", async () => {
     const projectId = await createTestProject();
-    completeWithFailoverMock.mockResolvedValue({ ok: false, error: { message: "provider down" } });
+    aiCallMock.mockResolvedValue({ ok: false, error: { message: "provider down" } });
 
     const res = await request(app)
       .post(`/api/projects/${projectId}/agentic/draft-subsection`)
@@ -332,7 +343,7 @@ describe("Journal Step A: Two-Pass Sub-Section Drafting & Exact Word-Count Contr
   it("draft-subsection keeps a short AI draft as is when expansion fails (no filler)", async () => {
     const projectId = await createTestProject();
     const short = fakeAiDraft("A short real draft.", 120);
-    completeWithFailoverMock
+    aiCallMock
       .mockResolvedValueOnce({ ok: true, value: { text: short } })
       .mockRejectedValueOnce(new Error("expansion failed"));
 
@@ -353,6 +364,6 @@ describe("Journal Step A: Two-Pass Sub-Section Drafting & Exact Word-Count Contr
       .set(AI_HEADERS)
       .send({ subSectionId: "sec-1-sub-1", targetWords: 400 });
     expect(res.status).toBe(400);
-    expect(completeWithFailoverMock).not.toHaveBeenCalled();
+    expect(aiCallMock).not.toHaveBeenCalled();
   });
 });
