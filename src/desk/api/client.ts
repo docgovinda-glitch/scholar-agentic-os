@@ -114,7 +114,7 @@ export async function commitProjectToDatabase(projectId: string): Promise<Projec
   }
 }
 
-async function authHeaders(): Promise<Record<string, string>> {
+export async function authHeaders(): Promise<Record<string, string>> {
   if (!isSupabaseConfigured()) return {};
   const { data } = await getSupabaseClient().auth.getSession();
   const token = data.session?.access_token;
