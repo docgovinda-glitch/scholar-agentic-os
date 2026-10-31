@@ -11,10 +11,6 @@
 
 import { executeWebSearch, type SearchResultItem } from "./webSearchEngine.ts";
 import { validateAndRefineCitations } from "./citationValidator.ts";
-import { completeWithFailover } from "../../../src/platform/gateway/gateway.ts";
-import { defaultPolicy } from "../../../src/platform/warden/policy.ts";
-import { recordConsent } from "../../../src/platform/warden/warden.ts";
-import type { CandidateProvider } from "../../../src/platform/gateway/types.ts";
 
 export interface ResearchPlanSubQuestion {
   question: string;
@@ -46,75 +42,28 @@ export interface DeepResearchResult {
   completedAt: string;
 }
 
+export type ResearchImage = { dataUrl?: string; data?: string; mimeType?: string; name?: string };
+
 /**
- * Helper to execute an LLM call using provided candidates with inherent consent.
+ * One AI call for the pipeline. The server passes a router-backed caller
+ * (`routedCompletion`), so deep research uses the user's chain like every
+ * other feature.
  */
-async function callLlmHelper(
+export type ResearchLlm = (
   systemPrompt: string,
   userPrompt: string,
-  candidates: CandidateProvider[],
-  responseFormat?: "json" | "text",
-  images?: Array<{ dataUrl?: string; data?: string; mimeType?: string; name?: string }>
-): Promise<string> {
-  let policy = defaultPolicy();
-  for (const c of candidates) {
-    if (c.apiKey) {
-      policy = recordConsent(policy, c.provider);
-    }
-  }
-
-  let orderedCandidates = [...candidates];
-  if (images && images.length > 0) {
-    orderedCandidates.sort((a, b) => {
-      if (a.provider === "gemini" && b.provider !== "gemini") return -1;
-      if (b.provider === "gemini" && a.provider !== "gemini") return 1;
-      return 0;
-    });
-  }
-
-  const normalizedImages =
-    images && images.length > 0
-      ? images.map((img) => ({
-          dataUrl:
-            img.dataUrl ||
-            (img.data
-              ? img.data.startsWith("data:")
-                ? img.data
-                : `data:${img.mimeType || "image/jpeg"};base64,${img.data}`
-              : ""),
-          mimeType: img.mimeType || "image/jpeg",
-          name: img.name || "image",
-        }))
-      : undefined;
-
-  const result = await completeWithFailover(
-    {
-      taskClass: normalizedImages ? "chat" : "verification",
-      systemPrompt,
-      userPrompt,
-      segments: [],
-      images: normalizedImages,
-      responseFormat: responseFormat === "json" ? "json" : undefined,
-    },
-    { candidates: orderedCandidates },
-    policy
-  );
-
-  if (!result.ok) {
-    throw new Error(result.error?.message || "LLM execution failed");
-  }
-
-  return typeof result.value === "string" ? result.value : result.value.text;
-}
+  responseFormat: "json" | "text",
+  images?: ResearchImage[]
+) => Promise<string>;
 
 /**
  * Stage 1: Formulate a multi-vector research plan from user topic and attachments.
  */
 export async function formulateResearchPlan(
   topic: string,
-  candidates: CandidateProvider[],
+  llm: ResearchLlm,
   files?: Array<{ name: string; text?: string; type?: string }>,
-  images?: Array<{ dataUrl?: string; data?: string; mimeType?: string; name?: string }>
+  images?: ResearchImage[]
 ): Promise<ResearchPlan> {
   const systemPrompt = `You are the Scholar Core Deep Research Planning Agent.
 Analyze the user's research topic and deconstruct it into a rigorous research plan.
@@ -147,7 +96,7 @@ Provide exactly 3 focused subQuestions that explore foundational context, empiri
   }\n\nGenerate the structured research plan.`;
 
   try {
-    const raw = await callLlmHelper(systemPrompt, userPrompt, candidates, "json");
+    const raw = await llm(systemPrompt, userPrompt, "json");
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
     if (parsed.subQuestions && Array.isArray(parsed.subQuestions) && parsed.subQuestions.length > 0) {
@@ -190,13 +139,13 @@ Provide exactly 3 focused subQuestions that explore foundational context, empiri
  */
 export async function executeDeepResearch(
   topic: string,
-  candidates: CandidateProvider[],
+  llm: ResearchLlm,
   onProgress?: (status: string) => void,
   files?: Array<{ name: string; text?: string; type?: string }>,
-  images?: Array<{ dataUrl?: string; data?: string; mimeType?: string; name?: string }>
+  images?: ResearchImage[]
 ): Promise<DeepResearchResult> {
   onProgress?.("Formulating structured research plan & decomposing sub-questions...");
-  const plan = await formulateResearchPlan(topic, candidates, files, images);
+  const plan = await formulateResearchPlan(topic, llm, files, images);
 
   onProgress?.(`Conducting multi-source investigations across ${plan.subQuestions.length} research vectors...`);
 
@@ -308,7 +257,7 @@ ${evidenceDigest}
 
 Generate the comprehensive Deep Research Report.`;
 
-  const rawSynthesizedReport = await callLlmHelper(synthesisSystemPrompt, synthesisUserPrompt, candidates, "text", images);
+  const rawSynthesizedReport = await llm(synthesisSystemPrompt, synthesisUserPrompt, "text", images);
   const validated = validateAndRefineCitations(rawSynthesizedReport, allCitations, { files, images });
 
   // Extract consensus and divergent highlights heuristically or from LLM text

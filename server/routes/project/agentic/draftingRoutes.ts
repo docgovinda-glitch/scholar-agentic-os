@@ -1,13 +1,11 @@
+import { routedCompletion } from "../../../src/ai/routerBridge.ts";
 import express from "express";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
 import { safeParseAnswerField } from "../../../../src/shared/projectStateSchema.ts";
 import {
   callOpenRouterText,
   streamOpenRouterJSON,
-  getCandidates,
-  buildAuthorizedPolicy,
 } from "../../../utils/llm.ts";
-import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
   sanitizeScholarlyText,
@@ -29,7 +27,7 @@ import {
 import { chunkAndRerankEvidence } from "../../../src/services/semanticRagEngine.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import { getProjectSafe } from "./helpers.ts";
-import { NoClientAiProviderError, sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
+import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
 import type { UserDatasetRecord, DraftSubSectionRequestBody } from "./types.ts";
 
 export const draftingRoutes = express.Router({ mergeParams: true });
@@ -165,8 +163,6 @@ ${req.body?.contextPrompt ? `- Author Guidance: ${req.body.contextPrompt}` : ""}
 ${req.body?.thesisStatement ? `- Thesis Statement: ${req.body.thesisStatement}` : ""}
 Target Word Budget: ${targetWords} words.`;
 
-    const candidates = getCandidates(req);
-
     const wantsStream = req.headers.accept?.includes("text/event-stream") || req.query.stream === "true";
     if (wantsStream) {
       await scholarBrain.stream(
@@ -184,26 +180,10 @@ Target Word Budget: ${targetWords} words.`;
 
     // Pass 1 needs a real AI draft. Without one, nothing is written: no template
     // prose (which would put invented findings next to the user's real sources).
-    if (candidates.length === 0) {
-      return sendAiFailure(res, new NoClientAiProviderError(), "Sub-section draft");
-    }
-
     let draftText = "";
     try {
-      const response = await completeWithFailover(
-        {
-          taskClass: "drafting",
-          systemPrompt,
-          userPrompt,
-          segments: [{ label: "subSection", text: userPrompt }],
-        },
-        { candidates },
-        buildAuthorizedPolicy(candidates)
-      );
-      if (!response.ok || !response.value?.text?.trim()) {
-        throw new UnusableAiResponseError("sub-section draft");
-      }
-      draftText = response.value.text;
+      draftText = await routedCompletion(req, { task: "drafting", systemPrompt, userPrompt });
+      if (!draftText.trim()) throw new UnusableAiResponseError("sub-section draft");
     } catch (e) {
       return sendAiFailure(res, e, "Sub-section draft");
     }
@@ -221,19 +201,8 @@ Ensure the final text lands within ±5% of ${targetWords} words without conversa
 Existing Draft:
 ${draftText}`;
 
-        const expansionResponse = await completeWithFailover(
-          {
-            taskClass: "refinement",
-            systemPrompt,
-            userPrompt: expansionPrompt,
-            segments: [{ label: "expansion", text: expansionPrompt }],
-          },
-          { candidates },
-          buildAuthorizedPolicy(candidates)
-        );
-        if (expansionResponse.ok && expansionResponse.value?.text && expansionResponse.value.text.trim().length > 0) {
-          draftText = expansionResponse.value.text;
-        }
+        const expanded = await routedCompletion(req, { task: "drafting", systemPrompt, userPrompt: expansionPrompt });
+        if (expanded.trim().length > 0) draftText = expanded;
       } catch (e) {
         console.warn("Pass 2 AI expansion failed; keeping the shorter draft", e instanceof Error ? e.message : e);
       }

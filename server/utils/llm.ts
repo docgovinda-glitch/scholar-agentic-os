@@ -1,7 +1,6 @@
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import type express from 'express';
-import { completeWithFailover, streamWithFailover } from "../../src/platform/gateway/gateway.js";
 import { defaultPolicy } from "../../src/platform/warden/policy.js";
 import { recordConsent, type EgressPolicy } from "../../src/platform/warden/warden.js";
 import type { TaskClass } from "../../src/platform/warden/types.js";
@@ -427,99 +426,6 @@ export async function streamOpenRouterText(
   const override = handleFrontendLLMOverride(req, res, systemPrompt, userPrompt);
   if (override) return override;
   return streamThroughRouter(req, res, systemPrompt, userPrompt, taskType);
-}
-
-export interface MultimodalAgenticOptions {
-  systemPrompt?: string;
-  userPrompt: string;
-  images?: { dataUrl: string; mimeType?: string; name?: string }[];
-  taskType?: string;
-  candidates?: CandidateProvider[];
-  temperature?: number;
-  maxTokens?: number;
-  onChunk?: (chunk: string) => void;
-}
-
-export async function executeMultimodalAgentic(
-  options: MultimodalAgenticOptions,
-  req?: LlmRequestLike
-): Promise<{ text: string; provider: string; model: string }> {
-  const candidates =
-    options.candidates && options.candidates.length > 0 ? options.candidates : getCandidates(req);
-  if (candidates.length === 0) {
-    throw new Error(
-      "No client-owned BYOK API key or local AI runner was supplied for this request. Please configure your credentials in AI Access."
-    );
-  }
-
-  const orderedCandidates = [...candidates];
-  if (options.images && options.images.length > 0) {
-    orderedCandidates.sort((a, b) => {
-      if (a.provider === "gemini" && b.provider !== "gemini") return -1;
-      if (b.provider === "gemini" && a.provider !== "gemini") return 1;
-      return 0;
-    });
-  }
-
-  const policy = buildAuthorizedPolicy(orderedCandidates);
-  const taskClass = mapTaskType(
-    options.taskType || (options.images?.length ? "chat" : "reasoning")
-  );
-
-  if (options.onChunk) {
-    let full = "";
-    const result = await streamWithFailover(
-      {
-        taskClass,
-        systemPrompt: options.systemPrompt,
-        userPrompt: options.userPrompt,
-        images: options.images,
-        temperature: options.temperature,
-        maxTokens: options.maxTokens,
-        segments: [{ label: "Input", text: options.userPrompt }],
-      },
-      (chunk) => {
-        full += chunk;
-        options.onChunk!(chunk);
-      },
-      { candidates: orderedCandidates },
-      policy
-    );
-
-    if (!result.ok) {
-      throw new Error(result.error?.message || "AI Agent Generation Failed");
-    }
-
-    const modelVal =
-      typeof result.value === "object" && result.value !== null && "model" in result.value
-        ? String((result.value as { model?: string }).model || "")
-        : "";
-    return { text: full, provider: result.providerId, model: modelVal };
-  } else {
-    const result = await completeWithFailover(
-      {
-        taskClass,
-        systemPrompt: options.systemPrompt,
-        userPrompt: options.userPrompt,
-        images: options.images,
-        temperature: options.temperature,
-        maxTokens: options.maxTokens,
-        segments: [{ label: "Input", text: options.userPrompt }],
-      },
-      { candidates: orderedCandidates },
-      policy
-    );
-
-    if (!result.ok) {
-      throw new Error(result.error?.message || "AI Agent Generation Failed");
-    }
-
-    return {
-      text: typeof result.value === "string" ? result.value : result.value.text,
-      provider: result.providerId,
-      model: typeof result.value === "object" ? result.value.model : "",
-    };
-  }
 }
 
 export async function generateGeminiEmbedding(text: string, apiKey?: string): Promise<number[]> {

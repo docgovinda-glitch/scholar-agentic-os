@@ -1,7 +1,9 @@
 import express, { Request, Response } from "express";
 import { requireAuth } from "../src/middleware/auth.ts";
-import { getCandidates, getPremiumAiPolicy, executeMultimodalAgentic, readVerifiedBrowserResult, resolveRequestAiConfig, signLlmChallenge, computePromptHash } from "../utils/llm.ts";
-import { InvalidLlmChallengeError } from "../src/ai/aiRouteErrors.ts";
+import { getPremiumAiPolicy, readVerifiedBrowserResult, resolveRequestAiConfig, signLlmChallenge, computePromptHash } from "../utils/llm.ts";
+import { InvalidLlmChallengeError, LocalModelUnreachableError, NoClientAiProviderError, sendAiFailure } from "../src/ai/aiRouteErrors.ts";
+import { aiAvailability, answeredByLabel, routedCompletion } from "../src/ai/routerBridge.ts";
+import type { ResearchLlm } from "../src/research/deepResearchEngine.ts";
 import { executeWebSearch, formatSearchResultsForPrompt } from "../src/research/webSearchEngine.ts";
 import { executeDeepResearch } from "../src/research/deepResearchEngine.ts";
 import { validateAndRefineCitations } from "../src/research/citationValidator.ts";
@@ -24,6 +26,15 @@ import type { VerifiedSourceItem } from "../src/utils/citationLockScrubber.ts";
 import { countExactWords } from "../src/utils/wordBudgetAllocator.ts";
 import { evaluateBurstiness } from "../src/utils/scholarlyVoiceGuard.ts";
 import { chunkAndRerankEvidence } from "../src/services/semanticRagEngine.ts";
+
+/** Deep research runs each of its AI steps through the request's router chain. */
+const researchLlm = (req: Request): ResearchLlm => (systemPrompt, userPrompt, _format, images) =>
+  routedCompletion(req, {
+    task: "reasoning",
+    systemPrompt,
+    userPrompt,
+    images: images?.filter((i) => i.data).map((i) => ({ mediaType: i.mimeType ?? "image/jpeg", data: i.data as string })),
+  });
 
 /**
  * Ask Scholar's live web search, cached per query for 20 minutes so a request
@@ -251,11 +262,9 @@ export function registerAIRoutes(
       if (!topic || typeof topic !== "string") {
         return res.status(400).json({ error: "Missing required topic string" });
       }
-
-      const candidates = getCandidates(req);
-      if (candidates.length === 0) {
-        return res.status(503).json({ error: "No client-owned AI provider configured for deep research. Please configure in AI Access." });
-      }
+      const where = await aiAvailability(req, "reasoning");
+      if (where === "none") return sendAiFailure(res, new NoClientAiProviderError(), "Deep research");
+      if (where === "browser") return sendAiFailure(res, new LocalModelUnreachableError(), "Deep research");
 
       const [evidence, webResults] = await Promise.all([
         scholarBrain.retrieveEvidence({ query: topic, maxResults: 15 }).catch(() => []),
@@ -279,7 +288,7 @@ export function registerAIRoutes(
         };
       });
 
-      const result = await executeDeepResearch(topic, candidates, undefined, files, normalizedImages);
+      const result = await executeDeepResearch(topic, researchLlm(req), undefined, files, normalizedImages);
 
       const verifiedSources: VerifiedSourceItem[] = evidence.map((e) => ({
         id: e.id,
@@ -308,7 +317,7 @@ export function registerAIRoutes(
         evidence,
       });
     } catch (err) {
-      res.status(500).json({ error: `Deep research failed: ${err instanceof Error ? err.message : String(err)}` });
+      sendAiFailure(res, err, "Deep research");
     }
   });
 
@@ -348,9 +357,6 @@ export function registerAIRoutes(
       // request's prompt is rebuilt, so the challenge is checked against it.
       const hasBrowserResult = req.body?.llmResult !== undefined && req.body?.llmResult !== null;
       let incomingLlmResult: string | null = null;
-      const aiConfig = resolveRequestAiConfig(req);
-      const candidates = getCandidates(req);
-
       // Normalize images so dataUrl and base64 data are reliably present
       const normalizedImages = (images || []).map((img: any) => {
         const raw = img.dataUrl || img.data || "";
@@ -448,8 +454,7 @@ export function registerAIRoutes(
         incomingLlmResult = readVerifiedBrowserResult(req, deepSysPrompt, effectivePrompt);
       } else if (mode === "deep-research") {
         const deepSysPrompt = "You are Scholar Core Deep Research Agent. Provide an exhaustive, deeply researched academic synthesis with verified citations and structured sections.";
-        if (candidates.length === 0) {
-          return res.status(426).json({
+        const deepHandOff = () => res.status(426).json({
             requireFrontendLLM: true,
             challengeToken: makeChallengeToken(deepSysPrompt, effectivePrompt),
             systemPrompt: deepSysPrompt,
@@ -460,9 +465,9 @@ export function registerAIRoutes(
             deliverableIntent,
             citationStyle: cleanStyle,
           });
-        }
+        if ((await aiAvailability(req, "reasoning").catch(() => "server" as const)) !== "server") return deepHandOff();
         try {
-          const research = await executeDeepResearch(effectivePrompt, candidates, undefined, files, normalizedImages);
+          const research = await executeDeepResearch(effectivePrompt, researchLlm(req), undefined, files, normalizedImages);
           const locked = sanitizeAndLockScholarResponse(research.synthesizedReport, [], citationStyle, deliverableIntent);
           return res.json({
             ok: true,
@@ -470,8 +475,8 @@ export function registerAIRoutes(
             text: locked.text,
             plan: research.plan,
             citations: research.allCitations,
-            provider: candidates[0]?.provider || "byok",
-            model: candidates[0]?.model || aiConfig.model || "client-selected",
+            provider: answeredByLabel(req),
+            model: answeredByLabel(req),
             citationStyle,
             wordCount: locked.wordCount,
             verifiedSourcesCount: (research.allCitations || []).length,
@@ -479,18 +484,10 @@ export function registerAIRoutes(
             recommendedWorkspaceHandoff: locked.recommendedWorkspaceHandoff,
           });
         } catch (deepErr: unknown) {
-          console.warn("Server deep research execution failed, falling back to frontend LLM:", deepErr);
-          return res.status(426).json({
-            requireFrontendLLM: true,
-            challengeToken: makeChallengeToken(deepSysPrompt, effectivePrompt),
-            systemPrompt: deepSysPrompt,
-            userPrompt: effectivePrompt,
-            taskType: "reasoning",
-            mode: "deep-research",
-            canonicalSources,
-            deliverableIntent,
-            citationStyle: cleanStyle,
-          });
+          // Mid-chain hand-off to the user's local model is still a 426; a
+          // provider failure is reported, never silently handed to the browser.
+          if (deepErr instanceof LocalModelUnreachableError || deepErr instanceof NoClientAiProviderError) return deepHandOff();
+          return sendAiFailure(res, deepErr, "Deep research");
         }
       }
 
@@ -596,7 +593,7 @@ Formatting & Academic Citation Rules:
       }
 
       // 6. Execute Agent with Multimodal & Model Failover Support
-      if (!incomingLlmResult && candidates.length === 0) {
+      if (!incomingLlmResult && (await aiAvailability(req, normalizedImages.length > 0 ? "vision" : "drafting").catch(() => "server" as const)) !== "server") {
         return res.status(426).json({
           requireFrontendLLM: true,
           challengeToken: makeChallengeToken(effectiveSystemPrompt, assembledUserPrompt),
@@ -632,8 +629,19 @@ Formatting & Academic Citation Rules:
           model: "client-router",
         };
       } else {
+        const chatHandOff = () => res.status(426).json({
+          requireFrontendLLM: true,
+          challengeToken: makeChallengeToken(effectiveSystemPrompt, assembledUserPrompt),
+          systemPrompt: effectiveSystemPrompt,
+          userPrompt: assembledUserPrompt,
+          taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
+          mode,
+          canonicalSources,
+          deliverableIntent,
+          citationStyle: cleanStyle,
+        });
         try {
-          if (candidates.length > 0 && normalizedImages.length === 0) {
+          if (normalizedImages.length === 0) {
             const brainRes = await scholarBrain.complete({
               req,
               systemPrompt: effectiveSystemPrompt,
@@ -641,33 +649,21 @@ Formatting & Academic Citation Rules:
               taskClass: "drafting",
               responseFormat: "text",
             });
-            result = {
-              text: brainRes.text,
-              provider: brainRes.provider,
-              model: brainRes.model,
-            };
+            result = { text: brainRes.text, provider: brainRes.provider, model: brainRes.model };
           } else {
-            result = await executeMultimodalAgentic({
+            const text = await routedCompletion(req, {
+              task: "vision",
               systemPrompt: effectiveSystemPrompt,
               userPrompt: assembledUserPrompt,
-              images: normalizedImages && normalizedImages.length > 0 ? normalizedImages : undefined,
-              taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
-              candidates,
-            }, req);
+              images: normalizedImages.map((img: { mimeType: string; data: string }) => ({ mediaType: img.mimeType, data: img.data })),
+            });
+            result = { text, provider: answeredByLabel(req), model: answeredByLabel(req) };
           }
         } catch (execErr: unknown) {
-          console.warn("Server multimodal agent execution failed, requesting frontend LLM fallback:", execErr);
-          return res.status(426).json({
-            requireFrontendLLM: true,
-            challengeToken: makeChallengeToken(effectiveSystemPrompt, assembledUserPrompt),
-            systemPrompt: effectiveSystemPrompt,
-            userPrompt: assembledUserPrompt,
-            taskType: normalizedImages && normalizedImages.length > 0 ? "chat" : "reasoning",
-            mode,
-            canonicalSources,
-            deliverableIntent,
-            citationStyle: cleanStyle,
-          });
+          // No AI, or the user's local model: the browser runs the prompt (426).
+          // A provider failure is reported (502), never silently handed off.
+          if (execErr instanceof NoClientAiProviderError || execErr instanceof LocalModelUnreachableError) return chatHandOff();
+          return sendAiFailure(res, execErr, "The answer");
         }
       }
 

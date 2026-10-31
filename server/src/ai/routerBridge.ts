@@ -21,6 +21,7 @@ import { defaultAdapters } from "../../../src/platform/router/adapters.ts";
 import type { Candidate, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, TaskClass } from "../../../src/platform/router/types.ts";
 import { keyringToCandidates, parseKeyring, type KeyringEntry, type PremiumPort } from "../../routes/aiRun.ts";
 import { createAiFetch, screenCandidates } from "./aiEndpointGuard.ts";
+import { LocalModelUnreachableError, NoClientAiProviderError } from "./aiRouteErrors.ts";
 
 const ROUTER_TASK: Record<string, TaskClass> = {
   reasoning: "reasoning", drafting: "drafting", "long-context": "long-context", coding: "coding",
@@ -86,6 +87,8 @@ export interface RoutedCall {
   userPrompt: string;
   maxOutputTokens?: number;
   temperature?: number;
+  /** Images sent with the user prompt (base64, no data: prefix). */
+  images?: Array<{ mediaType: string; data: string }>;
   /** Forward live events (streaming endpoints). */
   onEvent?: (ev: RouterEvent) => void;
   signal?: AbortSignal;
@@ -109,11 +112,16 @@ export async function chainFor(req: Scoped, task: TaskClass): Promise<Candidate[
 export async function routedText(req: Request, call: RoutedCall): Promise<string> {
   const scoped = req as Scoped;
   scoped.aiRoute ??= { notices: [] };
-  const chain = await chainFor(scoped, call.task);
+  const images = call.images?.filter((i) => i.data) ?? [];
+  const task: TaskClass = images.length ? "vision" : call.task;
+  const chain = await chainFor(scoped, task);
+  const userContent: RouteRequest["messages"][number]["content"] = images.length
+    ? [{ type: "text", text: call.userPrompt }, ...images.map((i) => ({ type: "image" as const, mediaType: i.mediaType, data: i.data }))]
+    : call.userPrompt;
   const request: RouteRequest = {
     requestId: crypto.randomUUID(),
-    task: call.task,
-    messages: [...(call.systemPrompt ? [{ role: "system" as const, content: call.systemPrompt }] : []), { role: "user" as const, content: call.userPrompt }],
+    task,
+    messages: [...(call.systemPrompt ? [{ role: "system" as const, content: call.systemPrompt }] : []), { role: "user" as const, content: userContent }],
     desiredOutputTokens: call.maxOutputTokens ?? 8_192,
     minOutputTokens: Math.min(512, call.maxOutputTokens ?? 512),
     temperature: call.temperature,
@@ -149,3 +157,36 @@ export function aiRouteDecorator(req: Request, res: Response, next: NextFunction
   };
   next();
 }
+
+/**
+ * `routedText` for routes that run only on the server: errors come back as the
+ * classes `sendAiFailure` already answers (400 ai_provider_required, 400
+ * ai_local_model_unreachable, 502 ai_unavailable).
+ */
+export async function routedCompletion(req: Request, call: RoutedCall): Promise<string> {
+  try {
+    return await routedText(req, call);
+  } catch (err) {
+    if (err instanceof NoAiConnectedError) throw new NoClientAiProviderError();
+    if (err instanceof RouterHandoffError) throw new LocalModelUnreachableError();
+    throw err;
+  }
+}
+
+/**
+ * Where this request's AI would run, without calling it: "server" (Premium or
+ * a cloud key), "browser" (the first choice is the user's local model) or
+ * "none". Lets a route hand off before doing expensive retrieval.
+ */
+export async function aiAvailability(req: Request, task: TaskClass): Promise<"server" | "browser" | "none"> {
+  try {
+    const chain = await chainFor(req as Scoped, task);
+    return chain[0]?.runsIn === "browser" ? "browser" : "server";
+  } catch (err) {
+    if (err instanceof NoAiConnectedError) return "none";
+    throw err;
+  }
+}
+
+/** The label of the model that answered this request, for response metadata. */
+export const answeredByLabel = (req: Request): string => (req as Scoped).aiRoute?.answeredBy?.label ?? "router";
