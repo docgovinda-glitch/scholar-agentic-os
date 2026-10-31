@@ -1,4 +1,6 @@
 import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
+import { buildKeyring, encodeKeyring } from "../ai/keyring";
+import { inspectAiResponse } from "../ai/aiRouteNotices";
 import { type RoutingTaskType, routeDecision } from "../aiAccess/aiAccessApi";
 import { completeWithFailover, streamWithFailover } from "../../platform/gateway/gateway";
 import { defaultPolicy, recordConsent } from "../../platform/warden/warden";
@@ -171,13 +173,21 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
     if (aiConfig.apiKey) transientAiHeaders["x-ai-api-key"] = aiConfig.apiKey;
     if (aiConfig.baseUrl) transientAiHeaders["x-ai-base-url"] = aiConfig.baseUrl;
   }
+  // Every AI connection on this device, in order, so the server can switch to
+  // the next one visibly when a provider fails.
+  if (routeUsesClientAi(input)) {
+    const ring = await buildKeyring().catch(() => []);
+    if (ring.length) transientAiHeaders["x-ai-keyring"] = encodeKeyring(ring);
+  }
 
   const headers = {
     ...transientAiHeaders,
     ...(init.headers as Record<string, string> | undefined),
     ...(await authHeaders()),
   };
-  return await originalFetch(input, { ...init, headers });
+  const res = await originalFetch(input, { ...init, headers });
+  if (routeUsesClientAi(input)) inspectAiResponse(res);
+  return res;
 }
 
 export async function authedJsonFetch(

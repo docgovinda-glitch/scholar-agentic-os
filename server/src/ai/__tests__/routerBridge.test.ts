@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import express from "express";
 import request from "supertest";
-import { aiRouteDecorator, configureRouterBridge } from "../routerBridge";
+import { aiRouteDecorator, configureRouterBridge, keyringFromRequest } from "../routerBridge";
 import { callOpenRouterText, streamOpenRouterText } from "../../../utils/llm";
 import { CircuitBreaker, MemoryBreakerStore } from "../../../../src/platform/router/circuitBreaker";
 import { ProviderHttpError } from "../../../../src/platform/router/errors";
@@ -107,5 +107,14 @@ describe("existing AI steps through the router", () => {
     expect(text).toMatch(/event: log\ndata: .*Switched from bad-1 · your key to good-1 · your key/);
     expect(text).toContain('event: route');
     expect(text).toContain('"text":"ok from good-1"');
+  });
+
+  it("puts the legacy primary provider first unless the keyring already has it", () => {
+    const ring = Buffer.from(JSON.stringify([{ provider: "anthropic", model: "a1", apiKey: "k1" }])).toString("base64url");
+    const merged = keyringFromRequest({ headers: { "x-ai-keyring": ring, "x-ai-provider": "openrouter", "x-ai-model": "r1", "x-ai-api-key": "k2", "x-ai-base-url": "https://openrouter.example/api/v1" } });
+    expect(merged.map((e) => `${e.provider}:${e.model}`)).toEqual(["custom:r1", "anthropic:a1"]);
+
+    const same = keyringFromRequest({ headers: { "x-ai-keyring": ring, "x-ai-provider": "anthropic", "x-ai-model": "a1", "x-ai-api-key": "k1" } });
+    expect(same).toHaveLength(1);
   });
 });
