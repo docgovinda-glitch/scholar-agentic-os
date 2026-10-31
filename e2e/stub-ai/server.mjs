@@ -9,7 +9,8 @@
  *
  *   node e2e/stub-ai/server.mjs            # listens on :1234
  *   GET  /v1/models                        # one model: e2e-stub
- *   POST /v1/chat/completions              # fixed answer (JSON when asked)
+ *   POST /v1/chat/completions              # fixed answer (JSON when asked); streams
+ *                                          # OpenAI-style SSE when "stream": true
  *   GET  /__calls                          # how many completions were served
  */
 import http from "node:http";
@@ -31,6 +32,23 @@ function answerFor(body) {
   return PROSE;
 }
 
+/** OpenAI-compatible streaming: content deltas, a usage chunk when asked, then [DONE]. */
+function streamAnswer(res, body, text) {
+  res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+  const id = `stub-${calls}`;
+  const model = body.model || "e2e-stub";
+  const chunk = (payload) => res.write(`data: ${JSON.stringify({ id, object: "chat.completion.chunk", model, ...payload })}\n\n`);
+  const size = Math.ceil(text.length / 3);
+  for (let i = 0; i < text.length; i += size) {
+    chunk({ choices: [{ index: 0, delta: { content: text.slice(i, i + size) }, finish_reason: null }] });
+  }
+  chunk({ choices: [{ index: 0, delta: {}, finish_reason: "stop" }] });
+  if (body.stream_options?.include_usage) {
+    chunk({ choices: [], usage: { prompt_tokens: 0, completion_tokens: Math.ceil(text.length / 4), total_tokens: Math.ceil(text.length / 4) } });
+  }
+  res.end("data: [DONE]\n\n");
+}
+
 const server = http.createServer((req, res) => {
   const send = (status, payload) => {
     res.writeHead(status, { "Content-Type": "application/json" });
@@ -44,8 +62,8 @@ const server = http.createServer((req, res) => {
     req.on("end", () => {
       let body;
       try { body = JSON.parse(raw); } catch { return send(400, { error: { message: "invalid JSON" } }); }
-      if (body.stream) return send(400, { error: { message: "streaming is not supported by the stub" } });
       calls += 1;
+      if (body.stream) return streamAnswer(res, body, answerFor(body));
       send(200, {
         id: `stub-${calls}`,
         object: "chat.completion",
