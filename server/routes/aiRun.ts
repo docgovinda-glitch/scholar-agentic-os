@@ -9,6 +9,9 @@
  * Keys: BYOK keys arrive per request in the `x-ai-keyring` header (base64url
  * JSON). They live in memory for that request only: never stored, logged or
  * returned. Premium keys come from the vault and never leave the server.
+ *
+ * A base URL the user names is screened (`aiEndpointGuard`): https only, public
+ * addresses only, connection pinned. A blocked endpoint is skipped with a reason.
  */
 import { createHash, randomUUID } from "node:crypto";
 import type express from "express";
@@ -21,8 +24,9 @@ import { defaultAdapters } from "../../src/platform/router/adapters.ts";
 import { assignBadges, curateModels, type MeasuredSpeed } from "../../src/platform/router/modelCuration.ts";
 import { listLiveModels, ModelListError } from "../../src/platform/router/modelListers.ts";
 import type { Candidate, ProviderId, RouteRequest, RouterEvent } from "../../src/platform/router/types.ts";
+import { AiEndpointBlockedError, createAiFetch, screenCandidates } from "../src/ai/aiEndpointGuard.ts";
 
-const PROVIDERS = ["openai", "anthropic", "google", "groq", "deepseek", "mistral", "ollama", "lmstudio", "webllm"] as const;
+const PROVIDERS = ["openai", "anthropic", "google", "groq", "deepseek", "mistral", "ollama", "lmstudio", "webllm", "custom"] as const;
 const LOCAL = new Set<ProviderId>(["ollama", "lmstudio", "webllm"]);
 
 const keyringEntry = z.object({
@@ -120,7 +124,8 @@ const modelCache = new Map<string, { at: number; models: unknown }>();
 const MODEL_CACHE_MS = 6 * 60 * 60_000;
 
 export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}): void {
-  const adapters = deps.adapters ?? defaultAdapters();
+  const aiFetch = createAiFetch();
+  const adapters = deps.adapters ?? defaultAdapters(aiFetch);
   const breaker = deps.breaker ?? new CircuitBreaker(new MemoryBreakerStore());
   const listModels = deps.listModels ?? listLiveModels;
 
@@ -134,12 +139,17 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
     try { keyring = parseKeyring(req.headers["x-ai-keyring"]); } catch (e) { res.status(400).json({ error: (e as Error).message }); return; }
 
     const body = parsed.data;
-    const own = keyringToCandidates(keyring);
+    const screened = await screenCandidates(keyringToCandidates(keyring));
+    const own = screened.kept;
     const premium = deps.premium ? await deps.premium.candidates(userId, body.task).catch(() => ({ candidates: [] as Candidate[], unavailable: "Premium is temporarily unavailable." })) : { candidates: [] as Candidate[] };
     const cloudOwn = own.filter((c) => c.lane === "byok");
     const local = own.filter((c) => c.lane === "local");
     const chain = body.preferLane === "byok" ? [...cloudOwn, ...premium.candidates, ...local] : [...premium.candidates, ...cloudOwn, ...local];
 
+    if (chain.length === 0 && screened.blocked.length) {
+      res.status(400).json({ error: screened.blocked.map((b) => `${b.label}: ${b.reason}`).join("; "), code: "ai_endpoint_blocked" });
+      return;
+    }
     if (chain.length === 0) {
       res.status(400).json({
         error: premium.unavailable ? `${premium.unavailable} Add your own AI key or a local model in AI Access.` : "No AI is connected. Add your own AI key or a local model in AI Access.",
@@ -160,6 +170,9 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
     const byId = new Map(chain.map((c) => [c.id, c]));
 
     await pipeToSse(req, res, async function* (signal): AsyncGenerator<RouterEvent> {
+      for (const b of screened.blocked) {
+        yield { type: "candidate_skipped", candidateId: `blocked:${b.label}`, label: b.label, reason: "endpoint_blocked", detail: b.reason };
+      }
       for await (const ev of route(request, chain, signal, { site: "server", adapters, breaker, ...deps.routerOptions })) {
         if (ev.type === "metrics") {
           const c = byId.get(ev.candidateId);
@@ -184,12 +197,12 @@ export function registerAiRunRoutes(app: express.Express, deps: AiRunDeps = {}):
         const hit = modelCache.get(cacheKey);
         if (hit && Date.now() - hit.at < MODEL_CACHE_MS) return { provider: k.provider, models: hit.models };
         try {
-          const live = await listModels(k.provider, { apiKey: k.apiKey, baseUrl: k.baseUrl });
+          const live = await listModels(k.provider, { apiKey: k.apiKey, baseUrl: k.baseUrl, fetchImpl: aiFetch });
           const models = assignBadges(curateModels(k.provider, live), speeds);
           modelCache.set(cacheKey, { at: Date.now(), models });
           return { provider: k.provider, models };
         } catch (e) {
-          return { provider: k.provider, models: [], error: e instanceof ModelListError ? e.message : "Could not reach the provider" };
+          return { provider: k.provider, models: [], error: e instanceof ModelListError || e instanceof AiEndpointBlockedError ? e.message : "Could not reach the provider" };
         }
       })
     );

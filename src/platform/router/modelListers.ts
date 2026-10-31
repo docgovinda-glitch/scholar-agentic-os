@@ -125,6 +125,11 @@ export const LISTERS: Partial<Record<ProviderId, Lister>> = {
     return ollamaShape.parse(json).models.map((m) => ({ id: m.name, createdAt: m.modified_at ? Date.parse(m.modified_at) : undefined }));
   },
 
+  custom: async (ctx) => {
+    if (!ctx.baseUrl) throw new ModelListError("custom", undefined, "No endpoint address provided");
+    return fromOpenAiShape(await getJson("custom", `${ctx.baseUrl.replace(/\/$/, "")}/models`, ctx.apiKey ? { Authorization: `Bearer ${ctx.apiKey}` } : {}, ctx));
+  },
+
   lmstudio: async (ctx) => fromOpenAiShape(await getJson("lmstudio", `${ctx.baseUrl ?? "http://localhost:1234/v1"}/models`, {}, ctx)),
 };
 

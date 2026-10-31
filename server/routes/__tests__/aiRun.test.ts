@@ -47,6 +47,16 @@ describe("POST /api/ai/run", () => {
     expect(res.body.code).toBe("ai_provider_required");
   });
 
+  it("a custom endpoint on a private address is refused with the reason, and the key is not echoed", async () => {
+    const res = await request(app()).post("/api/ai/run")
+      .set("x-ai-keyring", keyring([{ provider: "custom", model: "m", apiKey: SECRET, baseUrl: "https://169.254.169.254/v1" }]))
+      .send(body);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("ai_endpoint_blocked");
+    expect(res.body.error).toContain("private");
+    expect(JSON.stringify(res.body)).not.toContain(SECRET);
+  });
+
   it("an unreadable key header is a 400", async () => {
     const res = await request(app()).post("/api/ai/run").set("x-ai-keyring", "%%%").send(body);
     expect(res.status).toBe(400);

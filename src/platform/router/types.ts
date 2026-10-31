@@ -2,7 +2,9 @@
 
 export type ProviderId =
   | "openai" | "anthropic" | "google" | "groq" | "deepseek" | "mistral"
-  | "ollama" | "lmstudio" | "webllm";
+  | "ollama" | "lmstudio" | "webllm"
+  /** Any OpenAI-compatible endpoint the user names (base URL required). */
+  | "custom";
 
 /** Who pays and where the call runs. */
 export type Lane = "premium" | "byok" | "local";
@@ -84,7 +86,7 @@ export interface Failure {
 /** The single event stream the UI renders. Every state change is one event. */
 export type RouterEvent =
   | { type: "route_start"; requestId: string; chain: Array<Pick<Candidate, "id" | "label" | "lane">> }
-  | { type: "candidate_skipped"; candidateId: string; label: string; reason: "circuit_open" | "context_too_small" | "no_credential"; detail: string }
+  | { type: "candidate_skipped"; candidateId: string; label: string; reason: "circuit_open" | "context_too_small" | "no_credential" | "endpoint_blocked"; detail: string }
   | { type: "attempt_start"; candidateId: string; label: string; lane: Lane; attempt: number; maxOutputTokens: number }
   | { type: "limit_warning"; candidateId: string; promptTokens: number; contextWindow: number; usedRatio: number; outputClampedTo: number }
   | { type: "token"; text: string }

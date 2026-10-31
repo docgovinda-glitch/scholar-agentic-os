@@ -281,5 +281,5 @@ export function ollamaAdapter(fetchImpl: FetchImpl = fetch): ProviderAdapter {
 /** Adapters keyed by provider, for `RouterOptions.adapters`. */
 export function defaultAdapters(fetchImpl: FetchImpl = fetch): Partial<Record<ProviderId, ProviderAdapter>> {
   const oa = openAiCompatibleAdapter(fetchImpl);
-  return { openai: oa, groq: oa, deepseek: oa, mistral: oa, lmstudio: oa, anthropic: anthropicAdapter(fetchImpl), google: geminiAdapter(fetchImpl), ollama: ollamaAdapter(fetchImpl) };
+  return { openai: oa, groq: oa, deepseek: oa, mistral: oa, lmstudio: oa, custom: oa, anthropic: anthropicAdapter(fetchImpl), google: geminiAdapter(fetchImpl), ollama: ollamaAdapter(fetchImpl) };
 }
