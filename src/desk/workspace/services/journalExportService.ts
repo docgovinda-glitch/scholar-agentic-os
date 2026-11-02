@@ -43,11 +43,11 @@ export type JournalExportAuthor =
     };
 
 export function getAuthorDisplayName(author: any): string {
-  if (!author) return "Lead Author";
+  if (!author) return "[Author name]";
   if (author.name) return author.name;
   const parts = [author.title, author.firstName, author.middleName, author.surname].filter(Boolean);
   if (parts.length > 0) return parts.join(" ");
-  return "Lead Author";
+  return "[Author name]";
 }
 
 export interface JournalExportParams {
@@ -354,7 +354,7 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
   const fontName = params.template === "ieee" || params.template === "acm" ? "Arial" : "Times New Roman";
   const authorList = params.authors && params.authors.length > 0
     ? params.authors
-    : [{ name: "Lead Researcher", affiliation: "Department of Computer Science & Engineering", email: "author@university.edu" }];
+    : [{ name: "[Author name]", affiliation: "[Affiliation]", email: "" }];
 
   const children: (Paragraph | Table)[] = [];
 
@@ -712,11 +712,11 @@ export function printJournalManuscript(params: JournalExportParams): void {
     return;
   }
 
-  const authorsHtml = (params.authors || [{ name: "Lead Author", affiliation: "University Department", email: "author@university.edu" }])
+  const authorsHtml = (params.authors?.length ? params.authors : [{ name: "[Author name]", affiliation: "[Affiliation]", email: "" }])
     .map((a, i) => `<span class="author-item"><strong>${getAuthorDisplayName(a)}</strong><sup>${i + 1}</sup></span>`)
     .join(", ");
 
-  const affiliationsHtml = (params.authors || [{ name: "Lead Author", affiliation: "University Department", email: "author@university.edu" }])
+  const affiliationsHtml = (params.authors?.length ? params.authors : [{ name: "[Author name]", affiliation: "[Affiliation]", email: "" }])
     .map((a, i) => `<div><sup>${i + 1}</sup> ${a.affiliation || ""}</div>`)
     .join("");
 

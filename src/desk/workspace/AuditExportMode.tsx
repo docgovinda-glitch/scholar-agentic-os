@@ -213,29 +213,19 @@ export default function AuditExportMode() {
   const [creditEnabled, setCreditEnabled] = useState(true);
   const [aiDisclosureEnabled, setAiDisclosureEnabled] = useState(true);
 
-  const defaultDataAvail = useMemo(() => {
-    if (primaryDatasets.length > 0) {
-      const names = primaryDatasets.map((d) => d.title || d.name || d.id).join(", ");
-      return `Primary empirical dataset [${primaryDatasets[0].id}] (${names}) is archived and accessible via the project vault repository. All remaining analytical telemetry and benchmark evaluation scripts generated during the current study are available from the corresponding author upon reasonable request.`;
-    }
-    return "All empirical simulation telemetry, benchmark datasets, and analysis scripts generated during this study are archived in the repository and available upon reasonable request.";
+  // Declarations are statements the authors make, so they start empty: only
+  // the authors know their funding, interests, contributions and data access.
+  // A starting draft that names their own datasets is offered, never filled in.
+  const datasetDraft = useMemo(() => {
+    if (primaryDatasets.length === 0) return "";
+    const names = primaryDatasets.map((d) => d.title || d.name || d.id).join(", ");
+    return `The data analysed in this study (${names}) are available from the corresponding author on reasonable request.`;
   }, [primaryDatasets]);
 
-  const [dataAvailabilityStatement, setDataAvailabilityStatement] = useState(
-    answers["data_availability_statement"] || defaultDataAvail
-  );
-  const [competingInterestsStatement, setCompetingInterestsStatement] = useState(
-    answers["competing_interests_statement"] ||
-      "The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper. This research received no specific external funding."
-  );
-  const [creditStatement, setCreditStatement] = useState(
-    answers["credit_statement"] ||
-      "Conceptualization: Lead Author; Methodology: Co-Author; Software & Formal Analysis: Lead Author; Investigation: All Authors; Writing – Original Draft: Lead Author; Writing – Review & Editing: All Authors."
-  );
-  const [aiDisclosureStatement, setAiDisclosureStatement] = useState(
-    answers["ai_disclosure_statement"] ||
-      "During the preparation of this work, the authors utilized Scholar Agentic OS strictly for orthographic refinement and literature gap synthesis. The authors reviewed and edited all content and take full responsibility for the manuscript."
-  );
+  const [dataAvailabilityStatement, setDataAvailabilityStatement] = useState(answers["data_availability_statement"] || "");
+  const [competingInterestsStatement, setCompetingInterestsStatement] = useState(answers["competing_interests_statement"] || "");
+  const [creditStatement, setCreditStatement] = useState(answers["credit_statement"] || "");
+  const [aiDisclosureStatement, setAiDisclosureStatement] = useState(answers["ai_disclosure_statement"] || "");
 
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
@@ -246,29 +236,16 @@ export default function AuditExportMode() {
   const [citationStyle, setCitationStyle] = useState<string>(
     answers["citation_style"] || "apa7"
   );
-  const [title, setTitle] = useState(
-    answers["working_title"] ||
-      (project as { title?: string })?.title ||
-      "Provable Bounds in Autonomous Research Workflows"
-  );
-  const [runningHead, setRunningHead] = useState(
-    answers["running_head"] || "PROVABLE BOUNDS IN AUTONOMOUS WORKFLOWS"
-  );
+  // The title page is the author's: start from what the project has, never a stand-in person.
+  const [title, setTitle] = useState(answers["working_title"] || (project as { title?: string })?.title || "");
+  const [runningHead, setRunningHead] = useState(answers["running_head"] || "");
   const [authorName, setAuthorName] = useState(
-    project?.authors?.[0]
-      ? `${project.authors[0].firstName} ${project.authors[0].surname}`
-      : "Dr. Elena Rostova"
+    project?.authors?.[0] ? `${project.authors[0].firstName} ${project.authors[0].surname}`.trim() : ""
   );
-  const [affiliation, setAffiliation] = useState(
-    project?.authors?.[0]?.affiliation || "Department of Computer Science & Quantum Information, University of Oxford"
-  );
-  const [orcid, setOrcid] = useState(answers["author_orcid"] || "0000-0002-1825-0097");
-  const [email, setEmail] = useState(
-    project?.authors?.[0]?.email || "e.rostova@oxford.ac.uk"
-  );
-  const [keywords, setKeywords] = useState(
-    answers["keywords"] || "Autonomous AI, Provenance Verification, Gate G7, Sub-Section Word Budgets, Peer Review Rebuttal"
-  );
+  const [affiliation, setAffiliation] = useState(project?.authors?.[0]?.affiliation || "");
+  const [orcid, setOrcid] = useState(answers["author_orcid"] || "");
+  const [email, setEmail] = useState(project?.authors?.[0]?.email || "");
+  const [keywords, setKeywords] = useState(answers["keywords"] || "");
 
   useEffect(() => {
     if (project) {
@@ -293,36 +270,33 @@ export default function AuditExportMode() {
       if (answers["citation_style"]) {
         setCitationStyle(answers["citation_style"]);
       }
-      if (!answers["data_availability_statement"] && defaultDataAvail) {
-        setDataAvailabilityStatement(defaultDataAvail);
+      for (const [key, set] of [
+        ["data_availability_statement", setDataAvailabilityStatement],
+        ["competing_interests_statement", setCompetingInterestsStatement],
+        ["credit_statement", setCreditStatement],
+        ["ai_disclosure_statement", setAiDisclosureStatement],
+        ["keywords", setKeywords],
+      ] as const) {
+        if (answers[key]) set(answers[key]);
       }
     }
-  }, [project, answers, defaultDataAvail]);
+  }, [project, answers]);
 
   const [isExporting, setIsExporting] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
 
   // Conductor Gate G7 Certification status
-  const g7Score = useMemo(() => {
-    let score = 70;
-    if (isWordCountCompliant) score += 10;
-    if (citationReconciliation.passed) score += 10;
-    if (voiceTelemetry.passed) score += 5;
-    if (dataAvailabilityEnabled && competingInterestsEnabled && creditEnabled && aiDisclosureEnabled) {
-      score += 5;
-    }
-    return Math.min(100, score);
-  }, [
-    isWordCountCompliant,
-    citationReconciliation.passed,
-    voiceTelemetry.passed,
-    dataAvailabilityEnabled,
-    competingInterestsEnabled,
-    creditEnabled,
-    aiDisclosureEnabled,
-  ]);
-
-  const g7CertifiedReady = g7Score >= 95;
+  // The share of the five checks that pass; nothing is granted up front.
+  const declarationsWritten = [
+    [dataAvailabilityEnabled, dataAvailabilityStatement],
+    [competingInterestsEnabled, competingInterestsStatement],
+    [creditEnabled, creditStatement],
+    [aiDisclosureEnabled, aiDisclosureStatement],
+  ].every(([on, text]) => on && String(text).trim().length > 0);
+  const titlePageComplete = [title, authorName, affiliation, email].every((v) => v.trim().length > 0);
+  const g7Checks = [isWordCountCompliant, citationReconciliation.passed, voiceTelemetry.passed, declarationsWritten, titlePageComplete];
+  const g7Score = Math.round((g7Checks.filter(Boolean).length / g7Checks.length) * 100);
+  const g7CertifiedReady = g7Checks.every(Boolean);
 
   // Append Declarations to Manuscript End-Matter
   const handleAppendDeclarations = useCallback(async () => {
@@ -330,16 +304,16 @@ export default function AuditExportMode() {
     setSaveStatus("Appending declarations...");
 
     let declarationsText = "\n\n## Declarations\n\n";
-    if (dataAvailabilityEnabled) {
+    if (dataAvailabilityEnabled && dataAvailabilityStatement.trim()) {
       declarationsText += `**Data & Primary Material Availability:** ${dataAvailabilityStatement}\n\n`;
     }
-    if (competingInterestsEnabled) {
+    if (competingInterestsEnabled && competingInterestsStatement.trim()) {
       declarationsText += `**Competing Interests / Funding Declaration:** ${competingInterestsStatement}\n\n`;
     }
-    if (creditEnabled) {
+    if (creditEnabled && creditStatement.trim()) {
       declarationsText += `**CRediT Author Contribution Statement:** ${creditStatement}\n\n`;
     }
-    if (aiDisclosureEnabled) {
+    if (aiDisclosureEnabled && aiDisclosureStatement.trim()) {
       declarationsText += `**Transparent Methodology & AI-Assisted Tool Disclosure:** ${aiDisclosureStatement}\n\n`;
     }
 
@@ -830,16 +804,21 @@ export default function AuditExportMode() {
                     Data & Primary Material Availability Statement
                   </span>
                 </label>
-                {primaryDatasets.length > 0 && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)]">
-                    Referencing Mode 2 Primary Data
-                  </span>
+                {datasetDraft && dataAvailabilityEnabled && !dataAvailabilityStatement.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setDataAvailabilityStatement(datasetDraft)}
+                    className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)] cursor-pointer"
+                  >
+                    Start from my datasets
+                  </button>
                 )}
               </div>
               {dataAvailabilityEnabled && (
                 <textarea
                   aria-label="Data Availability Statement"
                   rows={2}
+                  placeholder="Where readers can get your data, e.g. a repository and DOI, or 'available from the corresponding author on reasonable request'."
                   value={dataAvailabilityStatement}
                   onChange={(e) => setDataAvailabilityStatement(e.target.value)}
                   className="w-full text-xs p-2 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]"
@@ -864,6 +843,7 @@ export default function AuditExportMode() {
                 <textarea
                   aria-label="Competing Interests Statement"
                   rows={2}
+                  placeholder="Your funding sources and any competing interests, e.g. 'The authors declare no competing interests.' Only you can state this."
                   value={competingInterestsStatement}
                   onChange={(e) => setCompetingInterestsStatement(e.target.value)}
                   className="w-full text-xs p-2 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]"
@@ -888,6 +868,7 @@ export default function AuditExportMode() {
                 <textarea
                   aria-label="CRediT Statement"
                   rows={2}
+                  placeholder="Who did what, using CRediT roles, e.g. 'A. Author: Conceptualization, Writing – original draft. B. Author: Formal analysis.'"
                   value={creditStatement}
                   onChange={(e) => setCreditStatement(e.target.value)}
                   className="w-full text-xs p-2 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]"
@@ -912,6 +893,7 @@ export default function AuditExportMode() {
                 <textarea
                   aria-label="AI Disclosure Statement"
                   rows={2}
+                  placeholder="How you used AI tools in preparing this work and that you take responsibility for the content, as your journal requires."
                   value={aiDisclosureStatement}
                   onChange={(e) => setAiDisclosureStatement(e.target.value)}
                   className="w-full text-xs p-2 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]"
@@ -1018,6 +1000,7 @@ export default function AuditExportMode() {
               </label>
               <input
                 id="meta-title"
+                  placeholder="Your article title"
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -1034,6 +1017,7 @@ export default function AuditExportMode() {
               </label>
               <input
                 id="meta-running-head"
+                  placeholder="Short title for page headers"
                 type="text"
                 maxLength={50}
                 value={runningHead}
@@ -1052,6 +1036,7 @@ export default function AuditExportMode() {
                 </label>
                 <input
                   id="meta-author"
+                  placeholder="Your full name"
                   type="text"
                   value={authorName}
                   onChange={(e) => setAuthorName(e.target.value)}
@@ -1068,6 +1053,7 @@ export default function AuditExportMode() {
                 </label>
                 <input
                   id="meta-orcid"
+                  placeholder="0000-0000-0000-0000"
                   type="text"
                   value={orcid}
                   onChange={(e) => setOrcid(e.target.value)}
@@ -1086,6 +1072,7 @@ export default function AuditExportMode() {
                 </label>
                 <input
                   id="meta-affil"
+                  placeholder="Department, institution, city, country"
                   type="text"
                   value={affiliation}
                   onChange={(e) => setAffiliation(e.target.value)}
@@ -1102,6 +1089,7 @@ export default function AuditExportMode() {
                 </label>
                 <input
                   id="meta-email"
+                  placeholder="Corresponding author email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -1119,6 +1107,7 @@ export default function AuditExportMode() {
               </label>
               <input
                 id="meta-keywords"
+                  placeholder="4–6 keywords, separated by commas"
                 type="text"
                 value={keywords}
                 onChange={(e) => setKeywords(e.target.value)}

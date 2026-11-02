@@ -126,3 +126,20 @@ describe("resolveTexts", () => {
     expect(t).toEqual({ texts: { s1a: "x" }, unsorted: "Old words." });
   });
 });
+
+describe("back matter", () => {
+  const units = manuscriptUnits(blueprint);
+
+  it("keeps Declarations and References added in Delivery at the end, not as unsorted text", () => {
+    const md = "## Introduction\n\n### § Problem Domain\n\nDecoders are slow.\n\n## Declarations\n\n**Funding:** None.\n\n## References\n\n1. Smith (2024).";
+    const t = splitLegacyManuscript(md, units);
+    expect(t.unsorted).toBe("");
+    expect(t.backMatter).toBe("## Declarations\n\n**Funding:** None.\n\n## References\n\n1. Smith (2024).");
+    const again = assembleManuscript(units, { ...t, texts: { ...t.texts, s2a: "We ran a trial." } });
+    expect(again.indexOf("## Methods")).toBeLessThan(again.indexOf("## Declarations"));
+    expect(again.trimEnd().endsWith("1. Smith (2024).")).toBe(true);
+    // And it survives storage.
+    expect(loadTexts(serializeTexts(t), undefined, units).backMatter).toBe(t.backMatter);
+  });
+});
+

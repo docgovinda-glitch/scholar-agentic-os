@@ -39,9 +39,16 @@ export interface ManuscriptTexts {
    * sub-section heading. Kept so nothing the author wrote is lost.
    */
   unsorted: string;
+  /**
+   * Closing matter added elsewhere (Declarations from Delivery, a References
+   * list, Acknowledgements, Appendices). Kept at the end, as written.
+   */
+  backMatter?: string;
 }
 
 export const EMPTY_TEXTS: ManuscriptTexts = { texts: {}, unsorted: "" };
+
+const BACK_MATTER = /^(declarations?|references|bibliography|acknowledg(e)?ments?|appendi(x|ces)|funding|conflicts? of interest|competing interests|data availability|author contributions?)\b/i;
 
 export function countWords(text: string | undefined): number {
   return (text ?? "").trim().split(/\s+/).filter(Boolean).length;
@@ -187,12 +194,14 @@ export function loadTexts(rawSections: unknown, legacyMarkdown: string | undefin
     }
   }
   if (parsed && typeof parsed === "object" && "texts" in parsed) {
-    const p = parsed as { texts?: unknown; unsorted?: unknown };
+    const p = parsed as { texts?: unknown; unsorted?: unknown; backMatter?: unknown };
     const texts: Record<string, string> = {};
     if (p.texts && typeof p.texts === "object") {
       for (const [k, v] of Object.entries(p.texts as Record<string, unknown>)) if (typeof v === "string") texts[k] = v;
     }
-    return { texts, unsorted: typeof p.unsorted === "string" ? p.unsorted : "" };
+    const out: ManuscriptTexts = { texts, unsorted: typeof p.unsorted === "string" ? p.unsorted : "" };
+    if (typeof p.backMatter === "string" && p.backMatter.trim()) out.backMatter = p.backMatter;
+    return out;
   }
   return splitLegacyManuscript(legacyMarkdown ?? "", units);
 }
@@ -206,6 +215,9 @@ export function splitLegacyManuscript(markdown: string, units: ManuscriptUnit[])
   const unsorted: string[] = [];
   // Split before every ## / ### heading, keeping the heading with its block.
   const blocks = text.split(/\n(?=#{2,3}\s)/);
+  // Everything from the first closing heading (## Declarations, ## References…) on is back matter.
+  const backAt = blocks.findIndex((b) => /^##\s/.test(b) && BACK_MATTER.test(b.replace(/^##\s+/, "")));
+  const backMatter = backAt >= 0 ? blocks.splice(backAt).join("\n").trim() : "";
   for (const block of blocks) {
     const m = block.match(/^(#{2,3})\s+(.*)\n?([\s\S]*)$/);
     if (!m) {
@@ -228,7 +240,9 @@ export function splitLegacyManuscript(markdown: string, units: ManuscriptUnit[])
       unsorted.push(block.trim());
     }
   }
-  return { texts, unsorted: unsorted.join("\n\n") };
+  const out: ManuscriptTexts = { texts, unsorted: unsorted.join("\n\n") };
+  if (backMatter) out.backMatter = backMatter;
+  return out;
 }
 
 /** The whole manuscript as markdown, for Review, Delivery and export. */
@@ -244,11 +258,12 @@ export function assembleManuscript(units: ManuscriptUnit[], t: ManuscriptTexts):
       out.push((t.texts[u.id] ?? "").trim());
     }
   }
+  if (t.backMatter?.trim()) out.push(t.backMatter.trim());
   return out.join("\n\n").trim() ? out.join("\n\n").trim() + "\n" : "";
 }
 
 export function serializeTexts(t: ManuscriptTexts): string {
-  return JSON.stringify({ version: 1, texts: t.texts, unsorted: t.unsorted });
+  return JSON.stringify({ version: 1, texts: t.texts, unsorted: t.unsorted, ...(t.backMatter?.trim() ? { backMatter: t.backMatter } : {}) });
 }
 
 /**
@@ -274,7 +289,7 @@ export function writtenContext(units: ManuscriptUnit[], t: ManuscriptTexts, exce
 }
 
 export function totalWords(t: ManuscriptTexts): number {
-  return Object.values(t.texts).reduce((n, s) => n + countWords(s), 0) + countWords(t.unsorted);
+  return Object.values(t.texts).reduce((n, s) => n + countWords(s), 0) + countWords(t.unsorted) + countWords(t.backMatter);
 }
 
 /** The next unit to write, following the writing order: the first one not yet near its target. */
@@ -311,5 +326,5 @@ export function reconcileTexts(t: ManuscriptTexts, units: ManuscriptUnit[]): Man
     else if (body.trim()) orphans.push(body.trim());
   }
   if (orphans.length === 0) return t;
-  return { texts, unsorted: [t.unsorted.trim(), ...orphans].filter(Boolean).join("\n\n") };
+  return { ...t, texts, unsorted: [t.unsorted.trim(), ...orphans].filter(Boolean).join("\n\n") };
 }
