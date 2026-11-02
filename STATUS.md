@@ -28,7 +28,7 @@
 | T6 Hotfix 2 | DONE | |
 | T7 Edge Function | DONE | v11 |
 | T8 Purge | DONE (order deviation) | |
-| T9 Migration reconciliation | DONE (repo side; production apply recorded in §1) | `scripts/db/schema-diff.sh` compares production (read-only fingerprint over the Management API) with a fresh replay on plain Postgres (`scripts/db/supabase-stub.sql`). Found 2026-11-02: 5 production-only tables used by no code and empty (`pending_password_resets` with a plain-text `new_password` column, 4 `pocket_*` tables writable by any signed-in user), and ID-document objects that only the replay creates. `20261102000000_reconcile_schema_with_production` drops the tables only while empty and removes the ID-document leftovers. Remaining known differences: `profiles.is_approved` and `is_username_approved()` (legacy, production-only), pgvector in `public` vs `extensions`, Supabase platform objects |
+| T9 Migration reconciliation | DONE (applied to production 2026-11-02, §1) | `scripts/db/schema-diff.sh` compares production (read-only fingerprint over the Management API) with a fresh replay on plain Postgres (`scripts/db/supabase-stub.sql`). Found 2026-11-02: 5 production-only tables used by no code and empty (`pending_password_resets` with a plain-text `new_password` column, 4 `pocket_*` tables writable by any signed-in user), and ID-document objects that only the replay creates. `20261102000000_reconcile_schema_with_production` drops the tables only while empty and removes the ID-document leftovers. Remaining known differences: `profiles.is_approved` and `is_username_approved()` (legacy, production-only), pgvector in `public` vs `extensions`, Supabase platform objects |
 | T10 Production readiness | DONE (agent side) | PR CI + audit gate, deploy waits for live commit + deep health + smoke, uptime workflow, Render health check path (#86); deploy check accepts a newer live commit that contains the run's commit (#99). Owner-only: branch protection, error tracking account, rollback drill (§5) |
 | T11 AUDIT findings | PARTIAL | see section 3 |
 | B1 Product audit | FIRST PASS + AI map | `PRODUCT_AUDIT.md`; area g mapped in `docs/AI-CALL-MAP.md` (#94) |
@@ -65,6 +65,7 @@
 | 2026-10-30 18:15Z | SQL `20261030170000_credit_amount_must_be_positive` (#136) via Management API; recorded in `schema_migrations` | function defs snapshot `~/backups/credit-functions-20261030T181524Z.json` (agent machine) | `grant_credits(-1)` and `deduct_credits(0)` → 22023, no ledger rows; anon/authenticated execute still false | re-create both functions from the snapshot |
 | 2026-10-30 18:47Z | Final check after #137 deployed (live `afcba5d`; #138 is docs only) | — | production smoke 35/35 (`scripts/smoke-prod.sh`); `/api/health` healthy | n/a |
 | 2026-10-31 → 2026-11-02 | Deploys #140–#144, the AI router (code only, no SQL, no env changes) | live `4b54a0e` (#139) | `/api/health` commit `30cc719` (#144); production smoke 38/38, including the 3 new AI router checks (the cloud-metadata endpoint is refused) | redeploy previous |
+| 2026-11-02 09:14Z | SQL `20261102000000_reconcile_schema_with_production` (#149) via Management API, recorded in `schema_migrations` | 5 empty, unused tables (`pending_password_resets`, 4 `pocket_*`); definitions and row counts (all 0) in `~/backups/dead-tables-20261102T091312Z.txt` (agent machine) | tables gone; `scripts/db/schema-diff.sh` shows only the documented differences (T9); production smoke 38/38 | re-create from the snapshot definitions (tables were empty) |
 
 ## T5 results (2026-10-29, read-only, `default_transaction_read_only = on`, counts only)
 
@@ -160,6 +161,10 @@ Later PRs were opened by the agent and merged by it (owner-authorized) only afte
 | #142 | All AI connections sent (keyring); routing notices; AI Access shows the best models only, with evidence |
 | #143 | Ask Scholar: browser-side answers are announced; true timeout message |
 | #144 | Workspace AI steps: one live status line with Stop |
+| #145 | Docs and production smoke after the AI router |
+| #147 | Invented content removed from slide templates, theme previews and Journal Revision |
+| #148 | Theme sample KPIs and an unverifiable licence claim removed |
+| #149 | T9: production schema compared with the migrations; drift reconciled |
 
 ---
 
