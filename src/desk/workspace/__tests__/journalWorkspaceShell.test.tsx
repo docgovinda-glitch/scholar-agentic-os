@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import ResearchWorkspace from "../ResearchWorkspace";
 import * as api from "../../api";
 import type { ProjectView } from "../../types";
@@ -74,5 +74,17 @@ describe("Journal workspace frame", () => {
     expect(await screen.findByText("Reviewer Panel")).toBeInTheDocument();
     fireEvent.click(within(header).getByRole("button", { name: "Activity" }));
     expect(within(header).getByRole("button", { name: "Activity" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("each view's tab goes to that view's stage, Delivery included", async () => {
+    const onStageChange = vi.fn();
+    render(<ResearchWorkspace projectId="proj-shell" initialStage="definition" onStageChange={onStageChange} />);
+    const header = await screen.findByTestId("apple-studio-header");
+    for (const [tab, stage] of [["Evidence", "vault_sources"], ["Studio", "draft"], ["Review", "peer_review"], ["Delivery", "export"], ["Blueprint", "definition"]]) {
+      fireEvent.click(within(header).getByRole("tab", { name: tab }));
+      expect(onStageChange).toHaveBeenLastCalledWith(stage);
+      expect(within(header).getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
+    }
+    await waitFor(() => expect(api.saveIntakeAnswers).toHaveBeenCalledWith("proj-shell", { current_mode: "audit_export", current_stage: "export" }));
   });
 });

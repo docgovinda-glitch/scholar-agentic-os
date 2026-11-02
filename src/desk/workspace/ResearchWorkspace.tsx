@@ -189,12 +189,12 @@ function ResearchWorkspaceInner({
             : "blueprint"
         }
         onPhaseSelect={(phase: AppleStudioPhaseId) => {
-          const modeMap: Record<AppleStudioPhaseId, "protocol" | "evidence" | "studio" | "referee" | "audit"> = {
+          const modeMap: Record<AppleStudioPhaseId, "protocol" | "evidence" | "studio" | "referee" | "audit_export"> = {
             blueprint: "protocol",
             evidence: "evidence",
             studio: "studio",
             review: "referee",
-            delivery: "audit",
+            delivery: "audit_export",
           };
           setMode(modeMap[phase]);
         }}
