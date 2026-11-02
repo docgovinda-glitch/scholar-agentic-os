@@ -61,16 +61,16 @@ export function AssignmentSubmissionStage({
 
   // Customizable Cover Sheet Metadata
   const [studentName, setStudentName] = useState(
-    project?.answers?.["student_name"] || "Academic Candidate"
+    project?.answers?.["student_name"] || ""
   );
   const [studentId, setStudentId] = useState(
-    project?.answers?.["student_id"] || "SCH-2026-X01"
+    project?.answers?.["student_id"] || ""
   );
   const [courseName, setCourseName] = useState(
-    project?.answers?.["course_name"] || projectState.brief.courseDetails?.courseName || "Academic Course"
+    project?.answers?.["course_name"] || projectState.brief.courseDetails?.courseName || ""
   );
   const [institutionName, setInstitutionName] = useState(
-    project?.answers?.["institution"] || "University Faculty of Arts & Sciences"
+    project?.answers?.["institution"] || ""
   );
   const [showMetadataForm, setShowMetadataForm] = useState(false);
 
@@ -114,10 +114,10 @@ export function AssignmentSubmissionStage({
       }
       await exportAssignmentToDocx({
         title: assignmentTitle,
-        studentName: studentName || "Academic Candidate",
-        studentId: studentId || "SCH-2026-X01",
-        courseName: courseName || projectState.brief.courseDetails?.courseName || "Academic Course",
-        institution: institutionName || "University Faculty of Arts & Sciences",
+        studentName: studentName || undefined,
+        studentId: studentId || undefined,
+        courseName: courseName || projectState.brief.courseDetails?.courseName || undefined,
+        institution: institutionName || undefined,
         brief: projectState.brief,
         sections: activeSections,
         sources: projectState.sources.curated,
@@ -142,10 +142,10 @@ export function AssignmentSubmissionStage({
       }
       exportAssignmentToPdf({
         title: assignmentTitle,
-        studentName: studentName || "Academic Candidate",
-        studentId: studentId || "SCH-2026-X01",
-        courseName: courseName || projectState.brief.courseDetails?.courseName || "Academic Course",
-        institution: institutionName || "University Faculty of Arts & Sciences",
+        studentName: studentName || undefined,
+        studentId: studentId || undefined,
+        courseName: courseName || projectState.brief.courseDetails?.courseName || undefined,
+        institution: institutionName || undefined,
         brief: projectState.brief,
         sections: activeSections,
         sources: projectState.sources.curated,

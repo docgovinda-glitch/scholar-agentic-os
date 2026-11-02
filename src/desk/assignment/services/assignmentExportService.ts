@@ -38,6 +38,18 @@ import {
 } from "./referenceListGenerator";
 import { isTutorialOrShortQABrief } from "../../../utils/briefExtractor";
 
+const ACADEMIC_LEVEL_NAMES: Record<string, string> = {
+  high_school: "High school",
+  undergraduate: "Undergraduate",
+  postgraduate: "Postgraduate",
+  doctoral: "Doctoral",
+};
+
+/** The brief's academic level in words, or "—" when the brief doesn't say. */
+export function academicLevelName(level: string | undefined): string {
+  return (level && ACADEMIC_LEVEL_NAMES[level]) || "—";
+}
+
 export interface AssignmentExportParams {
   title: string;
   studentName?: string;
@@ -109,10 +121,11 @@ export function downloadBlob(blob: Blob, filename: string): void {
 export async function generateAssignmentDocx(params: AssignmentExportParams): Promise<Blob> {
   const {
     title,
-    studentName = "Candidate",
-    studentId = "SCH-2026-X01",
-    institution = "University Faculty of Arts & Sciences",
-    courseName = params.brief.courseDetails?.courseName || "Academic Studies",
+    // Cover details are the student's own; a missing one is shown as missing, never invented.
+    studentName = "—",
+    studentId = "—",
+    institution = "",
+    courseName = params.brief.courseDetails?.courseName || "",
     brief,
     sections,
     sources,
@@ -132,9 +145,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
   });
 
   const citationStyleLabel = (brief.citationStyle || "harvard").toUpperCase();
-  const academicLevelLabel = brief.academicLevel === "postgraduate"
-    ? "Postgraduate (Level 7 / Master's)"
-    : "Undergraduate (Level 6 / Bachelor's)";
+  const academicLevelLabel = academicLevelName(brief.academicLevel);
 
   // Standard 1-inch margins (1440 twips / dxa)
   const academicMargins = {
@@ -399,7 +410,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
           spacing: { line: 360, after: 140 },
           children: [
             new TextRun({
-              text: "[Section drafted in accordance with assignment brief.]",
+              text: "[Not drafted yet]",
               font: "Times New Roman",
               size: 24, // 12pt
               italics: true,
@@ -579,10 +590,11 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
 
   const {
     title,
-    studentName = "Candidate",
-    studentId = "SCH-2026-X01",
-    institution = "University Faculty of Arts & Sciences",
-    courseName = params.brief.courseDetails?.courseName || "Academic Studies",
+    // Cover details are the student's own; a missing one is shown as missing, never invented.
+    studentName = "—",
+    studentId = "—",
+    institution = "",
+    courseName = params.brief.courseDetails?.courseName || "",
     brief,
     sections,
     sources,
@@ -624,7 +636,7 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
         .filter(Boolean)
         .map((p) => `<p>${p.replace(/^#+\s*/, "")}</p>`)
         .join("");
-      return `<section class="academic-section"><h2>${s.title}</h2>${paras || "<p><em>[Section complete]</em></p>"}</section>`;
+      return `<section class="academic-section"><h2>${s.title}</h2>${paras || "<p><em>[Not drafted yet]</em></p>"}</section>`;
     })
     .join("\n");
 
@@ -749,7 +761,7 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
     <table class="meta-table">
       <tr><td class="label">Candidate:</td><td>${studentName}</td></tr>
       <tr><td class="label">Candidate ID:</td><td>${studentId}</td></tr>
-      <tr><td class="label">Academic Level:</td><td>${brief.academicLevel === "postgraduate" ? "Postgraduate (Level 7)" : "Undergraduate (Level 6)"}</td></tr>
+      <tr><td class="label">Academic Level:</td><td>${academicLevelName(brief.academicLevel)}</td></tr>
       <tr><td class="label">Word Count:</td><td>${computedWordCount.toLocaleString()} words (Target: ${brief.targetWordCount.toLocaleString()})</td></tr>
       <tr><td class="label">Citation Style:</td><td>${citationStyleLabel}</td></tr>
       <tr><td class="label">Submission Date:</td><td>${formattedDate}</td></tr>
