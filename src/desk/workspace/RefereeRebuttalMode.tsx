@@ -14,6 +14,8 @@ import {
 } from "../api";
 import { normalizeUnicodeNFC } from "../../document_intelligence/index";
 import { safeParseAnswerField } from "../../shared/projectStateSchema";
+import RevisionRoundPanel from "../journal/RevisionRoundPanel";
+import type { RevisionRound } from "../../domain/journal/revision";
 
 export const REFEREE_PERSONAS: Array<{
   role: RefereeRole;
@@ -241,20 +243,20 @@ export default function RefereeRebuttalMode() {
 
   // Formatted Rebuttal Letter Text for Export
   const formattedRebuttalLetter = useMemo(() => {
-    let letter = `# Point-by-Point Author Response & Rebuttal Letter\n\n`;
+    let letter = `# Practice response to the simulated review panel\n\n`;
     letter += `**Manuscript Title:** ${workingTitle}\n`;
     letter += `**Date:** ${new Date().toLocaleDateString()}\n\n`;
-    letter += `Dear Editors and Reviewers,\n\nWe express our sincere gratitude to the Editorial Board and the five peer reviewers for their constructive, rigorous evaluations. Below, we address each critique point-by-point, detailing our methodological, theoretical, and textual revisions.\n\n---\n\n`;
+    letter += `These are AI-simulated reviewer comments for practice before submission, not reviews from a journal.\n\n---\n\n`;
 
     rebuttalMatrix.forEach((m, idx) => {
       letter += `### Reviewer Comment ${idx + 1} (${m.referee} — ${m.lens})\n`;
       letter += `**Target Section:** ${m.section}\n`;
       letter += `**Critique:** "${m.critique}"\n\n`;
-      letter += `**Author Response:** ${m.authorResponse || "We concur with the reviewer's observation and have updated the manuscript accordingly."}\n\n`;
+      letter += `**Author Response:** ${m.authorResponse?.trim() || "_Not yet written._"}\n\n`;
       if (m.diff?.replace) {
         letter += `**Manuscript Revision:**\n> "${m.diff.replace}"\n\n`;
       }
-      letter += `**Status:** ${m.status || "Accepted & Revised"}\n\n---\n\n`;
+      letter += m.status ? `**Status:** ${m.status}\n\n---\n\n` : `---\n\n`;
     });
 
     return letter;
@@ -327,6 +329,19 @@ export default function RefereeRebuttalMode() {
 
       {/* WORKBENCH BODY: 2 COLUMN SPLIT */}
       <div className="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto w-full space-y-8">
+        {/* The journal's real reviews come first; the simulated panel is practice before submission. */}
+        <RevisionRoundPanel
+          stored={answers["revision_round"]}
+          manuscript={manuscriptText}
+          title={workingTitle}
+          journal={String(answers["target_journal"] || "").trim() || undefined}
+          onSave={async (round: RevisionRound | null) => {
+            if (!effectiveProjectId) return;
+            const saved = await saveIntakeAnswers(effectiveProjectId, { ...(project?.answers || answers), revision_round: round ? JSON.stringify(round) : "" });
+            setProject(saved);
+          }}
+        />
+
         {/* TOP SECTION: 5-REFEREE PANEL SIMULATOR */}
         <section
           aria-labelledby="referee-panel-heading"
