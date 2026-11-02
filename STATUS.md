@@ -28,7 +28,7 @@
 | T6 Hotfix 2 | DONE | |
 | T7 Edge Function | DONE | v11 |
 | T8 Purge | DONE (order deviation) | |
-| T9 Migration reconciliation | PARTIAL | fresh-DB replay works with 2 documented workarounds (`authentic_id`, premium_requests order); schema diff vs production not possible from sandbox (no raw TCP for `pg_dump`) |
+| T9 Migration reconciliation | DONE (repo side; production apply recorded in §1) | `scripts/db/schema-diff.sh` compares production (read-only fingerprint over the Management API) with a fresh replay on plain Postgres (`scripts/db/supabase-stub.sql`). Found 2026-11-02: 5 production-only tables used by no code and empty (`pending_password_resets` with a plain-text `new_password` column, 4 `pocket_*` tables writable by any signed-in user), and ID-document objects that only the replay creates. `20261102000000_reconcile_schema_with_production` drops the tables only while empty and removes the ID-document leftovers. Remaining known differences: `profiles.is_approved` and `is_username_approved()` (legacy, production-only), pgvector in `public` vs `extensions`, Supabase platform objects |
 | T10 Production readiness | DONE (agent side) | PR CI + audit gate, deploy waits for live commit + deep health + smoke, uptime workflow, Render health check path (#86); deploy check accepts a newer live commit that contains the run's commit (#99). Owner-only: branch protection, error tracking account, rollback drill (§5) |
 | T11 AUDIT findings | PARTIAL | see section 3 |
 | B1 Product audit | FIRST PASS + AI map | `PRODUCT_AUDIT.md`; area g mapped in `docs/AI-CALL-MAP.md` (#94) |
@@ -216,7 +216,7 @@ Earlier deliverables (`SYSTEM_MAP.md`, `SETUP.md`, `AUDIT.md`, `PROD_CHECKS.md`,
 3. **Branch protection on `main`** (require CI and E2E checks) — a GitHub setting the agent has no tool for.
 4. **Deploy smoke secrets (optional):** add the `SMOKE_*` repository secrets so `deploy.yml` runs the production smoke suite after each deploy.
 5. **Error tracking:** create an account (e.g. Sentry free tier) and add its DSN; listed in `PRODUCT_BACKLOG.md`.
-6. **Production schema diff (T9):** compare production's schema with a fresh replay (`scripts/db/replay-migrations.sh`); needs direct Postgres access, which the agent sandbox does not have.
+6. **Production schema diff (T9):** done by the agent with `scripts/db/schema-diff.sh` (read-only on production). Re-run it after any schema change made outside migrations.
 7. **Send `USER_NOTICE.md`** only after items 1 and the checklist in that file.
 
 **Known gaps (not blocking, recorded):**
