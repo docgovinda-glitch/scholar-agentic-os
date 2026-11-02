@@ -60,7 +60,7 @@ export function buildThesisDocx(data: ThesisProjectData): Document {
 export const thesisDocxBlob = (data: ThesisProjectData): Promise<Blob> => packDocxToBlob(buildThesisDocx(data));
 
 /** A file name from the title: letters, digits and dashes only. */
-export function thesisFileName(title: string, ext: "docx" | "md"): string {
-  const base = title.normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").slice(0, 80) || "thesis";
+export function thesisFileName(title: string, ext: "docx" | "md", fallback = "thesis"): string {
+  const base = title.normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").slice(0, 80) || fallback;
   return `${base}.${ext}`;
 }

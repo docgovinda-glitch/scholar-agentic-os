@@ -252,9 +252,13 @@ router.post(
     const dialect = req.body?.dialect === "en-US" ? "en-US" : "en-GB";
 
     const answers = (record.answers || {}) as Record<string, unknown>;
-    const title = String(answers.title || answers.working_title || "").trim();
+    // The Proposal workspace saves its title as proposalTitle; older projects used title / working_title.
+    const title = String(answers.proposalTitle || answers.title || answers.working_title || "").trim();
     const agency = String(answers.agency || answers.fundingAgency || "");
     const mechanism = String(answers.mechanism || "");
+    const hypothesis = String(answers.overarchingHypothesis || "").trim();
+    const aims = (Array.isArray(answers.specificAims) ? answers.specificAims : [])
+      .filter((a): a is string => typeof a === "string" && a.trim().length > 0);
     if (!title || !sectionTitle) {
       return res.status(400).json({ error: "Add your proposal title and the section title before drafting." });
     }
@@ -306,7 +310,7 @@ router.post(
 
     const systemPrompt = `You are an elite academic grant writer specializing in ${agency} (${mechanism}) applications.
 Draft the "${sectionTitle}" section adhering strictly to high-rigour scholarly conventions.
-Target word count: approximately ${targetWords} words.
+${hypothesis ? `Central hypothesis (the section must be consistent with it): ${hypothesis}\n` : ""}${aims.length ? `Specific aims:\n${aims.map((a, i) => `Aim ${i + 1}. ${a}`).join("\n")}\n` : ""}Target word count: approximately ${targetWords} words.
 Scholarly dialect: ${dialect}.
 
 CITATION RULES:

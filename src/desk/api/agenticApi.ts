@@ -564,6 +564,18 @@ export async function draftThesisChapter(projectId: string, payload: ThesisChapt
   };
 }
 
+/** Drafts one proposal section with the user's AI, grounded in retrieved and Vault sources. */
+export async function draftProposalSection(
+  projectId: string,
+  payload: { sectionTitle: string; targetWords: number; prompt?: string }
+): Promise<{ content: string; bibliography: string }> {
+  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/proposal/draft-section`, "POST", payload);
+  if (!res.ok) throw await apiError(res, "The section could not be drafted");
+  const body = (await res.json()) as { content?: unknown; bibliography?: unknown };
+  if (typeof body.content !== "string" || !body.content.trim()) throw new Error("The AI returned an empty section. Nothing was changed.");
+  return { content: body.content, bibliography: typeof body.bibliography === "string" ? body.bibliography : "" };
+}
+
 export interface ThesisChapterAuditResponse {
   projectId: string;
   alignmentScore: number;
