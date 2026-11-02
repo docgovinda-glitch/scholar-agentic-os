@@ -555,24 +555,26 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
     children.push(...contentElements);
   });
 
-  // ── Mandatory Journal Declarations ──
-  children.push(
-    new Paragraph({
-      text: "Declarations",
-      heading: HeadingLevel.HEADING_1,
-      spacing: { before: 400, after: 160 },
-      run: { font: fontName, bold: true, size: 26 },
-    })
-  );
-
+  // ── Declarations: only the statements the authors wrote ──
   const decl = params.declarations || {};
   const declarationItems = [
-    { label: "Ethics Approval and Consent to Participate", value: decl.ethicsApproval || "Not applicable. This study does not involve human subjects or animal experiments." },
-    { label: "Funding", value: decl.funding || "This research did not receive any specific grant from funding agencies in the public, commercial, or not-for-profit sectors." },
-    { label: "Competing Interests", value: decl.conflictOfInterest || "The authors declare that they have no competing financial or non-financial interests that could have influenced the work reported in this paper." },
-    { label: "Data and Code Availability", value: decl.dataAvailability || "All empirical simulation telemetry and analytical evaluation scripts generated during the current study are available in the project repository upon request." },
-    { label: "Authors' Contributions", value: decl.authorContributions || "All authors contributed substantially to study conceptualization, theoretical formulation, empirical evaluation, and manuscript revision." },
-  ];
+    { label: "Ethics Approval and Consent to Participate", value: decl.ethicsApproval },
+    { label: "Funding", value: decl.funding },
+    { label: "Competing Interests", value: decl.conflictOfInterest },
+    { label: "Data and Code Availability", value: decl.dataAvailability },
+    { label: "Authors' Contributions", value: decl.authorContributions },
+  ].filter((d): d is { label: string; value: string } => typeof d.value === "string" && d.value.trim().length > 0);
+
+  if (declarationItems.length > 0) {
+    children.push(
+      new Paragraph({
+        text: "Declarations",
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 400, after: 160 },
+        run: { font: fontName, bold: true, size: 26 },
+      })
+    );
+  }
 
   declarationItems.forEach((item) => {
     children.push(
@@ -595,23 +597,18 @@ export function buildJournalDocxDocument(params: JournalExportParams): Document 
     );
   });
 
-  // ── References / Bibliography ──
-  children.push(
-    new Paragraph({
-      text: "References",
-      heading: HeadingLevel.HEADING_1,
-      spacing: { before: 400, after: 160 },
-      run: { font: fontName, bold: true, size: 26 },
-    })
-  );
-
-  const refs = params.references && params.references.length > 0
-    ? params.references
-    : [
-        "Castro, M., & Liskov, B. (2002). Practical Byzantine fault tolerance and proactive recovery. ACM Transactions on Computer Systems (TOCS), 20(4), 398-461.",
-        "Lamport, L., Shostak, R., & Pease, M. (1982). The Byzantine generals problem. ACM Transactions on Programming Languages and Systems, 4(3), 382-401.",
-        "Ongaro, D., & Ousterhout, J. (2014). In search of an understandable consensus algorithm. USENIX Annual Technical Conference, 305-319.",
-      ];
+  // ── References: only the list given (the manuscript usually carries its own) ──
+  const refs = params.references ?? [];
+  if (refs.length > 0) {
+    children.push(
+      new Paragraph({
+        text: "References",
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 400, after: 160 },
+        run: { font: fontName, bold: true, size: 26 },
+      })
+    );
+  }
 
   refs.forEach((refLine, idx) => {
     const isNumbered = /^\s*\[?\d+\]?/.test(refLine);
@@ -720,6 +717,15 @@ export function printJournalManuscript(params: JournalExportParams): void {
     .map((a, i) => `<div><sup>${i + 1}</sup> ${a.affiliation || ""}</div>`)
     .join("");
 
+  const declarationsHtml = [
+    ["Funding", params.declarations?.funding],
+    ["Conflict of Interest", params.declarations?.conflictOfInterest],
+    ["Data Availability", params.declarations?.dataAvailability],
+  ]
+    .filter(([, v]) => typeof v === "string" && v.trim())
+    .map(([k, v]) => `<p><strong>${k}:</strong> ${v}</p>`)
+    .join("");
+
   const sectionsHtml = params.sections
     .map((sec, i) => {
       if (sec.section.toLowerCase().includes("abstract")) return "";
@@ -733,9 +739,7 @@ export function printJournalManuscript(params: JournalExportParams): void {
     })
     .join("");
 
-  const referencesHtml = (params.references || [
-    "Castro, M., & Liskov, B. (2002). Practical Byzantine fault tolerance. ACM TOCS, 20(4), 398-461.",
-  ])
+  const referencesHtml = (params.references ?? [])
     .map((r, i) => `<div class="ref-item">[${i + 1}] ${r}</div>`)
     .join("");
 
@@ -849,16 +853,14 @@ export function printJournalManuscript(params: JournalExportParams): void {
     ${params.keywords ? `<div class="keywords"><strong>Keywords—</strong> ${params.keywords.join("; ")}</div>` : ""}
   </div>` : ""}
   <div class="manuscript-body">${sectionsHtml}</div>
-  <div class="declarations">
+  ${declarationsHtml ? `<div class="declarations">
     <h2>Declarations</h2>
-    <p><strong>Funding:</strong> ${params.declarations?.funding || "None reported."}</p>
-    <p><strong>Conflict of Interest:</strong> ${params.declarations?.conflictOfInterest || "The authors declare no competing interests."}</p>
-    <p><strong>Data Availability:</strong> ${params.declarations?.dataAvailability || "Data available upon reasonable request."}</p>
-  </div>
-  <div class="references">
+    ${declarationsHtml}
+  </div>` : ""}
+  ${referencesHtml ? `<div class="references">
     <h2>References</h2>
     ${referencesHtml}
-  </div>
+  </div>` : ""}
 </body>
 </html>`;
 
@@ -873,7 +875,8 @@ export function generateJournalLatex(params: JournalExportParams): { tex: string
   const isIEEE = params.template === "ieee";
   const docClass = isIEEE ? "\\documentclass[journal]{IEEEtran}" : "\\documentclass[11pt,a4paper]{article}";
 
-  const authorLatex = (params.authors || [{ name: "Author Name", affiliation: "University" }])
+  const authorLatex = (params.authors ?? [])
+    .filter((a) => getAuthorDisplayName(a).trim())
     .map((a) => `\\author{${getAuthorDisplayName(a)}\\thanks{${a.affiliation || ""}}}`)
     .join("\n");
 
@@ -883,6 +886,15 @@ export function generateJournalLatex(params: JournalExportParams): { tex: string
       return `\\section{${cleanTitle}}\n${sec.content}\n`;
     })
     .join("\n");
+
+  const declared = [
+    ["Funding", params.declarations?.funding],
+    ["Conflict of Interest", params.declarations?.conflictOfInterest],
+    ["Data Availability", params.declarations?.dataAvailability],
+  ].filter(([, v]) => typeof v === "string" && v.trim());
+  const latexDeclarations = declared.length
+    ? `\\section*{Declarations}\n${declared.map(([k, v]) => `\\textbf{${k}:} ${v}`).join(" \\\\\n")}\n`
+    : "";
 
   const tex = `% Camera-Ready LaTeX Source for ${params.targetJournal}
 ${docClass}
@@ -898,44 +910,15 @@ ${authorLatex}
 \\begin{document}
 \\maketitle
 
-\\begin{abstract}
-${params.abstract || "Autonomous academic reasoning under provable empirical bounds."}
-\\end{abstract}
-
+${params.abstract?.trim() ? `\\begin{abstract}\n${params.abstract.trim()}\n\\end{abstract}\n` : ""}
 ${sectionsLatex}
 
-\\section*{Declarations}
-\\textbf{Funding:} ${params.declarations?.funding || "No specific grant reported."} \\\\
-\\textbf{Conflict of Interest:} ${params.declarations?.conflictOfInterest || "None."} \\\\
-\\textbf{Data Availability:} ${params.declarations?.dataAvailability || "Available on request."}
-
-\\bibliographystyle{IEEEtran}
-\\bibliography{references}
-
+${latexDeclarations}
 \\end{document}
 `;
 
-  const bib = `@article{castro2002practical,
-  title={Practical Byzantine fault tolerance and proactive recovery},
-  author={Castro, Miguel and Liskov, Barbara},
-  journal={ACM Transactions on Computer Systems (TOCS)},
-  volume={20},
-  number={4},
-  pages={398--461},
-  year={2002},
-  publisher={ACM New York, NY, USA}
-}
-
-@article{lamport1982byzantine,
-  title={The Byzantine generals problem},
-  author={Lamport, Leslie and Shostak, Robert and Pease, Marshall},
-  journal={ACM Transactions on Programming Languages and Systems},
-  volume={4},
-  number={3},
-  pages={382--401},
-  year={1982}
-}
-`;
+  // References are part of the manuscript text; no bibliography file is invented.
+  const bib = "";
 
   return { tex, bib };
 }

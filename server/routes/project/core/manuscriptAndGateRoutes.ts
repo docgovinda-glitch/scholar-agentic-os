@@ -832,7 +832,7 @@ export function registerManuscriptAndGateRoutes(
         document: documentToExport,
         format: targetFormat,
         title: documentToExport.title,
-        author: record.authors?.[0] ? `${record.authors[0].firstName} ${record.authors[0].surname}` : "Scholar OS",
+        author: record.authors?.[0] ? `${record.authors[0].firstName} ${record.authors[0].surname}`.trim() : "",
         academicOptions: {
           template: (template as any) || "apa7",
           runningHead: req.body?.runningHead || req.query?.runningHead || record.answers?.["running_head"],
