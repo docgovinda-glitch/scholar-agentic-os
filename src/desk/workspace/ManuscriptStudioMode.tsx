@@ -21,6 +21,7 @@ import {
   type ManuscriptTexts,
 } from "../journal/manuscriptModel";
 import { evidenceFor, studioEvidence } from "../journal/studioEvidence";
+import { parseReferenceRecords } from "../../domain/journal/references";
 import StudioOutline, { UNSORTED_ID } from "../journal/studio/StudioOutline";
 import StudioEvidencePanel from "../journal/studio/StudioEvidencePanel";
 import StudioSectionEditor from "../journal/studio/StudioSectionEditor";
@@ -82,6 +83,7 @@ export default function ManuscriptStudioMode() {
   const written = totalWords(texts);
   const dialect: "en-GB" | "en-US" = answers["orthography"]?.includes("US") ? "en-US" : "en-GB";
   const evidence = useMemo(() => studioEvidence(answers), [answers]);
+  const referenceRecords = useMemo(() => parseReferenceRecords(answers["reference_records"]), [answers]);
   const unitEvidence = unit ? evidenceFor(evidence, unit.id, unit.sectionId, unit.assignedSourceIds) : [];
   const next = nextToWrite(units, texts);
 
@@ -135,7 +137,8 @@ export default function ManuscriptStudioMode() {
     const e = evidence.find((x) => x.id === id);
     if (!e) return `Unknown source (${id})`;
     const surname = e.author.split(/[ ,]/).filter(Boolean)[0] || e.author;
-    return `${surname}${/et al\.$/.test(e.author) ? " et al." : ""}, ${e.year ?? "n.d."}`;
+    const retracted = referenceRecords[id]?.integrity?.status === "retracted" ? " · retracted" : "";
+    return `${surname}${/et al\.$/.test(e.author) ? " et al." : ""}, ${e.year ?? "n.d."}${retracted}`;
   };
 
   const canDraft = Boolean((answers["working_title"] || answers["title"] || answers["core_problem"] || "").trim());

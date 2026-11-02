@@ -732,8 +732,19 @@ export function registerManuscriptAndGateRoutes(
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
 
+    // The journal workspace sends its manuscript with citations already
+    // rendered in the chosen style; it takes the place of the stored text.
+    const supplied =
+      typeof req.body?.manuscriptMarkdown === "string" && req.body.manuscriptMarkdown.trim() ? (req.body.manuscriptMarkdown as string) : null;
+
     // Synthesize document if missing but manuscript draft is present in answers
-    let documentToExport = record.document;
+    let documentToExport = supplied
+      ? manuscriptToCanonicalDocument(
+          record.projectId,
+          record.answers?.["working_title"] || (record as { title?: string }).title || "Manuscript",
+          supplied
+        )
+      : record.document;
     if (!documentToExport) {
       const rawManuscript =
         record.answers?.["manuscript_markdown"] ||
@@ -773,6 +784,7 @@ export function registerManuscriptAndGateRoutes(
 
     if (format === "markdown" || format === "md") {
       let mdContent =
+        supplied ||
         record.answers?.["manuscript_markdown"] ||
         record.answers?.["full_text_markdown"] ||
         documentToExport.blocks.map((b) => b.text).join("\n\n");

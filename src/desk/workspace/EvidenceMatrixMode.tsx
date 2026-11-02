@@ -22,6 +22,34 @@ import {
 } from "../../services/discovery/multiPortalLiteratureHarvester";
 import { executeLiveSearch } from "../../services/liveSearchService";
 import { normalizeUnicodeNFC } from "../../document_intelligence/index";
+import AddByDoi from "../journal/AddByDoi";
+import { parseReferenceRecords, type ReferenceRecord } from "../../domain/journal/references";
+
+const ROLES: SmartEvidenceRow["epistemicRole"][] = ["Supporting", "Contrasting / Critical", "Methodological Anchor", "Primary User Dataset"];
+
+/** A saved source as a matrix row. Gaps stay empty: no stand-in title, author or findings. */
+function rowFromStored(item: Record<string, unknown>, idx: number): SmartEvidenceRow {
+  const id = String(item.id || `src_${idx + 1}`);
+  const role = ROLES.find((r) => r === item.epistemicRole);
+  return {
+    id,
+    citationToken: `[CITE:${id}]`,
+    title: String(item.title || "Untitled source"),
+    authors: Array.isArray(item.authors)
+      ? (item.authors as unknown[]).map(String).filter(Boolean)
+      : [String(item.author || item.authors || "")].filter(Boolean),
+    year: typeof item.year === "number" ? item.year : parseInt(String(item.year ?? ""), 10) || undefined,
+    doi: typeof item.doi === "string" ? item.doi : undefined,
+    portal: typeof item.portal === "string" ? item.portal : "OpenAlex",
+    badge: typeof item.badge === "string" && item.badge ? item.badge : "Scholarly source",
+    isUserData: false,
+    epistemicRole:
+      role ??
+      (item.stance === "Contrasting" ? "Contrasting / Critical" : item.stance === "Methodological" ? "Methodological Anchor" : "Supporting"),
+    extractedFindings: String(item.extractedFindings || item.keyFindings || item.abstract || item.summary || ""),
+    assignedSectionId: String(item.assignedSectionId || ""),
+  };
+}
 
 export default function EvidenceMatrixMode() {
   const { project, projectId, setProject, setMode } = useResearchWorkspace();
@@ -76,30 +104,7 @@ export default function EvidenceMatrixMode() {
       if (rawVault) {
         const parsed = JSON.parse(rawVault);
         if (Array.isArray(parsed)) {
-          parsed.forEach((item: Record<string, unknown>, idx: number) => {
-            const id = String(item.id || `src_${idx + 1}`);
-            list.push({
-              id,
-              citationToken: `[CITE:${id}]`,
-              title: String(item.title || "Scholarly Literature Document"),
-              authors: Array.isArray(item.authors)
-                ? (item.authors as string[])
-                : [String(item.author || item.authors || "Anonymous")],
-              year: typeof item.year === "number" ? item.year : parseInt(String(item.year ?? ""), 10) || undefined,
-              doi: typeof item.doi === "string" ? item.doi : undefined,
-              portal: typeof item.portal === "string" ? item.portal : "OpenAlex",
-              badge: "Verified Scholarly Literature",
-              isUserData: false,
-              epistemicRole:
-                item.stance === "Contrasting"
-                  ? "Contrasting / Critical"
-                  : item.stance === "Methodological"
-                  ? "Methodological Anchor"
-                  : "Supporting",
-              extractedFindings: String(item.keyFindings || item.abstract || item.summary || "Empirical findings verified from peer-reviewed literature."),
-              assignedSectionId: String(item.assignedSectionId || ""),
-            });
-          });
+          parsed.forEach((item: Record<string, unknown>, idx: number) => list.push(rowFromStored(item, idx)));
         }
       }
     } catch {}
@@ -141,30 +146,7 @@ export default function EvidenceMatrixMode() {
     if (rawVault && scholarlySources.length === 0) {
       const parsed = safeParseAnswerField<Record<string, unknown>[]>(rawVault, []);
       if (Array.isArray(parsed) && parsed.length > 0) {
-          const list: SmartEvidenceRow[] = parsed.map((item: Record<string, unknown>, idx: number) => {
-            const id = String(item.id || `src_${idx + 1}`);
-            return {
-              id,
-              citationToken: `[CITE:${id}]`,
-              title: String(item.title || "Scholarly Literature Document"),
-              authors: Array.isArray(item.authors)
-                ? (item.authors as string[])
-                : [String(item.author || item.authors || "Anonymous")],
-              year: typeof item.year === "number" ? item.year : parseInt(String(item.year ?? ""), 10) || undefined,
-              doi: typeof item.doi === "string" ? item.doi : undefined,
-              portal: typeof item.portal === "string" ? item.portal : "OpenAlex",
-              badge: "Verified Scholarly Literature",
-              isUserData: false,
-              epistemicRole:
-                item.stance === "Contrasting"
-                  ? "Contrasting / Critical"
-                  : item.stance === "Methodological"
-                  ? "Methodological Anchor"
-                  : "Supporting",
-              extractedFindings: String(item.keyFindings || item.abstract || item.summary || "Empirical findings verified from peer-reviewed literature."),
-              assignedSectionId: String(item.assignedSectionId || ""),
-            };
-          });
+          const list: SmartEvidenceRow[] = parsed.map(rowFromStored);
           setScholarlySources(list);
         }
       }
@@ -316,14 +298,14 @@ export default function EvidenceMatrixMode() {
       id,
       citationToken: `[CITE:${id}]`,
       title: normalizeUnicodeNFC(item.title),
-      authors: item.authors || ["Author"],
+      authors: item.authors || [],
       year: item.year,
       doi: item.doi,
       portal: typeof item.portal === "string" ? item.portal : "OpenAlex",
-      badge: "Verified Scholarly Literature",
+      badge: "Scholarly source",
       isUserData: false,
       epistemicRole: "Supporting",
-      extractedFindings: normalizeUnicodeNFC(item.abstract || "Empirical scholarly findings."),
+      extractedFindings: normalizeUnicodeNFC(item.abstract || ""),
       assignedSectionId: "",
     };
 
@@ -340,6 +322,38 @@ export default function EvidenceMatrixMode() {
     } catch (err: unknown) {
       console.warn("Failed to persist added scholarly source:", err);
     }
+  };
+
+  // Add a source from its DOI: the registered record is kept beside the row.
+  const handleAddByDoi = async (record: ReferenceRecord, abstract: string): Promise<"added" | "exists"> => {
+    if (!effectiveProjectId) throw new Error("Open a project first.");
+    const doiLc = record.doi?.toLowerCase();
+    const existing = scholarlySources.find((s) => s.id === record.id || (doiLc && s.doi?.toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//, "") === doiLc));
+    const id = existing?.id ?? record.id;
+    const row: SmartEvidenceRow = existing ?? {
+      id,
+      citationToken: `[CITE:${id}]`,
+      title: normalizeUnicodeNFC(record.title || "Untitled source"),
+      authors: record.authors.map((a) => (a.given ? `${a.given} ${a.family}` : a.family)),
+      year: record.year,
+      doi: record.doi,
+      portal: record.registry === "datacite" ? "DataCite" : "Crossref",
+      badge: "Registered record",
+      isUserData: false,
+      epistemicRole: "Supporting",
+      extractedFindings: normalizeUnicodeNFC(abstract),
+      assignedSectionId: "",
+    };
+    const updated = existing ? scholarlySources : [row, ...scholarlySources];
+    const records = { ...parseReferenceRecords((project?.answers || answers)["reference_records"]), [id]: { ...record, id } };
+    const saved = await saveIntakeAnswers(effectiveProjectId, {
+      ...(project?.answers || answers),
+      approved_vault_sources: JSON.stringify(updated),
+      reference_records: JSON.stringify(records),
+    });
+    setScholarlySources(updated);
+    setProject(saved);
+    return existing ? "exists" : "added";
   };
 
   // Update Section Assignment
@@ -651,6 +665,16 @@ export default function EvidenceMatrixMode() {
               Query 250M+ peer-reviewed papers across OpenAlex, CrossRef, arXiv, and live web grounding to synthesize evidence.
             </p>
           </div>
+
+          {effectiveProjectId && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-[color:var(--text-primary)]">Add a source by DOI</p>
+              <p className="text-[11px] text-[color:var(--text-muted)]">
+                Authors, year, journal, volume and pages come from the DOI registry (Crossref or DataCite), with any retraction on record.
+              </p>
+              <AddByDoi projectId={effectiveProjectId} onAdded={handleAddByDoi} />
+            </div>
+          )}
 
           {/* Search Bar & Portal Pills */}
           <div className="space-y-3">
