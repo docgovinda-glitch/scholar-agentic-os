@@ -411,10 +411,14 @@ These findings establish that multi-agent consensus can achieve provable stabili
       ).toBeInTheDocument();
     });
 
-    // 4. Secondary quick-export buttons (LaTeX, Typst, Markdown)
-    const latexBtn = screen.getByRole("button", { name: /LaTeX \(\.tex\)/i });
+    // 4. Secondary quick-export buttons (LaTeX package, JATS, Typst, Markdown)
+    const latexBtn = screen.getByRole("button", { name: /LaTeX \(\.zip\)/i });
     expect(latexBtn).toBeInTheDocument();
     fireEvent.click(latexBtn);
+
+    const jatsBtn = screen.getByRole("button", { name: /JATS XML \(\.xml\)/i });
+    expect(jatsBtn).toBeInTheDocument();
+    fireEvent.click(jatsBtn);
 
     const typstBtn = screen.getByRole("button", { name: /Typst \(\.typ\)/i });
     expect(typstBtn).toBeInTheDocument();

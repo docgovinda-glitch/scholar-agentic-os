@@ -154,6 +154,44 @@ describe("References in Audit & Export", () => {
   });
 });
 
+describe("Structured exports in Delivery", () => {
+  const answers = () => ({
+    target_journal: "IEEE Transactions on Software Engineering",
+    citation_style: "IEEE",
+    manuscript_markdown: "### § Abstract\n\nShort abstract.\n\n### § Introduction\n\nArrays are central [CITE:doi_10_1038_numpy].",
+    approved_vault_sources: JSON.stringify([{ id: "doi_10_1038_numpy", title: "Array programming with NumPy", authors: ["Charles R. Harris"], year: 2020, doi: "10.1038/numpy" }]),
+    reference_records: JSON.stringify({ doi_10_1038_numpy: harris }),
+  });
+  const blobs = () => vi.mocked(window.URL.createObjectURL).mock.calls.map((c) => c[0] as Blob);
+
+  it("JATS XML carries the abstract, the section and a linked reference", async () => {
+    current = projectWith(answers());
+    mount(<AuditExportMode />);
+    await screen.findByText("1 cited · all resolved");
+    fireEvent.click(screen.getByRole("button", { name: /JATS XML \(\.xml\)/ }));
+    const xml = await blobs()[0].text();
+    expect(xml).toContain("<abstract><p>Short abstract.</p></abstract>");
+    expect(xml).toContain('<xref ref-type="bibr" rid="ref-doi_10_1038_numpy">');
+    expect(xml).toContain("<surname>Harris</surname>");
+  });
+
+  it("the LaTeX template is suggested from the journal and the package uses it", async () => {
+    current = projectWith(answers());
+    mount(<AuditExportMode />);
+    await screen.findByText("1 cited · all resolved");
+    await waitFor(() => expect((screen.getByRole("combobox", { name: "LaTeX template" }) as HTMLSelectElement).value).toBe("ieeetran"));
+    fireEvent.click(screen.getByRole("button", { name: /LaTeX \(\.zip\)/ }));
+    await waitFor(() => expect(blobs().length).toBe(1));
+    const { default: JSZip } = await import("jszip");
+    const zip = await JSZip.loadAsync(await blobs()[0].arrayBuffer());
+    const tex = await zip.file("main.tex")!.async("string");
+    expect(tex).toContain("\\documentclass[journal]{IEEEtran}");
+    expect(tex).toContain("Arrays are central~\\cite{doi_10_1038_numpy}.");
+    expect(await zip.file("references.bib")!.async("string")).toContain("@article{doi_10_1038_numpy,");
+    expect(await zip.file("README.txt")!.async("string")).toContain("https://ctan.org/pkg/ieeetran");
+  });
+});
+
 describe("Add a source by DOI in Evidence", () => {
   it("adds the registered record as a source and keeps the record for the reference list", async () => {
     current = projectWith({});

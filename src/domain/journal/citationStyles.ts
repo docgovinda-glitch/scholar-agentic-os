@@ -229,7 +229,7 @@ export function citedIds(markdown: string): string[] {
 }
 
 /** Drops a "## References" (or Bibliography / Works Cited) section; the generated one replaces it. */
-function withoutReferenceSection(md: string): string {
+export function withoutReferenceSection(md: string): string {
   return md.replace(/(^|\n)#{1,3} +(?:References|Bibliography|Works Cited|Reference List)\s*\n[\s\S]*?(?=\n#{1,3} +\S|$)/i, "$1").trimEnd();
 }
 
