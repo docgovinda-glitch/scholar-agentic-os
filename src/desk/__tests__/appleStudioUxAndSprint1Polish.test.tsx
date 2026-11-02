@@ -138,7 +138,7 @@ describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () =>
       expect(screen.getByText(/3 Aims Formulated/i)).toBeInTheDocument();
     });
 
-    it("renders ThesisWorkspace (OT-09) with an empty project and zero occurrences of 'Quantum Cognitive' or 'Autonomous Verification', showing 'Generate Structured Blueprint from Topic'", () => {
+    it("renders ThesisWorkspace (OT-09) with an empty project and zero occurrences of 'Quantum Cognitive' or 'Autonomous Verification', offering a 5-chapter structure", () => {
       const { container } = render(<ThesisWorkspace projectId="proj-empty-thesis" />);
 
       const htmlText = container.textContent || "";
@@ -146,11 +146,12 @@ describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () =>
       expect(htmlText).not.toMatch(/Autonomous Verification/i);
 
       const blueprintBtn = screen.getByTestId("generate-structured-blueprint-btn");
-      expect(blueprintBtn).toHaveTextContent(/Generate Structured Blueprint from Topic/i);
+      expect(blueprintBtn).toHaveTextContent(/Set up a 5-chapter structure/i);
 
-      // Clicking the button populates a clean 5-chapter dissertation blueprint
+      // Clicking the button sets up the 5-chapter structure (and writes no research questions)
       fireEvent.click(blueprintBtn);
       expect(screen.getByText(/5 Chapters Planned/i)).toBeInTheDocument();
+      expect(container.textContent).not.toMatch(/RQ1: What are the foundational/i);
     });
   });
 
