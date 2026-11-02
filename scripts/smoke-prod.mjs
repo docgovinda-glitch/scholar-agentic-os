@@ -210,6 +210,23 @@ await check('11 MB upload → 413', async () => {
   const r = await upload('/api/vault/parse-file', tokA, Buffer.alloc(11 * 1024 * 1024, 32), 'big.txt', 'text/plain');
   expect(r.status === 413, `HTTP ${r.status}`);
 });
+// AI router: checks that never reach a provider (nothing is spent).
+const keyringHeader = (entries) => Buffer.from(JSON.stringify(entries)).toString('base64url');
+await check('/api/ai/run rejects a malformed request and an unreadable keyring', async () => {
+  const bad = await req('POST', '/api/ai/run', { token: tokA, body: { task: 'fast', messages: [] } });
+  const ring = await req('POST', '/api/ai/run', { token: tokA, headers: { 'x-ai-keyring': '%%%' }, body: { task: 'fast', messages: [{ role: 'user', content: 'hi' }] } });
+  expect(bad.status === 400 && ring.status === 400, `body ${bad.status} keyring ${ring.status}`);
+});
+await check('/api/ai/models with no keys → empty list', async () => {
+  const r = await req('GET', '/api/ai/models', { token: tokA });
+  expect(r.status === 200 && Array.isArray(r.json?.providers) && r.json.providers.length === 0, `HTTP ${r.status}`);
+});
+await check('/api/ai/models refuses a cloud-metadata endpoint, key not echoed', async () => {
+  const secret = 'smoke-not-a-real-key-123';
+  const r = await req('GET', '/api/ai/models', { token: tokA, headers: { 'x-ai-keyring': keyringHeader([{ provider: 'custom', model: 'm', apiKey: secret, baseUrl: 'https://169.254.169.254/v1' }]) } });
+  const err = r.json?.providers?.[0]?.error ?? '';
+  expect(r.status === 200 && /private or internal/.test(err) && !r.text.includes(secret), `HTTP ${r.status}: ${err.slice(0, 80)}`);
+});
 for (const url of ['http://127.0.0.1/', 'http://169.254.169.254/latest/meta-data/', 'http://10.0.0.1/', 'http://[::1]/', 'http://2130706433/']) {
   await check(`SSRF ${url} rejected`, async () => {
     const r = await req('POST', '/api/vault/parse-url', { token: tokA, body: { url } });

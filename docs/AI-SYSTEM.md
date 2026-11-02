@@ -4,6 +4,33 @@ This document specifies the current AI gateway, candidate resolution routing, mu
 
 ---
 
+## 0. The AI router (server, since #140–#144)
+
+Every server-side AI call goes through one router: `src/platform/router/`, bridged by `server/src/ai/routerBridge.ts`. Sections 3, 4 and 9 below describe the client-side gateway (`src/platform/gateway/`), which is now used only for browser-side runs: local models, and the Ask Scholar retry when the server cannot answer.
+
+- **Chain per request.** Premium resources (entitled, within quota; `server/src/ai/premiumPort.ts`), then the user's own keys in their order, then their local model.
+  - Keys arrive per request in the `x-ai-keyring` header (base64url JSON, at most 8 entries).
+  - The legacy `x-ai-*` headers are read as the user's primary entry.
+  - Keys are used for that request only: never stored, logged or returned.
+- **Visible failover** (`router.ts`). Every switch, retry, skip and limit is an event with its reason.
+  - Partial output is never silently retried.
+  - First-token timeout 25 s, idle timeout 20 s.
+  - Retry-After is honoured; a wait over 20 s switches to the next candidate instead.
+  - A circuit breaker (`circuitBreaker.ts`) skips a failing provider for a while.
+- **Preflight** (`tokenBudget.ts`). The prompt is estimated against the model's context; the answer is clamped with a `limit_warning` event, or the candidate is skipped.
+- **Where events go.**
+  - JSON AI responses carry `aiRoute { answeredBy, notices, usage }` (`aiRouteDecorator`), and the client shows notices as a toast (`src/desk/ai/aiRouteNotices.ts`).
+  - Streams forward every event as `route` SSE events, and `authedStreamFetch` feeds them to the workspace status dock (`src/desk/ai/LiveAiStatusDock.tsx`), whose Stop aborts the request.
+  - `POST /api/ai/run` is the direct SSE endpoint (`server/routes/aiRun.ts`).
+- **Local models.** They run on the server only where `serverCanReachLocalModels()` allows it (development, or `ALLOW_SERVER_LOCAL_AI=true`). Elsewhere the request is handed to the browser (426 with a signed challenge).
+- **User-named endpoints** (`server/src/ai/aiEndpointGuard.ts`).
+  - Apart from the providers' own API hosts, an endpoint must use https and resolve only to public addresses, and the connection is pinned to the checked addresses.
+  - A blocked endpoint is skipped with its reason.
+  - `ALLOW_PRIVATE_AI_ENDPOINTS=true` lifts this check for self-hosted installs.
+- **Models** (`GET /api/ai/models`, `modelListers.ts`, `modelCuration.ts`).
+  - The list is each provider's live model list, curated by rules: text models only, stable aliases over dated snapshots, no stale previews, newest generation per family and tier, at most 4 per provider.
+  - Badges appear only with evidence: provider tier, reported context size, measured speed (20 or more samples), or a pinned benchmark with its source.
+
 ## 1. AI System Overview
 
 Scholar Core enforces a **Strict Client-Owned BYOK / Local AI Architecture**. The platform does NOT provide server-owned, platform-paid, or free-tier server AI quotas. All AI inference executes strictly using the user's own credentials (BYOK API keys stored client-side in encrypted IndexedDB / local device storage, or Local AI runners on `http://localhost:*` such as Ollama, LM Studio, vLLM, and LocalAI).

@@ -20,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Old template generators removed** (#137). Unused code that could write template essays (including a hard-coded Zappos/Schein essay) is gone.
 - **Landing page** (#115). The demo is labelled as an illustration with fictional sources. "Verified to the standard of Nature" and "100% cryptographic citation provenance" are replaced with what the app does.
 
+### AI router (#140–#144)
+- **One router for every AI call.** All features use one ordered chain: Premium (when entitled and within quota), then each of the user's own keys in their order, then their local model. Ask Scholar, deep research and every workspace step are included. Users with only Premium or several keys were previously treated as having no AI in most features.
+- **No silent failures.**
+  - A failing provider moves to the next one with a visible notice that names the reason.
+  - A provider failure is no longer silently handed to the browser.
+  - With no AI connected, the server no longer writes a "[Simulated Academic Stream]" draft.
+  - Ask Scholar says when an answer came from the browser instead of the server. Its timeout message no longer promises an automatic model switch.
+- **Live status in workspaces.** One status line shows which model is answering and on whose account, retries with a countdown, switches with their reason, and speed. Stop cancels the step, including the provider call.
+- **Best models only.** AI Access lists at most four live models per provider, chosen by curation rules rather than a fixed list. A badge appears only with evidence (provider tier, reported context size, measured speed).
+- **Security.** An AI endpoint address the user names must use https and resolve only to public addresses. The connection is pinned against DNS rebinding. Localhost, private ranges and cloud metadata are refused. Keys in the `x-ai-keyring` header are used for that request only: never stored, logged or returned.
+
 ### AI access
 - The user's own AI key is sent only to routes that run AI, not with every request (#93).
 - The AI Access page says which features Premium covers (#96).
