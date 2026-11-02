@@ -116,8 +116,10 @@ describe('MultiSlideDeckPreview (Canva & Gamma Style 5-Slide Progression)', () =
     // Slide 4
     fireEvent.click(screen.getByRole('button', { name: 'Slide 4' }));
     expect(screen.getByText('04 Metrics')).toBeInTheDocument();
-    expect(screen.getByText('+84.2%')).toBeInTheDocument();
+    // Metric tiles keep their labels; the figures are placeholders, never invented values.
     expect(screen.getByText('Retention')).toBeInTheDocument();
+    expect(screen.queryByText('+84.2%')).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/\+84\.2%|\+\$420M|3\.8x|12,450/);
 
     // Slide 5
     fireEvent.click(screen.getByRole('button', { name: 'Slide 5' }));

@@ -60,32 +60,6 @@ interface LogEntry {
   type: "info" | "patch" | "done" | "warn";
 }
 
-const DEFAULT_MANUSCRIPT_SECTIONS: DraftSection[] = [
-  {
-    section: "Introduction",
-    word_count: 850,
-    content:
-      "Autonomous reasoning architectures demonstrate an average variance reduction. However, deterministic bounds remain unaddressed in multi-agent configurations, which may compromise stability during adversarial divergence.",
-  },
-  {
-    section: "Methodology",
-    word_count: 1200,
-    content:
-      "We formulate the verification problem as a deterministic bipartite matching operator. The computational complexity is assumed to scale linearly across participating agents under symmetric communications.",
-  },
-  {
-    section: "Results",
-    word_count: 950,
-    content:
-      "Evaluation against synthetic benchmark suites indicates a 94.2% fidelity rate. The empirical runtime exhibits minimal latency degradation across varying agent group sizes up to n=128.",
-  },
-  {
-    section: "Discussion",
-    word_count: 800,
-    content:
-      "The empirical results confirm that bounded multi-agent consensus achieves provable stability. Further research is necessary to evaluate high-noise sensor regimes.",
-  },
-];
 
 export default function RevisionStage({
   stage,
@@ -149,8 +123,10 @@ export default function RevisionStage({
     } catch {
       // Ignore
     }
-    return DEFAULT_MANUSCRIPT_SECTIONS;
+    // No draft yet: nothing to revise (never a sample manuscript).
+    return [];
   }, [project?.answers]);
+  const hasDraft = initialDraftSections.length > 0;
 
   // Read existing critiques from project answers (Stage 21)
   const peerCritiques = useMemo<PeerCritiqueInput[]>(() => {
@@ -284,6 +260,7 @@ export default function RevisionStage({
 
   // Trigger automated revision mapping agent
   const startAgent = async () => {
+    if (!hasDraft) return;
     setIsProcessing(true);
     setError(null);
     setScanProgress(0);
@@ -526,13 +503,18 @@ export default function RevisionStage({
               <p className="text-[color:var(--text-secondary)] text-sm mt-0.5 max-w-3xl font-sans">
                 Map peer review critiques directly to manuscript sections, generating non-destructive sentence-level replacement patches with before/after diffs.
               </p>
+              {!hasDraft && (
+                <p className="text-sm mt-2 text-[color:var(--text-secondary)]" role="status">
+                  There&apos;s no manuscript draft yet. Draft it in the Drafting stage, then come back to map revisions.
+                </p>
+              )}
             </div>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={startAgent}
-              disabled={isProcessing}
+              disabled={isProcessing || !hasDraft}
               className="px-5 py-2.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-sm shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer font-sans"
             >
               {isProcessing ? (
@@ -683,7 +665,8 @@ export default function RevisionStage({
 
             <button
               onClick={startAgent}
-              className="mt-8 px-8 py-3.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-base shadow-md hover:bg-[color:var(--accent-hover)] transition-all flex items-center gap-2.5 cursor-pointer font-sans"
+              disabled={!hasDraft}
+              className="mt-8 px-8 py-3.5 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-base shadow-md hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2.5 cursor-pointer font-sans"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />

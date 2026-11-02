@@ -11,13 +11,23 @@ export interface SwissEditorialTemplateProps {
   onUpdateSlide?: (updated: SlideCard) => void;
 }
 
+/** The slide's own figures (metric-callout blocks). Nothing is ever filled in. */
+function slideMetrics(slide: SlideCard): Array<{ value: string; label: string; context?: string }> {
+  return slide.blocks
+    .filter((b): b is Extract<SlideCard['blocks'][number], { type: 'metric-callout' }> => b.type === 'metric-callout')
+    .map((b) => ({ value: (b.metric || b.value || '').trim(), label: b.label, context: b.context }))
+    .filter((m) => m.value);
+}
+
+const EMPTY_NOTE = 'text-xs font-sans text-neutral-500 italic';
+
 /**
  * EditorialCoverSlide:
  * Split canvas matching the Swiss hard-edge retro-poster aesthetic (Image 1 reference):
  * - Left: Warm cream ground (#F7F5F0), editorial serif headline, tilted tomato-red banner (-3deg),
  *   subheadline narrative, high-contrast metric callout bar with red dividers.
- * - Right: Diagonal split photo/illustration window of coastal wetlands and migratory birds,
- *   with slanted cobalt-blue callout ribbon.
+ * - Right: Diagonal split illustration window with an optional slanted callout ribbon.
+ * Only the slide's own text and figures are shown; an empty field is left out.
  * - Bottom: Persistent dark summary bar (bg-neutral-900 text-white).
  */
 export function EditorialCoverSlide({
@@ -28,25 +38,14 @@ export function EditorialCoverSlide({
   isEditable = false,
   onUpdateSlide,
 }: SwissEditorialTemplateProps) {
-  const headerTag = slide.headerTag || 'Qingdao Nature Society | Qingdao Coastal Wetland Park';
-  const dateBadge = slide.dateBadge || '11.07—11.13';
-  const actionHeadline = slide.actionHeadline || 'Qing Plover';
-  const angledBanner = slide.angledBanner || 'MIGRATORY BIRD SEASON';
-  const subheadline =
-    slide.subheadline ||
-    'This winter, join the week when the city draws closest to 120,000 passing migratory birds. Walk the tidal flats for seven days and meet the neighbors who share our coast.';
-  const summaryBar =
-    slide.summaryBar ||
-    'Strategic Mandate: 120,000 migratory birds protected via 66 certified observation corridors.';
-  const calloutRibbon = slide.calloutRibbon || 'Migratory birds arrive, and the city makes room.';
-
-  // Extract or default 3 metrics
-  const metricCalloutBlock = slide.blocks.find((b) => b.type === 'metric-callout') as any;
-  const metrics = [
-    { value: metricCalloutBlock?.metric || '120,000', label: 'migratory birds' },
-    { value: '66', label: 'limited sessions' },
-    { value: '18,000', label: 'participant spots' },
-  ];
+  const headerTag = slide.headerTag?.trim();
+  const dateBadge = slide.dateBadge?.trim();
+  const actionHeadline = slide.actionHeadline || 'Untitled slide';
+  const angledBanner = slide.angledBanner?.trim();
+  const subheadline = (slide.subheadline || slide.summary || '').trim();
+  const summaryBar = slide.summaryBar?.trim();
+  const calloutRibbon = slide.calloutRibbon?.trim();
+  const metrics = slideMetrics(slide).slice(0, 3);
 
   return (
     <div
@@ -72,12 +71,16 @@ export function EditorialCoverSlide({
         <div className="lg:col-span-7 flex flex-col justify-between space-y-3.5 pr-2">
           {/* Top Metadata Header with Lime Date Pill */}
           <div className="space-y-1">
-            <div className="flex items-center gap-3 text-xs font-sans text-neutral-800">
-              <span className="font-semibold tracking-wide">{headerTag}</span>
-              <span className="bg-[#BEF264] text-[#365314] font-mono font-bold text-[11px] px-2.5 py-0.5 rounded-sm shadow-xs select-none">
-                {dateBadge}
-              </span>
-            </div>
+            {(headerTag || dateBadge) && (
+              <div className="flex items-center gap-3 text-xs font-sans text-neutral-800">
+                {headerTag && <span className="font-semibold tracking-wide">{headerTag}</span>}
+                {dateBadge && (
+                  <span className="bg-[#BEF264] text-[#365314] font-mono font-bold text-[11px] px-2.5 py-0.5 rounded-sm shadow-xs select-none">
+                    {dateBadge}
+                  </span>
+                )}
+              </div>
+            )}
             {/* Cobalt Blue Accent Line */}
             <div className="w-24 h-0.5 bg-[#2563EB]" />
           </div>
@@ -90,21 +93,23 @@ export function EditorialCoverSlide({
           </div>
 
           {/* Angled Tomato-Red Banner (-3 deg) */}
-          <div className="pt-1">
+          {angledBanner && <div className="pt-1">
             <div className="inline-block transform -rotate-3 origin-left shadow-lg bg-[#EB4424] px-4 sm:px-6 py-2 rounded-xs select-none">
               <span className="font-sans font-black text-xl sm:text-2xl lg:text-3xl tracking-tight text-neutral-950 uppercase block">
                 {angledBanner}
               </span>
             </div>
-          </div>
+          </div>}
 
           {/* Narrative Subheadline Copy */}
-          <p className="text-xs sm:text-sm md:text-base text-neutral-700 leading-relaxed max-w-lg font-sans pt-1">
-            {subheadline}
-          </p>
+          {subheadline && (
+            <p className="text-xs sm:text-sm md:text-base text-neutral-700 leading-relaxed max-w-lg font-sans pt-1">
+              {subheadline}
+            </p>
+          )}
 
-          {/* High-Contrast Stat Callout Bar */}
-          <div className="pt-2">
+          {/* High-Contrast Stat Callout Bar: the slide's own figures only */}
+          {metrics.length > 0 && <div className="pt-2">
             <div className="w-12 h-0.5 bg-[#EB4424] mb-2" />
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs sm:text-sm font-sans">
               {metrics.map((m, idx) => (
@@ -121,15 +126,10 @@ export function EditorialCoverSlide({
                 </React.Fragment>
               ))}
             </div>
-          </div>
+          </div>}
 
-          {/* Bottom Left Organizer Tag & Slide Pagination */}
-          <div className="pt-2 flex items-center justify-between text-[11px] font-sans text-neutral-500 border-t border-neutral-200/80">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-neutral-700">Organizer</span>
-              <span>|</span>
-              <span>Qingdao Nature Society</span>
-            </div>
+          {/* Slide Pagination */}
+          <div className="pt-2 flex items-center justify-end text-[11px] font-sans text-neutral-500 border-t border-neutral-200/80">
             <div className="font-mono text-xs text-neutral-400 font-semibold">
               {String(slideIndex + 1).padStart(2, '0')} / {String(totalSlides).padStart(2, '0')}
             </div>
@@ -138,7 +138,7 @@ export function EditorialCoverSlide({
 
         {/* Right Column (5 cols): Diagonal Split Photo / Illustration Window */}
         <div className="lg:col-span-5 h-64 sm:h-80 lg:h-full min-h-[300px] relative rounded-2xl overflow-hidden border border-neutral-300 shadow-xl bg-slate-900 group">
-          {/* Scenic Coastal Wetlands & Migratory Birds Vector Landscape */}
+          {/* Decorative landscape illustration (no data) */}
           <div className="absolute inset-0 bg-gradient-to-b from-[#87CEEB] via-[#B0C4DE] to-[#607B8B] flex items-center justify-center overflow-hidden">
             <svg
               viewBox="0 0 400 300"
@@ -194,11 +194,11 @@ export function EditorialCoverSlide({
             </svg>
 
             {/* Overlaid Slanted Cobalt-Blue Parallelogram Callout Ribbon */}
-            <div className="absolute bottom-5 right-4 bg-[#2563EB] text-white px-4 py-2 text-xs sm:text-sm font-sans font-bold tracking-wide transform -skew-x-12 shadow-2xl border-b-2 border-blue-300">
+            {calloutRibbon && <div className="absolute bottom-5 right-4 bg-[#2563EB] text-white px-4 py-2 text-xs sm:text-sm font-sans font-bold tracking-wide transform -skew-x-12 shadow-2xl border-b-2 border-blue-300">
               <span className="transform skew-x-12 inline-block">
                 {calloutRibbon}
               </span>
-            </div>
+            </div>}
           </div>
         </div>
       </div>
@@ -210,7 +210,7 @@ export function EditorialCoverSlide({
       >
         <div className="flex items-center gap-2 truncate pr-2">
           <span className="w-2 h-2 rounded-full bg-[#EB4424] shrink-0" />
-          <span className="font-semibold text-neutral-300 truncate">{summaryBar}</span>
+          {summaryBar && <span className="font-semibold text-neutral-300 truncate">{summaryBar}</span>}
         </div>
         <div className="font-mono text-[10px] uppercase tracking-widest text-neutral-400 shrink-0 hidden sm:block">
           SCHOLAR OS // EDITORIAL POSTER
@@ -233,28 +233,13 @@ export function EditorialMetricsSlide({
   isEditable = false,
   onUpdateSlide,
 }: SwissEditorialTemplateProps) {
-  const actionHeadline =
-    slide.actionHeadline ||
-    'Tidal Flat Carrying Capacity Reaches Peak Threshold with 74% Coastal Concentration';
-  const category = slide.frameworkPhase || '02 · EMPIRICAL METRICS & EVIDENCE';
-  const summaryBar =
-    slide.summaryBar ||
-    'Takeaway: 74.2% habitat concentration confirms tidal mudflats as irreplaceable ecological nodes.';
-
-  const ratio = slide.ratioComparison || {
-    labelA: 'Core Protected Tidal Habitat',
-    percentA: 74.2,
-    labelB: 'Urban Coastal Buffer Zone',
-    percentB: 25.8,
-    ratio: '2.88 : 1',
-    insight: 'Overwintering shorebirds concentrate heavily along the seaward tidal margins.',
-  };
-
-  const stats = [
-    { value: '120,000', label: 'ANNUAL CENSUS', delta: '+18.4% YoY surge', color: '#EB4424' },
-    { value: '74.2%', label: 'CORE HABITAT DENSITY', delta: 'Peak ecological load', color: '#2563EB' },
-    { value: '66', label: 'PATROL CORRIDORS', delta: 'Zero incident record', color: '#18181B' },
-  ];
+  const actionHeadline = slide.actionHeadline || 'Untitled slide';
+  const category = slide.frameworkPhase || '02 · METRICS & EVIDENCE';
+  const summaryBar = (slide.summaryBar || slide.summary || '').trim();
+  // Only the slide's own ratio and figures; nothing is filled in.
+  const ratio = slide.ratioComparison;
+  const COLORS = ['#EB4424', '#2563EB', '#18181B'];
+  const stats = slideMetrics(slide).slice(0, 3).map((m, i) => ({ value: m.value, label: m.label, delta: m.context ?? '', color: COLORS[i] }));
 
   return (
     <div
@@ -267,9 +252,6 @@ export function EditorialMetricsSlide({
           <div className="flex items-center gap-2">
             <span className="bg-[#EB4424] text-white font-mono font-bold text-[10px] uppercase px-2 py-0.5 rounded-sm">
               {category}
-            </span>
-            <span className="text-neutral-500 font-sans text-xs">
-              Qingdao Nature Society // Field Survey
             </span>
           </div>
           <span className="font-mono text-xs text-neutral-400 font-semibold">
@@ -284,8 +266,11 @@ export function EditorialMetricsSlide({
 
       {/* Body: Oversized Stat Callouts & High-Contrast Ratio Bar */}
       <div className="my-auto py-4 space-y-6">
-        {/* 3 Oversized Stat Callouts */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {stats.length === 0 && !ratio && (
+          <p className={EMPTY_NOTE}>No figures on this slide yet. Add one from your own work.</p>
+        )}
+        {/* Oversized Stat Callouts */}
+        {stats.length > 0 && <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {stats.map((s, idx) => (
             <div
               key={idx}
@@ -300,15 +285,17 @@ export function EditorialMetricsSlide({
               >
                 {s.value}
               </div>
-              <div className="text-xs font-sans text-neutral-600 font-medium">
-                {s.delta}
-              </div>
+              {s.delta && (
+                <div className="text-xs font-sans text-neutral-600 font-medium">
+                  {s.delta}
+                </div>
+              )}
             </div>
           ))}
-        </div>
+        </div>}
 
         {/* High-Contrast Ratio Comparison Bar Component */}
-        <div className="bg-white rounded-2xl p-6 border border-neutral-300 shadow-md space-y-3">
+        {ratio && <div className="bg-white rounded-2xl p-6 border border-neutral-300 shadow-md space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs font-sans">
             <div className="flex items-center gap-2">
               <span className="font-bold text-neutral-900">{ratio.labelA}</span>
@@ -338,10 +325,12 @@ export function EditorialMetricsSlide({
             </div>
           </div>
 
-          <p className="text-xs text-neutral-600 font-sans italic pt-0.5">
-            {ratio.insight}
-          </p>
-        </div>
+          {ratio.insight && (
+            <p className="text-xs text-neutral-600 font-sans italic pt-0.5">
+              {ratio.insight}
+            </p>
+          )}
+        </div>}
       </div>
 
       {/* Persistent Dark Bottom Summary Bar */}
@@ -351,7 +340,7 @@ export function EditorialMetricsSlide({
       >
         <div className="flex items-center gap-2 truncate pr-2">
           <span className="w-2 h-2 rounded-full bg-[#EB4424] shrink-0" />
-          <span className="font-semibold text-neutral-300 truncate">{summaryBar}</span>
+          {summaryBar && <span className="font-semibold text-neutral-300 truncate">{summaryBar}</span>}
         </div>
         <div className="font-mono text-[10px] uppercase tracking-widest text-neutral-400 shrink-0 hidden sm:block">
           SCHOLAR OS // METRICS PROOF
@@ -374,54 +363,10 @@ export function EditorialCategoriesSlide({
   isEditable = false,
   onUpdateSlide,
 }: SwissEditorialTemplateProps) {
-  const actionHeadline =
-    slide.actionHeadline ||
-    'Three Foundational Pillars Secure Sustainable Multi-Species Coastal Coexistence';
-  const category = slide.frameworkPhase || '03 · STRATEGIC PILLARS BREAKDOWN';
-  const summaryBar =
-    slide.summaryBar ||
-    'Strategic Alignment: Tri-pillar architecture guarantees zero ecological disruption through 2030.';
-
-  const defaultPillars = [
-    {
-      id: 'p1',
-      title: 'HABITAT SANCTUARY',
-      tag: '// PILLAR 01',
-      accentColor: 'red' as const,
-      points: [
-        '14.8 km² tidal mudflat protection',
-        'Zero-construction perimeter',
-        'Seasonal access quotas',
-      ],
-      stat: '14,800 Hectares',
-    },
-    {
-      id: 'p2',
-      title: 'AUTONOMOUS SENSING',
-      tag: '// PILLAR 02',
-      accentColor: 'blue' as const,
-      points: [
-        'Acoustic bird tracking stations',
-        'LiDAR drone telemetry',
-        'Salinity and flux monitors',
-      ],
-      stat: '99.4% Uptime',
-    },
-    {
-      id: 'p3',
-      title: 'COMMUNITY GUARDIANS',
-      tag: '// PILLAR 03',
-      accentColor: 'black' as const,
-      points: [
-        '66 certified ranger patrol paths',
-        'Public scientific workshops',
-        'Rapid wildlife response unit',
-      ],
-      stat: '66 Patrol Paths',
-    },
-  ];
-
-  const pillars = slide.pillars && slide.pillars.length > 0 ? slide.pillars : defaultPillars;
+  const actionHeadline = slide.actionHeadline || 'Untitled slide';
+  const category = slide.frameworkPhase || '03 · PILLARS';
+  const summaryBar = (slide.summaryBar || slide.summary || '').trim();
+  const pillars = slide.pillars ?? [];
 
   return (
     <div
@@ -434,9 +379,6 @@ export function EditorialCategoriesSlide({
           <div className="flex items-center gap-2">
             <span className="bg-[#EB4424] text-white font-mono font-bold text-[10px] uppercase px-2 py-0.5 rounded-sm">
               {category}
-            </span>
-            <span className="text-neutral-500 font-sans text-xs">
-              Qingdao Nature Society // Strategic Plan
             </span>
           </div>
           <span className="font-mono text-xs text-neutral-400 font-semibold">
@@ -451,6 +393,7 @@ export function EditorialCategoriesSlide({
 
       {/* Body: 3–4 Solid Color-Blocked Columns */}
       <div className="my-auto py-4">
+        {pillars.length === 0 && <p className={EMPTY_NOTE}>No pillars on this slide yet.</p>}
         <div
           className={`grid grid-cols-1 ${pillars.length === 4 ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'
             } gap-4`}
@@ -511,7 +454,7 @@ export function EditorialCategoriesSlide({
       >
         <div className="flex items-center gap-2 truncate pr-2">
           <span className="w-2 h-2 rounded-full bg-[#EB4424] shrink-0" />
-          <span className="font-semibold text-neutral-300 truncate">{summaryBar}</span>
+          {summaryBar && <span className="font-semibold text-neutral-300 truncate">{summaryBar}</span>}
         </div>
         <div className="font-mono text-[10px] uppercase tracking-widest text-neutral-400 shrink-0 hidden sm:block">
           SCHOLAR OS // STRATEGIC PILLARS

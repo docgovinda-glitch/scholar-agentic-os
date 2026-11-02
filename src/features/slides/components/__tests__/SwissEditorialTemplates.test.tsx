@@ -8,143 +8,102 @@ import {
   EditorialMetricsSlide,
   EditorialCategoriesSlide,
 } from '../SwissEditorialTemplates';
-import { decomposeToSwissEditorial } from '../../services/universalDecomposer';
+import { legacySwissEditorialDeck } from '../../__tests__/fixtures/legacySwissEditorialDeck';
 import SlideCanvas from '../SlideCanvas';
 import { SLIDE_THEMES } from '../../types/themes';
-import type { SlideDeck } from '../../types/slides';
+import type { SlideCard, SlideDeck } from '../../types/slides';
 
-describe('SwissEditorialTemplates (Swiss Hard-Edge Retro-Poster Aesthetic)', () => {
+// Text the templates used to fill in when a slide field was empty.
+const INVENTED = /Qingdao|Qing Plover|MIGRATORY BIRD SEASON|120,000|18,000|74\.2%|25\.8%|14,800|99\.4%|66 Patrol|ANNUAL CENSUS|Tidal Flat|HABITAT SANCTUARY|11\.07/;
+
+const bare = (over: Partial<SlideCard>): SlideCard => ({
+  id: 's', order: 1, actionHeadline: '', layoutType: 'cover', framework: 'Standard-Narrative', blocks: [], ...over,
+} as SlideCard);
+
+describe('SwissEditorialTemplates (Swiss hard-edge retro-poster look)', () => {
   const swissTheme = SLIDE_THEMES['swiss-editorial'];
 
-  it('renders EditorialCoverSlide matching Image 1 reference with angled banner, split photo window, and dark summary bar', () => {
-    const deck = decomposeToSwissEditorial({
-      topic: 'Qing Plover: Migratory Bird Season',
+  it('cover shows the slide’s own headline, banner, figures and summary bar', () => {
+    const slide = bare({
+      actionHeadline: 'Rural Clinic Wait Times',
+      angledBanner: 'FIELD STUDY',
+      subheadline: 'What drives the wait, and what shortens it.',
+      calloutRibbon: 'Data from the user’s own survey.',
+      summaryBar: 'Takeaway: triage order matters most.',
+      blocks: [{ type: 'metric-callout', metric: '412', label: 'patients surveyed' }],
     });
-    const coverSlide = deck.slides[0];
+    render(<EditorialCoverSlide slide={slide} slideIndex={0} totalSlides={3} theme={swissTheme} />);
 
-    render(
-      <EditorialCoverSlide
-        slide={coverSlide}
-        slideIndex={0}
-        totalSlides={deck.slides.length}
-        theme={swissTheme}
-      />
-    );
-
-    // Directive 1: Warm cream canvas, serif title, persistent dark bottom summary bar
     expect(screen.getByTestId('editorial-cover-slide')).toBeInTheDocument();
-    expect(screen.getByText(/Qing Plover/i)).toBeInTheDocument();
-    expect(screen.getByText('MIGRATORY BIRD SEASON')).toBeInTheDocument();
-    expect(screen.getByText('11.07—11.13')).toBeInTheDocument();
-    expect(
-      screen.getByText(/Migratory birds arrive, and the city makes room/i)
-    ).toBeInTheDocument();
-
-    // 3 metrics with red dividers
-    expect(screen.getByText('120,000')).toBeInTheDocument();
-    expect(screen.getByText('migratory birds')).toBeInTheDocument();
-
-    // Persistent dark bottom summary bar
+    expect(screen.getByText('Rural Clinic Wait Times')).toBeInTheDocument();
+    expect(screen.getByText('FIELD STUDY')).toBeInTheDocument();
+    expect(screen.getByText('412')).toBeInTheDocument();
+    expect(screen.getByText('patients surveyed')).toBeInTheDocument();
+    expect(screen.getByText(/triage order matters most/)).toBeInTheDocument();
     const summaryBar = screen.getByTestId('persistent-dark-summary-bar');
-    expect(summaryBar).toBeInTheDocument();
     expect(summaryBar.className).toContain('bg-neutral-900');
     expect(summaryBar.className).toContain('text-white');
   });
 
-  it('renders EditorialMetricsSlide with high-contrast ratio comparison bars and oversized stat callouts', () => {
-    const deck = decomposeToSwissEditorial({
-      topic: 'Coastal Mudflat Ecological Census',
+  it('metrics slide shows the slide’s own figures and ratio', () => {
+    const slide = bare({
+      layoutType: 'metrics',
+      actionHeadline: 'Triage cut the median wait',
+      blocks: [{ type: 'metric-callout', metric: '38 min', label: 'MEDIAN WAIT', context: 'after triage' }],
+      ratioComparison: { labelA: 'Triaged', percentA: 60, labelB: 'Walk-in', percentB: 40, ratio: '3 : 2', insight: 'From the user’s data.' },
     });
-    const metricsSlide = deck.slides[1];
+    render(<EditorialMetricsSlide slide={slide} slideIndex={1} totalSlides={3} theme={swissTheme} />);
 
-    render(
-      <EditorialMetricsSlide
-        slide={metricsSlide}
-        slideIndex={1}
-        totalSlides={deck.slides.length}
-        theme={swissTheme}
-      />
-    );
-
-    expect(screen.getByTestId('editorial-metrics-slide')).toBeInTheDocument();
-    expect(screen.getByText(/Tidal Flat Carrying Capacity/i)).toBeInTheDocument();
-
-    // High-contrast segmented ratio bar (74.2% vs 25.8%)
-    expect(screen.getAllByText('74.2%').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('25.8%')).toBeInTheDocument();
-    expect(screen.getByText(/Core Protected Tidal Habitat/i)).toBeInTheDocument();
-    expect(screen.getByText(/Urban Coastal Buffer Zone/i)).toBeInTheDocument();
-
-    // Oversized stat callout
-    expect(screen.getByText('ANNUAL CENSUS')).toBeInTheDocument();
-    expect(screen.getByText('120,000')).toBeInTheDocument();
-
-    // Persistent dark bottom summary bar
-    const summaryBar = screen.getByTestId('persistent-dark-summary-bar');
-    expect(summaryBar).toBeInTheDocument();
-    expect(summaryBar.className).toContain('bg-neutral-900');
+    expect(screen.getByText('Triage cut the median wait')).toBeInTheDocument();
+    expect(screen.getByText('38 min')).toBeInTheDocument();
+    expect(screen.getByText('MEDIAN WAIT')).toBeInTheDocument();
+    expect(screen.getByText('60%')).toBeInTheDocument();
+    expect(screen.getByText('Triaged')).toBeInTheDocument();
   });
 
-  it('renders EditorialCategoriesSlide with solid color-blocked columns for pillar breakdowns', () => {
-    const deck = decomposeToSwissEditorial({
-      topic: 'Triple Pillar Conservation Masterplan',
-    });
-    const categoriesSlide = deck.slides[2];
+  it('categories slide shows the slide’s own pillars', () => {
+    const slide = bare({
+      layoutType: 'categories',
+      actionHeadline: 'Three changes',
+      pillars: [
+        { id: 'a', title: 'TRIAGE', points: ['Nurse-led triage'], accentColor: 'red' },
+        { id: 'b', title: 'SCHEDULING', points: ['Booked slots'], accentColor: 'blue' },
+      ],
+    } as Partial<SlideCard>);
+    render(<EditorialCategoriesSlide slide={slide} slideIndex={2} totalSlides={3} theme={swissTheme} />);
 
-    render(
-      <EditorialCategoriesSlide
-        slide={categoriesSlide}
-        slideIndex={2}
-        totalSlides={deck.slides.length}
-        theme={swissTheme}
-      />
-    );
+    expect(screen.getByText('TRIAGE')).toBeInTheDocument();
+    expect(screen.getByText('SCHEDULING')).toBeInTheDocument();
+  });
 
-    expect(screen.getByTestId('editorial-categories-slide')).toBeInTheDocument();
-    expect(screen.getByText(/Three Foundational Pillars/i)).toBeInTheDocument();
+  it.each([
+    ['cover', EditorialCoverSlide],
+    ['metrics', EditorialMetricsSlide],
+    ['categories', EditorialCategoriesSlide],
+  ] as const)('an empty %s slide shows nothing invented', (_name, Template) => {
+    const { container } = render(<Template slide={bare({})} slideIndex={0} totalSlides={1} theme={swissTheme} />);
+    expect(container.textContent).not.toMatch(INVENTED);
+    expect(container.textContent).toContain('Untitled slide');
+  });
 
-    // 3 color-blocked pillars: Habitat Sanctuary, Autonomous Sensing, Community Guardians
-    expect(screen.getByText('HABITAT SANCTUARY')).toBeInTheDocument();
-    expect(screen.getByText('AUTONOMOUS SENSING')).toBeInTheDocument();
-    expect(screen.getByText('COMMUNITY GUARDIANS')).toBeInTheDocument();
-    expect(screen.getByText('14,800 Hectares')).toBeInTheDocument();
-    expect(screen.getByText('99.4% Uptime')).toBeInTheDocument();
-    expect(screen.getByText('66 Patrol Paths')).toBeInTheDocument();
-
-    // Persistent dark bottom summary bar
-    const summaryBar = screen.getByTestId('persistent-dark-summary-bar');
-    expect(summaryBar).toBeInTheDocument();
-    expect(summaryBar.className).toContain('bg-neutral-900');
+  it('a deck saved by an earlier version still renders', () => {
+    const deck = legacySwissEditorialDeck({ topic: 'Plover migration' });
+    render(<EditorialCoverSlide slide={deck.slides[0]} slideIndex={0} totalSlides={deck.slides.length} theme={swissTheme} />);
+    expect(screen.getByText(/Plover migration/)).toBeInTheDocument();
   });
 
   it('SlideCanvas renders 16:9 container, floating bottom dock with navigation and PDF export button', () => {
-    const deck: SlideDeck = decomposeToSwissEditorial();
+    const deck: SlideDeck = legacySwissEditorialDeck();
     const mockExportPdf = vi.fn();
 
-    render(
-      <SlideCanvas
-        deck={deck}
-        theme={swissTheme}
-        initialSlideIndex={0}
-        onExportPdf={mockExportPdf}
-      />
-    );
+    render(<SlideCanvas deck={deck} theme={swissTheme} initialSlideIndex={0} onExportPdf={mockExportPdf} />);
 
-    // 16:9 responsive slide container
     const slideCard = screen.getByTestId('slide-card-active');
-    expect(slideCard).toBeInTheDocument();
     expect(slideCard.className).toContain('aspect-[16/9]');
-
-    // Floating bottom controller
-    expect(
-      screen.getByRole('navigation', { name: /Presentation controls/i })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: /Presentation controls/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/Next slide/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Previous slide/i)).toBeInTheDocument();
-
-    // PDF Export button in dock
     const pdfBtn = screen.getByRole('button', { name: /Export to PDF/i });
-    expect(pdfBtn).toBeInTheDocument();
     pdfBtn.click();
     expect(mockExportPdf).toHaveBeenCalledTimes(1);
   });

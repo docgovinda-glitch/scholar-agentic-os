@@ -229,7 +229,7 @@ describe('saved decks from earlier versions', () => {
 
   it.each([
     ['curated case-study deck', () => import('../../services/slideGenerator').then((m) => m.generateSlideDeck({ topic: 'Why Zappos pays new hires to quit (MN6094NI)' }))],
-    ['swiss editorial deck', () => import('../../services/slideGenerator').then((m) => m.decomposeToSwissEditorial({ topic: 'Plover migration' }))],
+    ['swiss editorial deck (earlier version)', () => import('../../__tests__/fixtures/legacySwissEditorialDeck').then((m) => m.legacySwissEditorialDeck({ topic: 'Plover migration' }))],
     ['coursework extraction deck', () => import('../../services/slideGenerator').then((m) => m.extractSlidesFromAcademicText('# T\n## Context\nTools fail 84% of audits.\n- Risk one\n- Risk two\n## Results\nVerification reaches 100% accuracy.'))],
   ])('%s loads without losing text', async (_name, load) => {
     const legacy = await load();

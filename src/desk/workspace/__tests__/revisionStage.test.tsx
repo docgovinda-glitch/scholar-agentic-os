@@ -127,6 +127,15 @@ describe("Stage 22: AI Revision (RevisionStage)", () => {
     expect(screen.getByRole("button", { name: /Begin Automated Revision Mapping/i })).toBeInTheDocument();
   });
 
+  it("with no manuscript draft, nothing is revised and no sample manuscript appears", () => {
+    const { manuscript_draft: _omit, ...answers } = mockProject.answers as Record<string, string>;
+    render(<RevisionStage stage="revision" projectId="proj-revision-01" project={{ ...mockProject, answers }} />);
+
+    expect(screen.getByText(/no manuscript draft yet/i)).toBeInTheDocument();
+    for (const b of screen.getAllByRole("button", { name: /Revision Mapping/i })) expect(b).toBeDisabled();
+    expect(document.body.textContent).not.toMatch(/94\.2% fidelity|n=128/);
+  });
+
   it("triggers revision agent with streaming logs, progress indicator, and DOES NOT auto-advance", async () => {
     const onAdvanceMock = vi.fn();
 
