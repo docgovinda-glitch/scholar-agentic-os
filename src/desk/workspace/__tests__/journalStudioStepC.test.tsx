@@ -473,8 +473,10 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
         const letterArea = screen.getByRole("textbox", {
           name: /Formatted Author Rebuttal Letter/i,
         }) as HTMLTextAreaElement;
-        expect(letterArea.value).toContain("Dear Editors and Reviewers");
-        expect(letterArea.value).toContain("Point-by-Point Author Response & Rebuttal Letter");
+        // The simulated panel's letter is practice, and says so; it isn't addressed to a journal.
+        expect(letterArea.value).toContain("Practice response to the simulated review panel");
+        expect(letterArea.value).toContain("not reviews from a journal");
+        expect(letterArea.value).not.toContain("We concur with the reviewer's observation");
       });
     });
   });
