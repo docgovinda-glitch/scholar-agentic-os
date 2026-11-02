@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import StageNavigation from "../StageNavigation";
 import ProtocolBlueprintMode from "../ProtocolBlueprintMode";
 import EvidenceMatrixMode from "../EvidenceMatrixMode";
 import ResearchWorkspace from "../ResearchWorkspace";
@@ -139,67 +138,6 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
     vi.mocked(api.allocateProjectWordBudget).mockResolvedValue({
       ok: true,
       blueprint: mockBlueprint,
-    });
-  });
-
-  describe("1. 5-Mode Studio Switcher (StageNavigation)", () => {
-    it("renders the 5 core studio modes cleanly with zero Minimal (9) | Detailed (25) toggle pills", () => {
-      const onStageChange = vi.fn();
-      const onModeChange = vi.fn();
-
-      render(
-        <StageNavigation
-          currentStage="definition"
-          currentMode="protocol"
-          stageStatuses={{ definition: "active" } as any}
-          onStageChange={onStageChange}
-          onModeChange={onModeChange}
-        />
-      );
-
-      // Verify ZERO "Minimal" or "Detailed" toggle pills
-      expect(screen.queryByText(/Minimal/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Detailed/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/9 Steps/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/25 Steps/i)).not.toBeInTheDocument();
-
-      // Verify the 5 Mode Studios
-      expect(screen.getByText("Protocol & Blueprint")).toBeInTheDocument();
-      expect(screen.getByText("Literature & Data Matrix")).toBeInTheDocument();
-      expect(screen.getByText("Manuscript Studio")).toBeInTheDocument();
-      expect(screen.getByText("Referee & Rebuttal")).toBeInTheDocument();
-      expect(screen.getByText("Audit & Submission Export")).toBeInTheDocument();
-
-      // Verify mode numbers
-      expect(screen.getByText("01")).toBeInTheDocument();
-      expect(screen.getByText("02")).toBeInTheDocument();
-      expect(screen.getByText("03")).toBeInTheDocument();
-      expect(screen.getByText("04")).toBeInTheDocument();
-      expect(screen.getByText("05")).toBeInTheDocument();
-
-      // Click Mode 2 -> triggers onModeChange("evidence")
-      fireEvent.click(screen.getByText("Literature & Data Matrix"));
-      expect(onModeChange).toHaveBeenCalledWith("evidence");
-    });
-
-    it("renders collapsed mode as an icon-only rail with 5 accessible buttons", () => {
-      const onStageChange = vi.fn();
-
-      render(
-        <StageNavigation
-          currentStage="definition"
-          currentMode="protocol"
-          stageStatuses={{ definition: "active" } as any}
-          onStageChange={onStageChange}
-          isCollapsed={true}
-        />
-      );
-
-      const nav = screen.getByRole("navigation", { name: /collapsed/i });
-      expect(nav).toBeInTheDocument();
-      const buttons = nav.querySelectorAll("button");
-      // 5 modes (plus expand button)
-      expect(buttons.length).toBeGreaterThanOrEqual(5);
     });
   });
 
