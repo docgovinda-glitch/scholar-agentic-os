@@ -244,6 +244,18 @@ These findings establish that multi-agent consensus can achieve provable stabili
     expect(screen.getByText(/Gate G7: ACTION REQUIRED/i)).toBeInTheDocument();
   });
 
+  it("an empty manuscript passes no text checks: 0% and nothing to check yet", async () => {
+    vi.mocked(api.getProject).mockResolvedValue({ ...baseProject, authors: [], answers: { working_title: "Empty" } });
+    render(
+      <ResearchProvider projectId="proj-step-d" initialStage="export" onStageChangeCallback={vi.fn()}>
+        <AuditExportMode />
+      </ResearchProvider>
+    );
+    await waitFor(() => expect(screen.getAllByText("Nothing to check yet")).toHaveLength(2));
+    expect(screen.getByText(/^0% Pass$/)).toBeInTheDocument();
+    expect(screen.queryByText(/Scholarly Voice Certified|100% Citation Provenance Reconciled/)).not.toBeInTheDocument();
+  });
+
   it("offers a data-availability draft naming the author's datasets, only on request", async () => {
     vi.mocked(api.getProject).mockResolvedValue({
       ...baseProject,

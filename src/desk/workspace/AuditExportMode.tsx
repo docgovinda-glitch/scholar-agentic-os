@@ -294,7 +294,11 @@ export default function AuditExportMode() {
     [aiDisclosureEnabled, aiDisclosureStatement],
   ].every(([on, text]) => on && String(text).trim().length > 0);
   const titlePageComplete = [title, authorName, affiliation, email].every((v) => v.trim().length > 0);
-  const g7Checks = [isWordCountCompliant, citationReconciliation.passed, voiceTelemetry.passed, declarationsWritten, titlePageComplete];
+  // Text checks pass only when there is text to check.
+  const hasText = actualWords > 0;
+  const citationsOk = hasText && citationReconciliation.passed;
+  const voiceOk = hasText && voiceTelemetry.passed;
+  const g7Checks = [isWordCountCompliant, citationsOk, voiceOk, declarationsWritten, titlePageComplete];
   const g7Score = Math.round((g7Checks.filter(Boolean).length / g7Checks.length) * 100);
   const g7CertifiedReady = g7Checks.every(Boolean);
 
@@ -670,12 +674,16 @@ export default function AuditExportMode() {
               </div>
               <span
                 className={`text-xs font-bold px-2 py-0.5 rounded ${
-                  citationReconciliation.passed
+                  citationsOk
                     ? "bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]"
+                    : !hasText
+                    ? "bg-[color:var(--surface-sunken)] text-[color:var(--text-muted)]"
                     : "bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)]"
                 }`}
               >
-                {citationReconciliation.passed
+                {!hasText
+                  ? "Nothing to check yet"
+                  : citationsOk
                   ? "100% Citation Provenance Reconciled (0 Orphan Citations, 0 Anachronisms)"
                   : "Citation Reconciliation Warning"}
               </span>
@@ -728,14 +736,14 @@ export default function AuditExportMode() {
               </div>
               <span
                 className={`text-xs font-bold px-2 py-0.5 rounded ${
-                  voiceTelemetry.passed
+                  voiceOk
                     ? "bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]"
+                    : !hasText
+                    ? "bg-[color:var(--surface-sunken)] text-[color:var(--text-muted)]"
                     : "bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
                 }`}
               >
-                {voiceTelemetry.passed
-                  ? "Scholarly Voice Certified"
-                  : "Voice Optimization Suggested"}
+                {!hasText ? "Nothing to check yet" : voiceOk ? "Scholarly Voice Certified" : "Voice Optimization Suggested"}
               </span>
             </div>
 
