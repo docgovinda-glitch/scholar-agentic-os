@@ -13,6 +13,7 @@ import {
 } from "../api";
 import type { WordBudgetBlueprint, RebuttalMatrixItem } from "./types";
 import ReferencesCheck from "../journal/ReferencesCheck";
+import VerificationChecks, { useVerification } from "../journal/VerificationChecks";
 import { checkDois, lookupDoi } from "../journal/referenceApi";
 import { studioEvidence } from "../journal/studioEvidence";
 import { auditCitations, recordsForSources } from "../../domain/journal/referenceAudit";
@@ -112,7 +113,8 @@ export default function AuditExportMode() {
   }, [answers]);
 
   // ── 1. Word Count Compliance ──
-  const targetWords = blueprint?.targetTotalWords || 3500;
+  // The author's own target from Blueprint (or the journal profile); none is assumed.
+  const targetWords = blueprint?.targetTotalWords || Number(answers["target_word_count"]) || 0;
   const actualWords = useMemo(() => {
     return manuscriptMarkdown.trim() ? manuscriptMarkdown.trim().split(/\s+/).length : 0;
   }, [manuscriptMarkdown]);
@@ -122,7 +124,8 @@ export default function AuditExportMode() {
     return Number((((actualWords - targetWords) / targetWords) * 100).toFixed(1));
   }, [actualWords, targetWords]);
 
-  const isWordCountCompliant = Math.abs(wordDeltaPercent) <= 5.0;
+  const hasWordTarget = targetWords > 0;
+  const isWordCountCompliant = hasWordTarget && actualWords > 0 && Math.abs(wordDeltaPercent) <= 5.0;
 
   // ── 2. References: every citation resolved, nothing retracted unacknowledged ──
   const sources = useMemo(() => studioEvidence(answers), [answers]);
@@ -138,53 +141,8 @@ export default function AuditExportMode() {
   const [checkingRefs, setCheckingRefs] = useState(false);
   const [refCheckError, setRefCheckError] = useState<string | null>(null);
 
-  // ── 3. Humanized Voice & Orthographic Telemetry ──
-  const voiceTelemetry = useMemo(() => {
-    const sentences = manuscriptMarkdown
-      .split(/[.!?]+\s+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 5);
-
-    let sentenceStdDev = 7.4;
-    if (sentences.length > 2) {
-      const lengths = sentences.map((s) => s.split(/\s+/).length);
-      const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
-      const variance =
-        lengths.reduce((sum, len) => sum + Math.pow(len - mean, 2), 0) / lengths.length;
-      sentenceStdDev = Number(Math.sqrt(variance).toFixed(1));
-    }
-
-    const bannedTokens = [
-      "delve",
-      "delving",
-      "furthermore",
-      "testament",
-      "tapestry",
-      "vital",
-      "crucial",
-      "game-changer",
-      "beacon",
-      "plethora",
-      "pivotal",
-      "underscore",
-    ];
-
-    const lower = manuscriptMarkdown.toLowerCase();
-    const bannedFound = bannedTokens.filter((token) =>
-      new RegExp(`\\b${token}\\b`, "i").test(lower)
-    );
-
-    const burstinessScore = Math.min(10, Math.max(7.5, Number((sentenceStdDev * 1.15).toFixed(1))));
-
-    return {
-      burstinessScore,
-      sentenceStdDev,
-      bannedFound,
-      bannedCount: bannedFound.length,
-      britishSpellingScore: 100,
-      passed: bannedFound.length === 0 && burstinessScore >= 7.0,
-    };
-  }, [manuscriptMarkdown]);
+  // ── 3. Verification: statistics, spelling, abstract numbers, numbering ──
+  const verification = useVerification(manuscriptMarkdown);
 
   // ── 4. 2026 Publisher Ethical Declarations ──
   const [dataAvailabilityEnabled, setDataAvailabilityEnabled] = useState(true);
@@ -279,9 +237,9 @@ export default function AuditExportMode() {
   // Text checks pass only when there is text to check.
   const hasText = actualWords > 0;
   const citationsOk = hasText && referenceAudit.blocking === 0;
-  const voiceOk = hasText && voiceTelemetry.passed;
-  const g7Checks = [isWordCountCompliant, citationsOk, voiceOk, declarationsWritten, titlePageComplete];
-  const g7Score = Math.round((g7Checks.filter(Boolean).length / g7Checks.length) * 100);
+  const verificationOk = hasText && verification.problems === 0;
+  const g7Checks = [isWordCountCompliant, citationsOk, verificationOk, declarationsWritten, titlePageComplete];
+  const g7Passed = g7Checks.filter(Boolean).length;
   const g7CertifiedReady = g7Checks.every(Boolean);
 
   // Append Declarations to Manuscript End-Matter
@@ -621,7 +579,7 @@ export default function AuditExportMode() {
           >
             <span>{g7CertifiedReady ? "✓ Gate G7: CERTIFIED READY" : "⚠ Gate G7: ACTION REQUIRED"}</span>
             <span className="px-1.5 py-0.2 rounded bg-[color:var(--surface-raised)] text-[11px]">
-              {g7Score}% Pass
+              {g7Passed} of {g7Checks.length} checks pass
             </span>
           </div>
         </div>
@@ -648,7 +606,7 @@ export default function AuditExportMode() {
             <h3 className="text-sm font-bold uppercase tracking-wider text-[color:var(--text-secondary)] flex items-center gap-2">
               <span>Gate G7 Scorecard</span>
               <span className="text-xs font-normal normal-case text-[color:var(--text-muted)]">
-                (Word Budget, Provenance, Voice Telemetry & Ethics)
+                (Word budget, references, verification and declarations)
               </span>
             </h3>
           </div>
@@ -671,7 +629,9 @@ export default function AuditExportMode() {
                     : "bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
                 }`}
               >
-                {isWordCountCompliant
+                {!hasWordTarget
+                  ? "No word target set in Blueprint"
+                  : isWordCountCompliant
                   ? `Within Budget (±5% Target: ${actualWords.toLocaleString()} / ${targetWords.toLocaleString()} words, ${wordDeltaPercent > 0 ? "+" : ""}${wordDeltaPercent}%)`
                   : `Budget Deviation: ${actualWords.toLocaleString()} / ${targetWords.toLocaleString()} words (${wordDeltaPercent > 0 ? "+" : ""}${wordDeltaPercent}%)`}
               </span>
@@ -687,13 +647,13 @@ export default function AuditExportMode() {
               <div className="p-2.5 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
                 <div className="text-[11px] text-[color:var(--text-muted)]">Mode 1 Target Budget</div>
                 <div className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
-                  {targetWords.toLocaleString()}
+                  {hasWordTarget ? targetWords.toLocaleString() : "Not set"}
                 </div>
               </div>
               <div className="p-2.5 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
                 <div className="text-[11px] text-[color:var(--text-muted)]">Tolerance Band (±5%)</div>
                 <div className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
-                  {Math.round(targetWords * 0.95).toLocaleString()} – {Math.round(targetWords * 1.05).toLocaleString()}
+                  {hasWordTarget ? `${Math.round(targetWords * 0.95).toLocaleString()} – ${Math.round(targetWords * 1.05).toLocaleString()}` : "—"}
                 </div>
               </div>
             </div>
@@ -738,60 +698,8 @@ export default function AuditExportMode() {
             onAcknowledge={handleAcknowledgeRetraction}
           />
 
-          {/* 3. Humanized Voice & Orthographic Telemetry */}
-          <div className="p-4 rounded-xl border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-[color:var(--text-primary)]">
-                  3. Humanized Voice & Orthographic Telemetry
-                </span>
-                <span className="text-xs text-[color:var(--text-muted)]">
-                  (scholarlyVoiceGuard)
-                </span>
-              </div>
-              <span
-                className={`text-xs font-bold px-2 py-0.5 rounded ${
-                  voiceOk
-                    ? "bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]"
-                    : !hasText
-                    ? "bg-[color:var(--surface-sunken)] text-[color:var(--text-muted)]"
-                    : "bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
-                }`}
-              >
-                {!hasText ? "Nothing to check yet" : voiceOk ? "Scholarly Voice Certified" : "Voice Optimization Suggested"}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3 text-xs">
-              <div className="p-2.5 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
-                <div className="text-[11px] text-[color:var(--text-muted)]">Syntactic Burstiness</div>
-                <div className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
-                  {voiceTelemetry.burstinessScore} / 10
-                </div>
-                <div className="text-[10px] text-[color:var(--text-muted)] mt-0.5">
-                  Std Dev: ±{voiceTelemetry.sentenceStdDev} words
-                </div>
-              </div>
-              <div className="p-2.5 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
-                <div className="text-[11px] text-[color:var(--text-muted)]">Banned AI Clichés</div>
-                <div className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
-                  {voiceTelemetry.bannedCount} Detected
-                </div>
-                <div className="text-[10px] text-[color:var(--text-muted)] mt-0.5">
-                  {voiceTelemetry.bannedCount === 0 ? "Zero AI clichés (Pass)" : voiceTelemetry.bannedFound.join(", ")}
-                </div>
-              </div>
-              <div className="p-2.5 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
-                <div className="text-[11px] text-[color:var(--text-muted)]">Orthographic Consistency</div>
-                <div className="text-base font-bold text-[color:var(--text-primary)] mt-0.5">
-                  {voiceTelemetry.britishSpellingScore}% British
-                </div>
-                <div className="text-[10px] text-[color:var(--text-muted)] mt-0.5">
-                  -ise/-our/-re spelling verified
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* 3. Verification */}
+          <VerificationChecks markdown={manuscriptMarkdown} />
 
           {/* 4. 2026 Publisher Ethical & Provenance Declarations */}
           <div className="p-4 rounded-xl border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] flex flex-col gap-4">
