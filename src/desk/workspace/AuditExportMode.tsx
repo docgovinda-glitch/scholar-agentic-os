@@ -16,6 +16,7 @@ import ReferencesCheck from "../journal/ReferencesCheck";
 import VerificationChecks, { useVerification } from "../journal/VerificationChecks";
 import { LATEX_TEMPLATES, buildLatex, exportParts, packageReadme, suggestTemplate, type LatexTemplate } from "../../domain/journal/latex";
 import { buildJats } from "../../domain/journal/jats";
+import { parseFigures, placeFigures } from "../../domain/journal/figures";
 import AuthorsEditor from "../journal/AuthorsEditor";
 import { checkAuthors, creditStatement as creditFromRoles, fullName, type ManuscriptAuthor } from "../../domain/journal/authorship";
 import { checkDois, lookupDoi } from "../journal/referenceApi";
@@ -146,7 +147,8 @@ export default function AuditExportMode() {
   const [refCheckError, setRefCheckError] = useState<string | null>(null);
 
   // ── 3. Verification: statistics, spelling, abstract numbers, numbering ──
-  const verification = useVerification(manuscriptMarkdown);
+  const figures = useMemo(() => parseFigures(answers["manuscript_figures"]), [answers]);
+  const verification = useVerification(manuscriptMarkdown, figures);
 
   // ── 4. 2026 Publisher Ethical Declarations ──
   const [dataAvailabilityEnabled, setDataAvailabilityEnabled] = useState(true);
@@ -407,7 +409,8 @@ export default function AuditExportMode() {
   // Export waits while a citation points nowhere or to an unacknowledged retraction.
   const exportBlocked = referenceAudit.blocking > 0;
   const exportBlockedNotice = `Fix the references first: ${referenceAudit.blocking} citation${referenceAudit.blocking === 1 ? "" : "s"} ${referenceAudit.blocking === 1 ? "points" : "point"} to no source or to a retracted paper. See "2. References".`;
-  const exportText = renderedManuscript.markdown;
+  // Figures and tables go after the references, numbered by first mention, with their captions.
+  const exportText = useMemo(() => placeFigures(renderedManuscript.markdown, figures).markdown, [renderedManuscript, figures]);
   // The declarations the authors wrote and left switched on; nothing else.
   const writtenDeclarations = (
     [
@@ -580,6 +583,7 @@ export default function AuditExportMode() {
           body: parts.body,
           declarations: writtenDeclarations,
           records: recordsForSources(sources, savedRecords),
+          figures,
         };
         const base = title.replace(/[^a-zA-Z0-9_-]/g, "_") || "manuscript";
         if (format === "jats") {
@@ -591,6 +595,7 @@ export default function AuditExportMode() {
             const zip = new JSZip();
             zip.file("main.tex", pkg.tex);
             if (pkg.bib) zip.file("references.bib", pkg.bib);
+            for (const f of pkg.files) zip.file(f.name, f.data);
             zip.file("README.txt", packageReadme(latexTemplate, shared.journal ?? ""));
             downloadBlob(await zip.generateAsync({ type: "blob" }), `${base}_latex.zip`);
           })();
@@ -601,7 +606,7 @@ export default function AuditExportMode() {
         downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.typ`);
       }
     },
-    [exportText, exportBlocked, exportBlockedNotice, title, authorName, affiliation, namedAuthors, answers, manuscriptMarkdown, keywords, writtenDeclarations, sources, savedRecords, latexTemplate, citationStyle]
+    [exportText, exportBlocked, exportBlockedNotice, title, authorName, affiliation, namedAuthors, answers, manuscriptMarkdown, keywords, writtenDeclarations, sources, savedRecords, latexTemplate, citationStyle, figures]
   );
 
   return (
@@ -755,7 +760,7 @@ export default function AuditExportMode() {
           />
 
           {/* 3. Verification */}
-          <VerificationChecks markdown={manuscriptMarkdown} />
+          <VerificationChecks markdown={manuscriptMarkdown} figures={figures} />
 
           {/* 4. 2026 Publisher Ethical & Provenance Declarations */}
           <div className="p-4 rounded-xl border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] flex flex-col gap-4">

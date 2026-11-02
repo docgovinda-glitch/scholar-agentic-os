@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { checkStatistics, formatP } from "../../domain/journal/statcheck";
+import { numberFigures, type ManuscriptFigure } from "../../domain/journal/figures";
 import { abstractNumbersMissingFromBody, checkNumbering, checkSpelling, flaggedPhrases } from "../../domain/journal/manuscriptChecks";
 
 const TONE = {
@@ -10,7 +11,7 @@ const TONE = {
 };
 
 /** Runs every check; pure apart from memoisation, so the caller can gate on it. */
-export function useVerification(markdown: string) {
+export function useVerification(markdown: string, figures: ManuscriptFigure[] = []) {
   return useMemo(() => {
     const stats = checkStatistics(markdown);
     const spelling = checkSpelling(markdown);
@@ -19,9 +20,12 @@ export function useVerification(markdown: string) {
     const phrases = flaggedPhrases(markdown);
     const badStats = stats.filter((s) => !s.consistent && !s.oneTailedFits).length;
     const numberingProblems = numbering.filter((n) => n.missing.length || n.outOfOrder.length).length;
-    const problems = badStats + spelling.mixedWords.length + abstractMissing.length + numberingProblems;
-    return { stats, spelling, abstractMissing, numbering, phrases, problems, badStats };
-  }, [markdown]);
+    // Figure and table objects: each must be referred to, and each reference must have an object.
+    const objects = numberFigures(markdown, figures);
+    const objectProblems = objects.unmentioned.length + objects.missing.length;
+    const problems = badStats + spelling.mixedWords.length + abstractMissing.length + numberingProblems + objectProblems;
+    return { stats, spelling, abstractMissing, numbering, phrases, problems, badStats, objects, hasObjects: figures.length > 0 || objects.missing.length > 0 };
+  }, [markdown, figures]);
 }
 
 function Check({ title, tone, status, children }: { title: string; tone: keyof typeof TONE; status: string; children?: React.ReactNode }) {
@@ -40,8 +44,8 @@ function Check({ title, tone, status, children }: { title: string; tone: keyof t
  * Checks that read the text the way an editor would. Each finding names the
  * words or numbers it is about; none is a score.
  */
-export default function VerificationChecks({ markdown }: { markdown: string }) {
-  const v = useVerification(markdown);
+export default function VerificationChecks({ markdown, figures = [] }: { markdown: string; figures?: ManuscriptFigure[] }) {
+  const v = useVerification(markdown, figures);
   const hasText = markdown.trim().length > 0;
   const pill = !hasText
     ? { tone: TONE.muted, text: "Nothing to check yet" }
@@ -102,6 +106,20 @@ export default function VerificationChecks({ markdown }: { markdown: string }) {
           >
             {v.abstractMissing.length > 0 && <p>The abstract states {v.abstractMissing.join(", ")}, but the rest of the manuscript doesn't. Report {v.abstractMissing.length === 1 ? "it" : "them"} in Results, or correct the abstract.</p>}
           </Check>
+          {v.hasObjects && (
+            <Check
+              title="Figures and tables referred to"
+              tone={v.objects.unmentioned.length || v.objects.missing.length ? "bad" : "ok"}
+              status={v.objects.unmentioned.length || v.objects.missing.length ? "Fix references" : `${v.objects.figures.length + v.objects.tables.length} numbered`}
+            >
+              {v.objects.unmentioned.length > 0 && (
+                <p>
+                  Never referred to in the text: {v.objects.unmentioned.map((f) => `${f.kind === "table" ? "table" : "figure"} “${f.caption || f.id}”`).join(", ")}. Journals expect every one to be cited; refer to it from the Studio or remove it.
+                </p>
+              )}
+              {v.objects.missing.length > 0 && <p>References to nothing: {v.objects.missing.join(", ")}. The figure or table was removed or never added.</p>}
+            </Check>
+          )}
           {v.numbering.map((n) => (
             <Check
               key={n.kind}

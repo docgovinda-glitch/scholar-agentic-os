@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { StudioEvidence } from "../studioEvidence";
 import { citedReferences } from "../studioEvidence";
+import { figureToken, numberFigures, type ManuscriptFigure } from "../../../domain/journal/figures";
 
 /**
  * Sources for the section being written (or all of them), each insertable as a
@@ -12,13 +13,19 @@ export default function StudioEvidencePanel({
   manuscript,
   onInsert,
   onGoToEvidence,
+  figures = [],
+  onInsertText,
 }: {
   forUnit: StudioEvidence[];
   all: StudioEvidence[];
   manuscript: string;
   onInsert: (token: string) => void;
   onGoToEvidence: () => void;
+  figures?: ManuscriptFigure[];
+  /** Inserts plain text (a figure or table reference) at the cursor. */
+  onInsertText?: (text: string) => void;
 }) {
+  const numbering = numberFigures(manuscript, figures);
   const [tab, setTab] = useState<"unit" | "all">(forUnit.length > 0 ? "unit" : "all");
   const list = tab === "unit" ? forUnit : all;
   const { entries, unknownTokens } = citedReferences(manuscript, all);
@@ -72,6 +79,33 @@ export default function StudioEvidencePanel({
           ))
         )}
       </div>
+
+      {figures.length > 0 && onInsertText && (
+        <section className="border-t border-[color:var(--border-subtle)] p-3 max-h-[30%] overflow-y-auto" aria-labelledby="studio-figures-heading">
+          <h3 id="studio-figures-heading" className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-2">
+            Figures and tables
+          </h3>
+          <ul className="space-y-1.5">
+            {figures.map((f) => (
+              <li key={f.id} className="flex items-center justify-between gap-2 text-[11px] text-[color:var(--text-secondary)]">
+                <span className="min-w-0 truncate">
+                  <strong className="text-[color:var(--text-primary)]">{numbering.label[f.id] ?? (f.kind === "table" ? "Table (not yet referred to)" : "Figure (not yet referred to)")}</strong>
+                  {f.caption ? ` · ${f.caption}` : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onInsertText(figureToken(f))}
+                  aria-label={`Refer to ${f.kind} ${f.id}`}
+                  className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-md border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] cursor-pointer"
+                >
+                  Refer
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[10px] text-[color:var(--text-muted)]">The reference becomes "Figure 1", "Table 2"… in exports, numbered by first mention.</p>
+        </section>
+      )}
 
       <section className="border-t border-[color:var(--border-subtle)] p-3 max-h-[40%] overflow-y-auto" aria-labelledby="studio-references-heading">
         <h3 id="studio-references-heading" className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-2">

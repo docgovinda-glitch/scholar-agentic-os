@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Copy, Download, FileInput, Trash2 } from "lucide-react";
 import {
   changedSections,
@@ -51,13 +51,26 @@ export default function RevisionRoundPanel({
   const progress = round ? revisionProgress(round.comments) : null;
   const letter = round ? responseLetter(round, { title, journal }) : "";
 
+  // One save at a time, always of the latest round, so an older save can't land last.
+  const latest = useRef<RevisionRound | null>(saved);
+  const saving = useRef(false);
+  const unsaved = useRef(false);
   const persist = async (next: RevisionRound | null) => {
+    latest.current = next;
     setRound(next);
+    unsaved.current = true;
+    if (saving.current) return;
+    saving.current = true;
     try {
-      await onSave(next);
+      while (unsaved.current) {
+        unsaved.current = false;
+        await onSave(latest.current);
+      }
       setStatus("Saved.");
     } catch {
       setStatus("Could not save. Your changes are still on screen; try again.");
+    } finally {
+      saving.current = false;
     }
   };
 
@@ -70,7 +83,9 @@ export default function RevisionRoundPanel({
 
   const patch = (id: string, p: Partial<RevisionComment>) => {
     if (!round) return;
-    setRound({ ...round, comments: round.comments.map((c) => (c.id === id ? { ...c, ...p } : c)) });
+    const next = { ...round, comments: round.comments.map((c) => (c.id === id ? { ...c, ...p } : c)) };
+    latest.current = next;
+    setRound(next);
     setStatus(null);
   };
   const save = () => round && void persist(round);
