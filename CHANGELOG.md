@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-30
 
+### Journal Article Workshop rebuild
+- **One workspace, five views** (#157). One header; the duplicate header row, mode sidebar and internal status bar are gone. The model picker no longer shows an unmeasured context-window figure.
+- **Target journal first** (#158). Blueprint opens with a journal profile, read from pasted author guidelines by the user's AI and checked against them (nothing the guidelines do not state is kept). It sets the outline, word target and citation style.
+- **Retired stage screens deleted.** The 25 stage screens (unreachable since the five views replaced them), their sidebar, registry and tests were removed with the owner's approval. Saved answers they wrote remain in projects.
+
 ### Honest output everywhere (no invented content)
 - **Thesis & Proposal review tools now work** (#100). The Viva simulator, cross-chapter audit, grant study-section review and specific-aims audit called routes that did not exist, so every user saw the same built-in results ("Top 8th Percentile", "94/100", "alignment 92"). They now call the real routes and show only the AI's answer. When the user's own input is missing, no AI is connected or the AI fails, the user sees a plain message saying why nothing was produced. Server-side heuristic scores, invented examiner names and template draft text were removed.
 - **Viva practice room and self-review worksheet** (#101). These replace demo content (fixed questions with invented figures, a word-count "grade", pre-filled reviewer praise, a percentile and a payline verdict).

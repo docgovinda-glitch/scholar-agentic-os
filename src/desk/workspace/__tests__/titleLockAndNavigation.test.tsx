@@ -4,8 +4,6 @@ import "@testing-library/jest-dom/vitest";
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { executeTitleLockAndProceed } from "../titleLockContract";
-import TitleLockStage from "../stages/TitleLockStage";
-import TitleSelectionStage from "../stages/TitleSelectionStage";
 import { ResearchProvider, useResearchWorkspace } from "../ResearchContext";
 import * as api from "../../api";
 import type { ProjectView } from "../../types";
@@ -112,87 +110,6 @@ describe("Title Lock Contract & Stage Navigation System Integrity", () => {
       // 3. Verify deterministic navigation to vault_sources
       expect(onAdvance).toHaveBeenCalledWith("vault_sources");
       expect(result).toEqual(updatedMock);
-    });
-  });
-
-  describe("Button visibility and action states in TitleLockStage and TitleSelectionStage", () => {
-    it("TitleLockStage: displays 'Lock Snapshot & Proceed' when unlocked, and 'Proceed to Evidence (Phase II) →' when locked", () => {
-      const onSaved = vi.fn();
-      const onAdvance = vi.fn();
-
-      // Unlocked
-      const { rerender } = render(
-        <TitleLockStage
-          stage="title_lock"
-          projectId={mockProject.id}
-          project={mockProject}
-          onSaved={onSaved}
-          onAdvance={onAdvance}
-        />
-      );
-
-      const lockBtn = screen.getByRole("button", { name: /Lock Snapshot & Proceed/i });
-      expect(lockBtn).toBeInTheDocument();
-      expect(lockBtn).not.toBeDisabled();
-
-      // Locked
-      const lockedProject: ProjectView = {
-        ...mockProject,
-        answers: {
-          ...mockProject.answers,
-          title_locked: "true",
-        },
-      };
-
-      rerender(
-        <TitleLockStage
-          stage="title_lock"
-          projectId={mockProject.id}
-          project={lockedProject}
-          onSaved={onSaved}
-          onAdvance={onAdvance}
-        />
-      );
-
-      const proceedBtn = screen.getByRole("button", { name: /Proceed to Evidence \(Phase II\) →/i });
-      expect(proceedBtn).toBeInTheDocument();
-      expect(proceedBtn).not.toBeDisabled();
-
-      // Clicking when locked navigates immediately to vault_sources
-      fireEvent.click(proceedBtn);
-      expect(onAdvance).toHaveBeenCalledWith("vault_sources");
-    });
-
-    it("TitleSelectionStage: displays 'Proceed to Evidence (Phase II) →' and remains clickable when title is locked", () => {
-      const onSaved = vi.fn();
-      const onAdvance = vi.fn();
-
-      const lockedProject: ProjectView = {
-        ...mockProject,
-        answers: {
-          ...mockProject.answers,
-          title_locked: "true",
-          generated_titles: JSON.stringify([
-            { id: "1", title_text: "Candidate 1", subtitle_text: null, rationale: "good", status: "proposed" },
-          ]),
-        },
-      };
-
-      render(
-        <TitleSelectionStage
-          stage="title_selection"
-          projectId={mockProject.id}
-          project={lockedProject}
-          onSaved={onSaved}
-          onAdvance={onAdvance}
-        />
-      );
-
-      const proceedButtons = screen.getAllByRole("button", { name: /Proceed to Evidence \(Phase II\) →/i });
-      expect(proceedButtons.length).toBeGreaterThanOrEqual(1);
-
-      fireEvent.click(proceedButtons[0]);
-      expect(onAdvance).toHaveBeenCalledWith("vault_sources");
     });
   });
 
