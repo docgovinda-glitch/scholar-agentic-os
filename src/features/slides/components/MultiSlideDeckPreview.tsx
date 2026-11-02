@@ -184,7 +184,7 @@ export default function MultiSlideDeckPreview({
                   {/* Academic Meta & Committee Footnote */}
                   <div className="flex items-center justify-between pt-1 border-t border-black/5 dark:border-white/5 text-[6.5px] font-mono opacity-60">
                     <span>OXFORD &amp; CAMBRIDGE PEER REVIEW</span>
-                    <span>DOI: 10.1038/s41586-026</span>
+                    <span>DOI: —</span>
                   </div>
                 </div>
               ) : theme.category === 'apple-keynote' ? (
@@ -203,7 +203,7 @@ export default function MultiSlideDeckPreview({
                     >
                       PRO ARCHITECTURE · 3NM SILICON
                     </span>
-                    <span className="text-[7px] font-mono opacity-40">WWDC26</span>
+                    <span className="text-[7px] font-mono opacity-40">KEYNOTE</span>
                   </div>
                   <h3 className="text-xs sm:text-sm md:text-base font-black tracking-tight leading-tight line-clamp-2">
                     {deckTitle || theme.name}
@@ -247,11 +247,11 @@ export default function MultiSlideDeckPreview({
                   </div>
                   <div className="flex items-center justify-between pt-0.5 border-t border-black/5 dark:border-white/5 text-[6.5px] font-mono opacity-50">
                     <span>AUTUMN EDITION</span>
-                    <span>ISSUE 4,921</span>
+                    <span>ISSUE NO. —</span>
                   </div>
                 </div>
               ) : theme.category === 'scientific' ? (
-                /* CATEGORY 4: SCIENTIFIC & BLUEPRINT (BioRender, NASA, Genomic) */
+                /* CATEGORY 4: SCIENTIFIC & BLUEPRINT */
                 <div
                   className="p-2 sm:p-2.5 rounded-lg border space-y-1 font-mono text-[7px]"
                   style={{
@@ -263,9 +263,9 @@ export default function MultiSlideDeckPreview({
                   <div className="flex items-center justify-between pb-0.5 border-b" style={{ borderColor: `${theme.accent}30` }}>
                     <span className="font-bold flex items-center gap-1" style={{ color: theme.accent }}>
                       <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: theme.accent }} />
-                      TELEMETRY LOCK // 2.4 GHz
+                      TELEMETRY LOCK
                     </span>
-                    <span className="opacity-50">LAT 28.57° N // LON 80.64° W</span>
+                    <span className="opacity-50">COORDINATES — // —</span>
                   </div>
                   <h3 className="text-xs sm:text-sm font-sans font-black tracking-tight leading-tight line-clamp-2 pt-0.5">
                     {deckTitle || theme.name}
@@ -274,8 +274,8 @@ export default function MultiSlideDeckPreview({
                     Spatial Transcriptomics &amp; Molecular Cryo-EM Resolution
                   </p>
                   <div className="flex items-center justify-between pt-0.5 opacity-60 text-[6.5px]">
-                    <span>BIO-RENDER PROTOCOL // REF: 8092-B</span>
-                    <span>ASSAY SENSITIVITY: 99.99%</span>
+                    <span>LAB PROTOCOL // REF —</span>
+                    <span>ASSAY SENSITIVITY: —</span>
                   </div>
                 </div>
               ) : theme.category === 'conference' ? (
@@ -284,7 +284,7 @@ export default function MultiSlideDeckPreview({
                   style={{ borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }}
                 >
                   <div className="inline-block px-2 py-0.5 rounded-full text-[7px] font-bold tracking-widest uppercase bg-red-600 text-white font-sans">
-                    TED KEYNOTE · BIG IDEA
+                    KEYNOTE · BIG IDEA
                   </div>
                   <h3 className="text-xs sm:text-sm font-black tracking-tight leading-tight line-clamp-2">
                     {deckTitle || 'What If Every Decision Was Grounded in Verifiable Truth?'}
@@ -293,7 +293,7 @@ export default function MultiSlideDeckPreview({
                     A radical reimagining of how humanity structures intelligent systems.
                   </p>
                   <div className="text-[6.5px] font-mono opacity-50">
-                    LIVE MAIN STAGE AUDITORIUM · 3,500 ATTENDEES
+                    MAIN STAGE · LIVE
                   </div>
                 </div>
               ) : (
@@ -315,7 +315,7 @@ export default function MultiSlideDeckPreview({
                     >
                       CONFIDENTIAL // BOARD BRIEFING
                     </span>
-                    <span className="text-[7px] font-mono opacity-50">MCKINSEY &amp; BCG</span>
+                    <span className="text-[7px] font-mono opacity-50">STRATEGY BRIEF</span>
                   </div>
                   <h3 className="text-xs sm:text-sm md:text-base font-black tracking-tight leading-tight line-clamp-2">
                     {deckTitle || theme.name}
@@ -434,8 +434,8 @@ export default function MultiSlideDeckPreview({
                       <p className="opacity-80">Phase jitter: &lt;0.002 ps · Drift comp locked</p>
                     </div>
                     <div className="p-1 rounded border space-y-0.5 border-black/10 dark:border-white/10">
-                      <span className="font-bold block text-emerald-500">✓ PROTOCOL VALIDATED</span>
-                      <p className="opacity-80">Cryo-EM grid 0.18Å · Zero spectral clipping</p>
+                      <span className="font-bold block text-emerald-500">PROTOCOL</span>
+                      <p className="opacity-80">Cryo-EM grid · resolution —</p>
                     </div>
                   </div>
                 </div>
@@ -446,7 +446,7 @@ export default function MultiSlideDeckPreview({
                     &ldquo;Complexity is the enemy of execution. Clarity is an act of moral courage.&rdquo;
                   </p>
                   <span className="text-[6.5px] font-mono opacity-50 block">
-                    DELIVERED LIVE TO 3,500 GLOBAL LEADERS
+                    DELIVERED LIVE
                   </span>
                 </div>
               ) : (
@@ -511,15 +511,15 @@ export default function MultiSlideDeckPreview({
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-[6.5px] font-mono font-bold uppercase tracking-wider" style={{ color: theme.accent }}>
-                          ● 3NM NEURAL ENGINE
+                          ● NEURAL ENGINE
                         </span>
-                        <span className="text-[6px] font-mono opacity-50">&lt;1.2ms P99</span>
+                        <span className="text-[6px] font-mono opacity-50">P99 latency</span>
                       </div>
                       <div className="text-[7.5px] sm:text-[8px] font-bold leading-tight">
                         Autonomous Core &amp; On-Chip Tensor Fusion
                       </div>
                       <div className="flex items-center gap-1 text-[6px] font-mono opacity-70">
-                        <span className="px-1 py-0.2 rounded bg-black/5 dark:bg-white/10">50B Transistors</span>
+                        <span className="px-1 py-0.2 rounded bg-black/5 dark:bg-white/10">Transistor count</span>
                         <span className="px-1 py-0.2 rounded bg-black/5 dark:bg-white/10">Zero Cold Start</span>
                       </div>
                     </div>
@@ -534,7 +534,7 @@ export default function MultiSlideDeckPreview({
                         }}
                       >
                         <span className="font-bold block" style={{ color: theme.accent }}>
-                          800 GB/s Bus
+                          Unified Bus
                         </span>
                         <span className="opacity-75 text-[6px]">Unified Memory Pool</span>
                       </div>
@@ -629,10 +629,10 @@ export default function MultiSlideDeckPreview({
                         Deterministic Core
                       </div>
                       <div className="text-[5.5px] opacity-70 leading-tight">
-                        Zero hallucination bounds with schema lock.
+                        Schema-checked outputs.
                       </div>
                       <span className="inline-block text-[5.5px] font-mono font-semibold px-1 py-0.2 rounded bg-black/5 dark:bg-white/10">
-                        99.98% SLA
+                        SLA: your figure
                       </span>
                     </div>
 
@@ -655,7 +655,7 @@ export default function MultiSlideDeckPreview({
                         Sub-second pipeline handoffs across agents.
                       </div>
                       <span className="inline-block text-[5.5px] font-mono font-semibold px-1 py-0.2 rounded bg-black/5 dark:bg-white/10">
-                        3.8x Speedup
+                        Speedup: your figure
                       </span>
                     </div>
 
@@ -678,7 +678,7 @@ export default function MultiSlideDeckPreview({
                         Immutable citation audit trails per assertion.
                       </div>
                       <span className="inline-block text-[5.5px] font-mono font-semibold px-1 py-0.2 rounded bg-black/5 dark:bg-white/10">
-                        100% Provenance
+                        Provenance
                       </span>
                     </div>
                   </div>
@@ -782,7 +782,7 @@ export default function MultiSlideDeckPreview({
                       </ul>
                       <div className="pt-0.5">
                         <span className="text-[5.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-white/80 dark:bg-black/40" style={{ color: theme.accent }}>
-                          ● 3.8X OPERATIONAL VELOCITY UNLOCK
+                          ● OPERATIONAL VELOCITY UNLOCK
                         </span>
                       </div>
                     </div>
@@ -813,7 +813,7 @@ export default function MultiSlideDeckPreview({
                   </div>
                   <div className="flex items-center justify-between pt-0.5 border-t border-black/5 dark:border-white/5 text-[6px] font-serif opacity-70">
                     <span className="font-bold">— OXFORD FACULTY SENATE REVIEW</span>
-                    <span className="font-mono">DOI: 10.1038/s41586</span>
+                    <span className="font-mono">DOI: —</span>
                   </div>
                 </div>
               ) : theme.category === 'academic' ? (
@@ -841,7 +841,7 @@ export default function MultiSlideDeckPreview({
                         Y_it = β₁·Treat_it + X_it&apos;γ + ε_it
                       </div>
                       <div className="text-[5.5px] font-mono opacity-70">
-                        p &lt; 0.001 · n = 12,450 · 95% CI
+                        p = — · n = — · 95% CI [—, —]
                       </div>
                     </div>
 
@@ -870,17 +870,17 @@ export default function MultiSlideDeckPreview({
                   <div className="grid grid-cols-3 gap-1 text-[6.5px]">
                     <div className="p-1 rounded border space-y-0.5" style={{ borderColor: `${theme.accent}40`, backgroundColor: `${theme.accent}08` }}>
                       <span className="text-[5.5px] block opacity-60">CRYO-EM</span>
-                      <span className="font-bold text-[7px] block" style={{ color: theme.accent }}>0.18 Å</span>
+                      <span className="font-bold text-[7px] block" style={{ color: theme.accent }}>—</span>
                       <span className="text-[5px] opacity-70">Sub-angstrom</span>
                     </div>
                     <div className="p-1 rounded border space-y-0.5 border-black/10 dark:border-white/10">
                       <span className="text-[5.5px] block opacity-60">AFFINITY</span>
-                      <span className="font-bold text-[7px] block text-emerald-500">Kd 0.42 nM</span>
+                      <span className="font-bold text-[7px] block text-emerald-500">Kd —</span>
                       <span className="text-[5px] opacity-70">High specificity</span>
                     </div>
                     <div className="p-1 rounded border space-y-0.5 border-black/10 dark:border-white/10">
                       <span className="text-[5.5px] block opacity-60">PURITY</span>
-                      <span className="font-bold text-[7px] block text-cyan-400">99.99%</span>
+                      <span className="font-bold text-[7px] block text-cyan-400">—</span>
                       <span className="text-[5px] opacity-70">Mass-spec assay</span>
                     </div>
                   </div>
@@ -912,7 +912,7 @@ export default function MultiSlideDeckPreview({
                     <span className="text-[7.5px] sm:text-[8px] font-bold tracking-tight opacity-90 truncate font-mono">
                       STRATEGIC ARCHITECTURE &amp; MECE FRAMEWORK
                     </span>
-                    <span className="text-[6px] font-mono opacity-50">MCKINSEY &amp; BCG</span>
+                    <span className="text-[6px] font-mono opacity-50">STRATEGY BRIEF</span>
                   </div>
                   <div
                     className="p-1 rounded border text-center text-[7px]"
@@ -924,12 +924,12 @@ export default function MultiSlideDeckPreview({
                     <div className="p-1 rounded border border-black/10 dark:border-white/10 space-y-0.5">
                       <span className="font-bold text-[6px] block opacity-70">ARGUMENT A: Cost Rationalization</span>
                       <p className="text-[5.5px] opacity-75 leading-tight">Eliminate manual formatting and redundant reviews.</p>
-                      <span className="text-[5px] font-mono text-emerald-500 font-bold block">EVIDENCE 01: -$180M OpEx</span>
+                      <span className="text-[5px] font-mono text-emerald-500 font-bold block">EVIDENCE 01: your figure</span>
                     </div>
                     <div className="p-1 rounded border border-black/10 dark:border-white/10 space-y-0.5">
                       <span className="font-bold text-[6px] block opacity-70">ARGUMENT B: Velocity Acceleration</span>
                       <p className="text-[5.5px] opacity-75 leading-tight">Deterministic generation with verified audit trails.</p>
-                      <span className="text-[5px] font-mono font-bold block" style={{ color: theme.accent }}>EVIDENCE 02: 3.8x Speed</span>
+                      <span className="text-[5px] font-mono font-bold block" style={{ color: theme.accent }}>EVIDENCE 02: your figure</span>
                     </div>
                   </div>
                 </div>
@@ -942,7 +942,7 @@ export default function MultiSlideDeckPreview({
              ========================================================================= */}
           {activeSlide === 3 && (
             <div className={`space-y-1.5 py-0.5 text-left ${fontClass}`}>
-              {/* Category-Bespoke Domain Metrics (NO REPETITIVE +84.2% Core Retention) */}
+              {/* Category-specific metric tiles: placeholders only; no invented figures */}
               {theme.category === 'academic' ? (
                 /* Academic Statistical Significance */
                 <div>
@@ -954,7 +954,7 @@ export default function MultiSlideDeckPreview({
                       style={{ backgroundColor: `${theme.accent}12`, borderColor: `${theme.accent}35` }}
                     >
                       <span className="text-xs sm:text-sm font-black font-serif block" style={{ color: theme.accent }}>
-                        p &lt; 0.001
+                        p = —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Significance</span>
                     </div>
@@ -962,11 +962,11 @@ export default function MultiSlideDeckPreview({
                       <span className="text-xs sm:text-sm font-black font-serif block" style={{ color: theme.accent }}>
                         95% CI
                       </span>
-                      <span className="text-[6.5px] font-bold block opacity-90">[0.84, 0.92]</span>
+                      <span className="text-[6.5px] font-bold block opacity-90">[—, —]</span>
                     </div>
                     <div className="p-1 rounded-lg border text-center space-y-0.5 border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
                       <span className="text-xs sm:text-sm font-black font-serif block" style={{ color: theme.accent }}>
-                        n = 12,450
+                        n = —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Trial Cohort</span>
                     </div>
@@ -983,19 +983,19 @@ export default function MultiSlideDeckPreview({
                       style={{ backgroundColor: `${theme.accent}12`, borderColor: `${theme.accent}35` }}
                     >
                       <span className="text-xs sm:text-sm font-black font-sans block" style={{ color: theme.accent }}>
-                        50B
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Transistors</span>
                     </div>
                     <div className="p-1 rounded-lg border text-center space-y-0.5 border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
                       <span className="text-xs sm:text-sm font-black font-sans block" style={{ color: theme.accent }}>
-                        3.8x
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Neural Engine</span>
                     </div>
                     <div className="p-1 rounded-lg border text-center space-y-0.5 border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
                       <span className="text-xs sm:text-sm font-black font-mono block" style={{ color: theme.accent }}>
-                        &lt;1.2ms
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">P99 Latency</span>
                     </div>
@@ -1005,26 +1005,26 @@ export default function MultiSlideDeckPreview({
                 /* Editorial Market Indicators */
                 <div>
                   <div className="text-[7.5px] sm:text-[8px] font-serif font-bold tracking-tight opacity-90 truncate mb-1">
-                    Financial Times &amp; Macro Diffusion Indices
+                    Market &amp; Macro Indicators
                   </div>
                   <div className="grid grid-cols-3 gap-1">
                     <div className="p-1 rounded-lg border text-center space-y-0.5"
                       style={{ backgroundColor: `${theme.accent}12`, borderColor: `${theme.accent}35` }}
                     >
                       <span className="text-xs sm:text-sm font-black font-serif block" style={{ color: theme.accent }}>
-                        +14.8%
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Diffusion Alpha</span>
                     </div>
                     <div className="p-1 rounded-lg border text-center space-y-0.5 border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
                       <span className="text-xs sm:text-sm font-black font-serif block" style={{ color: theme.accent }}>
-                        £1.8B
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Capital Flow</span>
                     </div>
                     <div className="p-1 rounded-lg border text-center space-y-0.5 border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
                       <span className="text-xs sm:text-sm font-black font-mono block" style={{ color: theme.accent }}>
-                        94.2
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Trust Index</span>
                     </div>
@@ -1041,19 +1041,19 @@ export default function MultiSlideDeckPreview({
                       style={{ backgroundColor: `${theme.accent}12`, borderColor: `${theme.accent}35` }}
                     >
                       <span className="text-xs sm:text-sm font-black font-mono block" style={{ color: theme.accent }}>
-                        99.99%
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Assay Purity</span>
                     </div>
                     <div className="p-1 rounded-lg border text-center space-y-0.5 border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
                       <span className="text-xs sm:text-sm font-black font-mono block" style={{ color: theme.accent }}>
-                        0.18 Å
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Resolution</span>
                     </div>
                     <div className="p-1 rounded-lg border text-center space-y-0.5 border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
                       <span className="text-xs sm:text-sm font-black font-mono block" style={{ color: theme.accent }}>
-                        2.4 GHz
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Carrier Band</span>
                     </div>
@@ -1070,19 +1070,19 @@ export default function MultiSlideDeckPreview({
                       style={{ backgroundColor: `${theme.accent}12`, borderColor: `${theme.accent}35` }}
                     >
                       <span className="text-xs sm:text-sm font-black font-sans block" style={{ color: theme.accent }}>
-                        1 in 3
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Individuals</span>
                     </div>
                     <div className="p-1 rounded-lg border text-center space-y-0.5 border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
                       <span className="text-xs sm:text-sm font-black font-sans block" style={{ color: theme.accent }}>
-                        100,000
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Lives Saved</span>
                     </div>
                     <div className="p-1 rounded-lg border text-center space-y-0.5 border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
                       <span className="text-xs sm:text-sm font-black font-sans block" style={{ color: theme.accent }}>
-                        0%
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Compromise</span>
                     </div>
@@ -1099,19 +1099,19 @@ export default function MultiSlideDeckPreview({
                       style={{ backgroundColor: `${theme.accent}12`, borderColor: `${theme.accent}35` }}
                     >
                       <span className="text-xs sm:text-sm font-black font-mono block" style={{ color: theme.accent }}>
-                        +84.2%
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Retention</span>
                     </div>
                     <div className="p-1 rounded-lg border text-center space-y-0.5 border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
                       <span className="text-xs sm:text-sm font-black font-mono block" style={{ color: theme.accent }}>
-                        +$420M
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">EBITDA Value</span>
                     </div>
                     <div className="p-1 rounded-lg border text-center space-y-0.5 border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
                       <span className="text-xs sm:text-sm font-black font-mono block" style={{ color: theme.accent }}>
-                        3.8x
+                        —
                       </span>
                       <span className="text-[6.5px] font-bold block opacity-90">Velocity</span>
                     </div>
@@ -1187,7 +1187,7 @@ export default function MultiSlideDeckPreview({
                       <span className="w-3 h-3 rounded-full flex items-center justify-center font-mono font-bold text-[6px] shrink-0 opacity-60">
                         3
                       </span>
-                      <span className="truncate opacity-60">Worldwide Availability: Commercial Rollout Across 180 Countries</span>
+                      <span className="truncate opacity-60">Worldwide Availability: Commercial Rollout</span>
                     </div>
                   </div>
                 </div>
