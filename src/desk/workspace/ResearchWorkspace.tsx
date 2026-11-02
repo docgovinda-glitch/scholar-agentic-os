@@ -247,7 +247,8 @@ function ResearchWorkspaceInner({
             ) : currentMode === "audit" || currentMode === "audit_export" ? (
               <AuditExportMode />
             ) : (
-              <ProtocolBlueprintMode />
+              // Re-read the plan after a journal profile changes it.
+              <ProtocolBlueprintMode key={project.answers?.["journal_profile_saved_at"] || "blueprint"} />
             )}
           </Suspense>
         </div>
