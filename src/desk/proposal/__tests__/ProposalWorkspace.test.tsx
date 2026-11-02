@@ -5,13 +5,20 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import ProposalWorkspace from "../ProposalWorkspace";
 
+const draftBodies: Array<Record<string, unknown>> = [];
+
 describe("ProposalWorkspace (OT-19 Grant & Research Proposal Engine)", () => {
   let failNext = false;
   beforeEach(() => {
     failNext = false;
     vi.restoreAllMocks();
-    vi.spyOn(window, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+    draftBodies.length = 0;
+    vi.spyOn(window, "fetch").mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/proposal/draft-section")) {
+        draftBodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify({ success: true, content: "We will run a stepped-wedge trial.", bibliography: "", wordCount: 6 }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
 
       // Mocks follow the real server routes and response shapes. The old mocks
       // used paths the server never had (/audit-aims, /simulate-review), so in
@@ -80,7 +87,9 @@ describe("ProposalWorkspace (OT-19 Grant & Research Proposal Engine)", () => {
 
     const genBtn = screen.getByTestId("generate-structured-blueprint-btn");
     fireEvent.click(genBtn);
-    expect(screen.getByText(/3 Aims Formulated/i)).toBeInTheDocument();
+    // Three empty aims to fill in; none written for the applicant.
+    expect(screen.getByText(/0 of 3 aims written/i)).toBeInTheDocument();
+    expect(screen.getAllByRole("textbox", { name: /^Aim \d$/ }).map((el) => (el as HTMLInputElement).value)).toEqual(["", "", ""]);
 
     // Switch to Agency & Rubric
     fireEvent.click(screen.getByRole("button", { name: /1\. Agency & Rubric/i }));
@@ -154,8 +163,44 @@ describe("ProposalWorkspace (OT-19 Grant & Research Proposal Engine)", () => {
     );
     render(<ProposalWorkspace projectId="proj-proposal-2" />);
     fireEvent.click(screen.getByTestId("generate-structured-blueprint-btn"));
-    expect(screen.getByText(/3 Aims Formulated/i)).toBeInTheDocument();
+    expect(screen.getByText(/0 of 3 aims written/i)).toBeInTheDocument();
     expect(screen.queryByText(/\$500,000|500,000/)).not.toBeInTheDocument();
+    // Nor a hypothesis or aim wording.
+    expect(document.body.textContent).not.toMatch(/We hypothesize|Establish the theoretical and empirical baseline/);
     expect(screen.queryByText(/Standard Investigator Grant Track/i)).not.toBeInTheDocument();
+  });
+
+  it("Research Strategy and Preliminary Studies keep their own text", async () => {
+    render(<ProposalWorkspace projectId="proj-proposal-1" />);
+    await screen.findByDisplayValue("NSF / NIH Joint Informatics Program").catch(() => undefined);
+    fireEvent.click(screen.getByRole("button", { name: /3\. Preliminary Studies/i }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Preliminary Studies" }), { target: { value: "Pilot at one clinic." } });
+    fireEvent.click(screen.getByRole("button", { name: /5\. Research Strategy & Risk/i }));
+    expect((screen.getByRole("textbox", { name: "Research Strategy and Approach" }) as HTMLTextAreaElement).value).toBe("");
+    fireEvent.change(screen.getByRole("textbox", { name: "Research Strategy and Approach" }), { target: { value: "Stepped-wedge design." } });
+    fireEvent.click(screen.getByRole("button", { name: /3\. Preliminary Studies/i }));
+    expect((screen.getByRole("textbox", { name: "Preliminary Studies" }) as HTMLTextAreaElement).value).toBe("Pilot at one clinic.");
+  });
+
+  it("the budget is the applicant's own items, totalled against the ceiling", async () => {
+    render(<ProposalWorkspace projectId="proj-proposal-1" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /6\. Budget & Resources/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /6\. Budget & Resources/i }));
+    // No invented allocation before the applicant enters anything.
+    expect(screen.queryByText(/Personnel & Postdocs \(60%\)/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Add item/i }));
+    fireEvent.change(screen.getByLabelText("Description of budget item 1"), { target: { value: "Study nurse" } });
+    fireEvent.change(screen.getByLabelText("Amount of budget item 1 in USD"), { target: { value: "250000" } });
+    await waitFor(() => expect(screen.getByText("$250,000")).toBeInTheDocument());
+    expect(screen.getByText(/left of your target of \$1,250,000/)).toBeInTheDocument();
+  });
+
+  it("drafts a section with the user's AI once there is a title", async () => {
+    render(<ProposalWorkspace projectId="proj-proposal-1" />);
+    await waitFor(() => expect(screen.getAllByText(/Empirical Grant Architecture Study/).length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole("button", { name: /5\. Research Strategy & Risk/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Draft Research Strategy and Approach with AI/i }));
+    await waitFor(() => expect((screen.getByRole("textbox", { name: "Research Strategy and Approach" }) as HTMLTextAreaElement).value).toBe("We will run a stepped-wedge trial."));
+    expect(draftBodies[0]).toMatchObject({ sectionTitle: "Research Strategy and Approach", targetWords: 1500 });
   });
 });
