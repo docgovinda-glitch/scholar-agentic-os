@@ -448,7 +448,7 @@ export const scholarBrain = {
           }
           if (ev.type === "fallback") sendSSE("status", { message: `Switched from ${ev.fromLabel} to ${ev.toLabel}: ${ev.message}` });
           if (ev.type === "retry") sendSSE("status", { message: `${ev.message}. Retrying in ${Math.ceil(ev.waitMs / 1000)}s` });
-          if (ev.type !== "metrics") sendSSE("route", ev);
+          sendSSE("route", ev);
         },
       });
 
