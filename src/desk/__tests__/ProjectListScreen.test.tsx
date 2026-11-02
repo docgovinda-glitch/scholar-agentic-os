@@ -838,7 +838,9 @@ describe("minimal website assistant", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send question" }));
 
     expect(await screen.findByText(/A browser-side answer about essay structure/i, {}, { timeout: 3000 })).toBeInTheDocument();
-    expect(await screen.findByText(/couldn't answer \(provider 500\)\. This answer came directly from your browser/i, {}, { timeout: 3000 })).toBeInTheDocument();
+    // The toast, plus its copy in the screen-reader live region once announced.
+    const notices = await screen.findAllByText(/couldn't answer \(provider 500\)\. This answer came directly from your browser/i, {}, { timeout: 3000 });
+    expect(notices[0]).toBeInTheDocument();
   });
 
   it("resets conversation when Reset Chat button is clicked", async () => {
