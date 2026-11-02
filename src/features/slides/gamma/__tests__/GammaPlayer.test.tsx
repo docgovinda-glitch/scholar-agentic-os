@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import GammaPlayer from '../GammaPlayer';
 import { composeDeckFromText } from '../composer';
@@ -55,4 +55,30 @@ describe('GammaPlayer (full-screen presenter)', () => {
     render(<GammaPlayer deck={{ ...deck, slides: [] }} onClose={vi.fn()} />);
     expect(screen.getByText(/no slides yet/i)).toBeInTheDocument();
   });
+
+  it('rehearsal opens in presenter view and paces against the talk length', () => {
+    vi.useFakeTimers();
+    try {
+      // 3 slides in 3 minutes: a minute each.
+      render(<GammaPlayer deck={{ ...deck, talkMinutes: 3 }} initialPresenter onClose={vi.fn()} />);
+      expect(screen.getByText(/Presenter Mode/i)).toBeInTheDocument();
+      const paceCard = () => screen.getByTestId('rehearsal-pace');
+      expect(paceCard()).toHaveTextContent('On pace');
+      expect(paceCard()).toHaveTextContent('About 1:00 a slide. Move on from this one by 1:00.');
+      act(() => { vi.advanceTimersByTime(100_000); });
+      expect(paceCard()).toHaveTextContent('0:40 behind');
+      expect(paceCard()).toHaveTextContent('1:20 left');
+      // R restarts the clock.
+      fireEvent.keyDown(window, { key: 'r' });
+      expect(paceCard()).toHaveTextContent('On pace');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('without a talk length there is a timer but no pace guide', () => {
+    render(<GammaPlayer deck={{ ...deck, talkMinutes: undefined }} initialPresenter onClose={vi.fn()} />);
+    expect(screen.queryByTestId('rehearsal-pace')).not.toBeInTheDocument();
+  });
 });
+

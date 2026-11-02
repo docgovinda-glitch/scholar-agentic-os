@@ -4,7 +4,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, FileJson, FileText, Play, Printer } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, FileJson, FileText, Play, Printer, Timer } from 'lucide-react';
 import type { SlideDeck, SlideViewMode } from '../types/slides';
 import { GammaSlide } from '../gamma/GammaCard';
 import { getCardContent } from '../gamma/content';
@@ -94,6 +94,8 @@ export default function Step04Delivery({ deck, onPrevStep, onStartPresentation }
   const [viewMode, setViewMode] = useState<SlideViewMode>('stage');
   const [menuOpen, setMenuOpen] = useState(false);
   const [playing, setPlaying] = useState(false);
+  // Rehearsal: presenter view from the first slide, timed against the talk length.
+  const [rehearsing, setRehearsing] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const theme = useMemo(() => resolveDeckTheme(deck.themeId || DEFAULT_DECK_THEME_ID, deck.customTheme), [deck.themeId, deck.customTheme]);
   const slide = deck.slides[index];
@@ -198,6 +200,16 @@ export default function Step04Delivery({ deck, onPrevStep, onStartPresentation }
 
           <button
             type="button"
+            onClick={() => setRehearsing(true)}
+            disabled={total === 0}
+            title={deck.talkMinutes ? `Run through with notes and a ${deck.talkMinutes}-minute pace guide` : 'Run through with notes, the next slide and a timer'}
+            className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full text-xs font-semibold border border-neutral-300 dark:border-white/15 text-neutral-800 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/5 cursor-pointer disabled:opacity-40"
+          >
+            <Timer className="w-3 h-3" />
+            Rehearse{deck.talkMinutes ? ` (${deck.talkMinutes} min)` : ''}
+          </button>
+          <button
+            type="button"
             data-testid="start-presentation-btn"
             onClick={start}
             disabled={total === 0}
@@ -288,6 +300,7 @@ export default function Step04Delivery({ deck, onPrevStep, onStartPresentation }
 
       <PrintableDeck deck={deck} />
       {playing && <GammaPlayer deck={deck} initialSlideIndex={index} onClose={() => setPlaying(false)} />}
+      {rehearsing && <GammaPlayer deck={deck} initialSlideIndex={0} initialPresenter onClose={() => setRehearsing(false)} />}
     </div>
   );
 }
