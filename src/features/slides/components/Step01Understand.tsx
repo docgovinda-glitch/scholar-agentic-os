@@ -260,9 +260,12 @@ export default function Step01Understand({
           return;
         }
         fallbackReason = 'No AI is connected, so this is a starter outline built from your plan. Connect one in AI Access to have the slides drafted.';
+      } else if (res.status === 401) {
+        fallbackReason = 'Sign in so your AI can draft the slides. This is a starter outline built from your plan.';
       } else {
         const err = await res.json().catch(() => ({}));
-        fallbackReason = `The AI could not draft the slides${(err as { error?: string }).error ? `: ${(err as { error?: string }).error}` : '.'} This is a starter outline built from your plan.`;
+        const why = (err as { error?: string }).error?.trim().replace(/\.$/, '');
+        fallbackReason = `The AI could not draft the slides${why ? `: ${why}.` : '.'} This is a starter outline built from your plan.`;
       }
     } catch (e) {
       fallbackReason = `The AI could not draft the slides${e instanceof Error && e.message ? `: ${e.message}` : '.'} This is a starter outline built from your plan.`;
