@@ -10,6 +10,15 @@ import * as api from "../../api";
 import type { ProjectView } from "../../types";
 import type { WordBudgetBlueprint } from "../types";
 
+// jsdom has no layout; ProseMirror measures the cursor when it scrolls to it.
+if (typeof Range !== "undefined") {
+  Range.prototype.getClientRects = Range.prototype.getClientRects || (() => ({ length: 0, item: () => null, [Symbol.iterator]: [][Symbol.iterator] }) as unknown as DOMRectList);
+  Range.prototype.getBoundingClientRect = Range.prototype.getBoundingClientRect || (() => ({ x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, toJSON: () => ({}) }) as DOMRect);
+}
+if (typeof document !== "undefined" && !document.elementFromPoint) {
+  document.elementFromPoint = () => null;
+}
+
 let confirmAnswer = true;
 let confirmCalls = 0;
 vi.mock("../../../components/ui/FeedbackSystem", async (importOriginal) => ({
@@ -186,9 +195,12 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
       expect(await screen.findByRole("heading", { name: "Hardware Architecture Specification" })).toBeInTheDocument();
       // The old single document was split on its sub-section heading.
       await openUnit(/Problem Domain & Background/);
-      const box = screen.getByRole("textbox", { name: "Problem Domain & Background text" }) as HTMLTextAreaElement;
-      expect(box.value).toContain("Scalable surface code quantum error correction");
-      expect(box.value).not.toContain("### §");
+      const box = screen.getByRole("textbox", { name: "Problem Domain & Background text" });
+      expect(box).toHaveTextContent("Scalable surface code quantum error correction");
+      expect(box).not.toHaveTextContent("### §");
+      // Citations are objects in the text, shown as author and year.
+      expect(box.querySelectorAll('[data-cite="src_f101"]')).toHaveLength(1);
+      expect(box.querySelector('[data-cite="src_f101"]')).toHaveTextContent("Smith, 2024");
     });
 
     it("drafts a section with its sources and what is already written, and saves sections plus the assembled manuscript", async () => {
@@ -213,8 +225,8 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
       // The AI sees the Introduction text already written, to stay consistent.
       expect(payload.contextPrompt).toContain("Scalable surface code quantum error correction");
       await waitFor(() =>
-        expect((screen.getByRole("textbox", { name: "Research Questions & Novelty text" }) as HTMLTextAreaElement).value).toBe(
-          "We ask whether pipelined FPGA decoders stay under 100ns [CITE:src_f101]."
+        expect(screen.getByRole("textbox", { name: "Research Questions & Novelty text" })).toHaveTextContent(
+          "We ask whether pipelined FPGA decoders stay under 100ns"
         )
       );
       await waitFor(() => expect(api.saveIntakeAnswers).toHaveBeenCalled(), { timeout: 3000 });
@@ -233,7 +245,7 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
       fireEvent.click(screen.getByRole("button", { name: /Redraft Problem Domain & Background with AI/i }));
       await waitFor(() => expect(confirmCalls).toBe(1));
       expect(api.draftProjectSubSection).not.toHaveBeenCalled();
-      expect((screen.getByRole("textbox", { name: "Problem Domain & Background text" }) as HTMLTextAreaElement).value).toContain("Scalable surface code");
+      expect(screen.getByRole("textbox", { name: "Problem Domain & Background text" })).toHaveTextContent("Scalable surface code");
     });
 
     it("Focus hides the outline and sources so the text gets the page", async () => {
@@ -262,12 +274,17 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
       expect(panel.textContent).not.toMatch(/Verified Scholarly Publication|Primary User Ingestion/);
 
       fireEvent.click(within(panel).getByRole("button", { name: "Cite Real-Time Syndrome Decoding in Surface Codes" }));
-      const box = screen.getByRole("textbox", { name: "Problem Domain & Background text" }) as HTMLTextAreaElement;
-      await waitFor(() => expect(box.value.match(/\[CITE:src_f101\]/g)?.length).toBe(2));
+      const box = screen.getByRole("textbox", { name: "Problem Domain & Background text" });
+      await waitFor(() => expect(box.querySelectorAll('[data-cite="src_f101"]')).toHaveLength(2));
+      // The new citation is saved as a [CITE:id] marker in the section's text.
+      await waitFor(() => {
+        const saved = vi.mocked(api.saveIntakeAnswers).mock.calls.at(-1)?.[1] as Record<string, string> | undefined;
+        expect(saved && JSON.parse(saved.manuscript_sections).texts["sub-intro-1"].match(/\[CITE:src_f101\]/g)).toHaveLength(2);
+      }, { timeout: 3000 });
 
       fireEvent.click(screen.getByRole("button", { name: /Diacritics/ }));
       fireEvent.click(screen.getByRole("button", { name: "Insert Long a" }));
-      await waitFor(() => expect(box.value).toContain("ā"));
+      await waitFor(() => expect(box).toHaveTextContent("ā"));
     });
   });
 
