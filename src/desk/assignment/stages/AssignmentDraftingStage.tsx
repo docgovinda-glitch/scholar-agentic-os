@@ -63,6 +63,7 @@ export function AssignmentDraftingStage({
     generatingSectionIds,
     initializeDraftingPlan,
     executionMode,
+    isLoading,
   } = useAssignmentWorkspace();
 
   const [streamingChunk, setStreamingChunk] = useState<string>("");
@@ -326,6 +327,31 @@ export function AssignmentDraftingStage({
     if (onBack) onBack();
     else setPhase("sources");
   };
+
+  // Without a brief the outline would be generic headings about nothing in
+  // particular. Ask for the brief instead, unless the student already wrote.
+  if (!isLoading && project && !question?.trim() && currentWordCount === 0) {
+    return (
+      <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 text-neutral-900 dark:text-neutral-100">
+        <section
+          data-testid="drafting-needs-brief"
+          className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-3 text-center"
+        >
+          <h1 className="text-lg sm:text-xl font-semibold tracking-tight">Add your assignment brief first</h1>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md mx-auto">
+            Drafting builds its sections from your assignment question, word count and citation style. Enter them in Extract and the outline appears here.
+          </p>
+          <button
+            type="button"
+            onClick={() => setPhase("extract")}
+            className="mt-2 px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 cursor-pointer"
+          >
+            Go to Extract
+          </button>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 text-neutral-900 dark:text-neutral-100">

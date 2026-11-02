@@ -345,4 +345,20 @@ describe("Scholar Core Assignment Workspace", () => {
     const nav = screen.getByRole("navigation", { name: /Assignment Workflow Phases/i });
     expect(within(nav).getByRole("button", { name: /Phase \d: Submission/i })).toHaveTextContent("0%");
   });
+
+  it("Drafting asks for the brief instead of showing a generic outline", async () => {
+    getProject.mockResolvedValue({
+      projectId: "proj-nobrief",
+      outputTypeId: "OT-01",
+      title: "Untitled Assignment",
+      hasDocument: false,
+      answers: { assignment_question: "", word_count: 0, citation_style: "" },
+      gates: [],
+    });
+    render(<AssignmentWorkspace projectId="proj-nobrief" initialStage="drafting" onStageChange={vi.fn()} />);
+    expect(await screen.findByTestId("drafting-needs-brief", undefined, { timeout: 4000 })).toBeInTheDocument();
+    expect(screen.queryByText(/Core Analytical Subject|Theoretical Foundations of/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Go to Extract/i }));
+    expect(await screen.findByText(/Please provide the assignment question/i, undefined, { timeout: 4000 })).toBeInTheDocument();
+  });
 });
