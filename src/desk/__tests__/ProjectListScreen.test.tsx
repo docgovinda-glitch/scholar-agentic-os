@@ -827,6 +827,22 @@ describe("minimal website assistant", () => {
     });
   });
 
+  it("when the server can't answer, a browser-side answer is shown and announced, never silently", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    executeAgenticQuery.mockRejectedValueOnce(new Error("provider 500"));
+    executeAgenticLLM.mockResolvedValueOnce("A browser-side answer about essay structure.");
+
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+    fireEvent.click(screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i }));
+    fireEvent.change(screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i), { target: { value: "write an essay on biology" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send question" }));
+
+    expect(await screen.findByText(/A browser-side answer about essay structure/i, {}, { timeout: 3000 })).toBeInTheDocument();
+    // The toast, plus its copy in the screen-reader live region once announced.
+    const notices = await screen.findAllByText(/couldn't answer \(provider 500\)\. This answer came directly from your browser/i, {}, { timeout: 3000 });
+    expect(notices[0]).toBeInTheDocument();
+  });
+
   it("resets conversation when Reset Chat button is clicked", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);

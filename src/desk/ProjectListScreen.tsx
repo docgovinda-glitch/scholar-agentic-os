@@ -889,9 +889,12 @@ export default function ProjectListScreen({
               history,
             });
           } catch (serverErr) {
-            // Direct client-side failover using configured BYOK keys in AI Access if server execution fails
+            // The server could not answer: try the user's own key directly from
+            // this browser, and say so (an answer from a different path is never silent).
             try {
               const clientTxt = await executeAgenticLLM(effectiveSystemPrompt, query, "reasoning");
+              const reason = serverErr instanceof Error ? serverErr.message : "it did not respond";
+              showAppToast(`Scholar Core's server couldn't answer (${reason.slice(0, 160)}). This answer came directly from your browser using your own AI key, without the server's citation checks.`, "warning", 9000);
               agentResponse = {
                 ok: true,
                 text: clientTxt,
