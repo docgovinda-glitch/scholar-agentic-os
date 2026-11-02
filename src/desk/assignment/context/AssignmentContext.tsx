@@ -1610,12 +1610,13 @@ export function AssignmentProvider({
     }
   }, [internalSections, outline, sources, userUploadedSources, approvedSourceIds, projectState.brief, saveAnswers]);
 
-  // Phase 4 auto-initialization: if entering Phase 4 without submissionReport, run submission audit
+  // Phase 4 auto-initialization: entering Phase 4 with a draft but no
+  // submissionReport runs the audit. An empty paper is never graded.
   useEffect(() => {
-    if (currentPhase === "submission" && !isLoading && !submissionReport && !isAuditingSubmission) {
+    if (currentPhase === "submission" && !isLoading && currentWordCount > 0 && !submissionReport && !isAuditingSubmission) {
       runSubmissionAudit();
     }
-  }, [currentPhase, isLoading, submissionReport, isAuditingSubmission, runSubmissionAudit]);
+  }, [currentPhase, isLoading, currentWordCount, submissionReport, isAuditingSubmission, runSubmissionAudit]);
 
   return (
     <AssignmentContext.Provider

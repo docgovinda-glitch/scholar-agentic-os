@@ -1060,6 +1060,13 @@ export default function AssignmentUnderstandStage({
     Boolean(localCitation) &&
     Boolean(localLevel) &&
     Boolean(localType);
+  const missingFields = [
+    localQuestion.trim().length < 10 && "the assignment question (10+ characters)",
+    !(localWordCount > 0) && "a word count",
+    !localCitation && "a citation style",
+    !localLevel && "an academic level",
+    !localType && "an assignment type",
+  ].filter((x): x is string => Boolean(x));
 
   const subQuestions = useMemo(() => {
     return generateSubQuestions(localQuestion, localBrief);
@@ -1465,38 +1472,6 @@ export default function AssignmentUnderstandStage({
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="flex items-center p-0.5 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-xs font-medium select-none">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (setExecutionMode) setExecutionMode("minimal");
-                    saveAnswers({ execution_mode: "minimal", executionMode: "minimal" });
-                  }}
-                  className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer ${
-                    executionMode === "minimal"
-                      ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white font-semibold shadow-2xs"
-                      : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                  }`}
-                >
-                  Minimal Mode
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (setExecutionMode) setExecutionMode("detailed");
-                    saveAnswers({ execution_mode: "detailed", executionMode: "detailed" });
-                  }}
-                  className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer ${
-                    executionMode === "detailed"
-                      ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white font-semibold shadow-2xs"
-                      : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                  }`}
-                >
-                  Detailed Mode
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Assignment Question Section */}
@@ -1812,9 +1787,12 @@ export default function AssignmentUnderstandStage({
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-neutral-100 dark:border-white/5">
             <div className="text-xs">
               {!canProceedToSources ? (
-                <p className="text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  <span>Please provide the assignment question, word count, and citation style to continue.</span>
+                <p className="text-neutral-500 dark:text-neutral-400 flex items-start gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+                  <span>
+                    Please provide the assignment question, word count, and citation style to continue.
+                    {missingFields.length > 0 && <span className="block text-[11px] mt-0.5">Still needed: {missingFields.join(", ")}.</span>}
+                  </span>
                 </p>
               ) : (
                 <p className="text-neutral-500 dark:text-neutral-400">

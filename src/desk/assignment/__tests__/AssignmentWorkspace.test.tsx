@@ -147,11 +147,11 @@ describe("Scholar Core Assignment Workspace", () => {
       />
     );
 
-    // 1. Clean Left Section: Back button and plain text title
+    // 1. One back button: the studio header's. The assignment bar below it
+    // no longer repeats it.
     const header = await screen.findByRole("banner");
-    const backBtn = within(header).getByRole("button", { name: /back/i });
-    expect(backBtn).toBeInTheDocument();
-    fireEvent.click(backBtn);
+    expect(within(header).queryByRole("button", { name: /back/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("studio-back-to-desk-btn"));
     expect(handleClose).toHaveBeenCalledTimes(1);
 
     // Inline-editable title with auto-save
@@ -175,9 +175,9 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(within(header).queryByRole("button", { name: /vault/i })).not.toBeInTheDocument();
     expect(within(header).queryByRole("button", { name: /ai access/i })).not.toBeInTheDocument();
 
-    // 3. Simplified AI Tutor: minimalist icon button
-    const tutorToggle = within(header).getByRole("button", { name: /toggle ai tutor/i });
-    expect(tutorToggle).toBeInTheDocument();
+    // 3. One tutor toggle: the studio header's inspector button.
+    expect(within(header).queryByRole("button", { name: /toggle ai tutor/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId("inspector-toggle")).toBeInTheDocument();
     expect(within(header).queryByText("AI Tutor")).not.toBeInTheDocument();
 
     // 4. Duplicate counter removed from top header; lives exclusively in stage navigation
@@ -290,5 +290,75 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(within(nav).getByRole("button", { name: /Phase 4: Drafting/i })).toBeInTheDocument();
     expect(within(nav).getByRole("button", { name: /Phase 5: Submission/i })).toBeInTheDocument();
   });
-});
 
+  it("renaming in the studio header saves the title", async () => {
+    render(<AssignmentWorkspace projectId="proj-123" initialStage="understand" onStageChange={vi.fn()} />);
+    fireEvent.click(await screen.findByTestId("studio-project-title"));
+    const input = screen.getByTestId("studio-project-title-input");
+    fireEvent.change(input, { target: { value: "Renamed From Header" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() =>
+      expect(saveIntakeAnswers).toHaveBeenCalledWith("proj-123", expect.objectContaining({ assignment_title: "Renamed From Header" }))
+    );
+  });
+
+  it("the tutor starts closed on a phone-width screen", async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false })) as unknown as typeof window.matchMedia;
+    try {
+      render(<AssignmentWorkspace projectId="proj-123" initialStage="understand" onStageChange={vi.fn()} />);
+      await screen.findByTestId("inspector-toggle");
+      expect(screen.queryByTestId("assignment-tutor-drawer")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("inspector-toggle"));
+      expect(screen.getByTestId("assignment-tutor-drawer")).toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it("an empty brief shows 0% and cannot proceed, with a hint instead of an error", async () => {
+    getProject.mockResolvedValueOnce({
+      projectId: "proj-empty",
+      outputTypeId: "OT-01",
+      title: "Untitled Assignment",
+      hasDocument: false,
+      answers: { assignment_question: "", word_count: 0, citation_style: "" },
+      gates: [],
+    });
+    render(<AssignmentWorkspace projectId="proj-empty" initialStage="understand" onStageChange={vi.fn()} />);
+    const nav = await screen.findByRole("navigation", { name: /Assignment Workflow Phases/i });
+    expect(within(nav).getByRole("button", { name: /Phase 1: Extract/i })).toHaveTextContent("0%");
+    expect(await screen.findByRole("button", { name: /Proceed to Sources/i })).toBeDisabled();
+    expect(screen.getByText(/Still needed: .*the assignment question/i)).toBeInTheDocument();
+    // Only one Minimal/Detailed choice on the page.
+    expect(screen.getAllByRole("radio", { name: /Detailed/i })).toHaveLength(1);
+  });
+
+  it("does not grade an empty paper on the Submission step", async () => {
+    render(<AssignmentWorkspace projectId="proj-123" initialStage="submission" onStageChange={vi.fn()} />);
+    expect(await screen.findByTestId("submission-nothing-drafted")).toBeInTheDocument();
+    expect(screen.queryByText(/Predicted Grade Band/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Third Class|First Class|Upper Second/i)).not.toBeInTheDocument();
+    // No audit was saved for it either.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(saveIntakeAnswers).not.toHaveBeenCalledWith("proj-123", expect.objectContaining({ assignment_submission_report: expect.anything() }));
+    const nav = screen.getByRole("navigation", { name: /Assignment Workflow Phases/i });
+    expect(within(nav).getByRole("button", { name: /Phase \d: Submission/i })).toHaveTextContent("0%");
+  });
+
+  it("Drafting asks for the brief instead of showing a generic outline", async () => {
+    getProject.mockResolvedValue({
+      projectId: "proj-nobrief",
+      outputTypeId: "OT-01",
+      title: "Untitled Assignment",
+      hasDocument: false,
+      answers: { assignment_question: "", word_count: 0, citation_style: "" },
+      gates: [],
+    });
+    render(<AssignmentWorkspace projectId="proj-nobrief" initialStage="drafting" onStageChange={vi.fn()} />);
+    expect(await screen.findByTestId("drafting-needs-brief", undefined, { timeout: 4000 })).toBeInTheDocument();
+    expect(screen.queryByText(/Core Analytical Subject|Theoretical Foundations of/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Go to Extract/i }));
+    expect(await screen.findByText(/Please provide the assignment question/i, undefined, { timeout: 4000 })).toBeInTheDocument();
+  });
+});

@@ -173,15 +173,6 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   const [uploadingBrief, setUploadingBrief] = useState<boolean>(false);
   const [showCourseDetails, setShowCourseDetails] = useState<boolean>(false);
 
-  const handleModeChange = useCallback((mode: "minimal" | "detailed") => {
-    if (typeof setExecutionMode === "function") {
-      setExecutionMode(mode);
-    }
-    saveAnswers({
-      execution_mode: mode,
-      executionMode: mode,
-    });
-  }, [setExecutionMode, saveAnswers]);
 
   // Auto-Update Writing Tone on initial load if essay with default analytical tone
   useEffect(() => {
@@ -242,6 +233,13 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     Boolean(localCitation) &&
     Boolean(localLevel) &&
     Boolean(localType);
+  const missingFields = [
+    localQuestion.trim().length < 10 && "the assignment question (10+ characters)",
+    !(localWordCount > 0) && "a word count",
+    !localCitation && "a citation style",
+    !localLevel && "an academic level",
+    !localType && "an assignment type",
+  ].filter((x): x is string => Boolean(x));
 
   const computeWordBudgetFromSections = (
     total: number,
@@ -632,49 +630,15 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           </p>
         </div>
 
-        {/* Minimal Mode | Detailed Mode Toggle & Action */}
+        {/* Next step. The Minimal/Detailed flow choice lives in the assignment bar above. */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="flex flex-col items-start sm:items-end gap-1">
-            <div className="flex items-center p-0.5 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-xs font-medium select-none">
-              <button
-                type="button"
-                role="radio"
-                aria-checked={executionMode === "minimal"}
-                onClick={() => handleModeChange("minimal")}
-                className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer flex items-center gap-1.5 ${
-                  executionMode === "minimal"
-                    ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white font-semibold shadow-2xs"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                }`}
-                title="Minimal (Quick Flow): Auto-Outline"
-              >
-                <span>Minimal Mode</span>
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={executionMode === "detailed"}
-                onClick={() => handleModeChange("detailed")}
-                className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer flex items-center gap-1.5 ${
-                  executionMode === "detailed"
-                    ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white font-semibold shadow-2xs"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                }`}
-                title="Detailed (Guided Architect): Custom Thesis & Roadmap"
-              >
-                <span>Detailed Mode</span>
-              </button>
-            </div>
-            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-              {executionMode === "minimal" ? "Minimal = Auto-Outline" : "Detailed = Custom Thesis & Roadmap"}
-            </span>
-          </div>
-
           {onProceed && executionMode === "detailed" && (
             <button
               type="button"
               onClick={onProceed}
-              className="px-3.5 py-1.5 rounded-xl border border-neutral-200/80 dark:border-white/10 text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              disabled={!canGenerate}
+              title={canGenerate ? undefined : "Add the assignment question, word count and citation style first"}
+              className="disabled:opacity-40 disabled:cursor-not-allowed px-3.5 py-1.5 rounded-xl border border-neutral-200/80 dark:border-white/10 text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
             >
               <span>Proceed to Phase 2: Understand</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -685,7 +649,9 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
             <button
               type="button"
               onClick={onProceed}
-              className="px-3 py-1.5 rounded-xl border border-neutral-200/80 dark:border-white/10 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              disabled={!canGenerate}
+              title={canGenerate ? undefined : "Add the assignment question, word count and citation style first"}
+              className="disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 rounded-xl border border-neutral-200/80 dark:border-white/10 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
             >
               <span>Proceed to Phase 2: Sources</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -879,7 +845,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
         </div>
 
         {/* Academic Parameters: Academic Level, Assignment Type, Citation Style, Writing Tone & Target Words */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1.35fr] gap-3.5 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[1fr_1fr_1fr_1fr_1.35fr] gap-3.5 pt-1">
           {/* Academic Level */}
           <div className="space-y-1">
             <label htmlFor="academic_level" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
@@ -1155,9 +1121,12 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-neutral-100 dark:border-white/5">
           <div className="text-xs">
             {!canGenerate ? (
-              <p className="text-red-500 flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>Please provide the assignment question, word count, and citation style to continue.</span>
+              <p className="text-neutral-500 dark:text-neutral-400 flex items-start gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+                <span>
+                  Please provide the assignment question, word count, and citation style to continue.
+                  {missingFields.length > 0 && <span className="block text-[11px] mt-0.5">Still needed: {missingFields.join(", ")}.</span>}
+                </span>
               </p>
             ) : (
               <p className="text-neutral-500 dark:text-neutral-400">
