@@ -54,20 +54,16 @@ describe('presentationScopeClassifier', () => {
     );
   });
 
-  it('generates grounded inquiry points and guardrails for general academic topics', () => {
-    const scope = classifyPresentationScope(
-      '',
-      'Autonomous Multi-Agent Consensus'
-    );
-
-    expect(scope.covers.length).toBeGreaterThanOrEqual(4);
+  it('a bare topic gets no stand-in points: the presenter writes their own', () => {
+    const scope = classifyPresentationScope('', 'Autonomous Multi-Agent Consensus');
+    expect(scope.covers).toEqual([]);
+    expect(scope.summaryBanner).toMatch(/Add the points you want to make/);
     expect(scope.avoids.length).toBeGreaterThanOrEqual(3);
-    // Guarantees no raw internal tags leaked into cards
-    scope.covers.forEach((item) => {
-      expect(item).not.toMatch(/\[L\d+/);
-    });
-    scope.avoids.forEach((item) => {
-      expect(item).not.toMatch(/\[L\d+/);
-    });
+    scope.avoids.forEach((item) => expect(item).not.toMatch(/\[L\d+/));
+  });
+
+  it("the author's own questions become the points, without line tags", () => {
+    const scope = classifyPresentationScope('', 'T', ['[L001] Why do decoders fall behind?', '[L002] What does pipelining change?']);
+    expect(scope.covers).toEqual(['Why do decoders fall behind?', 'What does pipelining change?']);
   });
 });

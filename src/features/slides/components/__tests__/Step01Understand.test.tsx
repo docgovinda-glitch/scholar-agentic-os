@@ -178,7 +178,7 @@ describe('Step01Understand (Zero-Ghost Rule, Scope Cards & Presentation Style)',
     const addCoverBtn = screen.getByRole('button', { name: /Add Key Point/i });
     fireEvent.click(addCoverBtn);
 
-    const input = screen.getByPlaceholderText(/Add a key focus point\.\.\./i);
+    const input = screen.getByPlaceholderText(/Add a point you want to make/i);
     fireEvent.change(input, { target: { value: 'New diagnostic benchmark for corporate onboarding' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
 
@@ -205,10 +205,10 @@ describe('Step01Understand (Zero-Ghost Rule, Scope Cards & Presentation Style)',
       />
     );
 
-    fireEvent.change(screen.getByLabelText(/Presentation Topic/i), {
+    fireEvent.change(screen.getByLabelText(/^Title/i), {
       target: { value: 'Municipal climate adaptation budgets' },
     });
-    fireEvent.click(screen.getByLabelText(/Save & Generate Outline/i));
+    fireEvent.click(screen.getByRole('button', { name: 'Starter outline without AI' }));
 
     expect(handleUpdate).toHaveBeenCalled();
     const generated = handleUpdate.mock.calls[0][0] as SlideDeck;
@@ -234,13 +234,15 @@ describe('Step01Understand (Zero-Ghost Rule, Scope Cards & Presentation Style)',
     fireEvent.change(styleSelect, { target: { value: 'executive-pitch' } });
 
     // Enter Zappos topic
-    const topicTextarea = screen.getByLabelText(/Presentation Topic/i);
+    // A five-slide talk.
+    fireEvent.change(screen.getByLabelText('Slide Count'), { target: { value: '5' } });
+    const topicTextarea = screen.getByLabelText(/^Title/i);
     fireEvent.change(topicTextarea, {
       target: { value: 'Why Zappos Pays New Hires $2,000 to Quit (MN6094NI Leadership Tutorial)' },
     });
 
-    // Click Save & Generate Outline
-    const generateBtn = screen.getByLabelText(/Save & Generate Outline/i);
+    // Build the starter outline (no AI)
+    const generateBtn = screen.getByRole('button', { name: 'Starter outline without AI' });
     fireEvent.click(generateBtn);
 
     expect(handleUpdate).toHaveBeenCalled();

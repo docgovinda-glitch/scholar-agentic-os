@@ -78,16 +78,18 @@ describe("PresentationWorkspace", () => {
     expect(screen.getByTestId("step-01-understand")).toBeInTheDocument();
     expect(screen.queryByTestId("generated-outline-section")).not.toBeInTheDocument();
 
-    const input = screen.getByPlaceholderText(/presentation topic|key question/i);
+    const input = screen.getByLabelText(/^Title/i);
     fireEvent.change(input, {
       target: { value: "Why Zappos Pays New Hires to Quit" },
     });
 
-    const genBtn = screen.getByRole("button", { name: /Create Slides Outline/i });
+    const genBtn = screen.getByRole("button", { name: "Starter outline without AI" });
     fireEvent.click(genBtn);
 
     expect(screen.getByText(/Generated Presentation Outline/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Why Zappos Pays New Hires to Quit/i).length).toBeGreaterThan(0);
+    // The title field keeps what was typed, and the outline shows the built deck.
+    expect((screen.getByLabelText(/^Title/i) as HTMLInputElement).value).toBe("Why Zappos Pays New Hires to Quit");
+    expect(screen.getAllByText(/Why Zappos Pays New Hires \$2,000 to Quit/i).length).toBeGreaterThan(0);
   });
 
   it("Step 02: displays the curated theme gallery (including the 4 classic presets) and accent picker without legacy bloat", () => {
