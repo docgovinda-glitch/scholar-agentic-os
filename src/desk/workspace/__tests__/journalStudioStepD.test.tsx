@@ -158,6 +158,8 @@ These findings establish that multi-agent consensus can achieve provable stabili
         surname: "Rostova",
         affiliation: "University of Oxford",
         email: "e.rostova@oxford.ac.uk",
+        isCorresponding: true,
+        creditRoles: ["Conceptualization", "Writing – original draft"],
       },
     ],
     claimGraph: { nodes: [], edges: [] },
@@ -235,8 +237,8 @@ These findings establish that multi-agent consensus can achieve provable stabili
       </ResearchProvider>
     );
     await waitFor(() => expect((screen.getByLabelText(/Full Article Title/i) as HTMLInputElement).value).toBe("My Article"));
-    expect((screen.getByLabelText(/Author Name\(s\)/i) as HTMLInputElement).value).toBe("");
-    expect((screen.getByLabelText(/ORCID iD/i) as HTMLInputElement).value).toBe("");
+    expect(screen.queryByLabelText(/Author 1 first name/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Add at least one author.")).toBeInTheDocument();
     for (const name of [/Data Availability Statement/i, /Competing Interests Statement/i, /CRediT Statement/i, /AI Disclosure Statement/i]) {
       expect((screen.getByRole("textbox", { name }) as HTMLTextAreaElement).value).toBe("");
     }
@@ -341,10 +343,11 @@ These findings establish that multi-agent consensus can achieve provable stabili
     const runningHeadInput = screen.getByLabelText(/Running Head/i) as HTMLInputElement;
     expect(runningHeadInput.value).toBe("PROVABLE BOUNDS IN AUTONOMOUS WORKFLOWS");
 
-    const authorInput = screen.getByLabelText(/Author Name\(s\)/i) as HTMLInputElement;
-    expect(authorInput.value).toBe("Elena Rostova");
+    expect((screen.getByLabelText(/Author 1 first name/i) as HTMLInputElement).value).toBe("Elena");
+    expect((screen.getByLabelText(/Author 1 surname/i) as HTMLInputElement).value).toBe("Rostova");
 
-    const orcidInput = screen.getByLabelText(/ORCID iD/i) as HTMLInputElement;
+    // An ORCID saved the older way (answers.author_orcid) belongs to the first author.
+    const orcidInput = screen.getByLabelText(/Author 1 ORCID iD/i) as HTMLInputElement;
     expect(orcidInput.value).toBe("0000-0002-1825-0097");
   });
 

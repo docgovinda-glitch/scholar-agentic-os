@@ -840,11 +840,13 @@ export function registerManuscriptAndGateRoutes(
           authorEmail: req.body?.email || req.query?.email || record.authors?.[0]?.email,
           authorOrcid: req.body?.orcid || req.query?.orcid || record.answers?.["author_orcid"],
           authors: record.authors && record.authors.length > 0
-            ? record.authors.map((a) => ({
+            ? record.authors.map((a, i) => ({
                 name: `${a.firstName} ${a.surname}`.trim(),
                 affiliation: a.affiliation,
                 email: a.email,
-                isCorresponding: true,
+                orcid: a.orcid,
+                // The author marked corresponding; the first one only when none is.
+                isCorresponding: a.isCorresponding || (i === 0 && !record.authors!.some((x) => x.isCorresponding)),
               }))
             : undefined,
           keywords: req.body?.keywords || (record.answers?.["keywords"] ? record.answers["keywords"].split(",").map((s: string) => s.trim()) : undefined),
