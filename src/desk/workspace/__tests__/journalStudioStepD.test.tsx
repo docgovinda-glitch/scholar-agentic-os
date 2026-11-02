@@ -115,6 +115,11 @@ These findings establish that multi-agent consensus can achieve provable stabili
       selected_journal_name: "Nature Machine Intelligence",
       running_head: "PROVABLE BOUNDS IN AUTONOMOUS WORKFLOWS",
       author_orcid: "0000-0002-1825-0097",
+      // A finished submission: the authors have written their declarations.
+      data_availability_statement: "Benchmark data are available from the corresponding author on reasonable request.",
+      competing_interests_statement: "The authors declare no competing interests.",
+      credit_statement: "E. Rostova: Conceptualization, Writing – original draft.",
+      ai_disclosure_statement: "AI tools were used for language editing; the authors take responsibility for the content.",
       keywords: "Quantum Computing, Error Correction, Surface Codes, FPGA Decoding",
       word_budget_blueprint: JSON.stringify(mockBlueprint),
       manuscript_markdown: sampleManuscript,
@@ -213,21 +218,58 @@ These findings establish that multi-agent consensus can achieve provable stabili
     expect(screen.getByText(/Transparent Methodology & AI-Assisted Tool Disclosure/i)).toBeInTheDocument();
   });
 
-  it("auto-references Mode 2 primary datasets in the Data Availability declaration", async () => {
+  it("a new project has no stand-in author or declarations and is not certified", async () => {
+    vi.mocked(api.getProject).mockResolvedValue({
+      ...baseProject,
+      authors: [],
+      answers: {
+        working_title: "My Article",
+        word_budget_blueprint: baseProject.answers.word_budget_blueprint,
+        manuscript_markdown: baseProject.answers.manuscript_markdown,
+        user_data_entries: baseProject.answers.user_data_entries,
+      },
+    });
     render(
       <ResearchProvider projectId="proj-step-d" initialStage="export" onStageChangeCallback={vi.fn()}>
         <AuditExportMode />
       </ResearchProvider>
     );
+    await waitFor(() => expect((screen.getByLabelText(/Full Article Title/i) as HTMLInputElement).value).toBe("My Article"));
+    expect((screen.getByLabelText(/Author Name\(s\)/i) as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText(/ORCID iD/i) as HTMLInputElement).value).toBe("");
+    for (const name of [/Data Availability Statement/i, /Competing Interests Statement/i, /CRediT Statement/i, /AI Disclosure Statement/i]) {
+      expect((screen.getByRole("textbox", { name }) as HTMLTextAreaElement).value).toBe("");
+    }
+    expect(document.body.textContent).not.toMatch(/Rostova|Oxford|0000-0002-1825-0097|no known competing/);
+    expect(screen.getByText(/Gate G7: ACTION REQUIRED/i)).toBeInTheDocument();
+  });
 
-    await waitFor(() => {
-      expect(screen.getByText("Referencing Mode 2 Primary Data")).toBeInTheDocument();
-      const dataAvailArea = screen.getByRole("textbox", {
-        name: /Data Availability Statement/i,
-      }) as HTMLTextAreaElement;
-      expect(dataAvailArea.value).toContain("user_data_101");
-      expect(dataAvailArea.value).toContain("FPGA Latency Benchmark Data");
+  it("an empty manuscript passes no text checks: 0% and nothing to check yet", async () => {
+    vi.mocked(api.getProject).mockResolvedValue({ ...baseProject, authors: [], answers: { working_title: "Empty" } });
+    render(
+      <ResearchProvider projectId="proj-step-d" initialStage="export" onStageChangeCallback={vi.fn()}>
+        <AuditExportMode />
+      </ResearchProvider>
+    );
+    await waitFor(() => expect(screen.getAllByText("Nothing to check yet")).toHaveLength(2));
+    expect(screen.getByText(/^0% Pass$/)).toBeInTheDocument();
+    expect(screen.queryByText(/Scholarly Voice Certified|100% Citation Provenance Reconciled/)).not.toBeInTheDocument();
+  });
+
+  it("offers a data-availability draft naming the author's datasets, only on request", async () => {
+    vi.mocked(api.getProject).mockResolvedValue({
+      ...baseProject,
+      answers: { ...baseProject.answers, data_availability_statement: "" },
     });
+    render(
+      <ResearchProvider projectId="proj-step-d" initialStage="export" onStageChangeCallback={vi.fn()}>
+        <AuditExportMode />
+      </ResearchProvider>
+    );
+    const area = (await screen.findByRole("textbox", { name: /Data Availability Statement/i })) as HTMLTextAreaElement;
+    expect(area.value).toBe("");
+    fireEvent.click(await screen.findByRole("button", { name: "Start from my datasets" }));
+    expect(area.value).toContain("FPGA Latency Benchmark Data");
   });
 
   it("appends formatted 2026 declarations to manuscript end-matter and saves to project answers", async () => {
@@ -241,7 +283,7 @@ These findings establish that multi-agent consensus can achieve provable stabili
       const dataAvailArea = screen.getByRole("textbox", {
         name: /Data Availability Statement/i,
       }) as HTMLTextAreaElement;
-      expect(dataAvailArea.value).toContain("user_data_101");
+      expect(dataAvailArea.value).toContain("Benchmark data are available");
     });
 
     const appendButton = screen.getByRole("button", {
@@ -253,7 +295,7 @@ These findings establish that multi-agent consensus can achieve provable stabili
       expect(api.saveIntakeAnswers).toHaveBeenCalledWith(
         "proj-step-d",
         expect.objectContaining({
-          data_availability_statement: expect.stringContaining("user_data_101"),
+          data_availability_statement: expect.stringContaining("Benchmark data are available"),
           competing_interests_statement: expect.any(String),
           credit_statement: expect.any(String),
           ai_disclosure_statement: expect.any(String),

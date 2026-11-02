@@ -2,13 +2,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import ManuscriptStudioMode from "../ManuscriptStudioMode";
 import RefereeRebuttalMode from "../RefereeRebuttalMode";
 import { ResearchProvider } from "../ResearchContext";
 import * as api from "../../api";
 import type { ProjectView } from "../../types";
 import type { WordBudgetBlueprint } from "../types";
+
+let confirmAnswer = true;
+let confirmCalls = 0;
+vi.mock("../../../components/ui/FeedbackSystem", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../components/ui/FeedbackSystem")>()),
+  requestAppConfirm: async () => {
+    confirmCalls += 1;
+    return confirmAnswer;
+  },
+}));
 
 // Mock API modules
 vi.mock("../../api", () => ({
@@ -140,6 +150,8 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
 
   beforeEach(() => {
     vi.clearAllMocks();
+    confirmAnswer = true;
+    confirmCalls = 0;
     vi.mocked(api.getProject).mockImplementation(async () => JSON.parse(JSON.stringify(baseProject)));
     vi.mocked(api.saveIntakeAnswers).mockImplementation(async (_id, answers) => ({
       ...JSON.parse(JSON.stringify(baseProject)),
@@ -147,212 +159,115 @@ describe("Journal Rebuild Step C — Mode 3 Grounded Manuscript Studio & Mode 4 
     }));
   });
 
-  describe("1. Mode 3: Grounded Manuscript Studio (ManuscriptStudioMode)", () => {
-    it("renders 3-pane split layout, displays sub-section word budgets from Mode 1, and drafts sub-sections within target budget", async () => {
+  describe("1. Mode 3: Writing Studio (ManuscriptStudioMode)", () => {
+    const renderStudio = () =>
+      render(
+        <ResearchProvider projectId="proj-step-c" initialStage="draft">
+          <ManuscriptStudioMode />
+        </ResearchProvider>
+      );
+    // Waits for the project to load (the outline shows the blueprint) and the unit to open.
+    const openUnit = async (title: RegExp) => {
+      await waitFor(() => {
+        const outline = screen.getByRole("navigation", { name: "Manuscript outline" });
+        fireEvent.click(within(outline).getByRole("button", { name: title }));
+        expect(screen.getByRole("heading", { level: 2, name: title })).toBeInTheDocument();
+      });
+    };
+
+    it("shows the outline in writing order with words per sub-section, and the earlier draft split into its sections", async () => {
+      renderStudio();
+      const outline = await screen.findByRole("navigation", { name: "Manuscript outline" });
+      // Methods before the Introduction in writing order.
+      const text = outline.textContent || "";
+      expect(text.indexOf("Methodology")).toBeLessThan(text.indexOf("Introduction"));
+      expect(within(outline).getByText("Write 1st")).toBeInTheDocument();
+      // It opens on the next thing to write: the empty Methods sub-section.
+      expect(await screen.findByRole("heading", { name: "Hardware Architecture Specification" })).toBeInTheDocument();
+      // The old single document was split on its sub-section heading.
+      await openUnit(/Problem Domain & Background/);
+      const box = screen.getByRole("textbox", { name: "Problem Domain & Background text" }) as HTMLTextAreaElement;
+      expect(box.value).toContain("Scalable surface code quantum error correction");
+      expect(box.value).not.toContain("### §");
+    });
+
+    it("drafts a section with its sources and what is already written, and saves sections plus the assembled manuscript", async () => {
       vi.mocked(api.draftProjectSubSection).mockResolvedValueOnce({
         ok: true,
-        subSectionId: "sub-intro-1",
-        content:
-          "Contemporary quantum information processors necessitate sub-100ns decoding cycles to sustain fault tolerance across scalable surface codes [CITE:src_f101]. As demonstrated in physical hardware trials [CITE:user_data_101], pipelined FPGA syndromic processors mitigate communication bottlenecks and maintain consistent real-time operational thresholds.",
-        actualWords: 432,
-        warnings: [],
-        citedSources: ["src_f101", "user_data_101"],
+        subSectionId: "sub-intro-2",
+        content: "We ask whether pipelined FPGA decoders stay under 100ns [CITE:src_f101].",
+        actualWords: 12,
       });
-
-      render(
-        <ResearchProvider projectId="proj-step-c" initialStage="draft">
-          <ManuscriptStudioMode />
-        </ResearchProvider>
+      renderStudio();
+      await openUnit(/Research Questions & Novelty/);
+      fireEvent.click(screen.getByRole("button", { name: /Draft Research Questions & Novelty with AI/i }));
+      await waitFor(() => expect(api.draftProjectSubSection).toHaveBeenCalled());
+      const payload = vi.mocked(api.draftProjectSubSection).mock.calls[0][1];
+      expect(payload).toMatchObject({
+        sectionId: "sec-intro",
+        subSectionId: "sub-intro-2",
+        subSectionTitle: "Introduction: Research Questions & Novelty",
+        targetWords: 450,
+        dialect: "en-GB",
+      });
+      // The AI sees the Introduction text already written, to stay consistent.
+      expect(payload.contextPrompt).toContain("Scalable surface code quantum error correction");
+      await waitFor(() =>
+        expect((screen.getByRole("textbox", { name: "Research Questions & Novelty text" }) as HTMLTextAreaElement).value).toBe(
+          "We ask whether pipelined FPGA decoders stay under 100ns [CITE:src_f101]."
+        )
       );
-
-      // Verify Mode 3 header & 3-pane elements
-      await waitFor(() => {
-        expect(screen.getByText("Mode 3")).toBeInTheDocument();
-      });
-      await waitFor(() => {
-        expect(screen.getByText(/Grounded Manuscript Studio/i)).toBeInTheDocument();
-      });
-      await waitFor(() => {
-        expect(screen.getByText(/350–500 Word Slices/i)).toBeInTheDocument();
-      });
-      await waitFor(() => {
-        expect(screen.getAllByText(/Problem Domain & Background/i).length).toBeGreaterThanOrEqual(1);
-        expect(screen.getAllByText(/Research Questions & Novelty/i).length).toBeGreaterThanOrEqual(1);
-      });
-
-      // Verify Left Pane displays word targets and action buttons
-      expect(screen.getByRole("button", { name: /Draft Active Sub-Section/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Draft Entire Section Iteratively/i })).toBeInTheDocument();
-
-      // Trigger Fact-Locked Sub-Section Drafting
-      const draftBtn = screen.getByRole("button", { name: /Draft Active Sub-Section/i });
-      fireEvent.click(draftBtn);
-
-      await waitFor(() => {
-        expect(api.draftProjectSubSection).toHaveBeenCalledWith(
-          "proj-step-c",
-          expect.objectContaining({
-            sectionId: "sec-intro",
-            subSectionId: "sub-intro-1",
-            subSectionTitle: "Problem Domain & Background",
-            targetWords: 450,
-            dialect: "en-GB",
-          })
-        );
-      });
-
-      // Confirm prose updated in manuscript canvas
-      await waitFor(() => {
-        const textarea = screen.getByRole("textbox", { name: /Academic Manuscript Canvas/i }) as HTMLTextAreaElement;
-        expect(textarea.value).toContain(
-          "Contemporary quantum information processors necessitate sub-100ns decoding cycles"
-        );
-      });
+      await waitFor(() => expect(api.saveIntakeAnswers).toHaveBeenCalled(), { timeout: 3000 });
+      const saved = vi.mocked(api.saveIntakeAnswers).mock.calls.at(-1)![1] as Record<string, string>;
+      expect(JSON.parse(saved.manuscript_sections).texts["sub-intro-2"]).toContain("pipelined FPGA decoders");
+      expect(saved.manuscript_markdown).toContain("## Introduction\n\n### § Problem Domain & Background");
+      expect(saved.manuscript_markdown).toContain("### § Research Questions & Novelty\n\nWe ask whether");
+      // Only the studio's own fields are sent, not a stale copy of every answer.
+      expect(Object.keys(saved).sort()).toEqual(["assembled_draft", "full_text_markdown", "manuscript_markdown", "manuscript_sections"]);
     });
 
-    it("supports Zen Focus writing mode toggling to collapse and expand sidebars", async () => {
-      render(
-        <ResearchProvider projectId="proj-step-c" initialStage="draft">
-          <ManuscriptStudioMode />
-        </ResearchProvider>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText(/Zen Focus/i)).toBeInTheDocument();
-      });
-
-      const zenToggle = screen.getByRole("button", { name: /Zen Focus/i });
-      fireEvent.click(zenToggle);
-
-      // Sidebars should now be collapsed and toggle should read "Exit Zen"
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Exit Zen/i })).toBeInTheDocument();
-      });
-
-      // Toggle back
-      fireEvent.click(screen.getByRole("button", { name: /Exit Zen/i }));
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Zen Focus/i })).toBeInTheDocument();
-      });
+    it("asks before an AI draft replaces text the author wrote, and keeps it when declined", async () => {
+      confirmAnswer = false;
+      renderStudio();
+      await openUnit(/Problem Domain & Background/);
+      fireEvent.click(screen.getByRole("button", { name: /Redraft Problem Domain & Background with AI/i }));
+      await waitFor(() => expect(confirmCalls).toBe(1));
+      expect(api.draftProjectSubSection).not.toHaveBeenCalled();
+      expect((screen.getByRole("textbox", { name: "Problem Domain & Background text" }) as HTMLTextAreaElement).value).toContain("Scalable surface code");
     });
 
-    it("iteratively drafts an entire section through sequential runner with telemetry", async () => {
-      vi.mocked(api.draftProjectSubSection)
-        .mockResolvedValueOnce({
-          ok: true,
-          subSectionId: "sub-intro-1",
-          content: "Slice 1 completed with high precision [CITE:src_f101].",
-          actualWords: 420,
-          warnings: [],
-          citedSources: ["src_f101"],
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          subSectionId: "sub-intro-2",
-          content: "Slice 2 introduces our central research questions and novel decoder architecture.",
-          actualWords: 440,
-          warnings: [],
-          citedSources: [],
-        });
-
-      render(
-        <ResearchProvider projectId="proj-step-c" initialStage="draft">
-          <ManuscriptStudioMode />
-        </ResearchProvider>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Draft Entire Section Iteratively/i })).toBeInTheDocument();
-      });
-
-      const iterativeBtn = screen.getByRole("button", { name: /Draft Entire Section Iteratively/i });
-      fireEvent.click(iterativeBtn);
-
-      await waitFor(() => {
-        expect(api.draftProjectSubSection).toHaveBeenCalledTimes(2);
-      });
-
-      await waitFor(() => {
-        const textarea = screen.getByRole("textbox", { name: /Academic Manuscript Canvas/i }) as HTMLTextAreaElement;
-        expect(textarea.value).toContain("Slice 1 completed with high precision");
-        expect(textarea.value).toContain("Slice 2 introduces our central research questions");
-      });
+    it("Focus hides the outline and sources so the text gets the page", async () => {
+      renderStudio();
+      await screen.findByRole("navigation", { name: "Manuscript outline" });
+      fireEvent.click(screen.getByRole("button", { name: /^Sources$/ }));
+      expect(screen.getByRole("complementary", { name: "Sources panel" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /^Focus$/ }));
+      expect(screen.queryByRole("navigation", { name: "Manuscript outline" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("complementary", { name: "Sources panel" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /Exit focus/ }));
+      expect(screen.getByRole("navigation", { name: "Manuscript outline" })).toBeInTheDocument();
     });
 
-    it("displays both scholarly literature and primary user datasets in the Evidence Drawer with 1-click citation insertion", async () => {
-      render(
-        <ResearchProvider projectId="proj-step-c" initialStage="draft">
-          <ManuscriptStudioMode />
-        </ResearchProvider>
-      );
+    it("lists the section's sources and the author's data, cites in one click, and builds references from what is recorded", async () => {
+      renderStudio();
+      await openUnit(/Problem Domain & Background/);
+      fireEvent.click(screen.getByRole("button", { name: /^Sources$/ }));
+      const panel = screen.getByRole("complementary", { name: "Sources panel" });
+      expect(within(panel).getByRole("button", { name: "This section (2)" })).toBeInTheDocument();
+      expect(within(panel).getByText("Your data")).toBeInTheDocument();
+      expect(within(panel).getByText("Literature")).toBeInTheDocument();
+      // References from the citations already in the text: nothing claimed beyond the record.
+      expect(within(panel).getByText("Kovacs, L. (2026). FPGA Latency Benchmark Data. [Dataset].")).toBeInTheDocument();
+      expect(within(panel).getByText("Smith, J. (2024). Real-Time Syndrome Decoding in Surface Codes.")).toBeInTheDocument();
+      expect(panel.textContent).not.toMatch(/Verified Scholarly Publication|Primary User Ingestion/);
 
-      // Check Evidence Drawer
-      await waitFor(() => {
-        expect(screen.getByText(/Evidence Ledger/i)).toBeInTheDocument();
-        expect(screen.getByText("All Sources (2)")).toBeInTheDocument();
-      });
+      fireEvent.click(within(panel).getByRole("button", { name: "Cite Real-Time Syndrome Decoding in Surface Codes" }));
+      const box = screen.getByRole("textbox", { name: "Problem Domain & Background text" }) as HTMLTextAreaElement;
+      await waitFor(() => expect(box.value.match(/\[CITE:src_f101\]/g)?.length).toBe(2));
 
-      // Switch to All Sources tab to inspect full ledger
-      const allSourcesTab = screen.getByRole("button", { name: /All Sources/i });
-      fireEvent.click(allSourcesTab);
-
-      await waitFor(() => {
-        expect(screen.getAllByText(/FPGA Latency Benchmark Data/i).length).toBeGreaterThanOrEqual(1);
-        expect(screen.getAllByText(/Real-Time Syndrome Decoding in Surface Codes/i).length).toBeGreaterThanOrEqual(1);
-      });
-
-      // Check badges for Primary Data and Literature
-      expect(screen.getByText("Primary Data")).toBeInTheDocument();
-      expect(screen.getByText("Literature")).toBeInTheDocument();
-
-      // Test 1-click citation insert
-      const insertButtons = screen.getAllByRole("button", { name: /\+ Insert Citation/i });
-      expect(insertButtons.length).toBeGreaterThanOrEqual(1);
-
-      fireEvent.click(insertButtons[0]);
-
-      // Check textarea receives the citation token
-      await waitFor(() => {
-        const textarea = screen.getByRole("textbox", { name: /Academic Manuscript Canvas/i }) as HTMLTextAreaElement;
-        expect(textarea.value).toContain("[CITE:user_data_101]");
-      });
-    });
-
-    it("renders live APA 7 Verified Bibliography and provides IAST diacritic insertion popover", async () => {
-      render(
-        <ResearchProvider projectId="proj-step-c" initialStage="draft">
-          <ManuscriptStudioMode />
-        </ResearchProvider>
-      );
-
-      // Verify APA 7 Bibliography automatically appended and formatted
-      await waitFor(() => {
-        expect(screen.getByText(/Verified Bibliography/i)).toBeInTheDocument();
-        expect(
-          screen.getByText(/Kovacs, L\. \(2026\)\. FPGA Latency Benchmark Data \[Empirical Research Dataset\]\. Primary User Ingestion\./i)
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText(/Smith, J\. \(2024\)\. Real-Time Syndrome Decoding in Surface Codes\. Verified Scholarly Publication\./i)
-        ).toBeInTheDocument();
-      });
-
-      // Verify IAST Diacritic toolbar popover
-      const iastButton = screen.getByRole("button", { name: /IAST Diacritics/i });
-      fireEvent.click(iastButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Click to Insert Scholarly Diacritic/i)).toBeInTheDocument();
-        expect(screen.getByTitle(/Long a/i)).toBeInTheDocument();
-        expect(screen.getByTitle(/Palatal s/i)).toBeInTheDocument();
-      });
-
-      // Insert diacritic ā
-      fireEvent.click(screen.getByTitle(/Long a/i));
-
-      await waitFor(() => {
-        const textarea = screen.getByRole("textbox", { name: /Academic Manuscript Canvas/i }) as HTMLTextAreaElement;
-        expect(textarea.value).toContain("ā");
-      });
+      fireEvent.click(screen.getByRole("button", { name: /Diacritics/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Insert Long a" }));
+      await waitFor(() => expect(box.value).toContain("ā"));
     });
   });
 
