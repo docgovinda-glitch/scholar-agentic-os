@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useResearchWorkspace } from "./ResearchContext";
-import { saveIntakeAnswers } from "../api";
+import { saveAuthors, saveIntakeAnswers } from "../api";
+import type { Author } from "../types";
 import {
   exportJournalToDocx,
   exportRefereeLetterToDocx,
@@ -15,6 +16,8 @@ import ReferencesCheck from "../journal/ReferencesCheck";
 import VerificationChecks, { useVerification } from "../journal/VerificationChecks";
 import { LATEX_TEMPLATES, buildLatex, exportParts, packageReadme, suggestTemplate, type LatexTemplate } from "../../domain/journal/latex";
 import { buildJats } from "../../domain/journal/jats";
+import AuthorsEditor from "../journal/AuthorsEditor";
+import { checkAuthors, creditStatement as creditFromRoles, fullName, type ManuscriptAuthor } from "../../domain/journal/authorship";
 import { checkDois, lookupDoi } from "../journal/referenceApi";
 import { studioEvidence } from "../journal/studioEvidence";
 import { auditCitations, recordsForSources } from "../../domain/journal/referenceAudit";
@@ -185,12 +188,31 @@ export default function AuditExportMode() {
   // The title page is the author's: start from what the project has, never a stand-in person.
   const [title, setTitle] = useState(answers["working_title"] || (project as { title?: string })?.title || "");
   const [runningHead, setRunningHead] = useState(answers["running_head"] || "");
-  const [authorName, setAuthorName] = useState(
-    project?.authors?.[0] ? `${project.authors[0].firstName} ${project.authors[0].surname}`.trim() : ""
+  // Every author, in byline order, as saved on the project. An ORCID saved the
+  // older way (answers.author_orcid) still belongs to the first author.
+  const authorsFromProject = useCallback(
+    (): ManuscriptAuthor[] =>
+      (project?.authors ?? []).map((a, i) => ({
+        id: a.id || `au-${i}`,
+        firstName: a.firstName || "",
+        surname: a.surname || "",
+        affiliation: a.affiliation || "",
+        email: a.email || "",
+        orcid: a.orcid || (i === 0 ? answers["author_orcid"] || "" : ""),
+        isCorresponding: Boolean(a.isCorresponding) || (i === 0 && !(project?.authors ?? []).some((x) => x.isCorresponding)),
+        creditRoles: Array.isArray(a.creditRoles) ? a.creditRoles : [],
+      })),
+    [project?.authors, answers]
   );
-  const [affiliation, setAffiliation] = useState(project?.authors?.[0]?.affiliation || "");
-  const [orcid, setOrcid] = useState(answers["author_orcid"] || "");
-  const [email, setEmail] = useState(project?.authors?.[0]?.email || "");
+  const [authorList, setAuthorList] = useState<ManuscriptAuthor[]>(authorsFromProject);
+  const authorsDirty = React.useRef(false);
+  const [authorSave, setAuthorSave] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const namedAuthors = authorList.filter((a) => fullName(a));
+  const corresponding = namedAuthors.find((a) => a.isCorresponding) ?? namedAuthors[0];
+  const authorName = namedAuthors.map(fullName).join(", ");
+  const affiliation = namedAuthors[0]?.affiliation ?? "";
+  const email = corresponding?.email ?? "";
+  const orcid = corresponding?.orcid ?? "";
   const [keywords, setKeywords] = useState(answers["keywords"] || "");
 
   useEffect(() => {
@@ -201,18 +223,7 @@ export default function AuditExportMode() {
       if (answers["running_head"]) {
         setRunningHead(answers["running_head"]);
       }
-      if (project.authors?.[0]) {
-        setAuthorName(`${project.authors[0].firstName} ${project.authors[0].surname}`.trim());
-        if (project.authors[0].affiliation) {
-          setAffiliation(project.authors[0].affiliation);
-        }
-        if (project.authors[0].email) {
-          setEmail(project.authors[0].email);
-        }
-      }
-      if (answers["author_orcid"]) {
-        setOrcid(answers["author_orcid"]);
-      }
+      if (!authorsDirty.current) setAuthorList(authorsFromProject());
       if (answers["citation_style"]) {
         setCitationStyle(styleSelectValue(answers["citation_style"]));
       }
@@ -242,7 +253,7 @@ export default function AuditExportMode() {
     [creditEnabled, creditStatement],
     [aiDisclosureEnabled, aiDisclosureStatement],
   ].every(([on, text]) => on && String(text).trim().length > 0);
-  const titlePageComplete = [title, authorName, affiliation, email].every((v) => v.trim().length > 0);
+  const titlePageComplete = title.trim().length > 0 && checkAuthors(authorList).length === 0;
   // Text checks pass only when there is text to check.
   const hasText = actualWords > 0;
   const citationsOk = hasText && referenceAudit.blocking === 0;
@@ -409,6 +420,22 @@ export default function AuditExportMode() {
     .filter(([, on, text]) => on && String(text).trim())
     .map(([label, , text]) => ({ label, text: String(text).trim() }));
 
+  const handleSaveAuthors = useCallback(async () => {
+    if (!effectiveProjectId) return;
+    setAuthorSave("saving");
+    try {
+      const saved = await saveAuthors(
+        effectiveProjectId,
+        authorList.map((a) => ({ ...a, orcid: a.orcid?.trim() || undefined, affiliation: a.affiliation?.trim() || undefined })) as Author[]
+      );
+      authorsDirty.current = false;
+      setProject(saved);
+      setAuthorSave("saved");
+    } catch {
+      setAuthorSave("error");
+    }
+  }, [effectiveProjectId, authorList, setProject]);
+
   // Export handlers
   const handleDownloadDocx = useCallback(async () => {
     if (!effectiveProjectId) return;
@@ -435,14 +462,7 @@ export default function AuditExportMode() {
           targetJournal: targetJournalName,
           template: layoutMode === "2-column-camera" ? "ieee" : "apa7",
           citationStyle,
-          authors: [
-            {
-              name: authorName,
-              affiliation,
-              email,
-              isCorresponding: true,
-            },
-          ],
+          authors: namedAuthors.map((a) => ({ name: fullName(a), affiliation: a.affiliation, email: a.email, isCorresponding: a.isCorresponding })),
           abstract: answers["abstract"] || "",
           keywords: keywords.split(",").map((s) => s.trim()),
           sections: [
@@ -554,7 +574,7 @@ export default function AuditExportMode() {
         const shared = {
           title,
           journal: String(answers.target_journal || "").trim() || undefined,
-          authors: authorName.trim() ? [{ name: authorName, affiliation, email, orcid }] : [],
+          authors: namedAuthors.map((a) => ({ name: fullName(a), affiliation: a.affiliation, email: a.email, orcid: a.orcid })),
           abstract: parts.abstract || String(answers["abstract"] || ""),
           keywords: keywords.split(",").map((k: string) => k.trim()).filter(Boolean),
           body: parts.body,
@@ -581,7 +601,7 @@ export default function AuditExportMode() {
         downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.typ`);
       }
     },
-    [exportText, exportBlocked, exportBlockedNotice, title, authorName, affiliation, email, orcid, answers, manuscriptMarkdown, keywords, writtenDeclarations, sources, savedRecords, latexTemplate, citationStyle]
+    [exportText, exportBlocked, exportBlockedNotice, title, authorName, affiliation, namedAuthors, answers, manuscriptMarkdown, keywords, writtenDeclarations, sources, savedRecords, latexTemplate, citationStyle]
   );
 
   return (
@@ -831,6 +851,15 @@ export default function AuditExportMode() {
                   CRediT Author Contribution Statement
                 </span>
               </label>
+              {creditEnabled && authorList.some((a) => a.creditRoles.length > 0) && (
+                <button
+                  type="button"
+                  onClick={() => setCreditStatement(creditFromRoles(authorList))}
+                  className="self-start px-2.5 py-1 rounded-md text-[11px] font-semibold border border-[color:var(--border-control)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                >
+                  Write from the authors' CRediT roles
+                </button>
+              )}
               {creditEnabled && (
                 <textarea
                   aria-label="CRediT Statement"
@@ -1017,77 +1046,16 @@ export default function AuditExportMode() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label
-                  htmlFor="meta-author"
-                  className="block text-[11px] font-bold text-[color:var(--text-primary)] mb-1"
-                >
-                  Author Name(s)
-                </label>
-                <input
-                  id="meta-author"
-                  placeholder="Your full name"
-                  type="text"
-                  value={authorName}
-                  onChange={(e) => setAuthorName(e.target.value)}
-                  className="w-full text-xs p-2 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="meta-orcid"
-                  className="block text-[11px] font-bold text-[color:var(--text-primary)] mb-1"
-                >
-                  ORCID iD
-                </label>
-                <input
-                  id="meta-orcid"
-                  placeholder="0000-0000-0000-0000"
-                  type="text"
-                  value={orcid}
-                  onChange={(e) => setOrcid(e.target.value)}
-                  className="w-full text-xs p-2 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label
-                  htmlFor="meta-affil"
-                  className="block text-[11px] font-bold text-[color:var(--text-primary)] mb-1"
-                >
-                  Institutional Affiliation
-                </label>
-                <input
-                  id="meta-affil"
-                  placeholder="Department, institution, city, country"
-                  type="text"
-                  value={affiliation}
-                  onChange={(e) => setAffiliation(e.target.value)}
-                  className="w-full text-xs p-2 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="meta-email"
-                  className="block text-[11px] font-bold text-[color:var(--text-primary)] mb-1"
-                >
-                  Corresponding Email
-                </label>
-                <input
-                  id="meta-email"
-                  placeholder="Corresponding author email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full text-xs p-2 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]"
-                />
-              </div>
-            </div>
+            <AuthorsEditor
+              authors={authorList}
+              onChange={(next) => {
+                authorsDirty.current = true;
+                setAuthorSave("idle");
+                setAuthorList(next);
+              }}
+              onSave={handleSaveAuthors}
+              saveState={authorSave}
+            />
 
             <div>
               <label
