@@ -58,7 +58,7 @@ export default function AssignmentStageNavigation({
   // Global Progress Percentages for each phase
   const phasePercentages = useMemo(() => {
     const hasBrief = Boolean(question && question.trim().length > 10);
-    const p1 = hasBrief ? 100 : question?.trim() ? 50 : 25;
+    const p1 = hasBrief ? 100 : question?.trim() ? 50 : 0;
     const p2 = structure?.isConfirmed ? 100 : structure ? 75 : hasBrief ? 50 : 0;
     const p3 = Math.min(100, Math.round((approvedSourceIds.length / 4) * 100));
     const p4 = Math.min(100, wordCountPercentage || 0);

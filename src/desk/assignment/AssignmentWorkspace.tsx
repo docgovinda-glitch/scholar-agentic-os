@@ -423,7 +423,13 @@ function AssignmentWorkspaceInner({
   } = useAssignmentWorkspace();
 
   const currentPhaseDef = ASSIGNMENT_PHASES.find((p) => p.id === currentPhase);
-  const [tutorPanelOpen, setTutorPanelOpen] = useState(true);
+  // Docked beside the stage on wide screens; on phones it would cover the
+  // whole form, so it starts closed there and opens from the header.
+  const [tutorPanelOpen, setTutorPanelOpen] = useState(() =>
+    typeof window === "undefined" || typeof window.matchMedia !== "function"
+      ? true
+      : window.matchMedia("(min-width: 640px)").matches
+  );
   useUnsavedChangesGuard(Boolean(isLoading));
 
   // Inline-editable title with auto-save on blur / Enter
@@ -450,8 +456,8 @@ function AssignmentWorkspaceInner({
     }
   }, [editableTitle]);
 
-  const handleTitleBlur = () => {
-    const trimmed = editableTitle.trim() || "Academic Assignment";
+  const commitTitle = (next: string) => {
+    const trimmed = next.trim() || "Academic Assignment";
     setEditableTitle(trimmed);
     if (project && (trimmed !== (project.answers?.["assignment_title"] || project.answers?.["title"]))) {
       saveAnswers({ assignment_title: trimmed, title: trimmed });
@@ -465,6 +471,8 @@ function AssignmentWorkspaceInner({
       }
     }
   };
+
+  const handleTitleBlur = () => commitTitle(editableTitle);
 
   const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -583,9 +591,7 @@ function AssignmentWorkspaceInner({
         deliverableCode="OT-01"
         deliverableLabel="Coursework Studio"
         projectTitle={editableTitle || "Untitled Assignment"}
-        onProjectTitleChange={(nextTitle) => {
-          setEditableTitle(nextTitle);
-        }}
+        onProjectTitleChange={commitTitle}
         activePhase={
           currentPhase === "extract"
             ? "blueprint"
@@ -620,26 +626,10 @@ function AssignmentWorkspaceInner({
         onToggleInspector={() => setTutorPanelOpen((o) => !o)}
       />
 
-      {/* Minimalist Workspace Header */}
+      {/* Assignment bar: the title (also editable on phones, where the studio header hides it) and the flow mode */}
       <header className="bg-white dark:bg-ink-750 z-20 shrink-0">
         <div className="flex items-center justify-between px-4 sm:px-6 pt-2.5 pb-1 gap-4">
           <div className="flex items-center gap-2.5 min-w-0">
-            {/* Apple/Notion-Style Clean Back Button */}
-            <button
-              type="button"
-              onClick={() => {
-                if (onClose) onClose();
-                else if (typeof window !== "undefined") window.location.href = "/";
-              }}
-              title="Back"
-              aria-label="Back"
-              className="p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-              </svg>
-            </button>
-
             {/* Inline-Editable Project Title with Auto-Save onBlur */}
             <div className="flex items-center gap-1 group max-w-xs sm:max-w-md md:max-w-lg min-w-0">
               <input
@@ -667,7 +657,7 @@ function AssignmentWorkspaceInner({
             </div>
           </div>
 
-          {/* Right Section: Minimal vs Detailed Mode Toggle & Socratic Tutor Drawer Toggle */}
+          {/* Right Section: Minimal vs Detailed flow (the tutor toggle lives in the studio header) */}
           <div className="flex items-center gap-2.5 shrink-0">
             {/* Minimal vs Detailed Segmented Control (OT-10 Parity) */}
             <div
@@ -705,22 +695,6 @@ function AssignmentWorkspaceInner({
               </button>
             </div>
 
-            {/* Socratic Tutor Drawer Toggle Button */}
-            <button
-              type="button"
-              onClick={() => setTutorPanelOpen(!tutorPanelOpen)}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center ${
-                tutorPanelOpen
-                  ? "text-neutral-900 dark:text-white bg-neutral-200/70 dark:bg-white/10 shadow-2xs"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/50 dark:hover:bg-white/5"
-              }`}
-              title="Toggle Socratic Tutor drawer"
-              aria-label="Toggle AI Tutor"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-              </svg>
-            </button>
           </div>
         </div>
       </header>
