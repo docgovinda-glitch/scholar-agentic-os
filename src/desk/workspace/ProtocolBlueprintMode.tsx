@@ -11,6 +11,8 @@ import { saveIntakeAnswers, allocateProjectWordBudget } from "../api";
 import { executeAgenticLLM } from "../api";
 import { normalizeUnicodeNFC } from "../../document_intelligence/index";
 import { parseAndRepairLLMJson } from "../../shared/llmJsonParser";
+import JournalProfileCard from "../journal/JournalProfileCard";
+import { blueprintFromStructure } from "../journal/journalProfile";
 
 export interface GapProposal {
   id: string;
@@ -237,13 +239,26 @@ Preliminary Context: ${preliminaryContext || "General peer-reviewed scholarly co
     setOrthography(newOrthography);
 
     try {
+      // Only the fields this card owns; the server merges them.
       const nextAnswers: Record<string, string> = {
-        ...answers,
         target_word_count: String(newWords),
         manuscript_template: newTemplate,
         citation_style: newStyle,
         orthography: newOrthography,
       };
+      // An outline taken from the target journal keeps the journal's sections;
+      // a new word target only resizes them.
+      const journalSections =
+        blueprint?.sections.length && blueprint.sections.every((sec) => sec.id.startsWith("jp-"))
+          ? blueprint.sections.map((sec) => sec.sectionName)
+          : null;
+      if (journalSections) {
+        const resized = blueprintFromStructure(project.projectId, journalSections, newWords);
+        nextAnswers.word_budget_blueprint = JSON.stringify(resized);
+        setBlueprint(resized);
+        setProject(await saveIntakeAnswers(project.projectId, nextAnswers));
+        return;
+      }
       const updated = await saveIntakeAnswers(project.projectId, nextAnswers);
       setProject(updated);
       // Reallocate word budget to reflect the new total and template
@@ -362,6 +377,9 @@ Preliminary Context: ${preliminaryContext || "General peer-reviewed scholarly co
 
       {/* Main Body */}
       <div className="p-6 max-w-6xl mx-auto w-full space-y-8">
+        {/* The target journal comes first: its rules shape the outline and the checks */}
+        {project && <JournalProfileCard project={project} onApplied={setProject} />}
+
         {/* CARD A: Research Thesis & Live Gap Finder */}
         <section aria-labelledby="thesis-gap-heading" className="bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-6">
           <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-4">
@@ -573,21 +591,24 @@ Preliminary Context: ${preliminaryContext || "General peer-reviewed scholarly co
               <label htmlFor="target-words-select" className="text-xs font-bold text-[color:var(--text-primary)]">
                 Target Word Ceiling
               </label>
-              <select
+              <input
                 id="target-words-select"
-                value={targetTotalWords}
-                onChange={(e) => {
+                type="number"
+                min={500}
+                step={100}
+                key={targetTotalWords}
+                defaultValue={targetTotalWords}
+                onBlur={(e) => {
                   const val = parseInt(e.target.value, 10);
-                  handleSaveFormattingProfile(val, template, citationStyle, orthography);
+                  if (Number.isFinite(val) && val >= 500 && val !== targetTotalWords) {
+                    handleSaveFormattingProfile(val, template, citationStyle, orthography);
+                  }
                 }}
-                className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-3 py-2 text-xs font-semibold text-[color:var(--text-primary)] outline-none cursor-pointer"
-              >
-                <option value={3000}>3,000 words (Short Article / Letter)</option>
-                <option value={5000}>5,000 words (Standard Research Paper)</option>
-                <option value={6000}>6,000 words (Full Journal Article - Default)</option>
-                <option value={7500}>7,500 words (Extended Empirical Article)</option>
-                <option value={10000}>10,000 words (Comprehensive Review / Monograph)</option>
-              </select>
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-3 py-2 text-xs font-semibold text-[color:var(--text-primary)] outline-none tabular-nums"
+              />
             </div>
 
             {/* Template */}

@@ -277,7 +277,7 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
       });
 
       // Check sub-section target inputs (450 words each)
-      const input = screen.getAllByRole("spinbutton")[0];
+      const input = screen.getByRole("spinbutton", { name: "Target words for Problem Domain & Background" });
       expect(input).toHaveValue(450);
 
       // Tweak sub-section target

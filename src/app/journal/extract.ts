@@ -42,7 +42,8 @@ export interface ExtractJournalRequirementsResult {
   usage: JournalExtractionUsage;
 }
 
-function systemPrompt(): string {
+/** The extraction instructions, shared by every route that runs the extraction. */
+export function journalExtractionPrompt(): string {
   return [
     "You extract structural submission requirements from a journal's own author guidelines text.",
     "Report ONLY what the supplied text explicitly states. Never infer, assume, or fill in a typical or default academic-journal convention for anything the text does not say.",
@@ -56,7 +57,7 @@ function systemPrompt(): string {
   ].join("\n");
 }
 
-function tryParseProposal(raw: string): JournalRequirementsProposal | undefined {
+export function tryParseProposal(raw: string): JournalRequirementsProposal | undefined {
   const trimmed = raw.trim();
   // Tolerate a model wrapping the JSON in a markdown fence despite instructions.
   const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
@@ -113,7 +114,7 @@ export async function extractJournalRequirements(
       model: input.model,
       taskClass: "rule_extraction",
       scopeId: input.scopeId,
-      systemPrompt: systemPrompt(),
+      systemPrompt: journalExtractionPrompt(),
       userPrompt: input.guidelinesText,
       // Labelled "guideline" so the Warden's classifier (platform/warden/
       // classify.ts) treats this as public source material, not user_content
