@@ -117,7 +117,7 @@ draftingRoutes.post(
               assignedSources.push({
                 id: ud.id,
                 authors: ud.author || "Principal Investigator (Primary Data)",
-                year: ud.year || 2026,
+                year: ud.year || "n.d.",
                 title: ud.title,
                 stance:
                   ud.epistemicRole === "Methodological Anchor"
@@ -147,7 +147,7 @@ ${ragResult.formattedContext}
 
 TASK SPECIFICATION:
 You are drafting academic sub-section "${subSectionTitle}".
-Target Word Budget: approximately ${targetWords} words (must land strictly in 350–500 words).
+Target Word Budget: approximately ${targetWords} words (stay within about 15% of it).
 
 CRITICAL CITATION RULES:
 1. Every factual assertion, quantitative finding, or empirical claim MUST cite evidence using [CITE:source_id] tokens from the ledger above.

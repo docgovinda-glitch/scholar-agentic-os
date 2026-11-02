@@ -1,1131 +1,377 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import type { ProjectView } from "../types";
-import type {
-  WordBudgetBlueprint,
-  SectionBudget,
-  SubSectionBudget,
-  UserDatasetItem,
-  SmartEvidenceRow,
-  BibliographyEntry,
-} from "./types";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, BookOpen, Library, ListTree, Maximize2, Minimize2, X } from "lucide-react";
+import type { WordBudgetBlueprint } from "./types";
 import { useResearchWorkspace } from "./ResearchContext";
-import {
-  saveIntakeAnswers,
-  draftProjectSubSection,
-  polishProjectManuscript,
-} from "../api";
+import { saveIntakeAnswers, draftProjectSubSection, polishProjectManuscript } from "../api";
 import { normalizeUnicodeNFC } from "../../document_intelligence/index";
+import { safeParseAnswerField } from "../../shared/projectStateSchema";
+import { requestAppConfirm } from "../../components/ui/FeedbackSystem";
+import {
+  assembleManuscript,
+  countWords,
+  groupUnits,
+  manuscriptUnits,
+  nextToWrite,
+  reconcileTexts,
+  resolveTexts,
+  serializeTexts,
+  SECTION_GUIDANCE,
+  totalWords,
+  writtenContext,
+  type ManuscriptTexts,
+} from "../journal/manuscriptModel";
+import { evidenceFor, studioEvidence } from "../journal/studioEvidence";
+import StudioOutline, { UNSORTED_ID } from "../journal/studio/StudioOutline";
+import StudioEvidencePanel from "../journal/studio/StudioEvidencePanel";
+import StudioSectionEditor from "../journal/studio/StudioSectionEditor";
 
-export const IAST_DIACRITICS = [
-  { char: "ā", upper: "Ā", label: "Long a" },
-  { char: "ī", upper: "Ī", label: "Long i" },
-  { char: "ū", upper: "Ū", label: "Long u" },
-  { char: "ṛ", upper: "Ṛ", label: "Vocalic r" },
-  { char: "ṝ", upper: "Ṝ", label: "Long vocalic r" },
-  { char: "ḷ", upper: "Ḷ", label: "Vocalic l" },
-  { char: "ś", upper: "Ś", label: "Palatal s" },
-  { char: "ṣ", upper: "Ṣ", label: "Retroflex s" },
-  { char: "ṇ", upper: "Ṇ", label: "Retroflex n" },
-  { char: "ṅ", upper: "Ṅ", label: "Velar n" },
-  { char: "ñ", upper: "Ñ", label: "Palatal n" },
-  { char: "ṃ", upper: "Ṃ", label: "Anusvara" },
-  { char: "ḥ", upper: "Ḥ", label: "Visarga" },
-] as const;
+export { IAST_DIACRITICS } from "../journal/studio/StudioSectionEditor";
 
+const wide = () => typeof window !== "undefined" && window.innerWidth >= 1536;
+
+/**
+ * Mode 3, the Writing Studio: the manuscript one section at a time, with the
+ * outline on the left (in article order or the order authors usually write)
+ * and the section's sources on the right. The writing column gets the room.
+ */
 export default function ManuscriptStudioMode() {
   const { project, projectId, setProject, setMode } = useResearchWorkspace();
-  const effectiveProjectId = project?.projectId || projectId;
-  const answers = useMemo(() => project?.answers || {}, [project?.answers]);
+  const pid = project?.projectId || projectId;
+  const answers = useMemo<Record<string, string>>(() => project?.answers || {}, [project?.answers]);
 
-  // Working Title & Formatting Profiles
-  const workingTitle = answers["working_title"] || answers["title"] || "Grounded Manuscript";
-  const citationStyle = answers["citation_style"] || "APA 7";
-  const dialect: "en-GB" | "en-US" = answers["orthography"]?.includes("US") ? "en-US" : "en-GB";
-
-  // Blueprint from Mode 1
-  const blueprint: WordBudgetBlueprint | null = useMemo(() => {
-    try {
-      const raw = answers["word_budget_blueprint"];
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.sections)) return parsed;
-      }
-    } catch {}
-    return null;
+  const blueprint = useMemo(() => {
+    const bp = safeParseAnswerField<WordBudgetBlueprint | null>(answers["word_budget_blueprint"], null);
+    return bp && Array.isArray(bp.sections) && bp.sections.length > 0 ? bp : null;
   }, [answers["word_budget_blueprint"]]);
+  const targetTotal = blueprint?.targetTotalWords || parseInt(answers["target_word_count"] || "", 10) || 6000;
+  const units = useMemo(() => manuscriptUnits(blueprint, targetTotal), [blueprint, targetTotal]);
 
-  // Layout State: Collapsible 3-Pane Sidebars
-  const [leftPaneCollapsed, setLeftPaneCollapsed] = useState(false);
-  const [rightPaneCollapsed, setRightPaneCollapsed] = useState(false);
-  const isZenFocus = leftPaneCollapsed && rightPaneCollapsed;
+  const storedMarkdown = answers["manuscript_markdown"] || answers["assembled_draft"] || answers["manuscript_draft"] || "";
+  const [texts, setTexts] = useState<ManuscriptTexts>(() => resolveTexts(answers["manuscript_sections"], storedMarkdown, units));
+  const touched = useRef(false);
 
-  // Active Selected Section and Sub-Section
-  const [activeSectionId, setActiveSectionId] = useState<string>(() => {
-    return blueprint?.sections[0]?.id || "";
-  });
-  const [activeSubSectionId, setActiveSubSectionId] = useState<string>(() => {
-    return blueprint?.sections[0]?.subSections[0]?.id || "";
-  });
-
-  // State: Manuscript Full Text
-  const [manuscriptText, setManuscriptText] = useState<string>(() => {
-    return (
-      answers["manuscript_markdown"] ||
-      answers["assembled_draft"] ||
-      answers["manuscript_draft"] ||
-      ""
-    );
-  });
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("saved");
-
-  // State: Drafting In-Flight & Sequential Section Runner
-  const [isDraftingActiveSubSection, setIsDraftingActiveSubSection] = useState(false);
-  const [isSequentialRunning, setIsSequentialRunning] = useState(false);
-  const [sequentialProgressMessage, setSequentialProgressMessage] = useState<string | null>(null);
-  const [draftError, setDraftError] = useState<string | null>(null);
-
-  // State: Term-Locked Polish & Diff Preview Modal
-  const [isPolishing, setIsPolishing] = useState(false);
-  const [polishPreviewModalOpen, setPolishPreviewModalOpen] = useState(false);
-  const [polishedDiffData, setPolishedDiffData] = useState<{
-    original: string;
-    revised: string;
-    burstinessDelta?: number;
-    styleCorrections?: string[];
-  } | null>(null);
-
-  // State: Diacritic Toolbar Popover Open
-  const [isDiacriticPopoverOpen, setIsDiacriticPopoverOpen] = useState(false);
-
-  // State: Right Pane Tabs & Search
-  const [rightPaneTab, setRightPaneTab] = useState<"assigned" | "all">("assigned");
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
-
-  const editorTextareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Sync state if project changes
+  // Until the author edits here, follow the saved project (it may still be loading).
   useEffect(() => {
-    const remoteText = answers["manuscript_markdown"] || answers["assembled_draft"];
-    if (remoteText && !manuscriptText) {
-      setManuscriptText(remoteText);
-    }
-    if (blueprint?.sections?.length) {
-      if (!activeSectionId || !blueprint.sections.some((s) => s.id === activeSectionId)) {
-        setActiveSectionId(blueprint.sections[0].id);
-      }
-      if (
-        !activeSubSectionId ||
-        !blueprint.sections.some((s) => s.subSections.some((sub) => sub.id === activeSubSectionId))
-      ) {
-        setActiveSubSectionId(blueprint.sections[0].subSections[0]?.id || "");
-      }
-    }
-  }, [answers, blueprint, activeSectionId, activeSubSectionId, manuscriptText]);
+    if (!touched.current) setTexts(resolveTexts(answers["manuscript_sections"], storedMarkdown, units));
+  }, [answers["manuscript_sections"], storedMarkdown, units]);
+  // If the outline changes, text under a removed section is kept as unsorted text.
+  useEffect(() => {
+    setTexts((t) => reconcileTexts(t, units));
+  }, [units]);
 
-  // Primary User Datasets from Mode 2
-  const userDatasets: UserDatasetItem[] = useMemo(() => {
-    try {
-      const raw = answers["user_datasets"] || answers["user_data_entries"];
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {}
-    return [];
-  }, [answers["user_datasets"], answers["user_data_entries"]]);
+  const [activeId, setActiveId] = useState<string>(() => nextToWrite(units, texts)?.id || units[0]?.id || UNSORTED_ID);
+  useEffect(() => {
+    if (activeId !== UNSORTED_ID && !units.some((u) => u.id === activeId)) setActiveId(nextToWrite(units, texts)?.id || units[0]?.id || UNSORTED_ID);
+  }, [units, activeId, texts]);
+  const unit = activeId === UNSORTED_ID ? null : units.find((u) => u.id === activeId) ?? null;
+  const value = unit ? texts.texts[unit.id] ?? "" : texts.unsorted;
+  const heading = unit ? (unit.isWholeSection ? unit.title : unit.title) : "Text from your earlier draft";
 
-  // Scholarly Sources from Mode 2 / Vault
-  const scholarlySources: SmartEvidenceRow[] = useMemo(() => {
-    const list: SmartEvidenceRow[] = [];
-    try {
-      const rawVault = answers["approved_vault_sources"] || answers["vault_sources"];
-      if (rawVault) {
-        const parsed = JSON.parse(rawVault);
-        if (Array.isArray(parsed)) {
-          parsed.forEach((item: Record<string, unknown>, idx: number) => {
-            const id = String(item.id || `src_${idx + 1}`);
-            list.push({
-              id,
-              citationToken: `[CITE:${id}]`,
-              title: String(item.title || "Scholarly Literature Document"),
-              authors: Array.isArray(item.authors)
-                ? (item.authors as string[])
-                : [String(item.author || item.authors || "Anonymous")],
-              year: typeof item.year === "number" ? item.year : parseInt(String(item.year ?? ""), 10) || undefined,
-              doi: typeof item.doi === "string" ? item.doi : undefined,
-              portal: typeof item.portal === "string" ? item.portal : "OpenAlex",
-              badge: "Verified Scholarly Literature",
-              isUserData: false,
-              epistemicRole:
-                item.stance === "Contrasting"
-                  ? "Contrasting / Critical"
-                  : item.stance === "Methodological"
-                  ? "Methodological Anchor"
-                  : "Supporting",
-              extractedFindings: String(item.keyFindings || item.abstract || item.summary || "Empirical findings verified from peer-reviewed literature."),
-              assignedSectionId: String(item.assignedSectionId || ""),
-            });
+  const [order, setOrder] = useState<"manuscript" | "writing">("writing");
+  const [focus, setFocus] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(wide);
+  const [readAll, setReadAll] = useState(false);
+  const [busy, setBusy] = useState<"draft" | "polish" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [polish, setPolish] = useState<{ original: string; revised: string; notes: string[] } | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const manuscript = useMemo(() => assembleManuscript(units, texts), [units, texts]);
+  const written = totalWords(texts);
+  const dialect: "en-GB" | "en-US" = answers["orthography"]?.includes("US") ? "en-US" : "en-GB";
+  const evidence = useMemo(() => studioEvidence(answers), [answers]);
+  const unitEvidence = unit ? evidenceFor(evidence, unit.id, unit.sectionId, unit.assignedSourceIds) : [];
+  const next = nextToWrite(units, texts);
+
+  // Debounced save of only the fields this studio owns.
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persist = useCallback(
+    (t: ManuscriptTexts) => {
+      if (!pid) return;
+      setSaveStatus("saving");
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(async () => {
+        const md = assembleManuscript(units, t);
+        try {
+          const saved = await saveIntakeAnswers(pid, {
+            manuscript_sections: serializeTexts(t),
+            manuscript_markdown: md,
+            assembled_draft: md,
+            full_text_markdown: md,
           });
+          if (saved) setProject(saved);
+          setSaveStatus("saved");
+        } catch {
+          setSaveStatus("error");
         }
-      }
-    } catch {}
-    return list;
-  }, [answers["approved_vault_sources"], answers["vault_sources"]]);
+      }, 800);
+    },
+    [pid, units, setProject]
+  );
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
 
-  // All Evidence Combined
-  const allEvidence: Array<{
-    id: string;
-    citationToken: string;
-    title: string;
-    author: string;
-    year?: number;
-    badge: string;
-    isUserData: boolean;
-    extractedFindings: string;
-    assignedSectionId?: string;
-  }> = useMemo(() => {
-    const userMapped = userDatasets.map((d) => ({
-      id: d.id,
-      citationToken: d.citationToken,
-      title: d.title,
-      author: d.author,
-      year: d.year,
-      badge: "Primary User Data / Upload",
-      isUserData: true,
-      extractedFindings: d.extractedFindings || d.summary,
-      assignedSectionId: d.assignedSectionId,
-    }));
-
-    const scholarlyMapped = scholarlySources.map((s) => ({
-      id: s.id,
-      citationToken: s.citationToken,
-      title: s.title,
-      author: s.authors[0] || "Anonymous",
-      year: s.year,
-      badge: "Verified Scholarly Literature",
-      isUserData: false,
-      extractedFindings: s.extractedFindings,
-      assignedSectionId: s.assignedSectionId,
-    }));
-
-    return [...userMapped, ...scholarlyMapped];
-  }, [userDatasets, scholarlySources]);
-
-  const effectiveSectionId = activeSectionId || blueprint?.sections[0]?.id || "";
-  const effectiveSubSectionId = activeSubSectionId || blueprint?.sections[0]?.subSections[0]?.id || "";
-
-  // Evidence Filtered for Active Sub-Section
-  const assignedEvidence = useMemo(() => {
-    let activeSubAssignedIds: string[] = [];
-    if (blueprint) {
-      for (const sec of blueprint.sections) {
-        const sub = sec.subSections.find((s) => s.id === effectiveSubSectionId);
-        if (sub && Array.isArray(sub.assignedSourceIds)) {
-          activeSubAssignedIds = sub.assignedSourceIds;
-          break;
-        }
-      }
-    }
-
-    return allEvidence.filter(
-      (e) =>
-        e.assignedSectionId === effectiveSubSectionId ||
-        e.assignedSectionId === effectiveSectionId ||
-        activeSubAssignedIds.includes(e.id)
-    );
-  }, [allEvidence, effectiveSubSectionId, effectiveSectionId, blueprint]);
-
-  // Sub-Section Word Count Resolver:
-  // Extracts word count per sub-section from manuscript text by finding heading delimiters or proportion
-  const subSectionWordCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    if (!blueprint) return counts;
-
-    blueprint.sections.forEach((sec) => {
-      sec.subSections.forEach((sub) => {
-        // Look for § sub.title or sub.title in manuscript
-        const escaped = sub.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const regex = new RegExp(`(?:##|###|§)?\\s*${escaped}[\\s\\S]*?(?=(?:##|###|§)|$)`, "i");
-        const match = manuscriptText.match(regex);
-        if (match && match[0]) {
-          const words = match[0].split(/\s+/).filter(Boolean).length;
-          counts[sub.id] = words;
-        } else {
-          counts[sub.id] = 0;
-        }
+  const setActiveText = useCallback(
+    (next: string, id: string = activeId) => {
+      touched.current = true;
+      const normalized = normalizeUnicodeNFC(next);
+      setTexts((t) => {
+        const updated = id === UNSORTED_ID ? { ...t, unsorted: normalized } : { ...t, texts: { ...t.texts, [id]: normalized } };
+        persist(updated);
+        return updated;
       });
-    });
+    },
+    [activeId, persist]
+  );
 
-    return counts;
-  }, [blueprint, manuscriptText]);
-
-  // Total Manuscript Word Count & Reading Time
-  const totalActualWords = useMemo(() => {
-    return manuscriptText.split(/\s+/).filter(Boolean).length;
-  }, [manuscriptText]);
-
-  const targetTotalWords = blueprint?.targetTotalWords || 6000;
-  const estimatedReadingMinutes = Math.max(1, Math.ceil(totalActualWords / 220));
-
-  // Live Verified Bibliography Generated from Citations Cited in Text
-  const verifiedBibliography: BibliographyEntry[] = useMemo(() => {
-    if (!manuscriptText) return [];
-
-    // Match all [CITE:id] tokens
-    const matches = manuscriptText.match(/\[CITE:[a-zA-Z0-9_-]+\]/g) || [];
-    const uniqueTokens = Array.from(new Set(matches));
-
-    const entries: BibliographyEntry[] = [];
-    uniqueTokens.forEach((tok) => {
-      const cleanId = tok.replace(/\[CITE:/g, "").replace(/\]/g, "");
-      const matched = allEvidence.find((e) => e.id === cleanId || e.citationToken === tok);
-
-      if (matched) {
-        // Format according to APA 7 standard
-        const formatted = matched.isUserData
-          ? `${matched.author} (${matched.year ?? "n.d."}). ${matched.title} [Empirical Research Dataset]. Primary User Ingestion.`
-          : `${matched.author} (${matched.year ?? "n.d."}). ${matched.title}. Verified Scholarly Publication.`;
-
-        entries.push({
-          id: matched.id,
-          token: tok,
-          author: matched.author,
-          year: matched.year ?? "n.d.",
-          title: matched.title,
-          formattedCitation: formatted,
-          isUserData: matched.isUserData,
-        });
-      }
-    });
-
-    // Alphabetize by author
-    return entries.sort((a, b) => a.author.localeCompare(b.author));
-  }, [manuscriptText, allEvidence]);
-
-  // Debounced Autosave (Optimistic)
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const handleManuscriptChange = (newText: string) => {
-    const normalized = normalizeUnicodeNFC(newText);
-    setManuscriptText(normalized);
-    setSaveStatus("saving");
-
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(async () => {
-      if (!effectiveProjectId) return;
-      try {
-        const nextAnswers = {
-          ...answers,
-          manuscript_markdown: normalized,
-          assembled_draft: normalized,
-          full_text_markdown: normalized,
-        };
-        const saved = await saveIntakeAnswers(effectiveProjectId, nextAnswers);
-        setProject(saved);
-        setSaveStatus("saved");
-      } catch (err) {
-        console.warn("Autosave note:", err);
-        setSaveStatus("idle");
-      }
-    }, 800);
-  };
-
-  // Draft Active Sub-Section (Fact-Locked)
-  const handleDraftActiveSubSection = async () => {
-    if (!effectiveProjectId || !blueprint) return;
-
-    // Find active section and sub-section
-    let activeSec: SectionBudget | undefined;
-    let activeSub: SubSectionBudget | undefined;
-
-    for (const sec of blueprint.sections) {
-      const found = sec.subSections.find((s) => s.id === activeSubSectionId);
-      if (found) {
-        activeSec = sec;
-        activeSub = found;
-        break;
-      }
-    }
-
-    if (!activeSec || !activeSub) return;
-
-    setIsDraftingActiveSubSection(true);
-    setDraftError(null);
-
-    try {
-      const assigned = assignedEvidence.map((e) => ({
-        id: e.id,
-        authors: e.author,
-        year: e.year ?? "n.d.",
-        title: e.title,
-        keyFindings: e.extractedFindings,
-      }));
-
-      const res = await draftProjectSubSection(effectiveProjectId, {
-        sectionId: activeSec.id,
-        subSectionId: activeSub.id,
-        subSectionTitle: activeSub.title,
-        targetWords: activeSub.targetWords,
-        dialect,
-        assignedSources: assigned,
-      });
-
-      if (res.ok && res.content) {
-        // Insert or replace active sub-section in manuscript text
-        const subHeader = `### § ${activeSub.title}`;
-        let updatedText = manuscriptText;
-
-        if (updatedText.includes(subHeader)) {
-          // Replace existing block
-          const regex = new RegExp(`### § ${activeSub.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?(?=(?:### §)|$)`, "i");
-          updatedText = updatedText.replace(regex, `${subHeader}\n\n${res.content.trim()}\n\n`);
-        } else {
-          // Append to text
-          updatedText = updatedText.trim()
-            ? `${updatedText.trim()}\n\n${subHeader}\n\n${res.content.trim()}\n`
-            : `${subHeader}\n\n${res.content.trim()}\n`;
-        }
-
-        handleManuscriptChange(updatedText);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setDraftError(msg);
-    } finally {
-      setIsDraftingActiveSubSection(false);
-    }
-  };
-
-  // Draft Entire Section Iteratively
-  const handleDraftSectionIteratively = async () => {
-    if (!effectiveProjectId || !blueprint || isSequentialRunning) return;
-
-    const targetSec = blueprint.sections.find((s) => s.id === activeSectionId) || blueprint.sections[0];
-    if (!targetSec) return;
-
-    setIsSequentialRunning(true);
-    setDraftError(null);
-
-    let currentManuscript = manuscriptText;
-
-    try {
-      for (let i = 0; i < targetSec.subSections.length; i++) {
-        const sub = targetSec.subSections[i];
-        setSequentialProgressMessage(
-          `Drafting slice ${i + 1} of ${targetSec.subSections.length}: "${sub.title}" (~${sub.targetWords} words)...`
-        );
-        setActiveSubSectionId(sub.id);
-
-        const assigned = allEvidence
-          .filter((e) => e.assignedSectionId === sub.id || e.assignedSectionId === targetSec.id)
-          .map((e) => ({
-            id: e.id,
-            authors: e.author,
-            year: e.year ?? "n.d.",
-            title: e.title,
-            keyFindings: e.extractedFindings,
-          }));
-
-        const res = await draftProjectSubSection(effectiveProjectId, {
-          sectionId: targetSec.id,
-          subSectionId: sub.id,
-          subSectionTitle: sub.title,
-          targetWords: sub.targetWords,
-          dialect,
-          assignedSources: assigned,
-        });
-
-        if (res.ok && res.content) {
-          const subHeader = `### § ${sub.title}`;
-          if (currentManuscript.includes(subHeader)) {
-            const regex = new RegExp(`### § ${sub.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?(?=(?:### §)|$)`, "i");
-            currentManuscript = currentManuscript.replace(regex, `${subHeader}\n\n${res.content.trim()}\n\n`);
-          } else {
-            currentManuscript = currentManuscript.trim()
-              ? `${currentManuscript.trim()}\n\n${subHeader}\n\n${res.content.trim()}\n`
-              : `${subHeader}\n\n${res.content.trim()}\n`;
-          }
-          handleManuscriptChange(currentManuscript);
-        }
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setDraftError(`Iterative drafting halted: ${msg}`);
-    } finally {
-      setIsSequentialRunning(false);
-      setSequentialProgressMessage(null);
-    }
-  };
-
-  // 1-Click Insert Citation Token at Cursor
-  const handleInsertCitation = (token: string) => {
-    if (!editorTextareaRef.current) return;
-    const textarea = editorTextareaRef.current;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const prev = manuscriptText;
-
-    const inserted = `${prev.substring(0, start)} ${token} ${prev.substring(end)}`;
-    handleManuscriptChange(inserted);
-
+  const insertAtCursor = (text: string, pad = false) => {
+    const el = textareaRef.current;
+    const start = el?.selectionStart ?? value.length;
+    const end = el?.selectionEnd ?? value.length;
+    const piece = pad ? `${start > 0 && !/\s$/.test(value.slice(0, start)) ? " " : ""}${text} ` : text;
+    setActiveText(value.slice(0, start) + piece + value.slice(end));
     setTimeout(() => {
-      textarea.focus();
-      const nextPos = start + token.length + 2;
-      textarea.setSelectionRange(nextPos, nextPos);
-    }, 50);
-
-    setCopiedToken(token);
-    setTimeout(() => setCopiedToken(null), 1500);
+      el?.focus();
+      el?.setSelectionRange(start + piece.length, start + piece.length);
+    }, 0);
   };
 
-  // Quick Insert IAST Diacritic
-  const handleInsertDiacritic = (char: string) => {
-    if (!editorTextareaRef.current) return;
-    const textarea = editorTextareaRef.current;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const prev = manuscriptText;
+  const canDraft = Boolean((answers["working_title"] || answers["title"] || answers["core_problem"] || "").trim());
 
-    const inserted = `${prev.substring(0, start)}${char}${prev.substring(end)}`;
-    handleManuscriptChange(inserted);
-
-    setTimeout(() => {
-      textarea.focus();
-      const nextPos = start + char.length;
-      textarea.setSelectionRange(nextPos, nextPos);
-    }, 30);
-  };
-
-  // Term-Locked Humanize & Polish Selection
-  const handleOpenPolishModal = async () => {
-    if (!effectiveProjectId || !manuscriptText.trim()) return;
-
-    let textToPolish = manuscriptText;
-    if (editorTextareaRef.current) {
-      const { selectionStart, selectionEnd } = editorTextareaRef.current;
-      if (selectionEnd > selectionStart) {
-        textToPolish = manuscriptText.substring(selectionStart, selectionEnd);
-      }
-    }
-
-    setIsPolishing(true);
-    try {
-      const res = await polishProjectManuscript(effectiveProjectId, {
-        text: textToPolish,
-        dialect,
+  const draft = async (guidance: string) => {
+    if (!unit || !pid) return;
+    const targetId = unit.id;
+    if (countWords(texts.texts[targetId]) > 0) {
+      const ok = await requestAppConfirm({
+        title: `Replace ${heading}?`,
+        message: "The AI draft will replace the text you have in this section. This can't be undone.",
+        confirmLabel: "Replace",
+        variant: "danger",
       });
-
-      if (res.ok && res.polishedText) {
-        setPolishedDiffData({
-          original: textToPolish,
-          revised: res.polishedText,
-          burstinessDelta: res.burstinessDelta,
-          styleCorrections: res.styleCorrections,
-        });
-        setPolishPreviewModalOpen(true);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setDraftError(`Polish failed: ${msg}`);
+      if (!ok) return;
+    }
+    setBusy("draft");
+    setError(null);
+    try {
+      const ctx = writtenContext(units, texts, targetId);
+      const contextPrompt = [
+        SECTION_GUIDANCE[unit.kind],
+        guidance.trim() ? `Author guidance: ${guidance.trim()}` : "",
+        ctx ? `Sections the author has already written. Stay consistent with them and do not contradict their methods or results:\n${ctx}` : "",
+      ].filter(Boolean).join("\n\n");
+      const res = await draftProjectSubSection(pid, {
+        sectionId: unit.sectionId,
+        subSectionId: unit.id,
+        subSectionTitle: unit.isWholeSection ? unit.title : `${unit.sectionTitle}: ${unit.title}`,
+        targetWords: unit.targetWords,
+        dialect,
+        contextPrompt,
+        assignedSources: unitEvidence.map((e) => ({
+          id: e.id,
+          authors: e.author,
+          year: e.year ?? "n.d.",
+          title: e.title,
+          doi: e.doi,
+          keyFindings: e.findings || undefined,
+        })),
+      });
+      if (res?.content?.trim()) setActiveText(res.content.trim(), targetId);
+      else setError("The AI returned no text. Nothing was changed.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The section could not be drafted.");
     } finally {
-      setIsPolishing(false);
+      setBusy(null);
     }
   };
 
-  // Apply Polished Prose
-  const handleApplyPolishedProse = () => {
-    if (!polishedDiffData) return;
-    const updated = manuscriptText.replace(polishedDiffData.original, polishedDiffData.revised);
-    handleManuscriptChange(updated);
-    setPolishPreviewModalOpen(false);
-    setPolishedDiffData(null);
+  const startPolish = async () => {
+    if (!pid || !value.trim()) return;
+    const el = textareaRef.current;
+    const selected = el && el.selectionEnd > el.selectionStart ? value.slice(el.selectionStart, el.selectionEnd) : value;
+    setBusy("polish");
+    setError(null);
+    try {
+      const res = await polishProjectManuscript(pid, { text: selected, dialect });
+      if (res?.polishedText?.trim()) setPolish({ original: selected, revised: res.polishedText, notes: res.styleCorrections ?? [] });
+      else setError("The polish returned no text. Nothing was changed.");
+    } catch (err) {
+      setError(err instanceof Error ? `Polish failed: ${err.message}` : "Polish failed.");
+    } finally {
+      setBusy(null);
+    }
   };
+
+  const applyPolish = () => {
+    if (!polish) return;
+    setActiveText(value.includes(polish.original) ? value.replace(polish.original, polish.revised) : value);
+    setPolish(null);
+  };
+
+  const showOutline = !focus;
+  const showSources = !focus && sourcesOpen;
 
   return (
-    <div className="h-full flex flex-col bg-[color:var(--surface-canvas)] overflow-hidden">
-      {/* STUDIO MODE HEADER */}
-      <div className="shrink-0 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-6 py-3.5 z-10">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-600 text-white shrink-0">
-                  Mode 3
-                </span>
-                <span className="text-xs font-semibold text-[color:var(--text-muted)]">
-                  Grounded Manuscript Studio
-                </span>
-              </div>
-              <h1 className="text-sm font-bold text-[color:var(--text-primary)] truncate max-w-md">
-                {workingTitle}
-              </h1>
-              <div className="flex items-center gap-2 text-[10px] text-[color:var(--text-secondary)] font-mono">
-                <span>{totalActualWords.toLocaleString()} / {targetTotalWords.toLocaleString()} words</span>
-                <span>·</span>
-                <span>~{estimatedReadingMinutes} min read</span>
-                <span>·</span>
-                <span className={saveStatus === "saving" ? "text-amber-500 font-bold" : "text-emerald-500 font-semibold"}>
-                  {saveStatus === "saving" ? "Autosaving…" : `Autosaved v${project?.version || 1}`}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Zen Focus Toggle */}
-            <button
-              type="button"
-              onClick={() => {
-                if (isZenFocus) {
-                  setLeftPaneCollapsed(false);
-                  setRightPaneCollapsed(false);
-                } else {
-                  setLeftPaneCollapsed(true);
-                  setRightPaneCollapsed(true);
-                }
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
-                isZenFocus
-                  ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] border-[color:var(--accent)]"
-                  : "bg-[color:var(--surface-sunken)] border-[color:var(--border-control)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
-              }`}
-              title="Toggle Zen Focus Writing (Collapse Sidebars)"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-              </svg>
-              <span>{isZenFocus ? "Exit Zen" : "Zen Focus"}</span>
-            </button>
-
-            {/* Mode 2 Back */}
-            <button
-              type="button"
-              onClick={() => setMode("evidence")}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] transition-all cursor-pointer"
-            >
-              ← Mode 2: Evidence
-            </button>
-
-            {/* Mode 4 Proceed */}
-            <button
-              type="button"
-              onClick={() => setMode("referee")}
-              className="px-4 py-1.5 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-            >
-              <span>Proceed to Mode 4: Referee</span>
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </button>
-          </div>
+    <div className="h-full flex flex-col min-h-0 bg-[color:var(--surface-canvas)]">
+      {/* Studio bar */}
+      <div className="shrink-0 border-b border-[color:var(--border-subtle)] px-4 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)]">Mode 3 · Writing Studio</div>
+          <h1 className="text-sm font-semibold text-[color:var(--text-primary)] truncate">
+            {answers["working_title"] || answers["title"] || "Untitled article"}
+          </h1>
+        </div>
+        <div className="flex items-center gap-2 text-xs" aria-live="polite">
+          <span className="tabular-nums text-[color:var(--text-secondary)]">
+            <strong className="text-[color:var(--text-primary)]">{written.toLocaleString()}</strong> / {targetTotal.toLocaleString()} words
+          </span>
+          <span className={`text-[11px] ${saveStatus === "error" ? "text-[color:var(--state-danger)]" : "text-[color:var(--text-muted)]"}`}>
+            {saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "Not saved" : "Saved"}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button type="button" onClick={() => setReadAll((r) => !r)} aria-pressed={readAll} aria-label={readAll ? "Back to writing" : "Read manuscript"} className="studio-btn">
+            <BookOpen className="w-3.5 h-3.5" aria-hidden="true" /> <span className="hidden sm:inline">{readAll ? "Back to writing" : "Read manuscript"}</span>
+          </button>
+          <button type="button" onClick={() => setSourcesOpen((o) => !o)} aria-pressed={sourcesOpen} aria-label="Sources" className="studio-btn">
+            <Library className="w-3.5 h-3.5" aria-hidden="true" /> <span className="hidden sm:inline">Sources</span>
+          </button>
+          <button type="button" onClick={() => setFocus((f) => !f)} aria-pressed={focus} aria-label={focus ? "Exit focus" : "Focus"} className="studio-btn">
+            {focus ? <Minimize2 className="w-3.5 h-3.5" aria-hidden="true" /> : <Maximize2 className="w-3.5 h-3.5" aria-hidden="true" />}
+            <span className="hidden sm:inline">{focus ? "Exit focus" : "Focus"}</span>
+          </button>
+          <button type="button" onClick={() => setMode("evidence")} className="studio-btn" aria-label="Back to Evidence">
+            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" /> <span className="hidden sm:inline">Evidence</span>
+          </button>
+          <button type="button" onClick={() => setMode("referee")} className="studio-btn studio-btn-primary" aria-label="Go to Review">
+            <span className="hidden sm:inline">Review</span> <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
         </div>
       </div>
 
-      {/* 3-PANE STUDIO BODY */}
-      <div className="flex-1 flex min-h-0 relative">
-        {/* PANE 1: LEFT SUB-SECTION WORD BUDGET NAVIGATOR */}
-        {!leftPaneCollapsed ? (
-          <aside
-            aria-label="Sub-Section Word Budget Navigator"
-            className="w-72 xl:w-80 shrink-0 border-r border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)]/40 flex flex-col min-h-0"
-          >
-            <div className="p-3.5 border-b border-[color:var(--border-subtle)] flex items-center justify-between bg-[color:var(--surface-canvas)]">
-              <div>
-                <span className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider block">
-                  Sub-Section Budgets
-                </span>
-                <span className="text-xs font-bold text-[color:var(--text-primary)]">
-                  350–500 Word Slices
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setLeftPaneCollapsed(true)}
-                className="p-1 rounded-lg hover:bg-[color:var(--surface-hover)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] cursor-pointer"
-                title="Collapse Navigator"
-              >
-                ◀
-              </button>
-            </div>
-
-            {/* Action Bar: Sequential Drafting & Active Sub-Section */}
-            <div className="p-3 border-b border-[color:var(--border-subtle)] space-y-2 bg-[color:var(--surface-canvas)]/60">
-              <button
-                type="button"
-                disabled={isDraftingActiveSubSection || isSequentialRunning}
-                onClick={handleDraftActiveSubSection}
-                className="w-full px-3 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
-              >
-                {isDraftingActiveSubSection ? (
-                  <>
-                    <div className="spinner w-3 h-3" />
-                    <span>Fact-Lock Drafting…</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    <span>Draft Active Sub-Section</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                disabled={isDraftingActiveSubSection || isSequentialRunning}
-                onClick={handleDraftSectionIteratively}
-                className="w-full px-3 py-1.5 rounded-xl text-[11px] font-semibold bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
-                title="Iterates through all sub-sections in active section sequentially"
-              >
-                {isSequentialRunning ? (
-                  <>
-                    <div className="spinner w-3 h-3" />
-                    <span>Sequential Runner Active…</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Draft Entire Section Iteratively</span>
-                    <span className="text-[10px] text-[color:var(--text-muted)]">⚡</span>
-                  </>
-                )}
-              </button>
-
-              {sequentialProgressMessage && (
-                <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[10px] text-blue-600 dark:text-blue-400 font-mono animate-pulse">
-                  {sequentialProgressMessage}
-                </div>
-              )}
-
-              {draftError && (
-                <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[10px] text-rose-500 font-medium">
-                  {draftError}
-                </div>
-              )}
-            </div>
-
-            {/* Sub-Section Accordion List */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-4">
-              {blueprint?.sections.map((sec) => (
-                <div key={sec.id} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-[color:var(--text-primary)] px-1">
-                    <span>{sec.order}. {sec.sectionName}</span>
-                    <span className="text-[10px] font-mono text-[color:var(--text-muted)]">
-                      {sec.targetWords}w
-                    </span>
-                  </div>
-
-                  <div className="space-y-1">
-                    {sec.subSections.map((sub, sIdx) => {
-                      const actual = subSectionWordCounts[sub.id] || 0;
-                      const target = sub.targetWords || 450;
-                      const ratio = actual / target;
-                      const percent = Math.min(100, Math.round(ratio * 100));
-
-                      const isWithinTarget = ratio >= 0.95 && ratio <= 1.05;
-                      const isOverBudget = ratio > 1.05;
-                      const isSelected = activeSubSectionId === sub.id;
-
-                      const barColor = isWithinTarget
-                        ? "bg-emerald-500"
-                        : isOverBudget
-                        ? "bg-amber-500"
-                        : "bg-[color:var(--accent)]";
-
-                      return (
-                        <div
-                          key={sub.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => {
-                            setActiveSectionId(sec.id);
-                            setActiveSubSectionId(sub.id);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              setActiveSectionId(sec.id);
-                              setActiveSubSectionId(sub.id);
-                            }
-                          }}
-                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                            isSelected
-                              ? "bg-[color:var(--surface-canvas)] border-[color:var(--accent)] shadow-xs ring-1 ring-[color:var(--accent)]/30"
-                              : "bg-[color:var(--surface-canvas)] border-[color:var(--border-subtle)] hover:border-[color:var(--border-control)]"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-1 text-[11px]">
-                            <span className="font-semibold text-[color:var(--text-primary)] line-clamp-1">
-                              § {sec.order}.{sIdx + 1} {sub.title}
-                            </span>
-                            <span className="font-mono text-[9px] text-[color:var(--text-muted)] shrink-0">
-                              {target}w
-                            </span>
-                          </div>
-
-                          {/* Progress Bar & Telemetry */}
-                          <div className="mt-2 space-y-1">
-                            <div className="h-1.5 w-full bg-[color:var(--surface-sunken)] rounded-full overflow-hidden">
-                              <div
-                                className={`h-full transition-all duration-300 ${barColor}`}
-                                style={{ width: `${percent}%` }}
-                              />
-                            </div>
-
-                            <div className="flex items-center justify-between text-[9px] font-mono text-[color:var(--text-secondary)]">
-                              <span>
-                                {actual} / {target} words · {percent}%
-                              </span>
-                              {isWithinTarget && (
-                                <span className="text-emerald-500 font-bold uppercase tracking-wider text-[8px]">
-                                  ✓ In Budget
-                                </span>
-                              )}
-                              {isOverBudget && (
-                                <span className="text-amber-500 font-bold uppercase tracking-wider text-[8px]">
-                                  +{(actual - target)}w
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
+      <div className="flex-1 flex min-h-0">
+        {showOutline && (
+          <aside className="hidden md:flex w-64 shrink-0 overflow-hidden border-r border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)]/40 min-h-0">
+            <StudioOutline units={units} texts={texts} activeId={activeId} order={order} onOrderChange={setOrder} onSelect={(id) => { setActiveId(id); setReadAll(false); }} />
           </aside>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setLeftPaneCollapsed(false)}
-            className="w-7 border-r border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] flex items-center justify-center text-[10px] text-[color:var(--text-muted)] cursor-pointer"
-            title="Expand Budget Navigator"
-          >
-            ▶
-          </button>
         )}
 
-        {/* PANE 2: CENTER ACADEMIC MANUSCRIPT CANVAS */}
-        <main className="flex-1 flex flex-col min-w-0 bg-[color:var(--surface-canvas)]">
-          {/* Quick Toolbar: Polish, IAST Diacritics Popover, Word Count */}
-          <div className="shrink-0 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]/60 px-4 py-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              {/* Polish & Humanize */}
-              <button
-                type="button"
-                disabled={isPolishing || !manuscriptText.trim()}
-                onClick={handleOpenPolishModal}
-                className="px-3 py-1 rounded-lg text-xs font-bold bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                title="Term-locked humanization purges AI clichés while preserving all citations and technical terms"
-              >
-                {isPolishing ? (
-                  <>
-                    <div className="spinner w-3 h-3" />
-                    <span>Polishing…</span>
-                  </>
-                ) : (
-                  <>
-                    <span>✨ Term-Locked Humanize & Polish</span>
-                  </>
-                )}
-              </button>
-
-              {/* IAST Diacritics Popover Toggle */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsDiacriticPopoverOpen(!isDiacriticPopoverOpen)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1 ${
-                    isDiacriticPopoverOpen
-                      ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] border-[color:var(--accent)]"
-                      : "bg-[color:var(--surface-sunken)] border-[color:var(--border-control)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
-                  }`}
-                  title="Insert IAST scholarly diacritics (ā, ī, ū, ṛ, ś, etc.)"
-                >
-                  <span className="font-serif font-bold">ā/ś</span>
-                  <span className="text-[10px]">IAST Diacritics</span>
-                </button>
-
-                {isDiacriticPopoverOpen && (
-                  <div className="absolute top-full left-0 mt-1 z-30 w-72 p-2.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-control)] rounded-xl shadow-xl space-y-2">
-                    <span className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider block">
-                      Click to Insert Scholarly Diacritic
-                    </span>
-                    <div className="grid grid-cols-6 gap-1">
-                      {IAST_DIACRITICS.map((item) => (
-                        <button
-                          key={item.char}
-                          type="button"
-                          onClick={() => handleInsertDiacritic(item.char)}
-                          className="p-1 rounded bg-[color:var(--surface-sunken)] hover:bg-[color:var(--accent)] hover:text-[color:var(--text-inverse)] font-serif text-sm font-bold transition-colors cursor-pointer text-center"
-                          title={item.label}
-                        >
-                          {item.char}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Word Count Indicator */}
-            <div className="flex items-center gap-2 text-xs font-mono text-[color:var(--text-secondary)]">
-              <span>{totalActualWords.toLocaleString()} words</span>
-              <span>·</span>
-              <span>{dialect === "en-GB" ? "British English (-ise)" : "US English"}</span>
-            </div>
+        <main className="flex-1 min-w-0 overflow-y-auto">
+          {/* Phones: the outline as a picker */}
+          <div className="md:hidden px-4 pt-4">
+            <label htmlFor="studio-section-picker" className="sr-only">Section</label>
+            <select
+              id="studio-section-picker"
+              value={activeId}
+              onChange={(e) => { setActiveId(e.target.value); setReadAll(false); }}
+              className="w-full px-3 py-2 text-sm rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]"
+            >
+              {texts.unsorted.trim() && <option value={UNSORTED_ID}>Text from your earlier draft</option>}
+              {groupUnits(units, order).map((g) => (
+                <optgroup key={g.sectionId} label={g.sectionTitle}>
+                  {g.units.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.isWholeSection ? u.title : u.title} ({countWords(texts.texts[u.id])}/{u.targetWords})
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           </div>
 
-          {/* Text Editor Area: Apple Pages / Ulysses Sheet */}
-          <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center">
-            <div className="apple-sheet w-full max-w-3xl mx-auto py-8 px-6 sm:px-10 shadow-sm rounded-2xl bg-surface flex-1 flex flex-col space-y-6">
-              <textarea
-                ref={editorTextareaRef}
-                aria-label="Academic Manuscript Canvas"
-                value={manuscriptText}
-                onChange={(e) => handleManuscriptChange(e.target.value)}
-                placeholder="Compose or assemble your peer-reviewed manuscript here. Sub-sections drafted via Mode 1 budgets and citations inserted from Mode 2 Smart Evidence will appear seamlessly..."
-                className="w-full flex-1 min-h-[460px] bg-transparent text-xs md:text-sm font-mono leading-relaxed text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] outline-none resize-none border-0 focus:ring-0 p-2 apple-prose-measure"
-              />
-
-              {/* Live Verified Bibliography Card */}
-              {verifiedBibliography.length > 0 && (
-                <section
-                  aria-labelledby="verified-bibliography-heading"
-                  className="pt-6 border-t border-[color:var(--border-subtle)] space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 id="verified-bibliography-heading" className="text-xs font-bold text-[color:var(--text-primary)] uppercase tracking-wider flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      Verified Bibliography & Reference List ({verifiedBibliography.length} Cited Sources)
-                    </h3>
-                    <span className="text-[10px] font-mono text-[color:var(--text-muted)]">
-                      {citationStyle} Formatting
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 bg-[color:var(--surface-sunken)]/60 rounded-xl p-4 border border-[color:var(--border-subtle)]">
-                    {verifiedBibliography.map((entry) => (
-                      <div
-                        key={entry.token}
-                        className="text-xs font-serif leading-relaxed text-[color:var(--text-primary)] pl-6 -indent-6"
-                      >
-                        <code className="text-[10px] font-mono text-[color:var(--accent)] mr-1.5 font-bold">
-                          {entry.token}
-                        </code>
-                        <span>{entry.formattedCitation}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
+          {readAll ? (
+            <article aria-label="Full manuscript" className="max-w-3xl mx-auto px-4 sm:px-8 py-8">
+              {manuscript.trim() ? (
+                <div className="whitespace-pre-wrap font-serif text-[15px] leading-7 text-[color:var(--text-primary)]">{manuscript}</div>
+              ) : (
+                <p className="text-sm text-[color:var(--text-muted)]">Nothing written yet. Sections appear here as you write them.</p>
               )}
-            </div>
-          </div>
-        </main>
-
-        {/* PANE 3: RIGHT ASSIGNED EVIDENCE & PRIMARY DATA DRAWER */}
-        {!rightPaneCollapsed ? (
-          <aside
-            aria-label="Assigned Evidence & Primary Data Drawer"
-            className="w-80 xl:w-96 shrink-0 border-l border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)]/40 flex flex-col min-h-0"
-          >
-            <div className="p-3.5 border-b border-[color:var(--border-subtle)] flex items-center justify-between bg-[color:var(--surface-canvas)]">
-              <button
-                type="button"
-                onClick={() => setRightPaneCollapsed(true)}
-                className="p-1 rounded-lg hover:bg-[color:var(--surface-hover)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] cursor-pointer"
-                title="Collapse Drawer"
-              >
-                ▶
-              </button>
-              <div>
-                <span className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider block text-right">
-                  Evidence Ledger
-                </span>
-                <span className="text-xs font-bold text-[color:var(--text-primary)]">
-                  Sources & Primary Datasets
-                </span>
-              </div>
-            </div>
-
-            {/* Tabs: Assigned vs All */}
-            <div className="flex border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] text-xs">
-              <button
-                type="button"
-                onClick={() => setRightPaneTab("assigned")}
-                className={`flex-1 py-2 font-bold transition-colors cursor-pointer border-b-2 text-center ${
-                  rightPaneTab === "assigned"
-                    ? "border-[color:var(--accent)] text-[color:var(--accent)]"
-                    : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
-                }`}
-              >
-                Assigned ({assignedEvidence.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setRightPaneTab("all")}
-                className={`flex-1 py-2 font-bold transition-colors cursor-pointer border-b-2 text-center ${
-                  rightPaneTab === "all"
-                    ? "border-[color:var(--accent)] text-[color:var(--accent)]"
-                    : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
-                }`}
-              >
-                All Sources ({allEvidence.length})
-              </button>
-            </div>
-
-            {/* List of Evidence Items */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
-              {(rightPaneTab === "assigned" ? assignedEvidence : allEvidence).length === 0 ? (
-                <div className="p-6 text-center text-xs text-[color:var(--text-muted)] space-y-2">
-                  <p>No evidence items assigned to this sub-section yet.</p>
+            </article>
+          ) : (
+            <>
+              <StudioSectionEditor
+                key={activeId}
+                unit={unit}
+                heading={heading}
+                value={value}
+                onChange={(v) => setActiveText(v)}
+                textareaRef={textareaRef}
+                onDraft={(g) => void draft(g)}
+                onPolish={() => void startPolish()}
+                onInsertText={(t) => insertAtCursor(t)}
+                busy={busy}
+                canDraft={canDraft}
+                draftBlocker="Set your research question or working title in Blueprint first, so the AI knows what the article is about."
+              />
+              {error && (
+                <p role="alert" className="max-w-3xl mx-auto px-4 sm:px-8 -mt-2 pb-4 text-xs text-[color:var(--state-danger)]">{error}</p>
+              )}
+              {next && next.id !== activeId && (
+                <div className="max-w-3xl mx-auto px-4 sm:px-8 pb-10">
                   <button
                     type="button"
-                    onClick={() => setMode("evidence")}
-                    className="text-xs font-bold text-[color:var(--accent)] hover:underline cursor-pointer"
+                    onClick={() => setActiveId(next.id)}
+                    className="text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
                   >
-                    Go to Mode 2 to map evidence →
+                    Next in writing order: {next.isWholeSection ? next.title : `${next.sectionTitle} › ${next.title}`} →
                   </button>
                 </div>
-              ) : (
-                (rightPaneTab === "assigned" ? assignedEvidence : allEvidence).map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] space-y-2 text-xs hover:border-[color:var(--border-control)] transition-all"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <code className="text-[10px] font-mono font-bold text-[color:var(--accent)] px-1.5 py-0.5 rounded bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)]">
-                        {item.citationToken}
-                      </code>
-                      <span
-                        className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                          item.isUserData
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                            : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30"
-                        }`}
-                      >
-                        {item.isUserData ? "Primary Data" : "Literature"}
-                      </span>
-                    </div>
-
-                    <div>
-                      <h4 className="font-bold text-[color:var(--text-primary)] text-xs line-clamp-2">
-                        {item.title}
-                      </h4>
-                      <p className="text-[10px] text-[color:var(--text-secondary)] mt-0.5">
-                        {item.author} ({item.year ?? "n.d."})
-                      </p>
-                    </div>
-
-                    <p className="text-[10px] text-[color:var(--text-muted)] line-clamp-2 bg-[color:var(--surface-sunken)]/60 p-2 rounded-lg">
-                      {item.extractedFindings}
-                    </p>
-
-                    <div className="pt-1 flex items-center justify-between">
-                      <button
-                        type="button"
-                        onClick={() => handleInsertCitation(item.citationToken)}
-                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1 shadow-xs"
-                      >
-                        <span>+ Insert Citation</span>
-                      </button>
-
-                      {copiedToken === item.citationToken && (
-                        <span className="text-[10px] text-emerald-500 font-bold">
-                          ✓ Inserted!
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
               )}
-            </div>
-          </aside>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setRightPaneCollapsed(false)}
-            className="w-7 border-l border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] flex items-center justify-center text-[10px] text-[color:var(--text-muted)] cursor-pointer"
-            title="Expand Evidence Drawer"
-          >
-            ◀
-          </button>
+            </>
+          )}
+        </main>
+
+        {showSources && (
+          <>
+            <div className="fixed inset-0 z-30 bg-black/40 2xl:hidden" aria-hidden="true" onClick={() => setSourcesOpen(false)} />
+            <aside
+              aria-label="Sources panel"
+              className="fixed inset-y-0 right-0 z-40 w-full max-w-sm flex flex-col bg-[color:var(--surface-canvas)] shadow-2xl 2xl:static 2xl:z-auto 2xl:shadow-none 2xl:w-80 2xl:shrink-0 border-l border-[color:var(--border-subtle)] min-h-0"
+            >
+              <div className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--border-subtle)] 2xl:hidden">
+                <span className="text-xs font-semibold text-[color:var(--text-primary)]">Sources</span>
+                <button type="button" onClick={() => setSourcesOpen(false)} aria-label="Close sources" className="p-1 rounded-md hover:bg-[color:var(--surface-hover)] cursor-pointer">
+                  <X className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </div>
+              <StudioEvidencePanel
+                forUnit={unitEvidence}
+                all={evidence}
+                manuscript={manuscript}
+                onInsert={(token) => insertAtCursor(token, true)}
+                onGoToEvidence={() => setMode("evidence")}
+              />
+            </aside>
+          </>
         )}
       </div>
 
-      {/* POLISH DIFF PREVIEW MODAL */}
-      {polishPreviewModalOpen && polishedDiffData && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-[color:var(--text-primary)]">
-                  Term-Locked Humanize & Polish Preview
-                </h3>
-                <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-                  Syntactic burstiness delta: +{polishedDiffData.burstinessDelta || 0.28} · Citations & terminology 100% locked
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPolishPreviewModalOpen(false)}
-                className="text-xs font-bold text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] p-1 cursor-pointer"
-              >
-                ✕
+      {polish && (
+        <div role="dialog" aria-modal="true" aria-labelledby="polish-heading" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="w-full max-w-4xl max-h-[85vh] flex flex-col rounded-2xl bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] shadow-2xl">
+            <div className="px-5 py-3 border-b border-[color:var(--border-subtle)] flex items-center justify-between">
+              <h3 id="polish-heading" className="text-sm font-semibold text-[color:var(--text-primary)]">Polished text: review before applying</h3>
+              <button type="button" onClick={() => setPolish(null)} aria-label="Close" className="p-1 rounded-md hover:bg-[color:var(--surface-hover)] cursor-pointer">
+                <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
-
-            <div className="flex-1 overflow-y-auto space-y-4 text-xs font-mono">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-rose-500/5 border border-rose-500/20 space-y-2">
-                  <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider block">
-                    Original Draft
-                  </span>
-                  <p className="text-[color:var(--text-secondary)] whitespace-pre-wrap leading-relaxed">
-                    {polishedDiffData.original}
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 space-y-2">
-                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider block">
-                    Polished Manuscript (High Burstiness & Zero Clichés)
-                  </span>
-                  <p className="text-[color:var(--text-primary)] whitespace-pre-wrap leading-relaxed">
-                    {polishedDiffData.revised}
-                  </p>
-                </div>
+            <div className="grid md:grid-cols-2 gap-4 p-5 overflow-y-auto text-sm leading-relaxed">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-1">Yours</div>
+                <p className="whitespace-pre-wrap text-[color:var(--text-secondary)]">{polish.original}</p>
               </div>
-
-              {polishedDiffData.styleCorrections && polishedDiffData.styleCorrections.length > 0 && (
-                <div className="p-3 rounded-xl bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] space-y-1">
-                  <span className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider">
-                    Applied Voice Guard Corrections:
-                  </span>
-                  <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-[color:var(--text-secondary)]">
-                    {polishedDiffData.styleCorrections.map((corr, idx) => (
-                      <li key={idx}>{corr}</li>
-                    ))}
-                  </ul>
-                </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-1">Polished</div>
+                <p className="whitespace-pre-wrap text-[color:var(--text-primary)]">{polish.revised}</p>
+              </div>
+              {polish.notes.length > 0 && (
+                <ul className="md:col-span-2 list-disc pl-5 text-xs text-[color:var(--text-muted)]">
+                  {polish.notes.map((n) => <li key={n}>{n}</li>)}
+                </ul>
               )}
             </div>
-
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[color:var(--border-subtle)]">
-              <button
-                type="button"
-                onClick={() => setPolishPreviewModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyPolishedProse}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-sm"
-              >
-                Accept & Apply Polished Prose
-              </button>
+            <div className="px-5 py-3 border-t border-[color:var(--border-subtle)] flex justify-end gap-2">
+              <button type="button" onClick={() => setPolish(null)} className="studio-btn">Keep mine</button>
+              <button type="button" onClick={applyPolish} className="studio-btn studio-btn-primary">Apply polished text</button>
             </div>
           </div>
         </div>

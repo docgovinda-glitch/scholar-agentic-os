@@ -63,7 +63,9 @@ function ResearchWorkspaceInner({
   const [stageNavOpen, setStageNavOpen] = useState(false);
   const [trayOpen, setTrayOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // The header tabs already switch modes, so the mode list starts as an icon
+  // rail and the writing area gets the width. It can still be expanded.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [isZenMode, setIsZenMode] = useState(false);
   const [engineMenuOpen, setEngineMenuOpen] = useState(false);
   const engineMenuRef = React.useRef<HTMLDivElement>(null);
