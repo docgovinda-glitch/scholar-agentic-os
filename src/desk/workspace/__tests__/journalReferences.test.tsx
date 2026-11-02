@@ -222,3 +222,52 @@ describe("Add a source by DOI in Evidence", () => {
     expect(await screen.findByText(/Crossref lists a retraction for this paper/)).toBeInTheDocument();
   });
 });
+
+describe("Figures and tables", () => {
+  const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+  it("Evidence: a table is typed in, captioned and saved on the project", async () => {
+    current = projectWith({});
+    mount(<EvidenceMatrixMode />);
+    const panel = await screen.findByRole("region", { name: "Figures and tables" });
+    fireEvent.click(within(panel).getByRole("button", { name: "Add table" }));
+    await waitFor(() => expect(JSON.parse(current.answers.manuscript_figures as string)).toHaveLength(1));
+    const rows = await within(panel).findByLabelText("Table tab1 rows");
+    fireEvent.change(rows, { target: { value: "Group\tn\nSleep\t15\nWake\t15" } });
+    fireEvent.blur(rows);
+    const caption = within(panel).getByLabelText("Table tab1 caption");
+    fireEvent.change(caption, { target: { value: "Participants by group." } });
+    fireEvent.blur(caption);
+    await waitFor(() =>
+      expect(JSON.parse(current.answers.manuscript_figures as string)[0]).toMatchObject({
+        id: "tab1",
+        kind: "table",
+        caption: "Participants by group.",
+        rows: [["Group", "n"], ["Sleep", "15"], ["Wake", "15"]],
+      })
+    );
+    expect(within(panel).getByText("[TAB:tab1]")).toBeInTheDocument();
+  });
+
+  it("Delivery: an uncited figure is flagged, and the LaTeX package carries the cited one's image", async () => {
+    current = projectWith({
+      manuscript_markdown: "### § Results\n\nRecall rose ([FIG:fig1]).",
+      manuscript_figures: JSON.stringify([
+        { id: "fig1", kind: "figure", caption: "Recall by condition.", altText: "Bars", image: PNG },
+        { id: "fig2", kind: "figure", caption: "Sleep stages.", altText: "" },
+      ]),
+    });
+    mount(<AuditExportMode />);
+    const checks = await screen.findByRole("region", { name: "Verification" });
+    expect(within(checks).getByText("Fix references")).toBeInTheDocument();
+    expect(within(checks).getByText(/Never referred to in the text: figure “Sleep stages.”/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /LaTeX \(\.zip\)/ }));
+    await waitFor(() => expect(vi.mocked(window.URL.createObjectURL).mock.calls.length).toBe(1));
+    const { default: JSZip } = await import("jszip");
+    const zip = await JSZip.loadAsync(await (vi.mocked(window.URL.createObjectURL).mock.calls[0][0] as Blob).arrayBuffer());
+    expect(Object.keys(zip.files).sort()).toEqual(["README.txt", "figure1.png", "main.tex"]);
+    expect(await zip.file("main.tex")!.async("string")).toContain("Recall rose (Figure~\\ref{fig:1}).");
+  });
+});
+

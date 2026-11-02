@@ -22,6 +22,7 @@ import {
 } from "../journal/manuscriptModel";
 import { evidenceFor, studioEvidence } from "../journal/studioEvidence";
 import { parseReferenceRecords } from "../../domain/journal/references";
+import { parseFigures } from "../../domain/journal/figures";
 import StudioOutline, { UNSORTED_ID } from "../journal/studio/StudioOutline";
 import StudioEvidencePanel from "../journal/studio/StudioEvidencePanel";
 import StudioSectionEditor from "../journal/studio/StudioSectionEditor";
@@ -84,6 +85,7 @@ export default function ManuscriptStudioMode() {
   const dialect: "en-GB" | "en-US" = answers["orthography"]?.includes("US") ? "en-US" : "en-GB";
   const evidence = useMemo(() => studioEvidence(answers), [answers]);
   const referenceRecords = useMemo(() => parseReferenceRecords(answers["reference_records"]), [answers]);
+  const figures = useMemo(() => parseFigures(answers["manuscript_figures"]), [answers]);
   const unitEvidence = unit ? evidenceFor(evidence, unit.id, unit.sectionId, unit.assignedSourceIds) : [];
   const next = nextToWrite(units, texts);
 
@@ -349,6 +351,8 @@ export default function ManuscriptStudioMode() {
                 manuscript={manuscript}
                 onInsert={insertCitation}
                 onGoToEvidence={() => setMode("evidence")}
+                figures={figures}
+                onInsertText={(t) => insertText(` ${t}`)}
               />
             </aside>
           </>

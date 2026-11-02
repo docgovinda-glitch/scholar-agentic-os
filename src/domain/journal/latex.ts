@@ -7,6 +7,7 @@
  */
 import type { ReferenceRecord } from "./references";
 import { citedIds, isNumeric, withoutReferenceSection, type StyleKey } from "./citationStyles";
+import { figureFile, imageBytes, numberFigures, type ManuscriptFigure } from "./figures";
 
 export type LatexTemplate = "elsarticle" | "ieeetran" | "sn-jnl" | "article";
 
@@ -155,11 +156,14 @@ export interface LatexInput {
   body: string;
   declarations: Array<{ label: string; text: string }>;
   records: Record<string, ReferenceRecord>;
+  figures?: ManuscriptFigure[];
 }
 
 export interface LatexProject {
   tex: string;
   bib: string;
+  /** Figure images to put beside main.tex. */
+  files: Array<{ name: string; data: Uint8Array }>;
   /** Cited ids with no record; they stay as text "[id]". */
   missing: string[];
 }
@@ -182,7 +186,54 @@ export function buildLatex(input: LatexInput): LatexProject {
     return [ok.length ? `${citeCmd}{${ok.join(",")}}` : "", ...bad].filter(Boolean).join(" ");
   };
 
-  const body = bodyLatex(input.body, cite);
+  // Figure and table references: protected from escaping, then \ref to their floats.
+  const numbering = numberFigures(input.body, input.figures ?? []);
+  const floats = [...numbering.figures, ...numbering.tables];
+  const slot = new Map(floats.map((f, i) => [f.id, i]));
+  const marked = input.body.replace(/\[(FIG|TAB):([A-Za-z0-9_-]+)\]/g, (tok, _k, id) => (slot.has(id) ? `\u0001${slot.get(id)}\u0002` : tok));
+  // "Figure 2" → fig:2, "Table 1" → tab:1
+  const refName = (f: ManuscriptFigure) => `${f.kind === "table" ? "tab" : "fig"}:${numbering.label[f.id].split(" ")[1]}`;
+  const unmark = (tex: string) =>
+    tex.replace(/\u0001(\d+)\u0002/g, (_m, i) => {
+      const f = floats[Number(i)];
+      return `${f.kind === "table" ? "Table" : "Figure"}~\\ref{${refName(f)}}`;
+    });
+  const files: LatexProject["files"] = [];
+  const floatTex = floats
+    .map((f) => {
+      const caption = inlineLatex([f.caption.trim(), f.credit?.trim()].filter(Boolean).join(" "), cite);
+      if (f.kind === "table") {
+        const rows = f.rows ?? [];
+        const width = Math.max(1, ...rows.map((r) => r.length));
+        const line = (r: string[]) => `${Array.from({ length: width }, (_, i) => inlineLatex(r[i] ?? "", cite)).join(" & ")} \\\\`;
+        return [
+          "\\begin{table}[htbp]",
+          "\\centering",
+          `\\caption{${caption}}\\label{${refName(f)}}`,
+          `\\begin{tabular}{${"l".repeat(width)}}`,
+          "\\hline",
+          rows[0] ? line(rows[0]) : "",
+          "\\hline",
+          ...rows.slice(1).map(line),
+          "\\hline",
+          "\\end{tabular}",
+          "\\end{table}",
+        ].filter(Boolean).join("\n");
+      }
+      const label = numbering.label[f.id];
+      const bytes = f.image ? imageBytes(f.image) : null;
+      const name = figureFile(f, label);
+      if (bytes) files.push({ name, data: bytes });
+      return [
+        "\\begin{figure}[htbp]",
+        "\\centering",
+        bytes ? `\\includegraphics[width=\\linewidth]{${name}}` : `\\fbox{\\parbox{0.8\\linewidth}{\\centering No image uploaded for ${label}.}}`,
+        `\\caption{${caption}}\\label{${refName(f)}}`,
+        "\\end{figure}",
+      ].join("\n");
+    })
+    .join("\n\n");
+  const body = unmark(bodyLatex(marked, cite)) + (floatTex ? `\n\n${floatTex}` : "");
   const t = (s: string) => inlineLatex(s, cite);
   const title = t(input.title || "Untitled manuscript");
   const abstract = input.abstract?.trim() ? t(input.abstract.trim()) : "";
@@ -304,7 +355,7 @@ export function buildLatex(input: LatexInput): LatexProject {
       ].filter(Boolean).join("\n\n");
     }
   }
-  return { tex: `${tex}\n`, bib: hasBib ? `${toBibtex(bibRecords)}\n` : "", missing };
+  return { tex: `${tex}\n`, bib: hasBib ? `${toBibtex(bibRecords)}\n` : "", missing, files };
 }
 
 /**

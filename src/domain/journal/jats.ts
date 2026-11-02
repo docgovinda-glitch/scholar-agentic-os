@@ -7,6 +7,7 @@
  */
 import type { ReferenceRecord } from "./references";
 import { citedIds } from "./citationStyles";
+import { figureFile, numberFigures, type ManuscriptFigure, type Numbering } from "./figures";
 
 export interface JatsInput {
   title: string;
@@ -18,20 +19,28 @@ export interface JatsInput {
   body: string;
   declarations: Array<{ label: string; text: string }>;
   records: Record<string, ReferenceRecord>;
+  figures?: ManuscriptFigure[];
 }
 
 export const escapeXml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const refId = (id: string) => `ref-${id.replace(/[^A-Za-z0-9_.-]/g, "_")}`;
 
+// Numbering for the document being built (buildJats is synchronous and sets it first).
+let floats: Numbering | null = null;
+
 function inline(src: string, known: Set<string>): string {
   const out: string[] = [];
-  const re = /\[CITE:([A-Za-z0-9_.:-]+)\]|\*\*([^*\n]+?)\*\*|\*([^*\n]+?)\*/g;
+  const re = /\[CITE:([A-Za-z0-9_.:-]+)\]|\*\*([^*\n]+?)\*\*|\*([^*\n]+?)\*|\[(FIG|TAB):([A-Za-z0-9_-]+)\]/g;
   let last = 0;
   for (const m of src.matchAll(re)) {
     out.push(escapeXml(src.slice(last, m.index)));
     if (m[1]) out.push(known.has(m[1]) ? `<xref ref-type="bibr" rid="${refId(m[1])}">${escapeXml(m[1])}</xref>` : escapeXml(m[0]));
     else if (m[2]) out.push(`<bold>${inline(m[2], known)}</bold>`);
     else if (m[3]) out.push(`<italic>${inline(m[3], known)}</italic>`);
+    else if (m[5]) {
+      const label = floats?.label[m[5]];
+      out.push(label ? `<xref ref-type="${m[4] === "TAB" ? "table" : "fig"}" rid="${m[4] === "TAB" ? "tab" : "fig"}-${escapeXml(m[5])}">${label}</xref>` : escapeXml(m[0]));
+    }
     last = (m.index ?? 0) + m[0].length;
   }
   out.push(escapeXml(src.slice(last)));
@@ -89,7 +98,18 @@ function citationXml(r: ReferenceRecord): string {
   return `<ref id="${refId(r.id)}"><element-citation publication-type="${type}">${parts.join("")}</element-citation></ref>`;
 }
 
+function floatXml(f: ManuscriptFigure, label: string, known: Set<string>): string {
+  const caption = `<caption><p>${inline([f.caption.trim(), f.credit?.trim()].filter(Boolean).join(" "), known)}</p></caption>`;
+  if (f.kind === "table") {
+    const rows = f.rows ?? [];
+    const cells = (r: string[], tag: "th" | "td") => `<tr>${r.map((c) => `<${tag}>${inline(c, known)}</${tag}>`).join("")}</tr>`;
+    return `<table-wrap id="tab-${escapeXml(f.id)}"><label>${label}</label>${caption}<table>${rows[0] ? `<thead>${cells(rows[0], "th")}</thead>` : ""}<tbody>${rows.slice(1).map((r) => cells(r, "td")).join("")}</tbody></table></table-wrap>`;
+  }
+  return `<fig id="fig-${escapeXml(f.id)}"><label>${label}</label>${caption}${f.altText.trim() ? `<alt-text>${escapeXml(f.altText.trim())}</alt-text>` : ""}${f.image ? `<graphic xlink:href="${figureFile(f, label)}"/>` : ""}</fig>`;
+}
+
 export function buildJats(input: JatsInput): string {
+  floats = numberFigures(input.body, input.figures ?? []);
   const ids = citedIds(input.body).filter((id) => input.records[id]);
   const known = new Set(ids);
   const authors = input.authors.filter((a) => a.name.trim());
@@ -123,6 +143,7 @@ ${keywords.length ? `<kwd-group>${keywords.map((k) => `<kwd>${escapeXml(k)}</kwd
 ${bodyXml(input.body, known)}
 </body>
 ${back ? `<back>${back}</back>` : ""}
+${floats.figures.length + floats.tables.length ? `<floats-group>${[...floats.figures, ...floats.tables].map((f) => floatXml(f, floats!.label[f.id], known)).join("")}</floats-group>` : ""}
 </article>
 `;
 }

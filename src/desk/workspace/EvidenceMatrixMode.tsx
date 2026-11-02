@@ -23,6 +23,8 @@ import {
 import { executeLiveSearch } from "../../services/liveSearchService";
 import { normalizeUnicodeNFC } from "../../document_intelligence/index";
 import AddByDoi from "../journal/AddByDoi";
+import FiguresPanel from "../journal/FiguresPanel";
+import { parseFigures, type ManuscriptFigure } from "../../domain/journal/figures";
 import { parseReferenceRecords, type ReferenceRecord } from "../../domain/journal/references";
 
 const ROLES: SmartEvidenceRow["epistemicRole"][] = ["Supporting", "Contrasting / Critical", "Methodological Anchor", "Primary User Dataset"];
@@ -994,6 +996,26 @@ export default function EvidenceMatrixMode() {
               </p>
             </div>
           )}
+        </section>
+
+        {/* SECTION D: Figures and tables */}
+        <section aria-labelledby="figures-heading" className="bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-4">
+          <div className="border-b border-[color:var(--border-subtle)] pb-4">
+            <h2 id="figures-heading" className="text-sm font-bold text-[color:var(--text-primary)]">
+              D. Figures and tables
+            </h2>
+            <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
+              Upload figures (PNG or JPEG) and type or paste tables. Each gets a caption; refer to it from the Studio and it is numbered in order of first mention.
+            </p>
+          </div>
+          <FiguresPanel
+            figures={parseFigures(answers["manuscript_figures"])}
+            onChange={async (next: ManuscriptFigure[]) => {
+              if (!effectiveProjectId) return;
+              const saved = await saveIntakeAnswers(effectiveProjectId, { ...(project?.answers || answers), manuscript_figures: JSON.stringify(next) });
+              setProject(saved);
+            }}
+          />
         </section>
       </div>
 
