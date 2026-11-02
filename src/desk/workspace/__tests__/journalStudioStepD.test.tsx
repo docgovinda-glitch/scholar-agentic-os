@@ -204,11 +204,11 @@ These findings establish that multi-agent consensus can achieve provable stabili
     expect(screen.getByText("2. References")).toBeInTheDocument();
     expect(screen.getByText("2 cited · 1 to review")).toBeInTheDocument();
 
-    // Check 3: Humanized Voice & Orthographic Telemetry
-    expect(screen.getByText(/3\. Humanized Voice & Orthographic Telemetry/i)).toBeInTheDocument();
-    expect(screen.getByText(/Syntactic Burstiness/i)).toBeInTheDocument();
-    expect(screen.getByText(/0 Detected/i)).toBeInTheDocument();
-    expect(screen.getByText(/Orthographic Consistency/i)).toBeInTheDocument();
+    // Check 3: Verification. The sample has no test statistics, spelling mixes,
+    // abstract numbers or figure mentions, so there is nothing to fix.
+    expect(screen.getByText("3. Verification")).toBeInTheDocument();
+    expect(screen.getByText("No problems found")).toBeInTheDocument();
+    expect(screen.getByText("Statistics recomputed")).toBeInTheDocument();
 
     // Check 4: 2026 Publisher Ethical Declarations
     expect(screen.getByText(/4\. 2026 Publisher Ethical & Provenance Declarations/i)).toBeInTheDocument();
@@ -244,7 +244,7 @@ These findings establish that multi-agent consensus can achieve provable stabili
     expect(screen.getByText(/Gate G7: ACTION REQUIRED/i)).toBeInTheDocument();
   });
 
-  it("an empty manuscript passes no text checks: 0% and nothing to check yet", async () => {
+  it("an empty manuscript passes no text checks: 0 of 5 and nothing to check yet", async () => {
     vi.mocked(api.getProject).mockResolvedValue({ ...baseProject, authors: [], answers: { working_title: "Empty" } });
     render(
       <ResearchProvider projectId="proj-step-d" initialStage="export" onStageChangeCallback={vi.fn()}>
@@ -252,8 +252,9 @@ These findings establish that multi-agent consensus can achieve provable stabili
       </ResearchProvider>
     );
     await waitFor(() => expect(screen.getAllByText("Nothing to check yet")).toHaveLength(2));
-    expect(screen.getByText(/^0% Pass$/)).toBeInTheDocument();
-    expect(screen.queryByText(/Scholarly Voice Certified|100% Citation Provenance Reconciled/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^0 of 5 checks pass$/)).toBeInTheDocument();
+    expect(screen.getByText("No word target set in Blueprint")).toBeInTheDocument();
+    expect(screen.queryByText(/No problems found|all resolved/)).not.toBeInTheDocument();
   });
 
   it("offers a data-availability draft naming the author's datasets, only on request", async () => {
