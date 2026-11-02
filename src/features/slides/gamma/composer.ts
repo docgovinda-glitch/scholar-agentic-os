@@ -530,6 +530,87 @@ export function composeDeckFromTopic(topic: string, opts: ComposeOptions = {}): 
 }
 
 /**
+ * A rough slide budget for a talk: about one content slide per minute, plus a
+ * title and a closing card, within what one deck can hold.
+ */
+export function slidesForMinutes(minutes: number): number {
+  const m = Number.isFinite(minutes) && minutes > 0 ? minutes : 10;
+  return Math.max(4, Math.min(15, Math.round(m * 0.75) + 2));
+}
+
+export interface TalkPlan {
+  title: string;
+  /** The one thing the audience should remember. */
+  keyMessage?: string;
+  /** The points to make, in order. Each becomes a card. */
+  points?: string[];
+  talkMinutes?: number;
+  slideCount?: number;
+  audience?: string;
+  framework?: NarrativeFramework;
+  deckId?: string;
+}
+
+/**
+ * A starting deck from the presenter's own plan, no AI: their title, their key
+ * message as the opening line and the closing takeaway, and one card per point
+ * they want to make, in their order. Remaining slots get the structural
+ * prompts of the topic outline. Nothing is added as fact.
+ */
+export function composeDeckFromPlan(plan: TalkPlan): SlideDeck {
+  const framework = plan.framework || 'Standard-Narrative';
+  const title = clean(plan.title) || 'Untitled presentation';
+  const key = clean(plan.keyMessage || '');
+  const points = (plan.points || []).map(clean).filter(Boolean);
+  const count = Math.max(3, Math.min(15, plan.slideCount ?? (plan.talkMinutes ? slidesForMinutes(plan.talkMinutes) : 6)));
+  const short = words(title).length > 8 ? shorten(title, 8).replace(/…$/, '') : title;
+  const lowerShort = /^[A-Z]{2,}/.test(short) ? short : short.charAt(0).toLowerCase() + short.slice(1);
+
+  const slides: SlideCard[] = [
+    makeSlide(
+      0,
+      { eyebrow: plan.audience || 'Presentation', headline: title, lede: key || undefined, items: [], stats: [] },
+      'title',
+      key ? `Open with the question behind the talk, then say where it ends up: ${key}` : `Introduce yourself and the question behind ${title}.`,
+      framework,
+    ),
+  ];
+  const middle = count - 2;
+  points.slice(0, middle).forEach((point) => {
+    slides.push(
+      makeSlide(
+        slides.length,
+        { eyebrow: `Point ${slides.length}`, headline: point, lede: 'Add the one figure, example or source that supports this point.', items: [], stats: [] },
+        'statement',
+        `Make this point: ${point}. Then give the evidence for it.`,
+        framework,
+      ),
+    );
+  });
+  for (let i = 0; slides.length < count - 1; i++) {
+    const arc = TOPIC_ARC[i % TOPIC_ARC.length];
+    slides.push(makeSlide(slides.length, arc.build(lowerShort), arc.layout, arc.notes(lowerShort), framework));
+  }
+  slides.push(
+    makeSlide(
+      slides.length,
+      key
+        ? { eyebrow: 'Takeaway', headline: key, lede: undefined, items: [], stats: [] }
+        : CLOSING.build(lowerShort),
+      'statement',
+      key ? 'Say the key message again, slowly, then invite questions.' : CLOSING.notes,
+      framework,
+    ),
+  );
+  return {
+    ...deckShell({ deckId: plan.deckId, framework, topic: key || title }, title, slides),
+    ...(plan.talkMinutes ? { talkMinutes: plan.talkMinutes } : {}),
+    ...(key ? { keyMessage: key } : {}),
+    ...(points.length ? { talkPoints: points } : {}),
+  };
+}
+
+/**
  * Converts a legacy block-based deck (e.g. a curated case-study deck) into
  * Gamma cards, choosing varied layouts and dropping any figure that does not
  * appear in `sourceText`.

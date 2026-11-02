@@ -4,10 +4,13 @@ import type { SlideDeck } from '../types/slides';
 import { CANVAS_H, CANVAS_W } from './geometry';
 import { GammaSlide } from './GammaCard';
 import { DEFAULT_DECK_THEME_ID, resolveDeckTheme } from './theme';
+import { clock, pace } from './pacing';
 
 export interface GammaPlayerProps {
   deck: SlideDeck;
   initialSlideIndex?: number;
+  /** Open in presenter view (notes, next slide, timer): rehearsal. */
+  initialPresenter?: boolean;
   onClose: () => void;
 }
 
@@ -37,10 +40,10 @@ const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${Str
  * Full-screen presenter. Audience mode shows the card edge to edge; presenter
  * mode (N) adds speaker notes, the next card and a timer.
  */
-export default function GammaPlayer({ deck, initialSlideIndex = 0, onClose }: GammaPlayerProps) {
+export default function GammaPlayer({ deck, initialSlideIndex = 0, initialPresenter = false, onClose }: GammaPlayerProps) {
   const total = deck.slides.length;
   const [index, setIndex] = useState(Math.min(Math.max(0, initialSlideIndex), Math.max(0, total - 1)));
-  const [presenter, setPresenter] = useState(false);
+  const [presenter, setPresenter] = useState(initialPresenter);
   const [chrome, setChrome] = useState(true);
   const [elapsed, setElapsed] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -112,6 +115,10 @@ export default function GammaPlayer({ deck, initialSlideIndex = 0, onClose }: Ga
         case 'Escape':
           if (!document.fullscreenElement) exit();
           break;
+        case 'r':
+        case 'R':
+          setElapsed(0);
+          break;
         case 'n':
         case 'N':
           setPresenter((p) => !p);
@@ -153,9 +160,18 @@ export default function GammaPlayer({ deck, initialSlideIndex = 0, onClose }: Ga
         {presenter && (
           <aside className="w-[340px] shrink-0 flex flex-col gap-4 text-[#F8F7F4]" aria-label="Presenter notes">
             <div className="flex items-center justify-between text-xs text-neutral-400">
-              <span className="inline-flex items-center gap-1.5 tabular-nums"><Timer className="w-3.5 h-3.5" /> {fmt(elapsed)}</span>
-              <span className="tabular-nums">{index + 1} / {total}</span>
+              <span className="inline-flex items-center gap-1.5 tabular-nums">
+                <Timer className="w-3.5 h-3.5" /> {fmt(elapsed)}
+                {deck.talkMinutes ? <span className="text-neutral-500">of {deck.talkMinutes}:00</span> : null}
+              </span>
+              <span className="flex items-center gap-2">
+                <button type="button" onClick={() => setElapsed(0)} className="text-[11px] text-neutral-500 hover:text-neutral-200 cursor-pointer" title="Restart the timer (R)">
+                  Restart timer
+                </button>
+                <span className="tabular-nums">{index + 1} / {total}</span>
+              </span>
             </div>
+            {deck.talkMinutes ? <PaceCard p={pace(elapsed, index, total, deck.talkMinutes)} /> : null}
             <div>
               <p className="text-[11px] uppercase tracking-[0.14em] text-neutral-500 mb-2">Next</p>
               {nextSlide ? <GammaSlide slide={nextSlide} index={index + 1} theme={theme} /> : <p className="text-sm text-neutral-500">End of deck</p>}
@@ -196,6 +212,23 @@ export default function GammaPlayer({ deck, initialSlideIndex = 0, onClose }: Ga
       <div className="absolute left-0 bottom-0 h-[3px] bg-white/10 w-full" aria-hidden>
         <div className="h-full transition-[width] duration-300" style={{ width: `${total ? ((index + 1) / total) * 100 : 0}%`, background: theme.accent === '#171717' ? '#F8F7F4' : theme.accent }} />
       </div>
+    </div>
+  );
+}
+
+/** Where the speaker is against the planned talk length. */
+function PaceCard({ p }: { p: ReturnType<typeof pace> }) {
+  const tone = p.status === 'behind' ? 'bg-amber-500/15 text-amber-200' : p.status === 'ahead' ? 'bg-sky-500/15 text-sky-200' : 'bg-emerald-500/15 text-emerald-200';
+  const label = p.status === 'behind' ? `${clock(p.by)} behind` : p.status === 'ahead' ? `${clock(p.by)} ahead` : 'On pace';
+  return (
+    <div className="rounded-2xl bg-white/[0.05] p-3 space-y-1.5" aria-live="polite" data-testid="rehearsal-pace">
+      <div className="flex items-center justify-between">
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${tone}`}>{label}</span>
+        <span className="text-xs tabular-nums text-neutral-400">{p.remaining >= 0 ? `${clock(p.remaining)} left` : `${clock(-p.remaining)} over`}</span>
+      </div>
+      <p className="text-[11px] text-neutral-500">
+        About {clock(p.perSlide)} a slide. Move on from this one by {clock(p.slideEndsAt)}.
+      </p>
     </div>
   );
 }

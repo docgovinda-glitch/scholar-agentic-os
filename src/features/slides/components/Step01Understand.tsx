@@ -18,7 +18,7 @@ import {
   PRESENTATION_STYLE_PROFILES,
 } from '../services/slideGenerator';
 import { classifyPresentationScope } from '../services/presentationScopeClassifier';
-import { composeDeckFromText, composeDeckFromTopic, legacyDeckToGamma } from '../gamma/composer';
+import { composeDeckFromPlan, composeDeckFromText, legacyDeckToGamma, slidesForMinutes } from '../gamma/composer';
 import { DEFAULT_DECK_THEME_ID, resolveDeckTheme } from '../gamma/theme';
 import { GammaSlide } from '../gamma/GammaCard';
 import { normalizeDeck } from '../gamma/content';
@@ -37,6 +37,12 @@ export interface Step01UnderstandProps {
   onNextStep: () => void;
 }
 
+/** Speaking time per slide, rounded to 15 seconds, as m:ss. */
+export function perSlideTime(minutes: number, slides: number): string {
+  const sec = Math.max(15, Math.round((minutes * 60) / Math.max(1, slides) / 15) * 15);
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+}
+
 export default function Step01Understand({
   projectId,
   deck,
@@ -51,7 +57,14 @@ export default function Step01Understand({
   const [selectedFramework, setSelectedFramework] = useState<NarrativeFramework>(
     deck.framework || 'Standard-Narrative'
   );
-  const [slideCount, setSlideCount] = useState<'5' | '8' | '12'>('5');
+  // The talk this deck is for: its length sets the slide budget, and the key
+  // message opens and closes the deck.
+  const [talkMinutes, setTalkMinutes] = useState<number>(deck.talkMinutes || 10);
+  const [keyMessage, setKeyMessage] = useState<string>(deck.keyMessage || '');
+  const [slideCount, setSlideCount] = useState<number>(
+    deck.slides.length >= 3 ? deck.slides.length : slidesForMinutes(deck.talkMinutes || 10)
+  );
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
   const [audienceLevel, setAudienceLevel] = useState<'general' | 'executive' | 'academic'>('general');
   const [isDecomposing, setIsDecomposing] = useState(false);
 
@@ -71,6 +84,10 @@ export default function Step01Understand({
 
   // Green ("What This Covers") & Yellow/Orange ("What to Avoid") Scope State
   const [scope, setScope] = useState<PresentationScopeBoundaries>(() => {
+    if (deck.talkPoints?.length) {
+      const base = classifyPresentationScope('', '');
+      return { ...base, covers: deck.talkPoints };
+    }
     return classifyPresentationScope(
       deck.slides[0]?.speakerNotes || '',
       deck.topic || (deck.title && deck.title !== 'Untitled Presentation' ? deck.title : '')
@@ -139,19 +156,25 @@ export default function Step01Understand({
       const textToUse = overrideText !== undefined ? overrideText : (rawTextInput || undefined);
       const topicToUse = overrideTopic !== undefined ? overrideTopic : topicInput;
 
-      // Update green/yellow scope boundaries
-      const nextScope = classifyPresentationScope(textToUse || '', topicToUse || '');
-      setScope(nextScope);
-
       const lowerTopic = (topicToUse || '').toLowerCase();
       const isSwiss =
         ['bird', 'plover', 'swiss', 'editorial'].some((k) => lowerTopic.includes(k)) || deck.themeId === 'swiss-editorial';
       // Curated course case study with real, hand-written content.
       const isCuratedCase = ['zappos', 'schein', 'mn6094ni'].some((k) => lowerTopic.includes(k));
+      // The points list is the presenter's: only uploaded material or a curated
+      // case replaces it.
+      let points = scope.covers;
+      if ((textToUse && textToUse.trim().length > 40) || isCuratedCase) {
+        const nextScope = classifyPresentationScope(textToUse || '', topicToUse || '');
+        if (nextScope.covers.length || isCuratedCase) {
+          setScope(nextScope);
+          points = nextScope.covers;
+        }
+      }
       const audienceLabel = AUDIENCE_LABELS[audienceLevel];
       const composeOpts = {
         topic: topicToUse,
-        slideCount: Number(slideCount),
+        slideCount,
         framework: selectedFramework,
         audience: audienceLabel,
         deckId: deck.id,
@@ -165,15 +188,27 @@ export default function Step01Understand({
         // The Swiss Editorial look is only a theme (applied below); its old
         // sample deck (a plover field report with fixed figures) is never used
         // as the content of someone else's topic.
-        const legacy = generateSlideDeck({ topic: topicToUse, text: textToUse, framework: selectedFramework, slideCount: Number(slideCount), presentationStyle: selectedFramework, audienceLevel });
+        const legacy = generateSlideDeck({ topic: topicToUse, text: textToUse, framework: selectedFramework, slideCount, presentationStyle: selectedFramework, audienceLevel });
         // Curated decks are trusted content: keep every figure they carry.
         generatedDeck = legacyDeckToGamma(legacy, JSON.stringify(legacy.slides));
       } else {
-        generatedDeck = composeDeckFromTopic(topicToUse, composeOpts);
+        generatedDeck = composeDeckFromPlan({
+          title: topicToUse,
+          keyMessage,
+          points,
+          talkMinutes,
+          slideCount,
+          audience: audienceLabel,
+          framework: selectedFramework,
+          deckId: deck.id,
+        });
       }
 
       onUpdateDeck({
         ...generatedDeck,
+        talkMinutes,
+        ...(keyMessage.trim() ? { keyMessage: keyMessage.trim() } : {}),
+        ...(points.length ? { talkPoints: points } : {}),
         id: deck.id || generatedDeck.id,
         themeId: isSwiss ? 'swiss-editorial' : deck.themeId || DEFAULT_DECK_THEME_ID,
         customTheme: deck.customTheme,
@@ -185,20 +220,26 @@ export default function Step01Understand({
 
   // AI Live Deck Generation from Scoped Project Research
   const handleLiveAiDeckGeneration = async () => {
+    setAiNotice(null);
     if (!projectId) {
       handleDecompose();
+      setAiNotice('AI drafting needs a saved project. This is a starter outline built from your plan.');
       return;
     }
     setIsDecomposing(true);
+    let fallbackReason = '';
     try {
-      const topicToUse = topicInput || deck.topic || deck.title;
       const res = await authedJsonFetch(
         `/api/projects/${encodeURIComponent(projectId)}/presentation/generate-deck`,
         'POST',
         {
-          topic: topicToUse,
+          title: topicInput,
+          topic: topicInput,
+          keyMessage: keyMessage || undefined,
+          points: scope.covers,
+          durationMinutes: talkMinutes,
           framework: selectedFramework,
-          slideCount: Number(slideCount),
+          slideCount,
           audienceLevel,
           rawText: rawTextInput || undefined,
         }
@@ -206,22 +247,33 @@ export default function Step01Understand({
 
       if (res.ok) {
         const data = await res.json();
-        if (data.deck && Array.isArray(data.deck.slides) && data.deck.slides.length > 0) {
+        if (data.generatedBy === 'ai-gateway' && data.deck && Array.isArray(data.deck.slides) && data.deck.slides.length > 0) {
           onUpdateDeck({
             ...normalizeDeck(data.deck as SlideDeck),
             id: deck.id || data.deck.id,
             themeId: deck.themeId || DEFAULT_DECK_THEME_ID,
             customTheme: deck.customTheme,
+            talkMinutes,
+            ...(keyMessage.trim() ? { keyMessage: keyMessage.trim() } : {}),
+            ...(scope.covers.length ? { talkPoints: scope.covers } : {}),
           });
           return;
         }
+        fallbackReason = 'No AI is connected, so this is a starter outline built from your plan. Connect one in AI Access to have the slides drafted.';
+      } else if (res.status === 401) {
+        fallbackReason = 'Sign in so your AI can draft the slides. This is a starter outline built from your plan.';
+      } else {
+        const err = await res.json().catch(() => ({}));
+        const why = (err as { error?: string }).error?.trim().replace(/\.$/, '');
+        fallbackReason = `The AI could not draft the slides${why ? `: ${why}.` : '.'} This is a starter outline built from your plan.`;
       }
-      handleDecompose();
-    } catch {
-      handleDecompose();
+    } catch (e) {
+      fallbackReason = `The AI could not draft the slides${e instanceof Error && e.message ? `: ${e.message}` : '.'} This is a starter outline built from your plan.`;
     } finally {
       setIsDecomposing(false);
     }
+    handleDecompose();
+    setAiNotice(fallbackReason);
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -421,25 +473,36 @@ export default function Step01Understand({
           )}
         </div>
 
-        {/* Mode 1: Topic Text Area */}
+        {/* Mode 1: the talk plan */}
         {inputMode === 'topic' && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="space-y-1">
-              <label
-                htmlFor="topic-input-field"
-                className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1"
-              >
-                <span>Presentation Topic</span>
+              <label htmlFor="topic-input-field" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
+                <span>Title</span>
                 <span className="text-rose-500 text-xs">*</span>
               </label>
-              <textarea
+              <input
                 id="topic-input-field"
-                rows={3}
+                type="text"
                 value={topicInput}
                 onChange={(e) => setTopicInput(e.target.value)}
-                placeholder="Type your presentation topic or key question here... (e.g. Sustainable Urban Planning, Corporate Strategy under High Rates)"
-                className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-3.5 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all leading-relaxed resize-y"
+                placeholder="A short title, e.g. Real-time decoding for surface codes"
+                className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white"
               />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="key-message-field" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
+                Key message <span className="font-normal text-neutral-500 dark:text-neutral-400">(the one thing your audience should remember)</span>
+              </label>
+              <textarea
+                id="key-message-field"
+                rows={2}
+                value={keyMessage}
+                onChange={(e) => setKeyMessage(e.target.value)}
+                placeholder="One sentence, e.g. A pipelined FPGA decoder keeps up with a surface code in real time."
+                className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-3.5 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white leading-relaxed resize-y"
+              />
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">It opens your first slide and closes your last. List the points you want to make below; each becomes a slide.</p>
             </div>
           </div>
         )}
@@ -587,7 +650,7 @@ export default function Step01Understand({
                     htmlFor="derived-topic-field"
                     className="block text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300"
                   >
-                    Presentation Topic
+                    Title
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -642,29 +705,45 @@ export default function Step01Understand({
         />
 
 
-        {/* Parameter Grid: Slide Count, Style, Audience Level & Action Button */}
+        {/* The talk: length, slides, style and audience */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-3 border-t border-neutral-100 dark:border-white/5 items-end">
-          {/* Slide Count */}
+          {/* Talk length: sets the slide budget */}
+          <div className="space-y-1">
+            <label htmlFor="talk-length" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">Talk length</label>
+            <div className="relative">
+              <select
+                id="talk-length"
+                value={talkMinutes}
+                onChange={(e) => {
+                  const m = Number(e.target.value);
+                  setTalkMinutes(m);
+                  setSlideCount(slidesForMinutes(m));
+                }}
+                className="w-full h-9 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 text-xs text-neutral-900 dark:text-neutral-100 appearance-none cursor-pointer pr-8 font-medium"
+              >
+                {[5, 10, 15, 20, 30, 45].map((m) => <option key={m} value={m}>{m} minutes</option>)}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400"><ChevronDown className="w-3.5 h-3.5" /></div>
+            </div>
+          </div>
+
+          {/* Slides: suggested from the length, adjustable */}
           <div className="space-y-1">
             <label htmlFor="slide-count" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-              <span>Slide Count</span>
-              <span className="text-rose-500 text-xs">*</span>
+              <span>Slides</span>
+              <span className="font-normal text-neutral-500 dark:text-neutral-400">(about {perSlideTime(talkMinutes, slideCount)} each)</span>
             </label>
             <div className="relative">
               <select
                 id="slide-count"
                 value={slideCount}
-                onChange={(e) => setSlideCount(e.target.value as '5' | '8' | '12')}
+                onChange={(e) => setSlideCount(Number(e.target.value))}
                 aria-label="Slide Count"
-                className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
+                className="w-full h-9 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 text-xs text-neutral-900 dark:text-neutral-100 appearance-none cursor-pointer pr-8 font-medium"
               >
-                <option value="5">5 Slides</option>
-                <option value="8">8 Slides</option>
-                <option value="12">10–12 Slides</option>
+                {Array.from({ length: 12 }, (_, i) => i + 4).map((n) => <option key={n} value={n}>{n} slides</option>)}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
-                <ChevronDown className="w-3.5 h-3.5" />
-              </div>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400"><ChevronDown className="w-3.5 h-3.5" /></div>
             </div>
           </div>
 
@@ -718,27 +797,226 @@ export default function Step01Understand({
             </div>
           </div>
 
-          {/* Action Button: Save & Generate Outline */}
-          <div>
-            <button
-              type="button"
-              onClick={() => handleDecompose()}
-              disabled={isDecomposing || isParsingFile}
-              aria-label="Save & Generate Outline (Create Slides Outline)"
-              className="w-full h-8 rounded-xl px-4 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {isDecomposing ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  <span>Generating…</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Save &amp; Generate Outline</span>
-                </>
-              )}
-            </button>
+        </div>
+
+        {/* Build: with the user's AI, or a starter outline from the plan alone */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => void handleLiveAiDeckGeneration()}
+            disabled={isDecomposing || isParsingFile || !topicInput.trim()}
+            className="h-9 rounded-xl px-4 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 font-semibold text-xs disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+          >
+            {isDecomposing ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <span>Building…</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>{deck.slides.length ? 'Rebuild slides with AI' : 'Build slides with AI'}</span>
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAiNotice(null); handleDecompose(); }}
+            disabled={isDecomposing || isParsingFile || !topicInput.trim()}
+            aria-label="Starter outline without AI"
+            className="h-9 rounded-xl px-4 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 font-semibold text-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer"
+          >
+            Starter outline (no AI)
+          </button>
+          {!topicInput.trim() && <span className="text-[11px] text-neutral-500 dark:text-neutral-400">Add a title to start.</span>}
+        </div>
+        {aiNotice && (
+          <p role="status" className="text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">{aiNotice}</p>
+        )}
+      </div>
+
+      {/* Your points (each becomes a slide) and what to leave out. Shown before the first build. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="presentation-scope-cards">
+        {/* Green Card — What This Presentation Covers */}
+        <div
+          data-testid="presentation-scope-covers-card"
+          className="p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/10 space-y-3 flex flex-col justify-between"
+        >
+          <div className="space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20">
+              <h3 className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>What This Presentation Covers</span>
+              </h3>
+              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                {scope.covers.length} Key Points · Editable
+              </span>
+            </div>
+
+            {scope.covers.length === 0 && (
+              <p className="text-xs text-emerald-900/80 dark:text-emerald-200/80">
+                List the points you want to make, in order. Each becomes a slide.
+              </p>
+            )}
+            <ul className="space-y-2">
+              {scope.covers.map((item, idx) => (
+                <li
+                  key={idx}
+                  className="text-xs text-emerald-900 dark:text-emerald-200/90 leading-relaxed flex items-start justify-between gap-2 bg-emerald-500/10 dark:bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/15 group"
+                >
+                  <div className="flex items-start gap-2 min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
+                    <span>{item}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveCover(idx)}
+                    className="opacity-0 group-hover:opacity-100 hover:text-red-500 text-neutral-400 transition-opacity p-0.5 shrink-0 cursor-pointer"
+                    title="Remove point"
+                    aria-label={`Remove point ${idx + 1}`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            {/* Add Key Point */}
+            {showAddCover ? (
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  value={newCoverInput}
+                  onChange={(e) => setNewCoverInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAddCover(newCoverInput);
+                      setNewCoverInput('');
+                      setShowAddCover(false);
+                    }
+                  }}
+                  placeholder="Add a point you want to make..."
+                  className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-emerald-500/30 bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleAddCover(newCoverInput);
+                    setNewCoverInput('');
+                    setShowAddCover(false);
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
+                >
+                  Add
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCover(false)}
+                  className="p-1 text-neutral-400 hover:text-neutral-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAddCover(true)}
+                className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1 cursor-pointer pt-1"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Add Key Point</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Yellow/Orange Card — What to Avoid (Out of Scope) */}
+        <div
+          data-testid="presentation-scope-avoids-card"
+          className="p-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 dark:bg-amber-950/10 space-y-3 flex flex-col justify-between"
+        >
+          <div className="space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-amber-500/20">
+              <h3 className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>What to Avoid (Out of Scope)</span>
+              </h3>
+              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                {scope.avoids.length} Rules · Editable
+              </span>
+            </div>
+
+            <ul className="space-y-2">
+              {scope.avoids.map((item, idx) => (
+                <li
+                  key={idx}
+                  className="text-xs text-amber-900 dark:text-amber-200/90 leading-relaxed flex items-start justify-between gap-2 bg-amber-500/10 dark:bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/15 group"
+                >
+                  <div className="flex items-start gap-2 min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1.5" />
+                    <span>{item}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAvoid(idx)}
+                    className="opacity-0 group-hover:opacity-100 hover:text-red-500 text-neutral-400 transition-opacity p-0.5 shrink-0 cursor-pointer"
+                    title="Remove rule"
+                    aria-label={`Remove rule ${idx + 1}`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            {/* Add Rule */}
+            {showAddAvoid ? (
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  value={newAvoidInput}
+                  onChange={(e) => setNewAvoidInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAddAvoid(newAvoidInput);
+                      setNewAvoidInput('');
+                      setShowAddAvoid(false);
+                    }
+                  }}
+                  placeholder="Add an out-of-scope rule..."
+                  className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-amber-500/30 bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleAddAvoid(newAvoidInput);
+                    setNewAvoidInput('');
+                    setShowAddAvoid(false);
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 cursor-pointer"
+                >
+                  Add
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddAvoid(false)}
+                  className="p-1 text-neutral-400 hover:text-neutral-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAddAvoid(true)}
+                className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-800 flex items-center gap-1 cursor-pointer pt-1"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Add Rule</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -758,187 +1036,6 @@ export default function Step01Understand({
         </div>
       ) : (
         <div className="space-y-6" data-testid="generated-outline-section">
-          {/* Green & Yellow Scope Cards (Replicating Coursework Phase 1 Image 6) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="presentation-scope-cards">
-            {/* Green Card — What This Presentation Covers */}
-            <div
-              data-testid="presentation-scope-covers-card"
-              className="p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/10 space-y-3 flex flex-col justify-between"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20">
-                  <h3 className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    <span>What This Presentation Covers</span>
-                  </h3>
-                  <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                    {scope.covers.length} Key Points · Editable
-                  </span>
-                </div>
-
-                <ul className="space-y-2">
-                  {scope.covers.map((item, idx) => (
-                    <li
-                      key={idx}
-                      className="text-xs text-emerald-900 dark:text-emerald-200/90 leading-relaxed flex items-start justify-between gap-2 bg-emerald-500/10 dark:bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/15 group"
-                    >
-                      <div className="flex items-start gap-2 min-w-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
-                        <span>{item}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveCover(idx)}
-                        className="opacity-0 group-hover:opacity-100 hover:text-red-500 text-neutral-400 transition-opacity p-0.5 shrink-0 cursor-pointer"
-                        title="Remove point"
-                        aria-label={`Remove point ${idx + 1}`}
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-
-                {/* Add Key Point */}
-                {showAddCover ? (
-                  <div className="flex items-center gap-2 pt-1">
-                    <input
-                      type="text"
-                      value={newCoverInput}
-                      onChange={(e) => setNewCoverInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleAddCover(newCoverInput);
-                          setNewCoverInput('');
-                          setShowAddCover(false);
-                        }
-                      }}
-                      placeholder="Add a key focus point..."
-                      className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-emerald-500/30 bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleAddCover(newCoverInput);
-                        setNewCoverInput('');
-                        setShowAddCover(false);
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
-                    >
-                      Add
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddCover(false)}
-                      className="p-1 text-neutral-400 hover:text-neutral-600 cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddCover(true)}
-                    className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1 cursor-pointer pt-1"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Add Key Point</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Yellow/Orange Card — What to Avoid (Out of Scope) */}
-            <div
-              data-testid="presentation-scope-avoids-card"
-              className="p-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 dark:bg-amber-950/10 space-y-3 flex flex-col justify-between"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-amber-500/20">
-                  <h3 className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                    <span>What to Avoid (Out of Scope)</span>
-                  </h3>
-                  <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
-                    {scope.avoids.length} Rules · Editable
-                  </span>
-                </div>
-
-                <ul className="space-y-2">
-                  {scope.avoids.map((item, idx) => (
-                    <li
-                      key={idx}
-                      className="text-xs text-amber-900 dark:text-amber-200/90 leading-relaxed flex items-start justify-between gap-2 bg-amber-500/10 dark:bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/15 group"
-                    >
-                      <div className="flex items-start gap-2 min-w-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1.5" />
-                        <span>{item}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveAvoid(idx)}
-                        className="opacity-0 group-hover:opacity-100 hover:text-red-500 text-neutral-400 transition-opacity p-0.5 shrink-0 cursor-pointer"
-                        title="Remove rule"
-                        aria-label={`Remove rule ${idx + 1}`}
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-
-                {/* Add Rule */}
-                {showAddAvoid ? (
-                  <div className="flex items-center gap-2 pt-1">
-                    <input
-                      type="text"
-                      value={newAvoidInput}
-                      onChange={(e) => setNewAvoidInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleAddAvoid(newAvoidInput);
-                          setNewAvoidInput('');
-                          setShowAddAvoid(false);
-                        }
-                      }}
-                      placeholder="Add an out-of-scope rule..."
-                      className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-amber-500/30 bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleAddAvoid(newAvoidInput);
-                        setNewAvoidInput('');
-                        setShowAddAvoid(false);
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 cursor-pointer"
-                    >
-                      Add
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddAvoid(false)}
-                      className="p-1 text-neutral-400 hover:text-neutral-600 cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddAvoid(true)}
-                    className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-800 flex items-center gap-1 cursor-pointer pt-1"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Add Rule</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
           {/* Outline: every generated card as a live thumbnail */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">

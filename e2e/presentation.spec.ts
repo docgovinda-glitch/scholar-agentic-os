@@ -6,8 +6,8 @@ import JSZip from "jszip";
 
 async function buildDeck(page: import("@playwright/test").Page) {
   await page.goto("/presentation");
-  await page.getByPlaceholder(/Type your presentation topic/i).fill("Climate migration in South Asia");
-  await page.getByRole("button", { name: /Generate Outline/i }).click();
+  await page.getByLabel(/^Title/).fill("Climate migration in South Asia");
+  await page.getByRole("button", { name: "Starter outline without AI" }).click();
   await page.getByRole("button", { name: /03 Edit Slides/ }).first().click();
   await expect(page.getByTestId("wysiwyg-slide-card")).toBeVisible();
 }

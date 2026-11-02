@@ -251,6 +251,12 @@ export interface SlideDeck {
   activeSlideIndex: number;
   createdAt?: string;
   updatedAt?: string;
+  /** The talk the deck is for: its length in minutes (drives rehearsal pacing). */
+  talkMinutes?: number;
+  /** The one thing the audience should remember. */
+  keyMessage?: string;
+  /** The points the presenter wants to make, in order (one card each). */
+  talkPoints?: string[];
 }
 
 export type SlideViewMode = 'stage' | 'standalone';
