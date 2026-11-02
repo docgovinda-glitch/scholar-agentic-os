@@ -12,6 +12,24 @@ import {
   downloadRefereeResponseLetterBlob,
 } from "../api";
 import type { WordBudgetBlueprint, RebuttalMatrixItem } from "./types";
+import ReferencesCheck from "../journal/ReferencesCheck";
+import { checkDois, lookupDoi } from "../journal/referenceApi";
+import { studioEvidence } from "../journal/studioEvidence";
+import { auditCitations, recordsForSources } from "../../domain/journal/referenceAudit";
+import { cleanDoi, parseReferenceRecords, type ReferenceRecord } from "../../domain/journal/references";
+import { isNumeric, renderManuscript, styleKey, type StyleKey } from "../../domain/journal/citationStyles";
+import { safeParseAnswerField } from "../../shared/projectStateSchema";
+
+/** The style select's values (kept from before) and their labels. */
+const STYLE_OPTIONS: Array<{ value: string; key: StyleKey; label: string }> = [
+  { value: "apa7", key: "apa", label: "APA 7th Edition (author–date)" },
+  { value: "ieee", key: "ieee", label: "IEEE (numbered [1])" },
+  { value: "harvard", key: "harvard", label: "Harvard (author, year)" },
+  { value: "chicago", key: "chicago", label: "Chicago (author–date)" },
+  { value: "mla9", key: "mla", label: "MLA 9th Edition (author)" },
+  { value: "vancouver", key: "vancouver", label: "Vancouver / ICMJE (numbered)" },
+];
+const styleSelectValue = (raw: string | undefined) => STYLE_OPTIONS.find((o) => o.key === styleKey(raw))?.value ?? "apa7";
 
 interface PrimaryDataEntry {
   id: string;
@@ -106,58 +124,19 @@ export default function AuditExportMode() {
 
   const isWordCountCompliant = Math.abs(wordDeltaPercent) <= 5.0;
 
-  // ── 2. Citation & Chronological Reconciliation ──
-  const citationReconciliation = useMemo(() => {
-    const citeRegex = /\[CITE:([a-zA-Z0-9_\-]+)\]/g;
-    const tokensFound = new Set<string>();
-    let match: RegExpExecArray | null;
-    while ((match = citeRegex.exec(manuscriptMarkdown)) !== null) {
-      tokensFound.add(match[1]);
-    }
-
-    const unverifiedClaimsCount = (
-      manuscriptMarkdown.match(/\[Unverified Claim/g) || []
-    ).length;
-
-    const knownIds = new Set([
-      ...primaryDatasets.map((d) => d.id),
-      ...vaultSources.map((s) => s.id),
-    ]);
-
-    const orphanCitations: string[] = [];
-    tokensFound.forEach((token) => {
-      if (!knownIds.has(token) && knownIds.size > 0) {
-        orphanCitations.push(token);
-      }
-    });
-
-    const uncitedVaultSources: string[] = [];
-    vaultSources.forEach((s) => {
-      if (!tokensFound.has(s.id)) {
-        uncitedVaultSources.push(s.title || s.name || s.id);
-      }
-    });
-
-    // Anachronisms: pubYear < eventYear (if pubYear is in future or claims violated)
-    let anachronismsCount = 0;
-    vaultSources.forEach((s) => {
-      const y = Number(s.year || s.publicationYear);
-      if (y > 2026 || (y > 0 && y < 1900)) {
-        anachronismsCount += 1;
-      }
-    });
-
-    const passed = orphanCitations.length === 0 && unverifiedClaimsCount === 0 && anachronismsCount === 0;
-
-    return {
-      totalInText: tokensFound.size,
-      orphanCitations,
-      uncitedVaultSources,
-      unverifiedClaimsCount,
-      anachronismsCount,
-      passed,
-    };
-  }, [manuscriptMarkdown, primaryDatasets, vaultSources]);
+  // ── 2. References: every citation resolved, nothing retracted unacknowledged ──
+  const sources = useMemo(() => studioEvidence(answers), [answers]);
+  const savedRecords = useMemo(() => parseReferenceRecords(answers["reference_records"]), [answers]);
+  const acknowledgedRetractions = useMemo(
+    () => safeParseAnswerField<string[]>(answers["acknowledged_retractions"], []).filter((x) => typeof x === "string"),
+    [answers]
+  );
+  const referenceAudit = useMemo(
+    () => auditCitations(manuscriptMarkdown, sources, savedRecords, acknowledgedRetractions),
+    [manuscriptMarkdown, sources, savedRecords, acknowledgedRetractions]
+  );
+  const [checkingRefs, setCheckingRefs] = useState(false);
+  const [refCheckError, setRefCheckError] = useState<string | null>(null);
 
   // ── 3. Humanized Voice & Orthographic Telemetry ──
   const voiceTelemetry = useMemo(() => {
@@ -233,9 +212,12 @@ export default function AuditExportMode() {
   const [layoutMode, setLayoutMode] = useState<"1-column-double" | "2-column-camera">(
     "1-column-double"
   );
-  const [citationStyle, setCitationStyle] = useState<string>(
-    answers["citation_style"] || "apa7"
+  const [citationStyle, setCitationStyle] = useState<string>(styleSelectValue(answers["citation_style"]));
+  const renderedManuscript = useMemo(
+    () => renderManuscript(manuscriptMarkdown, recordsForSources(sources, savedRecords), styleKey(citationStyle)),
+    [manuscriptMarkdown, sources, savedRecords, citationStyle]
   );
+  const styleLabel = STYLE_OPTIONS.find((o) => o.value === citationStyle)?.label.replace(/ \(.*\)$/, "") ?? "APA 7th Edition";
   // The title page is the author's: start from what the project has, never a stand-in person.
   const [title, setTitle] = useState(answers["working_title"] || (project as { title?: string })?.title || "");
   const [runningHead, setRunningHead] = useState(answers["running_head"] || "");
@@ -268,7 +250,7 @@ export default function AuditExportMode() {
         setOrcid(answers["author_orcid"]);
       }
       if (answers["citation_style"]) {
-        setCitationStyle(answers["citation_style"]);
+        setCitationStyle(styleSelectValue(answers["citation_style"]));
       }
       for (const [key, set] of [
         ["data_availability_statement", setDataAvailabilityStatement],
@@ -296,7 +278,7 @@ export default function AuditExportMode() {
   const titlePageComplete = [title, authorName, affiliation, email].every((v) => v.trim().length > 0);
   // Text checks pass only when there is text to check.
   const hasText = actualWords > 0;
-  const citationsOk = hasText && citationReconciliation.passed;
+  const citationsOk = hasText && referenceAudit.blocking === 0;
   const voiceOk = hasText && voiceTelemetry.passed;
   const g7Checks = [isWordCountCompliant, citationsOk, voiceOk, declarationsWritten, titlePageComplete];
   const g7Score = Math.round((g7Checks.filter(Boolean).length / g7Checks.length) * 100);
@@ -389,9 +371,73 @@ export default function AuditExportMode() {
     setProject,
   ]);
 
+  // Looks up cited DOIs: a full record where there is none from the registry
+  // yet, otherwise just the current retraction status. Saved on the project.
+  const handleCheckReferences = useCallback(async () => {
+    if (!effectiveProjectId) return;
+    setCheckingRefs(true);
+    setRefCheckError(null);
+    try {
+      const cited = new Set(referenceAudit.rows.map((r) => r.id));
+      const next: Record<string, ReferenceRecord> = { ...savedRecords };
+      const toLookUp: Array<{ id: string; doi: string }> = [];
+      const toCheck: Array<{ id: string; doi: string }> = [];
+      for (const src of sources) {
+        if (!cited.has(src.id) || src.isUserData) continue;
+        const rec = savedRecords[src.id];
+        const doi = cleanDoi(rec?.doi ?? src.doi);
+        if (!doi) continue;
+        (rec && rec.registry !== "author" ? toCheck : toLookUp).push({ id: src.id, doi });
+      }
+      let failed = 0;
+      for (const { id, doi } of toLookUp) {
+        try {
+          const { record } = await lookupDoi(effectiveProjectId, doi);
+          next[id] = { ...record, id };
+        } catch {
+          failed += 1;
+        }
+      }
+      if (toCheck.length) {
+        const { results } = await checkDois(effectiveProjectId, toCheck.map((x) => x.doi));
+        for (const { id, doi } of toCheck) if (results[doi]) next[id] = { ...next[id], integrity: results[doi] };
+      }
+      const saved = await saveIntakeAnswers(effectiveProjectId, {
+        ...answers,
+        reference_records: JSON.stringify(next),
+        references_checked_at: new Date().toISOString(),
+      });
+      setProject(saved);
+      if (failed) setRefCheckError(`${failed} DOI${failed === 1 ? "" : "s"} could not be found or reached; ${failed === 1 ? "it stays" : "they stay"} "Not checked".`);
+    } catch (err: unknown) {
+      setRefCheckError(err instanceof Error ? err.message : "The references could not be checked.");
+    } finally {
+      setCheckingRefs(false);
+    }
+  }, [effectiveProjectId, referenceAudit, savedRecords, sources, answers, setProject]);
+
+  const handleAcknowledgeRetraction = useCallback(
+    async (id: string, on: boolean) => {
+      if (!effectiveProjectId) return;
+      const next = on ? Array.from(new Set([...acknowledgedRetractions, id])) : acknowledgedRetractions.filter((x) => x !== id);
+      const saved = await saveIntakeAnswers(effectiveProjectId, { ...answers, acknowledged_retractions: JSON.stringify(next) });
+      setProject(saved);
+    },
+    [effectiveProjectId, acknowledgedRetractions, answers, setProject]
+  );
+
+  // Export waits while a citation points nowhere or to an unacknowledged retraction.
+  const exportBlocked = referenceAudit.blocking > 0;
+  const exportBlockedNotice = `Fix the references first: ${referenceAudit.blocking} citation${referenceAudit.blocking === 1 ? "" : "s"} ${referenceAudit.blocking === 1 ? "points" : "point"} to no source or to a retracted paper. See "2. References".`;
+  const exportText = renderedManuscript.markdown;
+
   // Export handlers
   const handleDownloadDocx = useCallback(async () => {
     if (!effectiveProjectId) return;
+    if (exportBlocked) {
+      setExportNotice(exportBlockedNotice);
+      return;
+    }
     setIsExporting("docx");
     setExportNotice("Compiling journal submission Word (.docx) document...");
 
@@ -399,6 +445,7 @@ export default function AuditExportMode() {
       // Try backend endpoint first
       const blob = await downloadProjectExportBlob(effectiveProjectId, "docx", {
         template: layoutMode === "2-column-camera" ? "ieee" : "apa7",
+        manuscriptMarkdown: exportText,
       });
       downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}_Submission.docx`);
       setExportNotice("Downloaded Journal Submission (.docx) successfully.");
@@ -418,12 +465,12 @@ export default function AuditExportMode() {
               isCorresponding: true,
             },
           ],
-          abstract: answers["abstract"] || "Autonomous reasoning verification under provable bounds.",
+          abstract: answers["abstract"] || "",
           keywords: keywords.split(",").map((s) => s.trim()),
           sections: [
             {
               section: "Manuscript Content",
-              content: manuscriptMarkdown || "# Introduction\n\nManuscript content compiled.",
+              content: exportText,
             },
           ],
           declarations: {
@@ -452,7 +499,9 @@ export default function AuditExportMode() {
     email,
     answers,
     keywords,
-    manuscriptMarkdown,
+    exportText,
+    exportBlocked,
+    exportBlockedNotice,
     dataAvailabilityStatement,
     competingInterestsStatement,
     creditStatement,
@@ -460,12 +509,17 @@ export default function AuditExportMode() {
 
   const handleDownloadPdf = useCallback(async () => {
     if (!effectiveProjectId) return;
+    if (exportBlocked) {
+      setExportNotice(exportBlockedNotice);
+      return;
+    }
     setIsExporting("pdf");
     setExportNotice("Compiling camera-ready PDF document...");
 
     try {
       const blob = await downloadProjectExportBlob(effectiveProjectId, "pdf", {
         template: layoutMode === "2-column-camera" ? "ieee" : "nature",
+        manuscriptMarkdown: exportText,
       });
       downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}_CameraReady.pdf`);
       setExportNotice("Downloaded Camera-Ready (.pdf) successfully.");
@@ -475,7 +529,7 @@ export default function AuditExportMode() {
       setIsExporting(null);
       setTimeout(() => setExportNotice(null), 5000);
     }
-  }, [project, effectiveProjectId, layoutMode, title]);
+  }, [project, effectiveProjectId, layoutMode, title, exportBlocked, exportBlockedNotice, exportText]);
 
   const handleDownloadRefereeLetter = useCallback(async () => {
     if (!effectiveProjectId) return;
@@ -510,8 +564,12 @@ export default function AuditExportMode() {
 
   const handleQuickExport = useCallback(
     (format: "latex" | "typst" | "markdown") => {
+      if (exportBlocked) {
+        setExportNotice(exportBlockedNotice);
+        return;
+      }
       if (format === "markdown") {
-        const blob = new Blob([manuscriptMarkdown], { type: "text/markdown;charset=utf-8" });
+        const blob = new Blob([exportText], { type: "text/markdown;charset=utf-8" });
         downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.md`);
       } else if (format === "latex") {
         const latexRes = generateJournalLatex({
@@ -519,17 +577,17 @@ export default function AuditExportMode() {
           targetJournal: "Journal Submission",
           template: layoutMode === "2-column-camera" ? "ieee" : "nature",
           authors: [{ name: authorName, affiliation, email }],
-          sections: [{ section: "Body", content: manuscriptMarkdown }],
+          sections: [{ section: "Body", content: exportText }],
         });
         const blob = new Blob([latexRes.tex], { type: "text/x-tex;charset=utf-8" });
         downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.tex`);
       } else if (format === "typst") {
-        const typstContent = `#set page(paper: "a4", margin: 2.5cm)\n#set text(font: "Linux Libertine", size: 11pt)\n\n= ${title}\n\n*${authorName}*\n_${affiliation}_\n\n${manuscriptMarkdown}`;
+        const typstContent = `#set page(paper: "a4", margin: 2.5cm)\n#set text(font: "Linux Libertine", size: 11pt)\n\n= ${title}\n\n*${authorName}*\n_${affiliation}_\n\n${exportText}`;
         const blob = new Blob([typstContent], { type: "text/plain;charset=utf-8" });
         downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.typ`);
       }
     },
-    [manuscriptMarkdown, title, layoutMode, authorName, affiliation, email]
+    [exportText, exportBlocked, exportBlockedNotice, title, layoutMode, authorName, affiliation, email]
   );
 
   return (
@@ -664,64 +722,21 @@ export default function AuditExportMode() {
             )}
           </div>
 
-          {/* 2. 100% Citation & Chronological Reconciliation */}
-          <div className="p-4 rounded-xl border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-[color:var(--text-primary)]">
-                  2. 100% Citation & Chronological Reconciliation
-                </span>
-              </div>
-              <span
-                className={`text-xs font-bold px-2 py-0.5 rounded ${
-                  citationsOk
-                    ? "bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]"
-                    : !hasText
-                    ? "bg-[color:var(--surface-sunken)] text-[color:var(--text-muted)]"
-                    : "bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)]"
-                }`}
-              >
-                {!hasText
-                  ? "Nothing to check yet"
-                  : citationsOk
-                  ? "100% Citation Provenance Reconciled (0 Orphan Citations, 0 Anachronisms)"
-                  : "Citation Reconciliation Warning"}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-4 gap-2 text-xs">
-              <div className="p-2 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
-                <div className="text-[10px] text-[color:var(--text-muted)]">In-Text Citations</div>
-                <div className="text-sm font-bold text-[color:var(--text-primary)] mt-0.5">
-                  {citationReconciliation.totalInText}
-                </div>
-              </div>
-              <div className="p-2 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
-                <div className="text-[10px] text-[color:var(--text-muted)]">Orphan Tokens</div>
-                <div className="text-sm font-bold text-[color:var(--text-primary)] mt-0.5">
-                  {citationReconciliation.orphanCitations.length}
-                </div>
-              </div>
-              <div className="p-2 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
-                <div className="text-[10px] text-[color:var(--text-muted)]">Unverified Claims</div>
-                <div className="text-sm font-bold text-[color:var(--text-primary)] mt-0.5">
-                  {citationReconciliation.unverifiedClaimsCount}
-                </div>
-              </div>
-              <div className="p-2 rounded bg-[color:var(--surface-canvas)] border border-[color:var(--border-control)]">
-                <div className="text-[10px] text-[color:var(--text-muted)]">Anachronisms</div>
-                <div className="text-sm font-bold text-[color:var(--text-primary)] mt-0.5">
-                  {citationReconciliation.anachronismsCount}
-                </div>
-              </div>
-            </div>
-
-            {citationReconciliation.orphanCitations.length > 0 && (
-              <div className="p-2 rounded bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] text-xs">
-                Orphan Citation Tokens Detected: {citationReconciliation.orphanCitations.join(", ")}
-              </div>
-            )}
-          </div>
+          {/* 2. References */}
+          <ReferencesCheck
+            audit={referenceAudit}
+            references={renderedManuscript.references}
+            styleLabel={styleLabel}
+            numbered={isNumeric(styleKey(citationStyle))}
+            hasText={hasText}
+            canCheck={referenceAudit.rows.some((r) => !["missing", "data", "unregistered"].includes(r.state))}
+            checking={checkingRefs}
+            checkError={refCheckError}
+            lastChecked={answers["references_checked_at"] || undefined}
+            onCheck={handleCheckReferences}
+            acknowledged={acknowledgedRetractions}
+            onAcknowledge={handleAcknowledgeRetraction}
+          />
 
           {/* 3. Humanized Voice & Orthographic Telemetry */}
           <div className="p-4 rounded-xl border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] flex flex-col gap-3">
@@ -983,12 +998,11 @@ export default function AuditExportMode() {
                 onChange={(e) => setCitationStyle(e.target.value)}
                 className="w-full text-xs p-2 rounded-lg border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]"
               >
-                <option value="apa7">APA 7th Edition (Author-Date, 0.5" Hanging Indent)</option>
-                <option value="ieee">IEEE Transactions (Numbered [1], Double-Column)</option>
-                <option value="harvard">Harvard Referencing (Author, Year)</option>
-                <option value="chicago">Chicago Style (Notes & Bibliography)</option>
-                <option value="mla9">MLA 9th Edition (Author Page)</option>
-                <option value="vancouver">Vancouver / ICMJE (Sequential Numbered)</option>
+                {STYLE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

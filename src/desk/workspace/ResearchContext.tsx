@@ -71,6 +71,13 @@ export function ResearchProvider({
     return getStudioModeForStage(currentStage).id;
   });
   const latestStageRef = React.useRef<ResearchStage | null>(initialStage);
+  // Read through refs so that moving between views (which changes the URL
+  // stage) does not reload the whole project.
+  const initialStageRef = React.useRef(initialStage);
+  initialStageRef.current = initialStage;
+  const onStageChangeRef = React.useRef(onStageChangeCallback);
+  onStageChangeRef.current = onStageChangeCallback;
+  const loadedRef = React.useRef<string | null>(null);
 
   useEffect(() => {
     if (initialStage) {
@@ -80,7 +87,9 @@ export function ResearchProvider({
   }, [initialStage]);
 
   const load = useCallback(async () => {
-    setIsLoading(true);
+    // Only the first load blanks the workspace; a later refresh (remote
+    // update) swaps the data in place so open work isn't unmounted.
+    if (loadedRef.current !== projectId) setIsLoading(true);
     try {
       const proj = await getProject(projectId);
       const [rub, doc] = proj.hasDocument 
@@ -92,6 +101,7 @@ export function ResearchProvider({
         proj.answers = {
           ...(proj.answers || {}),
           current_stage: latestStageRef.current,
+          current_mode: getStudioModeForStage(latestStageRef.current).id,
         };
       }
 
@@ -110,9 +120,10 @@ export function ResearchProvider({
         setCurrentModeState(getStudioModeForStage(targetStage).id);
       }
 
-      if (initialStage === null) {
-        onStageChangeCallback(targetStage, { replace: true });
+      if (initialStageRef.current === null) {
+        onStageChangeRef.current(targetStage, { replace: true });
       }
+      loadedRef.current = projectId;
     } catch (e) {
       setError(
         e instanceof UnauthenticatedError
@@ -122,7 +133,7 @@ export function ResearchProvider({
     } finally {
       setIsLoading(false);
     }
-  }, [projectId, onStageChangeCallback, initialStage]);
+  }, [projectId]);
 
   useEffect(() => {
     load();
@@ -202,6 +213,8 @@ export function ResearchProvider({
   }, [currentStage, onStageChangeCallback, project?.answers, projectId]);
 
   const setMode = useCallback(async (mode: JournalStudioMode) => {
+    // "audit" is the older name of the Delivery mode.
+    if (mode === "audit") mode = "audit_export";
     setCurrentModeState(mode);
     const modeDef = JOURNAL_STUDIO_MODES.find((m) => m.id === mode);
     const targetStage = modeDef?.primaryStage || "definition";

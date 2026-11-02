@@ -9,7 +9,10 @@ export interface StudioEvidence {
   id: string;
   citationToken: string;
   title: string;
+  /** Short form for display: "Smith", "Smith & Lee", "Smith et al.". */
   author: string;
+  /** Every author as recorded. */
+  authors: string[];
   year?: number;
   doi?: string;
   isUserData: boolean;
@@ -35,6 +38,7 @@ export function studioEvidence(answers: Record<string, unknown>): StudioEvidence
         citationToken: str(d.citationToken) || `[CITE:${id}]`,
         title: str(d.title) || str(d.name) || `Dataset ${i + 1}`,
         author: str(d.author) || "Your data",
+        authors: [str(d.author)].filter(Boolean),
         year: yearOf(d.year),
         isUserData: true,
         findings: str(d.extractedFindings) || str(d.summary),
@@ -52,6 +56,7 @@ export function studioEvidence(answers: Record<string, unknown>): StudioEvidence
         citationToken: `[CITE:${id}]`,
         title: str(v.title) || "Untitled source",
         author: authors.length > 2 ? `${authors[0]} et al.` : authors.join(" & ") || "Unknown author",
+        authors,
         year: yearOf(v.year),
         doi: str(v.doi) || undefined,
         isUserData: false,

@@ -200,9 +200,9 @@ These findings establish that multi-agent consensus can achieve provable stabili
     expect(screen.getByText(/1\. Word Count Budget Compliance/i)).toBeInTheDocument();
     expect(screen.getByText(/Within Budget/i)).toBeInTheDocument();
 
-    // Check 2: Citation & Chronological Reconciliation
-    expect(screen.getByText(/2\. 100% Citation & Chronological Reconciliation/i)).toBeInTheDocument();
-    expect(screen.getByText(/100% Citation Provenance Reconciled/i)).toBeInTheDocument();
+    // Check 2: References. One cited source has no DOI to check, one is the author's dataset.
+    expect(screen.getByText("2. References")).toBeInTheDocument();
+    expect(screen.getByText("2 cited · 1 to review")).toBeInTheDocument();
 
     // Check 3: Humanized Voice & Orthographic Telemetry
     expect(screen.getByText(/3\. Humanized Voice & Orthographic Telemetry/i)).toBeInTheDocument();

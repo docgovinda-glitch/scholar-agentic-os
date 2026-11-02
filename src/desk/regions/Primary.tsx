@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { exportProject } from "../api";
 import CanonicalDocumentEditor from "../editor/CanonicalDocumentEditor";
-import CitationIntegrityReport from "../journal/CitationIntegrityReport";
 import type { CanonicalDocument, ProjectView } from "../types";
 
 export interface ResolveCitationsOutcome {
@@ -148,8 +147,6 @@ export default function Primary({
           </div>
         </div>
       )}
-      {/* Citation integrity report */}
-      {project && <CitationIntegrityReport document={document} project={project} />}
       {/* Export controls (docs 33-EXPORT-ARCHITECTURE.md) */}
       <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-card)] px-10 py-4">
         <div className="max-w-[75ch] mx-auto">
