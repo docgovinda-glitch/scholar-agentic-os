@@ -2,6 +2,7 @@ import { useState } from "react";
 import { providerAccessFacts, type CloudProviderSpec } from "../../config/providerCatalog";
 import { getDefaultModelId, getModelsForProvider, type ModelSpec } from "../../config/modelCatalog";
 import ModelSelectField from "./ModelSelectField";
+import { bestDiscovered, curatedToSpec } from "./bestModels";
 import type { ConnectionTier, ProviderView } from "./useAiAccess";
 import { discoverProviderModels, getCachedDiscoveredModels, type DiscoveredModel } from "../../services/modelDiscovery";
 import { runProviderDiagnostics, type DiagnosticReport } from "../../services/aiDiagnostics";
@@ -106,6 +107,14 @@ export default function ProviderDetail({
       setPingRunning(false);
     }
   }
+
+  // With a live list, show only the best of it (router curation rules); the
+  // full list and a custom id stay one click away.
+  const [showAllModels, setShowAllModels] = useState(false);
+  const best = bestDiscovered(spec.id, discoveredModels);
+  const accessModes: ModelSpec["accessModes"] = tier === "free" ? ["free", "byok"] : ["byok"];
+  const bestSpecs = best.map((m) => curatedToSpec(spec.id, m, accessModes));
+  const showingBest = best.length > 0 && !showAllModels;
 
   // Combine catalog models with dynamically discovered models
   const effectiveModels: ModelSpec[] = [...models];
@@ -346,7 +355,17 @@ export default function ProviderDetail({
         <Step n={3} title="Choose a model">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs text-[color:var(--text-muted)]">
-              {effectiveModels.length} models available ({discoveredModels.length} live discovered)
+              {showingBest
+                ? `The ${best.length} best of ${discoveredModels.length} models on your account`
+                : `${effectiveModels.length} models available (${discoveredModels.length} live discovered)`}
+              {best.length > 0 && (
+                <>
+                  {" · "}
+                  <button type="button" onClick={() => setShowAllModels((v) => !v)} className="font-semibold text-[color:var(--accent-solid)] hover:underline">
+                    {showAllModels ? "Show best only" : "Show all"}
+                  </button>
+                </>
+              )}
             </span>
             <button
               type="button"
@@ -362,7 +381,13 @@ export default function ProviderDetail({
               {discoveryMsg}
             </p>
           )}
-          <ModelSelectField id={`model-${spec.id}`} models={effectiveModels} value={model} onChange={setModel} />
+          <ModelSelectField
+            id={`model-${spec.id}`}
+            models={showingBest ? withCurrent(bestSpecs, effectiveModels, model) : effectiveModels}
+            value={model}
+            onChange={setModel}
+          />
+          {showingBest && <BadgeEvidence models={best} selected={model} />}
           <p className="mt-1 text-xs text-[color:var(--text-muted)]">
             {effectiveModels.length > 0
               ? "Live discovered and verified models are prioritized. Advanced allows specifying any model ID."
@@ -556,4 +581,26 @@ export function Chip({ tone, children }: { tone: "good" | "warn" | "neutral"; ch
         ? "border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
         : "border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]";
   return <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>{children}</span>;
+}
+
+/** Keeps the saved model visible in the best-only list, so choosing "best" never hides the current choice. */
+function withCurrent(best: ModelSpec[], all: ModelSpec[], current: string): ModelSpec[] {
+  if (!current || best.some((m) => m.modelId === current)) return best;
+  const saved = all.find((m) => m.modelId === current);
+  return saved ? [...best, { ...saved, displayName: `${saved.displayName} (current)` }] : best;
+}
+
+/** Why the selected model carries its badges, in plain words. */
+function BadgeEvidence({ models, selected }: { models: ReturnType<typeof bestDiscovered>; selected: string }) {
+  const m = models.find((x) => x.id === selected);
+  if (!m || m.badges.length === 0) return null;
+  return (
+    <ul className="mt-1 space-y-0.5 text-xs text-[color:var(--text-secondary)]" aria-label="Why this model is recommended">
+      {m.badges.map((b) => (
+        <li key={b.id}>
+          <span className="font-semibold text-[color:var(--text-primary)]">{b.label}:</span> {b.evidence}
+        </li>
+      ))}
+    </ul>
+  );
 }
