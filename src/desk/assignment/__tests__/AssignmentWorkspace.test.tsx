@@ -333,4 +333,16 @@ describe("Scholar Core Assignment Workspace", () => {
     // Only one Minimal/Detailed choice on the page.
     expect(screen.getAllByRole("radio", { name: /Detailed/i })).toHaveLength(1);
   });
+
+  it("does not grade an empty paper on the Submission step", async () => {
+    render(<AssignmentWorkspace projectId="proj-123" initialStage="submission" onStageChange={vi.fn()} />);
+    expect(await screen.findByTestId("submission-nothing-drafted")).toBeInTheDocument();
+    expect(screen.queryByText(/Predicted Grade Band/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Third Class|First Class|Upper Second/i)).not.toBeInTheDocument();
+    // No audit was saved for it either.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(saveIntakeAnswers).not.toHaveBeenCalledWith("proj-123", expect.objectContaining({ assignment_submission_report: expect.anything() }));
+    const nav = screen.getByRole("navigation", { name: /Assignment Workflow Phases/i });
+    expect(within(nav).getByRole("button", { name: /Phase \d: Submission/i })).toHaveTextContent("0%");
+  });
 });

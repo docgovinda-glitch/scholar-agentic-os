@@ -74,12 +74,16 @@ export function AssignmentSubmissionStage({
   );
   const [showMetadataForm, setShowMetadataForm] = useState(false);
 
-  // Auto-run submission audit on mount if report is not yet generated
+  // There is nothing to grade until something is drafted: no audit, no
+  // grade band and no readiness score for an empty paper.
+  const hasDraft = currentWordCount > 0;
+
+  // Auto-run the submission audit on mount once there is a draft to audit
   useEffect(() => {
-    if (!submissionReport && !isAuditingSubmission && typeof runSubmissionAudit === "function") {
+    if (hasDraft && !submissionReport && !isAuditingSubmission && typeof runSubmissionAudit === "function") {
       runSubmissionAudit();
     }
-  }, [submissionReport, isAuditingSubmission, runSubmissionAudit]);
+  }, [hasDraft, submissionReport, isAuditingSubmission, runSubmissionAudit]);
 
   // Determine active sections list (internalSections or outline fallback)
   const activeSections = internalSections.length > 0 ? internalSections : outline.map((sec) => ({
@@ -187,7 +191,7 @@ export function AssignmentSubmissionStage({
   // Grade & Readiness values from submissionReport
   const predictedGrade = (submissionReport as any)?.predictedGrade ||
     ((submissionReport as any)?.overallScore ? `Score: ${(submissionReport as any).overallScore}%` : "Pending Evaluation");
-  const readinessPercentage = (submissionReport as any)?.readinessPercentage ?? (submissionReport?.overallScore ?? 75);
+  const readinessPercentage: number | null = (submissionReport as any)?.readinessPercentage ?? submissionReport?.overallScore ?? null;
   // Render helpers for detailed telemetry vs streamlined packaging
   const renderAuditLayout = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
@@ -440,7 +444,7 @@ export function AssignmentSubmissionStage({
             <button
               type="button"
               onClick={() => runSubmissionAudit?.()}
-              disabled={isAuditingSubmission}
+              disabled={isAuditingSubmission || !hasDraft}
               className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer inline-flex items-center gap-2 disabled:opacity-50"
               title="Re-run Rubric & Citation Audit"
             >
@@ -450,7 +454,21 @@ export function AssignmentSubmissionStage({
           </div>
         </div>
 
-        {/* Status Metrics Ribbon */}
+        {!hasDraft ? (
+          <div data-testid="submission-nothing-drafted" className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p className="text-sm text-neutral-600 dark:text-neutral-300">
+              Nothing to audit yet. Draft at least one section and the rubric check, grade estimate and citation check appear here.
+            </p>
+            <button
+              type="button"
+              onClick={() => (setPhase ? setPhase("drafting") : onBack?.())}
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 cursor-pointer shrink-0"
+            >
+              Go to Drafting
+            </button>
+          </div>
+        ) : (
+        /* Status Metrics Ribbon */
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-1">
             <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">
@@ -469,10 +487,12 @@ export function AssignmentSubmissionStage({
               Submission Readiness Index
             </span>
             <div className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white tabular-nums flex items-center gap-2">
-              <span>{readinessPercentage}%</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${readinessPercentage >= 75 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}>
-                {readinessPercentage >= 75 ? "Ready" : "Action Needed"}
-              </span>
+              <span>{readinessPercentage === null ? "—" : `${readinessPercentage}%`}</span>
+              {readinessPercentage !== null && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${readinessPercentage >= 75 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}>
+                  {readinessPercentage >= 75 ? "Ready" : "Action Needed"}
+                </span>
+              )}
             </div>
             <span className="text-[11px] text-neutral-400 dark:text-neutral-500 block">
               Audit pass index & integrity checks
@@ -494,6 +514,7 @@ export function AssignmentSubmissionStage({
             </span>
           </div>
         </div>
+        )}
       </div>
 
       {/* Export Error Alert if any */}
