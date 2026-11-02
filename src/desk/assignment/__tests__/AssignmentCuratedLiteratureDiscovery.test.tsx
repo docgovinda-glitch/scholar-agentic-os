@@ -53,6 +53,20 @@ vi.mock("../../../services/vault/cloudDriveService", () => ({
 
 const { default: AssignmentWorkspace } = await import("../AssignmentWorkspace");
 
+// AssignmentWorkspace React.lazy()-loads ContextPanel and its stages. Under
+// vitest the first import() of each makes Vite transform it on demand, which
+// under CPU load runs past the 1 s default findBy* timeout before the
+// Suspense fallback is replaced. Load them here, before any test's clock
+// starts, so findBy* only waits on render. Keep in sync with the lazy()
+// imports in AssignmentWorkspace.tsx.
+await Promise.all([
+  import("../../workspace/ContextPanel"),
+  import("../stages/AssignmentUnderstandStage"),
+  import("../stages/AssignmentSourcesStage"),
+  import("../stages/AssignmentDraftingStage"),
+  import("../stages/AssignmentSubmissionStage"),
+]);
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
