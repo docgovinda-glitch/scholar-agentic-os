@@ -8,6 +8,8 @@ export interface WorkspaceAutosaveBadgeProps {
   version?: number | string;
   lastSavedTime?: string;
   className?: string;
+  /** Below the lg breakpoint show only the coloured dot (the status stays in aria-label and title). */
+  compactOnSmall?: boolean;
   title?: string;
 }
 
@@ -21,6 +23,7 @@ export function WorkspaceAutosaveBadge({
   version,
   lastSavedTime,
   className = "",
+  compactOnSmall = false,
   title,
 }: WorkspaceAutosaveBadgeProps): React.ReactElement {
   const normalizedStatus: AutosaveState =
@@ -63,7 +66,7 @@ export function WorkspaceAutosaveBadge({
       data-testid="autosave-status"
       title={defaultTitle}
       aria-label={`Autosave status: ${statusLabel}${version ? `, version ${version}` : ""}`}
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap shrink-0 transition-colors ${
         isSaving
           ? "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
           : isOffline
@@ -81,13 +84,13 @@ export function WorkspaceAutosaveBadge({
             : "bg-emerald-500"
         }`}
       />
-      <span>{statusLabel}</span>
+      <span className={compactOnSmall ? "hidden lg:inline" : undefined}>{statusLabel}</span>
       {lastSavedTime && !isSaving && (
-        <span className="font-normal">({lastSavedTime})</span>
+        <span className={`font-normal ${compactOnSmall ? "hidden xl:inline" : ""}`}>({lastSavedTime})</span>
       )}
       {version !== undefined && (
         <span
-          className="font-mono text-[9px] px-1 py-0.2 rounded bg-black/5 dark:bg-white/10 opacity-80"
+          className={`font-mono text-[9px] px-1 py-0.2 rounded bg-black/5 dark:bg-white/10 opacity-80 ${compactOnSmall ? "hidden lg:inline" : ""}`}
           title={`Revision version ${version}`}
         >
           v{version}

@@ -196,7 +196,7 @@ export function AppleStudioHeader({
             }}
             data-testid="studio-project-title"
             title={onProjectTitleChange ? `${projectTitle} (Click to rename)` : projectTitle}
-            className={`group flex items-center gap-1.5 min-w-0 text-left px-1.5 py-1 rounded-md transition-colors ${
+            className={`group hidden sm:flex items-center gap-1.5 min-w-0 text-left px-1.5 py-1 rounded-md transition-colors ${
               onProjectTitleChange ? "hover:bg-surface-hover cursor-pointer" : "cursor-default"
             }`}
           >
@@ -260,7 +260,7 @@ export function AppleStudioHeader({
         {metricLabel && (
           <span
             data-testid="studio-live-metric-pill"
-            className="hidden lg:inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-mono font-medium bg-surface-hover text-secondary border border-border/60 shrink-0"
+            className="hidden 2xl:inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-mono font-medium bg-surface-hover text-secondary border border-border/60 shrink-0 whitespace-nowrap"
           >
             {metricLabel}
           </span>
@@ -272,7 +272,7 @@ export function AppleStudioHeader({
             onClick={onOpenAiAccess}
             data-testid="studio-ai-model-pill"
             title="Active AI Model & Routing Settings"
-            className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-surface-hover hover:bg-surface text-secondary hover:text-primary border border-border/60 transition-all duration-200 ease-out shrink-0 cursor-pointer"
+            className="hidden 2xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-surface-hover hover:bg-surface text-secondary hover:text-primary border border-border/60 transition-all duration-200 ease-out shrink-0 cursor-pointer whitespace-nowrap"
           >
             <Cpu className="w-3 h-3 text-accent shrink-0" />
             <span className="truncate max-w-[120px]">{aiModelLabel}</span>
@@ -280,6 +280,7 @@ export function AppleStudioHeader({
         )}
 
         <WorkspaceAutosaveBadge
+          compactOnSmall
           status={autosaveStatus}
           version={projectVersion}
           lastSavedTime={lastSavedTime ?? undefined}

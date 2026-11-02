@@ -76,7 +76,7 @@ router.post(
     if (!record) return;
 
     const body = req.body || {};
-    const title = String(body.title || record.answers?.title || "").trim();
+    const title = String(body.title || record.answers?.thesisTitle || record.answers?.title || "").trim();
     const degreeLevel = String(body.degreeLevel || record.answers?.degreeLevel || "").trim();
     const theoreticalFramework = String(body.theoreticalFramework || record.answers?.theoreticalFramework || "").trim();
     const researchQuestions: string[] = (
@@ -358,10 +358,13 @@ router.post(
     const dialect = req.body?.dialect === "en-US" ? "en-US" : "en-GB";
 
     const answers = (record.answers || {}) as Record<string, unknown>;
-    const title = String(answers.title || answers.working_title || "").trim();
+    // The Thesis workspace saves its title as thesisTitle; older projects used title / working_title.
+    const title = String(answers.thesisTitle || answers.title || answers.working_title || "").trim();
     const degreeLevel = String(answers.degreeLevel || "thesis");
     const theoreticalFramework = String(answers.theoreticalFramework || "not specified");
     const methodology = String(answers.methodologicalDesign || "not specified");
+    const researchQuestions = (Array.isArray(answers.researchQuestions) ? answers.researchQuestions : [])
+      .filter((q): q is string => typeof q === "string" && q.trim().length > 0);
     if (!title || !chapterTitle) {
       return res.status(400).json({ error: "Add your thesis title and the chapter title before drafting." });
     }
@@ -415,7 +418,7 @@ router.post(
 Draft Chapter ${chapterNumber}: "${chapterTitle}" for a ${degreeLevel} entitled "${title}".
 Theoretical Framework: ${theoreticalFramework}.
 Methodology: ${methodology}.
-Target word count: approximately ${targetWords} words.
+${researchQuestions.length ? `Research questions (the chapter must serve these):\n${researchQuestions.map((q, i) => `RQ${i + 1}. ${q}`).join("\n")}\n` : ""}Target word count: approximately ${targetWords} words.
 Scholarly dialect: ${dialect}.
 
 CITATION RULES:

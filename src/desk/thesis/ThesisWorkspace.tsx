@@ -5,13 +5,34 @@ import {
   saveIntakeAnswers,
   simulateVivaDefense,
   auditThesisChapters,
+  draftThesisChapter,
   type VivaSimulationResponse,
   type ThesisChapterAuditResponse,
 } from "../api";
+import ChapterEditor from "./components/ChapterEditor";
+import ResearchQuestionsEditor from "./components/ResearchQuestionsEditor";
+import LiteratureMatrixEditor from "./components/LiteratureMatrixEditor";
+import {
+  UNTITLED_THESIS,
+  addChapter,
+  emptyLiteratureMatrix,
+  missingForViva,
+  moveChapter,
+  removeChapter,
+  standardChapters,
+  thesisToMarkdown,
+  totalWords,
+  updateChapter,
+  type LiteratureMatrix,
+  type ThesisChapter,
+  type ThesisProjectData,
+} from "./thesisModel";
+import { thesisDocxBlob, thesisFileName } from "./thesisExport";
+import { downloadBlob } from "../assignment/services/assignmentExportService";
 import WorkspaceAutosaveBadge from "../../components/ui/WorkspaceAutosaveBadge";
 import AppleStudioHeader, { type AppleStudioPhaseId } from "../../components/ui/AppleStudioShell";
 import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
-import { Sparkles, Plus, CheckCircle2 } from "lucide-react";
+import { Sparkles, Plus, CheckCircle2, Download, PenLine } from "lucide-react";
 
 export type ThesisStage =
   | "proposal_framing"
@@ -21,28 +42,7 @@ export type ThesisStage =
   | "discussion_contributions"
   | "viva_defense";
 
-export interface ThesisChapter {
-  chapterNumber: number;
-  title: string;
-  wordCount: number;
-  targetWordCount: number;
-  status: "not_started" | "drafting" | "reviewed" | "completed";
-}
-
-export interface ThesisProjectData {
-  id: string;
-  projectId: string;
-  title: string;
-  degreeLevel: "Undergraduate Capstone" | "Master's Thesis" | "PhD Dissertation";
-  fieldOfStudy: string;
-  targetWordCount: number;
-  currentWordCount: number;
-  researchQuestions: string[];
-  theoreticalFramework: string;
-  methodologicalDesign: string;
-  supervisorNotes: string;
-  chapters: ThesisChapter[];
-}
+export type { ThesisChapter, ThesisProjectData } from "./thesisModel";
 
 const THESIS_STAGES: {
   id: ThesisStage;
@@ -75,9 +75,9 @@ const THESIS_STAGES: {
   {
     id: "empirical_results",
     phase: "studio",
-    label: "4. Empirical Chapters",
-    icon: "📊",
-    desc: "Ch. 4: Quantitative / qualitative findings",
+    label: "4. Write Chapters",
+    icon: "✍️",
+    desc: "Write or AI-draft every chapter",
   },
   {
     id: "discussion_contributions",
@@ -130,7 +130,7 @@ export default function ThesisWorkspace({
   const [thesisData, setThesisData] = useState<ThesisProjectData>({
     id: projectId,
     projectId,
-    title: "Untitled Thesis & Dissertation",
+    title: UNTITLED_THESIS,
     degreeLevel: "PhD Dissertation",
     fieldOfStudy: "",
     targetWordCount: 60000,
@@ -139,6 +139,7 @@ export default function ThesisWorkspace({
     theoreticalFramework: "",
     methodologicalDesign: "",
     supervisorNotes: "",
+    literatureMatrix: emptyLiteratureMatrix(),
     chapters: [],
   });
 
@@ -158,6 +159,8 @@ export default function ThesisWorkspace({
   const [auditError, setAuditError] = useState<string | null>(null);
 
   const isFirstMount = useRef(true);
+  // Fields the student edited before the saved project finished loading: loading never overwrites them.
+  const touchedRef = useRef<Set<keyof ThesisProjectData>>(new Set());
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Hydrate from backend project intake answers on mount
@@ -176,9 +179,9 @@ export default function ThesisWorkspace({
           (a["thesisTitle"] as string) ||
           (a["title"] as string) ||
           (projectObj.title as string) ||
-          "Untitled Thesis & Dissertation";
+          UNTITLED_THESIS;
 
-        setThesisData((prev) => ({
+        setThesisData((prev) => keepTouched(prev, touchedRef.current, {
           ...prev,
           title: hydratedTitle,
           degreeLevel:
@@ -202,6 +205,7 @@ export default function ThesisWorkspace({
           methodologicalDesign:
             (a["methodologicalDesign"] as string) ?? prev.methodologicalDesign,
           supervisorNotes: (a["supervisorNotes"] as string) ?? prev.supervisorNotes,
+          literatureMatrix: { ...emptyLiteratureMatrix(), ...((a["literatureMatrix"] as Partial<LiteratureMatrix> | undefined) ?? {}) },
           chapters: Array.isArray(a["chapters"])
             ? (a["chapters"] as ThesisChapter[])
             : prev.chapters,
@@ -230,11 +234,12 @@ export default function ThesisWorkspace({
             degreeLevel: nextData.degreeLevel,
             fieldOfStudy: nextData.fieldOfStudy,
             targetWordCount: nextData.targetWordCount,
-            currentWordCount: nextData.currentWordCount,
+            currentWordCount: totalWords(nextData.chapters),
             researchQuestions: nextData.researchQuestions,
             theoreticalFramework: nextData.theoreticalFramework,
             methodologicalDesign: nextData.methodologicalDesign,
             supervisorNotes: nextData.supervisorNotes,
+            literatureMatrix: nextData.literatureMatrix,
             chapters: nextData.chapters,
           });
           if (updated && updated.version) {
@@ -256,6 +261,7 @@ export default function ThesisWorkspace({
     key: K,
     val: ThesisProjectData[K]
   ) {
+    touchedRef.current.add(key);
     setThesisData((prev) => {
       const next = { ...prev, [key]: val };
       if (!isFirstMount.current) {
@@ -266,72 +272,37 @@ export default function ThesisWorkspace({
     isFirstMount.current = false;
   }
 
+  /** Sets up a conventional five-chapter structure. Titles, questions and framework stay the student's own. */
   function handleGenerateBlueprintFromTopic() {
-    const topicTitle =
-      thesisData.title && thesisData.title !== "Untitled Thesis & Dissertation"
-        ? thesisData.title
-        : "Structured Empirical Dissertation Inquiry";
-    const totalBudget = thesisData.targetWordCount > 0 ? thesisData.targetWordCount : 60000;
-
-    const structuredChapters: ThesisChapter[] = [
-      {
-        chapterNumber: 1,
-        title: "Introduction, Problem Statement & Research Framing",
-        wordCount: 0,
-        targetWordCount: Math.round(totalBudget * 0.12),
-        status: "drafting",
-      },
-      {
-        chapterNumber: 2,
-        title: "Critical Literature Review & Theoretical Synthesis",
-        wordCount: 0,
-        targetWordCount: Math.round(totalBudget * 0.25),
-        status: "not_started",
-      },
-      {
-        chapterNumber: 3,
-        title: "Methodology, Epistemological Design & Ethics",
-        wordCount: 0,
-        targetWordCount: Math.round(totalBudget * 0.2),
-        status: "not_started",
-      },
-      {
-        chapterNumber: 4,
-        title: "Empirical Analysis, Results & Validation",
-        wordCount: 0,
-        targetWordCount: Math.round(totalBudget * 0.25),
-        status: "not_started",
-      },
-      {
-        chapterNumber: 5,
-        title: "General Discussion, Contributions & Future Directions",
-        wordCount: 0,
-        targetWordCount: Math.round(totalBudget * 0.18),
-        status: "not_started",
-      },
-    ];
-
-    const next: ThesisProjectData = {
-      ...thesisData,
-      title: topicTitle,
-      fieldOfStudy: thesisData.fieldOfStudy || "Interdisciplinary Research",
-      theoreticalFramework:
-        thesisData.theoreticalFramework ||
-        `Integrated Theoretical & Empirical Framework for ${topicTitle}`,
-      researchQuestions:
-        thesisData.researchQuestions.length > 0
-          ? thesisData.researchQuestions
-          : [
-              `RQ1: What are the foundational theoretical and empirical determinants of ${topicTitle}?`,
-              `RQ2: How can a rigorous methodological architecture validate key hypotheses across domain constraints?`,
-              `RQ3: What are the broader theoretical, practical, and policy implications of the empirical findings?`,
-            ],
-      chapters: thesisData.chapters.length > 0 ? thesisData.chapters : structuredChapters,
-    };
-
+    if (thesisData.chapters.length > 0) return;
+    touchedRef.current.add("chapters");
+    const next: ThesisProjectData = { ...thesisData, chapters: standardChapters(thesisData.targetWordCount) };
     isFirstMount.current = false;
     setThesisData(next);
     persistChanges(next);
+  }
+
+  function updateChapters(next: ThesisChapter[]) {
+    updateThesisField("chapters", next);
+  }
+
+  async function handleDraftChapter(index: number, guidance: string) {
+    const ch = thesisData.chapters[index];
+    const result = await draftThesisChapter(projectId, {
+      chapterNumber: ch.chapterNumber,
+      chapterTitle: ch.title,
+      targetWords: ch.targetWordCount > 0 ? Math.min(ch.targetWordCount, 4000) : 1500,
+      prompt: guidance.trim() || undefined,
+    });
+    return { content: result.content, bibliography: result.bibliography };
+  }
+
+  async function handleExportDocx() {
+    downloadBlob(await thesisDocxBlob(thesisData), thesisFileName(thesisData.title, "docx"));
+  }
+
+  function handleExportMarkdown() {
+    downloadBlob(new Blob([thesisToMarkdown(thesisData)], { type: "text/markdown;charset=utf-8" }), thesisFileName(thesisData.title, "md"));
   }
 
   async function handleSimulateViva() {
@@ -370,10 +341,11 @@ export default function ThesisWorkspace({
   }
 
 
-  const progressPercent = Math.min(
-    100,
-    Math.round((thesisData.currentWordCount / (thesisData.targetWordCount || 1)) * 100)
-  );
+  const writtenWords = totalWords(thesisData.chapters);
+  const progressPercent = Math.min(100, Math.round((writtenWords / (thesisData.targetWordCount || 1)) * 100));
+  const vivaMissing = missingForViva(thesisData);
+  const draftBlocker =
+    !thesisData.title.trim() || thesisData.title === UNTITLED_THESIS ? "Add your thesis title in Proposal & Framing first." : undefined;
 
   const isBlankThesis =
     thesisData.chapters.length === 0 &&
@@ -396,7 +368,7 @@ export default function ThesisWorkspace({
           if (onClose) onClose();
           else if (typeof window !== "undefined") window.location.href = "/projects";
         }}
-        metricLabel={`${thesisData.currentWordCount.toLocaleString()} / ${thesisData.targetWordCount.toLocaleString()} words (${progressPercent}%)`}
+        metricLabel={`${writtenWords.toLocaleString()} / ${thesisData.targetWordCount.toLocaleString()} words (${progressPercent}%)`}
         aiModelLabel="Dissertation Advisor AI"
         onOpenAiAccess={onOpenAiAccess}
         autosaveStatus={saveStatus}
@@ -426,16 +398,16 @@ export default function ThesisWorkspace({
                   key={s.id}
                   type="button"
                   onClick={() => setCurrentStage(s.id)}
-                  className={`w-full text-left p-2.5 rounded-xl text-xs font-medium transition-all duration-200 ease-out flex items-center gap-2.5 cursor-pointer ${
+                  className={`shrink-0 md:w-full text-left p-2.5 rounded-xl text-xs font-medium transition-all duration-200 ease-out flex items-center gap-2.5 cursor-pointer ${
                     isActive
                       ? "bg-primary text-surface shadow-xs"
                       : "text-secondary hover:bg-surface hover:text-primary"
                   }`}
                 >
                   <span className="text-base shrink-0">{s.icon}</span>
-                  <div className="overflow-hidden">
-                    <div className="font-bold truncate">{s.label}</div>
-                    <div className={`text-[10px] truncate ${isActive ? "opacity-80" : "text-tertiary"}`}>
+                  <div className="md:overflow-hidden">
+                    <div className="font-bold whitespace-nowrap md:truncate">{s.label}</div>
+                    <div className={`hidden md:block text-[10px] truncate ${isActive ? "opacity-80" : "text-tertiary"}`}>
                       {s.desc}
                     </div>
                   </div>
@@ -457,13 +429,13 @@ export default function ThesisWorkspace({
                 <div className="space-y-1">
                   <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-accent">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Zero-Ghost Dissertation Blueprint</span>
+                    <span>Start your thesis</span>
                   </div>
                   <h3 className="text-sm font-bold text-primary">
-                    Ready to structure "{thesisData.title}"
+                    {thesisData.title === UNTITLED_THESIS ? "Ready to structure your thesis" : `Ready to structure "${thesisData.title}"`}
                   </h3>
                   <p className="text-xs text-secondary max-w-xl leading-relaxed">
-                    Start with a clean slate by configuring your theoretical framework and chapters below, or generate a 5-chapter dissertation architecture proportional to your target word budget in one click.
+                    Add your title, research questions and framework below, then set up your chapters: a standard five-chapter structure sized to your word budget, or your own.
                   </p>
                 </div>
                 <button
@@ -473,7 +445,7 @@ export default function ThesisWorkspace({
                   className="px-4 py-2.5 rounded-xl bg-primary text-surface text-xs font-semibold hover:opacity-90 transition-all shadow-xs shrink-0 flex items-center gap-1.5 cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Generate Structured Blueprint from Topic</span>
+                  <span>Set up a 5-chapter structure</span>
                 </button>
               </div>
             )}
@@ -497,8 +469,9 @@ export default function ThesisWorkspace({
                     <input
                       id="thesis-title"
                       type="text"
-                      value={thesisData.title}
-                      onChange={(e) => updateThesisField("title", e.target.value)}
+                      value={thesisData.title === UNTITLED_THESIS ? "" : thesisData.title}
+                      placeholder="Your working title"
+                      onChange={(e) => updateThesisField("title", e.target.value || UNTITLED_THESIS)}
                       className="w-full px-3 py-2 text-xs border border-border rounded-xl bg-background text-primary"
                     />
                   </div>
@@ -552,7 +525,26 @@ export default function ThesisWorkspace({
                       className="w-full px-3 py-2 text-xs border border-border rounded-xl bg-background text-primary"
                     />
                   </div>
+
+                  <div className="apple-card p-4 md:col-span-2">
+                    <label htmlFor="thesis-field" className="text-xs font-bold text-primary block mb-1.5">
+                      Field of Study
+                    </label>
+                    <input
+                      id="thesis-field"
+                      type="text"
+                      placeholder="e.g., Public Health, Computational Linguistics..."
+                      value={thesisData.fieldOfStudy}
+                      onChange={(e) => updateThesisField("fieldOfStudy", e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-border rounded-xl bg-background text-primary"
+                    />
+                  </div>
                 </div>
+
+                <ResearchQuestionsEditor
+                  questions={thesisData.researchQuestions}
+                  onChange={(next) => updateThesisField("researchQuestions", next)}
+                />
 
                 {/* Multi-Chapter Progress Matrix */}
                 <div className="apple-card p-5">
@@ -566,18 +558,7 @@ export default function ThesisWorkspace({
                       </span>
                       <button
                         type="button"
-                        onClick={() =>
-                          updateThesisField("chapters", [
-                            ...thesisData.chapters,
-                            {
-                              chapterNumber: thesisData.chapters.length + 1,
-                              title: `Chapter ${thesisData.chapters.length + 1}`,
-                              wordCount: 0,
-                              targetWordCount: 10000,
-                              status: "not_started",
-                            },
-                          ])
-                        }
+                        onClick={() => updateChapters(addChapter(thesisData.chapters))}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-surface-hover hover:bg-border/40 text-primary transition-colors cursor-pointer"
                       >
                         <Plus className="w-3 h-3" />
@@ -588,7 +569,7 @@ export default function ThesisWorkspace({
 
                   {thesisData.chapters.length === 0 ? (
                     <p className="text-xs text-tertiary italic py-2">
-                      No chapters configured yet. Click "Generate Structured Blueprint from Topic" above or "Add Chapter" to initialize your dissertation structure.
+                      No chapters yet. Use "Set up a 5-chapter structure" above, or "Add Chapter" to build your own.
                     </p>
                   ) : (
                     <div className="space-y-3">
@@ -612,24 +593,38 @@ export default function ThesisWorkspace({
                               <div>
                                 <p className="text-xs font-bold text-primary">{ch.title}</p>
                                 <p className="text-[10px] text-tertiary">
-                                  {ch.wordCount.toLocaleString()} / {ch.targetWordCount.toLocaleString()} words
+                                  {(ch.content !== undefined ? totalWords([ch]) : ch.wordCount).toLocaleString()} / {ch.targetWordCount.toLocaleString()} words
                                 </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
                               {gateSummary && (
-                                <div className="flex items-center gap-1.5 text-[9px] font-mono">
-                                  <span className="px-1.5 py-0.5 rounded font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                    G3:{gateSummary.g3Status.slice(0, 4)}
-                                  </span>
-                                  <span className="px-1.5 py-0.5 rounded font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                    G4:{gateSummary.g4Status.slice(0, 4)}
-                                  </span>
-                                  <span className="px-1.5 py-0.5 rounded font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                    G5:{gateSummary.g5Status.slice(0, 4)}
-                                  </span>
+                                <div className="flex items-center gap-1.5 text-[9px] font-mono" aria-label="Gate status">
+                                  {([["G3", gateSummary.g3Status], ["G4", gateSummary.g4Status], ["G5", gateSummary.g5Status]] as const).map(([g, st]) => (
+                                    <span
+                                      key={g}
+                                      title={`${g}: ${String(st).replace(/_/g, " ")}`}
+                                      className={`px-1.5 py-0.5 rounded font-semibold ${
+                                        st === "ready" || st === "signed_off"
+                                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                          : st === "invalidated"
+                                          ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
+                                          : "bg-surface-hover text-secondary"
+                                      }`}
+                                    >
+                                      {g}: {String(st).replace(/_/g, " ")}
+                                    </span>
+                                  ))}
                                 </div>
                               )}
+                              <button
+                                type="button"
+                                onClick={() => setCurrentStage("empirical_results")}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-primary bg-surface hover:bg-border/40 border border-border/60 cursor-pointer"
+                              >
+                                <PenLine className="w-3 h-3" aria-hidden="true" />
+                                Write
+                              </button>
                               <select
                                 aria-label={`Status of chapter ${idx + 1}`}
                                 value={ch.status}
@@ -665,47 +660,15 @@ export default function ThesisWorkspace({
                     Chapter 2: Thematic Literature Matrix
                   </h2>
                   <p className="text-xs text-secondary mt-1">
-                    Synthesize competing theoretical paradigms, identify empirical fractures, and link literature clusters directly to your Knowledge Vault.
+                    Plan Chapter 2: the foundations your field builds on, where current studies disagree, and the gap your thesis fills. Your notes save with the thesis.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="apple-card p-5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
-                      Foundational Stream
-                    </span>
-                    <h4 className="text-xs font-bold text-primary mt-1">
-                      Core Theoretical Lineage
-                    </h4>
-                    <p className="text-xs text-secondary mt-2 leading-relaxed">
-                      Map canonical foundational models and primary theoretical assumptions in {thesisData.fieldOfStudy || "your discipline"}.
-                    </p>
-                  </div>
-
-                  <div className="apple-card p-5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
-                      Contemporary Debates
-                    </span>
-                    <h4 className="text-xs font-bold text-primary mt-1">
-                      Methodological & Empirical Tensions
-                    </h4>
-                    <p className="text-xs text-secondary mt-2 leading-relaxed">
-                      Contrast recent empirical findings and highlight unresolved methodological divergences across recent literature.
-                    </p>
-                  </div>
-
-                  <div className="apple-card p-5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
-                      The Scholarly Gap
-                    </span>
-                    <h4 className="text-xs font-bold text-primary mt-1">
-                      Dissertation Contribution Anchor
-                    </h4>
-                    <p className="text-xs text-secondary mt-2 leading-relaxed">
-                      Isolate the specific theoretical or empirical deficit resolved by your {thesisData.degreeLevel}.
-                    </p>
-                  </div>
-                </div>
+                <LiteratureMatrixEditor
+                  matrix={thesisData.literatureMatrix}
+                  fieldOfStudy={thesisData.fieldOfStudy}
+                  onChange={(next) => updateThesisField("literatureMatrix", next)}
+                />
               </div>
             )}
 
@@ -836,6 +799,11 @@ export default function ThesisWorkspace({
                   </button>
                 </div>
 
+                {vivaMissing.length > 0 && (
+                  <p className="text-xs text-secondary" role="status">
+                    The examiner works from your thesis. Add {vivaMissing.join(" and ")} in Proposal &amp; Framing first.
+                  </p>
+                )}
                 {vivaError && (
                   <p role="alert" className="text-xs text-[color:var(--state-danger)]">
                     {vivaError}
@@ -892,35 +860,28 @@ export default function ThesisWorkspace({
               </div>
             )}
 
-            {currentStage !== "proposal_framing" &&
-              currentStage !== "literature_matrix" &&
-              currentStage !== "methodology_design" &&
-              currentStage !== "discussion_contributions" &&
-              currentStage !== "viva_defense" && (
-                <div className="flex flex-col gap-6">
+            {currentStage === "empirical_results" && (
+              <div className="flex flex-col gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div>
-                    <h2 className="text-xl font-bold tracking-tight text-primary capitalize">
-                      {THESIS_STAGES.find((s) => s.id === currentStage)?.label}
-                    </h2>
+                    <h2 className="text-xl font-bold tracking-tight text-primary">Write Chapters</h2>
                     <p className="text-xs text-secondary mt-1">
-                      {THESIS_STAGES.find((s) => s.id === currentStage)?.desc}
+                      {writtenWords.toLocaleString()} of {thesisData.targetWordCount.toLocaleString()} words written across {thesisData.chapters.length} chapters. Changes save automatically.
                     </p>
                   </div>
-
-                  <div className="apple-card p-6">
-                    <p className="text-xs text-secondary leading-relaxed mb-4">
-                      Milestone tracking and synthesis matrix for {thesisData.degreeLevel} progress.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStage("viva_defense")}
-                      className="px-4 py-2 bg-primary text-surface text-xs font-bold rounded-xl hover:opacity-90 transition-all cursor-pointer shadow-xs"
-                    >
-                      Proceed to Viva Defense Simulator →
-                    </button>
-                  </div>
+                  <ExportButtons onDocx={handleExportDocx} onMarkdown={handleExportMarkdown} disabled={thesisData.chapters.length === 0} />
                 </div>
-              )}
+                <ChapterEditor
+                  chapters={thesisData.chapters}
+                  onUpdate={(idx, patch) => updateChapters(updateChapter(thesisData.chapters, idx, patch))}
+                  onMove={(idx, delta) => updateChapters(moveChapter(thesisData.chapters, idx, delta))}
+                  onRemove={(idx) => updateChapters(removeChapter(thesisData.chapters, idx))}
+                  onDraft={handleDraftChapter}
+                  canDraft={!draftBlocker}
+                  draftBlocker={draftBlocker}
+                />
+              </div>
+            )}
           </div>
         </main>
 
@@ -959,6 +920,8 @@ export default function ThesisWorkspace({
               </div>
             </div>
 
+            <ExportButtons onDocx={handleExportDocx} onMarkdown={handleExportMarkdown} disabled={thesisData.chapters.length === 0} stacked />
+
             <div className="space-y-2">
               {onOpenVault && (
                 <button
@@ -985,4 +948,28 @@ export default function ThesisWorkspace({
       </div>
     </div>
   );
+}
+
+function ExportButtons({ onDocx, onMarkdown, disabled, stacked = false }: { onDocx: () => void | Promise<void>; onMarkdown: () => void; disabled: boolean; stacked?: boolean }) {
+  const cls = "inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-border/60 bg-surface hover:bg-surface-hover text-primary disabled:opacity-50 cursor-pointer";
+  return (
+    <div className={stacked ? "grid grid-cols-2 gap-2" : "flex gap-2 shrink-0"}>
+      <button type="button" onClick={() => void onDocx()} disabled={disabled} className={cls} title={disabled ? "Add a chapter first" : undefined}>
+        <Download className="w-3.5 h-3.5" aria-hidden="true" />
+        Word (.docx)
+      </button>
+      <button type="button" onClick={onMarkdown} disabled={disabled} className={cls} title={disabled ? "Add a chapter first" : undefined}>
+        <Download className="w-3.5 h-3.5" aria-hidden="true" />
+        Markdown
+      </button>
+    </div>
+  );
+}
+
+/** Applies loaded data except for fields the student already edited in this session. */
+function keepTouched(prev: ThesisProjectData, touched: Set<keyof ThesisProjectData>, loaded: ThesisProjectData): ThesisProjectData {
+  if (touched.size === 0) return loaded;
+  const out = { ...loaded } as Record<keyof ThesisProjectData, unknown>;
+  for (const k of touched) out[k] = prev[k];
+  return out as ThesisProjectData;
 }
