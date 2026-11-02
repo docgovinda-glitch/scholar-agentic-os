@@ -64,6 +64,7 @@
 | 2026-10-30 02:30 | Supabase Auth `rate_limit_otp` 30 → 300 (Management API PATCH `config/auth`, owner-approved) | 30 | read-back 300; other `rate_limit_*` unchanged; smoke 35/35 | PATCH back to 30 |
 | 2026-10-30 18:15Z | SQL `20261030170000_credit_amount_must_be_positive` (#136) via Management API; recorded in `schema_migrations` | function defs snapshot `~/backups/credit-functions-20261030T181524Z.json` (agent machine) | `grant_credits(-1)` and `deduct_credits(0)` → 22023, no ledger rows; anon/authenticated execute still false | re-create both functions from the snapshot |
 | 2026-10-30 18:47Z | Final check after #137 deployed (live `afcba5d`; #138 is docs only) | — | production smoke 35/35 (`scripts/smoke-prod.sh`); `/api/health` healthy | n/a |
+| 2026-10-31 → 2026-11-02 | Deploys #140–#144, the AI router (code only, no SQL, no env changes) | live `4b54a0e` (#139) | `/api/health` commit `30cc719` (#144); production smoke 38/38, including the 3 new AI router checks (the cloud-metadata endpoint is refused) | redeploy previous |
 
 ## T5 results (2026-10-29, read-only, `default_transaction_read_only = on`, counts only)
 
@@ -153,6 +154,12 @@ Later PRs were opened by the agent and merged by it (owner-authorized) only afte
 | #136 | Credit functions refuse zero or negative amounts (P1-11) |
 | #137 | Unused Coursework template-draft generators removed; screen-reader announcer timer cleared on unmount |
 | #138 | Handover: STATUS, audit, changelog, backlog, runbook |
+| #139 | STATUS: final production smoke 35/35 |
+| #140 | AI router backend: visible failover, streaming adapters, `/api/ai/run` (SSE), curated `/api/ai/models`; user-named endpoints screened (SSRF) |
+| #141 | Every server AI call on the router; local models run on the server only where allowed; e2e stub streams |
+| #142 | All AI connections sent (keyring); routing notices; AI Access shows the best models only, with evidence |
+| #143 | Ask Scholar: browser-side answers are announced; true timeout message |
+| #144 | Workspace AI steps: one live status line with Stop |
 
 ---
 
