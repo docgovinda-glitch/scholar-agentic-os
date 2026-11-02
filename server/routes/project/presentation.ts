@@ -305,6 +305,11 @@ router.post(
     const requestedSlides = Math.min(15, Math.max(4, Number(body.slideCount) || 6));
     const userTopic = str(body.topic, 300);
     const userText = str(body.rawText, 20000);
+    // The presenter's plan: the one message to land and the points to make, in order.
+    const keyMessage = str(body.keyMessage, 400);
+    const talkPoints = Array.isArray(body.points)
+      ? (body.points as unknown[]).map((p) => str(p, 300)).filter(Boolean).slice(0, 12)
+      : [];
 
     const rawTitle = str(body.title, 300) || userTopic || (record.answers?.title as string) || "Academic Research Presentation";
     const projectTitle = normalizeUnicodeNFC(rawTitle);
@@ -407,7 +412,9 @@ Output strict JSON only:
         const userPrompt = [
           `Topic: ${projectTitle}`,
           `Audience: ${targetAudience}`,
-          `Duration: ${durationMinutes} minutes`,
+          `Duration: ${durationMinutes} minutes (about ${Math.round((durationMinutes * 60) / requestedSlides)} seconds per card)`,
+          keyMessage ? `Key message (open with it on the title card's lede and close with it as the final takeaway): ${keyMessage}` : "",
+          talkPoints.length ? `Points the presenter wants to make, in this order, one card each:\n${talkPoints.map((p, i) => `${i + 1}. ${p}`).join("\n")}` : "",
           `Narrative framework: ${narrativeFramework}`,
           researchQuestions.length ? `Research questions: ${JSON.stringify(researchQuestions)}` : "",
           methodologyText ? `Methodology: ${methodologyText}` : "",

@@ -61,22 +61,12 @@ export function classifyPresentationScope(
   const covers: string[] = [];
   const cleanQuestions = questions.map(stripLineTags).filter((q) => q.length > 5);
 
-  if (cleanQuestions.length > 0) {
-    for (const q of cleanQuestions.slice(0, 5)) {
-      covers.push(q);
-    }
-  } else if (topic) {
-    covers.push(`Core analytical mechanism behind ${topic}.`);
-    covers.push(`Key structural tensions and empirical failure modes.`);
-    covers.push(`Practical methodology and verified operational architecture.`);
-    covers.push(`Demonstrated performance gains and benchmark evidence.`);
-    covers.push(`Strategic takeaways, trade-offs, and future implementation roadmap.`);
-  } else {
-    covers.push('Core analytical subject and primary research question.');
-    covers.push('Structural tensions and empirical failure modes.');
-    covers.push('Proposed methodology and verified architecture.');
-    covers.push('Validated benchmark results and observed outcomes.');
-    covers.push('Actionable recommendations and strategic next steps.');
+  // Only questions the author supplied become points. For a bare topic the
+  // list starts empty: the presenter writes the points they want to make
+  // (generic stand-ins such as "benchmark evidence" claimed content they may
+  // not have).
+  for (const q of cleanQuestions.slice(0, 5)) {
+    covers.push(q);
   }
 
   const avoids: string[] = [
@@ -87,7 +77,9 @@ export function classifyPresentationScope(
   ];
 
   return {
-    summaryBanner: `Identified ${covers.length} core presentation inquiry points and ${avoids.length} guardrail boundaries.`,
+    summaryBanner: covers.length
+      ? `${covers.length} points from your material and ${avoids.length} guardrails.`
+      : `Add the points you want to make; each becomes a slide.`,
     covers,
     avoids,
   };

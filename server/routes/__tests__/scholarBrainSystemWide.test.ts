@@ -381,6 +381,29 @@ describe("Architectural Unification Step 2: System-Wide scholarBrain Integration
       }
     });
 
+    it("POST /generate-deck gives the AI the presenter's key message, points and time per card", async () => {
+      const projectId = await createTestPresentationProject("proj-presentation-plan-test");
+      const card = (n: number, title: string) => ({ slideNumber: n, type: "framework_methodology", title, speakerNotes: "notes", card: { layout: "statement" } });
+      const brain = mockBrain({ deckTitle: "T", slides: [card(1, "A"), card(2, "B"), card(3, "C"), card(4, "D")] });
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/presentation/generate-deck`)
+        .set(aiHeaders)
+        .send({
+          title: "FPGA decoders",
+          keyMessage: "Pipelined decoders keep up in real time.",
+          points: ["Software decoders fall behind", "We tested three boards"],
+          durationMinutes: 10,
+          slideCount: 8,
+        });
+      expect(res.status).toBe(200);
+      expect(res.body.generatedBy).toBe("ai-gateway");
+      const prompt = String((brain.mock.calls[0][0] as { userPrompt: string }).userPrompt);
+      expect(prompt).toContain("Key message (open with it on the title card's lede and close with it as the final takeaway): Pipelined decoders keep up in real time.");
+      expect(prompt).toContain("1. Software decoders fall behind\n2. We tested three boards");
+      expect(prompt).toContain("Duration: 10 minutes (about 75 seconds per card)");
+      brain.mockRestore();
+    });
+
     // The route used to return a fixed, topic-independent Q&A set (with invented
     // results) whenever the AI call failed, and this test asserted it. It now
     // returns only the AI's questions (PRODUCT_AUDIT P0-11), so the answer is mocked.
