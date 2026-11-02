@@ -326,17 +326,20 @@ export async function renderDocx(
       "MANUSCRIPT SUBMISSION"
   );
 
+  // The title page shows only what the project records about its authors.
   const authors = academicOptions?.authors && academicOptions.authors.length > 0
     ? academicOptions.authors
-    : [
+    : metadata.author?.trim()
+    ? [
         {
-          name: metadata.author || "Lead Researcher",
-          affiliation: academicOptions?.authorAffiliation || "Department of Academic Research",
-          email: academicOptions?.authorEmail || "author@university.edu",
-          orcid: academicOptions?.authorOrcid || "0000-0002-1825-0097",
+          name: metadata.author.trim(),
+          affiliation: academicOptions?.authorAffiliation || "",
+          email: academicOptions?.authorEmail || "",
+          orcid: academicOptions?.authorOrcid || "",
           isCorresponding: true,
         },
-      ];
+      ]
+    : [];
 
   // Calculate word count statistics
   const totalWords = document.blocks.reduce(
@@ -635,42 +638,26 @@ export async function renderDocx(
   // ==========================================================================
   const decl = academicOptions?.ethicalDeclarations || {};
 
-  children.push(
-    new Paragraph({
-      text: "Declarations",
-      heading: HeadingLevel.HEADING_1,
-      spacing: { before: 400, after: 160 },
-      run: { font: fontName, bold: true, size: 28 },
-    })
-  );
-
+  // Only statements the authors wrote: an unwritten declaration is left out,
+  // never filled in on their behalf.
   const declarationStatements = [
-    {
-      label: "Data & Primary Material Availability",
-      text:
-        decl.dataAvailability ||
-        "All empirical simulation telemetry, benchmark datasets, and analysis scripts generated during this study are archived in the repository and available upon reasonable request.",
-    },
-    {
-      label: "Competing Interests / Funding Declaration",
-      text:
-        decl.competingInterests ||
-        decl.funding ||
-        "The authors declare no competing financial or non-financial interests that could have influenced the outcomes presented in this paper.",
-    },
-    {
-      label: "CRediT Author Contribution Statement",
-      text:
-        decl.authorContributions ||
-        "All authors contributed substantially to study conceptualization, theoretical formulation, experimental execution, and manuscript preparation.",
-    },
-    {
-      label: "Transparent Methodology & AI-Assisted Tool Disclosure",
-      text:
-        decl.aiDisclosure ||
-        "During the preparation of this manuscript, the authors utilized Scholar Agentic OS strictly for orthographic refinement and literature synthesis. All analyses and conclusions were verified by the authors.",
-    },
-  ];
+    { label: "Data & Primary Material Availability", text: decl.dataAvailability },
+    { label: "Competing Interests", text: decl.competingInterests },
+    { label: "Funding", text: decl.funding },
+    { label: "CRediT Author Contribution Statement", text: decl.authorContributions },
+    { label: "AI-Assisted Tool Disclosure", text: decl.aiDisclosure },
+  ].filter((d): d is { label: string; text: string } => typeof d.text === "string" && d.text.trim().length > 0);
+
+  if (declarationStatements.length > 0) {
+    children.push(
+      new Paragraph({
+        text: "Declarations",
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 400, after: 160 },
+        run: { font: fontName, bold: true, size: 28 },
+      })
+    );
+  }
 
   declarationStatements.forEach((item) => {
     children.push(
@@ -694,31 +681,29 @@ export async function renderDocx(
   });
 
   // ==========================================================================
-  // HANGING-INDENT CANONICAL BIBLIOGRAPHY
+  // HANGING-INDENT BIBLIOGRAPHY: only references passed in, from their own fields
   // ==========================================================================
-  children.push(
-    new Paragraph({
-      text: "References",
-      heading: HeadingLevel.HEADING_1,
-      spacing: { before: 400, after: 160 },
-      run: { font: fontName, bold: true, size: 28 },
-    })
-  );
+  const references = (academicOptions?.references ?? []).map((r) => {
+    const parts = [
+      r.authors && r.authors.length > 0 ? r.authors.join(", ") : "",
+      `(${r.year || "n.d."}).`,
+      r.title ? `${r.title}.` : "",
+      r.journal ? `${r.journal}.` : "",
+      r.doi ? `https://doi.org/${r.doi}` : "",
+    ];
+    return parts.filter(Boolean).join(" ").trim();
+  });
 
-  const references =
-    academicOptions?.references && academicOptions.references.length > 0
-      ? academicOptions.references.map((r, idx) => {
-          const authorStr = r.authors && r.authors.length > 0 ? r.authors.join(", ") : "Scholar OS Investigator";
-          const yearStr = r.year || "n.d.";
-          const titleStr = r.title || "Academic Study";
-          const journalStr = r.journal || "Journal of Academic Synthesis";
-          const doiStr = r.doi ? `https://doi.org/${r.doi}` : "";
-          return `${authorStr} (${yearStr}). ${titleStr}. ${journalStr}. ${doiStr}`.trim();
-        })
-      : [
-          "Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). Attention is all you need. Advances in Neural Information Processing Systems, 30, 5998-6008. https://doi.org/10.48550/arXiv.1706.03762",
-          "Kovacs, L., & Rostova, E. (2026). FPGA Latency Benchmark Data [Empirical Research Dataset]. Primary User Ingestion. https://doi.org/10.5281/zenodo.10987654",
-        ];
+  if (references.length > 0) {
+    children.push(
+      new Paragraph({
+        text: "References",
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 400, after: 160 },
+        run: { font: fontName, bold: true, size: 28 },
+      })
+    );
+  }
 
   // Alphabetically sort references
   const sortedReferences = [...references].sort((a, b) => a.localeCompare(b));
@@ -802,7 +787,7 @@ export async function renderRefereeResponseLetterDocx(
 ): Promise<Buffer> {
   const fontName = "Times New Roman";
   const title = norm(metadata.title || "Academic Manuscript");
-  const author = norm(metadata.author || "Lead Investigator");
+  const author = norm(metadata.author?.trim() || "The authors");
 
   // Only the author's own rebuttal matrix; never sample reviewer comments.
   const matrix = academicOptions?.rebuttalMatrix ?? [];
@@ -985,7 +970,7 @@ export async function renderRefereeResponseLetterDocx(
       spacing: { before: 40, after: 120 },
       children: [
         new TextRun({
-          text: `${author}\nOn behalf of all co-authors`,
+          text: metadata.author?.trim() ? `${author}\nOn behalf of all co-authors` : author,
           font: fontName,
           bold: true,
           size: 24,

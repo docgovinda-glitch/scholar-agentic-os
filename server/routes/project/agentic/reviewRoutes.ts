@@ -944,7 +944,7 @@ reviewRoutes.post("/export", async (req: express.Request<{ id: string }>, res) =
         title: doc.title,
         author: project.authors?.[0]
           ? `${project.authors[0].firstName} ${project.authors[0].surname}`
-          : "Scholar OS Investigator",
+          : "",
         discipline: project.answers?.["research_area"] || "Computer Science",
         templateName: citationStyle,
         academicOptions: {
