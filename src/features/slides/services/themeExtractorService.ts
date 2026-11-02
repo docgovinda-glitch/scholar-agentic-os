@@ -324,11 +324,6 @@ export function generateThemeFromPrompt(prompt: string): ExtractedThemeResult {
       textSecondary: '#3F3F46',
       textMuted: '#71717A',
       fontFamily: 'serif',
-      previewKpis: [
-        { value: '120k', label: 'Migratory Birds', sub: 'Seasonal Census' },
-        { value: '66', label: 'Sessions', sub: 'Field Observation' },
-        { value: '18k', label: 'Spots', sub: 'Public Engagement' },
-      ],
     };
   }
 
@@ -348,11 +343,6 @@ export function generateThemeFromPrompt(prompt: string): ExtractedThemeResult {
       textSecondary: '#D4D4D8',
       textMuted: '#A1A1AA',
       fontFamily: 'serif',
-      previewKpis: [
-        { value: '142.0', label: 'Fund Liquidity', sub: 'Capital Active' },
-        { value: '118', label: 'Portfolio Deals', sub: 'Series A/B' },
-        { value: '+18.0%', label: 'QoQ IRR', sub: 'Outperforming' },
-      ],
     };
   }
 
@@ -372,7 +362,6 @@ export function generateThemeFromPrompt(prompt: string): ExtractedThemeResult {
       textSecondary: '#44403C',
       textMuted: '#78716C',
       fontFamily: 'serif',
-      previewKpis: [{ value: '33.5', label: 'Conditional Approval', sub: 'Equity Transfer' }],
     };
   }
 
@@ -392,7 +381,6 @@ export function generateThemeFromPrompt(prompt: string): ExtractedThemeResult {
       textSecondary: '#334155',
       textMuted: '#64748B',
       fontFamily: 'sans',
-      previewKpis: [{ value: '90-Day', label: 'Memory Retention', sub: 'Randomized Trial' }],
     };
   }
 
@@ -412,11 +400,6 @@ export function generateThemeFromPrompt(prompt: string): ExtractedThemeResult {
       textSecondary: '#CBD5E1',
       textMuted: '#64748B',
       fontFamily: 'sans',
-      previewKpis: [
-        { value: '326', label: 'Fleet Units', sub: 'Active' },
-        { value: '105.2%', label: 'Target Ratio', sub: 'Q4 Yield' },
-        { value: '<8ms', label: 'Latency', sub: 'LiDAR Link' },
-      ],
     };
   }
 
@@ -436,10 +419,6 @@ export function generateThemeFromPrompt(prompt: string): ExtractedThemeResult {
       textSecondary: '#334155',
       textMuted: '#64748B',
       fontFamily: 'sans',
-      previewKpis: [
-        { value: 'p⁰→p¹', label: 'State Transition', sub: 'Continuous Flow' },
-        { value: '99.4%', label: 'Purity Yield', sub: 'Target Band' },
-      ],
     };
   }
 
@@ -459,7 +438,6 @@ export function generateThemeFromPrompt(prompt: string): ExtractedThemeResult {
     textSecondary: '#334155',
     textMuted: '#64748B',
     fontFamily: 'sans',
-    previewKpis: [{ value: '98.5%', label: 'Confidence Score', sub: 'AI Grounding' }],
   };
 }
 
@@ -484,10 +462,6 @@ export function generateFreestyleTheme(): ExtractedThemeResult {
       textSecondary: '#A7F3D0',
       textMuted: '#6EE7B7',
       fontFamily: 'serif',
-      previewKpis: [
-        { value: '99.4%', label: 'LiDAR Acc', sub: 'Sensor Fusion' },
-        { value: '320', label: 'Nodes Active', sub: 'Online' },
-      ],
     },
     {
       name: 'Freestyle Wine Red Architecture',
@@ -504,10 +478,6 @@ export function generateFreestyleTheme(): ExtractedThemeResult {
       textSecondary: '#44403C',
       textMuted: '#78716C',
       fontFamily: 'serif',
-      previewKpis: [
-        { value: 'Q3', label: '2023 Realization', sub: 'Quarterly' },
-        { value: '41', label: 'Companies', sub: 'Active' },
-      ],
     },
     {
       name: 'Freestyle Neo Tokyo Mesh',
@@ -524,10 +494,6 @@ export function generateFreestyleTheme(): ExtractedThemeResult {
       textSecondary: '#C4B5FD',
       textMuted: '#8B5CF6',
       fontFamily: 'sans',
-      previewKpis: [
-        { value: '3.4x', label: 'Audience Lift', sub: 'Empirical' },
-        { value: '88%', label: 'Retention', sub: 'Sustained' },
-      ],
     },
     {
       name: 'Freestyle Azure Wetland',
@@ -544,10 +510,6 @@ export function generateFreestyleTheme(): ExtractedThemeResult {
       textSecondary: '#0369A1',
       textMuted: '#38BDF8',
       fontFamily: 'sans',
-      previewKpis: [
-        { value: '186k', label: 'Residents Served', sub: 'Wetlands' },
-        { value: '24', label: 'Active Zones', sub: 'Protected' },
-      ],
     },
     {
       name: 'Freestyle Midnight Gold',
@@ -564,10 +526,6 @@ export function generateFreestyleTheme(): ExtractedThemeResult {
       textSecondary: '#E4E4E7',
       textMuted: '#A1A1AA',
       fontFamily: 'serif',
-      previewKpis: [
-        { value: '$4.2B', label: 'AUM Deployed', sub: 'Institutional' },
-        { value: '+22.4%', label: 'Benchmark Alpha', sub: 'Historical' },
-      ],
     },
     {
       name: 'Freestyle Alpine Handbook',
@@ -584,10 +542,6 @@ export function generateFreestyleTheme(): ExtractedThemeResult {
       textSecondary: '#1E3A2F',
       textMuted: '#3F6254',
       fontFamily: 'sans',
-      previewKpis: [
-        { value: '4-Season', label: 'Returns Index', sub: 'Eco Certified' },
-        { value: '180d', label: 'Field Duration', sub: 'Audited' },
-      ],
     },
   ];
 

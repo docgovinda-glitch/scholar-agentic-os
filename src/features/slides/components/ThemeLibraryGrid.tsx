@@ -332,7 +332,7 @@ export default function ThemeLibraryGrid({
       {/* Summary Counter */}
       <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 px-1">
         <span>Showing {filteredThemes.length} curated design templates</span>
-        <span className="font-mono text-[11px]">100% Royalty-Free &amp; Public Domain · Zero Copyright</span>
+        <span className="font-mono text-[11px]">Themes change colours, type and layout only</span>
       </div>
 
       {/* Grid of Theme Cards */}
