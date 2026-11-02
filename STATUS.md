@@ -226,10 +226,10 @@ Earlier deliverables (`SYSTEM_MAP.md`, `SETUP.md`, `AUDIT.md`, `PROD_CHECKS.md`,
 
 **Known gaps (not blocking, recorded):**
 
-- B3: the deep-research browser hand-off, output guardrails in `server/utils/llm.ts`, and a single `brain.ts` contract are not done. Today every route either uses the user's own AI or returns an honest 426/400/502.
+- B3: every server AI call now goes through one router (#140–#144, `docs/AI-SYSTEM.md` §0), including deep research, which hands off to the browser (426) when no AI is connected or the user's local model is first. Output guardrails stay per feature (citation lock, scholarly voice) rather than in one place.
 - B4: real BYOK calls per provider, local runners and quota exhaustion are tested with mocks and a stand-in AI only (no real provider keys in CI). Admin CRUD for providers/models/budgets has no dedicated tests.
-- B5: export is tested end to end for Journal only; Coursework, Thesis and Proposal export are not covered by automated tests (UNVERIFIED). No screen shows saved versions (backlog).
-- P1-13 (development only): the server ignores a custom local-runner address.
+- B5: Journal export is tested end to end; Coursework export (the .docx a student submits) has a unit test that unzips the file and checks its content. Thesis and Proposal have no export feature (backlog). No screen shows saved versions (backlog).
+- P1-13 fixed: a custom local-runner address reaches the router's local adapters (#141; test in `routerBridge.test.ts`).
 - Signup e-mail verification, password reset, ID upload, Zotero/Mendeley/Drive sync and the admin UI are not covered by automated tests (they need real inboxes or third-party accounts); see `PRODUCT_AUDIT.md` areas a, d, h.
 - The full vitest suite has ~18 tests in 5 files that need real credentials or network (`CLAUDE.md`); CI runs the rest.
 - Render free plan: cold starts (up to ~1 minute) and 512 MB RAM.

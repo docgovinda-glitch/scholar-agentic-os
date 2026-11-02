@@ -117,4 +117,25 @@ describe("existing AI steps through the router", () => {
     const same = keyringFromRequest({ headers: { "x-ai-keyring": ring, "x-ai-provider": "anthropic", "x-ai-model": "a1", "x-ai-api-key": "k1" } });
     expect(same).toHaveLength(1);
   });
+
+  it("a custom local-runner address is used, not the default (P1-13)", async () => {
+    const saved = process.env.ALLOW_SERVER_LOCAL_AI;
+    process.env.ALLOW_SERVER_LOCAL_AI = "true";
+    const seen: Array<string | undefined> = [];
+    const recorder: ProviderAdapter = {
+      async *stream(c: Candidate): AsyncIterable<AdapterChunk> {
+        seen.push(c.credential?.baseUrl);
+        yield { type: "text", text: "ok" };
+        yield { type: "usage", inputTokens: 1, outputTokens: 1 };
+      },
+    };
+    configureRouterBridge({ adapters: { ollama: recorder } });
+    try {
+      const res = await request(app()).post("/step").set({ "x-ai-provider": "ollama", "x-ai-model": "llama", "x-ai-base-url": "http://10.0.0.7:11500" }).send({});
+      expect(res.status).toBe(200);
+      expect(seen).toEqual(["http://10.0.0.7:11500"]);
+    } finally {
+      if (saved === undefined) delete process.env.ALLOW_SERVER_LOCAL_AI; else process.env.ALLOW_SERVER_LOCAL_AI = saved;
+    }
+  });
 });
