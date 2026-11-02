@@ -5,7 +5,6 @@ import {
   exportJournalToDocx,
   exportRefereeLetterToDocx,
   downloadBlob,
-  generateJournalLatex,
 } from "./services/journalExportService";
 import {
   downloadProjectExportBlob,
@@ -14,6 +13,8 @@ import {
 import type { WordBudgetBlueprint, RebuttalMatrixItem } from "./types";
 import ReferencesCheck from "../journal/ReferencesCheck";
 import VerificationChecks, { useVerification } from "../journal/VerificationChecks";
+import { LATEX_TEMPLATES, buildLatex, exportParts, packageReadme, suggestTemplate, type LatexTemplate } from "../../domain/journal/latex";
+import { buildJats } from "../../domain/journal/jats";
 import { checkDois, lookupDoi } from "../journal/referenceApi";
 import { studioEvidence } from "../journal/studioEvidence";
 import { auditCitations, recordsForSources } from "../../domain/journal/referenceAudit";
@@ -171,6 +172,11 @@ export default function AuditExportMode() {
     "1-column-double"
   );
   const [citationStyle, setCitationStyle] = useState<string>(styleSelectValue(answers["citation_style"]));
+  // The publisher's LaTeX class: suggested from the target journal, the author's to change.
+  const [latexTemplate, setLatexTemplate] = useState<LatexTemplate>(() =>
+    suggestTemplate(`${answers["target_journal"] || ""} ${answers["publisher"] || ""}`)
+  );
+  const latexTemplateChosen = React.useRef(false);
   const renderedManuscript = useMemo(
     () => renderManuscript(manuscriptMarkdown, recordsForSources(sources, savedRecords), styleKey(citationStyle)),
     [manuscriptMarkdown, sources, savedRecords, citationStyle]
@@ -209,6 +215,9 @@ export default function AuditExportMode() {
       }
       if (answers["citation_style"]) {
         setCitationStyle(styleSelectValue(answers["citation_style"]));
+      }
+      if (!latexTemplateChosen.current) {
+        setLatexTemplate(suggestTemplate(`${answers["target_journal"] || ""} ${answers["publisher"] || ""}`));
       }
       for (const [key, set] of [
         ["data_availability_statement", setDataAvailabilityStatement],
@@ -388,6 +397,17 @@ export default function AuditExportMode() {
   const exportBlocked = referenceAudit.blocking > 0;
   const exportBlockedNotice = `Fix the references first: ${referenceAudit.blocking} citation${referenceAudit.blocking === 1 ? "" : "s"} ${referenceAudit.blocking === 1 ? "points" : "point"} to no source or to a retracted paper. See "2. References".`;
   const exportText = renderedManuscript.markdown;
+  // The declarations the authors wrote and left switched on; nothing else.
+  const writtenDeclarations = (
+    [
+      ["Data Availability", dataAvailabilityEnabled, dataAvailabilityStatement],
+      ["Competing Interests", competingInterestsEnabled, competingInterestsStatement],
+      ["Author Contributions", creditEnabled, creditStatement],
+      ["Use of AI Tools", aiDisclosureEnabled, aiDisclosureStatement],
+    ] as Array<[string, boolean, string]>
+  )
+    .filter(([, on, text]) => on && String(text).trim())
+    .map(([label, , text]) => ({ label, text: String(text).trim() }));
 
   // Export handlers
   const handleDownloadDocx = useCallback(async () => {
@@ -521,7 +541,7 @@ export default function AuditExportMode() {
   }, [project, title, authorName, layoutMode, rebuttalMatrix]);
 
   const handleQuickExport = useCallback(
-    (format: "latex" | "typst" | "markdown") => {
+    (format: "latex" | "jats" | "typst" | "markdown") => {
       if (exportBlocked) {
         setExportNotice(exportBlockedNotice);
         return;
@@ -529,23 +549,39 @@ export default function AuditExportMode() {
       if (format === "markdown") {
         const blob = new Blob([exportText], { type: "text/markdown;charset=utf-8" });
         downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.md`);
-      } else if (format === "latex") {
-        const latexRes = generateJournalLatex({
+      } else if (format === "latex" || format === "jats") {
+        const parts = exportParts(manuscriptMarkdown);
+        const shared = {
           title,
-          targetJournal: "Journal Submission",
-          template: layoutMode === "2-column-camera" ? "ieee" : "nature",
-          authors: [{ name: authorName, affiliation, email }],
-          sections: [{ section: "Body", content: exportText }],
-        });
-        const blob = new Blob([latexRes.tex], { type: "text/x-tex;charset=utf-8" });
-        downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.tex`);
+          journal: String(answers.target_journal || "").trim() || undefined,
+          authors: authorName.trim() ? [{ name: authorName, affiliation, email, orcid }] : [],
+          abstract: parts.abstract || String(answers["abstract"] || ""),
+          keywords: keywords.split(",").map((k: string) => k.trim()).filter(Boolean),
+          body: parts.body,
+          declarations: writtenDeclarations,
+          records: recordsForSources(sources, savedRecords),
+        };
+        const base = title.replace(/[^a-zA-Z0-9_-]/g, "_") || "manuscript";
+        if (format === "jats") {
+          downloadBlob(new Blob([buildJats(shared)], { type: "application/xml;charset=utf-8" }), `${base}.xml`);
+        } else {
+          const pkg = buildLatex({ ...shared, template: latexTemplate, style: styleKey(citationStyle) });
+          void (async () => {
+            const { default: JSZip } = await import("jszip");
+            const zip = new JSZip();
+            zip.file("main.tex", pkg.tex);
+            if (pkg.bib) zip.file("references.bib", pkg.bib);
+            zip.file("README.txt", packageReadme(latexTemplate, shared.journal ?? ""));
+            downloadBlob(await zip.generateAsync({ type: "blob" }), `${base}_latex.zip`);
+          })();
+        }
       } else if (format === "typst") {
         const typstContent = `#set page(paper: "a4", margin: 2.5cm)\n#set text(font: "Linux Libertine", size: 11pt)\n\n= ${title}\n\n*${authorName}*\n_${affiliation}_\n\n${exportText}`;
         const blob = new Blob([typstContent], { type: "text/plain;charset=utf-8" });
         downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.typ`);
       }
     },
-    [exportText, exportBlocked, exportBlockedNotice, title, layoutMode, authorName, affiliation, email]
+    [exportText, exportBlocked, exportBlockedNotice, title, authorName, affiliation, email, orcid, answers, manuscriptMarkdown, keywords, writtenDeclarations, sources, savedRecords, latexTemplate, citationStyle]
   );
 
   return (
@@ -913,6 +949,31 @@ export default function AuditExportMode() {
                 ))}
               </select>
             </div>
+
+            {/* Publisher LaTeX class */}
+            <div>
+              <label htmlFor="latex-template-select" className="block text-xs font-bold text-[color:var(--text-primary)] mb-1">
+                LaTeX template
+              </label>
+              <select
+                id="latex-template-select"
+                value={latexTemplate}
+                onChange={(e) => {
+                  latexTemplateChosen.current = true;
+                  setLatexTemplate(e.target.value as LatexTemplate);
+                }}
+                className="w-full text-xs p-2 rounded-lg border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--border-strong)]"
+              >
+                {LATEX_TEMPLATES.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-[color:var(--text-muted)]">
+                Switching journal? Pick its publisher's class and citation style; the LaTeX and Word files are rebuilt from the same text.
+              </p>
+            </div>
           </div>
 
           {/* Author & Title Page Metadata */}
@@ -1096,13 +1157,22 @@ export default function AuditExportMode() {
               <div className="text-[11px] font-bold text-[color:var(--text-muted)] mb-2">
                 Secondary Formats:
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
                   type="button"
                   onClick={() => handleQuickExport("latex")}
+                  title={`main.tex for ${LATEX_TEMPLATES.find((t) => t.id === latexTemplate)?.label}, references.bib and a README, in one .zip`}
                   className="py-1.5 px-2 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] text-xs font-semibold hover:border-[color:var(--border-strong)] transition"
                 >
-                  LaTeX (.tex)
+                  LaTeX (.zip)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickExport("jats")}
+                  title="JATS 1.3 XML, the format journals and PubMed Central exchange articles in"
+                  className="py-1.5 px-2 rounded border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] text-xs font-semibold hover:border-[color:var(--border-strong)] transition"
+                >
+                  JATS XML (.xml)
                 </button>
                 <button
                   type="button"
