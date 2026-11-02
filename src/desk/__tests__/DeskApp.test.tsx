@@ -9,7 +9,7 @@
 // is tested in DeskAuthGate.test.tsx, and the server-side enforcement that
 // actually protects the data is in server/routes/__tests__/project.authz.test.ts.
 
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeAll, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { BrowserRouter } from "react-router-dom";
@@ -115,6 +115,31 @@ const projectView = (projectId: string, over: Record<string, unknown> = {}) => (
   gates: [{ gate: "G0", name: "Definition", status: "not_started", outstandingBlocking: [] }],
   ...over,
 });
+
+// DeskApp code-splits its screens with React.lazy() behind one Suspense
+// boundary. Under vitest every first import() of a screen makes Vite
+// transform that module and its whole dependency tree on demand, which is
+// slow — under CPU load it takes well over the 1 s default findBy* timeout,
+// so whichever test first hits a screen (e.g. ProjectListScreen on
+// /projects) timed out while the Suspense fallback was still showing.
+// Loading the chunks up front, outside any test's timing, means each findBy*
+// waits only on what it's meant to: render + the mocked fetches. If you add
+// a lazy screen to DeskApp.tsx, add it here too.
+beforeAll(async () => {
+  await Promise.all([
+    import("../account/AccountSettingsScreen"),
+    import("../aiAccess/AiAccessPage"),
+    import("../DeskShell"),
+    import("../workspace/ResearchWorkspace"),
+    import("../assignment/AssignmentWorkspace"),
+    import("../thesis/ThesisWorkspace"),
+    import("../proposal/ProposalWorkspace"),
+    import("../presentation/PresentationWorkspace"),
+    import("../ProjectListScreen"),
+    import("../setup/VaultSetupScreen"),
+    import("../vault/VaultScreen"),
+  ]);
+}, 60_000);
 
 // Deterministic starting URL for every test, not just a leftover from the
 // previous one's afterEach — the first test in the file would otherwise start
