@@ -321,7 +321,7 @@ function streamEventSink(sendEvent: (event: string, data: unknown) => void, onTo
     if (ev.type === "retry") sendEvent("log", { message: `↻ ${ev.message}. Retrying in ${Math.ceil(ev.waitMs / 1000)}s` });
     if (ev.type === "candidate_skipped") sendEvent("log", { message: `Skipped ${ev.label}: ${ev.detail}` });
     if (ev.type === "attempt_start") sendEvent("log", { message: `> ${ev.label}` });
-    if (ev.type !== "metrics") sendEvent("route", ev);
+    sendEvent("route", ev);
   };
 }
 

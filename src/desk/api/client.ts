@@ -1,6 +1,7 @@
 import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
 import { buildKeyring, encodeKeyring } from "../ai/keyring";
 import { inspectAiResponse } from "../ai/aiRouteNotices";
+import { liveAiStatus } from "../ai/liveAiStatus";
 import { type RoutingTaskType, routeDecision } from "../aiAccess/aiAccessApi";
 import { completeWithFailover, streamWithFailover } from "../../platform/gateway/gateway";
 import { defaultPolicy, recordConsent } from "../../platform/warden/warden";
@@ -229,10 +230,34 @@ export async function authedStreamFetch(
   body: unknown,
   onEvent: (event: string, data: any) => void
 ): Promise<void> {
+  if (!routeUsesClientAi(input)) return streamFetch(input, method, body, onEvent);
+  // AI steps report their routing to the status dock, which can also stop them.
+  const run = liveAiStatus.begin();
+  const tracked = (event: string, data: any) => {
+    if (event === "route") run.publish(data);
+    return onEvent(event, data);
+  };
+  try {
+    await streamFetch(input, method, body, tracked, run.signal);
+    run.end();
+  } catch (err) {
+    run.end(err);
+    throw err;
+  }
+}
+
+async function streamFetch(
+  input: string,
+  method: string,
+  body: unknown,
+  onEvent: (event: string, data: any) => void,
+  signal?: AbortSignal
+): Promise<void> {
   const res = await authedFetch(input, {
     method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (res.status === 426) {
@@ -260,6 +285,7 @@ export async function authedStreamFetch(
 
         const postRes = await authedFetch(input, {
           method,
+          signal,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...((typeof body === "object" && body !== null ? body : {})),
