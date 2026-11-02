@@ -123,7 +123,7 @@ describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () =>
   });
 
   describe("2. Zero-Ghost Overhaul for ProposalWorkspace (OT-19) & ThesisWorkspace (OT-09)", () => {
-    it("renders ProposalWorkspace (OT-19) with an empty project and zero occurrences of 'Autonomous Verification' or 'Quantum Cognitive', showing 'Generate Structured Blueprint from Topic'", () => {
+    it("renders ProposalWorkspace (OT-19) with an empty project and zero occurrences of 'Autonomous Verification' or 'Quantum Cognitive', offering 3 empty aims", () => {
       const { container } = render(<ProposalWorkspace projectId="proj-empty-proposal" />);
 
       const htmlText = container.textContent || "";
@@ -131,11 +131,11 @@ describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () =>
       expect(htmlText).not.toMatch(/Quantum Cognitive/i);
 
       const blueprintBtn = screen.getByTestId("generate-structured-blueprint-btn");
-      expect(blueprintBtn).toHaveTextContent(/Generate Structured Blueprint from Topic/i);
+      expect(blueprintBtn).toHaveTextContent(/Set up 3 aims to fill in/i);
 
-      // Clicking the button populates a clean 3-Aim blueprint
+      // Clicking the button sets up three empty aims (no wording written for the applicant)
       fireEvent.click(blueprintBtn);
-      expect(screen.getByText(/3 Aims Formulated/i)).toBeInTheDocument();
+      expect(screen.getByText(/0 of 3 aims written/i)).toBeInTheDocument();
     });
 
     it("renders ThesisWorkspace (OT-09) with an empty project and zero occurrences of 'Quantum Cognitive' or 'Autonomous Verification', offering a 5-chapter structure", () => {

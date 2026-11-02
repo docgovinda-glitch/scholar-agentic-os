@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import StudySectionScorer from "./components/StudySectionScorer";
 import {
   auditSpecificAims,
+  draftProposalSection,
   getProject,
   saveIntakeAnswers,
   simulateStudySectionReview,
@@ -11,7 +12,22 @@ import {
 import WorkspaceAutosaveBadge from "../../components/ui/WorkspaceAutosaveBadge";
 import AppleStudioHeader, { type AppleStudioPhaseId } from "../../components/ui/AppleStudioShell";
 import { useUnsavedChangesGuard } from "../../hooks/useUnsavedChangesGuard";
-import { Sparkles, Plus, Trash2, CheckCircle2 } from "lucide-react";
+import { Sparkles, Plus, Trash2, CheckCircle2, Download } from "lucide-react";
+import NarrativeSectionEditor from "./components/NarrativeSectionEditor";
+import BudgetEditor from "./components/BudgetEditor";
+import {
+  NARRATIVE_SECTIONS,
+  UNTITLED_PROPOSAL,
+  aimSlots,
+  budgetTotal,
+  proposalToMarkdown,
+  type BudgetItem,
+  type NarrativeKey,
+  type ProposalProjectData,
+} from "./proposalModel";
+import { proposalDocxBlob } from "./proposalExport";
+import { downloadBlob } from "../assignment/services/assignmentExportService";
+import { thesisFileName } from "../thesis/thesisExport";
 
 export type ProposalStage =
   | "agency_rubric"
@@ -23,20 +39,7 @@ export type ProposalStage =
   | "broader_impacts"
   | "study_section_review";
 
-export interface ProposalProjectData {
-  id: string;
-  title: string;
-  fundingAgency: string;
-  mechanism: string;
-  targetBudgetUSD: number;
-  durationMonths: number;
-  overarchingHypothesis: string;
-  specificAims: string[];
-  significanceStatement: string;
-  innovationStatement: string;
-  broaderImpacts: string;
-  preliminaryStudiesSummary: string;
-}
+export type { ProposalProjectData } from "./proposalModel";
 
 const PROPOSAL_STAGES: {
   id: ProposalStage;
@@ -137,7 +140,7 @@ export default function ProposalWorkspace({
   // Zero-Ghost Clean Empty Initial State (no pre-populated demo strings)
   const [proposalData, setProposalData] = useState<ProposalProjectData>({
     id: projectId,
-    title: "Untitled Research Proposal",
+    title: UNTITLED_PROPOSAL,
     fundingAgency: "",
     mechanism: "",
     targetBudgetUSD: 0,
@@ -146,8 +149,11 @@ export default function ProposalWorkspace({
     specificAims: [],
     significanceStatement: "",
     innovationStatement: "",
+    approachStrategy: "",
     broaderImpacts: "",
     preliminaryStudiesSummary: "",
+    budgetItems: [],
+    budgetJustification: "",
   });
 
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "offline">("saved");
@@ -167,6 +173,8 @@ export default function ProposalWorkspace({
   const [reviewError, setReviewError] = useState<string | null>(null);
 
   const isFirstMount = useRef(true);
+  // Fields edited before the saved project finished loading: loading never overwrites them.
+  const touchedRef = useRef<Set<keyof ProposalProjectData>>(new Set());
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Hydrate from backend project intake answers on mount
@@ -185,9 +193,9 @@ export default function ProposalWorkspace({
           (a["proposalTitle"] as string) ||
           (a["title"] as string) ||
           (projectObj.title as string) ||
-          "Untitled Research Proposal";
+          UNTITLED_PROPOSAL;
 
-        setProposalData((prev) => ({
+        setProposalData((prev) => keepTouched(prev, touchedRef.current, {
           ...prev,
           title: hydratedTitle,
           fundingAgency: (a["fundingAgency"] as string) ?? prev.fundingAgency,
@@ -215,6 +223,9 @@ export default function ProposalWorkspace({
           broaderImpacts: (a["broaderImpacts"] as string) ?? prev.broaderImpacts,
           preliminaryStudiesSummary:
             (a["preliminaryStudiesSummary"] as string) ?? prev.preliminaryStudiesSummary,
+          approachStrategy: (a["approachStrategy"] as string) ?? prev.approachStrategy,
+          budgetItems: Array.isArray(a["budgetItems"]) ? (a["budgetItems"] as BudgetItem[]) : prev.budgetItems,
+          budgetJustification: (a["budgetJustification"] as string) ?? prev.budgetJustification,
         }));
         if (typeof projectObj.version === "number") {
           setProjectVersion(projectObj.version);
@@ -247,6 +258,9 @@ export default function ProposalWorkspace({
             innovationStatement: nextData.innovationStatement,
             broaderImpacts: nextData.broaderImpacts,
             preliminaryStudiesSummary: nextData.preliminaryStudiesSummary,
+            approachStrategy: nextData.approachStrategy,
+            budgetItems: nextData.budgetItems,
+            budgetJustification: nextData.budgetJustification,
           });
           if (updated && updated.version) {
             setProjectVersion(updated.version);
@@ -267,6 +281,7 @@ export default function ProposalWorkspace({
     key: K,
     val: ProposalProjectData[K]
   ) {
+    touchedRef.current.add(key);
     setProposalData((prev) => {
       const next = { ...prev, [key]: val };
       if (!isFirstMount.current) {
@@ -277,40 +292,45 @@ export default function ProposalWorkspace({
     isFirstMount.current = false;
   }
 
+  /** Three empty aim slots to fill in. The proposal's wording is always the applicant's own. */
   function handleGenerateBlueprintFromTopic() {
-    const topicTitle =
-      proposalData.title && proposalData.title !== "Untitled Research Proposal"
-        ? proposalData.title
-        : "Empirical Investigation of Proposed Research Architecture";
-    // The starter only scaffolds editable outline text. Funder, mechanism and
-    // budget are the user's facts, so they are never filled in for them.
-    const agency = proposalData.fundingAgency;
-
-    const next: ProposalProjectData = {
-      ...proposalData,
-      title: topicTitle,
-      overarchingHypothesis:
-        proposalData.overarchingHypothesis ||
-        `We hypothesize that a rigorous empirical framework for ${topicTitle} will measurably improve reproducibility, domain validity, and analytical precision.`,
-      specificAims:
-        proposalData.specificAims.length > 0
-          ? proposalData.specificAims
-          : [
-              `Aim 1: Establish the theoretical and empirical baseline for ${topicTitle}.`,
-              `Aim 2: Design, implement, and validate the core methodological architecture and evaluation metrics.`,
-              `Aim 3: Benchmark scalability, robustness, and translational impact across representative datasets.`,
-            ],
-      significanceStatement:
-        proposalData.significanceStatement ||
-        `Addresses foundational methodological gaps in ${topicTitle}${agency ? ` aligned with ${agency} priorities` : ""}.`,
-      innovationStatement:
-        proposalData.innovationStatement ||
-        `Introduces verifiable multi-stage evaluation and reproducible validation protocols.`,
-    };
-    isFirstMount.current = false;
-    setProposalData(next);
-    persistChanges(next);
+    if (proposalData.specificAims.length > 0) return;
+    updateProposalField("specificAims", aimSlots(proposalData.specificAims));
   }
+
+  const draftBlocker =
+    !proposalData.title.trim() || proposalData.title === UNTITLED_PROPOSAL ? "Add your proposal title in Agency & Rubric first." : undefined;
+
+  async function draftSection(key: NarrativeKey, guidance: string): Promise<string> {
+    const meta = NARRATIVE_SECTIONS[key];
+    const result = await draftProposalSection(projectId, { sectionTitle: meta.title, targetWords: meta.targetWords, prompt: guidance.trim() || undefined });
+    return result.content;
+  }
+
+  const narrative = (key: NarrativeKey, rows = 10) => (
+    <NarrativeSectionEditor
+      key={key}
+      id={`proposal-${key}`}
+      title={NARRATIVE_SECTIONS[key].title}
+      hint={NARRATIVE_SECTIONS[key].hint}
+      targetWords={NARRATIVE_SECTIONS[key].targetWords}
+      value={proposalData[key]}
+      onChange={(next) => updateProposalField(key, next)}
+      onDraft={(g) => draftSection(key, g)}
+      canDraft={!draftBlocker}
+      draftBlocker={draftBlocker}
+      rows={rows}
+    />
+  );
+
+  async function handleExportDocx() {
+    downloadBlob(await proposalDocxBlob(proposalData), thesisFileName(proposalData.title, "docx", "proposal"));
+  }
+
+  function handleExportMarkdown() {
+    downloadBlob(new Blob([proposalToMarkdown(proposalData)], { type: "text/markdown;charset=utf-8" }), thesisFileName(proposalData.title, "md", "proposal"));
+  }
+
 
   async function handleAuditAims() {
     setAuditLoading(true);
@@ -382,8 +402,8 @@ export default function ProposalWorkspace({
         }}
         metricLabel={
           proposalData.targetBudgetUSD > 0
-            ? `$${proposalData.targetBudgetUSD.toLocaleString()} · ${proposalData.durationMonths}mo`
-            : `${proposalData.specificAims.length} Aims`
+            ? `$${budgetTotal(proposalData.budgetItems).toLocaleString("en-US")} / $${proposalData.targetBudgetUSD.toLocaleString("en-US")} · ${proposalData.durationMonths}mo`
+            : `${proposalData.specificAims.filter((a) => a.trim()).length} Aims`
         }
         aiModelLabel="Grant Panel AI"
         onOpenAiAccess={onOpenAiAccess}
@@ -414,16 +434,16 @@ export default function ProposalWorkspace({
                   key={s.id}
                   type="button"
                   onClick={() => setCurrentStage(s.id)}
-                  className={`w-full text-left p-2.5 rounded-xl text-xs font-medium transition-all duration-200 ease-out flex items-center gap-2.5 cursor-pointer ${
+                  className={`shrink-0 md:w-full text-left p-2.5 rounded-xl text-xs font-medium transition-all duration-200 ease-out flex items-center gap-2.5 cursor-pointer ${
                     isActive
                       ? "bg-primary text-surface shadow-xs"
                       : "text-secondary hover:bg-surface hover:text-primary"
                   }`}
                 >
                   <span className="text-base shrink-0">{s.icon}</span>
-                  <div className="overflow-hidden">
-                    <div className="font-bold truncate">{s.label}</div>
-                    <div className={`text-[10px] truncate ${isActive ? "opacity-80" : "text-tertiary"}`}>
+                  <div className="md:overflow-hidden">
+                    <div className="font-bold whitespace-nowrap md:truncate">{s.label}</div>
+                    <div className={`hidden md:block text-[10px] truncate ${isActive ? "opacity-80" : "text-tertiary"}`}>
                       {s.desc}
                     </div>
                   </div>
@@ -445,13 +465,13 @@ export default function ProposalWorkspace({
                 <div className="space-y-1">
                   <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-accent">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Zero-Ghost Grant Blueprint</span>
+                    <span>Start your proposal</span>
                   </div>
                   <h3 className="text-sm font-bold text-primary">
-                    Ready to structure "{proposalData.title}"
+                    {proposalData.title === UNTITLED_PROPOSAL ? "Ready to structure your proposal" : `Ready to structure "${proposalData.title}"`}
                   </h3>
                   <p className="text-xs text-secondary max-w-xl leading-relaxed">
-                    Start with a clean slate by entering your agency details and Specific Aims below, or generate a structured 3-Aim blueprint tailored to your research topic in one click.
+                    Enter your funder and mechanism in Agency &amp; Rubric, then write your central hypothesis and aims. Set up three empty aims to fill in, or add your own.
                   </p>
                 </div>
                 <button
@@ -461,7 +481,7 @@ export default function ProposalWorkspace({
                   className="px-4 py-2.5 rounded-xl bg-primary text-surface text-xs font-semibold hover:opacity-90 transition-all shadow-xs shrink-0 flex items-center gap-1.5 cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Generate Structured Blueprint from Topic</span>
+                  <span>Set up 3 aims to fill in</span>
                 </button>
               </div>
             )}
@@ -478,6 +498,20 @@ export default function ProposalWorkspace({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="apple-card p-4 md:col-span-2">
+                    <label htmlFor="proposal-title" className="text-xs font-bold text-primary block mb-1.5">
+                      Proposal Title
+                    </label>
+                    <input
+                      id="proposal-title"
+                      type="text"
+                      placeholder="Your working title"
+                      value={proposalData.title === UNTITLED_PROPOSAL ? "" : proposalData.title}
+                      onChange={(e) => updateProposalField("title", e.target.value || UNTITLED_PROPOSAL)}
+                      className="w-full px-3 py-2 text-xs border border-border rounded-xl bg-background text-primary"
+                    />
+                  </div>
+
                   <div className="apple-card p-4">
                     <label className="text-xs font-bold text-primary block mb-1.5">
                       Funding Agency
@@ -614,14 +648,14 @@ export default function ProposalWorkspace({
                     </h3>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">
-                        {proposalData.specificAims.length} Aims Formulated
+                        {proposalData.specificAims.filter((a) => a.trim()).length} of {proposalData.specificAims.length} aims written
                       </span>
                       <button
                         type="button"
                         onClick={() =>
                           updateProposalField("specificAims", [
                             ...proposalData.specificAims,
-                            `Aim ${proposalData.specificAims.length + 1}: `,
+                            "",
                           ])
                         }
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-surface-hover hover:bg-border/40 text-primary transition-colors cursor-pointer"
@@ -634,23 +668,25 @@ export default function ProposalWorkspace({
 
                   {proposalData.specificAims.length === 0 ? (
                     <p className="text-xs text-tertiary italic py-2">
-                      No Specific Aims added yet. Click "Add Aim" or "Generate Structured Blueprint from Topic" above.
+                      No aims yet. Use "Add Aim", or "Set up 3 aims to fill in" above.
                     </p>
                   ) : (
                     proposalData.specificAims.map((aim, idx) => (
-                      <div key={idx} className="flex gap-3 items-center">
+                      <div key={idx} className="flex gap-3 items-start">
                         <span className="w-6 h-6 rounded-full bg-primary text-surface text-xs font-bold flex items-center justify-center shrink-0">
                           {idx + 1}
                         </span>
-                        <input
-                          type="text"
+                        <textarea
+                          rows={2}
+                          aria-label={`Aim ${idx + 1}`}
+                          placeholder="What will this aim establish, and how?"
                           value={aim}
                           onChange={(e) => {
                             const next = [...proposalData.specificAims];
                             next[idx] = e.target.value;
                             updateProposalField("specificAims", next);
                           }}
-                          className="flex-1 px-3 py-2 text-xs border border-border rounded-xl bg-background text-primary"
+                          className="flex-1 px-3 py-2 text-xs border border-border rounded-xl bg-background text-primary resize-y"
                         />
                         <button
                           type="button"
@@ -681,31 +717,8 @@ export default function ProposalWorkspace({
                   </p>
                 </div>
 
-                <div className="apple-card p-5">
-                  <label className="text-xs font-bold text-primary block mb-1.5">
-                    Significance & Societal/Economic Impact
-                  </label>
-                  <textarea
-                    rows={4}
-                    placeholder="Explain the knowledge gap and why resolving it matters now..."
-                    value={proposalData.significanceStatement}
-                    onChange={(e) => updateProposalField("significanceStatement", e.target.value)}
-                    className="w-full p-3 text-xs border border-border rounded-xl bg-background text-primary apple-prose-measure"
-                  />
-                </div>
-
-                <div className="apple-card p-5">
-                  <label className="text-xs font-bold text-primary block mb-1.5">
-                    Methodological & Conceptual Innovation
-                  </label>
-                  <textarea
-                    rows={4}
-                    placeholder="Describe novel theoretical, technical, or experimental departures from status quo..."
-                    value={proposalData.innovationStatement}
-                    onChange={(e) => updateProposalField("innovationStatement", e.target.value)}
-                    className="w-full p-3 text-xs border border-border rounded-xl bg-background text-primary apple-prose-measure"
-                  />
-                </div>
+                {narrative("significanceStatement")}
+                {narrative("innovationStatement", 7)}
               </div>
             )}
 
@@ -716,47 +729,15 @@ export default function ProposalWorkspace({
                     Budget Justification & Resource Breakdown
                   </h2>
                   <p className="text-xs text-secondary mt-1">
-                    Direct and indirect cost allocation across personnel, computation, open science, and institutional facilities.
+                    Enter each cost as your funder's rules require. The total is checked against your budget ceiling ({proposalData.targetBudgetUSD > 0 ? `$${proposalData.targetBudgetUSD.toLocaleString("en-US")}` : "set it in Agency & Rubric"}).
                   </p>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="apple-card p-5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
-                      Personnel & Postdocs (60%)
-                    </span>
-                    <h4 className="text-lg font-bold text-primary mt-1">
-                      ${Math.round(proposalData.targetBudgetUSD * 0.6).toLocaleString()}
-                    </h4>
-                    <p className="text-[11px] text-tertiary mt-1">
-                      Lead PI effort + Postdoctoral & Graduate Research Assistants.
-                    </p>
-                  </div>
-
-                  <div className="apple-card p-5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
-                      Compute & Equipment (25%)
-                    </span>
-                    <h4 className="text-lg font-bold text-primary mt-1">
-                      ${Math.round(proposalData.targetBudgetUSD * 0.25).toLocaleString()}
-                    </h4>
-                    <p className="text-[11px] text-tertiary mt-1">
-                      Dedicated experimental instrumentation & high-throughput compute validation.
-                    </p>
-                  </div>
-
-                  <div className="apple-card p-5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
-                      Open Science & Travel (15%)
-                    </span>
-                    <h4 className="text-lg font-bold text-primary mt-1">
-                      ${Math.round(proposalData.targetBudgetUSD * 0.15).toLocaleString()}
-                    </h4>
-                    <p className="text-[11px] text-tertiary mt-1">
-                      Open data repository archiving, Gold OA fees & conference dissemination.
-                    </p>
-                  </div>
-                </div>
+                <BudgetEditor
+                  items={proposalData.budgetItems}
+                  targetBudgetUSD={proposalData.targetBudgetUSD}
+                  onChange={(next) => updateProposalField("budgetItems", next)}
+                />
+                {narrative("budgetJustification", 8)}
               </div>
             )}
 
@@ -831,55 +812,38 @@ export default function ProposalWorkspace({
               </div>
             )}
 
-            {currentStage !== "specific_aims" &&
-              currentStage !== "agency_rubric" &&
-              currentStage !== "significance_innovation" &&
-              currentStage !== "budget_justification" &&
-              currentStage !== "study_section_review" && (
-                <div className="flex flex-col gap-6">
-                  <div>
-                    <h2 className="text-xl font-bold tracking-tight text-primary capitalize">
-                      {PROPOSAL_STAGES.find((s) => s.id === currentStage)?.label}
-                    </h2>
-                    <p className="text-xs text-secondary mt-1">
-                      {PROPOSAL_STAGES.find((s) => s.id === currentStage)?.desc}
-                    </p>
-                  </div>
-
-                  <div className="apple-card p-6 space-y-4">
-                    <textarea
-                      rows={5}
-                      placeholder={`Draft ${PROPOSAL_STAGES.find((s) => s.id === currentStage)?.label} narrative...`}
-                      value={
-                        currentStage === "broader_impacts"
-                          ? proposalData.broaderImpacts
-                          : proposalData.preliminaryStudiesSummary
-                      }
-                      onChange={(e) =>
-                        updateProposalField(
-                          currentStage === "broader_impacts"
-                            ? "broaderImpacts"
-                            : "preliminaryStudiesSummary",
-                          e.target.value
-                        )
-                      }
-                      className="w-full p-3 text-xs border border-border rounded-xl bg-background text-primary apple-prose-measure"
-                    />
-                    <div className="flex items-center justify-between pt-2">
-                      <p className="text-xs text-secondary">
-                        Calibrated against {proposalData.fundingAgency || "agency"} review criteria.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setCurrentStage("study_section_review")}
-                        className="px-4 py-2 bg-primary text-surface text-xs font-bold rounded-xl hover:opacity-90 transition-all cursor-pointer shadow-xs"
-                      >
-                        Proceed to Study Section Review →
-                      </button>
-                    </div>
-                  </div>
+            {currentStage === "preliminary_data" && (
+              <div className="flex flex-col gap-6">
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight text-primary">Preliminary Studies</h2>
+                  <p className="text-xs text-secondary mt-1">Your own prior results that show the aims are feasible.</p>
                 </div>
-              )}
+                {narrative("preliminaryStudiesSummary")}
+              </div>
+            )}
+
+            {currentStage === "approach_workplan" && (
+              <div className="flex flex-col gap-6">
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight text-primary">Research Strategy & Risk</h2>
+                  <p className="text-xs text-secondary mt-1">For each aim: design, methods, analysis, expected outcomes, pitfalls and alternatives, and timeline.</p>
+                </div>
+                {narrative("approachStrategy", 16)}
+              </div>
+            )}
+
+            {currentStage === "broader_impacts" && (
+              <div className="flex flex-col gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-bold tracking-tight text-primary">Broader Impacts & Data Plan</h2>
+                    <p className="text-xs text-secondary mt-1">Benefit beyond the field, dissemination, data sharing and ethics. Then export the full proposal.</p>
+                  </div>
+                  <ExportButtons onDocx={handleExportDocx} onMarkdown={handleExportMarkdown} />
+                </div>
+                {narrative("broaderImpacts")}
+              </div>
+            )}
           </div>
         </main>
 
@@ -928,6 +892,8 @@ export default function ProposalWorkspace({
               </div>
             </div>
 
+            <ExportButtons onDocx={handleExportDocx} onMarkdown={handleExportMarkdown} stacked />
+
             <div className="space-y-2">
               {onOpenVault && (
                 <button
@@ -952,6 +918,30 @@ export default function ProposalWorkspace({
           </aside>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Applies loaded data except for fields the applicant already edited in this session. */
+function keepTouched(prev: ProposalProjectData, touched: Set<keyof ProposalProjectData>, loaded: ProposalProjectData): ProposalProjectData {
+  if (touched.size === 0) return loaded;
+  const out = { ...loaded } as Record<keyof ProposalProjectData, unknown>;
+  for (const k of touched) out[k] = prev[k];
+  return out as ProposalProjectData;
+}
+
+function ExportButtons({ onDocx, onMarkdown, stacked = false }: { onDocx: () => void | Promise<void>; onMarkdown: () => void; stacked?: boolean }) {
+  const cls = "inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-border/60 bg-surface hover:bg-surface-hover text-primary cursor-pointer";
+  return (
+    <div className={stacked ? "grid grid-cols-2 gap-2" : "flex gap-2 shrink-0"}>
+      <button type="button" onClick={() => void onDocx()} className={cls}>
+        <Download className="w-3.5 h-3.5" aria-hidden="true" />
+        Word (.docx)
+      </button>
+      <button type="button" onClick={onMarkdown} className={cls}>
+        <Download className="w-3.5 h-3.5" aria-hidden="true" />
+        Markdown
+      </button>
     </div>
   );
 }
