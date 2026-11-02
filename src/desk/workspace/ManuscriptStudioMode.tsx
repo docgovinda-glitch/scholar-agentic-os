@@ -24,6 +24,7 @@ import { evidenceFor, studioEvidence } from "../journal/studioEvidence";
 import StudioOutline, { UNSORTED_ID } from "../journal/studio/StudioOutline";
 import StudioEvidencePanel from "../journal/studio/StudioEvidencePanel";
 import StudioSectionEditor from "../journal/studio/StudioSectionEditor";
+import type { SectionEditorHandle } from "../journal/studio/SectionTextEditor";
 
 export { IAST_DIACRITICS } from "../journal/studio/StudioSectionEditor";
 
@@ -75,7 +76,7 @@ export default function ManuscriptStudioMode() {
   const [error, setError] = useState<string | null>(null);
   const [polish, setPolish] = useState<{ original: string; revised: string; notes: string[] } | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const editorRef = useRef<SectionEditorHandle | null>(null);
 
   const manuscript = useMemo(() => assembleManuscript(units, texts), [units, texts]);
   const written = totalWords(texts);
@@ -124,16 +125,17 @@ export default function ManuscriptStudioMode() {
     [activeId, persist]
   );
 
-  const insertAtCursor = (text: string, pad = false) => {
-    const el = textareaRef.current;
-    const start = el?.selectionStart ?? value.length;
-    const end = el?.selectionEnd ?? value.length;
-    const piece = pad ? `${start > 0 && !/\s$/.test(value.slice(0, start)) ? " " : ""}${text} ` : text;
-    setActiveText(value.slice(0, start) + piece + value.slice(end));
-    setTimeout(() => {
-      el?.focus();
-      el?.setSelectionRange(start + piece.length, start + piece.length);
-    }, 0);
+  const insertText = (text: string) => editorRef.current?.insertText(text);
+  const insertCitation = (token: string) => {
+    const id = token.match(/^\[CITE:(.+)\]$/)?.[1];
+    if (id) editorRef.current?.insertCitation(id);
+  };
+  // A citation chip reads "Author Year"; the stored text keeps [CITE:id].
+  const citationLabel = (id: string) => {
+    const e = evidence.find((x) => x.id === id);
+    if (!e) return `Unknown source (${id})`;
+    const surname = e.author.split(/[ ,]/).filter(Boolean)[0] || e.author;
+    return `${surname}${/et al\.$/.test(e.author) ? " et al." : ""}, ${e.year ?? "n.d."}`;
   };
 
   const canDraft = Boolean((answers["working_title"] || answers["title"] || answers["core_problem"] || "").trim());
@@ -186,8 +188,7 @@ export default function ManuscriptStudioMode() {
 
   const startPolish = async () => {
     if (!pid || !value.trim()) return;
-    const el = textareaRef.current;
-    const selected = el && el.selectionEnd > el.selectionStart ? value.slice(el.selectionStart, el.selectionEnd) : value;
+    const selected = editorRef.current?.selectedText() || value;
     setBusy("polish");
     setError(null);
     try {
@@ -203,7 +204,12 @@ export default function ManuscriptStudioMode() {
 
   const applyPolish = () => {
     if (!polish) return;
-    setActiveText(value.includes(polish.original) ? value.replace(polish.original, polish.revised) : value);
+    if (!value.includes(polish.original)) {
+      setError("The text changed while it was being polished, so the polish was not applied. Select the passage and try again.");
+      setPolish(null);
+      return;
+    }
+    setActiveText(value.replace(polish.original, polish.revised));
     setPolish(null);
   };
 
@@ -294,10 +300,11 @@ export default function ManuscriptStudioMode() {
                 heading={heading}
                 value={value}
                 onChange={(v) => setActiveText(v)}
-                textareaRef={textareaRef}
+                editorRef={editorRef}
+                citationLabel={citationLabel}
                 onDraft={(g) => void draft(g)}
                 onPolish={() => void startPolish()}
-                onInsertText={(t) => insertAtCursor(t)}
+                onInsertText={insertText}
                 busy={busy}
                 canDraft={canDraft}
                 draftBlocker="Set your research question or working title in Blueprint first, so the AI knows what the article is about."
@@ -322,10 +329,10 @@ export default function ManuscriptStudioMode() {
 
         {showSources && (
           <>
-            <div className="fixed inset-0 z-30 bg-black/40 2xl:hidden" aria-hidden="true" onClick={() => setSourcesOpen(false)} />
+            <div className="fixed inset-0 z-[45] bg-black/40 2xl:hidden" aria-hidden="true" onClick={() => setSourcesOpen(false)} />
             <aside
               aria-label="Sources panel"
-              className="fixed inset-y-0 right-0 z-40 w-full max-w-sm flex flex-col bg-[color:var(--surface-canvas)] shadow-2xl 2xl:static 2xl:z-auto 2xl:shadow-none 2xl:w-80 2xl:shrink-0 border-l border-[color:var(--border-subtle)] min-h-0"
+              className="fixed inset-y-0 right-0 z-50 w-full max-w-sm flex flex-col bg-[color:var(--surface-canvas)] shadow-2xl 2xl:static 2xl:z-auto 2xl:shadow-none 2xl:w-80 2xl:shrink-0 border-l border-[color:var(--border-subtle)] min-h-0"
             >
               <div className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--border-subtle)] 2xl:hidden">
                 <span className="text-xs font-semibold text-[color:var(--text-primary)]">Sources</span>
@@ -337,7 +344,7 @@ export default function ManuscriptStudioMode() {
                 forUnit={unitEvidence}
                 all={evidence}
                 manuscript={manuscript}
-                onInsert={(token) => insertAtCursor(token, true)}
+                onInsert={insertCitation}
                 onGoToEvidence={() => setMode("evidence")}
               />
             </aside>

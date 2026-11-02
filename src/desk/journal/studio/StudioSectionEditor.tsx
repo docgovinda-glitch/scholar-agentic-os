@@ -1,4 +1,5 @@
 import { useState, type RefObject } from "react";
+import SectionTextEditor, { type SectionEditorHandle } from "./SectionTextEditor";
 import { Loader2, Sparkles, Wand2 } from "lucide-react";
 import { countWords, SECTION_GUIDANCE, type ManuscriptUnit } from "../manuscriptModel";
 
@@ -27,7 +28,8 @@ export default function StudioSectionEditor({
   heading,
   value,
   onChange,
-  textareaRef,
+  editorRef,
+  citationLabel,
   onDraft,
   onPolish,
   onInsertText,
@@ -40,7 +42,8 @@ export default function StudioSectionEditor({
   heading: string;
   value: string;
   onChange: (next: string) => void;
-  textareaRef: RefObject<HTMLTextAreaElement | null>;
+  editorRef: RefObject<SectionEditorHandle | null>;
+  citationLabel: (id: string) => string;
   onDraft: (guidance: string) => void;
   onPolish: () => void;
   onInsertText: (text: string) => void;
@@ -79,13 +82,13 @@ export default function StudioSectionEditor({
         </div>
       )}
 
-      <textarea
-        ref={textareaRef}
-        aria-label={`${heading} text`}
+      <SectionTextEditor
+        ref={editorRef}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
+        ariaLabel={`${heading} text`}
         placeholder={unit ? `Write the ${heading.toLowerCase()} here…` : ""}
-        className="w-full min-h-[50vh] p-4 sm:p-5 text-[15px] leading-7 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] placeholder:text-[color:var(--text-muted)] resize-y focus:outline-none focus:border-[color:var(--accent-border)] font-serif"
+        citationLabel={citationLabel}
       />
 
       <div className="flex flex-wrap items-center gap-2">
