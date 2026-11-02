@@ -5,13 +5,18 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import ThesisWorkspace from "../ThesisWorkspace";
 
+const draftCalls: string[] = [];
+let lastBody: unknown;
+
 describe("ThesisWorkspace (OT-09 Thesis & Dissertation Studio)", () => {
   let failNext = false;
   beforeEach(() => {
     failNext = false;
     vi.restoreAllMocks();
-    vi.spyOn(window, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+    draftCalls.length = 0;
+    vi.spyOn(window, "fetch").mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
+      lastBody = init?.body;
 
       // Mocks follow the real server routes and response shapes. The old mocks
       // used paths the server never had (/audit-chapters, /simulate-viva), so in
@@ -33,6 +38,14 @@ describe("ThesisWorkspace (OT-09 Thesis & Dissertation Studio)", () => {
             },
             chapterSummaries: [],
           }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      if (url.includes("/thesis/draft-chapter")) {
+        draftCalls.push(String(lastBody));
+        return new Response(
+          JSON.stringify({ success: true, content: "Nurse-led triage reorders the queue by clinical need.", bibliography: "Okafor, A. (2021) Triage.", wordCount: 8, citedSourcesCount: 1 }),
           { status: 200, headers: { "Content-Type": "application/json" } }
         );
       }
@@ -158,5 +171,27 @@ describe("ThesisWorkspace (OT-09 Thesis & Dissertation Studio)", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/Nothing was produced/i);
     expect(screen.queryByText(/Simulated Examiner Persona/i)).not.toBeInTheDocument();
+  });
+
+  it("writes research questions and drafts a chapter with the user's AI into the chapter editor", async () => {
+    render(<ThesisWorkspace projectId="proj-thesis-1" />);
+    await screen.findByDisplayValue("Empirical Systems Dissertation");
+
+    fireEvent.click(screen.getByRole("button", { name: /Add question/i }));
+    fireEvent.change(screen.getByLabelText("Research question 1"), { target: { value: "What drives clinic wait times?" } });
+
+    fireEvent.click(screen.getByTestId("generate-structured-blueprint-btn"));
+    expect(screen.getByText(/5 Chapters Planned/i)).toBeInTheDocument();
+    // The structure never writes research questions for the student.
+    expect(screen.getAllByRole("textbox", { name: /Research question/i })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: /4\. Write Chapters/i }));
+    expect(screen.getByRole("heading", { name: /Write Chapters/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Draft with AI$/i }));
+
+    await waitFor(() => expect(screen.getByDisplayValue(/Nurse-led triage reorders the queue/)).toBeInTheDocument());
+    expect(JSON.parse(draftCalls[0])).toMatchObject({ chapterNumber: 1, chapterTitle: "Introduction" });
+    expect(screen.getByText(/References cited in this chapter/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/8 \/ 2,400 words|8 \/ [\d,]+ words/).length).toBeGreaterThan(0);
   });
 });

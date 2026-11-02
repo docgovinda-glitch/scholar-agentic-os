@@ -535,6 +535,35 @@ export async function simulateVivaDefense(
   };
 }
 
+export interface ThesisChapterDraftRequest {
+  chapterNumber: number;
+  chapterTitle: string;
+  targetWords: number;
+  /** Optional guidance from the student (what this chapter must cover). */
+  prompt?: string;
+}
+
+export interface ThesisChapterDraftResponse {
+  content: string;
+  bibliography: string;
+  wordCount: number;
+  citedSourcesCount: number;
+}
+
+/** Drafts one chapter with the user's AI, grounded in retrieved and Vault sources. */
+export async function draftThesisChapter(projectId: string, payload: ThesisChapterDraftRequest): Promise<ThesisChapterDraftResponse> {
+  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/thesis/draft-chapter`, "POST", payload);
+  if (!res.ok) throw await apiError(res, "The chapter could not be drafted");
+  const body = (await res.json()) as Partial<ThesisChapterDraftResponse>;
+  if (typeof body.content !== "string" || !body.content.trim()) throw new Error("The AI returned an empty chapter. Nothing was changed.");
+  return {
+    content: body.content,
+    bibliography: typeof body.bibliography === "string" ? body.bibliography : "",
+    wordCount: typeof body.wordCount === "number" ? body.wordCount : 0,
+    citedSourcesCount: typeof body.citedSourcesCount === "number" ? body.citedSourcesCount : 0,
+  };
+}
+
 export interface ThesisChapterAuditResponse {
   projectId: string;
   alignmentScore: number;
