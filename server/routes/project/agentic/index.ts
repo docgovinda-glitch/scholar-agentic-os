@@ -5,6 +5,7 @@ import { draftingRoutes } from "./draftingRoutes.ts";
 import { reviewRoutes } from "./reviewRoutes.ts";
 import { journalProfileRoutes } from "./journalProfileRoutes.ts";
 import { referenceRoutes } from "./referenceRoutes.ts";
+import { citationSupportRoutes } from "./citationSupportRoutes.ts";
 
 export const agenticRouter = express.Router({ mergeParams: true });
 
@@ -17,6 +18,7 @@ agenticRouter.use(draftingRoutes);
 agenticRouter.use(reviewRoutes);
 agenticRouter.use(journalProfileRoutes);
 agenticRouter.use(referenceRoutes);
+agenticRouter.use(citationSupportRoutes);
 
 // Export router alias for backward compatibility
 export { agenticRouter as router };

@@ -271,3 +271,31 @@ describe("Figures and tables", () => {
   });
 });
 
+describe("Do sources support their sentences", () => {
+  it("runs the check with the author's AI, saves the result, and lists problems first", async () => {
+    current = projectWith({
+      manuscript_markdown: "Arrays are central [CITE:doi_10_1038_numpy].",
+      approved_vault_sources: JSON.stringify([{ id: "doi_10_1038_numpy", title: "Array programming with NumPy", authors: ["Charles R. Harris"], year: 2020, keyFindings: "NumPy underpins scientific Python." }]),
+      reference_records: JSON.stringify({ doi_10_1038_numpy: harris }),
+    });
+    vi.mocked(api.authedJsonFetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        fingerprint: "x",
+        truncated: 0,
+        results: [{ key: "p1", citeId: "doi_10_1038_numpy", sentence: "Arrays are central.", verdict: "partly", quote: "NumPy underpins scientific Python", reason: "Narrower claim." }],
+      }),
+    } as Response);
+    mount(<AuditExportMode />);
+    const panel = await screen.findByRole("region", { name: "Do sources support their sentences" });
+    fireEvent.click(within(panel).getByRole("button", { name: "Check with my AI" }));
+    await waitFor(() => expect(current.answers.citation_support).toBeTruthy());
+    expect(vi.mocked(api.authedJsonFetch).mock.calls[0][0]).toBe("/api/projects/proj-refs/agentic/citations/support");
+    expect(await within(panel).findByText("Partly")).toBeInTheDocument();
+    expect(within(panel).getByText("“NumPy underpins scientific Python”")).toBeInTheDocument();
+    expect(within(panel).getByText(/Source: Array programming with NumPy\. Narrower claim\./)).toBeInTheDocument();
+    // The saved fingerprint ("x") doesn't match this text, so the result is marked out of date.
+    expect(within(panel).getByText(/The text has changed since this check/)).toBeInTheDocument();
+  });
+});
+

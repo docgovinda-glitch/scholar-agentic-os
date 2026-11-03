@@ -13,6 +13,7 @@ import {
 } from "../api";
 import type { WordBudgetBlueprint, RebuttalMatrixItem } from "./types";
 import ReferencesCheck from "../journal/ReferencesCheck";
+import CitationSupportPanel, { parseSavedSupport, type SavedSupport } from "../journal/CitationSupportPanel";
 import VerificationChecks, { useVerification } from "../journal/VerificationChecks";
 import { LATEX_TEMPLATES, buildLatex, exportParts, packageReadme, suggestTemplate, type LatexTemplate } from "../../domain/journal/latex";
 import { buildJats } from "../../domain/journal/jats";
@@ -758,6 +759,19 @@ export default function AuditExportMode() {
             acknowledged={acknowledgedRetractions}
             onAcknowledge={handleAcknowledgeRetraction}
           />
+
+          {effectiveProjectId && referenceAudit.rows.length > 0 && (
+            <CitationSupportPanel
+              projectId={effectiveProjectId}
+              manuscript={manuscriptMarkdown}
+              saved={parseSavedSupport(answers["citation_support"])}
+              titleOf={(id) => sources.find((s) => s.id === id)?.title ?? id}
+              onSave={async (support: SavedSupport) => {
+                const saved = await saveIntakeAnswers(effectiveProjectId, { ...answers, citation_support: JSON.stringify(support) });
+                setProject(saved);
+              }}
+            />
+          )}
 
           {/* 3. Verification */}
           <VerificationChecks markdown={manuscriptMarkdown} figures={figures} />
