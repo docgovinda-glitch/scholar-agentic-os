@@ -1,3 +1,4 @@
+import OutlineByAiPanel from "../components/OutlineByAiPanel";
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { DraftingSectionIndex } from "../components/DraftingSectionIndex";
@@ -66,6 +67,9 @@ export function AssignmentDraftingStage({
     initializeDraftingPlan,
     executionMode,
     isLoading,
+    structure,
+    rewriteOutline,
+    restoreOutline,
   } = useAssignmentWorkspace();
 
   const [streamingChunk, setStreamingChunk] = useState<string>("");
@@ -545,6 +549,7 @@ export function AssignmentDraftingStage({
       <div className={`grid grid-cols-1 gap-5 items-start ${showOutline ? "lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]" : ""}`}>
         {showOutline && (
         <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+          <OutlineByAiPanel structure={structure} onRewrite={rewriteOutline} onRestore={restoreOutline} />
           <DraftingSectionIndex
             sections={internalSections}
             activeSectionId={activeSection?.id || null}

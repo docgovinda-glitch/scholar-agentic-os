@@ -968,7 +968,7 @@ export default function AssignmentSourcesStage({
           </p>
         </div>
         <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 shrink-0 self-start sm:self-auto">
-          Scholarly Evidence Grounding
+          Sources ground your citations
         </span>
       </div>
 

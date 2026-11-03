@@ -73,6 +73,8 @@ export interface AppleStudioHeaderProps {
   onToggleInspector?: () => void;
   /** Optional additional action slot on the right */
   rightActions?: React.ReactNode;
+  /** Hide the five stage tabs, for workspaces with their own stage bar. */
+  hidePhaseTabs?: boolean;
 }
 
 const PHASE_ICONS: Record<AppleStudioPhaseId, React.ComponentType<{ className?: string }>> = {
@@ -111,6 +113,7 @@ export function AppleStudioHeader({
   inspectorOpen = false,
   onToggleInspector,
   rightActions,
+  hidePhaseTabs = false,
 }: AppleStudioHeaderProps): React.ReactElement {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState(projectTitle);
@@ -211,6 +214,7 @@ export function AppleStudioHeader({
       </div>
 
       {/* Center Zone: Unified 5-Phase Segmented Control */}
+      {hidePhaseTabs ? <div className="flex-1" /> : (
       <div
         role="tablist"
         aria-label="Studio cognitive stages"
@@ -251,6 +255,7 @@ export function AppleStudioHeader({
           );
         })}
       </div>
+      )}
 
       {/* Right Zone: Progressive Disclosure Status & Focus Capsule */}
       <div

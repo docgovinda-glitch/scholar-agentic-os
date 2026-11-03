@@ -107,6 +107,8 @@ export interface AssignmentContextValue {
   writingTone: WritingToneConfig;
   setWritingTone: (tone: WritingToneConfig) => Promise<void>;
   structure: AssignmentStructure;
+  /** Whether the latest changes have reached the server. */
+  saveStatus: "saved" | "saving" | "error";
   setStructure: (structure: AssignmentStructure) => Promise<void>;
   sectionBudgets: SectionBudgetItem[];
   addCustomSection: (title: string, targetWordCount: number) => Promise<void>;
@@ -155,6 +157,10 @@ export interface AssignmentContextValue {
   updateSectionContent: (sectionId: string, content: string) => Promise<void>;
   updateSectionTitle: (sectionId: string, newTitle: string) => Promise<void>;
   tuneOutlineWithQuestion: () => Promise<AssignmentDraftingSection[]>;
+  /** Writes the outline from the brief with the student's AI, or revises it as asked. Keeps written text. */
+  rewriteOutline: (instruction?: string) => Promise<{ ok: true; structure: AssignmentStructure } | { ok: false; error: string }>;
+  /** Puts back an earlier outline (undo). */
+  restoreOutline: (previous: AssignmentStructure) => Promise<void>;
   setGeneratingSection: (sectionId: string, isGenerating: boolean) => void;
   generatingSectionIds: Record<string, boolean>;
   initializeDraftingPlan: () => AssignmentDraftingSection[];
@@ -221,6 +227,8 @@ export function AssignmentProvider({
   // a slower earlier save can never land after (and erase) a newer one.
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
   const saveRunningRef = useRef(false);
+  // What the header shows: only "saved" once the server has the latest answers.
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const saveDirtyRef = useRef(false);
   const [document, setDocument] = useState<CanonicalDocument | null>(null);
   const [rubric, setRubric] = useState<RubricReport | null>(null);
@@ -445,18 +453,23 @@ export function AssignmentProvider({
       saveDirtyRef.current = true;
       if (!saveRunningRef.current) {
         saveRunningRef.current = true;
+        setSaveStatus("saving");
         saveChainRef.current = (async () => {
+          let failed = false;
           try {
             while (saveDirtyRef.current) {
               saveDirtyRef.current = false;
               try {
                 await saveIntakeAnswers(activeProjectId, projectRef.current?.answers ?? safeAnswers);
+                failed = false;
               } catch (err) {
+                failed = true;
                 console.error("Failed to persist assignment answers:", err);
               }
             }
           } finally {
             saveRunningRef.current = false;
+            setSaveStatus(failed ? "error" : "saved");
           }
         })();
       }
@@ -1207,6 +1220,37 @@ export function AssignmentProvider({
     return tuned;
   }, [question, project?.title, latestSections, sources, approvedSourceIds, targetWordCount, academicLevel, saveAnswers]);
 
+  const rewriteOutline = useCallback(
+    async (instruction?: string): Promise<{ ok: true; structure: AssignmentStructure } | { ok: false; error: string }> => {
+      try {
+        // Drafts written since the last save must reach the server first,
+        // so the revision can keep them.
+        const current = latestSections();
+        await saveAnswers({ assignment_internal_sections: current, assignment_outline: current });
+        const res = await authedJsonFetch(`/api/projects/${activeProjectId}/assignment/outline`, "POST", instruction ? { instruction } : {}, { skipLlmFallback: true });
+        const body = await res.json().catch(() => null);
+        if (!res.ok || !body?.structure?.headings?.length) {
+          return { ok: false, error: body?.error || `The outline could not be written (${res.status}).` };
+        }
+        const next = body.structure as AssignmentStructure;
+        await setStructure(next);
+        if (next.targetWordCount && next.targetWordCount !== targetWordCount) await saveAnswers({ targetWordCount: next.targetWordCount });
+        return { ok: true, structure: next };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : "The outline could not be written." };
+      }
+    },
+    [activeProjectId, latestSections, saveAnswers, setStructure, targetWordCount]
+  );
+
+  const restoreOutline = useCallback(
+    async (previous: AssignmentStructure) => {
+      await setStructure(previous);
+      if (previous.targetWordCount && previous.targetWordCount !== targetWordCount) await saveAnswers({ targetWordCount: previous.targetWordCount });
+    },
+    [saveAnswers, setStructure, targetWordCount]
+  );
+
   const updateSectionDraft = useCallback(
     async (sectionId: string, content: string) => {
       await updateSectionContent(sectionId, content);
@@ -1729,6 +1773,9 @@ export function AssignmentProvider({
         updateSectionContent,
         updateSectionTitle,
         tuneOutlineWithQuestion,
+        saveStatus,
+        rewriteOutline,
+        restoreOutline,
         setGeneratingSection,
         generatingSectionIds,
         initializeDraftingPlan,
