@@ -143,7 +143,7 @@ describe("Assignment Workspace Stages & Workflow", () => {
       />
     );
 
-    expect(await screen.findByText(/Submission Quality Audit & Camera-Ready Export/i, {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByText(/^Check and download$/i, {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getAllByText(/Submission & Review/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Word Document \(\.docx\)/i)).toBeInTheDocument();
     expect(screen.getByText(/PDF Document/i)).toBeInTheDocument();

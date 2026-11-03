@@ -1,4 +1,8 @@
 import { routedCompletion } from "../../../src/ai/routerBridge.ts";
+import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
+import { assignmentOutlinePrompt, assignmentOutlineUserPrompt, structureFromAi } from "../../../../src/domain/assignment/aiAssignmentOutline.ts";
+import { scopeBrief } from "../../../../src/domain/assignment/briefScoping.ts";
+import type { AssignmentDraftingSection } from "../../../../src/desk/assignment/types.ts";
 import express from "express";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
@@ -33,7 +37,6 @@ import {
 } from "../../../../src/desk/assignment/types.ts";
 import {
   generateDynamicAssignmentStructure,
-  generateAiEnhancedOutline,
   extractTargetFrameworks,
   sanitizeOutlineHeadings,
   assignmentStructureToOutlineTree,
@@ -314,15 +317,10 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       return true;
     });
 
+    // Only what the brief states: when it gives no marking criteria, none
+    // are invented (generic UK grade bands used to be shown as if they were).
     if (substantiveRubricItems.length > 0) {
       markingCriteriaInsights.push(...substantiveRubricItems.map((r) => `${r.lineRange} ${r.verbatimText}`).slice(0, 6));
-    } else {
-      markingCriteriaInsights.push(
-        "First Class (70%+): Demands independent critical stance, rigorous theoretical synthesis, and counterargument refutation.",
-        "Upper Second (60–69%): Requires sound structure, clear analytical argument, and consistent scholarly evidence.",
-        "Lower Second (50–59%): Awarded for descriptive summaries that answer the prompt but lack critical depth.",
-        "Third Class (40–49%): Threshold pass; factual knowledge present but marred by structural disorganization."
-      );
     }
 
     if (penaltyItems.length > 0) {
@@ -447,23 +445,42 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       ...(updatedTitle ? { title: updatedTitle, assignment_title: updatedTitle } : {}),
     };
 
-    const structure = await generateAiEnhancedOutline({
-      question,
-      assignmentType: assignmentType as any,
-      academicLevel: academicLevel as any,
-      targetWordCount: targetWords,
-      citationStyle,
-      briefText,
-      timeoutMs: 25000,
-      llmCaller: async (sys, usr) => {
-        try {
-          return await routedCompletion(req, { task: "drafting", systemPrompt: sys, userPrompt: usr });
-        } catch (llmErr) {
-          console.warn("AI outline call failed:", llmErr instanceof Error ? llmErr.message : llmErr);
-          return "";
-        }
-      }
-    });
+    // The outline is written by the student's AI from the whole brief. When
+    // no AI answers, the offline starter outline is used and marked as such,
+    // so the workspace can say it is not from the brief.
+    const criteriaLines = substantiveRubricItems.map((r) => r.verbatimText);
+    const discipline =
+      (typeof project.answers["assignment_discipline"] === "string" && project.answers["assignment_discipline"]) ||
+      scopeBrief(`${question} ${briefText}`).discipline;
+    let structure = undefined as ReturnType<typeof structureFromAi>;
+    let outlineNote: string | undefined;
+    try {
+      const aiText = await routedCompletion(req, {
+        task: "drafting",
+        systemPrompt: assignmentOutlinePrompt(),
+        userPrompt: assignmentOutlineUserPrompt({
+          brief: briefText,
+          question,
+          assignmentType: String(assignmentType),
+          academicLevel: String(academicLevel),
+          discipline: discipline || undefined,
+          citationStyle,
+          targetWords,
+          criteria: criteriaLines,
+        }),
+      });
+      structure = structureFromAi(aiText ?? "", targetWords);
+      if (!structure) outlineNote = "Your AI's answer had no usable outline, so a starter outline is shown.";
+    } catch (llmErr) {
+      console.warn("AI outline call failed:", llmErr instanceof Error ? llmErr.message : llmErr);
+      outlineNote = "No AI answered, so a starter outline is shown. Connect an AI and rebuild it from your brief.";
+    }
+    if (!structure) {
+      structure = {
+        ...generateDynamicAssignmentStructure({ question, assignmentType: assignmentType as any, academicLevel: academicLevel as any, targetWordCount: targetWords, citationStyle, briefText }),
+        source: "starter",
+      };
+    }
 
     project.answers.assignment_structure = JSON.stringify(structure);
     project.answers.structure = JSON.stringify(structure);
@@ -482,6 +499,8 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       briefLedger: ledger,
       updatedTitle: updatedTitle || project.answers?.["title"] || (project as any).title,
       structure,
+      outlineSource: structure.source,
+      outlineNote,
       targetFrameworks: structure.targetFrameworks || [],
       sections: assignmentStructureToOutlineTree(structure).sections,
     });
@@ -494,6 +513,65 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
 };
 
 router.post("/analyze", handleDeconstruct);
+
+/**
+ * POST /api/projects/:id/assignment/outline  { instruction? }
+ * Writes the outline from the brief with the student's AI, or revises the
+ * current one as asked ("add a section on ethics", "make it 3,000 words").
+ * Text already written is kept. Saves and returns the new outline.
+ */
+router.post("/outline", async (req: express.Request<{ id: string }>, res: express.Response) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const raw = req.body?.instruction;
+  const instruction = typeof raw === "string" ? raw.trim().slice(0, 600) || undefined : undefined;
+  const a = project.answers;
+  const question = cleanAnswerString(a["assignment_question"]) || extractStandardizedInstructions(a);
+  const briefText = cleanAnswerString(a["assignment_brief_text"]) || question;
+  if (!briefText || briefText.trim().length < 10) {
+    return res.status(400).json({ error: "Add your assignment brief first, so the outline can be about your assignment.", code: "missing_brief" });
+  }
+  const targetWords = Number(a["targetWordCount"] || a["word_count"] || a["word_limit"] || 1500) || 1500;
+  const assignmentType = String(a["assignmentType"] || a["assignment_type"] || "essay");
+  const current = safeParseObject(a["assignment_structure"] || a["structure"]) as any;
+  const previous = (safeParseObject(a["assignment_internal_sections"]) as AssignmentDraftingSection[] | undefined) ?? [];
+  const ledger = safeParseObject(a["brief_ledger"]) as Array<{ category?: string; verbatimText?: string }> | undefined;
+  const criteria = (Array.isArray(ledger) ? ledger : []).filter((l) => l.category === "rubric_band" && (l.verbatimText ?? "").length >= 15).map((l) => String(l.verbatimText));
+  const discipline =
+    (typeof a["assignment_discipline"] === "string" && a["assignment_discipline"]) || scopeBrief(`${question} ${briefText}`).discipline;
+
+  try {
+    const aiText = await routedCompletion(req, {
+      task: "drafting",
+      systemPrompt: assignmentOutlinePrompt(),
+      userPrompt: assignmentOutlineUserPrompt({
+        brief: briefText,
+        question,
+        assignmentType,
+        academicLevel: String(a["academicLevel"] || a["academic_level"] || "undergraduate"),
+        discipline: discipline || undefined,
+        citationStyle: cleanAnswerString(a["citationStyle"] || a["citation_style"]) || undefined,
+        targetWords,
+        criteria,
+        instruction,
+        current: current?.headings?.length ? current : null,
+        written: Array.isArray(previous) ? previous.filter((p) => (p.draftContent ?? "").trim()).map((p) => p.id) : [],
+      }),
+    });
+    const structure = structureFromAi(aiText ?? "", targetWords, { instruction, previous: Array.isArray(previous) ? previous : [] });
+    if (!structure) return sendAiFailure(res, new UnusableAiResponseError("outline"), "Outline");
+    structure.version = (Number(current?.version) || 0) + 1;
+    project.answers.assignment_structure = JSON.stringify(structure);
+    project.answers.structure = JSON.stringify(structure);
+    if (structure.targetWordCount !== targetWords) project.answers.targetWordCount = String(structure.targetWordCount);
+    delete project.answers.assignment_internal_sections;
+    delete project.answers.assignment_outline;
+    await getProjectStore().save(project);
+    res.json({ structure });
+  } catch (err) {
+    sendAiFailure(res, err, "Outline");
+  }
+});
 router.post("/deconstruct", handleDeconstruct);
 
 export default router;

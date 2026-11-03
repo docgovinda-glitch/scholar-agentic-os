@@ -928,6 +928,8 @@ export interface AssignmentStructure {
   writingTone?: string;
   rationale?: string;
   targetFrameworks?: string[];
+  /** "ai": written by the student's AI from the brief; "starter": the offline rule-based outline. */
+  source?: "ai" | "starter";
 
   // Research Blueprint Architecture & Question Mapping
   researchBlueprintOverview?: ResearchBlueprintOverview;

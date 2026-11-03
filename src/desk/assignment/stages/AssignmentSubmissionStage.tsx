@@ -188,10 +188,9 @@ export function AssignmentSubmissionStage({
   const wordDiffPercentage = targetWordCount > 0 ? ((wordDiff / targetWordCount) * 100).toFixed(1) : "0";
   const isWordCountCompliant = Math.abs(Number(wordDiffPercentage)) <= 10;
 
-  // Grade & Readiness values from submissionReport
-  const predictedGrade = (submissionReport as any)?.predictedGrade ||
-    ((submissionReport as any)?.overallScore ? `Score: ${(submissionReport as any).overallScore}%` : "Pending Evaluation");
-  const readinessPercentage: number | null = (submissionReport as any)?.readinessPercentage ?? submissionReport?.overallScore ?? null;
+  // Facts only: no predicted grade or readiness score.
+  const sectionsWritten = activeSections.filter((sec: { draftContent?: string }) => (sec.draftContent ?? "").trim().length > 0).length;
+  const toDoCount = ((submissionReport as { missingRequirements?: string[] } | null)?.missingRequirements ?? []).length;
   // Render helpers for detailed telemetry vs streamlined packaging
   const renderAuditLayout = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
@@ -283,7 +282,7 @@ export function AssignmentSubmissionStage({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 dark:border-white/5 pb-4">
         <div className="space-y-1">
           <h3 className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-white">
-            Camera-Ready Document Packaging
+            Download
           </h3>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             Formatted with standard 1-inch margins, title sheet, running headers, and formatted bibliography according to {citationStyle.toUpperCase()}.
@@ -354,7 +353,8 @@ export function AssignmentSubmissionStage({
           <button
             type="button"
             onClick={handleExportDocx}
-            disabled={isExportingDocx}
+            disabled={isExportingDocx || sectionsWritten === 0}
+            title={sectionsWritten === 0 ? "Write at least one section first" : undefined}
             data-testid="export-docx-button"
             className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-2 shadow-xs disabled:opacity-50"
           >
@@ -366,8 +366,10 @@ export function AssignmentSubmissionStage({
           <button
             type="button"
             onClick={handleExportPdf}
+            disabled={sectionsWritten === 0}
+            title={sectionsWritten === 0 ? "Write at least one section first" : undefined}
             data-testid="export-pdf-button"
-            className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-neutral-100 dark:bg-white/5 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200/70 dark:hover:bg-white/10 transition-colors cursor-pointer inline-flex items-center gap-2"
+            className="disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2.5 rounded-xl text-xs font-semibold bg-neutral-100 dark:bg-white/5 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200/70 dark:hover:bg-white/10 transition-colors cursor-pointer inline-flex items-center gap-2"
           >
             <Printer className="w-4 h-4" />
             <span>Download PDF Document</span>
@@ -377,7 +379,8 @@ export function AssignmentSubmissionStage({
           <button
             type="button"
             onClick={handleCopyMarkdown}
-            className="px-3.5 py-2.5 rounded-xl text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+            disabled={sectionsWritten === 0}
+            className="disabled:opacity-50 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer inline-flex items-center gap-1.5"
             title="Copy clean markdown text to clipboard"
           >
             {copiedMarkdown ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -412,11 +415,11 @@ export function AssignmentSubmissionStage({
             4
           </div>
           <p className="text-neutral-600 dark:text-neutral-400 text-xs leading-relaxed">
-            Verify academic rubric compliance, reconcile citations against verified references, and export camera-ready submissions with university title pages and bibliographies.
+            Check your draft against the brief, check that every citation matches a source, and download it with a title page and reference list.
           </p>
         </div>
         <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0 self-start sm:self-auto">
-          Audit &amp; Export Checkpoint
+          Before you submit
         </span>
       </div>
 
@@ -429,14 +432,14 @@ export function AssignmentSubmissionStage({
                 Phase 04 · Submission & Review
               </span>
               <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono">
-                Camera-Ready Checkpoint
+                Before you submit
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
-              Submission Quality Audit & Camera-Ready Export
+              Check and download
             </h1>
             <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-2xl">
-              Conduct automated 10-point rubric evaluation, reconcile in-text citations against verified bibliography entries, and download camera-ready academic manuscripts.
+              Check length, structure and what the question asks for, match each citation to a source, then download Word, PDF or plain text.
             </p>
           </div>
 
@@ -449,7 +452,7 @@ export function AssignmentSubmissionStage({
               title="Re-run Rubric & Citation Audit"
             >
               <RotateCw className={`w-3.5 h-3.5 ${isAuditingSubmission ? "animate-spin" : ""}`} />
-              <span>{isAuditingSubmission ? "Auditing..." : "Re-run Audit"}</span>
+              <span>{isAuditingSubmission ? "Checking…" : "Check again"}</span>
             </button>
           </div>
         </div>
@@ -457,7 +460,7 @@ export function AssignmentSubmissionStage({
         {!hasDraft ? (
           <div data-testid="submission-nothing-drafted" className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-sm text-neutral-600 dark:text-neutral-300">
-              Nothing to audit yet. Draft at least one section and the rubric check, grade estimate and citation check appear here.
+              Nothing to check yet. Write at least one section and the checks against your brief and the citation check appear here.
             </p>
             <button
               type="button"
@@ -471,32 +474,19 @@ export function AssignmentSubmissionStage({
         /* Status Metrics Ribbon */
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-1">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">
-              Predicted Grade Band
-            </span>
-            <div className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white truncate">
-              {predictedGrade}
+            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">Sections written</span>
+            <div className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white tabular-nums" data-testid="sections-written">
+              {sectionsWritten} / {activeSections.length}
             </div>
-            <span className="text-[11px] text-neutral-400 dark:text-neutral-500 block">
-              Phase 1 rubric criteria alignment
-            </span>
+            <span className="text-[11px] text-neutral-400 dark:text-neutral-500 block">Sections with text in them</span>
           </div>
 
           <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-1">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">
-              Submission Readiness Index
-            </span>
-            <div className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white tabular-nums flex items-center gap-2">
-              <span>{readinessPercentage === null ? "—" : `${readinessPercentage}%`}</span>
-              {readinessPercentage !== null && (
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${readinessPercentage >= 75 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}>
-                  {readinessPercentage >= 75 ? "Ready" : "Action Needed"}
-                </span>
-              )}
+            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">To do before submitting</span>
+            <div className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white tabular-nums" data-testid="todo-count">
+              {submissionReport ? (toDoCount === 0 ? "Nothing found" : toDoCount) : "Not checked"}
             </div>
-            <span className="text-[11px] text-neutral-400 dark:text-neutral-500 block">
-              Audit pass index & integrity checks
-            </span>
+            <span className="text-[11px] text-neutral-400 dark:text-neutral-500 block">From the checks against your brief</span>
           </div>
 
           <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/60 dark:border-white/5 space-y-1">
@@ -548,14 +538,14 @@ export function AssignmentSubmissionStage({
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-500" />
                 <span className="font-semibold text-neutral-800 dark:text-neutral-200">
-                  Detailed 10-Point Rubric & Citation Token Telemetry
+                  Checks and citations in detail
                 </span>
                 <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-neutral-200/70 dark:bg-white/10 text-neutral-600 dark:text-neutral-400">
                   Optional Inspector
                 </span>
               </div>
               <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                <span>{showDetailedAudit ? "Hide Telemetry" : "Inspect Rubric & Citation Details"}</span>
+                <span>{showDetailedAudit ? "Hide details" : "Show details"}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showDetailedAudit ? "rotate-180" : ""}`} />
               </div>
             </button>

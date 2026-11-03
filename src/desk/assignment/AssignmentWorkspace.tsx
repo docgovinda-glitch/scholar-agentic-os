@@ -300,104 +300,6 @@ export function AssignmentDraftingPlaceholder() {
   );
 }
 
-export function AssignmentSubmissionPlaceholder() {
-  const { setPhase, targetWordCount, currentWordCount, submissionReport, citationStyle } = useAssignmentWorkspace();
-
-  return (
-    <div className="max-w-4xl mx-auto p-6 sm:p-8 space-y-8 text-neutral-900 dark:text-neutral-100">
-      <div className="rounded-2xl p-6 sm:p-8 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 dark:border-white/5 pb-5">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                Phase 04 · Submission & Review
-              </span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-              Submission Quality Audit & Camera-Ready Export
-            </h1>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">
-              Run automated 10-point rubric evaluation, citation verification, and compile camera-ready exports.
-            </p>
-          </div>
-        </div>
-
-        {/* Audit Status Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/5 border border-neutral-200/60 dark:border-white/5">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">Estimated Grade Band</span>
-            <div className="mt-1 text-lg font-bold text-neutral-900 dark:text-white">
-              {submissionReport ? `${submissionReport.overallScore}%` : "Pending Evaluation"}
-            </div>
-            <span className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5 block">
-              10-point academic rubric
-            </span>
-          </div>
-
-          <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/5 border border-neutral-200/60 dark:border-white/5">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">Citation Compliance</span>
-            <div className="mt-1 text-lg font-bold text-neutral-900 dark:text-white uppercase font-mono">
-              {citationStyle}
-            </div>
-            <span className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5 block">
-              In-text & bibliography verification
-            </span>
-          </div>
-
-          <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/5 border border-neutral-200/60 dark:border-white/5">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">Word Budget Margin</span>
-            <div className="mt-1 text-lg font-bold text-neutral-900 dark:text-white tabular-nums">
-              {currentWordCount.toLocaleString()} / {targetWordCount.toLocaleString()}
-            </div>
-            <span className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5 block">
-              ±10% compliance threshold
-            </span>
-          </div>
-        </div>
-
-        {/* Export Formats */}
-        <div className="space-y-3 pt-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-            Export & Packaging
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-4 rounded-xl border border-neutral-200/70 dark:border-white/5 bg-neutral-50/50 dark:bg-white/[0.02] space-y-1">
-              <span className="text-xs font-semibold text-neutral-900 dark:text-white">Microsoft Word (.docx)</span>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Standard university submission formatting</p>
-            </div>
-            <div className="p-4 rounded-xl border border-neutral-200/70 dark:border-white/5 bg-neutral-50/50 dark:bg-white/[0.02] space-y-1">
-              <span className="text-xs font-semibold text-neutral-900 dark:text-white">Academic PDF (.pdf)</span>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Typeset typography with cover sheet</p>
-            </div>
-            <div className="p-4 rounded-xl border border-neutral-200/70 dark:border-white/5 bg-neutral-50/50 dark:bg-white/[0.02] space-y-1">
-              <span className="text-xs font-semibold text-neutral-900 dark:text-white">Markdown Source (.md)</span>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Clean portable academic prose</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation Actions */}
-        <div className="flex items-center justify-between pt-4 border-t border-neutral-100 dark:border-white/5">
-          <button
-            type="button"
-            onClick={() => setPhase("drafting")}
-            className="px-4 py-2 rounded-xl text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-          >
-            ← Back to Phase 3: Drafting
-          </button>
-          <button
-            type="button"
-            onClick={() => setPhase("understand")}
-            className="px-4 py-2 rounded-xl text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-          >
-            Return to Phase 1: Extract
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function AssignmentWorkspaceInner({
   onClose,
   onOpenAiAccess,
@@ -419,6 +321,7 @@ function AssignmentWorkspaceInner({
     saveAnswers,
     projectState,
     executionMode,
+    saveStatus,
     setExecutionMode,
   } = useAssignmentWorkspace();
 
@@ -625,7 +528,8 @@ function AssignmentWorkspaceInner({
         metricLabel={`${executionMode === "minimal" ? "Quick 4-Step" : "Guided 5-Step"}`}
         aiModelLabel="Socratic Tutor AI"
         onOpenAiAccess={onOpenAiAccess}
-        autosaveStatus="saved"
+        autosaveStatus={saveStatus}
+        hidePhaseTabs
         projectVersion={project?.version}
         inspectorOpen={tutorPanelOpen}
         onToggleInspector={() => setTutorPanelOpen((o) => !o)}

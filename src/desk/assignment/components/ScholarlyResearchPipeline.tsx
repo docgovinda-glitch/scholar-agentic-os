@@ -58,7 +58,7 @@ export const ScholarlyResearchPipeline: React.FC<ScholarlyResearchPipelineProps>
   return (
     <div className="text-xs font-medium text-neutral-500 dark:text-neutral-400 inline-flex items-center gap-1.5">
       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-      <span>Research Engine Calibrated</span>
+      <span>Searches use your brief</span>
       {question?.trim() ? (
         <>
           <span className="text-neutral-300 dark:text-neutral-600">·</span>
