@@ -219,11 +219,12 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
         </ResearchProvider>
       );
 
+      // Sub-section headings are now editable inputs, so they are found by value.
       await waitFor(() => {
         expect(screen.getByText("1. Introduction")).toBeInTheDocument();
-        expect(screen.getByText("Problem Domain & Background")).toBeInTheDocument();
-        expect(screen.getByText("Research Questions & Novelty")).toBeInTheDocument();
-        expect(screen.getByText("Hardware Architecture Specification")).toBeInTheDocument();
+        expect(screen.getByDisplayValue("Problem Domain & Background")).toBeInTheDocument();
+        expect(screen.getByDisplayValue("Research Questions & Novelty")).toBeInTheDocument();
+        expect(screen.getByDisplayValue("Hardware Architecture Specification")).toBeInTheDocument();
       });
 
       // Check sub-section target inputs (450 words each)
@@ -236,6 +237,55 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
       await waitFor(() => {
         expect(api.saveIntakeAnswers).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("2b. Mode 1: the AI writes the table of contents for this article", () => {
+    it("starts with no template, writes the outline with AI, applies a requested change, and can undo it", async () => {
+      const noOutline = { ...baseProject, answers: { ...baseProject.answers, word_budget_blueprint: "" } };
+      vi.mocked(api.getProject).mockResolvedValue(noOutline);
+      vi.mocked(api.saveIntakeAnswers).mockImplementation(async (_id, answers) => ({ ...noOutline, answers: { ...noOutline.answers, ...answers } }));
+      const outline = (sections: Array<[string, string[]]>, total: number) => ({
+        projectId: "proj-step-b", template: "IMRaD", targetTotalWords: total, allocatedTotalWords: total, totalSubSections: sections.reduce((n, [, u]) => n + u.length, 0),
+        createdAt: "", updatedAt: "",
+        sections: sections.map(([name, subs], i) => ({
+          id: `ai-${i + 1}`, sectionKey: "other", sectionName: name, order: i + 1, targetWords: Math.round(total / sections.length),
+          subSections: subs.map((t, j) => ({ id: `ai-${i + 1}-${j + 1}`, sectionId: `ai-${i + 1}`, title: t, order: j + 1, targetWords: Math.round(total / sections.length / subs.length), assignedSourceIds: [] })),
+        })),
+      });
+      const bodies: unknown[] = [];
+      vi.mocked(api.authedJsonFetch).mockImplementation(async (url: string, _m: string, body: unknown) => {
+        bodies.push(body);
+        if (!url.endsWith("/blueprint/outline")) return new Response("{}", { status: 404 });
+        const first = bodies.length === 1;
+        return new Response(JSON.stringify({ blueprint: first
+          ? outline([["Introduction", ["FPGA decoders and the timing gap"]], ["Methods", ["Testbed and timing protocol"]]], 6000)
+          : outline([["Introduction", ["FPGA decoders and the timing gap"]], ["Methods", ["Testbed and timing protocol"]], ["Policy implications", ["Hardware procurement"]]], 6000) }), { status: 200 });
+      });
+
+      render(
+        <ResearchProvider projectId="proj-step-b" initialStage="definition" onStageChangeCallback={() => {}}>
+          <ProtocolBlueprintMode />
+        </ResearchProvider>
+      );
+
+      // No fixed template is put in place.
+      expect(await screen.findByTestId("outline-empty")).toBeInTheDocument();
+      expect(api.allocateProjectWordBudget).not.toHaveBeenCalled();
+
+      // Ready once the project (title, problem) has loaded.
+      await waitFor(() => expect(screen.queryByText(/Add a working title or a research problem/)).toBeNull());
+      fireEvent.click(screen.getByRole("button", { name: "Write my table of contents with AI" }));
+      expect(await screen.findByDisplayValue("FPGA decoders and the timing gap")).toBeInTheDocument();
+      expect(bodies[0]).toEqual({});
+
+      fireEvent.change(screen.getByLabelText("Ask AI to change the outline"), { target: { value: "Add a section on policy implications" } });
+      fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+      expect(await screen.findByText("3. Policy implications")).toBeInTheDocument();
+      expect(bodies[1]).toEqual({ instruction: "Add a section on policy implications" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
+      await waitFor(() => expect(screen.queryByText("3. Policy implications")).toBeNull());
     });
   });
 
