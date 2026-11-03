@@ -66,6 +66,7 @@
 | 2026-10-30 18:47Z | Final check after #137 deployed (live `afcba5d`; #138 is docs only) | — | production smoke 35/35 (`scripts/smoke-prod.sh`); `/api/health` healthy | n/a |
 | 2026-10-31 → 2026-11-02 | Deploys #140–#144, the AI router (code only, no SQL, no env changes) | live `4b54a0e` (#139) | `/api/health` commit `30cc719` (#144); production smoke 38/38, including the 3 new AI router checks (the cloud-metadata endpoint is refused) | redeploy previous |
 | 2026-11-02 09:14Z | SQL `20261102000000_reconcile_schema_with_production` (#149) via Management API, recorded in `schema_migrations` | 5 empty, unused tables (`pending_password_resets`, 4 `pocket_*`); definitions and row counts (all 0) in `~/backups/dead-tables-20261102T091312Z.txt` (agent machine) | tables gone; `scripts/db/schema-diff.sh` shows only the documented differences (T9); production smoke 38/38 | re-create from the snapshot definitions (tables were empty) |
+| 2026-11-03 15:51Z | SQL `20261103150000_user_provider_keys` (#181, owner-approved) via Management API, recorded in `schema_migrations` | table absent; account key sync returned 503 | RLS on, 0 policies, anon/authenticated no select, service_role insert; anon REST read 401; live `6235dc9` round trip with the smoke account: save 200 (no-store), read back equal, list masked only, delete leaves 0 rows | `DROP TABLE public.user_provider_keys;` (keys stay on devices that have them) |
 
 ## T5 results (2026-10-29, read-only, `default_transaction_read_only = on`, counts only)
 
