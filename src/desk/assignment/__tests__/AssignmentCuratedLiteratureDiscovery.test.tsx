@@ -118,15 +118,18 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
     });
   });
 
-  describe("1. Initial Literature Discovery (30+ Sources)", () => {
-    it("generates at least 30 credible, authentic academic literature items initially", () => {
+  describe("1. Initial Literature Discovery (catalog works only)", () => {
+    it("returns the matching catalog works, with full metadata, and nothing made up to reach 30", () => {
       const sources = generateCuratedLiteratureSources(
         "Critically evaluate algorithmic governance and administrative law",
         "apa7"
       );
 
-      // Must return at least 30 items
-      expect(sources.length).toBeGreaterThanOrEqual(30);
+      // Every item is a catalog entry; the list is as long as the matches
+      // (the old floor of 30 was met by generating papers in real names).
+      expect(sources.length).toBeGreaterThan(0);
+      const catalogTitles = new Set(CORE_SCHOLARLY_CATALOG.map((c) => c.title));
+      sources.forEach((s) => expect(catalogTitles.has(s.title), s.title).toBe(true));
 
       // Verify academic quality and diversity
       const journals = sources.filter((s) => s.type === "journal");
@@ -156,7 +159,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
       });
     });
 
-    it("renders the 30+ sources count in the workspace UI", async () => {
+    it("renders the true sources count in the workspace UI", async () => {
       render(
         <AssignmentWorkspace
           projectId="proj-lit-1"
@@ -168,13 +171,13 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
       // Stage header should load
       expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
-      // Check header source counter indicates at least 30 identified
+      // Check header source counter shows how many were found
       const sourceCountMatches = screen.getAllByText(/\(\d+\s+identified\)/i);
       expect(sourceCountMatches.length).toBeGreaterThan(0);
       const text = sourceCountMatches[0].textContent;
       const countMatch = text?.match(/\((\d+)\s+identified\)/);
       const count = countMatch ? parseInt(countMatch[1], 10) : 0;
-      expect(count).toBeGreaterThanOrEqual(30);
+      expect(count).toBeGreaterThan(0);
     });
   });
 
@@ -423,7 +426,9 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
     it("progressively discovers additional non-duplicate China & IR literature on fetchMoreLiteratureSources", () => {
       const initialSources = generateCuratedLiteratureSources(chinaQuestion, "apa7");
       const moreSources = fetchMoreLiteratureSources(initialSources, chinaQuestion, 10);
-      expect(moreSources.length).toBe(10);
+      // At most the batch size; a short batch stays short rather than padded.
+      expect(moreSources.length).toBeGreaterThan(0);
+      expect(moreSources.length).toBeLessThanOrEqual(10);
 
       const initialIds = new Set(initialSources.map((s) => s.id));
       const initialDois = new Set(initialSources.map((s) => s.doi).filter(Boolean));
@@ -473,8 +478,10 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
       const intent = extractResearchIntent(prompt);
       expect(intent.academicDomain).toBe("Environmental Science & Climate Policy");
 
+      // No climate catalog exists offline, so nothing is returned rather than
+      // papers made up for the domain; live portal search supplies them.
       const sources = generateCuratedLiteratureSources(prompt, "apa7");
-      expect(sources.length).toBeGreaterThanOrEqual(30);
+      expect(sources).toHaveLength(0);
 
       // Should not contain China or Algorithmic Governance papers
       const chinaPapers = sources.filter((s) => s.title.toLowerCase().includes("china"));

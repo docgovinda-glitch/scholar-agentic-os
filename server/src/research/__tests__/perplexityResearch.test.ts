@@ -34,7 +34,8 @@ describe("Perplexity-Grade Research Engine & Citation Authenticity", () => {
 
       expect(auth.authorityTier).toBe("A");
       expect(auth.sourceType).toBe("scholarly");
-      expect(auth.authorityBadge).toBe("Peer-Reviewed / Academic");
+      // A journal site or .edu domain is scholarly, but that alone does not make a page peer-reviewed.
+      expect(auth.authorityBadge).toBe("Academic or scholarly publisher");
       expect(auth.score).toBeGreaterThanOrEqual(90);
       expect(auth.isPrimary).toBe(true);
       expect(auth.publisher).toBe("Nature Portfolio");
