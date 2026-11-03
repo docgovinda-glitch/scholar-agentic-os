@@ -1728,11 +1728,24 @@ export default function ProjectListScreen({
                 }}
                 className={`${
                   isAiSidebarOpen ? "hidden 2xl:inline-flex" : "hidden sm:inline-flex"
-                } items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer shadow-2xs`}
-                title="AI Access Settings • Click to configure"
+                } items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border cursor-pointer shadow-2xs ${
+                  aiStatus?.connected
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
+                    : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                }`}
+                title="AI Access • Click to configure"
+                data-testid="active-ai-pill"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Active AI: {activeProviderLabel}</span>
+                {/* Only an AI that is actually connected is shown as active; a saved
+                    preference with no key behind it is not. */}
+                <span className={`w-1.5 h-1.5 rounded-full ${aiStatus?.connected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                <span>
+                  {aiStatus?.connected
+                    ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
+                    : aiStatus
+                    ? "Connect an AI"
+                    : "Checking AI…"}
+                </span>
                 <span className="text-[10px] opacity-70">↗</span>
               </button>
             ) : (

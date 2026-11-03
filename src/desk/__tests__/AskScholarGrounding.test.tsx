@@ -100,4 +100,23 @@ describe("Ask Scholar grounds every answer in a fresh search", () => {
     );
     expect(await screen.findByTestId("no-live-sources")).toHaveTextContent("No recent sources were found");
   });
+
+  it("the AI pill shows an AI as active only when one is really connected", async () => {
+    getAiOperationalStatus.mockResolvedValue({ connected: false, statusText: "AI Disconnected", providers: [], capabilities: {} });
+    const { unmount } = render(
+      <MemoryRouter>
+        <ProjectListScreen onOpen={vi.fn()} userEmail="researcher@university.edu" onOpenAiAccess={vi.fn()} />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByTestId("active-ai-pill")).toHaveTextContent("Connect an AI"));
+    unmount();
+    getAiOperationalStatus.mockResolvedValue({ connected: true, statusText: "Ready", providers: [{ id: "groq", name: "Groq", model: "m", tier: "free" }], capabilities: {} });
+    render(
+      <MemoryRouter>
+        <ProjectListScreen onOpen={vi.fn()} userEmail="researcher@university.edu" onOpenAiAccess={vi.fn()} />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByTestId("active-ai-pill")).toHaveTextContent("AI: Groq"));
+  });
 });
+

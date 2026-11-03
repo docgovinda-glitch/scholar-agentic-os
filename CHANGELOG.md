@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Delivery tab fixed.** Clicking Delivery in the header sent the author back to Blueprint; it now opens Delivery, and moving between views no longer reloads the whole project.
 - **Retired stage screens deleted.** The 25 stage screens (unreachable since the five views replaced them), their sidebar, registry and tests were removed with the owner's approval. Saved answers they wrote remain in projects.
 
+### AI Access upgrade
+- **Honest AI status pill.** The pill at the top of the workspace shows the connected AI by name ("AI: Google Gemini") only when one is connected; otherwise it reads "Connect an AI" and opens AI Access.
+- **Quick start.** With nothing connected, Overview shows three ways to start (Google Gemini, Groq, Ollama on your own computer), each with its setup button and a link to get a key or download. It no longer flashes while the connection status is loading.
+- **Live routing.** The fixed "Agentic Task Routing Matrix", which listed routes whether or not those providers were connected, is replaced by "Which AI does what, right now": for research, sources, long documents and quick replies it shows the provider and model the router would pick and what it falls back to, from the same router real requests use. No AI is called to check this.
+- **Providers filters:** "Free to start" (free cloud keys and local runners) and "Connected (N)".
+- **Preferences badge** shows the preferred provider only if it is connected, else "Not set".
+
 ### Ask Scholar
 - **Every answer is grounded automatically.** The "Live Grounding" button and checkbox are gone (Ask Scholar header and composer, the workspace chat panels, and AI Access). Each research question starts from a fresh search of scholarly indexes and the web, and the answer cites those sources by number. A short follow-up ("what about in Nepal?") is searched together with the question before it. When nothing is found the answer says it comes from the AI's general knowledge. Structured AI steps (outlines, drafting, JSON tasks) no longer run a hidden web search when the old setting was on.
 - **Sources under each answer**, open by default, numbered [1], [2]… to match the text, with the time of the search.

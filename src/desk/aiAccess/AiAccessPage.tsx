@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { LiveRouting, QuickStart, providerLabel } from "./AiAccessExtras";
 import { PREMIUM_SCOPE_SENTENCE } from "./premiumScope";
 import { getCloudProvider, providerAccessFacts, CLOUD_PROVIDERS, type CloudProviderSpec } from "../../config/providerCatalog";
 import { getLocalRunner, LOCAL_RUNNERS, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
@@ -394,11 +395,11 @@ function OverviewSection({
               Preferences
             </span>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 border border-slate-200 dark:border-neutral-700 whitespace-nowrap shrink-0 capitalize">
-              {access.settings.provider || "Default"}
+              {access.connected.some((p) => p.id === access.settings.provider) ? providerLabel(access.settings.provider) : "Not set"}
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-neutral-400 leading-normal">
-            Routing, models & privacy
+            {access.connected.some((p) => p.id === access.settings.provider) ? "Preferred AI, models & privacy" : "Connect an AI to choose a preferred one"}
           </p>
         </button>
       </div>
@@ -459,30 +460,29 @@ function OverviewSection({
               </button>
             ))}
           </div>
-        </section>
-      ) : (
-        <section className="rounded-2xl border border-slate-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-6 text-left shadow-2xs">
-          <h3 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Nothing connected yet</h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400 max-w-xl leading-relaxed">
-            Connect a local runner or cloud AI provider to power generation, synthesis, and research drafting.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2.5">
-            <button
-              type="button"
-              onClick={() => onGo("providers")}
-              className="rounded-xl bg-slate-900 hover:bg-black dark:bg-white dark:hover:bg-slate-100 dark:text-slate-950 text-white px-4 py-2 text-xs font-semibold transition-all shadow-sm cursor-pointer"
-            >
-              Browse Providers
-            </button>
-            <button
-              type="button"
-              onClick={() => onGo("subscription")}
-              className="rounded-xl border border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-800/80 hover:bg-slate-50 dark:hover:bg-neutral-800 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-all cursor-pointer"
-            >
-              Learn about Premium
-            </button>
+          <div className="mt-5">
+            <LiveRouting refreshKey={access.connected.map((p) => p.id).join(",")} privacy={access.settings.preferences.privacyPreference === "no-cloud" ? "no-cloud" : "any"} />
           </div>
         </section>
+      ) : (
+        access.loading ? (
+          <p className="text-xs text-slate-500 dark:text-neutral-400" role="status">Checking your connections…</p>
+        ) : (
+        <>
+          <QuickStart onOpen={onOpen} />
+          <p className="text-xs text-slate-500 dark:text-neutral-400">
+            Prefer not to manage an account?{" "}
+            <button type="button" onClick={() => onGo("subscription")} className="underline cursor-pointer">
+              Scholar Core Premium
+            </button>{" "}
+            provides the AI for you. Or{" "}
+            <button type="button" onClick={() => onGo("providers")} className="underline cursor-pointer">
+              browse all providers
+            </button>
+            .
+          </p>
+        </>
+        )
       )}
     </div>
   );
@@ -497,7 +497,7 @@ function ProvidersSection({
   access: ReturnType<typeof useAiAccess>;
   onOpen: (id: string) => void;
 }) {
-  const [filter, setFilter] = useState<"all" | "local" | "cloud">("all");
+  const [filter, setFilter] = useState<"all" | "free" | "local" | "cloud" | "connected">("all");
   const [query, setQuery] = useState("");
 
   const localItems = useMemo(() => {
@@ -537,7 +537,16 @@ function ProvidersSection({
   }, [localItems, cloudItems]);
 
   const displayedItems = useMemo(() => {
-    let items = filter === "local" ? localItems : filter === "cloud" ? cloudItems : allItems;
+    let items =
+      filter === "local"
+        ? localItems
+        : filter === "cloud"
+        ? cloudItems
+        : filter === "free"
+        ? [...cloudItems.filter((p) => p.tierBadge === "Free"), ...localItems]
+        : filter === "connected"
+        ? allItems.filter((p) => p.connected)
+        : allItems;
     if (query.trim()) {
       const q = query.trim().toLowerCase();
       items = items.filter((p) => p.name.toLowerCase().includes(q));
@@ -646,6 +655,21 @@ function ProvidersSection({
           >
             Cloud Providers
           </button>
+          {(["free", "connected"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              title={f === "free" ? "Cloud providers with a free tier, plus local runners (always free)" : "Providers you have connected"}
+              className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                filter === f
+                  ? "bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] shadow-xs font-semibold"
+                  : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
+              }`}
+            >
+              {f === "free" ? "Free to start" : `Connected (${allItems.filter((p) => p.connected).length})`}
+            </button>
+          ))}
         </div>
 
         {/* Search input */}
@@ -1122,60 +1146,8 @@ function PreferencesSection({
         )}
       </section>
 
-      {/* Agentic Task Routing Matrix */}
-      <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-5 space-y-3 shadow-2xs">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold tracking-tight text-[color:var(--text-primary)]">
-              Agentic Task Routing Matrix
-            </h3>
-            <p className="mt-0.5 text-xs text-[color:var(--text-muted)]">
-              How Scholar Core's autonomous editorial agents map tasks across your connected AI tiers.
-            </p>
-          </div>
-          <span className="text-[11px] font-mono text-[color:var(--accent-solid)] border border-[color:var(--border-subtle)] px-2 py-0.5 rounded-full bg-[color:var(--surface-inset)]">
-            Auto-Orchestrated
-          </span>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3 pt-1">
-          <div className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] p-3 space-y-1.5">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400">
-              <span>🧠 Deep Reasoning</span>
-            </div>
-            <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
-              Peer Review, G1 Gap Synthesis, Quality Gates, and Editorial Board.
-            </p>
-            <div className="text-[11px] font-mono font-medium text-[color:var(--text-primary)] pt-1">
-              → {access.settings.provider ? `${access.settings.provider} (Primary)` : "DeepSeek-R1 / Claude"}
-            </div>
-          </div>
-
-          <div className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] p-3 space-y-1.5">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
-              <span>⚡ Fast Execution</span>
-            </div>
-            <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
-              Evidentiary Extraction, Intake Processing, Outline Generation, Citation Extraction.
-            </p>
-            <div className="text-[11px] font-mono font-medium text-[color:var(--text-primary)] pt-1">
-              → {fallback ? `${fallback} (Fast)` : "Groq / Flash / Local"}
-            </div>
-          </div>
-
-          <div className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] p-3 space-y-1.5">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              <span>📚 Embeddings & Vault</span>
-            </div>
-            <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
-              Semantic Search, Document Intelligence, Vector Indexing, Evidence Retrieval.
-            </p>
-            <div className="text-[11px] font-mono font-medium text-[color:var(--text-primary)] pt-1">
-              → Gemini Embeddings / Local Vector
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Live routing: the router's actual choice per kind of task, not a fixed table */}
+      <LiveRouting refreshKey={`${access.connected.map((p) => p.id).join(",")}|${access.settings.provider}|${fallback}`} privacy={privacy === "no-cloud" ? "no-cloud" : "any"} />
 
       {/* 3. Privacy & Security Section with Tooltip */}
       <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-5 space-y-3">
