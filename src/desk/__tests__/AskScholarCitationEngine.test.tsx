@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, within, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router-dom";
 import {
@@ -290,20 +290,23 @@ describe("Ask Scholar Citation Engine & Referencing System", () => {
         fireEvent.click(openButtons[0]);
       }
 
-      const styleSelect = screen.getByLabelText(/Preferred Referencing Style/i) as HTMLSelectElement;
-      expect(styleSelect).toBeDefined();
-
-      const options = Array.from(styleSelect.options).map((o) => o.value);
-      expect(options).toEqual(expect.arrayContaining(["apa", "mla", "chicago", "harvard", "ieee", "vancouver"]));
+      // The style picker (was a bare <select>) lists each style with how an
+      // in-text citation looks, grouped author–date / numbered.
+      const picker = screen.getByRole("button", { name: /Referencing style:/i });
+      fireEvent.click(picker);
+      const listbox = screen.getByRole("listbox", { name: "Referencing style" });
+      const names = within(listbox).getAllByRole("option").map((o) => o.textContent);
+      for (const n of ["APA", "MLA", "Chicago", "Harvard", "IEEE", "Vancouver"]) expect(names.some((t) => t?.includes(n))).toBe(true);
+      expect(within(listbox).getByRole("option", { name: /Harvard Referencing.*\(Vaswani, 2017\)/ })).toBeInTheDocument();
 
       // User selects IEEE
-      fireEvent.change(styleSelect, { target: { value: "ieee" } });
-      expect(styleSelect.value).toBe("ieee");
+      fireEvent.click(within(listbox).getByRole("option", { name: /^IEEE/ }));
       expect(localStorage.getItem("scholar_ask_citation_style")).toBe("ieee");
+      expect(screen.getByRole("button", { name: /Referencing style: IEEE/i })).toBeInTheDocument();
 
       // User switches to Harvard
-      fireEvent.change(styleSelect, { target: { value: "harvard" } });
-      expect(styleSelect.value).toBe("harvard");
+      fireEvent.click(screen.getByRole("button", { name: /Referencing style:/i }));
+      fireEvent.click(screen.getByRole("option", { name: /^Harvard/ }));
       expect(localStorage.getItem("scholar_ask_citation_style")).toBe("harvard");
     });
   });

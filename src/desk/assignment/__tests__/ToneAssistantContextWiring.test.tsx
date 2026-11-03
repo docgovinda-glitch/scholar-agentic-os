@@ -10,6 +10,13 @@ import WritingStyleSelector, {
 } from "../components/WritingStyleSelector";
 import { ASSIGNMENT_AGENT_CONFIGS } from "../types";
 
+// Workspace chats now search before every answer. These tests are about the
+// tone chips, so the search finds nothing and the question goes out as asked.
+vi.mock("../../../services/liveSearchService", async (orig) => ({
+  ...(await orig<typeof import("../../../services/liveSearchService")>()),
+  executeLiveSearch: vi.fn().mockResolvedValue([]),
+}));
+
 describe("Tone Assistant Context Synchronization & Dynamic Suggestion Chips", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -55,10 +62,7 @@ describe("Tone Assistant Context Synchronization & Dynamic Suggestion Chips", ()
     const chip1 = screen.getByText("Which tone best matches my assignment brief?");
     fireEvent.click(chip1);
 
-    expect(handleSend).toHaveBeenCalledWith(
-      "Which tone best matches my assignment brief?",
-      []
-    );
+    await waitFor(() => expect(handleSend).toHaveBeenCalledWith("Which tone best matches my assignment brief?", []));
 
     // Wait for the response to be rendered in the chat stream
     await waitFor(() => {
@@ -97,10 +101,7 @@ describe("Tone Assistant Context Synchronization & Dynamic Suggestion Chips", ()
     // Click Chip 2
     fireEvent.click(screen.getByText("Compare Analytical vs. Argumentative for this topic"));
 
-    expect(handleSend).toHaveBeenCalledWith(
-      "Compare Analytical vs. Argumentative for this topic",
-      []
-    );
+    await waitFor(() => expect(handleSend).toHaveBeenCalledWith("Compare Analytical vs. Argumentative for this topic", []));
   });
 
   it("dispatches tone assistant event when WritingStyleSelector receives focus or selection", () => {
@@ -156,10 +157,7 @@ describe("Tone Assistant Context Synchronization & Dynamic Suggestion Chips", ()
     );
 
     await waitFor(() => {
-      expect(handleSend).toHaveBeenCalledWith(
-        "How can I calibrate custom voice cloning?",
-        []
-      );
+      expect(handleSend).toHaveBeenCalledWith("How can I calibrate custom voice cloning?", []);
     });
 
     await waitFor(() => {

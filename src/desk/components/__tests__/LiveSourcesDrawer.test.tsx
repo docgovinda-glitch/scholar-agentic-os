@@ -37,10 +37,10 @@ describe("LiveSourcesDrawer UI Component", () => {
   it("renders collapsed header by default with source count and aria attributes", () => {
     render(<LiveSourcesDrawer sources={mockSources} />);
 
-    const button = screen.getByRole("button", { name: /Retrieved Live Sources/i });
+    const button = screen.getByRole("button", { name: /Sources \(2\)/i });
     expect(button).toBeInTheDocument();
     expect(button).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByText(/Retrieved Live Sources \(2\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sources \(2\)/i)).toBeInTheDocument();
     expect(screen.getByText("Show")).toBeInTheDocument();
 
     // Source cards should not be visible when collapsed
@@ -50,7 +50,7 @@ describe("LiveSourcesDrawer UI Component", () => {
   it("expands to reveal source cards, URLs, snippets, and authors upon click", () => {
     render(<LiveSourcesDrawer sources={mockSources} />);
 
-    const button = screen.getByRole("button", { name: /Retrieved Live Sources/i });
+    const button = screen.getByRole("button", { name: /Sources \(2\)/i });
     fireEvent.click(button);
 
     expect(button).toHaveAttribute("aria-expanded", "true");
@@ -75,13 +75,20 @@ describe("LiveSourcesDrawer UI Component", () => {
     expect(screen.getByText("wikipedia")).toBeInTheDocument();
   });
 
+  it("numbers each source to match the [n] markers in the answer and shows when it searched", () => {
+    render(<LiveSourcesDrawer sources={mockSources} searchedAt="09:40" initialExpanded />);
+    expect(screen.getByText("Searched at 09:40")).toBeInTheDocument();
+    expect(screen.getByLabelText("Source 1")).toHaveTextContent("[1]");
+    expect(screen.getByLabelText("Source 2")).toHaveTextContent("[2]");
+  });
+
   it("toggles back to collapsed state on second click", () => {
     render(<LiveSourcesDrawer sources={mockSources} initialExpanded={true} />);
 
     expect(screen.getByText("Hide")).toBeInTheDocument();
     expect(screen.getByText("Quantum Magnetometry in Living Cells")).toBeInTheDocument();
 
-    const button = screen.getByRole("button", { name: /Retrieved Live Sources/i });
+    const button = screen.getByRole("button", { name: /Sources \(2\)/i });
     fireEvent.click(button);
 
     expect(button).toHaveAttribute("aria-expanded", "false");

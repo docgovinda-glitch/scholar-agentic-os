@@ -2,6 +2,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
+  buildRetrievalQuery,
   formatLiveSearchGroundingContext,
   injectLiveGrounding,
   injectLiveGroundingToSystemPrompt,
@@ -84,7 +85,7 @@ describe("Live Web & Scholarly Search Service", () => {
       expect(formatted).toContain("provide inline citation links using markdown format");
     });
 
-    it("caps formatted sources to top 5 snippets", () => {
+    it("caps formatted sources to the top 8 snippets", () => {
       const largeList: LiveSearchResult[] = Array.from({ length: 10 }, (_, i) => ({
         title: `Paper ${i + 1}`,
         url: `https://example.org/${i + 1}`,
@@ -93,8 +94,9 @@ describe("Live Web & Scholarly Search Service", () => {
       }));
 
       const formatted = formatLiveSearchGroundingContext(largeList, "2026-10-23");
-      expect(formatted).toContain('[5] "Paper 5"');
-      expect(formatted).not.toContain('[6] "Paper 6"');
+      // Ask Scholar now searches for up to 6–8 sources per answer (was 5).
+      expect(formatted).toContain('[8] "Paper 8"');
+      expect(formatted).not.toContain('[9] "Paper 9"');
     });
   });
 
@@ -242,6 +244,17 @@ describe("Live Web & Scholarly Search Service", () => {
     it("reconstructOpenAlexAbstract handles empty or invalid inputs", () => {
       expect(reconstructOpenAlexAbstract(undefined)).toBe("");
       expect(reconstructOpenAlexAbstract({} as Record<string, number[]>)).toBe("");
+    });
+  });
+
+  describe("buildRetrievalQuery", () => {
+    it("searches a short or follow-up question together with the previous one", () => {
+      expect(buildRetrievalQuery("What about in Nepal?", ["How does climate change affect Himalayan farming?"])).toBe(
+        "How does climate change affect Himalayan farming? What about in Nepal?"
+      );
+      const full = "How does climate change affect smallholder farming in the Himalayas today?";
+      expect(buildRetrievalQuery(full, ["Something earlier entirely"])).toBe(full);
+      expect(buildRetrievalQuery("Why?", [])).toBe("Why?");
     });
   });
 });
