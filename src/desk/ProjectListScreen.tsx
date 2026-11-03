@@ -84,13 +84,12 @@ import {
   type AskCitationStyleId,
 } from "./scholarCitationEngine";
 import {
-  getLiveSearchGroundingEnabled,
-  setLiveSearchGroundingEnabled,
-  onLiveSearchGroundingChange,
+  buildRetrievalQuery,
   executeLiveSearch,
   injectLiveGroundingToSystemPrompt,
   type LiveSearchResult,
 } from "../services/liveSearchService";
+import CitationStylePicker from "./components/CitationStylePicker";
 import LiveSourcesDrawer from "./components/LiveSourcesDrawer";
 
 import {
@@ -590,13 +589,8 @@ export default function ProjectListScreen({
   });
   const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([]);
   const [isGuideThinking, setIsGuideThinking] = useState(false);
-  const [liveSearchGrounding, setLiveSearchGrounding] = useState<boolean>(() => getLiveSearchGroundingEnabled());
-
-  useEffect(() => {
-    return onLiveSearchGroundingChange((enabled) => {
-      setLiveSearchGrounding(enabled);
-    });
-  }, []);
+  // What Ask Scholar is doing for the current question: searching, then writing.
+  const [askPhase, setAskPhase] = useState<{ step: "searching" | "writing"; found?: number } | null>(null);
   const isLandingPage = activeView === "projects" && !choosing;
   const hasStartedChatting = guideMessages.some((m) => m.sender === "user") || isGuideThinking;
   const [expandedPlanIds, setExpandedPlanIds] = useState<Record<string, boolean>>({});
@@ -842,14 +836,17 @@ export default function ProjectListScreen({
         const styleInfo = getCitationStyleInfo(askCitationStyle);
         const systemPrompt = `You are Scholar Core Research Copilot, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers. Prioritize recently published (2020-2026), peer-reviewed, and credible sources. Format citations and references strictly according to ${styleInfo.name}. Ground all assertions in verified literature without fabricating sources or DOIs.`;
 
+        // Every research answer starts from a fresh search; a follow-up is
+        // searched together with the question before it.
         let liveRetrievedSources: LiveSearchResult[] = [];
-        if (liveSearchGrounding || targetMode === "search" || targetMode === "deep-research") {
-          try {
-            liveRetrievedSources = await executeLiveSearch(query, { limit: 5 });
-          } catch {
-            // Non-blocking failover
-          }
+        setAskPhase({ step: "searching" });
+        try {
+          const previousQuestions = guideMessages.filter((m) => m.sender === "user").map((m) => m.text);
+          liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { limit: 6 });
+        } catch {
+          // The answer still comes, marked as not based on a search.
         }
+        setAskPhase({ step: "writing", found: liveRetrievedSources.length });
 
         const effectiveSystemPrompt = liveRetrievedSources.length > 0
           ? injectLiveGroundingToSystemPrompt(systemPrompt, liveRetrievedSources)
@@ -919,7 +916,8 @@ export default function ProjectListScreen({
             plan: agentResponse.plan,
             citationStyle: agentResponse.citationStyle || askCitationStyle,
             citations: agentResponse.citations,
-            liveSources: liveRetrievedSources.length > 0 ? liveRetrievedSources : undefined,
+            liveSources: liveRetrievedSources,
+            searchedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             wordCount: agentResponse.wordCount,
             verifiedSourcesCount: agentResponse.verifiedSourcesCount,
             burstinessMetrics: agentResponse.burstinessMetrics,
@@ -958,6 +956,7 @@ export default function ProjectListScreen({
       setGuideMessages((prev) => [...prev, assistantMsg]);
     } finally {
       setIsGuideThinking(false);
+      setAskPhase(null);
     }
   }
 
@@ -2197,54 +2196,17 @@ export default function ProjectListScreen({
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/10 text-xs">
-                  <BookOpen className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-                  <label htmlFor="ask-scholar-header-citation-style" className="sr-only">
-                    Referencing Style
-                  </label>
-                  <select
-                    id="ask-scholar-header-citation-style"
-                    aria-label="Preferred Referencing Style"
-                    value={askCitationStyle}
-                    onChange={(e) => {
-                      const newStyle = e.target.value as AskCitationStyleId;
-                      setAskCitationStyle(newStyle);
-                      try {
-                        localStorage.setItem("scholar_ask_citation_style", newStyle);
-                      } catch {
-                        // ignore
-                      }
-                    }}
-                    className="bg-transparent text-[11px] font-medium text-neutral-700 dark:text-neutral-300 focus:outline-none cursor-pointer pr-1"
-                    title="Select referencing style (APA, MLA, Chicago, Harvard, IEEE, Vancouver)"
-                  >
-                    {ASK_SCHOLAR_CITATION_STYLES.map((s) => (
-                      <option key={s.id} value={s.id} className="bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100">
-                        {s.shortLabel}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = !liveSearchGrounding;
-                    setLiveSearchGrounding(next);
-                    setLiveSearchGroundingEnabled(next);
+                <CitationStylePicker
+                  value={askCitationStyle}
+                  onChange={(newStyle) => {
+                    setAskCitationStyle(newStyle);
+                    try {
+                      localStorage.setItem("scholar_ask_citation_style", newStyle);
+                    } catch {
+                      // ignore
+                    }
                   }}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer select-none ${
-                    liveSearchGrounding
-                      ? "bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-800/60 shadow-2xs"
-                      : "bg-neutral-100 dark:bg-white/[0.06] text-neutral-600 dark:text-neutral-400 border-neutral-200/80 dark:border-white/10 hover:text-neutral-900 dark:hover:text-white"
-                  }`}
-                  title="Toggle Live Web & Scholarly Search Grounding for real-time sources"
-                  aria-pressed={liveSearchGrounding}
-                  data-testid="ask-scholar-live-grounding-toggle"
-                >
-                  <span aria-hidden="true">🌐</span>
-                  <span className="hidden sm:inline">Live Grounding</span>
-                </button>
+                />
 
                 {hasStartedChatting && (
                   <button
@@ -2540,7 +2502,12 @@ export default function ProjectListScreen({
 
                     {/* Retrieved Live Sources Drawer */}
                     {msg.liveSources && msg.liveSources.length > 0 && (
-                      <LiveSourcesDrawer sources={msg.liveSources} />
+                      <LiveSourcesDrawer sources={msg.liveSources} searchedAt={msg.searchedAt} initialExpanded />
+                    )}
+                    {msg.liveSources && msg.liveSources.length === 0 && (
+                      <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400" data-testid="no-live-sources">
+                        No recent sources were found for this question, so this answer is from the AI's general knowledge. Check it before you rely on it.
+                      </p>
                     )}
 
                     {/* Citation Engine References & Bibliography */}
@@ -2887,23 +2854,25 @@ export default function ProjectListScreen({
                   </div>
                   <div className="flex flex-col gap-1 min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-xs text-neutral-900 dark:text-neutral-100">
-                        {sidebarAiMode === "deep_research"
-                          ? "Scholarly Deep Research in Progress"
-                          : sidebarAiMode === "search"
-                          ? "Live Multi-Vector Search & Verification"
-                          : "Scholar Core Reasoning"}
+                      <span className="font-semibold text-xs text-neutral-900 dark:text-neutral-100" role="status">
+                        {askPhase?.step === "searching"
+                          ? "Searching recent sources…"
+                          : askPhase?.step === "writing"
+                          ? askPhase.found
+                            ? `Found ${askPhase.found} source${askPhase.found === 1 ? "" : "s"} · writing the answer…`
+                            : "No recent sources found · answering from general knowledge…"
+                          : "Thinking…"}
                       </span>
                       <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.2 rounded-full border border-purple-200 dark:border-purple-800/40 animate-pulse">
                         Active
                       </span>
                     </div>
                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                      {sidebarAiMode === "deep_research"
-                        ? "Formulating multi-angle inquiries, querying academic repositories, and validating citation authenticity..."
-                        : sidebarAiMode === "search"
-                        ? "Searching authoritative sources and cross-checking evidence..."
-                        : "Analyzing research context and synthesizing findings..."}
+                      {askPhase?.step === "searching"
+                        ? "Scholarly indexes and the web are searched for every question, so the answer rests on the latest results."
+                        : sidebarAiMode === "deep_research"
+                        ? "Deep research takes longer: the question is explored from several angles."
+                        : "The answer cites the sources it uses by number."}
                     </p>
                     <div className="w-full h-1 bg-neutral-200/60 dark:bg-white/10 rounded-full overflow-hidden mt-1">
                       <div className="h-full bg-gradient-to-r from-sky-500 via-purple-500 to-indigo-500 w-1/2 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]" />
@@ -3048,24 +3017,10 @@ export default function ProjectListScreen({
                       onSelectMode={setSidebarAiMode}
                       onAttachFiles={handleSidebarFileSelect}
                     />
-                    <label
-                      htmlFor="ask-scholar-input-live-toggle"
-                      className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white cursor-pointer select-none transition-colors border border-neutral-200/60 dark:border-white/10 bg-neutral-50 dark:bg-white/5"
-                      title="Ground responses in fresh web & scholarly data"
-                    >
-                      <input
-                        id="ask-scholar-input-live-toggle"
-                        type="checkbox"
-                        checked={liveSearchGrounding}
-                        onChange={(e) => {
-                          const next = e.target.checked;
-                          setLiveSearchGrounding(next);
-                          setLiveSearchGroundingEnabled(next);
-                        }}
-                        className="rounded border-neutral-300 dark:border-neutral-700 text-sky-600 focus:ring-sky-500 cursor-pointer w-3.5 h-3.5"
-                      />
-                      <span>🌐 Live Grounding</span>
-                    </label>
+                    <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400" title="Each answer starts from a fresh search of scholarly indexes and the web">
+                      <span aria-hidden="true">🌐</span>
+                      <span>Searches recent sources for every answer</span>
+                    </span>
                   </div>
 
                   <div className="relative group">

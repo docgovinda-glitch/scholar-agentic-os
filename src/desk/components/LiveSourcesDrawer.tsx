@@ -6,12 +6,15 @@ export interface LiveSourcesDrawerProps {
   sources?: LiveSearchResult[];
   initialExpanded?: boolean;
   className?: string;
+  /** When the search ran, e.g. "09:40". */
+  searchedAt?: string;
 }
 
 export default function LiveSourcesDrawer({
   sources,
   initialExpanded = false,
   className = "",
+  searchedAt,
 }: LiveSourcesDrawerProps) {
   const [isOpen, setIsOpen] = useState(initialExpanded);
 
@@ -32,10 +35,10 @@ export default function LiveSourcesDrawer({
         <div className="flex items-center gap-2 min-w-0">
           <Globe className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" aria-hidden="true" />
           <span className="font-semibold text-sky-950 dark:text-sky-100 truncate">
-            Retrieved Live Sources ({sources.length})
+            Sources ({sources.length})
           </span>
           <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/50 shrink-0">
-            Real-Time Grounding
+            {searchedAt ? `Searched at ${searchedAt}` : "Searched for this answer"}
           </span>
         </div>
         <div className="flex items-center gap-1 text-sky-700 dark:text-sky-300">
@@ -60,11 +63,14 @@ export default function LiveSourcesDrawer({
               data-testid={`live-source-card-${i}`}
             >
               <div className="flex items-start justify-between gap-2">
+                <span className="text-[11px] font-mono font-semibold text-sky-700 dark:text-sky-300 shrink-0" aria-label={`Source ${i + 1}`}>
+                  [{i + 1}]
+                </span>
                 <a
                   href={src.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs font-semibold text-sky-700 dark:text-sky-400 hover:text-sky-900 dark:hover:text-sky-200 hover:underline line-clamp-1 cursor-pointer flex items-center gap-1.5"
+                  className="flex-1 min-w-0 text-xs font-semibold text-sky-700 dark:text-sky-400 hover:text-sky-900 dark:hover:text-sky-200 hover:underline line-clamp-1 cursor-pointer flex items-center gap-1.5"
                   title={src.title}
                 >
                   <span className="truncate">{src.title}</span>

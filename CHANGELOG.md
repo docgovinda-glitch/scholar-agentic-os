@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Delivery tab fixed.** Clicking Delivery in the header sent the author back to Blueprint; it now opens Delivery, and moving between views no longer reloads the whole project.
 - **Retired stage screens deleted.** The 25 stage screens (unreachable since the five views replaced them), their sidebar, registry and tests were removed with the owner's approval. Saved answers they wrote remain in projects.
 
+### Ask Scholar
+- **Every answer is grounded automatically.** The "Live Grounding" button and checkbox are gone (Ask Scholar header and composer, the workspace chat panels, and AI Access). Each research question starts from a fresh search of scholarly indexes and the web, and the answer cites those sources by number. A short follow-up ("what about in Nepal?") is searched together with the question before it. When nothing is found the answer says it comes from the AI's general knowledge. Structured AI steps (outlines, drafting, JSON tasks) no longer run a hidden web search when the old setting was on.
+- **Sources under each answer**, open by default, numbered [1], [2]… to match the text, with the time of the search.
+- **Clear progress:** "Searching recent sources…", then "Found N sources · writing the answer…".
+- **Referencing style picker** lists each style with how its in-text citation looks, grouped author–date and numbered, and now shows on phones too.
+- **Status** reads "Ready" (was "Ask Scholar is ready").
+
 ### Coursework and essay drafting fixed
 - **Typing no longer closes the editor.** Every keystroke was saved, and each save closed the editor, so writing a section by hand stopped after the first letter. The editor now stays open while you type and still saves as you go.
 - **Drafts are no longer lost.** Each section save was built from the outline as it was when the action started, so saves erased each other: "Draft all remaining" kept only the last section, and an AI draft finishing while you typed could wipe your text (or the other way round). Saves now build on the latest text and go to the server one at a time.

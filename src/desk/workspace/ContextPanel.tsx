@@ -5,9 +5,7 @@ import { useOptionalResearchWorkspace } from "./ResearchContext";
 import { sendCopilotMessage } from "../api";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 import {
-  getLiveSearchGroundingEnabled,
-  setLiveSearchGroundingEnabled,
-  onLiveSearchGroundingChange,
+  buildRetrievalQuery,
   executeLiveSearch,
   injectLiveGrounding,
   type LiveSearchResult,
@@ -245,15 +243,8 @@ export default function ContextPanel({
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [dynamicActions, setDynamicActions] = useState<string[] | null>(null);
-  const [liveGrounding, setLiveGrounding] = useState<boolean>(() => getLiveSearchGroundingEnabled());
   const [liveSourcesByMessageId, setLiveSourcesByMessageId] = useState<Record<number, LiveSearchResult[]>>({});
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    return onLiveSearchGroundingChange((enabled) => {
-      setLiveGrounding(enabled);
-    });
-  }, []);
 
   useEffect(() => {
     if (typeof endOfMessagesRef.current?.scrollIntoView === "function") {
@@ -270,13 +261,14 @@ export default function ContextPanel({
     setHistory(newHistory);
     setIsTyping(true);
 
+    // Every answer starts from a fresh search; a follow-up is searched with
+    // the question before it.
     let liveSources: LiveSearchResult[] = [];
-    if (liveGrounding) {
-      try {
-        liveSources = await executeLiveSearch(text, { limit: 4 });
-      } catch {
-        // Non-blocking failover
-      }
+    try {
+      const previous = history.filter((m) => m.role === "user").map((m) => m.content);
+      liveSources = await executeLiveSearch(buildRetrievalQuery(text, previous), { limit: 4 });
+    } catch {
+      // The answer still comes, without search results.
     }
 
     const outgoingText =
@@ -488,35 +480,6 @@ export default function ContextPanel({
             ))}
           </div>
         )}
-
-        {/* Live Web Search Grounding Toggle Bar */}
-        <div className="px-4 py-2 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] flex items-center justify-between shrink-0">
-          <label
-            htmlFor="context-panel-live-search-toggle"
-            className="flex items-center gap-2 cursor-pointer select-none text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
-          >
-            <input
-              id="context-panel-live-search-toggle"
-              type="checkbox"
-              checked={liveGrounding}
-              onChange={(e) => {
-                const next = e.target.checked;
-                setLiveGrounding(next);
-                setLiveSearchGroundingEnabled(next);
-              }}
-              className="rounded border-[color:var(--border-control)] text-sky-600 focus:ring-sky-500 cursor-pointer"
-            />
-            <span className="flex items-center gap-1.5">
-              <span>🌐</span>
-              <span>Live Web Search Grounding</span>
-            </span>
-          </label>
-          {liveGrounding && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium">
-              Active
-            </span>
-          )}
-        </div>
 
         {/* Chat Input */}
         <div className="p-4 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] shrink-0">
