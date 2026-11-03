@@ -21,6 +21,7 @@ import {
   removeChapter,
   standardChapters,
   thesisToMarkdown,
+  thesisCheckText,
   totalWords,
   updateChapter,
   type LiteratureMatrix,
@@ -28,6 +29,9 @@ import {
   type ThesisProjectData,
 } from "./thesisModel";
 import { thesisDocxBlob, thesisFileName } from "./thesisExport";
+import VerificationChecks from "../journal/VerificationChecks";
+import ThesisReferences from "./components/ThesisReferences";
+import { parseThesisReferences, parseThesisStyle } from "./thesisReferences";
 import { downloadBlob } from "../assignment/services/assignmentExportService";
 import WorkspaceAutosaveBadge from "../../components/ui/WorkspaceAutosaveBadge";
 import AppleStudioHeader, { type AppleStudioPhaseId } from "../../components/ui/AppleStudioShell";
@@ -209,6 +213,8 @@ export default function ThesisWorkspace({
           chapters: Array.isArray(a["chapters"])
             ? (a["chapters"] as ThesisChapter[])
             : prev.chapters,
+          references: parseThesisReferences(a["thesisReferences"]),
+          citationStyle: parseThesisStyle(a["citationStyle"]),
         }));
         if (typeof projectObj.version === "number") {
           setProjectVersion(projectObj.version);
@@ -241,6 +247,8 @@ export default function ThesisWorkspace({
             supervisorNotes: nextData.supervisorNotes,
             literatureMatrix: nextData.literatureMatrix,
             chapters: nextData.chapters,
+            thesisReferences: nextData.references ?? {},
+            citationStyle: nextData.citationStyle ?? "apa",
           });
           if (updated && updated.version) {
             setProjectVersion(updated.version);
@@ -669,6 +677,15 @@ export default function ThesisWorkspace({
                   fieldOfStudy={thesisData.fieldOfStudy}
                   onChange={(next) => updateThesisField("literatureMatrix", next)}
                 />
+
+                <ThesisReferences
+                  projectId={projectId}
+                  records={thesisData.references ?? {}}
+                  style={thesisData.citationStyle ?? "apa"}
+                  chapters={thesisData.chapters}
+                  onRecords={(next) => updateThesisField("references", next)}
+                  onStyle={(next) => updateThesisField("citationStyle", next)}
+                />
               </div>
             )}
 
@@ -731,6 +748,8 @@ export default function ThesisWorkspace({
                     {auditLoading ? "Auditing Chapters…" : "Run Cross-Chapter Audit →"}
                   </button>
                 </div>
+
+                <VerificationChecks markdown={thesisCheckText(thesisData.chapters)} title="Checks across all chapters" />
 
                 {auditError && (
                   <p role="alert" className="text-xs text-[color:var(--state-danger)]">

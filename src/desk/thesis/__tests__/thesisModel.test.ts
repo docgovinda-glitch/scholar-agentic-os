@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import JSZip from "jszip";
 import {
+  thesisCheckText,
   addChapter, countWords, missingForViva, moveChapter, removeChapter, standardChapters, thesisToMarkdown, totalWords, updateChapter,
   emptyLiteratureMatrix, UNTITLED_THESIS, type ThesisProjectData,
 } from "../thesisModel";
@@ -68,8 +69,40 @@ describe("thesis export", () => {
     expect(text).toContain("[Not drafted yet]");
   });
 
+  it("exports render [CITE:id] tags in the chosen style with one reference list, italics as italics", async () => {
+    const cited = base({
+      citationStyle: "apa",
+      references: {
+        r1: { id: "r1", kind: "article", title: "Triage and waits", authors: [{ family: "Okafor", given: "Ada" }], year: 2021, container: "BMJ Open", volume: "11", registry: "crossref" },
+      },
+      chapters: updateChapter(standardChapters(20000), 0, { content: "Triage cut waits [CITE:r1]." }),
+    });
+    const md = thesisToMarkdown(cited);
+    expect(md).toContain("Triage cut waits (Okafor, 2021).");
+    expect(md).toMatch(/## References\n\nOkafor, A\. \(2021\)\. Triage and waits\. \*BMJ Open\*, \*11\*/);
+
+    const xml = await (await JSZip.loadAsync(await Packer.toBuffer(buildThesisDocx(cited)))).file("word/document.xml")!.async("string");
+    const text = xml.replace(/<[^>]+>/g, " ");
+    expect(text).toContain("Triage cut waits (Okafor, 2021).");
+    expect(text).not.toContain("*BMJ Open*");
+    // The journal name is its own italic run.
+    expect(xml).toMatch(/<w:i\/>[\s\S]{0,200}?BMJ Open/);
+    // Without references nothing is added.
+    expect(thesisToMarkdown(data)).not.toMatch(/^## References/m);
+  });
+
   it("file names are safe", () => {
     expect(thesisFileName("Rural Clinic: Wait/Times?", "docx")).toBe("Rural-Clinic-WaitTimes.docx");
     expect(thesisFileName("???", "md")).toBe("thesis.md");
+  });
+});
+
+describe("thesisCheckText", () => {
+  it("joins drafted chapters under their titles and skips undrafted ones", () => {
+    const chapters = standardChapters(10_000);
+    chapters[0].content = "Opening words.";
+    chapters[2].content = "  Method words. ";
+    expect(thesisCheckText(chapters)).toBe("## Introduction\n\nOpening words.\n\n## Methodology\n\nMethod words.");
+    expect(thesisCheckText(standardChapters(10_000))).toBe("");
   });
 });

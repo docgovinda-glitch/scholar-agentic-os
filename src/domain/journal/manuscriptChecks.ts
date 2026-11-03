@@ -107,6 +107,8 @@ export function abstractNumbersMissingFromBody(markdown: string): string[] {
 
 export interface NumberingFinding {
   kind: "Figure" | "Table";
+  /** Set for per-chapter numbering (Figure 3.2): the findings are within that chapter. */
+  chapter?: number;
   /** Numbers mentioned, in order of first mention. */
   order: number[];
   /** Numbers skipped between 1 and the highest mentioned. */
@@ -115,23 +117,41 @@ export interface NumberingFinding {
   outOfOrder: number[];
 }
 
+/** How a number reads in the text: "Figure 2", or "Figure 3.2" in chapter numbering. */
+export const numberLabel = (f: Pick<NumberingFinding, "kind" | "chapter">, n: number) =>
+  `${f.kind} ${f.chapter !== undefined ? `${f.chapter}.` : ""}${n}`;
+
+function sequence(kind: NumberingFinding["kind"], order: number[], chapter?: number): NumberingFinding {
+  const max = Math.max(...order);
+  const missing = Array.from({ length: max }, (_, i) => i + 1).filter((n) => !order.includes(n));
+  const outOfOrder = order.filter((n, i) => order.slice(0, i).some((prev) => prev > n));
+  return { kind, ...(chapter !== undefined ? { chapter } : {}), order, missing, outOfOrder };
+}
+
+/**
+ * Gaps and order of figure and table numbers. Plain numbering (Figure 2) runs
+ * through the document; chapter numbering (Figure 3.2, as in theses) is
+ * checked within each chapter.
+ */
 export function checkNumbering(markdown: string): NumberingFinding[] {
   const kinds: Array<[NumberingFinding["kind"], RegExp]> = [
-    ["Figure", /\b(?:Figure|Fig\.)\s*(\d+)/gi],
-    ["Table", /\bTable\s+(\d+)/gi],
+    ["Figure", /\b(?:Figure|Fig\.)\s*(\d+)(?:\.(\d+))?/gi],
+    ["Table", /\bTable\s+(\d+)(?:\.(\d+))?/gi],
   ];
   const out: NumberingFinding[] = [];
   for (const [kind, re] of kinds) {
-    const order: number[] = [];
+    const plain: number[] = [];
+    const byChapter = new Map<number, number[]>();
     for (const m of markdown.matchAll(re)) {
-      const n = Number(m[1]);
-      if (!order.includes(n)) order.push(n);
+      const first = Number(m[1]);
+      if (m[2] !== undefined) {
+        const list = byChapter.get(first) ?? [];
+        if (!list.includes(Number(m[2]))) list.push(Number(m[2]));
+        byChapter.set(first, list);
+      } else if (!plain.includes(first)) plain.push(first);
     }
-    if (order.length === 0) continue;
-    const max = Math.max(...order);
-    const missing = Array.from({ length: max }, (_, i) => i + 1).filter((n) => !order.includes(n));
-    const outOfOrder = order.filter((n, i) => order.slice(0, i).some((prev) => prev > n));
-    out.push({ kind, order, missing, outOfOrder });
+    if (plain.length) out.push(sequence(kind, plain));
+    for (const [chapter, order] of Array.from(byChapter).sort((a, b) => a[0] - b[0])) out.push(sequence(kind, order, chapter));
   }
   return out;
 }
