@@ -371,7 +371,7 @@ export async function exportProjectManuscript(
 export async function downloadProjectExportBlob(
   projectId: string,
   format: string,
-  options?: { template?: string; includeRebuttalAppendix?: boolean; manuscriptMarkdown?: string }
+  options?: { template?: string; includeRebuttalAppendix?: boolean; manuscriptMarkdown?: string; layout?: "review" | "two_column"; lineNumbers?: boolean }
 ): Promise<Blob> {
   const url = `/api/projects/${encodeURIComponent(projectId)}/export/${encodeURIComponent(format)}`;
   const res = await authedFetch(url, {

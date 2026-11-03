@@ -26,7 +26,10 @@ import {
   BorderStyle,
   LineRuleType,
   ExternalHyperlink,
+  LineNumberRestartFormat,
+  SectionType,
 } from "docx";
+import { lineTwips } from "../../domain/journal/wordLayouts";
 import type { Block, CanonicalDocument } from "../../desk/types";
 import type { ExportMetadata } from "./types";
 import type { AcademicExportOptions } from "./academicPdfCompiler";
@@ -161,7 +164,8 @@ function buildNativeWordTable(rows: string[][], fontName: string): Table {
 function parseMarkdownToDocxElements(
   content: string,
   fontName: string,
-  lineSpacingTwips: number
+  lineSpacingTwips: number,
+  bodySize = 24
 ): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = [];
   const lines = norm(content).split("\n");
@@ -248,7 +252,7 @@ function parseMarkdownToDocxElements(
               text: trimmed.replace(/^>\s*/, ""),
               font: fontName,
               italics: true,
-              size: 24,
+              size: bodySize,
               color: "334155",
             }),
           ],
@@ -263,7 +267,7 @@ function parseMarkdownToDocxElements(
         new Paragraph({
           bullet: { level: 0 },
           spacing: { before: 60, after: 60, line: lineSpacingTwips, lineRule: LineRuleType.AUTO },
-          children: parseInlineRuns(trimmed.replace(/^[-*]\s+/, ""), fontName, 24),
+          children: parseInlineRuns(trimmed.replace(/^[-*]\s+/, ""), fontName, bodySize),
         })
       );
       continue;
@@ -276,7 +280,7 @@ function parseMarkdownToDocxElements(
         new Paragraph({
           spacing: { before: 60, after: 60, line: lineSpacingTwips, lineRule: LineRuleType.AUTO },
           indent: { left: 360 },
-          children: parseInlineRuns(`${numberedMatch[1]}. ${numberedMatch[2]}`, fontName, 24),
+          children: parseInlineRuns(`${numberedMatch[1]}. ${numberedMatch[2]}`, fontName, bodySize),
         })
       );
       continue;
@@ -286,7 +290,7 @@ function parseMarkdownToDocxElements(
     elements.push(
       new Paragraph({
         spacing: { before: 100, after: 140, line: lineSpacingTwips, lineRule: LineRuleType.AUTO },
-        children: parseInlineRuns(trimmed, fontName, 24),
+        children: parseInlineRuns(trimmed, fontName, bodySize),
       })
     );
   }
@@ -306,14 +310,16 @@ export async function renderDocx(
   metadata: ExportMetadata,
   academicOptions?: AcademicExportOptions
 ): Promise<Buffer> {
+  const layout = academicOptions?.wordLayout;
   const fontName =
-    academicOptions?.template === "ieee" || academicOptions?.template === "acm"
-      ? "Arial"
-      : "Times New Roman";
+    layout?.font ??
+    (academicOptions?.template === "ieee" || academicOptions?.template === "acm" ? "Arial" : "Times New Roman");
+  const bodySize = layout ? layout.sizePt * 2 : 24;
 
   // Configurable Line Spacing: 2.0 Double-Spaced (480 twips) is review submission standard
-  const lineSpacingTwips =
-    academicOptions?.lineSpacing === 1.15
+  const lineSpacingTwips = layout
+    ? lineTwips(layout.lineSpacing)
+    : academicOptions?.lineSpacing === 1.15
       ? 276
       : academicOptions?.lineSpacing === 1.5
       ? 360
@@ -371,13 +377,14 @@ export async function renderDocx(
   // ==========================================================================
 
   // Target Venue Notice
-  children.push(
+  // The journal the author chose; a layout name ("APA7", "IEEE") is not a journal.
+  if (academicOptions?.journalName?.trim()) children.push(
     new Paragraph({
       alignment: AlignmentType.RIGHT,
       spacing: { before: 0, after: 360 },
       children: [
         new TextRun({
-          text: `Prepared for Submission to: ${academicOptions?.template?.toUpperCase() || "Peer-Reviewed Journal"}`,
+          text: `Prepared for submission to: ${academicOptions.journalName.trim()}`,
           font: fontName,
           italics: true,
           size: 20, // 10pt
@@ -580,12 +587,10 @@ export async function renderDocx(
     );
   }
 
-  // Keywords
-  const keywords = academicOptions?.keywords && academicOptions.keywords.length > 0
-    ? academicOptions.keywords
-    : ["Autonomous Research", "Provenance Verification", "Multi-Agent Consensus"];
+  // Keywords: only the author's own, and no line at all without them.
+  const keywords = (academicOptions?.keywords ?? []).map((k) => k.trim()).filter(Boolean);
 
-  children.push(
+  if (keywords.length > 0) children.push(
     new Paragraph({
       alignment: AlignmentType.JUSTIFIED,
       indent: { left: 720, right: 720 },
@@ -619,6 +624,9 @@ export async function renderDocx(
   // MAIN BODY SECTIONS
   // ==========================================================================
 
+  // The body starts here: a two-column layout keeps the title page single-column.
+  const bodyStart = children.length;
+
   for (const block of document.blocks) {
     // Skip abstract block in main body since it's already rendered on page 2
     if (
@@ -629,7 +637,7 @@ export async function renderDocx(
       continue;
     }
 
-    const elements = parseMarkdownToDocxElements(block.text || "", fontName, lineSpacingTwips);
+    const elements = parseMarkdownToDocxElements(block.text || "", fontName, lineSpacingTwips, bodySize);
     children.push(...elements);
   }
 
@@ -718,6 +726,24 @@ export async function renderDocx(
     );
   });
 
+  // Line numbers (for reviewers) and columns apply to the body; the title page stays single-column.
+  const lineNumbers = layout?.lineNumbers ? { countBy: 1, restart: LineNumberRestartFormat.CONTINUOUS, distance: 360 } : undefined;
+  const splitBody = layout?.columns === 2 && bodyStart > 0 && bodyStart < children.length;
+  const titleChildren = splitBody ? children.slice(0, bodyStart) : children;
+  const bodySection = splitBody
+    ? [
+        {
+          properties: {
+            type: SectionType.CONTINUOUS,
+            page: { margin: { top: 1440, bottom: 1440, left: 1080, right: 1080 } },
+            column: { count: 2, space: 360 },
+            ...(lineNumbers ? { lineNumbers } : {}),
+          },
+          children: children.slice(bodyStart),
+        },
+      ]
+    : [];
+
   // Assemble Word Document with Headers & Footers
   const doc = new Document({
     sections: [
@@ -727,10 +753,11 @@ export async function renderDocx(
             margin: {
               top: 1440, // 1 inch = 1440 twips
               bottom: 1440,
-              left: 1440,
-              right: 1440,
+              left: splitBody ? 1080 : 1440,
+              right: splitBody ? 1080 : 1440,
             },
           },
+          ...(lineNumbers ? { lineNumbers } : {}),
         },
         headers: {
           default: new Header({
@@ -768,8 +795,9 @@ export async function renderDocx(
             ],
           }),
         },
-        children,
+        children: titleChildren,
       },
+      ...bodySection,
     ],
   });
 

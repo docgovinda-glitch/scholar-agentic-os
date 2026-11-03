@@ -35,6 +35,9 @@ describe("Word export adds nothing the author didn't write", () => {
       "Vaswani",
       "Rostova",
       "References",
+      "Keywords",
+      "Autonomous Research",
+      "Prepared for",
     ]) {
       expect(out, invented).not.toContain(invented);
     }
@@ -48,11 +51,15 @@ describe("Word export adds nothing the author didn't write", () => {
         {
           template: "apa7",
           ethicalDeclarations: { competingInterests: "AL consults for Acme Ltd." },
+          keywords: ["sleep", "memory"],
+          journalName: "Journal of Sleep Research",
           references: [{ id: "r1", authors: ["Smith, J."], year: "2020", title: "Sleep", journal: "Brain" }],
         }
       )
     );
     expect(out).toContain("Ada Lovelace");
+    expect(out).toContain("Prepared for submission to: Journal of Sleep Research");
+    expect(out).toContain("sleep; memory");
     expect(out).toContain("Competing Interests:");
     expect(out).toContain("AL consults for Acme Ltd.");
     expect(out).not.toContain("Funding:");

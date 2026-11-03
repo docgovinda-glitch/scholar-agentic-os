@@ -20,6 +20,7 @@ import CitationSupportPanel, { parseSavedSupport, type SavedSupport } from "../j
 import VerificationChecks, { useVerification } from "../journal/VerificationChecks";
 import { LATEX_TEMPLATES, buildLatex, exportParts, packageReadme, suggestTemplate, type LatexTemplate } from "../../domain/journal/latex";
 import { buildJats } from "../../domain/journal/jats";
+import { suggestWordLayout } from "../../domain/journal/wordLayouts";
 import { parseFigures, placeFigures } from "../../domain/journal/figures";
 import AuthorsEditor from "../journal/AuthorsEditor";
 import { checkAuthors, creditStatement as creditFromRoles, fullName, type ManuscriptAuthor } from "../../domain/journal/authorship";
@@ -186,6 +187,9 @@ export default function AuditExportMode() {
     suggestTemplate(`${answers["target_journal"] || ""} ${answers["publisher"] || ""}`)
   );
   const latexTemplateChosen = React.useRef(false);
+  // Word layout follows the suggested class until the author picks one.
+  const layoutChosen = React.useRef(false);
+  const [lineNumbers, setLineNumbers] = useState(true);
   const renderedManuscript = useMemo(
     () => renderManuscript(manuscriptMarkdown, recordsForSources(sources, savedRecords), styleKey(citationStyle)),
     [manuscriptMarkdown, sources, savedRecords, citationStyle]
@@ -234,7 +238,13 @@ export default function AuditExportMode() {
         setCitationStyle(styleSelectValue(answers["citation_style"]));
       }
       if (!latexTemplateChosen.current) {
-        setLatexTemplate(suggestTemplate(`${answers["target_journal"] || ""} ${answers["publisher"] || ""}`));
+        const suggestedClass = suggestTemplate(`${answers["target_journal"] || ""} ${answers["publisher"] || ""}`);
+        setLatexTemplate(suggestedClass);
+        if (!layoutChosen.current) {
+          const two = suggestWordLayout(suggestedClass) === "two_column";
+          setLayoutMode(two ? "2-column-camera" : "1-column-double");
+          setLineNumbers(!two);
+        }
       }
       for (const [key, set] of [
         ["data_availability_statement", setDataAvailabilityStatement],
@@ -458,6 +468,8 @@ export default function AuditExportMode() {
       const blob = await downloadProjectExportBlob(effectiveProjectId, "docx", {
         template: layoutMode === "2-column-camera" ? "ieee" : "apa7",
         manuscriptMarkdown: exportText,
+        layout: layoutMode === "2-column-camera" ? "two_column" : "review",
+        lineNumbers,
       });
       downloadBlob(blob, `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}_Submission.docx`);
       setExportNotice("Downloaded Journal Submission (.docx) successfully.");
@@ -494,6 +506,7 @@ export default function AuditExportMode() {
       setTimeout(() => setExportNotice(null), 5000);
     }
   }, [
+    lineNumbers,
     project,
     effectiveProjectId,
     layoutMode,
@@ -971,7 +984,11 @@ export default function AuditExportMode() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setLayoutMode("1-column-double")}
+                  onClick={() => {
+                    layoutChosen.current = true;
+                    setLayoutMode("1-column-double");
+                    setLineNumbers(true);
+                  }}
                   className={`p-2.5 rounded-lg border text-left transition ${
                     layoutMode === "1-column-double"
                       ? "border-[color:var(--border-strong)] bg-[color:var(--accent-subtle)] text-[color:var(--text-primary)] shadow-sm"
@@ -980,13 +997,17 @@ export default function AuditExportMode() {
                 >
                   <div className="text-xs font-bold">1-Column Double-Spaced</div>
                   <div className="text-[10px] text-[color:var(--text-muted)] mt-0.5">
-                    2.0 spacing, 12pt review submission standard
+                    12 pt Times, double-spaced, one column: the review copy most journals ask for
                   </div>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setLayoutMode("2-column-camera")}
+                  onClick={() => {
+                    layoutChosen.current = true;
+                    setLayoutMode("2-column-camera");
+                    setLineNumbers(false);
+                  }}
                   className={`p-2.5 rounded-lg border text-left transition ${
                     layoutMode === "2-column-camera"
                       ? "border-[color:var(--border-strong)] bg-[color:var(--accent-subtle)] text-[color:var(--text-primary)] shadow-sm"
@@ -995,10 +1016,21 @@ export default function AuditExportMode() {
                 >
                   <div className="text-xs font-bold">2-Column Camera-Ready</div>
                   <div className="text-[10px] text-[color:var(--text-muted)] mt-0.5">
-                    1.15 spacing, compact journal proceedings
+                    10 pt Times, single-spaced, two columns (IEEE Transactions style)
                   </div>
                 </button>
               </div>
+              <label className="mt-2 flex items-center gap-2 text-[11px] text-[color:var(--text-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={lineNumbers}
+                  onChange={(e) => {
+                    layoutChosen.current = true;
+                    setLineNumbers(e.target.checked);
+                  }}
+                />
+                Line numbers in the Word file (reviewers cite them; many journals require them at first submission)
+              </label>
             </div>
 
             {/* Citation Style Selector */}
