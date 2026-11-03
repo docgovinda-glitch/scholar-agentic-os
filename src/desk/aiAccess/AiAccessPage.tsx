@@ -137,7 +137,7 @@ export default function AiAccessPage({
         )}
       </header>
 
-      <div className="mx-auto grid max-w-5xl gap-6 px-5 py-6 md:grid-cols-[13rem_minmax(0,1fr)]">
+      <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-6 px-5 py-6 md:grid-cols-[13rem_minmax(0,1fr)]">
         {/* Decluttered sidebar: No subtitle text, 4 primary tabs, font-semibold & tracking-tight on active */}
         <nav aria-label="AI Access sections" className="md:sticky md:top-6 md:self-start">
           <ul className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
@@ -1171,7 +1171,7 @@ function PreferencesSection({
               >
                 <p className="font-semibold text-[color:var(--text-primary)]">Data Privacy & Key Encryption</p>
                 <ul className="space-y-1 text-[11px] text-[color:var(--text-muted)] list-disc pl-3">
-                  <li>Your API keys are encrypted at rest in this browser&apos;s local storage and are never stored in Scholar Core&apos;s database.</li>
+                  <li>Your API keys are saved to your account, each encrypted with its own key that is wrapped by a server-held master key, so they work on every device you sign in on. Each device keeps an encrypted copy in its browser storage. Removing a provider deletes its key from your account and, at their next sign-in, from your other devices.</li>
                   <li>When an AI step runs on Scholar Core&apos;s server (project agents, drafting, Ask Scholar and Deep Research), your key is sent over HTTPS in a request header for that request only, used in memory, and never logged or stored. Other requests never include it.</li>
                   <li>Premium uses Scholar Core&apos;s own keys, held server-side. They are never sent to your browser. {PREMIUM_SCOPE_SENTENCE}</li>
                   <li>Local runners receive your text directly from this device; it never reaches Scholar Core&apos;s servers.</li>

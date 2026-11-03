@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { isConfigured, loadUserAiSettings } from "../../services/userAiSettings";
 import { getAiAccessStatus } from "../aiAccess/aiAccessApi";
+import { syncKeysWithAccount } from "../aiAccess/accountKeys";
 
 /**
  * Whether the signed-in user still needs to see AI setup.
@@ -56,6 +57,10 @@ async function hasServerSideAiSource(): Promise<boolean> {
 }
 
 async function resolveStatus(userId: string): Promise<Exclude<AiSetupStatus, "checking">> {
+  // Bring in keys saved to the account from other devices first, so AI set
+  // up on a computer works on this phone. Capped so a slow network never
+  // holds the workspace on "Loading…".
+  await Promise.race([syncKeysWithAccount(), new Promise((r) => setTimeout(r, 4000))]);
   if (wasSkipped(userId)) return "ready";
   const settings = await loadUserAiSettings();
   if (isConfigured(settings)) return "ready";
@@ -84,8 +89,15 @@ export function useAiSetupStatus(userId: string | null) {
       const next = await resolveStatus(userId);
       if (active) setStatus(next);
     })();
+    // Coming back to the app (switching tabs or apps on a phone) picks up a
+    // key just added on another device; at most once every five minutes.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void syncKeysWithAccount(5 * 60 * 1000);
+    };
+    if (userId) document.addEventListener("visibilitychange", onVisible);
     return () => {
       active = false;
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [userId]);
 

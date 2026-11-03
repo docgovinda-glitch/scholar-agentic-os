@@ -21,11 +21,11 @@
  * What was missing was a view that composes the three into one connection
  * list. That is all this file is.
  *
- * SECURITY: API keys live only in `storeProviderKey`'s device-local encrypted
- * store. They are never placed in React state beyond the moment of entry,
- * never written to `preferences` (which syncs to Supabase), and never sent
- * anywhere except the one transient verification call the server makes on the
- * user's behalf. Premium is the deliberate opposite — the platform's own keys
+ * SECURITY: API keys live in `storeProviderKey`'s encrypted device store and,
+ * encrypted under the server's MASTER_KEY, in the user's account
+ * (accountKeys.ts / userKeyVault.ts) so they work on every device. They are
+ * never placed in React state beyond the moment of entry and never written to
+ * `preferences`. Premium is the deliberate opposite — the platform's own keys
  * stay server-side and are never sent to the browser at all.
  */
 
@@ -41,6 +41,7 @@ import {
   storeProviderKey,
   type UserAiSettings,
 } from "../../services/userAiSettings";
+import { removeKeyFromAccount, saveKeyToAccount, syncKeysWithAccount } from "./accountKeys";
 import { addConnection, getAiAccessStatus, removeConnection, verifyProviderKey, type AiAccessStatus, type VerifyKeyResult } from "./aiAccessApi";
 
 export type ConnectionTier = "local" | "free" | "byok";
@@ -118,6 +119,13 @@ export function useAiAccess() {
 
   useEffect(() => {
     void refresh();
+    // Pick up keys saved to the account from another device.
+    void syncKeysWithAccount().then((r) => {
+      if (r && (r.pulled.length || r.removed.length || r.pushed.length)) setKeyed(providersWithStoredKey());
+    });
+    const onChange = () => setKeyed(providersWithStoredKey());
+    window.addEventListener("scholar:ai-config-changed", onChange);
+    return () => window.removeEventListener("scholar:ai-config-changed", onChange);
   }, [refresh]);
 
   const build = useCallback(
@@ -192,6 +200,9 @@ export function useAiAccess() {
       }
 
       await storeProviderKey(input.providerId, input.apiKey);
+      // Saved to the account too, so it works on the person's other devices.
+      // If that fails now, the next sync uploads it.
+      await saveKeyToAccount(input.providerId, input.apiKey);
       await addConnection(input.providerId, input.tier, verification.modelsDetected);
 
       const next: UserAiSettings = {
@@ -238,6 +249,7 @@ export function useAiAccess() {
   const disconnect = useCallback(
     async (providerId: string) => {
       await removeConnection(providerId);
+      await removeKeyFromAccount(providerId);
       forgetProviderKey(providerId);
       setKeyed(providersWithStoredKey());
       await refresh();

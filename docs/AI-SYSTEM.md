@@ -185,8 +185,10 @@ To enforce strict user privacy and eliminate server-side platform key dependenci
 - **Zero Server Keys**:
   - The server holds zero platform-sponsored AI keys. `getCandidates(req)` strictly resolves candidates from transient request headers (`x-ai-provider`, `x-ai-api-key`, `x-ai-model`, `x-ai-base-url`) and never reads or falls back to server-side `process.env` AI keys.
   - If a user sends a request without their own credentials, `isServerAiAuthorized(req)` evaluates to `false` and server endpoints fall back to deterministic academic heuristics or return HTTP 426 requiring client-side execution.
-- **Client-Side Key Confidentiality & Zero Persistence**:
-  - BYOK API keys are strictly client-held in encrypted IndexedDB / local device storage.
+- **Key storage (account-saved BYOK keys)**:
+  - A user's BYOK keys are saved to their account in `public.user_provider_keys` (migration `20261103150000`): each key is AES-256-GCM encrypted under its own content key, wrapped by the server-held `MASTER_KEY` (`server/src/aiEngine/userKeyVault.ts`). RLS is on with no client policies; only the server reads it, scoped to the signed-in user.
+  - `GET /api/ai-access/keys/sync` returns the signed-in user's own keys (no-store) so each device keeps an encrypted copy in browser storage (`src/services/accountKeySync.ts`); every AI call still reads the key from the device store and sends it only as transient `x-ai-*` headers. The server never uses a stored key on its own.
+  - Removing a provider deletes the key from the account; other devices drop their copy at the next sync.
   - Body-injected keys (`req.body.apiKey`) are rejected with HTTP 400 (`rejectClientCredentials.ts`), preventing accidental database persistence.
   - Transient request headers are scrubbed and redacted by request privacy middleware in `server.ts` before any server logging.
 

@@ -11,11 +11,12 @@
  *
  * WHAT LIVES WHERE, and why:
  *
- *   API keys      → this device's localStorage, encrypted at rest. Never persisted
- *                   in our database. When executing server-orchestrated AI workflows,
- *                   keys are forwarded over HTTPS in transient request headers
- *                   (x-ai-api-key) for that single call, used in-memory only, and
- *                   never logged or written to disk.
+ *   API keys      → this device's localStorage, encrypted at rest. Since
+ *                   2026-11 they are also saved to the user's account
+ *                   (server/src/aiEngine/userKeyVault.ts) and copied to each
+ *                   device the user signs in on (accountKeySync.ts), so keys do
+ *                   follow the user. AI calls still read the device copy and send
+ *                   it only in transient request headers (x-ai-api-key).
  *   Provider/model → public.user_ai_settings, so the choice follows the user
  *                   to another device even though the key does not.
  *
