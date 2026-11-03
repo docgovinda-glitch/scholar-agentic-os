@@ -13,6 +13,9 @@ import {
 } from "../api";
 import type { WordBudgetBlueprint, RebuttalMatrixItem } from "./types";
 import ReferencesCheck from "../journal/ReferencesCheck";
+import ReportingChecklistPanel from "../journal/ReportingChecklistPanel";
+import { parseChecklistState, suggestChecklist, type ChecklistState } from "../../domain/journal/reportingChecklist";
+import { sectionsOf } from "../../domain/journal/revision";
 import CitationSupportPanel, { parseSavedSupport, type SavedSupport } from "../journal/CitationSupportPanel";
 import VerificationChecks, { useVerification } from "../journal/VerificationChecks";
 import { LATEX_TEMPLATES, buildLatex, exportParts, packageReadme, suggestTemplate, type LatexTemplate } from "../../domain/journal/latex";
@@ -775,6 +778,28 @@ export default function AuditExportMode() {
 
           {/* 3. Verification */}
           <VerificationChecks markdown={manuscriptMarkdown} figures={figures} />
+
+          {/* Reporting guideline checklist (CONSORT, PRISMA, STROBE, ARRIVE) */}
+          {effectiveProjectId && (
+            <ReportingChecklistPanel
+              stored={parseChecklistState(answers["reporting_checklist"])}
+              suggested={suggestChecklist(
+                String(answers["article_type"] || ""),
+                String(answers["study_design"] || answers["methodology"] || ""),
+                title,
+                Object.entries(sectionsOf(manuscriptMarkdown))
+                  .filter(([t]) => /method|design/i.test(t))
+                  .map(([, text]) => text.slice(0, 2000))
+                  .join(" ")
+              )}
+              sections={Object.keys(sectionsOf(manuscriptMarkdown))}
+              title={title}
+              onSave={async (state: ChecklistState | null) => {
+                const saved = await saveIntakeAnswers(effectiveProjectId, { ...(project?.answers || answers), reporting_checklist: state ? JSON.stringify(state) : "" });
+                setProject(saved);
+              }}
+            />
+          )}
 
           {/* 4. 2026 Publisher Ethical & Provenance Declarations */}
           <div className="p-4 rounded-xl border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] flex flex-col gap-4">
