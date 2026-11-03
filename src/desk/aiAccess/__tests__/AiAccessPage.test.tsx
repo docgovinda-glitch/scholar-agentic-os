@@ -27,6 +27,12 @@ vi.mock("../aiAccessApi", () => ({
   getMyPremiumRequest: vi.fn(async () => null),
   requestPremium: vi.fn(async () => ({ success: true })),
   withdrawPremiumRequest: vi.fn(async () => ({ success: true })),
+  // The page now shows the router's live decision per task (no AI is called).
+  routeDecision: vi.fn(async (taskType: string) =>
+    status.connections.length
+      ? { ok: true, choice: { tier: "free", providerId: status.connections[0].provider_id, modelId: taskType === "simple" ? "fast-model" : undefined, reasoning: "" }, fallbacks: status.connections.slice(1).map((c) => ({ tier: c.tier, providerId: c.provider_id, reasoning: "" })) }
+      : { ok: false, reasoning: "No AI is connected yet." }
+  ),
 }));
 
 vi.mock("../../../services/userAiSettings", () => ({
@@ -378,7 +384,52 @@ describe("Onboarding mode — AI Access as the first destination after login", (
   it("has no 'Guided setup' handoff — every section is already its own guided flow", async () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Overview" }));
-    expect(await screen.findByText(/Nothing connected yet/i)).toBeInTheDocument();
+    // The empty state is now a quick start with three ways in (was "Nothing connected yet").
+    expect(await screen.findByText(/Connect an AI to get started/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Guided setup" })).not.toBeInTheDocument();
   });
 });
+
+describe("AI Access upgrade: honest status, quick start, live routing", () => {
+  it("starts a newcomer with three concrete options, not a bare list of 46", async () => {
+    status.connections = [];
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Overview" }));
+    const start = await screen.findByRole("region", { name: "Get started" });
+    expect(start).toHaveTextContent("Recommended: Google Gemini");
+    expect(start).toHaveTextContent("Groq");
+    expect(start).toHaveTextContent("Ollama");
+    expect(screen.getAllByRole("link", { name: /Get a key/ })[0]).toHaveAttribute("href", "https://aistudio.google.com/app/apikey");
+    // A preferred provider with nothing connected is not shown as if it were set up.
+    expect(screen.getByRole("button", { name: /Preferences\s*Not set/ })).toBeInTheDocument();
+  });
+
+  it("shows which AI each task would use now, with fallbacks, from the live router", async () => {
+    status.connections = [
+      { provider_id: "groq", tier: "free", status: "connected", models_detected: 9 },
+      { provider_id: "ollama", tier: "local", status: "connected", models_detected: 2 },
+    ];
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Overview" }));
+    const routing = await screen.findByRole("region", { name: "How tasks are routed now" });
+    await waitFor(() => expect(routing).toHaveTextContent("Research, drafting and reviews"));
+    await waitFor(() => expect(routing).toHaveTextContent("Then Ollama if it is unavailable"));
+    expect(routing).toHaveTextContent("Groq · fast-model");
+    // No fixed, made-up routes remain anywhere on the page.
+    for (const made of ["DeepSeek-R1 / Claude", "Groq / Flash / Local", "Gemini Embeddings / Local Vector"]) {
+      expect(screen.queryByText(new RegExp(made.replace(/[/]/g, "\\/")))).toBeNull();
+    }
+  });
+
+  it("filters providers to free-to-start and connected ones", async () => {
+    status.connections = [{ provider_id: "groq", tier: "free", status: "connected", models_detected: 9 }];
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Connected (1)" }));
+    expect(await screen.findByText("Groq")).toBeInTheDocument();
+    expect(screen.queryByText("Ollama")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Free to start" }));
+    expect(await screen.findByText("Ollama")).toBeInTheDocument();
+  });
+});
+
