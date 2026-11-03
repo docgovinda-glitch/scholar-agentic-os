@@ -116,7 +116,7 @@ draftingRoutes.post(
             if (!ud.assignedSectionId || ud.assignedSectionId === subSectionId || ud.assignedSectionId === sectionId) {
               assignedSources.push({
                 id: ud.id,
-                authors: ud.author || "Principal Investigator (Primary Data)",
+                authors: ud.author || "The authors' own data",
                 year: ud.year || "n.d.",
                 title: ud.title,
                 stance:

@@ -4,6 +4,8 @@ import {
   calculateTokenSimilarity,
   executeMultiPortalDiscovery,
   PORTAL_CONFIGS,
+  harvestFromCrossref,
+  deduplicateAndRank,
 } from "../multiPortalLiteratureHarvester";
 
 describe("Multi-Portal Literature Harvester", () => {
@@ -154,5 +156,35 @@ describe("Multi-Portal Literature Harvester", () => {
       expect(PORTAL_CONFIGS.datacite.name).toBe("DataCite");
       expect(PORTAL_CONFIGS.europepmc.name).toBe("Europe PMC");
     });
+  });
+});
+
+describe("Portal records carry only what the portal returned", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("leaves missing authors, year, abstract and venue empty, and never marks the first hit a landmark", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ message: { items: [{ DOI: "10.1000/x", title: ["Sleep and recall"], "is-referenced-by-count": 3 }] } }),
+    }) as unknown as typeof fetch;
+    const [item] = await harvestFromCrossref("sleep recall", 5);
+    expect(item.title).toBe("Sleep and recall");
+    expect(item.authors).toEqual([]);
+    expect(item.year).toBeUndefined();
+    expect(item.abstract).toBe("");
+    expect(item.journal).toBe("");
+    expect(item.themes).toEqual([]);
+    expect(item.isLandmark).toBe(false);
+    expect(item.relevanceScore).toBe(0);
+  });
+
+  it("relevance is the share of search terms found in the title or abstract", () => {
+    const mk = (id: string, title: string, abstract = "") => ({ id, title, abstract, authors: [], journal: "", source: "external" as const, relevanceScore: 0, themes: [] });
+    const ranked = deduplicateAndRank([mk("a", "Sleep and memory consolidation", "Recall improves after sleep."), mk("b", "Quantum spin liquids")], "Sleep memory", "Psychology");
+    const byId = Object.fromEntries(ranked.map((r) => [r.id, r.relevanceScore]));
+    expect(byId.b).toBe(0);
+    expect(byId.a).toBeGreaterThan(0);
+    expect(byId.a).toBeLessThanOrEqual(100);
   });
 });

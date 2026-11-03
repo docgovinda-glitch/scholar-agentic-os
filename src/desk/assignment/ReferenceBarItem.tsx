@@ -113,7 +113,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
       ? authorsList.slice(0, 3).join(", ") + (authorsList.length > 3 ? " et al." : "")
       : source.isUserUploaded
       ? "Course Materials"
-      : "Scholarly Author";
+      : "Unknown author";
 
   const venueDisplay =
     source.journal ||

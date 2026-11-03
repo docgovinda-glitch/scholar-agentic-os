@@ -73,7 +73,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
       ? authorsList.slice(0, 3).join(", ") + (authorsList.length > 3 ? " et al." : "")
       : source.isUserUploaded
       ? "Course Materials / Uploaded Source"
-      : "Scholarly Author";
+      : "Unknown author";
 
   const venueDisplay =
     source.journal ||

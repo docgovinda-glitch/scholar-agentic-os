@@ -147,7 +147,8 @@ export function generateLatexSource(
   metadata: ExportMetadata,
   options: AcademicExportOptions = { template: "ieee" }
 ): string {
-  const { template, authorAffiliation = "Department of Computer Science & Academic Research", authorEmail = "author@university.edu", abstractText, keywords = [] } = options;
+  // Only what the project records about its author; nothing stands in for a missing one.
+  const { template, authorAffiliation = "", authorEmail = "", abstractText, keywords = [] } = options;
 
   let docClass = "\\documentclass[conference]{IEEEtran}";
   let extraPackages = "";
@@ -201,7 +202,7 @@ export function generateLatexSource(
   }
 
   const titleEscaped = escapeLatex(document.title || metadata.title || "Academic Manuscript");
-  const authorEscaped = escapeLatex(metadata.author || "Lead Researcher");
+  const authorEscaped = escapeLatex(metadata.author?.trim() || "");
   const affiliationEscaped = escapeLatex(authorAffiliation);
   const emailEscaped = escapeLatex(authorEmail);
 
@@ -209,16 +210,14 @@ export function generateLatexSource(
   if (template === "ieee") {
     headerBlock = `
 \\title{${titleEscaped}}
-\\author{\\IEEEauthorblockN{${authorEscaped}}
-\\IEEEauthorblockA{\\textit{${affiliationEscaped}} \\\\
-\\textit{Email: ${emailEscaped}}}}
+${authorEscaped ? `\\author{\\IEEEauthorblockN{${authorEscaped}}${affiliationEscaped || emailEscaped ? `\n\\IEEEauthorblockA{${[affiliationEscaped ? `\\textit{${affiliationEscaped}}` : "", emailEscaped ? `\\textit{Email: ${emailEscaped}}` : ""].filter(Boolean).join(" \\\\\n")}}` : ""}}` : ""}
 \\maketitle
 `;
   } else {
     headerBlock = `
 \\title{${titleEscaped}}
 \\author{${authorEscaped}}
-\\date{\\today}
+\\date{}
 \\maketitle
 `;
   }
@@ -245,9 +244,7 @@ ${keywordsBlock}
 
 ${bodyLatex.join("\n\n")}
 
-\\bibliographystyle{IEEEtran}
-\\bibliography{references}
-
+${options.references && options.references.length > 0 ? "\\bibliographystyle{IEEEtran}\n\\bibliography{references}\n" : ""}
 \\end{document}
 `;
 }
@@ -260,10 +257,10 @@ export function generateTypstSource(
   metadata: ExportMetadata,
   options: AcademicExportOptions = { template: "typst_modern" }
 ): string {
-  const { authorAffiliation = "Department of Academic Research", authorEmail = "author@university.edu", abstractText, keywords = [] } = options;
+  const { authorAffiliation = "", authorEmail = "", abstractText, keywords = [] } = options;
 
   const titleEscaped = escapeTypst(document.title || metadata.title || "Academic Manuscript");
-  const authorEscaped = escapeTypst(metadata.author || "Lead Researcher");
+  const authorEscaped = escapeTypst(metadata.author?.trim() || "");
   const affiliationEscaped = escapeTypst(authorAffiliation);
 
   let foundAbstract = abstractText || "";
@@ -302,7 +299,7 @@ export function generateTypstSource(
   margin: (x: 2cm, y: 2.5cm),
   columns: ${columnsVal},
   header: align(right)[
-    #text(size: 9pt, fill: luma(120))[${titleEscaped} --- Scholar OS]
+    #text(size: 9pt, fill: luma(120))[${titleEscaped}]
   ],
   footer: [
     #align(center)[#text(size: 9pt)[#counter(page).display()]]
@@ -325,8 +322,8 @@ export function generateTypstSource(
 #align(center)[
   #text(size: 18pt, weight: "bold")[${titleEscaped}]
   #v(0.8em)
-  #text(size: 11pt, weight: "medium")[${authorEscaped}] \\
-  #text(size: 9pt, style: "italic", fill: luma(80))[${affiliationEscaped}]
+  ${authorEscaped ? `#text(size: 11pt, weight: "medium")[${authorEscaped}] \\\\` : ""}
+  ${affiliationEscaped ? `#text(size: 9pt, style: "italic", fill: luma(80))[${affiliationEscaped}]` : ""}
   #v(1.5em)
 ]
 
@@ -348,7 +345,7 @@ ${foundAbstract ? `
 ${bodyTypst.join("\n\n")}
 
 #v(2em)
-#bibliography("references.bib", style: "ieee")
+${options.references && options.references.length > 0 ? `#bibliography("references.bib", style: "ieee")` : ""}
 `;
 }
 
@@ -435,7 +432,7 @@ export async function compileAcademicPdf(
   metadata: ExportMetadata,
   options: AcademicExportOptions = { template: "ieee" }
 ): Promise<Buffer> {
-  const { template, authorAffiliation = "Department of Academic Research", authorEmail = "author@university.edu", abstractText, keywords = [] } = options;
+  const { template, authorAffiliation = "", authorEmail = "", abstractText, keywords = [] } = options;
 
   let foundAbstract = abstractText || "";
   const bodyContent: Content[] = [];
@@ -449,9 +446,9 @@ export async function compileAcademicPdf(
 
   bodyContent.push({
     text: [
-      { text: `${metadata.author || "Lead Researcher"}\n`, bold: true, fontSize: 11 },
-      { text: `${authorAffiliation}\n`, italics: true, fontSize: 9.5, color: "#475569" },
-      { text: authorEmail, fontSize: 9, color: "#0284c7" },
+      ...(metadata.author?.trim() ? [{ text: `${metadata.author.trim()}\n`, bold: true, fontSize: 11 }] : []),
+      ...(authorAffiliation ? [{ text: `${authorAffiliation}\n`, italics: true, fontSize: 9.5, color: "#475569" }] : []),
+      ...(authorEmail ? [{ text: authorEmail, fontSize: 9, color: "#0284c7" }] : []),
     ],
     alignment: "center",
     margin: [0, 8, 0, 16],

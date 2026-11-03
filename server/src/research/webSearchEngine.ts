@@ -243,7 +243,7 @@ export function evaluateSourceAuthority(
       publisher,
       sourceType: "scholarly",
       authorityTier: "A",
-      authorityBadge: "Peer-Reviewed / Academic",
+      authorityBadge: "Academic or scholarly publisher",
       score: 90,
       isPrimary: true,
       publishedDate: detectedYear,
@@ -502,7 +502,7 @@ export async function searchCrossRef(query: string, maxResults = 4): Promise<Sea
       const year = item.created?.["date-parts"]?.[0]?.[0] || item.published?.["date-parts"]?.[0]?.[0];
       const url = item.URL || (item.DOI ? `https://doi.org/${item.DOI}` : "https://crossref.org");
       const venue = item["container-title"]?.[0] || "";
-      const snippet = `${author || "Scholarly Author"} (${year || "n.d."})${venue ? ` — ${venue}` : ""}. DOI: ${item.DOI || "N/A"}`;
+      const snippet = `${author || "Unknown author"} (${year || "n.d."})${venue ? ` — ${venue}` : ""}. DOI: ${item.DOI || "N/A"}`;
       const auth = evaluateSourceAuthority(url, title, snippet, year);
 
       return {
@@ -513,7 +513,7 @@ export async function searchCrossRef(query: string, maxResults = 4): Promise<Sea
         publisher: venue || auth.publisher,
         sourceType: "scholarly" as const,
         authorityTier: "A" as const,
-        authorityBadge: "Peer-Reviewed / DOI",
+        authorityBadge: "DOI-registered publication",
         score: 92,
         isPrimary: true,
         publishedDate: year ? String(year) : undefined,
@@ -533,7 +533,7 @@ export async function searchScholarlySources(query: string, maxResults = 4): Pro
     const results = await discoverOpenAlexSources(query, maxResults).catch(() => []);
     return results.map((r) => {
       const url = r.url || (r.doi ? `https://doi.org/${r.doi}` : `https://openalex.org`);
-      const snippet = `${r.authors?.slice(0, 3).join(", ") || "Unknown Author"} (${r.year || "n.d."})${r.venue ? ` — ${r.venue}` : ""}`;
+      const snippet = `${r.authors?.slice(0, 3).join(", ") || "Unknown author"} (${r.year || "n.d."})${r.venue ? ` — ${r.venue}` : ""}`;
       const auth = evaluateSourceAuthority(url, r.title, snippet, r.year);
 
       return {
@@ -544,7 +544,7 @@ export async function searchScholarlySources(query: string, maxResults = 4): Pro
         publisher: r.venue || auth.publisher,
         sourceType: "scholarly" as const,
         authorityTier: "A" as const,
-        authorityBadge: "Peer-Reviewed / OpenAlex",
+        authorityBadge: "Scholarly index (OpenAlex)",
         score: 91,
         isPrimary: true,
         publishedDate: r.year ? String(r.year) : undefined,

@@ -325,7 +325,7 @@ export function evaluate10PointRubric(
     criterion: "Evidentiary Grounding",
     score: sourceScore,
     maxScore: 10,
-    feedback: `Supported by ${sources.length} peer-reviewed references with ${citeCount} in-text citation anchors.`,
+    feedback: `Uses ${sources.length} source${sources.length === 1 ? "" : "s"} with ${citeCount} in-text citation${citeCount === 1 ? "" : "s"}.`,
   });
 
   // 3. Critical Synthesis

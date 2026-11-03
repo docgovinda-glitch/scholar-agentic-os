@@ -83,8 +83,8 @@ router.post(
         const systemPrompt = `You are an NIH/NSF Study Section Scientific Review Officer and Primary Reviewer.
 Evaluate the grant proposal and return a strictly formatted JSON object matching this schema:
 {
-  "overallImpactScore": "string (e.g. 1.8 (Top 12th Percentile - Highly Competitive))",
-  "recommendationForFunding": "string (e.g. Approved for Award Consideration)",
+  "overallImpactScore": "string: the overall impact score you assign on the NIH 1-9 scale (1 = exceptional), with one line on why. Do not state a percentile.",
+  "recommendationForFunding": "string: your recommendation in one short phrase",
   "studySectionMembers": [
     { "role": "string", "verdict": "string" }
   ],

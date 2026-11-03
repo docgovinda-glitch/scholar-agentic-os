@@ -340,7 +340,8 @@ export interface DiscoveredSource {
   journal?: string;
   doi?: string;
   url?: string;
-  relevanceScore: number;
+  /** Measured match to the assignment; absent for sources the student added themselves. */
+  relevanceScore?: number;
   mainFinding: string;
   suggestedUse: string;
   citation: string;

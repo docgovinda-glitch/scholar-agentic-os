@@ -88,6 +88,26 @@ function generateCitationString(draft: ServerDiscoveredDraft): string {
   return `${authorStr} ${yearStr}. ${draft.title}.${venue ? ` ${venue}.` : ""}${draft.doi ? ` https://doi.org/${draft.doi}` : ""}`;
 }
 
+// Words in assignment prompts that say what to do, not what it is about.
+const PROMPT_WORDS = new Set([
+  "about", "affected", "analyse", "analyze", "assess", "between", "compare", "consider", "critically",
+  "discuss", "does", "evaluate", "examine", "explain", "explore", "extent", "from", "have", "into",
+  "role", "such", "that", "their", "these", "this", "those", "what", "when", "where", "which", "while", "with",
+]);
+
+/**
+ * Measured relevance: the percentage of the question's key terms (words of
+ * 4+ letters, minus instruction words) that appear in the title. 0 when the
+ * question has no key terms.
+ */
+export function titleTermMatch(question: string, title: string): number {
+  const words = (t: string) => t.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3);
+  const terms = Array.from(new Set(words(question).filter((w) => !PROMPT_WORDS.has(w))));
+  if (terms.length === 0) return 0;
+  const inTitle = new Set(words(title));
+  return Math.round((terms.filter((t) => inTitle.has(t)).length / terms.length) * 100);
+}
+
 /**
  * Convert a server discovery draft into a canonical DiscoveredSource.
  * Never synthesizes missing metadata — marks it as unverified instead.
@@ -108,7 +128,7 @@ function mapDraftToDiscoveredSource(
     journal: draft.venue || undefined,
     doi: draft.doi || undefined,
     url: draft.url || (draft.doi ? `https://doi.org/${draft.doi}` : undefined),
-    relevanceScore: 75, // Baseline — real relevance is server-assigned
+    relevanceScore: titleTermMatch(question, draft.title),
     mainFinding: "", // Never synthesize findings from metadata alone
     suggestedUse: "",
     citation: generateCitationString(draft),

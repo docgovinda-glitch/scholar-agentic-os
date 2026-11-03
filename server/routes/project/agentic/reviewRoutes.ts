@@ -1014,8 +1014,8 @@ reviewRoutes.get("/export/rebuttal-letter", async (req: express.Request<{ id: st
     {
       title: project.answers?.["working_title"] || (project as { title?: string }).title || "Academic Manuscript",
       author: project.authors?.[0]
-        ? `${project.authors[0].firstName} ${project.authors[0].surname}`
-        : "Lead Investigator",
+        ? `${project.authors[0].firstName} ${project.authors[0].surname}`.trim()
+        : "",
       created: new Date(),
       modified: new Date(),
     },
@@ -1054,8 +1054,8 @@ reviewRoutes.post("/export/rebuttal-letter", async (req: express.Request<{ id: s
     {
       title: project.answers?.["working_title"] || (project as { title?: string }).title || "Academic Manuscript",
       author: project.authors?.[0]
-        ? `${project.authors[0].firstName} ${project.authors[0].surname}`
-        : "Lead Investigator",
+        ? `${project.authors[0].firstName} ${project.authors[0].surname}`.trim()
+        : "",
       created: new Date(),
       modified: new Date(),
     },

@@ -191,15 +191,15 @@ export async function harvestFromOpenAlex(query: string, limit = 30): Promise<Po
         id: `openalex-${work.id?.split("/").pop() || idx}`,
         portal: "openalex" as OpenPortal,
         doi,
-        title: stripMarkup(work.title || work.display_name || "Scholarly Investigation"),
-        authors: authors.length > 0 ? authors : ["Scholarly Investigator"],
-        year: Number(work.publication_year) || new Date().getFullYear(),
+        title: stripMarkup(work.title || work.display_name || "Untitled"),
+        authors,
+        year: Number(work.publication_year) || undefined,
         journal: venue,
         source: "external" as const,
-        relevanceScore: Math.min(98, Math.max(76, Math.floor(82 + (citations > 50 ? 10 : 5) - (idx % 6)))),
-        themes: themes.length > 0 ? themes : ["scholarly-literature", "foundations"],
-        abstract: abstract || "Primary research published in peer-reviewed academic repository.",
-        isLandmark: citations >= 100 || idx === 0,
+        relevanceScore: 0,
+        themes,
+        abstract: abstract || "",
+        isLandmark: citations >= 100,
         url: work.doi || work.primary_location?.landing_page_url || (work.id ? `https://openalex.org/${work.id.split("/").pop()}` : undefined),
         citationCount: citations,
         isOpenAccess,
@@ -246,7 +246,7 @@ export async function harvestFromCrossref(query: string, limit = 30): Promise<Po
       const year =
         item.published?.["date-parts"]?.[0]?.[0] ||
         item.created?.["date-parts"]?.[0]?.[0] ||
-        new Date().getFullYear();
+        undefined;
       const citations = item["is-referenced-by-count"] || 0;
       const subjects = Array.isArray(item.subject)
         ? item.subject.slice(0, 3).map((s: string) => s.toLowerCase().replace(/\s+/g, "-"))
@@ -257,14 +257,14 @@ export async function harvestFromCrossref(query: string, limit = 30): Promise<Po
         id: `crossref-${doi ? doi.replace(/[^\w-]/g, "_") : idx}`,
         portal: "crossref" as OpenPortal,
         doi,
-        title: stripMarkup(title || "Peer-Reviewed Scholarly Treatise"),
-        authors: authors.length > 0 ? authors : ["Academic Consortium"],
-        year: Number(year) || new Date().getFullYear(),
-        journal: container || "Academic Journal",
+        title: stripMarkup(title || "Untitled"),
+        authors,
+        year: Number(year) || undefined,
+        journal: container || "",
         source: "external" as const,
-        relevanceScore: Math.min(97, Math.max(78, Math.floor(84 + (citations > 30 ? 8 : 4) - (idx % 7)))),
-        themes: subjects.length > 0 ? subjects : ["peer-reviewed", "journal-publication"],
-        abstract: abstract || "Registered publication indexed in the international CrossRef academic DOI registry.",
+        relevanceScore: 0,
+        themes: subjects,
+        abstract: abstract || "",
         isLandmark: citations >= 100,
         url: item.URL || (doi ? `https://doi.org/${doi}` : undefined),
         citationCount: citations,
@@ -312,9 +312,9 @@ export async function harvestFromArxiv(query: string, limit = 25): Promise<Porta
         authors.push(authorMatch[1].trim());
       }
 
-      const year = publishedMatch ? new Date(publishedMatch[1].trim()).getFullYear() : new Date().getFullYear();
-      const rawTitle = titleMatch ? stripMarkup(titleMatch[1]) : "ArXiv Preprint Investigation";
-      const rawAbstract = summaryMatch ? stripMarkup(summaryMatch[1]) : "ArXiv scholarly preprint.";
+      const year = publishedMatch ? new Date(publishedMatch[1].trim()).getFullYear() : undefined;
+      const rawTitle = titleMatch ? stripMarkup(titleMatch[1]) : "Untitled";
+      const rawAbstract = summaryMatch ? stripMarkup(summaryMatch[1]) : "";
       const rawId = idMatch ? idMatch[1].trim() : "";
       const arxivDoi = doiMatch ? normalizeDoi(doiMatch[1].trim()) || undefined : undefined;
 
@@ -323,14 +323,14 @@ export async function harvestFromArxiv(query: string, limit = 25): Promise<Porta
         portal: "arxiv" as OpenPortal,
         doi: arxivDoi,
         title: rawTitle,
-        authors: authors.length > 0 ? authors : ["Preprint Author"],
-        year: Number(year) || new Date().getFullYear(),
-        journal: "arXiv Preprints",
+        authors,
+        year: Number(year) || undefined,
+        journal: "arXiv",
         source: "external" as const,
-        relevanceScore: Math.min(96, Math.max(77, 85 - (items.length % 6))),
-        themes: ["preprint", "stem-foundations", "arxiv-repository"],
+        relevanceScore: 0,
+        themes: ["preprint"],
         abstract: rawAbstract,
-        isLandmark: items.length === 0,
+        isLandmark: false,
         url: rawId || (arxivDoi ? `https://doi.org/${arxivDoi}` : undefined),
         isOpenAccess: true,
         openAccessPdfUrl: rawId ? rawId.replace("/abs/", "/pdf/") + ".pdf" : undefined,
@@ -364,21 +364,21 @@ export async function harvestFromDoaj(query: string, limit = 25): Promise<Portal
       const doiObj = Array.isArray(bib.identifier) ? bib.identifier.find((i: any) => i.type === "doi") : undefined;
       const cleanDoi = doiObj?.id ? normalizeDoi(doiObj.id) || undefined : undefined;
       const authors = Array.isArray(bib.author) ? bib.author.map((a: any) => a.name).filter(Boolean) : [];
-      const venue = bib.journal?.title || "Open Access Journal";
+      const venue = bib.journal?.title || "";
       const fullTextLink = Array.isArray(bib.link) ? bib.link.find((l: any) => l.type === "fulltext")?.url : undefined;
 
       return {
         id: `doaj-${item.id || idx}`,
         portal: "doaj" as OpenPortal,
         doi: cleanDoi,
-        title: stripMarkup(bib.title || "Open Access Scholarly Article"),
-        authors: authors.length > 0 ? authors : ["Open Access Researcher"],
-        year: Number(bib.year) || new Date().getFullYear(),
+        title: stripMarkup(bib.title || "Untitled"),
+        authors,
+        year: Number(bib.year) || undefined,
         journal: venue,
         source: "external" as const,
-        relevanceScore: Math.min(95, Math.max(76, 83 - (idx % 6))),
-        themes: ["open-access", "peer-reviewed-journal"],
-        abstract: stripMarkup(bib.abstract) || "Peer-reviewed article indexed in the Directory of Open Access Journals.",
+        relevanceScore: 0,
+        themes: ["open-access"],
+        abstract: stripMarkup(bib.abstract) || "",
         isLandmark: false,
         url: fullTextLink || (cleanDoi ? `https://doi.org/${cleanDoi}` : undefined),
         isOpenAccess: true,
@@ -411,7 +411,7 @@ export async function harvestFromDataCite(query: string, limit = 25): Promise<Po
       const doi = attrs.doi ? normalizeDoi(attrs.doi) || undefined : undefined;
       const titleObj = Array.isArray(attrs.titles) ? attrs.titles[0]?.title : "DataCite Scholarly Resource";
       const authors = Array.isArray(attrs.creators) ? attrs.creators.map((c: any) => c.name).filter(Boolean) : [];
-      const venue = attrs.publisher || "DataCite Open Repository";
+      const venue = attrs.publisher || "";
       const descObj = Array.isArray(attrs.descriptions) ? attrs.descriptions[0]?.description : "";
 
       return {
@@ -419,13 +419,13 @@ export async function harvestFromDataCite(query: string, limit = 25): Promise<Po
         portal: "datacite" as OpenPortal,
         doi,
         title: stripMarkup(titleObj),
-        authors: authors.length > 0 ? authors : ["Research Contributor"],
-        year: Number(attrs.publicationYear) || new Date().getFullYear(),
+        authors,
+        year: Number(attrs.publicationYear) || undefined,
         journal: venue,
         source: "external" as const,
-        relevanceScore: Math.min(94, Math.max(75, 82 - (idx % 6))),
-        themes: ["datacite-repository", "open-dataset", "empirical-artifact"],
-        abstract: stripMarkup(descObj) || "Scholarly artifact and dataset indexed in the international DataCite repository.",
+        relevanceScore: 0,
+        themes: ["datacite"],
+        abstract: stripMarkup(descObj) || "",
         isLandmark: false,
         url: doi ? `https://doi.org/${doi}` : undefined,
         isOpenAccess: true,
@@ -467,14 +467,14 @@ export async function harvestFromEuropePmc(query: string, limit = 25): Promise<P
         id: `europepmc-${item.id || idx}`,
         portal: "europepmc" as OpenPortal,
         doi,
-        title: stripMarkup(item.title || "Europe PMC Scholarly Paper"),
-        authors: authors.length > 0 ? authors : ["Biomedical Investigator"],
-        year: Number(item.pubYear) || new Date().getFullYear(),
-        journal: item.journalTitle || "Europe PMC Repository",
+        title: stripMarkup(item.title || "Untitled"),
+        authors,
+        year: Number(item.pubYear) || undefined,
+        journal: item.journalTitle || "",
         source: "external" as const,
-        relevanceScore: Math.min(96, Math.max(77, Math.floor(83 + (citations > 20 ? 8 : 3)))),
-        themes: ["europe-pmc", "life-sciences", "biomedical-corpus"],
-        abstract: stripMarkup(item.abstractText) || "Open access biomedical research indexed on Europe PMC.",
+        relevanceScore: 0,
+        themes: ["europe-pmc"],
+        abstract: stripMarkup(item.abstractText) || "",
         isLandmark: citations >= 80,
         url: doi ? `https://doi.org/${doi}` : item.pmcid ? `https://europepmc.org/articles/${item.pmcid}` : undefined,
         citationCount: citations,
@@ -557,8 +557,14 @@ export function deduplicateAndRank(
       if (areaTokens.has(t)) areaOverlap++;
     }
 
-    const bonus = Math.min(12, titleOverlap * 4 + areaOverlap * 2);
-    item.relevanceScore = Math.min(99, Math.max(76, item.relevanceScore + bonus));
+    // Relevance is measured, not assigned: the share of the search terms
+    // (title and research area) that appear in this paper's title or abstract.
+    const haystack = new Set(`${normTitle} ${(item.abstract || "").toLowerCase()}`.split(/[^a-z0-9]+/).filter(Boolean));
+    const terms = Array.from(new Set([...titleTokens, ...areaTokens]));
+    const found = terms.filter((t) => haystack.has(t)).length;
+    item.relevanceScore = terms.length ? Math.round((found / terms.length) * 100) : 0;
+    void titleOverlap;
+    void areaOverlap;
 
     if (cleanDoi) seenDois.set(cleanDoi, item);
     uniqueItems.push(item);

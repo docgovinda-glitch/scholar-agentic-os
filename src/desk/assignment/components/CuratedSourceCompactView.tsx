@@ -111,9 +111,9 @@ export const CuratedSourceCompactView: React.FC<CuratedSourceCompactViewProps> =
                     {source.relevanceCategory}
                   </span>
                 )}
-                <span className="text-xs font-mono font-bold text-neutral-700 dark:text-neutral-300">
-                  {source.relevanceScore}%
-                </span>
+                {typeof source.relevanceScore === "number" && (
+                  <span className="text-xs font-mono font-bold text-neutral-700 dark:text-neutral-300">{source.relevanceScore}%</span>
+                )}
 
                 <button
                   type="button"
