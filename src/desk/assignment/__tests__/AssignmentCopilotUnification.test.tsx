@@ -351,6 +351,9 @@ describe("Round 5: Context Panel Copilot Unification", () => {
         />
       );
 
+      // Drafting closes the side panel to give the writing area the width;
+      // the header's Inspector button opens it again.
+      fireEvent.click(await screen.findByRole("button", { name: "Show Inspector Drawer" }));
       const sidebar = await screen.findByRole("complementary");
 
       // Verify Scribe in Phase 3

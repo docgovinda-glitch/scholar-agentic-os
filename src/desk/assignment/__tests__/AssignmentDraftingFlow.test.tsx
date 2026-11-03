@@ -167,7 +167,7 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
       expect(citationAnchors[1]).toHaveTextContent("(Kearns & Roth, 2022)");
     });
 
-    it("allows entering Manual Edit mode and updates live content", () => {
+    it("edits the section text and saves each change", () => {
       const onUpdate = vi.fn();
       render(
         <DraftingActiveEditor
@@ -176,15 +176,26 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
         />
       );
 
-      // Click Manual Edit
-      const editBtn = screen.getByRole("button", { name: /Manual Edit/i });
-      fireEvent.click(editBtn);
-
-      const textarea = screen.getByLabelText("Manual Section Prose Editor");
-      expect(textarea).toBeInTheDocument();
-
+      fireEvent.click(screen.getByRole("button", { name: /Edit text/i }));
+      const textarea = screen.getByLabelText("Section text");
       fireEvent.change(textarea, { target: { value: "New manual prose paragraph (Smith, 2024)." } });
       expect(onUpdate).toHaveBeenCalledWith("New manual prose paragraph (Smith, 2024).");
+    });
+
+    it("stays open while typing even though each save changes the section", () => {
+      // Each keystroke is saved, which hands the editor a section with new
+      // draftContent. That used to close the editor after the first letter.
+      const onUpdate = vi.fn();
+      const { rerender } = render(<DraftingActiveEditor section={mockSections[1]} onUpdateContent={onUpdate} />);
+      fireEvent.click(screen.getByRole("button", { name: /Edit text/i }));
+      fireEvent.change(screen.getByLabelText("Section text"), { target: { value: "E" } });
+      rerender(<DraftingActiveEditor section={{ ...mockSections[1], draftContent: "E" }} onUpdateContent={onUpdate} />);
+      fireEvent.change(screen.getByLabelText("Section text"), { target: { value: "Ec" } });
+      rerender(<DraftingActiveEditor section={{ ...mockSections[1], draftContent: "Ec" }} onUpdateContent={onUpdate} />);
+      expect(screen.getByLabelText("Section text")).toHaveValue("Ec");
+      // A different section opens fresh.
+      rerender(<DraftingActiveEditor section={{ ...mockSections[0] }} onUpdateContent={onUpdate} />);
+      expect(screen.queryByLabelText("Section text")).toBeNull();
     });
   });
 
@@ -456,11 +467,10 @@ describe("Assignment Phase 3: Drafting Engine Components & Flow", () => {
         </AssignmentProvider>
       );
 
+      // The pill's old styling classes were asserted here; the compact header
+      // restyles it, so only its behaviour is checked.
       const presBtn = screen.getByRole("button", { name: /Present Presentation/i });
       expect(presBtn).toBeInTheDocument();
-      expect(presBtn.className).toContain("rounded-full");
-      expect(presBtn.className).toContain("px-4");
-      expect(presBtn.className).toContain("py-1.5");
 
       fireEvent.click(presBtn);
       expect(onPresentPresentation).toHaveBeenCalled();

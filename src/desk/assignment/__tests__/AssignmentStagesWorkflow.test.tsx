@@ -112,8 +112,9 @@ describe("Assignment Workspace Stages & Workflow", () => {
       />
     );
 
-    expect(await screen.findByText(/Grounded Section-by-Section Drafting/i, {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.getAllByText(/Drafting & Synthesis/i).length).toBeGreaterThanOrEqual(1);
+    // The drafting header is now a compact "Drafting" bar (was "Grounded
+    // Section-by-Section Drafting" / "Drafting & Synthesis").
+    expect(await screen.findByRole("heading", { name: "Drafting" }, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getAllByText(/3,000 words/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Introduction & Context/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Theoretical Framework/i).length).toBeGreaterThanOrEqual(1);
@@ -128,8 +129,8 @@ describe("Assignment Workspace Stages & Workflow", () => {
       />
     );
 
-    expect(await screen.findByText(/Overall Draft Progress/i, {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.getAllByText(/Drafting & Synthesis/i).length).toBeGreaterThanOrEqual(1);
+    expect(await screen.findByLabelText("Overall progress", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Drafting" })).toBeInTheDocument();
     expect(screen.getAllByText(/3,000 words/i).length).toBeGreaterThanOrEqual(1);
   });
 
