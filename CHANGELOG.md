@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **More room to write.** A one-line header with the word count; an outline that can be hidden (hidden by default on phones); the side panel closes on arrival (the Inspector button reopens it); a writing box that grows with the text instead of a small scrolling box; the bibliography folds away. Errors from AI drafting show above the editor instead of in the footer.
 - **Plainer labels:** "Edit text", "Done", "Draft with AI", "Write it myself".
 
+### Journal Mode 1: table of contents written for the article
+- **No fixed template.** Mode 1 no longer fills in the same IMRaD outline ("Problem Domain & Research Context", "Statistical Verification & Sub-Group Patterns"…) for every article. The author's AI writes the table of contents from the article's own title, gap, research questions, article type, target journal and word target, using the journal's required sections when its guidelines were saved, with sub-sections named after what this study covers. Headings that state results are dropped.
+- **Changes on request.** "Ask AI to change it" applies requests such as "shorten the literature review to 1,000 words", "add a section on policy implications" or "make it 8,000 words" to the current outline; a new total is kept only when the request names it. "Undo last change" restores the previous outline.
+- **Words always add up.** Word targets are scaled in code to the exact target; changing the word target rescales the outline instead of rebuilding a template. Sub-section headings and word counts stay editable by hand.
+- Mode 1 now also picks up a project that finishes loading after the view opens, without reopening a locked blueprint.
+
 ### Journal Mode 1: discovery funnel
 - **Two ways in.** "Explore and discover" starts from a broad interest; "I have my topic or journal" takes the problem, questions, title and journal directly. Three steps follow, each marked done as it is completed.
 - **Gaps from real papers.** The old gap finder asked the AI for gaps "with supporting DOIs" without giving it any papers, and showed whatever DOI and "Significance %" it typed. Gaps are now proposed by the author's AI from 15 recent papers with abstracts found on OpenAlex (Crossref when OpenAlex is unavailable); each gap quotes the papers it rests on, linked to their DOI, and a gap whose quote is not in the paper is dropped and counted. No significance scores.

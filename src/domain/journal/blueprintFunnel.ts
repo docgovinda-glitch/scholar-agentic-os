@@ -277,6 +277,6 @@ export function missingForLock(s: BlueprintState): string[] {
   if (!s.questions.some((q) => q.trim())) missing.push("at least one research question");
   if (!s.title.trim()) missing.push("a working title");
   if (!s.journal.trim()) missing.push("a target journal");
-  if (!s.hasBudget) missing.push("a word budget");
+  if (!s.hasBudget) missing.push("a table of contents");
   return missing;
 }
