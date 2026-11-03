@@ -738,7 +738,7 @@ describe("minimal website assistant", () => {
     expect(screen.getByText("How do I create a research project?")).toBeInTheDocument();
 
     // Clean pill-shaped input and Send button
-    const input = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i);
+    const input = screen.getByPlaceholderText(/Ask a research question/i);
     expect(input).toBeInTheDocument();
     const sendBtn = screen.getByRole("button", { name: "Send question" });
     expect(sendBtn).toBeInTheDocument();
@@ -768,7 +768,7 @@ describe("minimal website assistant", () => {
     const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
     fireEvent.click(toggleBtn);
 
-    const input = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i);
+    const input = screen.getByPlaceholderText(/Ask a research question/i);
     fireEvent.change(input, { target: { value: "generate code for a python script" } });
 
     const sendBtn = screen.getByRole("button", { name: "Send question" });
@@ -808,7 +808,7 @@ describe("minimal website assistant", () => {
     const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
     fireEvent.click(toggleBtn);
 
-    const input = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i);
+    const input = screen.getByPlaceholderText(/Ask a research question/i);
     fireEvent.change(input, { target: { value: "write an essay on biology" } });
 
     const sendBtn = screen.getByRole("button", { name: "Send question" });
@@ -834,7 +834,7 @@ describe("minimal website assistant", () => {
 
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
     fireEvent.click(screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i }));
-    fireEvent.change(screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i), { target: { value: "write an essay on biology" } });
+    fireEvent.change(screen.getByPlaceholderText(/Ask a research question/i), { target: { value: "write an essay on biology" } });
     fireEvent.click(screen.getByRole("button", { name: "Send question" }));
 
     expect(await screen.findByText(/A browser-side answer about essay structure/i, {}, { timeout: 3000 })).toBeInTheDocument();
@@ -863,7 +863,7 @@ describe("minimal website assistant", () => {
     const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
     fireEvent.click(toggleBtn);
 
-    const input = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i);
+    const input = screen.getByPlaceholderText(/Ask a research question/i);
     expect(input).toBeInTheDocument();
   });
 
@@ -880,7 +880,7 @@ describe("minimal website assistant", () => {
     expect(screen.getByText("How do I set up AI?")).toBeInTheDocument();
     expect(screen.getByText("What is Knowledge Vault?")).toBeInTheDocument();
 
-    const input = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i);
+    const input = screen.getByPlaceholderText(/Ask a research question/i);
     fireEvent.change(input, { target: { value: "Explain quantum coherence in biological systems" } });
 
     const sendBtn = screen.getByRole("button", { name: "Send question" });
@@ -897,7 +897,7 @@ describe("minimal website assistant", () => {
     const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
     fireEvent.click(toggleBtn);
 
-    const input = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i);
+    const input = screen.getByPlaceholderText(/Ask a research question/i);
     fireEvent.change(input, { target: { value: "What is cat?" } });
 
     const sendBtn = screen.getByRole("button", { name: "Send question" });
@@ -1301,7 +1301,7 @@ describe("prompt isolation & rich markdown rendering", () => {
     fireEvent.click(toggleBtn);
 
     const mainTextarea = screen.getByPlaceholderText(/Paste text, drop files\/images, or draft research instructions/i) as HTMLTextAreaElement;
-    const sidebarInput = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i) as HTMLInputElement;
+    const sidebarInput = screen.getByPlaceholderText(/Ask a research question/i) as HTMLInputElement;
 
     // Both are initially empty
     expect(mainTextarea.value).toBe("");

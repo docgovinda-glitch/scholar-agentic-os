@@ -399,3 +399,15 @@ describe('Edge cases', () => {
     }
   });
 });
+
+describe('APA 7 in-text names (surnames only)', () => {
+  it('uses surnames with & for two authors and et al. for three or more', async () => {
+    const { APA7Formatter } = await import('../apa7');
+    const f = new APA7Formatter();
+    const base = { id: 'r', kind: 'JournalArticle', title: 'T', year: '2024' } as any;
+    const a = (lastName: string, firstName = 'X.') => ({ firstName, lastName });
+    expect(f.formatInText({ ...base, authors: [a('Kubin', 'E.')] })).toBe('(Kubin, 2024)');
+    expect(f.formatInText({ ...base, authors: [a('Kubin', 'E.'), a('von Sikorski', 'C.')] })).toBe('(Kubin & von Sikorski, 2024)');
+    expect(f.formatInText({ ...base, authors: [a('Kubin'), a('Lee'), a('Park')] })).toBe('(Kubin et al., 2024)');
+  });
+});

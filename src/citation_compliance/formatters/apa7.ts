@@ -20,13 +20,25 @@ export class APA7Formatter implements CitationStyle {
   version = "7";
 
   formatInText(reference: CanonicalReference, options?: InTextOptions): string {
-    const author = this.formatAuthors(reference.authors, options?.etAl);
+    const author = this.inTextAuthors(reference.authors);
 
     if (options?.position !== undefined && options.locator) {
       return `${author}, ${options.position}`;
     }
 
     return `(${author}, ${authorDateYear(reference)})`;
+  }
+
+  /**
+   * APA 7 in-text names: surnames only (8.17): one author "Kubin", two
+   * "Kubin & von Sikorski", three or more "Kubin et al.".
+   */
+  private inTextAuthors(authors: CanonicalReference["authors"]): string {
+    const names = (authors ?? []).map((a) => a.lastName).filter(Boolean);
+    if (names.length === 0) return "Anonymous";
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return `${names[0]} & ${names[1]}`;
+    return `${names[0]} et al.`;
   }
 
   formatBibliography(reference: CanonicalReference): string {

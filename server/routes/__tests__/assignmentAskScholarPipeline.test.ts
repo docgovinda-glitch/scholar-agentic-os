@@ -185,13 +185,13 @@ Both architectures scale effectively [1, 2].
       expect(draft.includes("Hallucinated Reference")).toBe(false);
 
       // 2. Intercepts [1] with authentic deterministic APA citation
-      expect(draft).toContain("(Vaswani, A. & Shazeer, N., 2017)");
+      expect(draft).toContain("(Vaswani & Shazeer, 2017)");
 
       // 3. Intercepts [ev-he-2016] with authentic deterministic APA citation
-      expect(draft).toContain("(He, K. & Zhang, X., 2016)");
+      expect(draft).toContain("(He & Zhang, 2016)");
 
       // 4. Intercepts compound token [1, 2]
-      expect(draft).toContain("(Vaswani, A. & Shazeer, N., 2017; He, K. & Zhang, X., 2016)");
+      expect(draft).toContain("(Vaswani & Shazeer, 2017; He & Zhang, 2016)");
     });
 
     it("intercepts bracket tokens into IEEE numeric style [1], [2] when selected", async () => {
@@ -278,7 +278,7 @@ Both architectures scale effectively [1, 2].
 
       const parsed = JSON.parse(fullTextMatch![1]);
       expect(parsed.fullText).toBeDefined();
-      expect(parsed.fullText).toContain("(Vaswani, A. & Shazeer, N., 2017)");
+      expect(parsed.fullText).toContain("(Vaswani & Shazeer, 2017)");
       expect(parsed.fullText.includes("Fake Hallucinated References List")).toBe(false);
     });
   });

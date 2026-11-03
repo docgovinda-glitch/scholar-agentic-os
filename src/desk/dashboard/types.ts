@@ -16,8 +16,11 @@ export interface AgentAttachmentItem {
 }
 
 export interface AssistantAction {
-  type: "ai" | "ai-access" | "vault" | "workspaces" | "projects" | "auth";
+  type: "ai" | "ai-access" | "vault" | "workspaces" | "projects" | "auth" | "retry";
   label: string;
+  /** For "retry": the question to ask again, and how. */
+  query?: string;
+  mode?: "normal" | "search" | "deep-research";
 }
 
 export interface WebsiteAssistantMessage {
