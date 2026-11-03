@@ -196,8 +196,9 @@ export default function EvidenceMatrixMode() {
     try {
       const res = await uploadProjectUserData(effectiveProjectId, {
         rawText: normalizeUnicodeNFC(rawText.trim()),
-        title: normalizeUnicodeNFC(rawTitle.trim() || "Primary Field Notes & Observations"),
-        author: normalizeUnicodeNFC(rawAuthor.trim() || "Principal Investigator"),
+        // No stand-in author: an unnamed dataset is cited as the author's own data.
+        title: normalizeUnicodeNFC(rawTitle.trim() || "Untitled field notes"),
+        author: normalizeUnicodeNFC(rawAuthor.trim()),
         epistemicRole: rawRole,
         assignedSectionId: rawSectionId || undefined,
       });

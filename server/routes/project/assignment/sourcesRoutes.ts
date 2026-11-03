@@ -128,7 +128,6 @@ router.post("/research", async (req: express.Request<{ id: string }>, res) => {
           journal: draft.venue,
           doi: draft.doi,
           url: draft.url,
-          relevanceScore: Math.max(75, 98 - idx * 2),
           // Only what the index returned; no summary of findings is invented.
           mainFinding: draft.venue ? `Published in ${draft.venue}.` : "",
           suggestedUse:

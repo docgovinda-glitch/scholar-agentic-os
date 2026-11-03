@@ -456,7 +456,8 @@ evidenceRoutes.post(
 
     try {
       let title = (req.body?.title as string | undefined)?.trim() || "";
-      const author = (req.body?.author as string | undefined)?.trim() || "Principal Investigator (Primary Research)";
+      // No stand-in name: an unnamed dataset is the author's own, and is cited as such.
+      const author = (req.body?.author as string | undefined)?.trim() || "";
       const rawText = typeof req.body?.rawText === "string" ? req.body.rawText : undefined;
       const assignedSectionId = typeof req.body?.assignedSectionId === "string" ? req.body.assignedSectionId : undefined;
       const epistemicRole =
@@ -517,7 +518,7 @@ evidenceRoutes.post(
         textContent = normalizeUnicodeNFC(rawText.trim());
         format = req.body?.format || "text";
         sourceType = "field_notes";
-        if (!title) title = "Primary Field Notes & Observations";
+        if (!title) title = "Untitled field notes";
         const wordCount = textContent.split(/\s+/).length;
         summary = `Direct primary field note entry (${wordCount} words).`;
         extractedFindings = textContent.slice(0, 1500).trim();

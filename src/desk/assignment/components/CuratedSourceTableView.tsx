@@ -252,12 +252,16 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                   {/* Relevance */}
                   <td className="py-3 px-2 align-top">
                     <div className="flex flex-col items-start gap-1">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] border ${getCategoryBadgeClasses(source.relevanceCategory)}`}>
-                        {source.relevanceCategory || (source.relevanceScore >= 88 ? "Very High" : source.relevanceScore >= 76 ? "High" : "Moderate")}
-                      </span>
-                      <span className="text-[10px] font-mono font-medium text-neutral-500 dark:text-neutral-400">
-                        {source.relevanceScore}% match
-                      </span>
+                      {source.relevanceCategory && (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] border ${getCategoryBadgeClasses(source.relevanceCategory)}`}>
+                          {source.relevanceCategory}
+                        </span>
+                      )}
+                      {typeof source.relevanceScore === "number" ? (
+                        <span className="text-[10px] font-mono font-medium text-neutral-500 dark:text-neutral-400">{source.relevanceScore}% match</span>
+                      ) : (
+                        <span className="text-[10px] text-neutral-500 dark:text-neutral-400">Added by you</span>
+                      )}
                     </div>
                   </td>
 
@@ -350,9 +354,11 @@ export const CuratedSourceTableView: React.FC<CuratedSourceTableViewProps> = ({
                               <Sparkles className="w-3.5 h-3.5 text-blue-500" />
                               <span>Role in Assignment: {source.roleInAssignment || "Empirical evidence"}</span>
                             </span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] border ${getCategoryBadgeClasses(source.relevanceCategory)}`}>
-                              Relevance: {source.relevanceCategory || "High"} ({source.relevanceScore}%)
-                            </span>
+                            {(source.relevanceCategory || typeof source.relevanceScore === "number") && (
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] border ${getCategoryBadgeClasses(source.relevanceCategory)}`}>
+                                Relevance: {[source.relevanceCategory, typeof source.relevanceScore === "number" ? `${source.relevanceScore}%` : ""].filter(Boolean).join(" ")}
+                              </span>
+                            )}
                           </div>
                           {source.questionAlignment && (
                             <p className="text-neutral-700 dark:text-neutral-300">

@@ -63,7 +63,7 @@ export const CuratedSourceListView: React.FC<CuratedSourceListViewProps> = ({
             ? source.authors.join(", ")
             : source.isUserUploaded
             ? "Course Materials / Uploaded Source"
-            : "Scholarly Author";
+            : "Unknown author";
 
         const venueDisplay =
           source.journal ||
@@ -257,9 +257,9 @@ export const CuratedSourceListView: React.FC<CuratedSourceListViewProps> = ({
                       {source.relevanceCategory}
                     </span>
                   )}
-                  <span className="text-xs font-mono font-bold text-neutral-700 dark:text-neutral-300">
-                    {source.relevanceScore}% match
-                  </span>
+                  {typeof source.relevanceScore === "number" && (
+                    <span className="text-xs font-mono font-bold text-neutral-700 dark:text-neutral-300">{source.relevanceScore}% match</span>
+                  )}
                   <button
                     type="button"
                     onClick={() => onToggleBookmark(source.id)}

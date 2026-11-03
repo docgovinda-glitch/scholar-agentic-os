@@ -11,6 +11,33 @@ import {
   calculateScholarlyRelevance,
 } from "../services/scholarlyDiscoveryService";
 import type { DiscoveredSource } from "../types";
+import {
+  CORE_SCHOLARLY_CATALOG,
+  IR_CHINA_GEOPOLITICS_CATALOG,
+  ORGANIZATIONAL_CULTURE_CATALOG,
+} from "../services/scholarlyDiscoveryService";
+import { QUANTUM_COMPUTING_CATALOG } from "../services/catalogs/quantumComputingCatalog";
+import { UN_PEACE_SECURITY_CATALOG } from "../services/catalogs/unPeaceSecurityCatalog";
+
+// Every offline result must be a curated catalog entry, unchanged: the
+// discovery no longer makes up papers to reach a target count.
+const CATALOG = new Map(
+  [
+    ...CORE_SCHOLARLY_CATALOG,
+    ...IR_CHINA_GEOPOLITICS_CATALOG,
+    ...ORGANIZATIONAL_CULTURE_CATALOG,
+    ...QUANTUM_COMPUTING_CATALOG,
+    ...UN_PEACE_SECURITY_CATALOG,
+  ].map((c) => [c.title, c])
+);
+function expectFromCatalog(sources: DiscoveredSource[]) {
+  for (const s of sources) {
+    const entry = CATALOG.get(s.title);
+    expect(entry, s.title).toBeDefined();
+    expect(s.authors).toEqual(entry!.authors);
+    expect(String(s.year)).toBe(String(entry!.year));
+  }
+}
 import { generateCuratedLiteratureSources as seedSourcesFixture } from "../services/scholarlyDiscoveryService";
 const seedSources = (question: string) => seedSourcesFixture(question, "apa7");
 
@@ -134,7 +161,9 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
 
     it("treats academic discipline as a contextual constraint and does not search broad IR or leak unrelated UN veto papers", () => {
       const sources = generateCuratedLiteratureSources(ukraineQuestion, "apa7");
-      expect(sources.length).toBeGreaterThanOrEqual(30);
+      // Short list rather than padded: only catalog works that match.
+      expect(sources.length).toBeGreaterThan(0);
+      expectFromCatalog(sources);
 
       // Zero leakage of UN Security Council veto papers (ir-un-01, ir-un-02, etc.)
       const unVetoLeaked = sources.filter((s) => s.id.startsWith("src-ir-un"));
@@ -157,32 +186,20 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
       expect(deconstruction.geographicScope).toContain("South Asia");
       expect(deconstruction.cases).toContain("India-Pakistan Nuclear Dyad & Crisis Stability");
 
+      // The offline catalogs hold no South Asian nuclear studies, so none are
+      // made up to fill the list; live portal search supplies them.
       const sources = generateCuratedLiteratureSources(nuclearQuestion, "apa7");
-      expect(sources.length).toBeGreaterThanOrEqual(30);
-
-      const nuclearSources = sources.filter(
-        (s) =>
-          s.title.toLowerCase().includes("deterrence") ||
-          s.title.toLowerCase().includes("stability") ||
-          s.keyConcepts?.some((k) => k.toLowerCase().includes("deterrence") || k.toLowerCase().includes("stability"))
-      );
-      expect(nuclearSources.length).toBeGreaterThanOrEqual(25);
+      expect(sources.length).toBeLessThan(30);
+      expectFromCatalog(sources);
     });
   });
 
   describe("2. Recency-First Discovery & Seminal Core Theory Preservation", () => {
-    it("prioritizes recent 2026/2025 scholarship first while retaining seminal works as Core theory", () => {
+    it("does not invent recent studies, and retains seminal works as Core theory", () => {
       const sources = generateCuratedLiteratureSources(ukraineQuestion, "apa7");
 
-      // Top source must be a recent 2026 empirical study
-      const top1 = sources[0];
-      expect(parseInt(top1.year, 10)).toBeGreaterThanOrEqual(2025);
-      expect(top1.roleInAssignment).toBe("Empirical evidence");
-      expect(top1.relevanceCategory).toBe("Very High");
-
-      // Top 3 sources should feature 2026 and 2025 studies
-      const top3Years = sources.slice(0, 3).map((s) => parseInt(s.year, 10));
-      expect(top3Years.some((y) => y >= 2026)).toBe(true);
+      // Years are the catalog's own; no "2026 study" is made up to lead the list.
+      expectFromCatalog(sources);
 
       // Must also retain foundational studies (< 2010) as 'Core theory'
       const seminalCore = sources.filter((s) => s.roleInAssignment === "Core theory");
@@ -190,16 +207,20 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
       expect(seminalCore.some((s) => parseInt(s.year, 10) <= 2005)).toBe(true);
     });
 
-    it("assigns expected role and relevance categories to sources matching the required user table", () => {
+    it("assigns a role from the user table to every source", () => {
       const sources = generateCuratedLiteratureSources(ukraineQuestion, "apa7");
 
-      // Verify presence of all expected assignment roles:
-      const roles = new Set(sources.map((s) => s.roleInAssignment));
-      expect(roles.has("Empirical evidence")).toBe(true);
-      expect(roles.has("Theoretical framework")).toBe(true);
-      expect(roles.has("Comparative evidence")).toBe(true);
-      expect(roles.has("Core theory")).toBe(true);
-      expect(roles.has("Methodological framework")).toBe(true);
+      // Every role comes from the table; not every role must appear, since
+      // the list holds only the works that match the question.
+      const allowed = new Set([
+        "Empirical evidence",
+        "Theoretical framework",
+        "Comparative evidence",
+        "Core theory",
+        "Methodological framework",
+        "Contextual evidence",
+      ]);
+      sources.forEach((s) => expect(allowed.has(s.roleInAssignment as string), s.roleInAssignment).toBe(true));
 
       // Verify each source has questionAlignment populated
       sources.forEach((source) => {
@@ -214,7 +235,7 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
   describe("3. Workspace Card Grid & Evidence Badges", () => {
     // Table/List/Compact view-mode switcher was removed per UX refactor (task 6).
     // Sources are now displayed in a single standardised responsive card grid.
-    it("renders the curated sources grid with Relevance and Role badges visible", async () => {
+    it("renders the curated sources grid with the catalog works", async () => {
       render(
         <AssignmentWorkspace
           projectId="proj-ir-ukraine-1"
@@ -229,9 +250,9 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
       const grid = await screen.findByTestId("curated-sources-grid");
       expect(grid).toBeInTheDocument();
 
-      // Role badges are rendered in card grid (e.g. Empirical evidence)
-      const empiricalBadges = within(grid).getAllByText(/Empirical evidence/i);
-      expect(empiricalBadges.length).toBeGreaterThan(0);
+      // The compact grid shows each work's own title (here, a catalog book);
+      // the old assertion found "Empirical evidence" only on invented filler.
+      expect(within(grid).getByText(/Swords into Plowshares/i)).toBeInTheDocument();
     });
 
     it("filters literature by Role in Assignment (e.g. Theoretical framework)", async () => {
@@ -258,7 +279,7 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
       expect(theoreticalBadges.length).toBeGreaterThan(0);
     });
 
-    it("filters literature by latest 2026 publication year", async () => {
+    it("filters literature by publication year (seminal works)", async () => {
       render(
         <AssignmentWorkspace
           projectId="proj-ir-ukraine-1"
@@ -273,18 +294,15 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
       const filterToggle = screen.getByRole("button", { name: /Filters/i });
       fireEvent.click(filterToggle);
 
-      // Select 2026 publication year
+      // Select seminal works (no invented 2026 studies exist to filter on)
       const yearSelect = screen.getByLabelText(/Publication Year/i);
-      fireEvent.change(yearSelect, { target: { value: "2026" } });
+      fireEvent.change(yearSelect, { target: { value: "seminal" } });
 
-      // "2026 Recent" recency badge removed per UX refactor.
-      // Verify that grid still renders (filter applied but sources for this question have 2026 sources)
-      // and that year "2026" appears as source metadata in the grid
       const grid = screen.getByTestId("curated-sources-grid");
       expect(grid).toBeInTheDocument();
-      // Filtered sources show year "2026" in card metadata
-      const year2026Items = within(grid).getAllByText("2026");
-      expect(year2026Items.length).toBeGreaterThan(0);
+      // Filtered sources show their own year, e.g. Claude's 2006 book
+      const seminalItems = within(grid).getAllByText("2006");
+      expect(seminalItems.length).toBeGreaterThan(0);
     });
   });
 });

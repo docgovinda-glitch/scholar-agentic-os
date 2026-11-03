@@ -457,11 +457,11 @@ Help deepen analytical critique, strengthen argumentative transitions, eliminate
     scopedContextSummary = `
 PHASE 4 SUBMISSION AUDIT & EXAMINER STATE:
 - Overall Score & Grade Band: ${rubricAudit?.overallScore ? `${rubricAudit.overallScore}% (${rubricAudit.bandLabel || rubricAudit.overallBand})` : "Pending final audit"}
-- Readiness Index: ${rubricAudit?.readinessPercentage || (rubricAudit?.readyForSubmission ? "100%" : "85%")}
+- Readiness Index: ${rubricAudit?.readinessPercentage ? `${rubricAudit.readinessPercentage}%`.replace(/%%$/, "%") : "Not measured yet"}
 - Priority Fixes Identified:
-${(rubricAudit?.priorityFixes || []).map((f: string, i: number) => `  [Fix ${i + 1}] ${f}`).join("\n") || "  - Maintain rigorous theoretical critique\n  - Verify all in-text citations"}
+${(rubricAudit?.priorityFixes || []).map((f: string, i: number) => `  [Fix ${i + 1}] ${f}`).join("\n") || "  - None identified yet"}
 - Unresolved In-Text Citations (${unresolvedCitations.length}):
-${unresolvedCitations.map((c: any, i: number) => `  [C${i + 1}] "${c.rawCitation || c}" (Missing from bibliography or ambiguous)`).join("\n") || "  - 100% of in-text citations reconciled to bibliography"}
+${unresolvedCitations.map((c: any, i: number) => `  [C${i + 1}] "${c.rawCitation || c}" (Missing from bibliography or ambiguous)`).join("\n") || "  - None found"}
 - Word Count Adherence: ${currentTotalWords.toLocaleString()} / ${targetWordCount.toLocaleString()} words (${Math.abs(currentTotalWords - targetWordCount) <= targetWordCount * 0.1 ? "Compliant within ±10%" : "Check word count margin"})
 `;
     systemPrompt = `You are the Examiner, the Quality Audit & Final Review Copilot in Scholar OS.

@@ -106,7 +106,22 @@ describe("Camera-Ready Academic Compiler", () => {
     expect(typstCode).toContain("columns: 2");
     expect(typstCode).toContain("= 1. Introduction");
     expect(typstCode).toContain("== 1.1 Theoretical Framework");
-    expect(typstCode).toContain('#bibliography("references.bib", style: "ieee")');
+    // No references were given, so no bibliography is linked to an empty file.
+    expect(typstCode).not.toContain("#bibliography(");
+
+    const withRefs = generateTypstSource(sampleDoc, sampleMetadata, {
+      template: "typst_modern",
+      references: sampleReferences,
+    });
+    expect(withRefs).toContain('#bibliography("references.bib", style: "ieee")');
+  });
+
+  it("prints no stand-in author, affiliation or email when none are given", () => {
+    const opts = { template: "ieee" as const };
+    const meta = { ...sampleMetadata, author: "" };
+    for (const out of [generateLatexSource(sampleDoc, meta, opts), generateTypstSource(sampleDoc, meta, { template: "typst_modern" })]) {
+      expect(out).not.toMatch(/Lead Researcher|Department of|@university\.edu|Scholar OS/);
+    }
   });
 
   it("audits camera-ready academic compliance", () => {

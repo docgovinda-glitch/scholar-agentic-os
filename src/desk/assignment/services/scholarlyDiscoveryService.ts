@@ -3212,7 +3212,7 @@ export function calculateScholarlyRelevance(
       score = Math.min(40, score);
     }
   } else if (conceptMatches >= 2 || (conceptMatches >= 1 && caseMatches >= 1) || titleMatches >= 1) {
-    // Solid substantive alignment
+    // A substantive match on the question passes the inclusion gate (>= 65).
     score = Math.max(76, score);
   }
 
@@ -3254,316 +3254,7 @@ export function areSourcesRelevantToQuestion(
 // 4. Question-Led Scholarly Discovery & Multi-Facet Synthesis
 // --------------------------------------------------------------------------
 
-/**
- * Synthesizes authentic, peer-reviewed literature specifically tailored to answer
- * the decomposed assignment question across 5 research facets:
- * 1. Contemporary Empirical Evidence (2025–2026)
- * 2. Recent Theoretical Frameworks (2024–2025)
- * 3. Relevant Comparative Studies (2024–2026)
- * 4. Foundational Core Theory Classics (Seminal, 1979–2005)
- * 5. Methodological & Policy Evaluations (2024–2026)
- */
-export function synthesizeQuestionDrivenLiterature(
-  deconstruction: QuestionDeconstruction,
-  count: number,
-  existingIds = new Set<string>(),
-  existingTitles = new Set<string>()
-): ScholarlyCatalogItem[] {
-  const result: ScholarlyCatalogItem[] = [];
-  const domain = deconstruction.academicDiscipline;
-  const isIR = domain.includes("International");
 
-  const c0 = deconstruction.keyConcepts[0] || "Strategic Stability";
-  const c1 = deconstruction.keyConcepts[1] || deconstruction.keyConcepts[0] || "Contemporary Order";
-  const c2 = deconstruction.keyConcepts[2] || "Global Governance";
-  const indep = deconstruction.variables.independent[0] || "Structural Transformation";
-  const dep = deconstruction.variables.dependent[0] || "Systemic Stability";
-  const expl = deconstruction.variables.explanatory[0] || "Strategic Friction";
-  const th0 = deconstruction.theories[0] || "Structural Realism";
-  const th1 = deconstruction.theories[1] || "Liberal Institutionalism";
-  const geo = deconstruction.geographicScope[0] || "International System";
-  const cCase = deconstruction.cases[0] || "Contemporary Inquiries";
-
-  const archetypes = [
-    // 1. Facet 1: Contemporary Empirical Evidence (2026)
-    {
-      role: "Empirical evidence" as const,
-      relevanceCategory: "Very High" as const,
-      relevanceScore: 93,
-      type: "journal" as const,
-      journal: isIR ? "International Security" : domain.includes("Computer") ? "ACM Transactions on Computing" : "Harvard Public Policy Review",
-      title: `Empirical Evidence on ${c0} and ${dep}: Observational Data from ${geo}`,
-      authors: isIR ? ["Talmadge, C.", "Christensen, T. J."] : ["Gebru, T.", "Buolamwini, J."],
-      year: "2026",
-      volumeIssue: "50(3), 42–89",
-      methodology: "Empirical Study" as const,
-      mainFinding: `Provides primary 2025–2026 observational data on ${c0}, demonstrating that ${indep} alters ${dep} through measurable changes in ${expl}.`,
-      suggestedUse: `Essential contemporary empirical evidence directly testing hypotheses and providing observational data on ${c0}.`,
-      abstract: `Drawing on rigorous 2025–2026 empirical observations across ${geo}, this study evaluates the causal relationship between ${indep} and ${dep}. We find statistically significant confirmation that operational shifts in ${c0} induce measurable friction mediated by ${expl}, supplying indispensable contemporary baseline data.`,
-      concepts: [c0, c1, dep, "Empirical Evidence", geo],
-      impact: "Recent Landmark" as const,
-      credibility: "peer-reviewed" as const,
-      citations: 46,
-    },
-    // 2. Facet 2: Recent Theoretical Framework (2025)
-    {
-      role: "Theoretical framework" as const,
-      relevanceCategory: "High" as const,
-      relevanceScore: 88,
-      type: "journal" as const,
-      journal: isIR ? "European Journal of International Relations" : domain.includes("Law") ? "Modern Law Review" : "Theory and Society",
-      title: `Reconceptualizing ${th0}: ${c0}, ${indep}, and Systemic Change in Contemporary ${geo}`,
-      authors: isIR ? ["Acharya, A.", "Buzan, B."] : ["Pasquale, F.", "Zuboff, S."],
-      year: "2025",
-      volumeIssue: "31(2), 210–245",
-      methodology: "Theoretical Framework" as const,
-      mainFinding: `Formulates a rigorous analytical theoretical model linking ${th0} to contemporary institutional adaptations in ${c0}.`,
-      suggestedUse: `Primary theoretical framework for establishing conceptual parameters, variable definitions, and causal logic.`,
-      abstract: `This study articulates a formal theoretical framework bridging ${th0} and ${th1} to explain how ${c0} reshapes systemic order. We formalize how ${indep} creates structural dilemmas that challenge conventional equilibrium models, offering a nuanced explanatory framework for analyzing ${dep}.`,
-      concepts: [th0, c0, "Theoretical Architecture", "Systemic Change"],
-      impact: "Recent Landmark" as const,
-      credibility: "peer-reviewed" as const,
-      citations: 120,
-    },
-    // 3. Facet 3: Relevant Comparative Evidence (2025)
-    {
-      role: "Comparative evidence" as const,
-      relevanceCategory: "High" as const,
-      relevanceScore: 86,
-      type: "journal" as const,
-      journal: isIR ? "World Politics" : "Comparative Political Studies",
-      title: `Comparative Evidence on ${c0}: Strategic Adaptation and Cross-Regional Variations in ${geo}`,
-      authors: isIR ? ["Johnston, A. I.", "Goh, E."] : ["Citron, D. K.", "Crawford, K."],
-      year: "2025",
-      volumeIssue: "77(1), 88–132",
-      methodology: "Comparative Analysis" as const,
-      mainFinding: `Synthesizes comparative cross-case evidence showing divergent institutional responses to ${c0} across distinct jurisdictions.`,
-      suggestedUse: `Invaluable comparative evidence for contrasting regional responses, policy hedging, and institutional resistance.`,
-      abstract: `Through structured, focused comparison across multiple cases in ${geo}, this study evaluates how governing institutions mitigate risks associated with ${c0}. The comparative evidence highlights significant structural variation in compliance, deterrence signaling, and institutional resilience.`,
-      concepts: [c0, "Comparative Analysis", "Cross-Regional Evidence", geo],
-      impact: "Recent Landmark" as const,
-      credibility: "peer-reviewed" as const,
-      citations: 165,
-    },
-    // 4. Facet 4: Foundational Core Theory Classic (1999)
-    {
-      role: "Core theory" as const,
-      relevanceCategory: "High" as const,
-      relevanceScore: 87,
-      type: "book" as const,
-      publisher: "Cambridge University Press",
-      journal: "Cambridge University Press",
-      title: `Foundations of ${th0}: Anarchy, Sovereignty, and the Structural Logic of ${c0}`,
-      authors: isIR ? ["Wendt, A."] : domain.includes("Law") ? ["Dworkin, R."] : ["Lessig, L."],
-      year: "1999",
-      methodology: "Theoretical Framework" as const,
-      mainFinding: `Seminal theoretical articulation establishing the foundational ontological and structural parameters of ${c0} under systemic constraints.`,
-      suggestedUse: `Foundational core theory benchmark. Essential for establishing theoretical lineage, seminal definitions, and paradigm debates.`,
-      abstract: `This landmark text establishes the foundational theoretical parameters governing ${th0} and structural interaction. It demonstrates how sovereign identities and strategic cultures are co-constituted under systemic constraints, providing the core theoretical vocabulary for evaluating modern manifestations of ${c0}.`,
-      concepts: [th0, "Foundational Theory", "Ontological Parameters", c0],
-      impact: "Seminal Work" as const,
-      credibility: "academic-press" as const,
-      citations: 6450,
-    },
-    // 5. Facet 5: Methodological & Policy Evaluation (2026)
-    {
-      role: "Methodological framework" as const,
-      relevanceCategory: "High" as const,
-      relevanceScore: 85,
-      type: "institutional" as const,
-      journal: "Center for Strategic and International Studies (CSIS)",
-      publisher: "CSIS Policy Research Series",
-      title: `Evaluating the Strategic and Policy Repercussions of ${c0}: An Empirical Assessment Framework`,
-      authors: isIR ? ["Freedman, L.", "Biddle, S."] : ["O'Neil, C.", "Eubanks, V."],
-      year: "2026",
-      methodology: "Systematic Review" as const,
-      mainFinding: `Constructs a comprehensive policy evaluation matrix measuring empirical indicators, resource commitments, and governance outcomes for ${c0}.`,
-      suggestedUse: `Furnishes concrete contemporary policy metrics and systematic evaluation frameworks for analytical critique.`,
-      abstract: `This institutional policy report synthesizes empirical data from 38 jurisdictions to evaluate the strategic and policy impact of ${c0}. We track operational metrics, institutional allocations, and compliance to provide rigorous evidence on systemic adaptation.`,
-      concepts: [c0, "Policy Evaluation", "Systematic Review", "Strategic Indicators"],
-      impact: "Recent Landmark" as const,
-      credibility: "institutional-report" as const,
-      citations: 32,
-    },
-    // 6. Facet 1: Second Contemporary Quantitative Study (2026)
-    {
-      role: "Empirical evidence" as const,
-      relevanceCategory: "Very High" as const,
-      relevanceScore: 91,
-      type: "journal" as const,
-      journal: isIR ? "Security Studies" : "Journal of Empirical Legal Studies",
-      title: `Testing Causal Linkages in ${c0} and ${dep}: A Quantitative Multi-Year Evaluation`,
-      authors: isIR ? ["Lieber, K. A.", "Press, D. G."] : ["Selbst, A. D.", "Barocas, S."],
-      year: "2026",
-      volumeIssue: "35(1), 1–45",
-      methodology: "Quantitative Meta-Analysis" as const,
-      mainFinding: `Demonstrates statistically robust causal correlations between ${indep} and ${dep}, controlling for institutional mediation.`,
-      suggestedUse: `High-impact quantitative empirical evidence for supporting data-driven causal arguments.`,
-      abstract: `Using cross-national quantitative datasets and econometric estimation models, we test the core hypotheses of ${c0}. The findings corroborate that ${indep} significantly heightens ${dep}, while institutional checks offer partial mitigation under strict boundary conditions.`,
-      concepts: [c0, dep, "Quantitative Meta-Analysis", "Causal Inference"],
-      impact: "Recent Landmark" as const,
-      credibility: "peer-reviewed" as const,
-      citations: 58,
-    },
-    // 7. Facet 2: Second Theoretical Monograph (2024)
-    {
-      role: "Theoretical framework" as const,
-      relevanceCategory: "High" as const,
-      relevanceScore: 84,
-      type: "book" as const,
-      publisher: "Oxford University Press",
-      journal: "Oxford University Press",
-      title: `The Architecture of ${c0}: Norms, Institutions, and Systemic Resilience`,
-      authors: isIR ? ["Ikenberry, G. J.", "Deudney, D."] : ["Hildebrandt, M.", "Yeung, K."],
-      year: "2024",
-      methodology: "Theoretical Framework" as const,
-      mainFinding: `Examines how multilateral institutional norms withstand structural shocks generated by ${indep} and ${c0}.`,
-      suggestedUse: `Authoritative theoretical monograph for deep analysis of institutional resilience and norm contestation.`,
-      abstract: `This academic monograph evaluates the systemic longevity of global norms in the face of ${c0}. Drawing on institutional theory, the authors formulate a diagnostic model predicting when multilateral architectures adapt versus when they fracture under geopolitical stress.`,
-      concepts: [c0, "Norm Contestation", "Institutional Resilience", "Global Governance"],
-      impact: "Recent Landmark" as const,
-      credibility: "academic-press" as const,
-      citations: 320,
-    },
-    // 8. Facet 4: Second Seminal Classic (1979)
-    {
-      role: "Core theory" as const,
-      relevanceCategory: "High" as const,
-      relevanceScore: 86,
-      type: "book" as const,
-      publisher: "Waveland Press",
-      journal: "Waveland Press",
-      title: `Theory of International Politics: Anarchy and the Distribution of ${c0}`,
-      authors: isIR ? ["Waltz, K. N."] : domain.includes("Law") ? ["Hart, H. L. A."] : ["Wiener, N."],
-      year: "1979",
-      methodology: "Theoretical Framework" as const,
-      mainFinding: `Pioneering theoretical foundation establishing the structural imperatives of anarchy, balancing behavior, and systemic distribution of power.`,
-      suggestedUse: `Foundational theoretical baseline for all neorealist and structural arguments regarding systemic constraints on state action.`,
-      abstract: `The definitive classic of structural realism. Waltz argues that international outcomes cannot be explained by unit-level attributes alone, but are governed by the anarchic structure of the international system and the distribution of capabilities across states.`,
-      concepts: ["Structural Realism", "Anarchy", "Distribution of Capabilities", "Balancing"],
-      impact: "Seminal Work" as const,
-      credibility: "academic-press" as const,
-      citations: 13200,
-    },
-    // 9. Facet 5: Contemporary Case Context (2025)
-    {
-      role: "Contextual evidence" as const,
-      relevanceCategory: "High" as const,
-      relevanceScore: 85,
-      type: "journal" as const,
-      journal: isIR ? "International Studies Quarterly" : "Policy Studies Journal",
-      title: `${cCase}: Strategic Dilemmas, Crisis Escalation, and Diplomatic Pathways in ${geo}`,
-      authors: isIR ? ["Fravel, M. T.", "Saunders, P. C."] : ["Binns, R.", "Veale, M."],
-      year: "2025",
-      volumeIssue: "69(4), 512–540",
-      methodology: "Qualitative Case Study" as const,
-      mainFinding: `In-depth case study analyzing decision-making protocols, crisis communication channels, and deterrence signaling during ${cCase}.`,
-      suggestedUse: `Exemplary empirical case study for body paragraphs examining specific crisis escalation dynamics and operational diplomacy.`,
-      abstract: `Examining empirical decision-making records and diplomatic transcripts from ${cCase}, this qualitative investigation maps how leaders negotiate ${expl} during periods of high structural tension, identifying key drivers of stability.`,
-      concepts: [cCase, "Crisis Escalation", "Operational Diplomacy", c0],
-      impact: "Recent Landmark" as const,
-      credibility: "peer-reviewed" as const,
-      citations: 88,
-    },
-    // 10. Facet 5: Think Tank Policy Report (2025)
-    {
-      role: "Empirical evidence" as const,
-      relevanceCategory: "High" as const,
-      relevanceScore: 88,
-      type: "institutional" as const,
-      journal: "Brookings Institution Press",
-      publisher: "Brookings Institution",
-      title: `Strategic Stability in the 2020s: Indicators and Risk Assessment for ${c0}`,
-      authors: isIR ? ["Flournoy, M. A.", "Campbell, K. M."] : ["Chander, A.", "Sunder, M."],
-      year: "2025",
-      methodology: "Empirical Study" as const,
-      mainFinding: `Synthesizes field assessments and cross-departmental policy data to evaluate risk factors and deterrence margins.`,
-      suggestedUse: `Authoritative policy source for concrete strategic data, risk indicators, and multilateral recommendations.`,
-      abstract: `This Brookings report evaluates the operational stability of ${geo} under conditions of heightened competition. We introduce a multi-dimensional risk matrix quantifying stability indicators for ${c0} across defense, diplomatic, and economic domains.`,
-      concepts: [c0, "Strategic Stability", "Risk Assessment", "Multilateral Governance"],
-      impact: "Recent Landmark" as const,
-      credibility: "institutional-report" as const,
-      citations: 98,
-    },
-  ];
-
-  let offset = 0;
-  let generated = 0;
-  let cycle = 0;
-  
-  while (generated < count && offset < 200) {
-    const arch = archetypes[offset % archetypes.length];
-    cycle = Math.floor(offset / archetypes.length);
-    const uniqueSuffix = `${Date.now()}-${offset}-${Math.floor(Math.random() * 10000)}`;
-    const id = `src-syn-${domain.toLowerCase().replace(/[^a-z]/g, "").slice(0, 4)}-${uniqueSuffix}`;
-    
-    if (existingIds.has(id)) {
-      offset++;
-      continue;
-    }
-
-    const title = cycle > 0 ? `${arch.title} (Part ${cycle + 1}: ${c1})` : arch.title;
-    
-    // De-duplicate in case fetchMoreLiteratureSources calls this
-    if (existingTitles.has(title.toLowerCase().trim())) {
-      offset++;
-      continue;
-    }
-    existingTitles.add(title.toLowerCase().trim());
-    
-    const year = arch.year;
-
-    const item: ScholarlyCatalogItem = {
-      id,
-      title,
-      authors: [...arch.authors], // Clone to avoid Circular references
-      year,
-      type: arch.type,
-      journal: arch.journal,
-      publisher: arch.publisher,
-      doi: `10.1093/${domain.toLowerCase().replace(/[^a-z]/g, "").slice(0, 4)}.${year}.${uniqueSuffix}`,
-      relevanceScore: Math.min(99, arch.relevanceScore + (cycle % 5)),
-      roleInAssignment: arch.role,
-      relevanceCategory: arch.relevanceCategory,
-      questionAlignment: {
-        directScore: arch.relevanceScore,
-        supportsPart: `Supplies ${arch.role.toLowerCase()} directly evaluating ${c0}`,
-        evidenceType: arch.methodology,
-      },
-      mainFinding: arch.mainFinding,
-      suggestedUse: arch.suggestedUse,
-      citation: `${arch.authors.join(", ")} (${year}). ${title}. ${arch.journal}.`,
-      abstract: arch.abstract,
-      citationCount: arch.citations + (cycle * 15),
-      citationImpact: arch.impact,
-      methodology: arch.methodology,
-      keyConcepts: [...arch.concepts],
-      domain,
-      isOpenAccess: offset % 2 === 0,
-      isVerifiedAcademic: true,
-      sourceCredibility: arch.credibility,
-      volumeIssue: arch.volumeIssue,
-    };
-
-    result.push(item);
-    generated++;
-    offset++;
-  }
-
-  return result;
-}
-
-/**
- * Backward-compatible wrapper for synthesizeDomainScholarlyCatalog
- */
-export function synthesizeDomainScholarlyCatalog(
-  intent: ResearchIntent,
-  count: number,
-  existingIds = new Set<string>()
-): ScholarlyCatalogItem[] {
-  const deconstruction = intent.deconstruction || deconstructAssignmentQuestion(intent.rawQuestion);
-  return synthesizeQuestionDrivenLiterature(deconstruction, count, existingIds);
-}
 
 // --------------------------------------------------------------------------
 // 5. Main Public Discovery & Curation Functions
@@ -3635,21 +3326,10 @@ export function generateCuratedLiteratureSources(
     }
   }
 
-  // 3. Multi-Query Search Iteration & Gap Filling:
-  // If relevant candidates are fewer than 34, synthesize tailored literature filling all 5 research facets:
-  // 1. Contemporary Empirical Evidence (2025-2026)
-  // 2. Recent Theoretical Frameworks (2024-2025)
-  // 3. Relevant Comparative Evidence (2024-2026)
-  // 4. Foundational Core Theory (Seminal 1979-2005)
-  // 5. Methodological & Policy Evaluation (2024-2026)
+  // 3. Curated works only (see below).
+  // Only works that match the question. If there are few, the list is short:
+  // no papers are made up to fill it (live portal search adds real ones).
   let finalCatalog: ScholarlyCatalogItem[] = [...relevantCandidates];
-  const needed = Math.max(0, 36 - finalCatalog.length);
-  if (needed > 0) {
-    const existingIds = new Set(finalCatalog.map((s) => s.id));
-    const existingTitles = new Set(finalCatalog.map((s) => s.title.toLowerCase().trim()));
-    const synthesized = synthesizeQuestionDrivenLiterature(deconstruction, needed, existingIds, existingTitles);
-    finalCatalog = [...finalCatalog, ...synthesized];
-  }
 
   // 4. Recency-First Re-Ranking with Question Relevance Priority:
   // Hierarchy: Assignment Question -> Key Concepts -> Research Requirements -> Discipline -> Relevant Literature -> Recency
@@ -3710,7 +3390,7 @@ export function generateCuratedLiteratureSources(
     publisher: item.publisher,
     doi: item.doi,
     url: item.doi ? `https://doi.org/${item.doi}` : item.url,
-    relevanceScore: Math.max(70, item.relevanceScore),
+    relevanceScore: item.relevanceScore,
     roleInAssignment: item.roleInAssignment || "Empirical evidence",
     relevanceCategory:
       item.relevanceCategory ||
@@ -3800,13 +3480,7 @@ export function fetchMoreLiteratureSources(
 
   let selectedBatch: ScholarlyCatalogItem[] = uniqueCandidates.slice(0, batchSize);
 
-  // If pool has fewer than batchSize, synthesize new question-tailored items
-  if (selectedBatch.length < batchSize) {
-    const needed = batchSize - selectedBatch.length;
-    const existingTitles = new Set([...existingSources, ...selectedBatch].map(s => s.title.toLowerCase().trim()));
-    const synthesized = synthesizeQuestionDrivenLiterature(deconstruction, needed + 5, existingIds, existingTitles);
-    selectedBatch = [...selectedBatch, ...synthesized.slice(0, needed)];
-  }
+  // A short batch stays short: no papers are made up to fill it.
 
   return selectedBatch.map((item) => ({
     id: item.id,
@@ -3818,7 +3492,7 @@ export function fetchMoreLiteratureSources(
     publisher: item.publisher,
     doi: item.doi,
     url: item.doi ? `https://doi.org/${item.doi}` : item.url,
-    relevanceScore: Math.max(70, item.relevanceScore),
+    relevanceScore: item.relevanceScore,
     roleInAssignment: item.roleInAssignment || "Empirical evidence",
     relevanceCategory: item.relevanceCategory || "High",
     questionAlignment: item.questionAlignment || {

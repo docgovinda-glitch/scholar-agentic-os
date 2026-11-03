@@ -284,8 +284,8 @@ export default function AssignmentSourcesStage({
       doi: customForm.doi.trim(),
       citation: autoCitation,
       roleInAssignment: customForm.roleInAssignment,
-      relevanceScore: 98,
-      mainFinding: "Custom reference added to substantiate assignment analysis.",
+      // Added by the student: no match score, and no finding written for them.
+      mainFinding: "",
       suggestedUse: "Direct evidentiary and theoretical citation in assignment body.",
       status: "kept",
       isVerifiedAcademic: true,
@@ -676,10 +676,7 @@ export default function AssignmentSourcesStage({
           : "report") as SourceAcademicType,
         journal: `Course & User Materials (${formatBadge})`,
         publisher: "Course Grounding Source",
-        relevanceScore: 98,
-        mainFinding:
-          doc.relevanceSummary ||
-          "User-uploaded course grounding material analyzed and indexed for specific evidence and assignment alignment.",
+        mainFinding: doc.relevanceSummary || "",
         suggestedUse:
           "Direct primary evidence, lecture slide grounding, professor rubric alignment, or case empirical data.",
         citation: doc.citation || `${doc.name} (${yearStr}). Course Grounding Document.`,
