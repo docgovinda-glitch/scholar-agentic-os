@@ -50,6 +50,10 @@ export interface AcademicExportOptions {
   abstractText?: string;
   keywords?: string[];
   lineSpacing?: 1.15 | 1.5 | 2.0;
+  /** The target journal the author chose, for the title page. */
+  journalName?: string;
+  /** Font, size, spacing, columns and line numbers for the Word file. */
+  wordLayout?: import("../../domain/journal/wordLayouts").WordLayout;
   ethicalDeclarations?: {
     dataAvailability?: string;
     funding?: string;

@@ -12,6 +12,7 @@ import {
 } from "../../../../src/app/conductor/conductor.ts";
 import type { ProjectStore } from "../../../../src/services/store/types.ts";
 import { exportDocument } from "../../../../src/app/export/export.ts";
+import { layoutFrom } from "../../../../src/domain/journal/wordLayouts.ts";
 import type { ExportFormat } from "../../../../src/app/export/types.ts";
 import { safeParseAnswerField } from "../../../../src/shared/projectStateSchema";
 import { manuscriptToCanonicalDocument } from "../agentic";
@@ -852,6 +853,8 @@ export function registerManuscriptAndGateRoutes(
           keywords: req.body?.keywords || (record.answers?.["keywords"] ? record.answers["keywords"].split(",").map((s: string) => s.trim()) : undefined),
           abstractText: record.answers?.["abstract"] || record.answers?.["abstract_text"],
           lineSpacing: req.body?.lineSpacing ? (Number(req.body.lineSpacing) as 1.15 | 1.5 | 2.0) : 2.0,
+          wordLayout: layoutFrom(req.body?.layout, req.body?.lineNumbers),
+          journalName: typeof record.answers?.["target_journal"] === "string" ? record.answers["target_journal"] : undefined,
           ethicalDeclarations: {
             dataAvailability: record.answers?.["data_availability_statement"],
             competingInterests: record.answers?.["competing_interests_statement"],

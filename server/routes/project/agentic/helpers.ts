@@ -89,7 +89,8 @@ export function manuscriptToCanonicalDocument(
           blocks.push({
             id: `blk-${++blockIdx}`,
             kind: toHeadingKind(headingMatch[1].length),
-            text: normalizeUnicodeNFC(headingMatch[2]),
+            // "§ " marks Studio section headings in stored text; it isn't part of the title.
+            text: normalizeUnicodeNFC(headingMatch[2].replace(/^§\s*/, "")),
           });
         } else {
           blocks.push({
