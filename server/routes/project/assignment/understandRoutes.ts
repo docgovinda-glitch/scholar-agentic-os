@@ -6,6 +6,7 @@ import {
   normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
+import { scopeBrief, structureLens } from "../../../../src/domain/assignment/briefScoping.ts";
 import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig } from "../../../utils/llm.ts";
 import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
@@ -295,6 +296,13 @@ const handleStructure = async (req: express.Request<{ id: string }>, res: expres
 CRITICAL: You MUST divide the target word counts across the sections to strictly adhere to the user's custom section allocations above, and incorporate their specific notes into the section guidance!`
     : `Divide the ${targetWordCount} target words proportionally across the sections (e.g. Introduction ~10%, Body sections ~75%, Conclusion ~15%). The sum of targetWordCounts MUST equal approximately ${targetWordCount}.`;
 
+  // The subject the student chose (or the brief states) shapes the headings,
+  // instead of one generic template for every assignment.
+  const chosenDiscipline =
+    (typeof project.answers["assignment_discipline"] === "string" && project.answers["assignment_discipline"]) ||
+    scopeBrief(`${question} ${cleanAnswerString(project.answers["assignment_brief_text"]) || ""}`).discipline;
+  const subjectLens = structureLens(chosenDiscipline, String(assignmentType));
+
   try {
     const briefText = cleanAnswerString(project.answers["assignment_brief_text"]) || question;
     const isCourseworkWorkspace =
@@ -352,6 +360,8 @@ CORE ARCHITECTURAL RULES:
    }
 5. WORD ALLOCATIONS:
    The sum of all subheading targetWordCounts MUST equal approximately ${targetWordCount}.
+
+${subjectLens}
 
 ASSIGNMENT INTAKE:
 - Question: "${question}"

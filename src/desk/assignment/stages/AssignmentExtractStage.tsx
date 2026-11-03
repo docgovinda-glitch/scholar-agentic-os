@@ -30,6 +30,8 @@ import { useSubscriptionLimits } from "../../../hooks/useSubscriptionLimits";
 import { UpgradeModal } from "../../../components/modals/UpgradeModal";
 import { stripCircularReferences, safeFormatLabel } from "../../../utils/briefExtractor";
 import { validateBriefFile } from "../../../services/documentParser";
+import BriefScopePanel from "../components/BriefScopePanel";
+import { scopeBrief } from "../../../domain/assignment/briefScoping";
 import {
   ACADEMIC_LEVEL_OPTIONS,
   ASSIGNMENT_TYPE_OPTIONS,
@@ -167,6 +169,61 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   });
 
   const [isWordCountFocused, setIsWordCountFocused] = useState<boolean>(false);
+  const [localDiscipline, setLocalDiscipline] = useState<string>(() => String(project?.answers?.["assignment_discipline"] || ""));
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Details the brief states fill in the settings, once each; anything the
+  // student changes afterwards stays as they set it.
+  const scopeText = localQuestion || localBrief;
+  const scope = useMemo(() => scopeBrief(scopeText), [scopeText]);
+  const appliedScopeRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const patch: Record<string, unknown> = {};
+    const once = (key: string) => {
+      if (appliedScopeRef.current.has(key)) return false;
+      appliedScopeRef.current.add(key);
+      return true;
+    };
+    if (scope.level && scope.level !== localLevel && once(`level:${scope.level}`)) {
+      setLocalLevel(scope.level as AcademicLevel);
+      Object.assign(patch, { academic_level: scope.level, academicLevel: scope.level });
+    }
+    if (scope.assignmentType && scope.assignmentType !== localType && once(`type:${scope.assignmentType}`)) {
+      const tone = resolveMappedTone(scope.assignmentType as AssignmentType);
+      setLocalType(scope.assignmentType as AssignmentType);
+      setLocalTone(tone);
+      Object.assign(patch, { assignment_type: scope.assignmentType, assignmentType: scope.assignmentType, writing_tone: tone, writingTone: tone });
+    }
+    if (scope.citationStyle && scope.citationStyle !== localCitation && once(`style:${scope.citationStyle}`)) {
+      setLocalCitation(scope.citationStyle);
+      Object.assign(patch, { citation_style: scope.citationStyle, citationStyle: scope.citationStyle });
+    }
+    if (scope.wordCount && scope.wordCount !== localWordCount && once(`words:${scope.wordCount}`)) {
+      setLocalWordCount(scope.wordCount);
+      Object.assign(patch, { word_count: scope.wordCount, word_limit: scope.wordCount, targetWordCount: scope.wordCount });
+    }
+    if (scope.discipline && !localDiscipline && once(`discipline:${scope.discipline}`)) {
+      Object.assign(patch, { assignment_discipline: scope.discipline });
+    }
+    if (Object.keys(patch).length) saveAnswers(patch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to what the brief says
+  }, [scope]);
+
+  const answerScope = (q: "discipline" | "assignmentType" | "level", value: string) => {
+    if (q === "discipline") {
+      setLocalDiscipline(value);
+      saveAnswers({ assignment_discipline: value });
+    } else if (q === "assignmentType") {
+      const tone = resolveMappedTone(value as AssignmentType);
+      setLocalType(value as AssignmentType);
+      setLocalTone(tone);
+      appliedScopeRef.current.add(`type:${value}`);
+      saveAnswers({ assignment_type: value, assignmentType: value, writing_tone: tone, writingTone: tone, assignment_type_confirmed: "true" });
+    } else {
+      setLocalLevel(value as AcademicLevel);
+      saveAnswers({ academic_level: value, academicLevel: value });
+    }
+  };
   const [isGeneratingStructure, setIsGeneratingStructure] = useState<boolean>(false);
   const [structureError, setStructureError] = useState<string | null>(null);
   const [agenticStageIndex, setAgenticStageIndex] = useState(0);
@@ -844,8 +901,36 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           )}
         </div>
 
-        {/* Academic Parameters: Academic Level, Assignment Type, Citation Style, Writing Tone & Target Words */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[1fr_1fr_1fr_1fr_1.35fr] gap-3.5 pt-1">
+        <BriefScopePanel
+          brief={scopeText}
+          discipline={localDiscipline}
+          assignmentType={project?.answers?.["assignment_type_confirmed"] === "true" ? localType : undefined}
+          onAnswer={answerScope}
+        />
+
+        {/* Settings with sensible defaults: one line, opened only to change them */}
+        <details
+          open={settingsOpen}
+          onToggle={(e) => setSettingsOpen((e.currentTarget as HTMLDetailsElement).open)}
+          className="rounded-xl border border-neutral-200/80 dark:border-white/10"
+          data-testid="assignment-settings"
+        >
+          <summary className="cursor-pointer select-none px-3.5 py-2.5 text-xs text-neutral-600 dark:text-neutral-300 flex items-center justify-between gap-2">
+            <span>
+              <span className="font-semibold text-neutral-900 dark:text-neutral-100">Assuming: </span>
+              {[
+                ACADEMIC_LEVEL_OPTIONS.find((o) => o.id === localLevel)?.label,
+                ASSIGNMENT_TYPE_OPTIONS.find((o) => o.id === localType)?.label,
+                CITATION_STYLES.find((o) => o.id === localCitation)?.name,
+                WRITING_TONE_OPTIONS.find((o) => o.id === localTone)?.label,
+                `${(Number(localWordCount) || 2000).toLocaleString()} words`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+            <span className="underline shrink-0">{settingsOpen ? "Done" : "Change"}</span>
+          </summary>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[1fr_1fr_1fr_1fr_1.35fr] gap-3.5 px-3.5 pb-3.5 pt-1">
           {/* Academic Level */}
           <div className="space-y-1">
             <label htmlFor="academic_level" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
@@ -1079,6 +1164,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
             </div>
           </div>
         </div>
+        </details>
 
         {/* Optional Course & Rubric Accordion */}
         <div className="pt-2 border-t border-neutral-100 dark:border-white/5">

@@ -371,4 +371,21 @@ Synthesize corporate governance mechanisms that mitigate managerial agency confl
       }
     });
   });
+
+  describe("The outline is shaped by the subject, not one template", () => {
+    it("tells the AI how to structure a STEM piece when the student chose that subject", async () => {
+      const projectId = await createTestCourseworkProject("proj-lens-stem");
+      const store = getProjectStore();
+      const rec = (await store.get(projectId))!;
+      rec.answers = { ...rec.answers, assignment_question: "Evaluate the design of an experiment on enzyme activity.", assignment_discipline: "stem", assignment_type: "report" };
+      await store.save(rec);
+      // No AI connected: the route hands its prompt to the browser (426), so it can be read here.
+      const res = await request(app).post(`/api/projects/${projectId}/assignment/structure`).send({ targetWordCount: 2000 });
+      expect(res.status).toBe(426);
+      expect(res.body.userPrompt).toContain("SUBJECT AREA: Science, technology, engineering or maths.");
+      expect(res.body.userPrompt).toContain("hypothesis, method or design, results or analysis");
+      expect(res.body.userPrompt).toContain("FORM: a report");
+    });
+  });
 });
+
