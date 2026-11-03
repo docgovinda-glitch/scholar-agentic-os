@@ -42,6 +42,26 @@ describe("ThesisWorkspace (OT-09 Thesis & Dissertation Studio)", () => {
         );
       }
 
+      if (url.includes("/agentic/references/lookup")) {
+        return new Response(
+          JSON.stringify({
+            record: {
+              id: "doi-10.1000-retracted",
+              kind: "article",
+              title: "A retracted trial",
+              authors: [{ family: "Doe", given: "Jane" }],
+              year: 2019,
+              container: "Journal of Trials",
+              doi: "10.1000/retracted",
+              registry: "crossref",
+              integrity: { status: "retracted", notice: "10.1000/notice", checkedAt: "2026-11-03T00:00:00Z" },
+            },
+            abstract: "",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
       if (url.includes("/thesis/draft-chapter")) {
         draftCalls.push(String(lastBody));
         return new Response(
@@ -193,5 +213,43 @@ describe("ThesisWorkspace (OT-09 Thesis & Dissertation Studio)", () => {
     expect(JSON.parse(draftCalls[0])).toMatchObject({ chapterNumber: 1, chapterTitle: "Introduction" });
     expect(screen.getByText(/References cited in this chapter/i)).toBeInTheDocument();
     expect(screen.getAllByText(/8 \/ 2,400 words|8 \/ [\d,]+ words/).length).toBeGreaterThan(0);
+  });
+  it("checks every chapter's text in Discussion & Audit without any AI call", async () => {
+    render(<ThesisWorkspace projectId="proj-thesis-1" />);
+    await screen.findByDisplayValue("Empirical Systems Dissertation");
+    fireEvent.click(screen.getByTestId("generate-structured-blueprint-btn"));
+    fireEvent.click(screen.getByRole("button", { name: /4\. Write Chapters/i }));
+    fireEvent.change(screen.getAllByLabelText(/Chapter text/i)[0], {
+      target: { value: "Waits fell, t(28) = 2.20, p = .001. Figure 1.2 shows it before Figure 1.1. The behavior and the behaviour." },
+    });
+
+    const fetchesBefore = vi.mocked(window.fetch).mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: /5\. Discussion & Audit/i }));
+    const panel = screen.getByRole("region", { name: /Verification/i });
+    expect(panel).toHaveTextContent("Checks across all chapters");
+    expect(panel).toHaveTextContent("1 don't add up");
+    expect(panel).toHaveTextContent("Figure numbering, chapter 1");
+    // No abstract heading: the abstract check says so instead of "All reported".
+    expect(panel).toHaveTextContent("No abstract");
+    expect(panel).toHaveTextContent("Figure 1.1");
+    expect(panel).toHaveTextContent("“behavior” (1) and “behaviour” (1)");
+    // Reading the text needs no server or AI.
+    expect(vi.mocked(window.fetch).mock.calls.slice(fetchesBefore).some(([u]) => String(u).includes("/thesis/"))).toBe(false);
+  });
+  it("adds a source by DOI to the thesis reference list, shows its retraction and its citation tag", async () => {
+    render(<ThesisWorkspace projectId="proj-thesis-1" />);
+    await screen.findByDisplayValue("Empirical Systems Dissertation");
+    fireEvent.click(screen.getByRole("button", { name: /2\. Literature Matrix/i }));
+
+    fireEvent.change(screen.getByLabelText("DOI"), { target: { value: "10.1000/retracted" } });
+    fireEvent.click(screen.getByRole("button", { name: /Add by DOI/i }));
+
+    const list = await screen.findByRole("list", { name: /Reference list/i });
+    expect(list).toHaveTextContent("Doe, J. (2019). A retracted trial. Journal of Trials");
+    expect(list).not.toHaveTextContent("*Journal of Trials*");
+    expect(list).toHaveTextContent("Retracted");
+    expect(list).toHaveTextContent("Not cited in any chapter yet");
+    expect(list).toHaveTextContent("[CITE:doi-10.1000-retracted]");
+    expect(screen.getByText(/Crossref lists a retraction/)).toBeInTheDocument();
   });
 });

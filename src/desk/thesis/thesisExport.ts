@@ -5,10 +5,19 @@
 import { AlignmentType, Document, HeadingLevel, PageBreak, Paragraph, TextRun } from "docx";
 import { packDocxToBlob } from "../assignment/services/assignmentExportService";
 import type { ThesisProjectData } from "./thesisModel";
+import { renderThesis } from "./thesisReferences";
 
 const FONT = "Times New Roman";
 const para = (text: string, opts: { italics?: boolean; size?: number } = {}) =>
   new Paragraph({ spacing: { line: 360, after: 160 }, children: [new TextRun({ text, font: FONT, size: opts.size ?? 24, italics: opts.italics })] });
+
+/** A reference entry: its *italic* parts (journal, volume, book title) become italic runs. */
+const entryPara = (text: string) =>
+  new Paragraph({
+    spacing: { line: 360, after: 160 },
+    indent: { left: 720, hanging: 720 },
+    children: text.split(/\*([^*]+)\*/).map((part, i) => new TextRun({ text: part, font: FONT, size: 24, italics: i % 2 === 1 })),
+  });
 
 /** Blocks of text separated by blank lines become paragraphs; Markdown headings keep their level. */
 function bodyParagraphs(text: string): Paragraph[] {
@@ -43,7 +52,8 @@ export function buildThesisDocx(data: ThesisProjectData): Document {
     rqs.forEach((q, i) => children.push(para(`RQ${i + 1}. ${q.trim()}`)));
   }
 
-  for (const c of data.chapters) {
+  const rendered = renderThesis(data.chapters, data.references ?? {}, data.citationStyle ?? "apa");
+  for (const c of rendered.chapters) {
     children.push(new Paragraph({ children: [new PageBreak()] }));
     children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, spacing: { after: 240 }, children: [new TextRun({ text: `Chapter ${c.chapterNumber}: ${c.title}`, font: FONT, bold: true })] }));
     if (c.content?.trim()) children.push(...bodyParagraphs(c.content));
@@ -52,6 +62,12 @@ export function buildThesisDocx(data: ThesisProjectData): Document {
       children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 360, after: 120 }, children: [new TextRun({ text: "References", font: FONT, bold: true })] }));
       children.push(...bodyParagraphs(c.bibliography.replace(/^#+\s*References\s*\n/i, "")));
     }
+  }
+
+  if (rendered.references.length) {
+    children.push(new Paragraph({ children: [new PageBreak()] }));
+    children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, spacing: { after: 240 }, children: [new TextRun({ text: rendered.heading, font: FONT, bold: true })] }));
+    rendered.references.forEach((e) => children.push(entryPara(e)));
   }
 
   return new Document({ sections: [{ properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } }, children }] });

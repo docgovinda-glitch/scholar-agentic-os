@@ -3,6 +3,10 @@
  * the plain-text export. No React, no I/O, so every rule here is unit-tested.
  */
 
+import type { StyleKey } from "../../domain/journal/citationStyles";
+import type { ReferenceRecord } from "../../domain/journal/references";
+import { renderThesis } from "./thesisReferences";
+
 export type ChapterStatus = "not_started" | "drafting" | "reviewed" | "completed";
 
 export interface ThesisChapter {
@@ -39,6 +43,9 @@ export interface ThesisProjectData {
   supervisorNotes: string;
   literatureMatrix: LiteratureMatrix;
   chapters: ThesisChapter[];
+  /** Sources added from DOIs, by id; cited in chapters as [CITE:id]. */
+  references?: Record<string, ReferenceRecord>;
+  citationStyle?: StyleKey;
 }
 
 export const UNTITLED_THESIS = "Untitled Thesis & Dissertation";
@@ -121,10 +128,23 @@ export function thesisToMarkdown(data: ThesisProjectData): string {
   if (rqs.length) {
     out.push("## Research questions", "", ...rqs.map((q, i) => `${i + 1}. ${q.trim()}`), "");
   }
-  for (const c of data.chapters) {
+  const rendered = renderThesis(data.chapters, data.references ?? {}, data.citationStyle ?? "apa");
+  for (const c of rendered.chapters) {
     out.push(`## Chapter ${c.chapterNumber}: ${c.title}`, "");
     out.push(c.content?.trim() ? c.content.trim() : "_[Not drafted yet]_", "");
     if (c.bibliography?.trim()) out.push("### References", "", c.bibliography.trim(), "");
   }
+  if (rendered.references.length) out.push(`## ${rendered.heading}`, "", ...rendered.references.flatMap((e) => [e, ""]));
   return out.join("\n").trimEnd() + "\n";
+}
+
+/**
+ * The text the checks read: each chapter's own words under its title. An
+ * undrafted chapter adds nothing, so its placeholder is never checked.
+ */
+export function thesisCheckText(chapters: ThesisChapter[]): string {
+  return chapters
+    .filter((c) => c.content?.trim())
+    .map((c) => `## ${c.title}\n\n${c.content!.trim()}`)
+    .join("\n\n");
 }

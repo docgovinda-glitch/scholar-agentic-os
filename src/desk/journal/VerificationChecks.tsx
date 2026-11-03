@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { checkStatistics, formatP } from "../../domain/journal/statcheck";
 import { numberFigures, type ManuscriptFigure } from "../../domain/journal/figures";
-import { abstractNumbersMissingFromBody, checkNumbering, checkSpelling, flaggedPhrases } from "../../domain/journal/manuscriptChecks";
+import { abstractNumbersMissingFromBody, abstractOf, checkNumbering, checkSpelling, flaggedPhrases, numberLabel } from "../../domain/journal/manuscriptChecks";
 
 const TONE = {
   ok: "bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]",
@@ -24,7 +24,7 @@ export function useVerification(markdown: string, figures: ManuscriptFigure[] = 
     const objects = numberFigures(markdown, figures);
     const objectProblems = objects.unmentioned.length + objects.missing.length;
     const problems = badStats + spelling.mixedWords.length + abstractMissing.length + numberingProblems + objectProblems;
-    return { stats, spelling, abstractMissing, numbering, phrases, problems, badStats, objects, hasObjects: figures.length > 0 || objects.missing.length > 0 };
+    return { stats, spelling, hasAbstract: abstractOf(markdown).length > 0, abstractMissing, numbering, phrases, problems, badStats, objects, hasObjects: figures.length > 0 || objects.missing.length > 0 };
   }, [markdown, figures]);
 }
 
@@ -44,7 +44,7 @@ function Check({ title, tone, status, children }: { title: string; tone: keyof t
  * Checks that read the text the way an editor would. Each finding names the
  * words or numbers it is about; none is a score.
  */
-export default function VerificationChecks({ markdown, figures = [] }: { markdown: string; figures?: ManuscriptFigure[] }) {
+export default function VerificationChecks({ markdown, figures = [], title = "3. Verification" }: { markdown: string; figures?: ManuscriptFigure[]; title?: string }) {
   const v = useVerification(markdown, figures);
   const hasText = markdown.trim().length > 0;
   const pill = !hasText
@@ -59,7 +59,7 @@ export default function VerificationChecks({ markdown, figures = [] }: { markdow
   return (
     <section aria-label="Verification" className="p-4 rounded-xl border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="font-bold text-sm text-[color:var(--text-primary)]">3. Verification</span>
+        <span className="font-bold text-sm text-[color:var(--text-primary)]">{title}</span>
         <span className={`text-xs font-bold px-2 py-0.5 rounded ${pill.tone}`}>{pill.text}</span>
       </div>
       {hasText && (
@@ -95,14 +95,14 @@ export default function VerificationChecks({ markdown, figures = [] }: { markdow
             ))}
             {mixedVariety && v.spelling.mixedWords.length === 0 && (
               <p>
-                US forms ({v.spelling.usWords.slice(0, 4).join(", ")}) and UK forms ({v.spelling.ukWords.slice(0, 4).join(", ")}). Use the variety your journal asks for.
+                US forms ({v.spelling.usWords.slice(0, 4).join(", ")}) and UK forms ({v.spelling.ukWords.slice(0, 4).join(", ")}). Use one throughout: the variety your journal or university asks for.
               </p>
             )}
           </Check>
           <Check
             title="Abstract numbers in the body"
-            tone={v.abstractMissing.length ? "bad" : "ok"}
-            status={v.abstractMissing.length ? `${v.abstractMissing.length} only in abstract` : "All reported"}
+            tone={!v.hasAbstract ? "muted" : v.abstractMissing.length ? "bad" : "ok"}
+            status={!v.hasAbstract ? "No abstract" : v.abstractMissing.length ? `${v.abstractMissing.length} only in abstract` : "All reported"}
           >
             {v.abstractMissing.length > 0 && <p>The abstract states {v.abstractMissing.join(", ")}, but the rest of the manuscript doesn't. Report {v.abstractMissing.length === 1 ? "it" : "them"} in Results, or correct the abstract.</p>}
           </Check>
@@ -122,13 +122,13 @@ export default function VerificationChecks({ markdown, figures = [] }: { markdow
           )}
           {v.numbering.map((n) => (
             <Check
-              key={n.kind}
-              title={`${n.kind} numbering`}
+              key={`${n.kind}-${n.chapter ?? ""}`}
+              title={n.chapter !== undefined ? `${n.kind} numbering, chapter ${n.chapter}` : `${n.kind} numbering`}
               tone={n.missing.length || n.outOfOrder.length ? "bad" : "ok"}
               status={n.missing.length || n.outOfOrder.length ? "Out of sequence" : `${n.order.length} in order`}
             >
-              {n.missing.length > 0 && <p>Never mentioned: {n.missing.map((x) => `${n.kind} ${x}`).join(", ")}.</p>}
-              {n.outOfOrder.length > 0 && <p>First mentioned before a lower number: {n.outOfOrder.map((x) => `${n.kind} ${x}`).join(", ")}. Journals number them in order of first mention.</p>}
+              {n.missing.length > 0 && <p>Never mentioned: {n.missing.map((x) => numberLabel(n, x)).join(", ")}.</p>}
+              {n.outOfOrder.length > 0 && <p>First mentioned before a lower number: {n.outOfOrder.map((x) => numberLabel(n, x)).join(", ")}. Number them in order of first mention.</p>}
             </Check>
           ))}
           <Check title="Phrases reviewers flag as AI-sounding" tone={v.phrases.length ? "warn" : "ok"} status={v.phrases.length ? `${v.phrases.length} found` : "None"}>

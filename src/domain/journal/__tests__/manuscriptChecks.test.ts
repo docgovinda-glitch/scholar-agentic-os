@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { abstractNumbersMissingFromBody, abstractOf, checkNumbering, checkSpelling, flaggedPhrases } from "../manuscriptChecks";
+import { abstractNumbersMissingFromBody, abstractOf, checkNumbering, checkSpelling, flaggedPhrases, numberLabel } from "../manuscriptChecks";
 
 describe("checkSpelling", () => {
   it("reports a word spelt both ways", () => {
@@ -46,6 +46,20 @@ describe("checkNumbering", () => {
     ]);
     expect(checkNumbering("Figure 1 then Figure 4.")[0].missing).toEqual([2, 3]);
     expect(checkNumbering("No figures.")).toEqual([]);
+  });
+
+  it("checks chapter numbering (Figure 3.2) within each chapter, as theses number them", () => {
+    const out = checkNumbering("Figure 2.1 shows it. Then Figure 2.2. In chapter 3, Figure 3.2 comes before Figure 3.1, and Table 3.3 alone.");
+    const fig2 = out.find((f) => f.kind === "Figure" && f.chapter === 2)!;
+    expect(fig2).toMatchObject({ order: [1, 2], missing: [], outOfOrder: [] });
+    const fig3 = out.find((f) => f.kind === "Figure" && f.chapter === 3)!;
+    expect(fig3.outOfOrder).toEqual([1]);
+    expect(numberLabel(fig3, 1)).toBe("Figure 3.1");
+    const tab3 = out.find((f) => f.kind === "Table" && f.chapter === 3)!;
+    expect(tab3.missing).toEqual([1, 2]);
+    // No plain-numbered finding is invented from "Figure 3.2" being read as "Figure 3".
+    expect(out.some((f) => f.chapter === undefined)).toBe(false);
+    expect(numberLabel({ kind: "Table" }, 2)).toBe("Table 2");
   });
 });
 
