@@ -99,14 +99,18 @@ describe("Assignment Phase 4: Submission Audit & Export Flow", () => {
   });
 
   describe("RubricComplianceCard Component", () => {
-    it("renders predicted grade badge, readiness index, and criteria feedback", () => {
+    it("lists the brief's criteria and what can be checked, never a predicted grade or score", () => {
       render(<RubricComplianceCard report={mockRubricReport} />);
 
-      expect(screen.getByTestId("predicted-grade-badge")).toHaveTextContent("First Class (1st)");
-      expect(screen.getByText("88% Ready")).toBeInTheDocument();
+      expect(screen.getByText(/Scholar doesn.t predict marks/)).toBeInTheDocument();
       expect(screen.getByText("Critical Analysis & Argumentation")).toBeInTheDocument();
       expect(screen.getByText("Evidence & Scholarly Grounding")).toBeInTheDocument();
-      expect(screen.getByText(/Exceptional dialectical evaluation/)).toBeInTheDocument();
+      expect(screen.getAllByText("50%").length).toBe(2);
+      expect(screen.getByTestId("no-missing-requirements")).toBeInTheDocument();
+      // The rule-based grade, readiness score, per-criterion scores and canned praise are not shown.
+      expect(screen.queryByTestId("predicted-grade-badge")).toBeNull();
+      expect(screen.queryByText(/First Class|88% Ready|85 \/ 100/)).toBeNull();
+      expect(screen.queryByText(/Exceptional dialectical evaluation/)).toBeNull();
     });
 
     it("displays missing requirements alert box when issues are present", () => {
@@ -225,10 +229,12 @@ describe("Assignment Phase 4: Submission Audit & Export Flow", () => {
         </AssignmentProvider>
       );
 
-      // Verify header and predicted grade
-      expect(await screen.findByText("Submission Quality Audit & Camera-Ready Export")).toBeInTheDocument();
-      expect(screen.getAllByText("First Class (1st)").length).toBeGreaterThan(0);
-      expect(screen.getByText("88%")).toBeInTheDocument();
+      // Header and factual status (no predicted grade or readiness score)
+      expect(await screen.findByText("Check and download")).toBeInTheDocument();
+      expect(screen.getByTestId("sections-written")).toBeInTheDocument();
+      expect(screen.getByTestId("todo-count")).toHaveTextContent("Nothing found");
+      expect(screen.queryByText("First Class (1st)")).toBeNull();
+      expect(screen.queryByText(/Predicted Grade|Readiness Index/)).toBeNull();
 
       // Verify export buttons
       expect(screen.getByTestId("export-docx-button")).toBeInTheDocument();
