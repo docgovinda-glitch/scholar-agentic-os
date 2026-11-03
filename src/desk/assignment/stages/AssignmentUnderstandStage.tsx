@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import BriefScopePanel from "../components/BriefScopePanel";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { authedJsonFetch, authedFetch } from "../../api";
 import {
@@ -405,6 +406,7 @@ export default function AssignmentUnderstandStage({
   const [localQuestion, setLocalQuestion] = useState(cleanAnswerString(question));
   const [localLevel, setLocalLevel] = useState<AcademicLevel>(academicLevel || "undergraduate");
   const [localType, setLocalType] = useState<AssignmentType>(assignmentType || "essay");
+  const [localDiscipline, setLocalDiscipline] = useState<string>(() => String(project?.answers?.["assignment_discipline"] || ""));
   const [localWordCount, setLocalWordCount] = useState<number>(() => {
     const raw = Number(targetWordCount);
     if (isNaN(raw) || raw <= 0) return 2000;
@@ -1567,6 +1569,23 @@ export default function AssignmentUnderstandStage({
                 </div>
               </DropzoneErrorBoundary>
             )}
+
+            <BriefScopePanel
+              brief={localQuestion}
+              discipline={localDiscipline}
+              assignmentType={project?.answers?.["assignment_type_confirmed"] === "true" ? localType : undefined}
+              onAnswer={(q, value) => {
+                if (q === "discipline") {
+                  setLocalDiscipline(value);
+                  saveAnswers({ assignment_discipline: value });
+                } else if (q === "assignmentType") {
+                  handleTypeChange(value as AssignmentType);
+                  saveAnswers({ assignment_type_confirmed: "true" });
+                } else {
+                  handleLevelChange(value as AcademicLevel);
+                }
+              }}
+            />
 
             <input
               type="file"
