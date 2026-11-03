@@ -54,6 +54,15 @@ vi.mock("../../../services/vault/cloudDriveService", () => ({
 
 const { default: AssignmentWorkspace } = await import("../AssignmentWorkspace");
 
+// The workspace loads the catalog works for this question; tests read titles
+// and ids from it rather than naming entries, so they hold as the verified
+// catalog changes.
+const ETHICS_QUESTION = "Critically evaluate the ethics of autonomous decision-making systems.";
+const fixtureSources = seedSources(ETHICS_QUESTION);
+const [firstSource, secondSource, thirdSource] = fixtureSources;
+const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const titleRe = (text: string) => new RegExp(escapeRe(text), "i");
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -177,10 +186,10 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
       expect(screen.getByText(/Curated Scholarly Literature/i)).toBeInTheDocument();
 
       // Curated Literature Cards (Titles, Authors, Venue)
-      expect(screen.getByText(/Algorithmic Governance and the Politics of Predictive Accountability/i)).toBeInTheDocument();
-      expect(screen.getByText(/Pasquale, F., Zarsky, T./i)).toBeInTheDocument();
-      expect(screen.getByText(/Harvard Law Review/i)).toBeInTheDocument();
-      expect(screen.getByText(/Critical Synthesis of Empirical Evidence in Socio-Technical Decision Making/i)).toBeInTheDocument();
+      expect(screen.getByText(titleRe(firstSource.title))).toBeInTheDocument();
+      expect(screen.getAllByText(titleRe(firstSource.authors.join(", "))).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(titleRe((firstSource.journal || firstSource.publisher)!)).length).toBeGreaterThan(0);
+      expect(screen.getByText(titleRe(secondSource.title))).toBeInTheDocument();
 
       // Exit Gate Counter (visible when sources are present) & unblocked Proceed to Drafting & Skip to Drafting buttons
       const counter = screen.getByTestId("evidence-counter");
@@ -205,27 +214,27 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
       await screen.findByText(/Sources & Course Materials/i);
 
       // Approve card 1
-      const approveBtn1 = screen.getByRole("button", { name: /Approve Algorithmic Governance and the Politics of Predictive Accountability/i });
+      const approveBtn1 = screen.getByRole("button", { name: new RegExp(`Approve ${escapeRe(firstSource.title)}`, "i") });
       fireEvent.click(approveBtn1);
 
       await waitFor(() => {
         expect(saveIntakeAnswers).toHaveBeenCalledWith(
           "proj-sources-1",
           expect.objectContaining({
-            approved_source_ids: expect.arrayContaining(["src-curated-1"]),
+            approved_source_ids: expect.arrayContaining([firstSource.id]),
           })
         );
       });
 
       // Toggle off card 1 (Remove from approved)
-      const removeBtn1 = screen.getByRole("button", { name: /Remove Algorithmic Governance and the Politics of Predictive Accountability from approved/i });
+      const removeBtn1 = screen.getByRole("button", { name: new RegExp(`Remove ${escapeRe(firstSource.title)} from approved`, "i") });
       fireEvent.click(removeBtn1);
 
       await waitFor(() => {
         expect(saveIntakeAnswers).toHaveBeenCalledWith(
           "proj-sources-1",
           expect.objectContaining({
-            approved_source_ids: expect.not.arrayContaining(["src-curated-1"]),
+            approved_source_ids: expect.not.arrayContaining([firstSource.id]),
           })
         );
       });
@@ -247,7 +256,7 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
           citation_style: "apa7",
           academic_level: "undergraduate",
           assignment_type: "critical_essay",
-          approved_source_ids: ["src-curated-1", "src-curated-2", "src-curated-3"],
+          approved_source_ids: [firstSource.id, secondSource.id, thirdSource.id],
         },
         gates: [],
       });
@@ -284,9 +293,9 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
               expect.objectContaining({ name: "Week_04_Algorithmic_Ethics_Slides.pdf" }),
             ]),
             approved_source_ids: expect.arrayContaining([
-              "src-curated-1",
-              "src-curated-2",
-              "src-curated-3",
+              firstSource.id,
+              secondSource.id,
+              thirdSource.id,
               expect.stringMatching(/^doc-/),
             ]),
           })
