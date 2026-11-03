@@ -44,6 +44,14 @@ vi.mock("../../../services/userAiSettings", () => ({
   forgetProviderKey: vi.fn(() => {}),
 }));
 
+// Account key sync talks to the server; these tests cover the page, so it is
+// stubbed to "nothing changed" (accountKeySync has its own tests).
+vi.mock("../accountKeys", () => ({
+  syncKeysWithAccount: vi.fn(async () => null),
+  saveKeyToAccount: vi.fn(async () => true),
+  removeKeyFromAccount: vi.fn(async () => {}),
+}));
+
 vi.mock("../../../services/hardwareProfiler", () => ({
   loadHardwareProfile: vi.fn(async () => null),
   detectHardwareProfile: vi.fn(async () => null),
@@ -224,9 +232,11 @@ describe("Per-provider configuration", () => {
     fireEvent.click(screen.getByRole("button", { name: /Test and connect/i }));
 
     await waitFor(() => expect(api.verifyProviderKey).toHaveBeenCalledWith("groq", "gsk_test_key"));
-    // Key is stored on the device, and only the fact of the connection is
-    // recorded server-side — never the key itself.
+    // The key is stored on this device and saved (encrypted) to the account
+    // so it works on the person's other devices; the connection is recorded.
+    const account = await import("../accountKeys");
     expect(store.storeProviderKey).toHaveBeenCalledWith("groq", "gsk_test_key");
+    expect(account.saveKeyToAccount).toHaveBeenCalledWith("groq", "gsk_test_key");
     expect(api.addConnection).toHaveBeenCalledWith("groq", "free", 7);
   });
 
@@ -244,6 +254,8 @@ describe("Per-provider configuration", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/rejected by the provider/i);
     expect(store.storeProviderKey).not.toHaveBeenCalled();
     expect(api.addConnection).not.toHaveBeenCalled();
+    const account = await import("../accountKeys");
+    expect(account.saveKeyToAccount).not.toHaveBeenCalled();
   });
 });
 

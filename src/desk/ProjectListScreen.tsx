@@ -36,6 +36,7 @@ import AiAccessPage, { type SectionId } from "./aiAccess/AiAccessPage";
 import { CommandPalette } from "./components/CommandPalette";
 import {
   Plus,
+  FolderOpen,
   ArrowUp,
   ArrowRight,
   X,
@@ -73,6 +74,7 @@ import {
   Presentation,
 } from "lucide-react";
 import { getCloudProvider } from "../config/providerCatalog";
+import { useDeviceClass } from "../hooks/useDeviceClass";
 import { loadUserAiSettings } from "../services/userAiSettings";
 import { PromptBarActionMenu, type PromptMode } from "./PromptBarActionMenu";
 import {
@@ -322,6 +324,9 @@ export default function ProjectListScreen({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Phones get an Ask-first home: Ask Scholar at the top, compact workspace
+  // tiles below, and a bottom bar for the main places.
+  const { isMobile: isPhone } = useDeviceClass();
 
   // Command Palette & Resizable Assistant Split-Pane States
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -620,9 +625,12 @@ export default function ProjectListScreen({
     }
     refreshStatus();
     const interval = setInterval(refreshStatus, 20000);
+    // Keys arriving from the account (another device) or changed in AI Access.
+    window.addEventListener("scholar:ai-config-changed", refreshStatus);
     return () => {
       active = false;
       clearInterval(interval);
+      window.removeEventListener("scholar:ai-config-changed", refreshStatus);
     };
   }, []);
 
@@ -1273,6 +1281,149 @@ export default function ProjectListScreen({
     getSupabaseClient().auth.signOut();
   }
 
+  const mainPromptForm = (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (mainPromptInput.trim() || mainAttachments.length > 0) {
+          handleSendMainPrompt();
+        }
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+        setIsDragging(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (e.dataTransfer.files?.length) {
+          addMainFiles(Array.from(e.dataTransfer.files));
+        }
+      }}
+      className={`pointer-events-auto flex flex-col justify-between w-full rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 shadow-sm focus-within:border-neutral-400 dark:focus-within:border-white/20 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] p-3 transition-all duration-200 ${
+        isDragging
+          ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10 dark:bg-blue-950/20"
+          : ""
+      }`}
+    >
+      {/* Pending Attachments Chips */}
+      {mainAttachments.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 pb-1.5 border-b border-neutral-200/50 dark:border-white/5 mb-1.5 overflow-x-auto max-h-16">
+          {mainAttachments.map((att) => (
+            <div
+              key={att.id}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs"
+            >
+              {att.isImage ? (
+                att.previewUrl ? (
+                  <img src={att.previewUrl} alt={att.name} className="w-4 h-4 object-cover rounded" />
+                ) : (
+                  <Paperclip className="w-3 h-3 text-blue-500" />
+                )
+              ) : (
+                <FileText className="w-3 h-3 text-amber-500" />
+              )}
+              <span className="truncate max-w-[150px] font-medium text-[11px]">{att.name}</span>
+              <button
+                type="button"
+                onClick={() => removeMainAttachment(att.id)}
+                aria-label={`Remove ${att.name}`}
+                className="p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+          {isMainUploadingAttachment && (
+            <span className="text-[11px] text-neutral-400 flex items-center gap-1 animate-pulse">
+              <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing attachment...
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Top: Transparent flexible input */}
+      <div className="w-full flex items-center">
+        <textarea
+          ref={guideTextareaRef}
+          rows={isPhone ? 3 : 1}
+          value={mainPromptInput}
+          onChange={(e) => {
+            setMainPromptInput(e.target.value);
+            e.target.style.height = "auto";
+            e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              if (mainPromptInput.trim() || mainAttachments.length > 0) {
+                handleSendMainPrompt();
+              }
+            } else if (e.key === "Backspace" && mainPromptInput === "" && mainAttachments.length > 0) {
+              removeMainAttachment(mainAttachments[mainAttachments.length - 1].id);
+            }
+          }}
+          onPaste={(e) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            const newFiles: File[] = [];
+            for (let i = 0; i < items.length; i++) {
+              if (items[i].kind === "file") {
+                const file = items[i].getAsFile();
+                if (file) newFiles.push(file);
+              }
+            }
+            if (newFiles.length > 0) {
+              e.preventDefault();
+              addMainFiles(newFiles);
+            }
+          }}
+          id="main-research-instruction-input"
+          name="researchInstructions"
+          aria-label="Research instructions or assignment guidelines"
+          placeholder={isPhone ? "Ask a research question or paste your brief…" : "Paste text, drop files/images, or draft research instructions..."}
+          style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
+          className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input max-h-28 overflow-y-auto scholar-scrollbar"
+        />
+      </div>
+
+      {/* Bottom Action Row: Attachments & Mode Selector on left, Submit button on right */}
+      <div className="flex items-center justify-between gap-2 mt-1.5 pt-1 border-t border-neutral-200/40 dark:border-white/5 w-full">
+        <PromptBarActionMenu
+          currentMode={mainAiMode}
+          onSelectMode={setMainAiMode}
+          onAttachFiles={handleMainFileSelect}
+        />
+
+        <div className="relative group">
+          <button
+            type="submit"
+            title="Send message (Enter)"
+            aria-label="Send message"
+            disabled={(!mainPromptInput.trim() && mainAttachments.length === 0) || isGuideThinking}
+            className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-sm disabled:bg-neutral-200 dark:disabled:bg-white/10 disabled:text-neutral-400 dark:disabled:text-neutral-600 disabled:cursor-not-allowed"
+          >
+            {isGuideThinking ? (
+              <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>
+                <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span className="text-[10px] font-mono opacity-60">↵</span>
+              </>
+            )}
+          </button>
+          <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
+            Send message (Enter)
+          </span>
+        </div>
+      </div>
+    </form>
+  );
+
   return (
     <div className="h-screen w-full flex overflow-hidden bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-white font-sans selection:bg-neutral-100 selection:text-ink-850">
       {/* Mobile Backdrop Overlay */}
@@ -1808,8 +1959,8 @@ export default function ProjectListScreen({
         ) : (
           <>
             {/* Scrollable / Flexible Center Area */}
-            <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-y-auto scholar-scrollbar">
-              <div className="w-full max-w-5xl flex flex-col items-center gap-6 my-auto pb-4">
+            <div className="flex-1 flex flex-col items-center justify-start md:justify-center px-4 overflow-y-auto scholar-scrollbar">
+              <div className={`w-full max-w-5xl flex flex-col items-center gap-6 pb-4 ${isPhone ? "pt-3" : "my-auto"}`}>
                 {/* Onboarding welcome banner */}
                 {welcomeVisible && (
                   <div
@@ -1850,7 +2001,97 @@ export default function ProjectListScreen({
                 )}
 
                 {/* Subtle Welcome / Workspace Heading & 4-Card Template Grid (completely hidden once chatting begins) */}
-                {!isAiSidebarOpen && !hasStartedChatting ? (
+                {isPhone && !isAiSidebarOpen && !hasStartedChatting ? (
+                  <>
+                    <section aria-label="Ask Scholar" className="w-full">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <h1 className="text-xl font-semibold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
+                          <MessageSquare className="w-5 h-5 text-sky-500" aria-hidden="true" />
+                          Ask Scholar
+                        </h1>
+                        {userEmail && (
+                          <button
+                            type="button"
+                            data-testid="mobile-ai-status"
+                            onClick={() => {
+                              if (onOpenAiAccess) onOpenAiAccess();
+                              else setActiveView("ai-access");
+                            }}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer ${
+                              aiStatus?.connected
+                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                            }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${aiStatus?.connected ? "bg-emerald-500" : "bg-amber-500"}`} />
+                            {aiStatus?.connected
+                              ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
+                              : aiStatus
+                              ? "Connect an AI"
+                              : "Checking AI…"}
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[13px] text-neutral-600 dark:text-neutral-400 mb-3">
+                        Ask a research question or paste your assignment brief. Each answer starts from a fresh search of scholarly sources.
+                      </p>
+                      {mainPromptForm}
+                      <div className="mt-3 -mx-4 px-4 flex gap-2 overflow-x-auto scrollbar-hide" aria-label="Suggested questions">
+                        {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              setIsAiSidebarOpen(true);
+                              handleSendGuideMessage(faq.question);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-300 px-3 py-1.5 text-xs font-medium whitespace-nowrap cursor-pointer shrink-0 active:scale-95"
+                          >
+                            <Sparkles className="w-3 h-3 text-amber-500" aria-hidden="true" />
+                            {faq.shortLabel}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section aria-label="Start a workspace" className="w-full">
+                      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2">Start a workspace</h2>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {FORMAT_TILES.map((tile) => {
+                          const isBootingThis = creatingFormatId === tile.id;
+                          const tileTheme = getFormatTileTheme(tile.id);
+                          const length = (tile.specs || tile.footer).split(" · ").pop();
+                          return (
+                            <button
+                              key={tile.id}
+                              type="button"
+                              onClick={() => {
+                                if (creating) return;
+                                if (!userEmail) {
+                                  openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
+                                  return;
+                                }
+                                handleCreate(tile.id);
+                              }}
+                              disabled={creating && !isBootingThis}
+                              className="flex flex-col items-start gap-2 rounded-xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-ink-750 p-3 text-left cursor-pointer active:scale-[0.98] transition-transform disabled:opacity-50 min-h-[6.5rem]"
+                            >
+                              <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${tileTheme.badgeBg}`}>
+                                {isBootingThis ? (
+                                  <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <FormatIcon id={tile.id} className="w-4 h-4" />
+                                )}
+                              </span>
+                              <span className="text-[13px] font-semibold leading-snug text-neutral-900 dark:text-white">{tile.label}</span>
+                              {length && <span className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-tight">{length}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  </>
+                ) : !isAiSidebarOpen && !hasStartedChatting ? (
                   <>
                     <div className="text-center mb-2">
                       <h1 className="text-2xl font-semibold text-neutral-900 dark:text-white tracking-tight">
@@ -1956,7 +2197,8 @@ export default function ProjectListScreen({
               </div>
             </div>
 
-            {/* Main AI Prompt Bar — Parallel to the line above settings */}
+            {/* Main AI Prompt Bar — Parallel to the line above settings (on phones it sits in the Ask Scholar hero instead) */}
+            {!(isPhone && !isAiSidebarOpen && !hasStartedChatting) && (
             <div className="sticky bottom-0 z-20 w-full relative pointer-events-none flex flex-col justify-start bg-gradient-to-t from-paper-cool dark:from-ink-850 via-paper-cool/95 dark:via-ink-850/95 to-transparent px-4 pb-3">
               <div className="w-full max-w-4xl mx-auto relative pointer-events-auto flex flex-col items-center">
                 {/* Contextual Clarification when Ask Scholar is Open */}
@@ -1974,149 +2216,70 @@ export default function ProjectListScreen({
                   </div>
                 )}
 
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (mainPromptInput.trim() || mainAttachments.length > 0) {
-                      handleSendMainPrompt();
-                    }
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setIsDragging(true);
-                  }}
-                  onDragLeave={(e) => {
-                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                    setIsDragging(false);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setIsDragging(false);
-                    if (e.dataTransfer.files?.length) {
-                      addMainFiles(Array.from(e.dataTransfer.files));
-                    }
-                  }}
-                  className={`pointer-events-auto flex flex-col justify-between w-full rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 shadow-sm focus-within:border-neutral-400 dark:focus-within:border-white/20 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] p-3 transition-all duration-200 ${
-                    isDragging
-                      ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10 dark:bg-blue-950/20"
-                      : ""
-                  }`}
-                >
-                  {/* Pending Attachments Chips */}
-                  {mainAttachments.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1.5 pb-1.5 border-b border-neutral-200/50 dark:border-white/5 mb-1.5 overflow-x-auto max-h-16">
-                      {mainAttachments.map((att) => (
-                        <div
-                          key={att.id}
-                          className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs"
-                        >
-                          {att.isImage ? (
-                            att.previewUrl ? (
-                              <img src={att.previewUrl} alt={att.name} className="w-4 h-4 object-cover rounded" />
-                            ) : (
-                              <Paperclip className="w-3 h-3 text-blue-500" />
-                            )
-                          ) : (
-                            <FileText className="w-3 h-3 text-amber-500" />
-                          )}
-                          <span className="truncate max-w-[150px] font-medium text-[11px]">{att.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeMainAttachment(att.id)}
-                            aria-label={`Remove ${att.name}`}
-                            className="p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                      {isMainUploadingAttachment && (
-                        <span className="text-[11px] text-neutral-400 flex items-center gap-1 animate-pulse">
-                          <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing attachment...
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Top: Transparent flexible input */}
-                  <div className="w-full flex items-center">
-                    <textarea
-                      ref={guideTextareaRef}
-                      rows={1}
-                      value={mainPromptInput}
-                      onChange={(e) => {
-                        setMainPromptInput(e.target.value);
-                        e.target.style.height = "auto";
-                        e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          if (mainPromptInput.trim() || mainAttachments.length > 0) {
-                            handleSendMainPrompt();
-                          }
-                        } else if (e.key === "Backspace" && mainPromptInput === "" && mainAttachments.length > 0) {
-                          removeMainAttachment(mainAttachments[mainAttachments.length - 1].id);
-                        }
-                      }}
-                      onPaste={(e) => {
-                        const items = e.clipboardData?.items;
-                        if (!items) return;
-                        const newFiles: File[] = [];
-                        for (let i = 0; i < items.length; i++) {
-                          if (items[i].kind === "file") {
-                            const file = items[i].getAsFile();
-                            if (file) newFiles.push(file);
-                          }
-                        }
-                        if (newFiles.length > 0) {
-                          e.preventDefault();
-                          addMainFiles(newFiles);
-                        }
-                      }}
-                      id="main-research-instruction-input"
-                      name="researchInstructions"
-                      aria-label="Research instructions or assignment guidelines"
-                      placeholder="Paste text, drop files/images, or draft research instructions..."
-                      style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                      className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input max-h-28 overflow-y-auto scholar-scrollbar"
-                    />
-                  </div>
-
-                  {/* Bottom Action Row: Attachments & Mode Selector on left, Submit button on right */}
-                  <div className="flex items-center justify-between gap-2 mt-1.5 pt-1 border-t border-neutral-200/40 dark:border-white/5 w-full">
-                    <PromptBarActionMenu
-                      currentMode={mainAiMode}
-                      onSelectMode={setMainAiMode}
-                      onAttachFiles={handleMainFileSelect}
-                    />
-
-                    <div className="relative group">
-                      <button
-                        type="submit"
-                        title="Send message (Enter)"
-                        aria-label="Send message"
-                        disabled={(!mainPromptInput.trim() && mainAttachments.length === 0) || isGuideThinking}
-                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-sm disabled:bg-neutral-200 dark:disabled:bg-white/10 disabled:text-neutral-400 dark:disabled:text-neutral-600 disabled:cursor-not-allowed"
-                      >
-                        {isGuideThinking ? (
-                          <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <>
-                            <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span className="text-[10px] font-mono opacity-60">↵</span>
-                          </>
-                        )}
-                      </button>
-                      <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
-                        Send message (Enter)
-                      </span>
-                    </div>
-                  </div>
-                </form>
+                {mainPromptForm}
               </div>
             </div>
+            )}
           </>
+        )}
+
+        {/* Phone bottom bar: the main places, one tap each */}
+        {isPhone && (
+          <nav aria-label="Main" className="shrink-0 grid grid-cols-4 border-t border-neutral-200 dark:border-white/10 bg-paper-cool/95 dark:bg-ink-850/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
+            {[
+              {
+                label: "Ask",
+                icon: MessageSquare,
+                active: activeView === "projects" && !choosing,
+                onClick: () => {
+                  if (activeView !== "projects") handleCloseCentralView();
+                  setChoosing(false);
+                  if (hasStartedChatting) setIsAiSidebarOpen(true);
+                  else setTimeout(() => guideTextareaRef.current?.focus(), 300);
+                },
+              },
+              { label: "Projects", icon: FolderOpen, active: false, onClick: () => setMobileMenuOpen(true) },
+              {
+                label: "Vault",
+                icon: Database,
+                active: activeView === "vault",
+                onClick: () => {
+                  if (!userEmail) {
+                    openAuth("signin", "Sign in to access your Knowledge Vault references.");
+                    return;
+                  }
+                  setActiveView("vault");
+                  onOpenVault?.();
+                },
+              },
+              {
+                label: "AI",
+                icon: Sliders,
+                active: activeView === "ai-access",
+                onClick: () => {
+                  if (!userEmail) {
+                    openAuth("signin", "Sign in to configure AI provider keys and models.");
+                    return;
+                  }
+                  setActiveView("ai-access");
+                  onOpenAiAccess?.();
+                },
+              },
+            ].map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={item.onClick}
+                aria-current={item.active ? "page" : undefined}
+                className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium cursor-pointer ${
+                  item.active ? "text-neutral-900 dark:text-white" : "text-neutral-500 dark:text-neutral-400"
+                }`}
+              >
+                <item.icon className="w-5 h-5" aria-hidden="true" />
+                {item.label}
+              </button>
+            ))}
+          </nav>
         )}
       </main>
 

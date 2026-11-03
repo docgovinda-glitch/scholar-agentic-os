@@ -296,8 +296,8 @@ export default function ProviderDetail({
           </p>
           <p className="mt-1 text-xs text-[color:var(--text-secondary)]">
             {view.hasKeyOnDevice
-              ? "Your key is stored encrypted on this device only. You will enter it again on another computer."
-              : "No key is stored on this device — enter it again below to use this provider here."}
+              ? "Your key is saved to your account, encrypted, and works on every device you sign in on."
+              : "Your key has not reached this device yet. It arrives when you sign in here; if it does not, paste it again below."}
           </p>
         </section>
       ) : null}
@@ -332,8 +332,8 @@ export default function ProviderDetail({
             className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
           />
           <p className="mt-1 text-xs text-[color:var(--text-muted)]">
-            Stored encrypted on this device only — never saved on our servers. It passes through our server once to verify
-            it, and again each time you generate, but is never kept there.
+            Saved to your account, encrypted with a key held only by our server, so it works on every device you sign in on.
+            Removing this provider deletes it from your account and your devices.
           </p>
           {spec.requiresCustomBaseUrl && (
             <div className="mt-3">

@@ -420,3 +420,26 @@ export interface AuditLogEntry {
   created_at: string;
 }
 export const getAuditLog = () => api<AuditLogEntry[]>("/api/admin/ai/audit-log");
+
+// ── AI keys saved to the user's account ──────────────────────────────────
+// So the AI set up on one device works on every device the person signs in
+// on (server/src/aiEngine/userKeyVault.ts). Each call acts on the signed-in
+// user's own keys only.
+
+export interface AccountKeySummary {
+  providerId: string;
+  maskedPreview: string;
+  updatedAt: string;
+}
+export interface AccountKey {
+  providerId: string;
+  apiKey: string;
+  updatedAt: string;
+}
+
+export const listAccountKeys = () => api<{ keys: AccountKeySummary[] }>("/api/ai-access/keys", { cache: "no-store" });
+export const pullAccountKeys = () => api<{ keys: AccountKey[] }>("/api/ai-access/keys/sync", { cache: "no-store", retries: 0 });
+export const saveAccountKey = (providerId: string, key: string) =>
+  api<AccountKeySummary>(`/api/ai-access/keys/${encodeURIComponent(providerId)}`, { method: "PUT", body: JSON.stringify({ key }), cache: "no-store" });
+export const deleteAccountKey = (providerId: string) =>
+  api<{ success: true }>(`/api/ai-access/keys/${encodeURIComponent(providerId)}`, { method: "DELETE" });

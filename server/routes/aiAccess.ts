@@ -8,6 +8,8 @@ import { selectProvider, type RoutingContext, type TaskType } from "../src/aiEng
 import { routeForUser } from "../src/aiEngine/userRouter";
 import { premiumCatalogueForUser } from "../src/aiEngine/adminRouter";
 import { getCloudProvider, discoverModelsUrl, buildAuthHeaders } from "../../src/config/providerCatalog";
+import { rateLimit } from "../src/middleware/rateLimit";
+import { deleteUserKey, listUserKeys, readUserKeys, saveUserKey, UserKeyError, vaultAvailable } from "../src/aiEngine/userKeyVault";
 
 /**
  * User-facing AI Access routes (Section 20). Every route reads/writes only
@@ -88,9 +90,70 @@ export function registerAiAccessRoutes(app: express.Express): void {
     asyncHandler(async (req, res) => {
       const connections = new SupabaseTable(restConfig(), "user_ai_connections");
       await connections.delete(`user_id=eq.${encodeURIComponent(userId(req))}&provider_id=eq.${encodeURIComponent(req.params.providerId)}`);
+      // Disconnecting also removes the key saved to the account, so it does
+      // not come back on the next device sync. Best effort: the connection
+      // is already gone, and the client deletes the key itself as well.
+      await deleteUserKey(userId(req), req.params.providerId).catch(() => undefined);
       res.json({ success: true });
     })
   );
+
+  /**
+   * Keys saved to the user's account (server/src/aiEngine/userKeyVault.ts),
+   * so the AI the person set up on one device works on every device they
+   * sign in on. Every route acts on the signed-in user's own keys only.
+   * Responses carrying keys are never cached.
+   */
+  const keyLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, limitBy: "ip" });
+  const noStore = (_req: express.Request, res: express.Response, next: express.NextFunction) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  };
+  const vaultOff = (res: express.Response) =>
+    res.status(503).json({ error: "Saving keys to your account is not available on this server right now. Your keys still work on the device where you added them." });
+  const keyFail = (res: express.Response, err: unknown) => {
+    if (err instanceof UserKeyError) return res.status(400).json({ error: err.message });
+    // Never echo the underlying error: it could quote the request.
+    return res.status(503).json({ error: "Your saved keys could not be reached. Please try again." });
+  };
+
+  router.get("/keys", keyLimit, noStore, async (req, res) => {
+    if (!vaultAvailable()) return vaultOff(res);
+    try {
+      res.json({ keys: await listUserKeys(userId(req)) });
+    } catch (err) {
+      keyFail(res, err);
+    }
+  });
+
+  router.get("/keys/sync", keyLimit, noStore, async (req, res) => {
+    if (!vaultAvailable()) return vaultOff(res);
+    try {
+      res.json({ keys: await readUserKeys(userId(req)) });
+    } catch (err) {
+      keyFail(res, err);
+    }
+  });
+
+  router.put("/keys/:providerId", keyLimit, noStore, async (req, res) => {
+    if (!vaultAvailable()) return vaultOff(res);
+    try {
+      const body = (req.body ?? {}) as { key?: unknown };
+      res.json(await saveUserKey(userId(req), req.params.providerId, body.key as string));
+    } catch (err) {
+      keyFail(res, err);
+    }
+  });
+
+  router.delete("/keys/:providerId", keyLimit, noStore, async (req, res) => {
+    if (!vaultAvailable()) return vaultOff(res);
+    try {
+      await deleteUserKey(userId(req), req.params.providerId);
+      res.json({ success: true });
+    } catch (err) {
+      keyFail(res, err);
+    }
+  });
 
   /**
    * POST /api/ai-access/models
