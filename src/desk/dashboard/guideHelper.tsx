@@ -104,7 +104,7 @@ export function InlineCitationBadge({
       : undefined);
 
   return (
-    <span className="relative group/cite inline-block align-baseline mx-0.5 select-none">
+    <span className="relative group/cite inline align-baseline">
       <a
         href={targetUrl || "#"}
         target={targetUrl ? "_blank" : undefined}
@@ -113,8 +113,8 @@ export function InlineCitationBadge({
           if (!targetUrl) e.preventDefault();
           e.stopPropagation();
         }}
-        className="inline-flex items-center justify-center font-mono text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border border-blue-200/70 dark:border-blue-700/60 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-500 hover:scale-105 active:scale-95 transition-all shadow-2xs cursor-pointer"
-        title={targetUrl ? `Verified Citation ${displayLabel} — ${targetUrl}` : `Verified Citation ${displayLabel}`}
+        className="font-medium text-[0.95em] text-blue-700 dark:text-blue-300 underline decoration-blue-300/60 dark:decoration-blue-500/50 underline-offset-2 hover:decoration-current cursor-pointer"
+        title={citation?.title ? `Source ${displayLabel}: ${citation.title}` : targetUrl ? `Source ${displayLabel}: ${targetUrl}` : `Source ${displayLabel}`}
       >
         {displayLabel}
       </a>

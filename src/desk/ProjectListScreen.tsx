@@ -75,6 +75,7 @@ import {
 } from "lucide-react";
 import { getCloudProvider } from "../config/providerCatalog";
 import { useDeviceClass } from "../hooks/useDeviceClass";
+import { ASK_ANSWER_GUIDE, askFailureMessage, liveSourcesAsCitations } from "./dashboard/askScholarAnswer";
 import { loadUserAiSettings } from "../services/userAiSettings";
 import { PromptBarActionMenu, type PromptMode } from "./PromptBarActionMenu";
 import {
@@ -741,6 +742,8 @@ export default function ProjectListScreen({
       scrollToProjects();
     } else if (action.type === "auth") {
       openAuth("signin", "Sign in or register to explore AI-powered research inquiries.");
+    } else if (action.type === "retry" && action.query) {
+      void handleSendGuideMessage(action.query, [], action.mode);
     }
   }
 
@@ -804,6 +807,8 @@ export default function ProjectListScreen({
       setSidebarAttachments([]);
     }
     setIsGuideThinking(true);
+    // Sources found for this question, kept so a failed answer still shows them.
+    let sourcesFound: LiveSearchResult[] = [];
 
     try {
       if (isPlatformQuery(query) && currentAttachments.length === 0) {
@@ -842,7 +847,7 @@ export default function ProjectListScreen({
 
         let agentResponse: (AgenticQueryResponse & { ok?: boolean }) | undefined;
         const styleInfo = getCitationStyleInfo(askCitationStyle);
-        const systemPrompt = `You are Scholar Core Research Copilot, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers. Prioritize recently published (2020-2026), peer-reviewed, and credible sources. Format citations and references strictly according to ${styleInfo.name}. Ground all assertions in verified literature without fabricating sources or DOIs.`;
+        const systemPrompt = `You are Scholar Core Research Copilot, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers. Prefer recent, peer-reviewed and credible sources. Format citations and references strictly according to ${styleInfo.name}. Ground all assertions in verified literature without fabricating sources or DOIs.\n\n${ASK_ANSWER_GUIDE}`;
 
         // Every research answer starts from a fresh search; a follow-up is
         // searched together with the question before it.
@@ -851,6 +856,7 @@ export default function ProjectListScreen({
         try {
           const previousQuestions = guideMessages.filter((m) => m.sender === "user").map((m) => m.text);
           liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { limit: 6 });
+          sourcesFound = liveRetrievedSources;
         } catch {
           // The answer still comes, marked as not based on a search.
         }
@@ -951,14 +957,20 @@ export default function ProjectListScreen({
       }
     } catch (e: unknown) {
       console.error("Website Assistant error:", e);
-      const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred while communicating with the AI service.";
+      // Plain words, the sources already found, and one next step: connect
+      // an AI, or try again. No word count or generic follow-ups on a failure.
+      const failure = askFailureMessage(e, sourcesFound.length);
       const assistantMsg: WebsiteAssistantMessage = {
         id: `assistant-${Date.now()}`,
         sender: "assistant",
-        text: `⚠️ **AI Execution Error**: ${errorMessage}\n\nPlease check your AI settings in **AI Access** or ensure your API credentials are operational.`,
+        text: failure.text,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        action: { type: "ai-access", label: "Configure AI Provider in AI Access ↗" },
-        followUps: ["How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?"],
+        action:
+          failure.kind === "no-ai"
+            ? { type: "ai-access", label: "Connect an AI" }
+            : { type: "retry", label: "Try again", query, mode: targetMode },
+        liveSources: sourcesFound.length ? sourcesFound : undefined,
+        searchedAt: sourcesFound.length ? new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : undefined,
         error: true,
       };
       setGuideMessages((prev) => [...prev, assistantMsg]);
@@ -2354,18 +2366,21 @@ export default function ProjectListScreen({
                   <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500/10 via-indigo-500/10 to-purple-500/10 dark:from-sky-500/20 dark:via-indigo-500/20 dark:to-purple-500/20 border border-sky-500/20 dark:border-white/10 flex items-center justify-center shadow-2xs">
                     <ScholarCoreLogo size="sm" withText={false} className="scale-85" />
                   </div>
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-ink-800" title="AI Online" />
+                  <span
+                    className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-ink-800 ${aiStatus?.connected ? "bg-emerald-500" : "bg-amber-500"}`}
+                    title={aiStatus?.connected ? "AI connected" : "No AI connected"}
+                  />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">
                       Ask Scholar
                     </h2>
-                    <span className="text-[10px] bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 px-2 py-0.5 rounded-full font-medium border border-sky-200 dark:border-sky-800/40">
+                    <span className="hidden sm:inline text-[10px] bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 px-2 py-0.5 rounded-full font-medium border border-sky-200 dark:border-sky-800/40">
                       Research Copilot
                     </span>
                   </div>
-                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  <p className="hidden sm:block text-[11px] text-neutral-500 dark:text-neutral-400">
                     How can I help you with your research today?
                   </p>
                 </div>
@@ -2411,7 +2426,8 @@ export default function ProjectListScreen({
               </div>
             </header>
 
-            {/* Horizontally Scrolling Suggested Questions (Module 3.3) */}
+            {/* Horizontally Scrolling Suggested Questions (Module 3.3); on phones they make room for the answer once a chat starts */}
+            {!(isPhone && hasStartedChatting) && (
             <div className="relative border-b border-neutral-200/80 dark:border-white/10 shrink-0 bg-neutral-50/70 dark:bg-ink-900/70">
               <div className={`overflow-x-auto scrollbar-hide flex items-center gap-2 px-4 py-2.5 ${isLandingPage ? "max-w-4xl mx-auto" : ""}`}>
                 {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
@@ -2427,6 +2443,7 @@ export default function ProjectListScreen({
                 ))}
               </div>
             </div>
+            )}
 
             {/* Chat Canvas (flex-1 overflow-y-auto) */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm scholar-scrollbar">
@@ -2548,23 +2565,12 @@ export default function ProjectListScreen({
                         )}
                         {msg.mode === "search" && (
                           <span className="px-1.5 py-0.5 rounded text-[9px] bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/20 font-medium">
-                            🔍 Perplexity-Grade Research
+                            🔍 Web search
                           </span>
                         )}
-                        {msg.citations && msg.citations.length > 0 && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-medium">
-                            ✓ {msg.citations.length} Verified {msg.citations.length === 1 ? "Source" : "Sources"}
-                          </span>
-                        )}
-                        <span className="px-1.5 py-0.5 rounded text-[9px] bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 font-mono font-medium">
-                          ⚡ {msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words
-                        </span>
-                        {msg.burstinessMetrics && (
-                          <span
-                            title={`Syntactic burstiness: mean=${msg.burstinessMetrics.averageLength.toFixed(1)} words/sent, variance=${msg.burstinessMetrics.variance.toFixed(1)}`}
-                            className="hidden sm:inline-flex px-1.5 py-0.5 rounded text-[9px] bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 font-mono font-medium"
-                          >
-                            Burstiness: σ={Math.sqrt(msg.burstinessMetrics.variance).toFixed(1)}
+                        {!msg.error && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 font-mono font-medium">
+                            {msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words
                           </span>
                         )}
                         {msg.provider && (
@@ -2621,10 +2627,6 @@ export default function ProjectListScreen({
                             <span>{msg.verifiedSourcesCount ?? msg.citations?.length ?? 0} Verified Sources</span>
                           </span>
                         )}
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
-                          <FileText className="w-3 h-3" />
-                          <span>{msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words</span>
-                        </span>
                         {msg.model && (
                           <span className="text-[10px] text-neutral-400 font-mono">
                             {msg.model}
@@ -2635,7 +2637,7 @@ export default function ProjectListScreen({
 
                     {msg.sender === "assistant" ? renderFormattedGuideText(
                       msg.citations && msg.citations.length > 0 ? stripRawReferencesSection(msg.text) : msg.text,
-                      msg.citations,
+                      msg.citations && msg.citations.length > 0 ? msg.citations : liveSourcesAsCitations(msg.liveSources),
                       askCitationStyle
                     ) : (
                       <div className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.text}</div>
@@ -2989,7 +2991,7 @@ export default function ProjectListScreen({
                     )}
 
                     {/* Dynamic Follow-Up Questions ("Related Inquiries") */}
-                    {msg.sender === "assistant" && msg.followUps && msg.followUps.length > 0 && (
+                    {msg.sender === "assistant" && !msg.error && msg.followUps && msg.followUps.length > 0 && (
                       <div className="mt-3 pt-2.5 border-t border-neutral-200/60 dark:border-white/10 space-y-1.5">
                         <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                           <Lightbulb className="w-3 h-3 text-amber-500" />
@@ -3180,7 +3182,7 @@ export default function ProjectListScreen({
                         removeSidebarAttachment(sidebarAttachments[sidebarAttachments.length - 1].id);
                       }
                     }}
-                    placeholder="Ask anything, search projects, or type a command..."
+                    placeholder="Ask a research question…"
                     style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
                     className="w-full bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-[13px] text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none resize-none prompt-bare-input max-h-32 min-h-[36px] overflow-y-auto scholar-scrollbar leading-relaxed"
                   />

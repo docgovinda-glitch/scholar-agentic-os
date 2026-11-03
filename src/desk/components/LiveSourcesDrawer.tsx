@@ -34,10 +34,10 @@ export default function LiveSourcesDrawer({
       >
         <div className="flex items-center gap-2 min-w-0">
           <Globe className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" aria-hidden="true" />
-          <span className="font-semibold text-sky-950 dark:text-sky-100 truncate">
+          <span className="font-semibold text-sky-950 dark:text-sky-100 shrink-0">
             Sources ({sources.length})
           </span>
-          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/50 shrink-0">
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/50 min-w-0 truncate">
             {searchedAt ? `Searched at ${searchedAt}` : "Searched for this answer"}
           </span>
         </div>
@@ -70,10 +70,10 @@ export default function LiveSourcesDrawer({
                   href={src.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 min-w-0 text-xs font-semibold text-sky-700 dark:text-sky-400 hover:text-sky-900 dark:hover:text-sky-200 hover:underline line-clamp-1 cursor-pointer flex items-center gap-1.5"
+                  className="flex-1 min-w-0 text-xs font-semibold text-sky-700 dark:text-sky-400 hover:text-sky-900 dark:hover:text-sky-200 hover:underline cursor-pointer flex items-start gap-1.5"
                   title={src.title}
                 >
-                  <span className="truncate">{src.title}</span>
+                  <span className="line-clamp-2">{src.title}</span>
                   <ExternalLink className="w-3 h-3 shrink-0 opacity-70" aria-hidden="true" />
                 </a>
                 <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 shrink-0">
