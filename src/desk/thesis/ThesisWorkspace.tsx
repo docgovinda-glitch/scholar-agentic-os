@@ -313,6 +313,17 @@ export default function ThesisWorkspace({
     downloadBlob(new Blob([thesisToMarkdown(thesisData)], { type: "text/markdown;charset=utf-8" }), thesisFileName(thesisData.title, "md"));
   }
 
+  /** main.tex (report class), references.bib and a README, as a .zip. */
+  async function handleExportLatex() {
+    const [{ default: JSZip }, { buildThesisLatex }] = await Promise.all([import("jszip"), import("./thesisLatex")]);
+    const out = buildThesisLatex(thesisData);
+    const zip = new JSZip();
+    zip.file("main.tex", out.tex);
+    if (out.bib) zip.file("references.bib", out.bib);
+    zip.file("README.txt", out.readme);
+    downloadBlob(await zip.generateAsync({ type: "blob" }), thesisFileName(thesisData.title, "zip"));
+  }
+
   async function handleSimulateViva() {
     setVivaLoading(true);
     setVivaError(null);
@@ -888,7 +899,7 @@ export default function ThesisWorkspace({
                       {writtenWords.toLocaleString()} of {thesisData.targetWordCount.toLocaleString()} words written across {thesisData.chapters.length} chapters. Changes save automatically.
                     </p>
                   </div>
-                  <ExportButtons onDocx={handleExportDocx} onMarkdown={handleExportMarkdown} disabled={thesisData.chapters.length === 0} />
+                  <ExportButtons onDocx={handleExportDocx} onMarkdown={handleExportMarkdown} onLatex={handleExportLatex} disabled={thesisData.chapters.length === 0} />
                 </div>
                 <ChapterEditor
                   chapters={thesisData.chapters}
@@ -939,7 +950,7 @@ export default function ThesisWorkspace({
               </div>
             </div>
 
-            <ExportButtons onDocx={handleExportDocx} onMarkdown={handleExportMarkdown} disabled={thesisData.chapters.length === 0} stacked />
+            <ExportButtons onDocx={handleExportDocx} onMarkdown={handleExportMarkdown} onLatex={handleExportLatex} disabled={thesisData.chapters.length === 0} stacked />
 
             <div className="space-y-2">
               {onOpenVault && (
@@ -969,7 +980,7 @@ export default function ThesisWorkspace({
   );
 }
 
-function ExportButtons({ onDocx, onMarkdown, disabled, stacked = false }: { onDocx: () => void | Promise<void>; onMarkdown: () => void; disabled: boolean; stacked?: boolean }) {
+function ExportButtons({ onDocx, onMarkdown, onLatex, disabled, stacked = false }: { onDocx: () => void | Promise<void>; onMarkdown: () => void; onLatex: () => Promise<void>; disabled: boolean; stacked?: boolean }) {
   const cls = "inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-border/60 bg-surface hover:bg-surface-hover text-primary disabled:opacity-50 cursor-pointer";
   return (
     <div className={stacked ? "grid grid-cols-2 gap-2" : "flex gap-2 shrink-0"}>
@@ -980,6 +991,10 @@ function ExportButtons({ onDocx, onMarkdown, disabled, stacked = false }: { onDo
       <button type="button" onClick={onMarkdown} disabled={disabled} className={cls} title={disabled ? "Add a chapter first" : undefined}>
         <Download className="w-3.5 h-3.5" aria-hidden="true" />
         Markdown
+      </button>
+      <button type="button" onClick={() => void onLatex()} disabled={disabled} className={cls} title={disabled ? "Add a chapter first" : "main.tex and references.bib for pdflatex or Overleaf"}>
+        <Download className="w-3.5 h-3.5" aria-hidden="true" />
+        LaTeX (.zip)
       </button>
     </div>
   );
