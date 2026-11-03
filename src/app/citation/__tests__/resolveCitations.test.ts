@@ -114,8 +114,8 @@ describe("app/citation: resolveCitations", () => {
       "apa-7"
     );
     const intro = result.document.blocks.find((b) => b.id === "introduction")!;
-    expect(intro.text).toContain("(Zebra, Z., 2020)");
-    expect(intro.text).toContain("(Apple, A., 2021)");
+    expect(intro.text).toContain("(Zebra, 2020)");
+    expect(intro.text).toContain("(Apple, 2021)");
     // Cited in order zebra-then-apple, but the bibliography is alphabetical: Apple before Zebra.
     expect(result.citedSourceIds).toEqual(["s-apple", "s-zebra"]);
     const refs = result.document.blocks.find((b) => b.id === "references")!;

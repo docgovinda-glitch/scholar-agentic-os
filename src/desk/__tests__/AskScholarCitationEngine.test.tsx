@@ -198,19 +198,19 @@ describe("Ask Scholar Citation Engine & Referencing System", () => {
     it("replaces numeric bracket tokens [1] with APA author-date format", () => {
       const input = "Transformers replace recurrence [1].";
       const result = replaceBracketTokensWithDeterministicCitations(input, testSources, "apa");
-      expect(result).toBe("Transformers replace recurrence (Vaswani, A. & Shazeer, N., 2017).");
+      expect(result).toBe("Transformers replace recurrence (Vaswani & Shazeer, 2017).");
     });
 
     it("replaces compound bracket tokens [1, 2] with combined APA citation", () => {
       const input = "Both paradigms scale effectively [1, 2].";
       const result = replaceBracketTokensWithDeterministicCitations(input, testSources, "apa");
-      expect(result).toBe("Both paradigms scale effectively (Vaswani, A. & Shazeer, N., 2017; He, K. & Zhang, X., 2016).");
+      expect(result).toBe("Both paradigms scale effectively (Vaswani & Shazeer, 2017; He & Zhang, 2016).");
     });
 
     it("replaces identifier bracket tokens [ev-uuid] with APA citations", () => {
       const input = "Residual architectures stabilize gradient flow [ev-he-2016].";
       const result = replaceBracketTokensWithDeterministicCitations(input, testSources, "apa");
-      expect(result).toBe("Residual architectures stabilize gradient flow (He, K. & Zhang, X., 2016).");
+      expect(result).toBe("Residual architectures stabilize gradient flow (He & Zhang, 2016).");
     });
 
     it("preserves IEEE bracket numbering for numeric and identifier tokens", () => {
@@ -229,13 +229,13 @@ describe("Ask Scholar Citation Engine & Referencing System", () => {
       const input = "Refer to the [official repo](https://github.com/scholar) and evidence [1].";
       const result = replaceBracketTokensWithDeterministicCitations(input, testSources, "apa");
       expect(result).toContain("[official repo](https://github.com/scholar)");
-      expect(result).toContain("(Vaswani, A. & Shazeer, N., 2017)");
+      expect(result).toContain("(Vaswani & Shazeer, 2017)");
     });
 
     it("strips raw LLM hallucinated references and compiles deterministic bibliography", () => {
       const hallucinated = "Modern NLP models [1].\n\n## References\n1. Vaswani fake entry 2017";
       const interceptedProse = replaceBracketTokensWithDeterministicCitations(hallucinated, testSources, "apa");
-      expect(interceptedProse).toBe("Modern NLP models (Vaswani, A. & Shazeer, N., 2017).");
+      expect(interceptedProse).toBe("Modern NLP models (Vaswani & Shazeer, 2017).");
 
       const compiledBib = compileDeterministicBibliographyMarkdown(testSources, "apa");
       expect(compiledBib).toContain("## References");

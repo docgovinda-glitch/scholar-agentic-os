@@ -120,7 +120,7 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
     await screen.findByRole("heading", { name: "Ask Scholar" });
 
     // Ask a question in assistant drawer
-    const input = screen.getByPlaceholderText("Ask anything, search projects, or type a command...");
+    const input = screen.getByPlaceholderText("Ask a research question…");
     fireEvent.change(input, { target: { value: "Explain neural-symbolic systems" } });
     fireEvent.click(screen.getByRole("button", { name: "Send question" }));
 
@@ -151,7 +151,7 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
     await screen.findByRole("heading", { name: "Ask Scholar" });
 
     // Send research query
-    const input = screen.getByPlaceholderText("Ask anything, search projects, or type a command...");
+    const input = screen.getByPlaceholderText("Ask a research question…");
     fireEvent.change(input, { target: { value: "Synthesize CRISPR off-target cleavage mechanisms" } });
     fireEvent.click(screen.getByRole("button", { name: "Send question" }));
 
@@ -193,7 +193,7 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
     expect(screen.getByRole("heading", { name: "Slides & Keynotes" })).toBeInTheDocument();
 
     // 3. User starts chatting by sending a research question
-    const input = screen.getByPlaceholderText("Ask anything, search projects, or type a command...");
+    const input = screen.getByPlaceholderText("Ask a research question…");
     fireEvent.change(input, { target: { value: "Perform molecular dynamics synthesis" } });
     fireEvent.click(screen.getByRole("button", { name: "Send question" }));
 
