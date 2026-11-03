@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ProjectView } from "../types";
-import { Sparkles, Save, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { saveIntakeAnswers } from "../api";
+import { Save, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 
 interface ResearchDefinitionPanelProps {
   projectId: string;
@@ -8,39 +9,31 @@ interface ResearchDefinitionPanelProps {
   onSaved: (updated: ProjectView) => void;
 }
 
+function answerText(project: ProjectView, key: string): string {
+  const value = project.answers?.[key];
+  return typeof value === "string" ? value : "";
+}
+
 export default function ResearchDefinitionPanel({ projectId, project, onSaved }: ResearchDefinitionPanelProps) {
-  const [objectives, setObjectives] = useState(project.answers?.["objectives"] || "");
-  const [questions, setQuestions] = useState(project.answers?.["questions"] || "");
-  const [methodology, setMethodology] = useState(project.answers?.["methodology"] || "");
-  
+  const [objectives, setObjectives] = useState(() => answerText(project, "objectives"));
+  const [questions, setQuestions] = useState(() => answerText(project, "questions"));
+  const [methodology, setMethodology] = useState(() => answerText(project, "methodology"));
+
   const [busy, setBusy] = useState(false);
-  const [validating, setValidating] = useState(false);
-  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
-  
+  const [status, setStatus] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+
   async function handleSave() {
     setBusy(true);
+    setStatus(null);
     try {
-      // Stub for actual API call, replacing saveIntakeAnswers
-      // In a real implementation this would map to the new normalized schema
-      const updated = { ...project, answers: { objectives, questions, methodology } };
+      // The server merges this patch into the project's existing answers.
+      const updated = await saveIntakeAnswers(projectId, { objectives, questions, methodology });
       onSaved(updated);
-      setAiFeedback(null); // Clear previous feedback on save
+      setStatus({ tone: "ok", text: "Saved." });
+    } catch (e) {
+      setStatus({ tone: "error", text: e instanceof Error ? e.message : "The research definition could not be saved." });
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function handleValidate() {
-    if (!objectives || !questions || !methodology) return;
-    setValidating(true);
-    try {
-      // Simulate AI validation delay
-      await new Promise(r => setTimeout(r, 1500));
-      setAiFeedback(
-        "Strong foundation. The objectives align well with the methodology. Consider narrowing the scope of Research Question 2 to be more testable."
-      );
-    } finally {
-      setValidating(false);
     }
   }
 
@@ -51,7 +44,7 @@ export default function ResearchDefinitionPanel({ projectId, project, onSaved }:
           Research Definition
         </h2>
         <p className="text-[var(--text-secondary)] text-base font-sans">
-          Define the boundaries and goals of your journal article. These parameters will guide the autonomous research and manuscript generation phases.
+          Record the objectives, core questions and methodology of your journal article. They are saved with your project.
         </p>
       </header>
 
@@ -94,31 +87,18 @@ export default function ResearchDefinitionPanel({ projectId, project, onSaved }:
             className="w-full bg-transparent resize-y border-0 p-0 text-[var(--text-primary)] text-base placeholder-[var(--text-secondary)]/50 focus:ring-0 outline-none leading-relaxed font-sans"
           />
         </div>
-
-        {aiFeedback && (
-          <div className="rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 shadow-[var(--shadow-card)]">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-[var(--text-primary)]/10 flex items-center justify-center shrink-0">
-                <Sparkles className="w-4 h-4 text-[var(--text-primary)]" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-[var(--text-primary)] mb-1 font-sans">AI Research Architect</h4>
-                <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-sans">{aiFeedback}</p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="mt-8 flex items-center justify-end gap-4 border-t border-[var(--border-subtle)] pt-6">
-        <button
-          onClick={handleValidate}
-          disabled={validating || !objectives || !questions || !methodology}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-primary)] font-medium text-xs shadow-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-sans cursor-pointer"
-        >
-          {validating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-[var(--text-primary)]" />}
-          Validate Design
-        </button>
+        {status && (
+          <p
+            role={status.tone === "error" ? "alert" : "status"}
+            className={`flex items-center gap-2 text-xs font-sans ${status.tone === "error" ? "text-[color:var(--state-danger)]" : "text-[var(--text-secondary)]"}`}
+          >
+            {status.tone === "error" ? <AlertCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+            {status.text}
+          </p>
+        )}
 
         <button
           onClick={handleSave}
