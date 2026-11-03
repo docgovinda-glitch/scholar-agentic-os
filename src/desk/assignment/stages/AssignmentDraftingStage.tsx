@@ -21,6 +21,8 @@ import {
   FileCheck,
   RotateCcw,
   Book,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { SlideCanvas, extractSlidesFromAcademicText, type SlideDeck } from "../../../features/slides";
 import { buildFormattedBibliography } from "../services/assignmentExportService";
@@ -75,6 +77,11 @@ export function AssignmentDraftingStage({
   const [showKeynote, setShowKeynote] = useState(false);
   const [presentationDeck, setPresentationDeck] = useState<SlideDeck | null>(null);
   const [keynoteDeck, setKeynoteDeck] = useState<SlideDeck | null>(null);
+  // Beside the editor on wide screens; on phones it would push the writing
+  // area off screen, so it starts hidden there (Previous/Next still move).
+  const [showOutline, setShowOutline] = useState(() =>
+    typeof window === "undefined" || typeof window.matchMedia !== "function" ? true : window.matchMedia("(min-width: 1024px)").matches
+  );
 
   const draftMarkdown = useMemo(() => {
     return internalSections
@@ -354,98 +361,91 @@ export function AssignmentDraftingStage({
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 text-neutral-900 dark:text-neutral-100">
-      {/* Top Phase Header with Live Word Count Progress Bar */}
-      <header className="rounded-2xl p-6 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400">
-                Phase 03 · Drafting & Synthesis
-              </span>
-              <span className="text-xs text-neutral-400 dark:text-neutral-500">
-                PEEL Framework & Evidence Grounding
-              </span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-              Grounded Section-by-Section Drafting
-            </h1>
-            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-2xl">
-              Write your assignment section-by-section with 70% critical analysis / 30% description, automated citation binding, and real-time budget convergence. Customize section directives, revise with AI, or edit prose directly.
+    <div className="max-w-[1600px] mx-auto p-3 sm:p-5 space-y-4 text-neutral-900 dark:text-neutral-100">
+      {/* Compact header: progress and actions in one row, so the page is mostly writing space */}
+      <header className="rounded-2xl px-4 sm:px-5 py-3 bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs flex flex-col lg:flex-row lg:items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => setShowOutline((v) => !v)}
+            aria-pressed={showOutline}
+            aria-label={showOutline ? "Hide outline" : "Show outline"}
+            title={showOutline ? "Hide the outline for more writing space" : "Show the outline"}
+            className="p-2 rounded-lg border border-neutral-200/80 dark:border-white/10 hover:bg-neutral-50 dark:hover:bg-white/5 cursor-pointer shrink-0"
+          >
+            {showOutline ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+          </button>
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">Drafting</h1>
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
+              Write each section yourself or draft it with your AI, then edit. Everything saves as you go.
             </p>
-          </div>
-
-          {/* Quick Exit Gate & Presentation Action Pills */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                const handler = onPresentPresentation || onPresentKeynote;
-                if (handler) {
-                  handler(draftMarkdown);
-                } else {
-                  const deck = extractSlidesFromAcademicText(draftMarkdown, "SCR");
-                  setPresentationDeck(deck);
-                  setShowPresentation(true);
-                }
-              }}
-              aria-label="Present Presentation"
-              className="rounded-full px-4 py-1.5 text-sm font-medium border border-neutral-200/80 bg-white hover:bg-neutral-50 text-neutral-900 dark:border-white/10 dark:bg-ink-750 dark:hover:bg-neutral-800 dark:text-neutral-100 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-            >
-              <span>📽️</span>
-              <span>Present Presentation</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleProceed}
-              disabled={!canProceed}
-              aria-label="Proceed to Submission Audit"
-              className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs ${
-                canProceed
-                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99] cursor-pointer"
-                  : "bg-neutral-100 dark:bg-white/5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed border border-neutral-200/60 dark:border-white/5"
-              }`}
-            >
-              <span>Proceed to Submission Audit</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
           </div>
         </div>
 
-        {/* Aggregate Word Count Tracker Banner */}
-        <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/5 border border-neutral-200/60 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-neutral-900 dark:text-white">
-                Overall Draft Progress:
-              </span>
-              <span className="text-sm font-bold text-neutral-900 dark:text-white tabular-nums">
-                {currentWordCount.toLocaleString()} / {targetWordCount.toLocaleString()} words ({wordCountPercentage}%)
-              </span>
-            </div>
-            <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-              Target tolerance: {minRequiredWords.toLocaleString()} – {maxAllowedWords.toLocaleString()} words (±10% compliance threshold)
-            </p>
+        <div className="flex-1 min-w-0 lg:px-4" aria-label="Overall progress">
+          <div className="flex items-center justify-between text-[11px] text-neutral-600 dark:text-neutral-300 mb-1 gap-2">
+            <span className="font-semibold tabular-nums">
+              {currentWordCount.toLocaleString()} / {targetWordCount.toLocaleString()} words
+            </span>
+            <span className="text-neutral-400 dark:text-neutral-500 tabular-nums">
+              aim for {minRequiredWords.toLocaleString()}–{maxAllowedWords.toLocaleString()}
+            </span>
           </div>
+          <div className="w-full bg-neutral-200 dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${isWordCountCompliant ? "bg-emerald-500" : "bg-neutral-900 dark:bg-white"}`}
+              style={{ width: `${Math.min(100, wordCountPercentage)}%` }}
+            />
+          </div>
+        </div>
 
-          <div className="w-full sm:w-64 space-y-1">
-            <div className="w-full bg-neutral-200 dark:bg-white/10 h-2 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  isWordCountCompliant ? "bg-emerald-500" : "bg-neutral-900 dark:bg-white"
-                }`}
-                style={{ width: `${Math.min(100, wordCountPercentage)}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-[10px] text-neutral-400 font-mono">
-              <span>90% ({minRequiredWords}w)</span>
-              <span>100% ({targetWordCount}w)</span>
-              <span>110% ({maxAllowedWords}w)</span>
-            </div>
-          </div>
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              const handler = onPresentPresentation || onPresentKeynote;
+              if (handler) {
+                handler(draftMarkdown);
+              } else {
+                const deck = extractSlidesFromAcademicText(draftMarkdown, "SCR");
+                setPresentationDeck(deck);
+                setShowPresentation(true);
+              }
+            }}
+            aria-label="Present Presentation"
+            className="rounded-xl px-3 py-2 text-xs font-medium border border-neutral-200/80 bg-white hover:bg-neutral-50 text-neutral-900 dark:border-white/10 dark:bg-ink-750 dark:hover:bg-neutral-800 dark:text-neutral-100 transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <span aria-hidden="true">📽️</span>
+            <span>Present</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleProceed}
+            disabled={!canProceed}
+            aria-label="Proceed to Submission Audit"
+            title={canProceed ? undefined : "Draft every section and reach the word range first"}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              canProceed
+                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 cursor-pointer"
+                : "bg-neutral-100 dark:bg-white/5 text-neutral-400 dark:text-neutral-500 cursor-not-allowed border border-neutral-200/60 dark:border-white/5"
+            }`}
+          >
+            <span>Proceed to Submission Audit</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       </header>
+
+      {draftError && (
+        <div role="alert" className="flex items-start gap-2 text-xs text-[var(--text-primary)] bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl px-3 py-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <span className="flex-1">{draftError}</span>
+          <button type="button" onClick={() => setDraftError(null)} className="text-[11px] underline cursor-pointer shrink-0">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Detailed Mode Telemetry Panel: Overlap Validation (< 20%), Active-Voice & Anti-Fluff Metrics, Citation Tokens */}
       {executionMode === "detailed" && (
@@ -541,10 +541,10 @@ export function AssignmentDraftingStage({
         </section>
       )}
 
-      {/* Main Drafting Workspace Layout (Left Rail Index + Center Active Editor) */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-        {/* Left Rail / Section Index */}
-        <div className="md:col-span-4 lg:col-span-3.5">
+      {/* Outline (can be hidden) beside a wide writing area */}
+      <div className={`grid grid-cols-1 gap-5 items-start ${showOutline ? "lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]" : ""}`}>
+        {showOutline && (
+        <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
           <DraftingSectionIndex
             sections={internalSections}
             activeSectionId={activeSection?.id || null}
@@ -559,9 +559,10 @@ export function AssignmentDraftingStage({
             generatingSectionId={activeStreamingSectionId}
           />
         </div>
+        )}
 
-        {/* Center Active Streaming & Markdown Editor */}
-        <div className="md:col-span-8 lg:col-span-8.5">
+        {/* Writing area */}
+        <div className="min-w-0">
           <DraftingActiveEditor
             section={activeSection}
             onUpdateContent={(content) => {
@@ -595,17 +596,17 @@ export function AssignmentDraftingStage({
 
           {/* Live Bibliography Section */}
           {approvedSources.length > 0 && (
-            <div className="mt-6 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs overflow-hidden">
-              <div className="px-5 py-3 border-b border-neutral-100 dark:border-white/5 flex items-center gap-2 bg-neutral-50/50 dark:bg-white/[0.02]">
+            <details className="mt-5 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs overflow-hidden">
+              <summary className="px-5 py-3 flex items-center gap-2 bg-neutral-50/50 dark:bg-white/[0.02] cursor-pointer">
                 <Book className="w-4 h-4 text-emerald-500" />
-                <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Live Bibliography</h3>
-              </div>
+                <span className="text-sm font-semibold text-neutral-900 dark:text-white">Bibliography ({approvedSources.length})</span>
+              </summary>
               <div className="p-5 text-[13px] text-neutral-700 dark:text-neutral-300 leading-relaxed space-y-4">
                 {buildFormattedBibliography(approvedSources, citationStyle || "harvard").map((bib, i) => (
                   <p key={i} className="pl-6 -indent-6" dangerouslySetInnerHTML={{ __html: bib }} />
                 ))}
               </div>
-            </div>
+            </details>
           )}
         </div>
       </div>
@@ -621,12 +622,6 @@ export function AssignmentDraftingStage({
           <span>← Back to Sources & Evidence</span>
         </button>
 
-        {draftError && (
-          <div role="alert" className="flex items-start gap-2 text-xs text-[var(--text-primary)] bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl px-3 py-2 max-w-md">
-            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-            <span>{draftError}</span>
-          </div>
-        )}
 
         {/* Gate Status Feedback */}
         <div className="flex-1 flex items-center justify-center text-center px-4">

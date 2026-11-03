@@ -217,6 +217,11 @@ export function AssignmentProvider({
   useEffect(() => {
     projectRef.current = project;
   }, [project]);
+  // Saves go to the server one at a time, each carrying the latest answers, so
+  // a slower earlier save can never land after (and erase) a newer one.
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const saveRunningRef = useRef(false);
+  const saveDirtyRef = useRef(false);
   const [document, setDocument] = useState<CanonicalDocument | null>(null);
   const [rubric, setRubric] = useState<RubricReport | null>(null);
   const [outputType, setOutputType] = useState<OutputTypeSpec | null>(null);
@@ -435,11 +440,27 @@ export function AssignmentProvider({
         return { ...prev, answers: safeAnswers, title: standardized.title || prev.title };
       });
 
-      try {
-        await saveIntakeAnswers(activeProjectId, safeAnswers);
-      } catch (err) {
-        console.error("Failed to persist assignment answers:", err);
+      // One write in flight at a time. The first starts at once; changes made
+      // while it runs are sent together, as the latest answers, right after.
+      saveDirtyRef.current = true;
+      if (!saveRunningRef.current) {
+        saveRunningRef.current = true;
+        saveChainRef.current = (async () => {
+          try {
+            while (saveDirtyRef.current) {
+              saveDirtyRef.current = false;
+              try {
+                await saveIntakeAnswers(activeProjectId, projectRef.current?.answers ?? safeAnswers);
+              } catch (err) {
+                console.error("Failed to persist assignment answers:", err);
+              }
+            }
+          } finally {
+            saveRunningRef.current = false;
+          }
+        })();
       }
+      await saveChainRef.current;
     },
     [project, activeProjectId]
   );
@@ -1119,10 +1140,21 @@ export function AssignmentProvider({
     return generated;
   }, [structure, targetWordCount, sections, approvedSourceIds, question, project?.title, academicLevel, saveAnswers]);
 
+  /**
+   * The sections as last written, not as of the last render: a draft that
+   * finishes while the student types (or "Draft all", section after section)
+   * must build on every earlier change instead of overwriting it.
+   */
+  const latestSections = useCallback((): Array<AssignmentDraftingSection | OutlineSection> => {
+    const raw = safeParseAnswerField<AssignmentDraftingSection[]>(projectRef.current?.answers?.["assignment_internal_sections"], []);
+    if (Array.isArray(raw) && raw.length > 0) return raw;
+    return internalSections.length > 0 ? internalSections : outline;
+  }, [internalSections, outline]);
+
   const updateSectionContent = useCallback(
     async (sectionId: string, content: string) => {
       const words = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0;
-      const baseSections = internalSections.length > 0 ? internalSections : outline;
+      const baseSections = latestSections();
       const updated = baseSections.map((s) =>
         s.id === sectionId
           ? {
@@ -1139,12 +1171,12 @@ export function AssignmentProvider({
         assignment_outline: updated,
       });
     },
-    [internalSections, outline, saveAnswers]
+    [latestSections, saveAnswers]
   );
 
   const updateSectionTitle = useCallback(
     async (sectionId: string, newTitle: string) => {
-      const baseSections = internalSections.length > 0 ? internalSections : outline;
+      const baseSections = latestSections();
       const updated = baseSections.map((s) =>
         s.id === sectionId ? { ...s, title: newTitle } : s
       );
@@ -1154,12 +1186,12 @@ export function AssignmentProvider({
         assignment_outline: updated,
       });
     },
-    [internalSections, outline, saveAnswers]
+    [latestSections, saveAnswers]
   );
 
   const tuneOutlineWithQuestion = useCallback(async (): Promise<AssignmentDraftingSection[]> => {
     const topicToUse = question || project?.title || "Academic Assignment";
-    const existing = (internalSections.length > 0 ? internalSections : outline) as (AssignmentDraftingSection | InternalSectionPlan)[];
+    const existing = latestSections() as (AssignmentDraftingSection | InternalSectionPlan)[];
     const tuned = tuneSectionsToQuestion({
       existingSections: existing,
       assignmentTopic: topicToUse,
@@ -1173,7 +1205,7 @@ export function AssignmentProvider({
       assignment_outline: tuned,
     });
     return tuned;
-  }, [question, project?.title, internalSections, outline, sources, approvedSourceIds, targetWordCount, academicLevel, saveAnswers]);
+  }, [question, project?.title, latestSections, sources, approvedSourceIds, targetWordCount, academicLevel, saveAnswers]);
 
   const updateSectionDraft = useCallback(
     async (sectionId: string, content: string) => {
@@ -1187,7 +1219,7 @@ export function AssignmentProvider({
   }, []);
 
   const recalculateWordCounts = useCallback(async () => {
-    const baseSections = internalSections.length > 0 ? internalSections : outline;
+    const baseSections = latestSections();
     const updated = baseSections.map((sec) => {
       const words = sec.draftContent?.trim() ? sec.draftContent.trim().split(/\s+/).filter(Boolean).length : 0;
       return {
@@ -1200,7 +1232,7 @@ export function AssignmentProvider({
       assignment_internal_sections: updated,
       assignment_outline: updated,
     });
-  }, [internalSections, outline, saveAnswers]);
+  }, [latestSections, saveAnswers]);
 
   const setSubmissionReport = useCallback(
     async (report: RubricScoreReport | SubmissionCheckReport) => {

@@ -431,6 +431,11 @@ function AssignmentWorkspaceInner({
       : window.matchMedia("(min-width: 640px)").matches
   );
   useUnsavedChangesGuard(Boolean(isLoading));
+  // Drafting needs the width: the side panel closes on arrival there and the
+  // header's Inspector button reopens it.
+  useEffect(() => {
+    if (currentPhase === "drafting") setTutorPanelOpen(false);
+  }, [currentPhase]);
 
   // Inline-editable title with auto-save on blur / Enter
   const initialTitle =

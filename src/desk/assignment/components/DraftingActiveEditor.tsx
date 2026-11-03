@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { showAppToast } from "../../../components/ui/FeedbackSystem";
 import type { AssignmentDraftingSection, DiscoveredSource } from "../types";
 import {
@@ -176,18 +176,42 @@ export function DraftingActiveEditor({
     return list;
   }, [boundSources, allApprovedSources]);
 
-  // Sync manual text and title when active section changes
+  // A different section: start fresh. (Saving what the student types also
+  // changes draftContent; that must not close the editor mid-sentence.)
   useEffect(() => {
     setManualText(section?.draftContent || "");
     setIsEditingManually(false);
-    setTitleInput(section?.title || "");
     setIsEditingTitle(false);
     setInspectedCitation(null);
     setShowCitationDropdown(false);
     setCustomDirective("");
     setIsZenMode(false);
     setShowWriterBlockNudge(false);
-  }, [section?.id, section?.draftContent, section?.title]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the section changes
+  }, [section?.id]);
+
+  // Text that arrives from elsewhere (an AI draft) shows when not typing.
+  useEffect(() => {
+    if (!isEditingManually) setManualText(section?.draftContent || "");
+  }, [section?.draftContent, isEditingManually]);
+
+  useEffect(() => {
+    setTitleInput(section?.title || "");
+  }, [section?.title]);
+
+  // An AI draft or revision replaces the text: leave edit mode so typing
+  // cannot overwrite it with the older version.
+  useEffect(() => {
+    if (isStreaming) setIsEditingManually(false);
+  }, [isStreaming]);
+
+  // The writing box grows with the text instead of scrolling inside itself.
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el || isZenMode) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.max(el.scrollHeight, Math.round(window.innerHeight * 0.6))}px`;
+  }, [manualText, isEditingManually, isZenMode]);
 
   // Writer's Block Nudge Effect
   useEffect(() => {
@@ -829,7 +853,7 @@ export function DraftingActiveEditor({
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <Check className="w-3.5 h-3.5" />
-              <span>Done Editing</span>
+              <span>Done</span>
             </button>
           ) : (
             <button
@@ -839,7 +863,7 @@ export function DraftingActiveEditor({
               className="px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200/70 dark:hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <Edit3 className="w-3.5 h-3.5" />
-              <span>Manual Edit</span>
+              <span>Edit text</span>
             </button>
           )}
         </div>
@@ -911,7 +935,7 @@ export function DraftingActiveEditor({
       <main
         tabIndex={0}
         aria-label="Section Content"
-        className="flex-1 p-6 sm:p-8 min-h-[380px] max-h-[calc(100vh-380px)] overflow-y-auto focus:outline-none"
+        className="flex-1 p-4 sm:p-6 min-h-[60vh] focus:outline-none"
       >
         {isEditingManually ? (
           <div className="space-y-3 h-full flex flex-col">
@@ -1035,13 +1059,15 @@ export function DraftingActiveEditor({
               onChange={handleManualTextChange}
               placeholder="Write or refine your academic section prose here..."
               rows={16}
-              aria-label="Manual Section Prose Editor"
-              className="w-full flex-1 min-h-[340px] p-4 text-sm sm:text-base leading-relaxed text-neutral-900 dark:text-neutral-100 bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 resize-y font-sans transition-colors"
+              aria-label="Section text"
+              className="w-full flex-1 min-h-[60vh] p-5 text-base leading-relaxed text-neutral-900 dark:text-neutral-100 bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 resize-none overflow-hidden font-sans transition-colors"
             />
 
             <div className="flex justify-between items-center text-xs text-neutral-500 dark:text-neutral-400 px-1 pt-1">
-              <span>Auto-saving live changes. Click Done Editing when finished.</span>
-              <span className="tabular-nums font-mono">{manualText.length} characters</span>
+              <span>Saved as you type. Blank lines start new paragraphs.</span>
+              <span className="tabular-nums font-mono">
+                {currentWords.toLocaleString()} / {targetWords.toLocaleString()} words
+              </span>
             </div>
 
             {/* Tone Enhancer Diff Overlay */}
@@ -1090,10 +1116,10 @@ export function DraftingActiveEditor({
             </div>
             <div className="max-w-md space-y-1.5">
               <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
-                Section Ready for Drafting
+                This section is empty
               </h3>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                Generate this section using the PEEL academic framework (Point, Evidence, Explanation, Link) with 70% analytical depth and direct citations.
+                Write it yourself, or let your AI draft it from your approved sources and edit the result.
               </p>
             </div>
             <div className="flex items-center gap-3 pt-2">
@@ -1111,7 +1137,7 @@ export function DraftingActiveEditor({
                 ) : (
                   <>
                     <Sparkles className="w-3.5 h-3.5 text-amber-300 dark:text-amber-500" />
-                    <span>Generate with PEEL Framework</span>
+                    <span>Draft with AI</span>
                   </>
                 )}
               </button>
@@ -1121,7 +1147,7 @@ export function DraftingActiveEditor({
                 onClick={() => setIsEditingManually(true)}
                 className="px-4 py-2.5 rounded-xl text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
               >
-                Write Manually
+                Write it myself
               </button>
             </div>
           </div>

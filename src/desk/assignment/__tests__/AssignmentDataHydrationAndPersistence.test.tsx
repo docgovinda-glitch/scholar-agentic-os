@@ -176,12 +176,17 @@ describe("Assignment Data Hydration and Persistence Guarantee", () => {
     const levelSelect = screen.getByLabelText(/Academic Level/i) as HTMLSelectElement;
     fireEvent.change(levelSelect, { target: { value: "postgraduate" } });
 
-    expect(saveIntakeAnswers).toHaveBeenCalledWith(
-      "proj-edit-test",
-      expect.objectContaining({
-        academicLevel: "postgraduate",
-        academic_level: "postgraduate",
-      })
+    // Saves run one after another (a later save can no longer be overtaken by
+    // an earlier one), so this one goes out once the brief's save finishes.
+    await waitFor(() =>
+      expect(saveIntakeAnswers).toHaveBeenLastCalledWith(
+        "proj-edit-test",
+        expect.objectContaining({
+          academicLevel: "postgraduate",
+          academic_level: "postgraduate",
+          instructions: "Updated prompt: Critically assess the EU AI Act risk categories.",
+        })
+      )
     );
   });
 
