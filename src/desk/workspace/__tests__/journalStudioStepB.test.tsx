@@ -29,6 +29,9 @@ vi.mock("../../api", () => ({
   allocateProjectWordBudget: vi.fn(),
   uploadProjectUserData: vi.fn(),
   updateProjectUserData: vi.fn(),
+  authedJsonFetch: vi.fn(),
+  getJournalRequirements: vi.fn().mockResolvedValue(null),
+  saveJournalRequirements: vi.fn(),
 }));
 
 vi.mock("../../../services/discovery/multiPortalLiteratureHarvester", () => ({
@@ -142,62 +145,71 @@ describe("Journal Rebuild Step B — 5-Mode Navigation, Mode 1 Word Budgeter & M
   });
 
   describe("2. Mode 1: ProtocolBlueprintMode (Word Budget & Gaps)", () => {
-    it("renders thesis inputs, discovers literature gaps with DOIs, and locks title", async () => {
-      vi.mocked(api.executeAgenticLLM).mockResolvedValueOnce(
-        JSON.stringify({
-          gaps: [
-            {
-              id: "gap_empirical_101",
-              gap_type: "empirical",
-              description: "Absence of real-time sub-100ns latency benchmarking on physical quantum testbeds.",
-              importance_score: 95,
-              supporting_doi: "10.1038/s41586-024-0999",
-              why_it_matters: "Without physical timing validation, decoder throughput claims remain unverified.",
-            },
-          ],
-          titles: [
-            {
-              id: "t_101",
-              title_text: "Sub-100ns FPGA Syndrome Decoding",
-              subtitle_text: "Empirical Architecture on Surface Code Lattices",
-              rationale: "Direct and addresses the empirical gap.",
-            },
-          ],
-        })
-      );
+    // The old flow asked the AI for gaps "with DOIs" and showed whatever DOI it
+    // typed (e.g. 10.1038/s41586-024-0999, which it never looked up). Gaps now
+    // come only from real papers found first, each with a quote from them.
+    it("explores from an interest: grounded gaps, questions, a matched journal, then lock and Mode 2", async () => {
+      const calls: string[] = [];
+      vi.mocked(api.authedJsonFetch).mockImplementation(async (url: string) => {
+        calls.push(url);
+        if (url.endsWith("/blueprint/gaps"))
+          return new Response(JSON.stringify({
+            since: 2021,
+            dropped: 1,
+            papers: [{ key: "p1", title: "Decoder latency on FPGA testbeds", year: 2024, doi: "10.1/fpga", authors: [], abstract: "Physical timing was not measured.", source: "openalex" }],
+            gaps: [{ id: "gap-1", type: "empirical", statement: "Physical decoder timing is unmeasured.", whyItMatters: "Claims stay unverified.", evidence: [{ paperKey: "p1", quote: "Physical timing was not measured" }] }],
+          }), { status: 200 });
+        if (url.endsWith("/blueprint/questions"))
+          return new Response(JSON.stringify({ questions: ["How fast are FPGA decoders on physical testbeds?"], titles: ["Timing FPGA Decoders on Real Hardware"] }), { status: 200 });
+        if (url.endsWith("/blueprint/journals"))
+          return new Response(JSON.stringify({ since: 2021, journals: [{ id: "S1", name: "Quantum", publisher: "Verein", matchingWorks: 4, searchedWorks: 100, sampleTitles: ["A"], source: "openalex", rationale: "Published 4 of the 100 most relevant articles on this topic since 2021, e.g. “A”." }] }), { status: 200 });
+        return new Response("{}", { status: 404 });
+      });
+      const setModeSpy = vi.fn();
+      const noTitle = { ...baseProject, answers: { ...baseProject.answers, working_title: "", core_problem: "", title_locked: "" } };
+      vi.mocked(api.getProject).mockResolvedValue(noTitle);
 
       render(
-        <ResearchProvider projectId="proj-step-b" initialStage="definition" onStageChangeCallback={() => {}}>
+        <ResearchProvider projectId="proj-step-b" initialStage="definition" onStageChangeCallback={setModeSpy}>
           <ProtocolBlueprintMode />
         </ResearchProvider>
       );
 
-      // Wait for project hydration
-      await waitFor(() => {
-        expect(screen.getByLabelText(/Research Topic/i)).toHaveValue("Quantum error correction decoding latency");
-      });
+      fireEvent.click(await screen.findByRole("radio", { name: /Explore and discover/i }));
+      fireEvent.change(screen.getByLabelText(/Your area of interest/i), { target: { value: "quantum error correction" } });
+      fireEvent.click(screen.getByRole("button", { name: /Find research gaps/i }));
 
-      // Topic input
-      const topicInput = screen.getByLabelText(/Research Topic/i);
-      expect(topicInput).toHaveValue("Quantum error correction decoding latency");
+      // The gap shows the quote and the real paper it rests on; no made-up DOI or score.
+      expect(await screen.findByText(/Physical decoder timing is unmeasured/)).toBeInTheDocument();
+      expect(screen.getByText(/“Physical timing was not measured”/)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Decoder latency on FPGA testbeds \(2024\)/ })).toHaveAttribute("href", "https://doi.org/10.1/fpga");
+      expect(screen.getByTestId("gap-basis")).toHaveTextContent("1 proposed gap was left out");
+      expect(screen.queryByText(/Significance/)).toBeNull();
 
-      // Click Discover Literature Gaps
-      const discoverBtn = screen.getByRole("button", { name: /Discover Literature Gaps/i });
-      fireEvent.click(discoverBtn);
+      fireEvent.click(screen.getByRole("button", { name: /Physical decoder timing is unmeasured/ }));
+      fireEvent.click(screen.getByRole("button", { name: /Suggest questions and titles/i }));
+      await waitFor(() => expect(screen.getByLabelText("Research question 1")).toHaveValue("How fast are FPGA decoders on physical testbeds?"));
+      expect(screen.getByLabelText(/Working article title/)).toHaveValue("Timing FPGA Decoders on Real Hardware");
 
-      await waitFor(() => {
-        expect(api.executeAgenticLLM).toHaveBeenCalled();
-        expect(screen.getByText(/Absence of real-time sub-100ns latency benchmarking/i)).toBeInTheDocument();
-        expect(screen.getByText(/DOI: 10.1038\/s41586-024-0999/i)).toBeInTheDocument();
-      });
+      // No journal yet: the lock is closed and says why.
+      const lock = screen.getByRole("button", { name: /Lock blueprint and continue to Mode 2/i });
+      expect(lock).toBeDisabled();
+      expect(screen.getByText(/Still needed: a target journal/)).toBeInTheDocument();
 
-      // Lock Working Title & Gap
-      const lockBtn = screen.getByRole("button", { name: /(Re-)?Lock (Working )?Title & Gap/i });
-      fireEvent.click(lockBtn);
+      fireEvent.click(screen.getByRole("button", { name: /Find best-fit journals/i }));
+      expect(await screen.findByText(/Published 4 of the 100 most relevant articles/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Select Quantum" }));
+      // The guidelines form opens for the chosen journal; its rules come from there, not the index.
+      expect(await screen.findByTestId("journal-guidelines-prompt")).toHaveTextContent("not in public indexes");
 
-      await waitFor(() => {
-        expect(api.saveIntakeAnswers).toHaveBeenCalled();
-      });
+      await waitFor(() => expect(lock).toBeEnabled());
+      fireEvent.click(lock);
+      await waitFor(() =>
+        expect(vi.mocked(api.saveIntakeAnswers).mock.calls.some(([, a]) => (a as Record<string, string>).blueprint_locked === "true")),
+      );
+      const lockPatch = vi.mocked(api.saveIntakeAnswers).mock.calls.map(([, a]) => a as Record<string, string>).find((a) => a.blueprint_locked === "true")!;
+      expect(lockPatch).toMatchObject({ core_problem: "Physical decoder timing is unmeasured.", primary_research_question: "How fast are FPGA decoders on physical testbeds?", title: "Timing FPGA Decoders on Real Hardware" });
+      expect(calls.every((u) => u.startsWith("/api/projects/proj-step-b/agentic/blueprint/"))).toBe(true);
     });
 
     it("renders the interactive 350–500 word sub-section budget table and allows target tweaking", async () => {

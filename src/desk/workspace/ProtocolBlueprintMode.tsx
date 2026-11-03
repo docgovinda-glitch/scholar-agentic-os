@@ -1,595 +1,443 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import type { ProjectView } from "../types";
-import type {
-  WordBudgetBlueprint,
-  SectionBudget,
-  SubSectionBudget,
-  ManuscriptTemplate,
-} from "./types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, Circle, Compass, Lock, PenLine } from "lucide-react";
+import type { WordBudgetBlueprint, SectionBudget, SubSectionBudget, ManuscriptTemplate } from "./types";
 import { useResearchWorkspace } from "./ResearchContext";
 import { saveIntakeAnswers, allocateProjectWordBudget } from "../api";
-import { executeAgenticLLM } from "../api";
 import { normalizeUnicodeNFC } from "../../document_intelligence/index";
-import { parseAndRepairLLMJson } from "../../shared/llmJsonParser";
-import JournalProfileCard from "../journal/JournalProfileCard";
+import { safeParseAnswerField } from "../../shared/projectStateSchema";
+import JournalProfileCard, { SPELLING_OPTIONS, type SuggestedJournal } from "../journal/JournalProfileCard";
 import { blueprintFromStructure } from "../journal/journalProfile";
+import GapFinder, { type SavedGaps } from "../journal/blueprint/GapFinder";
+import QuestionsAndTitle from "../journal/blueprint/QuestionsAndTitle";
+import JournalMatcher, { type SavedJournals } from "../journal/blueprint/JournalMatcher";
+import { suggestQuestions } from "../journal/blueprintApi";
+import { ARTICLE_TYPES, missingForLock, templateForArticleType, type GroundedGap } from "../../domain/journal/blueprintFunnel";
 
-export interface GapProposal {
-  id: string;
-  gap_type: "empirical" | "theoretical" | "methodological" | "knowledge";
-  description: string;
-  importance_score: number;
-  supporting_doi?: string;
-  why_it_matters?: string;
+type Path = "explore" | "own";
+
+const card = "bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-5";
+const field =
+  "w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-3 py-2 text-xs text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] outline-none";
+
+/** Older projects saved title options as objects; newer ones as plain strings. */
+function parseTitleOptions(raw: unknown): string[] {
+  const xs = safeParseAnswerField<unknown[]>(raw, []);
+  return Array.isArray(xs)
+    ? xs
+        .map((x) => (typeof x === "string" ? x : x && typeof x === "object" && "title_text" in x ? String((x as { title_text: string }).title_text) : ""))
+        .filter(Boolean)
+    : [];
 }
 
-export interface TitleProposal {
-  id: string;
-  title_text: string;
-  subtitle_text?: string;
-  rationale: string;
+function StepHeading({ n, title, done, hint }: { n: number; title: string; done: boolean; hint: string }) {
+  return (
+    <div className="flex items-start gap-3 border-b border-[color:var(--border-subtle)] pb-4">
+      {done ? (
+        <CheckCircle2 className="w-5 h-5 shrink-0 text-[color:var(--state-success)]" aria-label="Done" />
+      ) : (
+        <span className="w-5 h-5 shrink-0 rounded-full border border-[color:var(--border-control)] text-[10px] font-bold flex items-center justify-center text-[color:var(--text-secondary)]">{n}</span>
+      )}
+      <div>
+        <h2 className="text-sm font-bold text-[color:var(--text-primary)]">
+          Step {n}. {title}
+        </h2>
+        <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">{hint}</p>
+      </div>
+    </div>
+  );
 }
 
+/**
+ * Mode 1: an adaptive funnel. An explorer starts from a broad interest and is
+ * led to a gap grounded in recent papers, questions, a title and a journal;
+ * an author who knows their topic or journal enters them directly. Locking
+ * the blueprint opens Mode 2.
+ */
 export default function ProtocolBlueprintMode() {
   const { project, setProject, setMode } = useResearchWorkspace();
-
   const answers = useMemo(() => project?.answers || {}, [project?.answers]);
+  const pid = project?.projectId;
 
-  // Section 1: Research Thesis & Live Gap Finder State
-  const [topic, setTopic] = useState<string>(() => answers["core_problem"] || answers["thesis_statement"] || "");
-  const [preliminaryContext, setPreliminaryContext] = useState<string>(() => answers["preliminary_context"] || "");
-  const [isDiscoveringGaps, setIsDiscoveringGaps] = useState<boolean>(false);
-  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
-
-  const [discoveredGaps, setDiscoveredGaps] = useState<GapProposal[]>(() => {
-    try {
-      const raw = answers["identified_gaps"];
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return [];
-  });
-
+  // ── Step 1 state ──
+  const [path, setPath] = useState<Path>(() =>
+    answers["blueprint_path"] === "own" ||
+    (!answers["blueprint_path"] && (answers["working_title"] || (answers["target_journal"] && !/^provisional$/i.test(answers["target_journal"]))))
+      ? "own"
+      : "explore"
+  );
+  const [interest, setInterest] = useState<string>(() => answers["interest_area"] || "");
+  const [gapSearch, setGapSearch] = useState<SavedGaps | null>(() => safeParseAnswerField<SavedGaps | null>(answers["gap_search"], null));
   const [selectedGapId, setSelectedGapId] = useState<string>(() => answers["selected_gap"] || "");
-  const [workingTitle, setWorkingTitle] = useState<string>(() => answers["working_title"] || answers["title"] || "");
-  const [isTitleLocked, setIsTitleLocked] = useState<boolean>(() => answers["title_locked"] === "true");
-
-  const [proposedTitles, setProposedTitles] = useState<TitleProposal[]>(() => {
-    try {
-      const raw = answers["title_options"];
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return [];
+  const [problem, setProblem] = useState<string>(() => answers["core_problem"] || answers["thesis_statement"] || "");
+  const [questions, setQuestions] = useState<string[]>(() => {
+    const saved = safeParseAnswerField<string[]>(answers["research_questions"], []);
+    return Array.isArray(saved) && saved.length ? saved : answers["primary_research_question"] ? [answers["primary_research_question"]] : [];
   });
+  const [title, setTitle] = useState<string>(() => answers["working_title"] || answers["title"] || "");
+  const [titleOptions, setTitleOptions] = useState<string[]>(() => parseTitleOptions(answers["title_options"]));
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(() => safeParseAnswerField<string[]>(answers["suggested_questions"], []));
 
-  // Section 2: Target Journal Formatting & Orthography Profile State
+  // ── Step 2 state ──
+  const [journalSearch, setJournalSearch] = useState<SavedJournals | null>(() => safeParseAnswerField<SavedJournals | null>(answers["journal_search"], null));
+  const [suggested, setSuggested] = useState<SuggestedJournal | null>(null);
+  const [articleType, setArticleType] = useState<string>(() => answers["article_type_id"] || "");
   const [targetTotalWords, setTargetTotalWords] = useState<number>(() => {
-    const raw = answers["target_word_count"];
-    const parsed = raw ? parseInt(raw, 10) : 6000;
-    return isNaN(parsed) || parsed <= 0 ? 6000 : parsed;
+    const parsed = parseInt(answers["target_word_count"] || "", 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 6000;
   });
-
   const [template, setTemplate] = useState<ManuscriptTemplate>(() => {
     const raw = answers["manuscript_template"];
-    if (raw === "Theoretical" || raw === "SystematicReview") return raw;
-    return "IMRaD";
+    return raw === "Theoretical" || raw === "SystematicReview" ? raw : "IMRaD";
   });
-
   const [citationStyle, setCitationStyle] = useState<string>(() => answers["citation_style"] || "APA 7");
-  const [orthography, setOrthography] = useState<string>(() => answers["orthography"] || "British / Oxford English (-ise/-our/-re)");
+  const [orthography, setOrthography] = useState<string>(() => answers["orthography"] || SPELLING_OPTIONS[0]);
 
-  // Section 3: Word Budget Blueprint State
+  // ── Step 3 state ──
   const [blueprint, setBlueprint] = useState<WordBudgetBlueprint | null>(() => {
-    try {
-      const raw = answers["word_budget_blueprint"];
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.sections)) return parsed;
-      }
-    } catch {}
-    return null;
+    const parsed = safeParseAnswerField<WordBudgetBlueprint | null>(answers["word_budget_blueprint"], null);
+    return parsed && Array.isArray(parsed.sections) ? parsed : null;
   });
+  const [isAllocatingBudget, setIsAllocatingBudget] = useState(false);
+  const [locked, setLocked] = useState<boolean>(() => answers["blueprint_locked"] === "true");
+  const [lockError, setLockError] = useState<string | null>(null);
 
-  const [isAllocatingBudget, setIsAllocatingBudget] = useState<boolean>(false);
-  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  // New projects carry the placeholder "provisional" until a journal is chosen.
+  const savedJournal = (answers["target_journal"] || "").trim();
+  const journal = /^provisional$/i.test(savedJournal) ? "" : savedJournal;
+  const selectedGap = gapSearch?.gaps.find((g) => g.id === selectedGapId) ?? null;
 
-  // Sync state if project changes remotely
+  // Saves only the fields this mode owns; the server merges them.
+  const save = useCallback(
+    async (patch: Record<string, string>) => {
+      if (!pid) return;
+      try {
+        setProject(await saveIntakeAnswers(pid, patch));
+      } catch (err) {
+        console.warn("Blueprint could not be saved:", err);
+      }
+    },
+    [pid, setProject]
+  );
+
+  // Typed fields save shortly after the author stops typing. Changing them
+  // after the lock reopens the blueprint.
+  const first = useRef(true);
   useEffect(() => {
-    if (answers["core_problem"] && !topic) setTopic(answers["core_problem"]);
-    if (answers["working_title"] && !workingTitle) setWorkingTitle(answers["working_title"]);
-    if (answers["title_locked"] === "true" && !isTitleLocked) setIsTitleLocked(true);
-  }, [answers, topic, workingTitle, isTitleLocked]);
-
-  // Auto-allocate word budget if not present
-  useEffect(() => {
-    if (!blueprint && project?.projectId && !isAllocatingBudget) {
-      handleAllocateBudget(targetTotalWords, template);
-    }
-  }, [blueprint, project?.projectId]);
-
-  // Discover Literature Gaps via Client AI
-  const handleDiscoverGaps = async () => {
-    if (!topic.trim()) {
-      setDiscoveryError("Please describe your research topic or question before discovering gaps.");
+    if (first.current) {
+      first.current = false;
       return;
     }
-
-    setIsDiscoveringGaps(true);
-    setDiscoveryError(null);
-
-    const systemPrompt = `You are a world-class academic research gap discovery agent.
-Based on the researcher's topic and context, identify 4 concrete, actionable research gaps in the peer-reviewed scholarly literature.
-Each gap must be grounded, empirical, theoretical, or methodological, with real academic significance and DOI references.
-Also propose 3 compelling, publishable academic titles that address the primary gap.
-
-Return strictly valid JSON in this exact shape:
-{
-  "gaps": [
-    {
-      "id": "gap_1",
-      "gap_type": "empirical",
-      "description": "...",
-      "importance_score": 92,
-      "supporting_doi": "10.1038/s41586-023-00000-0",
-      "why_it_matters": "..."
-    }
-  ],
-  "titles": [
-    {
-      "id": "t1",
-      "title_text": "...",
-      "subtitle_text": "...",
-      "rationale": "..."
-    }
-  ]
-}`;
-
-    const userPrompt = `Research Topic / Question: ${topic}
-Preliminary Context: ${preliminaryContext || "General peer-reviewed scholarly context"}`;
-
-    try {
-      const responseText = await executeAgenticLLM(
-        systemPrompt,
-        userPrompt,
-        "reasoning"
-      );
-
-      const parsed = parseAndRepairLLMJson<{ gaps?: GapProposal[]; titles?: TitleProposal[] }>(responseText, {});
-      const gaps: GapProposal[] = Array.isArray(parsed.gaps) ? parsed.gaps : [];
-      const titles: TitleProposal[] = Array.isArray(parsed.titles) ? parsed.titles : [];
-
-      setDiscoveredGaps(gaps);
-      setProposedTitles(titles);
-
-      if (gaps.length > 0 && !selectedGapId) {
-        setSelectedGapId(gaps[0].id);
-      }
-      if (titles.length > 0 && !workingTitle) {
-        setWorkingTitle(titles[0].title_text + (titles[0].subtitle_text ? `: ${titles[0].subtitle_text}` : ""));
-      }
-
-      if (project?.projectId) {
-        const nextAnswers: Record<string, string> = {
-          ...answers,
-          core_problem: normalizeUnicodeNFC(topic),
-          preliminary_context: normalizeUnicodeNFC(preliminaryContext),
-          identified_gaps: JSON.stringify(gaps),
-          title_options: JSON.stringify(titles),
-          selected_gap: gaps.length > 0 ? gaps[0].id : "",
-        };
-        const updated = await saveIntakeAnswers(project.projectId, nextAnswers);
-        setProject(updated);
-      }
-    } catch (err: unknown) {
-      console.warn("Error discovering literature gaps:", err);
-      // No invented gaps, DOIs or titles: report the failure.
-      setDiscoveryError(
-        "Gap discovery unavailable: nothing was generated. Connect an AI provider in AI Access, or try again."
-      );
-    } finally {
-      setIsDiscoveringGaps(false);
-    }
-  };
-
-  // Lock Gap and Working Title
-  const handleLockTitleAndGap = async () => {
-    if (!workingTitle.trim()) {
-      setDiscoveryError("Please enter or select a working article title before locking.");
-      return;
-    }
-    if (!project?.projectId) return;
-
-    try {
-      const normalizedTitle = normalizeUnicodeNFC(workingTitle.trim());
-      const nextAnswers: Record<string, string> = {
-        ...answers,
-        core_problem: normalizeUnicodeNFC(topic),
-        working_title: normalizedTitle,
-        title: normalizedTitle,
-        selected_gap: selectedGapId,
-        title_locked: "true",
-        title_locked_at: new Date().toISOString(),
+    const t = setTimeout(() => {
+      const qs = questions.map((q) => q.trim()).filter(Boolean);
+      const patch: Record<string, string> = {
+        blueprint_path: path,
+        interest_area: normalizeUnicodeNFC(interest.trim()),
+        core_problem: normalizeUnicodeNFC(problem.trim()),
+        research_questions: JSON.stringify(qs),
+        primary_research_question: qs[0] ?? "",
+        working_title: normalizeUnicodeNFC(title.trim()),
+        title: normalizeUnicodeNFC(title.trim()),
       };
-      setIsTitleLocked(true);
-      const updated = await saveIntakeAnswers(project.projectId, nextAnswers);
-      setProject(updated);
-      setSaveSuccessMessage("Working title and literature gap locked successfully.");
-      setTimeout(() => setSaveSuccessMessage(null), 4000);
-    } catch (err: unknown) {
-      console.warn("Failed to lock title and gap:", err);
+      if (locked) {
+        patch.blueprint_locked = "false";
+        setLocked(false);
+      }
+      void save(patch);
+    }, 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- save on content changes only
+  }, [path, interest, problem, questions, title]);
+
+  const handleAllocateBudget = useCallback(
+    async (words: number, tpl: ManuscriptTemplate) => {
+      if (!pid) return;
+      setIsAllocatingBudget(true);
+      try {
+        const res = await allocateProjectWordBudget(pid, words, tpl);
+        if (res.ok && res.blueprint) setBlueprint(res.blueprint);
+      } catch (err) {
+        console.warn("Failed to allocate budget:", err);
+      } finally {
+        setIsAllocatingBudget(false);
+      }
+    },
+    [pid]
+  );
+
+  // A budget exists from the start, so the author always sees the shape of the article.
+  useEffect(() => {
+    if (!blueprint && pid && !isAllocatingBudget) void handleAllocateBudget(targetTotalWords, template);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per project
+  }, [pid]);
+
+  const chooseGap = (gap: GroundedGap) => {
+    setSelectedGapId(gap.id);
+    setProblem(gap.statement);
+    void save({ selected_gap: gap.id });
+  };
+
+  const runSuggest = async () => {
+    const statement = selectedGap?.statement ?? problem.trim();
+    if (!pid || statement.length < 5) return;
+    setSuggesting(true);
+    setSuggestError(null);
+    try {
+      const r = await suggestQuestions(pid, interest.trim() || title.trim() || statement, { statement, whyItMatters: selectedGap?.whyItMatters });
+      // The author's own questions and title are never replaced: suggestions
+      // fill an empty list, otherwise they are offered to add.
+      const own = questions.map((q) => q.trim()).filter(Boolean);
+      if (own.length) setSuggestedQuestions(r.questions);
+      else setQuestions(r.questions);
+      setTitleOptions(r.titles);
+      if (!title.trim() && r.titles[0]) setTitle(r.titles[0]);
+      void save({ title_options: JSON.stringify(r.titles), suggested_questions: JSON.stringify(own.length ? r.questions : []) });
+    } catch (e) {
+      setSuggestError(e instanceof Error ? e.message : "Suggestions failed.");
+    } finally {
+      setSuggesting(false);
     }
   };
 
-  // Target Journal Controls Save
-  const handleSaveFormattingProfile = async (
-    newWords: number,
-    newTemplate: ManuscriptTemplate,
-    newStyle: string,
-    newOrthography: string
-  ) => {
-    if (!project?.projectId) return;
+  const selectJournal = (j: SavedJournals["journals"][number]) => {
+    setSuggested({ journalName: j.name, publisher: j.publisher, homepage: j.homepage });
+    void save({ target_journal: j.name, selected_journal_name: j.name, ...(j.publisher ? { publisher: j.publisher } : {}) });
+  };
+
+  const handleSaveFormattingProfile = async (newWords: number, newTemplate: ManuscriptTemplate, newStyle: string, newOrthography: string) => {
+    if (!pid) return;
     setTargetTotalWords(newWords);
     setTemplate(newTemplate);
     setCitationStyle(newStyle);
     setOrthography(newOrthography);
-
-    try {
-      // Only the fields this card owns; the server merges them.
-      const nextAnswers: Record<string, string> = {
-        target_word_count: String(newWords),
-        manuscript_template: newTemplate,
-        citation_style: newStyle,
-        orthography: newOrthography,
-      };
-      // An outline taken from the target journal keeps the journal's sections;
-      // a new word target only resizes them.
-      const journalSections =
-        blueprint?.sections.length && blueprint.sections.every((sec) => sec.id.startsWith("jp-"))
-          ? blueprint.sections.map((sec) => sec.sectionName)
-          : null;
-      if (journalSections) {
-        const resized = blueprintFromStructure(project.projectId, journalSections, newWords);
-        nextAnswers.word_budget_blueprint = JSON.stringify(resized);
-        setBlueprint(resized);
-        setProject(await saveIntakeAnswers(project.projectId, nextAnswers));
-        return;
-      }
-      const updated = await saveIntakeAnswers(project.projectId, nextAnswers);
-      setProject(updated);
-      // Reallocate word budget to reflect the new total and template
-      await handleAllocateBudget(newWords, newTemplate);
-    } catch (err: unknown) {
-      console.warn("Failed to save formatting profile:", err);
-    }
-  };
-
-  // Call Word Budget Allocator Endpoint
-  const handleAllocateBudget = async (words: number, tpl: ManuscriptTemplate) => {
-    if (!project?.projectId) return;
-    setIsAllocatingBudget(true);
-    try {
-      const res = await allocateProjectWordBudget(project.projectId, words, tpl);
-      if (res.ok && res.blueprint) {
-        setBlueprint(res.blueprint);
-        if (project) {
-          setProject({
-            ...project,
-            answers: {
-              ...project.answers,
-              word_budget_blueprint: JSON.stringify(res.blueprint),
-              target_word_count: String(words),
-              manuscript_template: tpl,
-            },
-          });
-        }
-      }
-    } catch (err: unknown) {
-      console.warn("Failed to allocate budget:", err);
-    } finally {
-      setIsAllocatingBudget(false);
-    }
-  };
-
-  // Inline adjustment of sub-section budget
-  const handleUpdateSubSectionTarget = async (sectionId: string, subSectionId: string, newTarget: number) => {
-    if (!blueprint || !project?.projectId) return;
-
-    const clampedTarget = Math.max(100, Math.min(1500, newTarget));
-    const updatedSections: SectionBudget[] = blueprint.sections.map((sec) => {
-      if (sec.id !== sectionId) return sec;
-      const updatedSub: SubSectionBudget[] = sec.subSections.map((sub) => {
-        if (sub.id === subSectionId) {
-          return { ...sub, targetWords: clampedTarget };
-        }
-        return sub;
-      });
-      const secTotal = updatedSub.reduce((acc, s) => acc + s.targetWords, 0);
-      return { ...sec, subSections: updatedSub, targetWords: secTotal };
-    });
-
-    const allocatedTotal = updatedSections.reduce((acc, s) => acc + s.targetWords, 0);
-    const updatedBlueprint: WordBudgetBlueprint = {
-      ...blueprint,
-      sections: updatedSections,
-      allocatedTotalWords: allocatedTotal,
-      updatedAt: new Date().toISOString(),
+    const patch: Record<string, string> = {
+      target_word_count: String(newWords),
+      manuscript_template: newTemplate,
+      citation_style: newStyle,
+      orthography: newOrthography,
     };
-
-    setBlueprint(updatedBlueprint);
-    try {
-      const nextAnswers: Record<string, string> = {
-        ...answers,
-        word_budget_blueprint: JSON.stringify(updatedBlueprint),
-      };
-      const updated = await saveIntakeAnswers(project.projectId, nextAnswers);
-      setProject(updated);
-    } catch (err: unknown) {
-      console.warn("Failed to save updated sub-section word budget:", err);
+    // An outline taken from the journal keeps its sections; a new word target only resizes them.
+    const journalSections = blueprint?.sections.length && blueprint.sections.every((s) => s.id.startsWith("jp-")) ? blueprint.sections.map((s) => s.sectionName) : null;
+    if (journalSections) {
+      const resized = blueprintFromStructure(pid, journalSections, newWords);
+      patch.word_budget_blueprint = JSON.stringify(resized);
+      setBlueprint(resized);
+      await save(patch);
+      return;
     }
+    await save(patch);
+    await handleAllocateBudget(newWords, newTemplate);
   };
+
+  const handleUpdateSubSectionTarget = async (sectionId: string, subSectionId: string, newTarget: number) => {
+    if (!blueprint || !pid) return;
+    const clamped = Math.max(100, Math.min(1500, newTarget));
+    const sections: SectionBudget[] = blueprint.sections.map((sec) => {
+      if (sec.id !== sectionId) return sec;
+      const subs: SubSectionBudget[] = sec.subSections.map((sub) => (sub.id === subSectionId ? { ...sub, targetWords: clamped } : sub));
+      return { ...sec, subSections: subs, targetWords: subs.reduce((n, s) => n + s.targetWords, 0) };
+    });
+    const next: WordBudgetBlueprint = { ...blueprint, sections, allocatedTotalWords: sections.reduce((n, s) => n + s.targetWords, 0), updatedAt: new Date().toISOString() };
+    setBlueprint(next);
+    await save({ word_budget_blueprint: JSON.stringify(next) });
+  };
+
+  const missing = missingForLock({ journal, problem, questions, title, hasBudget: Boolean(blueprint?.sections.length) });
+  const step1Done = Boolean(problem.trim() && questions.some((q) => q.trim()) && title.trim());
+
+  const lockAndContinue = async () => {
+    if (missing.length) {
+      setLockError(`Still needed: ${missing.join(", ")}.`);
+      return;
+    }
+    setLockError(null);
+    const qs = questions.map((q) => q.trim()).filter(Boolean);
+    await save({
+      blueprint_path: path,
+      core_problem: normalizeUnicodeNFC(problem.trim()),
+      research_questions: JSON.stringify(qs),
+      primary_research_question: qs[0],
+      working_title: normalizeUnicodeNFC(title.trim()),
+      title: normalizeUnicodeNFC(title.trim()),
+      title_locked: "true",
+      blueprint_locked: "true",
+      blueprint_locked_at: new Date().toISOString(),
+    });
+    setLocked(true);
+    setMode("evidence");
+  };
+
+  const pathButton = (p: Path, label: string, hint: string, Icon: typeof Compass) => (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={path === p}
+      onClick={() => setPath(p)}
+      className={`flex-1 text-left p-4 rounded-xl border cursor-pointer transition-colors ${
+        path === p ? "border-[color:var(--accent)] ring-1 ring-[color:var(--accent)] bg-[color:var(--surface-raised)]" : "border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] hover:border-[color:var(--border-control)]"
+      }`}
+    >
+      <span className="flex items-center gap-2 text-xs font-bold text-[color:var(--text-primary)]">
+        <Icon className="w-4 h-4" aria-hidden="true" />
+        {label}
+      </span>
+      <span className="block mt-1 text-[11px] text-[color:var(--text-secondary)]">{hint}</span>
+    </button>
+  );
+
+  const steps = [
+    { label: "Topic, gap & questions", done: step1Done },
+    { label: "Target journal", done: Boolean(journal) },
+    { label: "Lock blueprint", done: locked },
+  ];
 
   return (
     <div className="h-full flex flex-col bg-[color:var(--surface-canvas)] overflow-y-auto">
-      {/* Top Banner / Mode Header */}
       <div className="shrink-0 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-6 py-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent)] text-[color:var(--text-inverse)]">
-                Mode 1
-              </span>
-              <span className="text-xs font-semibold text-[color:var(--text-muted)]">
-                Protocol, Literature Gap & Word Budget Blueprint
-              </span>
-            </div>
-            <h1 className="text-xl font-bold text-[color:var(--text-primary)]">
-              Protocol & Blueprint
-            </h1>
-            <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-              Lock your research thesis, discover empirical gaps with supporting DOIs, set journal orthography, and partition sub-section word budgets.
-            </p>
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent)] text-[color:var(--text-inverse)]">Mode 1</span>
+            <h1 className="text-xl font-bold text-[color:var(--text-primary)] mt-1">Blueprint</h1>
+            <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">From an interest or your own topic to a locked plan: gap, questions, title, journal and word budget.</p>
           </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            {saveSuccessMessage && (
-              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30 animate-fade-in">
-                ✓ {saveSuccessMessage}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => setMode("evidence")}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-2 cursor-pointer"
-            >
-              <span>Proceed to Mode 2: Evidence Matrix</span>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </button>
-          </div>
+          <ol className="flex items-center gap-3 flex-wrap" aria-label="Blueprint steps">
+            {steps.map((s, i) => (
+              <li key={s.label} className="flex items-center gap-1.5 text-[11px] font-semibold text-[color:var(--text-secondary)]">
+                {s.done ? <CheckCircle2 className="w-4 h-4 text-[color:var(--state-success)]" aria-hidden="true" /> : <Circle className="w-4 h-4" aria-hidden="true" />}
+                <span>
+                  {i + 1}. {s.label}
+                  <span className="sr-only">{s.done ? " (done)" : " (to do)"}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
         </div>
       </div>
 
-      {/* Main Body */}
-      <div className="p-6 max-w-6xl mx-auto w-full space-y-8">
-        {/* The target journal comes first: its rules shape the outline and the checks */}
-        {project && <JournalProfileCard project={project} onApplied={setProject} />}
+      <div className="p-6 max-w-5xl mx-auto w-full space-y-8">
+        <div role="radiogroup" aria-label="Where are you starting from?" className="flex flex-col sm:flex-row gap-3">
+          {pathButton("explore", "Explore and discover", "I have a broad interest. Find gaps in recent papers and help me shape questions and a title.", Compass)}
+          {pathButton("own", "I have my topic or journal", "I already know my research problem, questions or title, and maybe the journal.", PenLine)}
+        </div>
 
-        {/* CARD A: Research Thesis & Live Gap Finder */}
-        <section aria-labelledby="thesis-gap-heading" className="bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-6">
-          <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-4">
-            <div>
-              <h2 id="thesis-gap-heading" className="text-sm font-bold text-[color:var(--text-primary)] flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
-                A. Research Thesis & Live Literature Gap Finder
-              </h2>
-              <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-                Define the core research question and use client-owned AI to synthesize 3–5 real gaps with supporting DOIs.
-              </p>
-            </div>
-            {isTitleLocked && (
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                Title & Gap Locked
-              </span>
-            )}
+        {/* STEP 1 */}
+        <section aria-labelledby="bp-step1" className={card}>
+          <div id="bp-step1">
+            <StepHeading
+              n={1}
+              title={path === "explore" ? "Find a gap, then questions and a title" : "Your problem, questions and title"}
+              done={step1Done}
+              hint={path === "explore" ? "Pick the gap you want to address; questions and title suggestions follow from it. Everything stays editable." : "Enter what you have. Suggestions are optional."}
+            />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {path === "explore" && pid && (
+            <GapFinder
+              projectId={pid}
+              interest={interest}
+              onInterest={setInterest}
+              saved={gapSearch}
+              onFound={(g) => {
+                setGapSearch(g);
+                void save({ gap_search: JSON.stringify(g), interest_area: g.interest });
+              }}
+              selectedGapId={selectedGapId}
+              onSelect={chooseGap}
+            />
+          )}
+
+          {(path === "own" || selectedGap) && (
             <div className="space-y-1.5">
-              <label htmlFor="research-topic-input" className="text-xs font-bold text-[color:var(--text-primary)]">
-                Research Topic or Primary Question <span className="text-rose-500">*</span>
+              <label htmlFor="bp-problem" className="text-xs font-bold text-[color:var(--text-primary)]">
+                Research gap or problem
               </label>
-              <textarea
-                id="research-topic-input"
-                rows={3}
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="e.g. Real-time syndrome decoding latency in scalable quantum error correction architectures..."
-                className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl p-3 text-xs text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)] outline-none resize-none transition-colors"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="preliminary-context-input" className="text-xs font-bold text-[color:var(--text-primary)]">
-                Preliminary Context & Theoretical Constraints <span className="text-[color:var(--text-muted)] font-normal">(Optional)</span>
-              </label>
-              <textarea
-                id="preliminary-context-input"
-                rows={3}
-                value={preliminaryContext}
-                onChange={(e) => setPreliminaryContext(e.target.value)}
-                placeholder="e.g. Focus on FPGA hardware architectures, sub-100ns latency thresholds, surface code lattices..."
-                className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl p-3 text-xs text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)] outline-none resize-none transition-colors"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-1">
-            <button
-              type="button"
-              disabled={isDiscoveringGaps || !topic.trim()}
-              onClick={handleDiscoverGaps}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isDiscoveringGaps ? (
-                <>
-                  <div className="spinner w-3.5 h-3.5" />
-                  <span>Discovering Literature Gaps via Client AI…</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4 text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <span>Discover Literature Gaps</span>
-                </>
-              )}
-            </button>
-
-            {discoveryError && (
-              <span className="text-xs text-rose-500 font-semibold">{discoveryError}</span>
-            )}
-          </div>
-
-          {/* Gaps List & Selection */}
-          {discoveredGaps.length > 0 && (
-            <div className="space-y-3 pt-2">
-              <span className="text-xs font-bold text-[color:var(--text-primary)] uppercase tracking-wider">
-                Select Anchor Gap to Address
-              </span>
-              <div className="grid grid-cols-1 gap-3">
-                {discoveredGaps.map((gap) => {
-                  const isSelected = selectedGapId === gap.id;
-                  return (
-                    <div
-                      key={gap.id}
-                      onClick={() => setSelectedGapId(gap.id)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setSelectedGapId(gap.id);
-                        }
-                      }}
-                      className={`p-4 rounded-xl border text-xs cursor-pointer transition-all ${
-                        isSelected
-                          ? "border-[color:var(--accent)] bg-[color:var(--accent)]/5 ring-1 ring-[color:var(--accent)]"
-                          : "border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] hover:border-[color:var(--border-control)]"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3 mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
-                              isSelected
-                                ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--text-inverse)]"
-                                : "border-[color:var(--border-control)]"
-                            }`}
-                          >
-                            {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                          </span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30">
-                            {gap.gap_type}
-                          </span>
-                          <span className="text-[10px] text-[color:var(--text-muted)] font-mono">
-                            Significance: {gap.importance_score}%
-                          </span>
-                        </div>
-                        {gap.supporting_doi && (
-                          <span className="text-[10px] font-mono text-[color:var(--text-secondary)] bg-[color:var(--surface-raised)] px-2 py-0.5 rounded border border-[color:var(--border-subtle)]">
-                            DOI: {gap.supporting_doi}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-[color:var(--text-primary)] font-medium pl-5.5">
-                        {gap.description}
-                      </p>
-                      {gap.why_it_matters && (
-                        <p className="text-[11px] text-[color:var(--text-secondary)] pl-5.5 mt-1 italic">
-                          Why it matters: {gap.why_it_matters}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <textarea id="bp-problem" rows={3} value={problem} onChange={(e) => setProblem(e.target.value)} placeholder="What is not yet known, and in what setting or population?" className={`${field} resize-y`} />
             </div>
           )}
 
-          {/* Working Title Input & Lock Action */}
-          <div className="pt-2 border-t border-[color:var(--border-subtle)] space-y-3">
-            <div className="flex items-center justify-between">
-              <label htmlFor="working-title-input" className="text-xs font-bold text-[color:var(--text-primary)]">
-                Working Article Title <span className="text-rose-500">*</span>
-              </label>
-              {proposedTitles.length > 0 && (
-                <div className="flex items-center gap-1.5 text-[11px]">
-                  <span className="text-[color:var(--text-muted)]">Suggestions:</span>
-                  {proposedTitles.map((t, idx) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setWorkingTitle(t.title_text + (t.subtitle_text ? `: ${t.subtitle_text}` : ""))}
-                      className="px-2 py-0.5 rounded text-[10px] bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] cursor-pointer truncate max-w-[140px]"
-                      title={t.title_text}
-                    >
-                      Option {idx + 1}
-                    </button>
-                  ))}
+          {(path === "own" || selectedGap) && (
+            <>
+              <QuestionsAndTitle
+                questions={questions}
+                onQuestions={setQuestions}
+                title={title}
+                onTitle={setTitle}
+                titleOptions={titleOptions}
+                suggest={problem.trim().length >= 5 ? () => void runSuggest() : undefined}
+                suggesting={suggesting}
+                suggestError={suggestError}
+              />
+              {suggestedQuestions.length > 0 && questions.some((q) => q.trim()) && (
+                <div className="text-[11px] text-[color:var(--text-secondary)] space-y-1" aria-label="Suggested questions">
+                  <p className="font-semibold">Suggested questions (click to add):</p>
+                  {suggestedQuestions
+                    .filter((s) => !questions.includes(s))
+                    .map((s) => (
+                      <button key={s} type="button" onClick={() => setQuestions([...questions.filter((q) => q.trim()), s].slice(0, 5))} className="block text-left underline cursor-pointer">
+                        + {s}
+                      </button>
+                    ))}
                 </div>
               )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                id="working-title-input"
-                type="text"
-                value={workingTitle}
-                onChange={(e) => setWorkingTitle(e.target.value)}
-                placeholder="e.g. Scalable FPGA Decoders for Real-Time Surface Code Quantum Error Correction"
-                className="flex-1 min-w-0 basis-56 bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-4 py-2 text-xs font-semibold text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)] outline-none transition-colors"
-              />
-              <button
-                type="button"
-                onClick={handleLockTitleAndGap}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                  isTitleLocked
-                    ? "bg-emerald-600 text-[color:var(--text-inverse)] hover:bg-emerald-700"
-                    : "bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)]"
-                }`}
-              >
-                {isTitleLocked ? "✓ Re-Lock Title & Gap" : "Lock Working Title & Gap"}
-              </button>
-            </div>
-          </div>
+            </>
+          )}
         </section>
 
-        {/* CARD B: Target Journal Formatting & Orthography Profile */}
-        <section aria-labelledby="formatting-profile-heading" className="bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-6">
-          <div className="border-b border-[color:var(--border-subtle)] pb-4">
-            <h2 id="formatting-profile-heading" className="text-sm font-bold text-[color:var(--text-primary)] flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              B. Target Journal Formatting & Orthography Profile
-            </h2>
-            <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-              Specify submission word count ceilings, manuscript structure template, citation standard, and dialect.
-            </p>
+        {/* STEP 2 */}
+        <section aria-labelledby="bp-step2" className={card}>
+          <div id="bp-step2">
+            <StepHeading
+              n={2}
+              title="Target journal"
+              done={Boolean(journal)}
+              hint={journal ? `Writing for ${journal}.` : "Find journals that publish on your topic, or enter the one you have in mind below."}
+            />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Target Words */}
+          {pid && (
+            <JournalMatcher
+              projectId={pid}
+              query={[problem, title, interest].map((s) => s.trim()).filter(Boolean).join(". ").slice(0, 600)}
+              saved={journalSearch}
+              onFound={(r) => {
+                setJournalSearch(r);
+                void save({ journal_search: JSON.stringify(r) });
+              }}
+              selectedName={journal}
+              onSelect={selectJournal}
+            />
+          )}
+
+          {project && <JournalProfileCard key={suggested?.journalName ?? "profile"} project={project} onApplied={setProject} suggested={suggested} />}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+            <div className="space-y-1.5">
+              <label htmlFor="bp-article-type" className="text-xs font-bold text-[color:var(--text-primary)]">
+                Article type
+              </label>
+              <select
+                id="bp-article-type"
+                value={articleType}
+                onChange={(e) => {
+                  setArticleType(e.target.value);
+                  void save({ article_type_id: e.target.value });
+                  void handleSaveFormattingProfile(targetTotalWords, templateForArticleType(e.target.value), citationStyle, orthography);
+                }}
+                className={`${field} cursor-pointer`}
+              >
+                <option value="">Choose…</option>
+                {ARTICLE_TYPES.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.label}
+                  </option>
+                ))}
+              </select>
+              <span className="block text-[10px] text-[color:var(--text-muted)]">Structure: {template === "SystematicReview" ? "Systematic review" : template}</span>
+            </div>
             <div className="space-y-1.5">
               <label htmlFor="target-words-select" className="text-xs font-bold text-[color:var(--text-primary)]">
-                Target Word Ceiling
+                Word target
               </label>
               <input
                 id="target-words-select"
@@ -600,190 +448,140 @@ Preliminary Context: ${preliminaryContext || "General peer-reviewed scholarly co
                 defaultValue={targetTotalWords}
                 onBlur={(e) => {
                   const val = parseInt(e.target.value, 10);
-                  if (Number.isFinite(val) && val >= 500 && val !== targetTotalWords) {
-                    handleSaveFormattingProfile(val, template, citationStyle, orthography);
-                  }
+                  if (Number.isFinite(val) && val >= 500 && val !== targetTotalWords) void handleSaveFormattingProfile(val, template, citationStyle, orthography);
                 }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                }}
-                className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-3 py-2 text-xs font-semibold text-[color:var(--text-primary)] outline-none tabular-nums"
+                onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                className={`${field} tabular-nums`}
               />
             </div>
-
-            {/* Template */}
-            <div className="space-y-1.5">
-              <label htmlFor="template-select" className="text-xs font-bold text-[color:var(--text-primary)]">
-                Manuscript Template
-              </label>
-              <select
-                id="template-select"
-                value={template}
-                onChange={(e) => {
-                  const val = e.target.value as ManuscriptTemplate;
-                  handleSaveFormattingProfile(targetTotalWords, val, citationStyle, orthography);
-                }}
-                className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-3 py-2 text-xs font-semibold text-[color:var(--text-primary)] outline-none cursor-pointer"
-              >
-                <option value="IMRaD">IMRaD (Intro, Method, Results, Discussion)</option>
-                <option value="Theoretical">Theoretical (Foundations, Model, Implications)</option>
-                <option value="SystematicReview">Systematic Review (PRISMA, Synthesis)</option>
-              </select>
-            </div>
-
-            {/* Citation Style */}
             <div className="space-y-1.5">
               <label htmlFor="citation-style-select" className="text-xs font-bold text-[color:var(--text-primary)]">
-                Citation Standard
+                Citation style
               </label>
-              <select
-                id="citation-style-select"
-                value={citationStyle}
-                onChange={(e) => {
-                  handleSaveFormattingProfile(targetTotalWords, template, e.target.value, orthography);
-                }}
-                className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-3 py-2 text-xs font-semibold text-[color:var(--text-primary)] outline-none cursor-pointer"
-              >
-                <option value="APA 7">APA 7th Edition (Author, Year)</option>
-                <option value="IEEE">IEEE (Numeric bracketed [1])</option>
-                <option value="Harvard">Harvard (Author-Date)</option>
-                <option value="Chicago Author-Date">Chicago (Author-Date)</option>
-                <option value="Chicago Notes">Chicago (Notes & Bibliography)</option>
-                <option value="MLA 9">MLA 9th Edition</option>
-                <option value="Vancouver">Vancouver (Numeric superscript)</option>
+              <select id="citation-style-select" value={citationStyle} onChange={(e) => void handleSaveFormattingProfile(targetTotalWords, template, e.target.value, orthography)} className={`${field} cursor-pointer`}>
+                {["APA 7", "IEEE", "Harvard", "Chicago Author-Date", "Chicago Notes", "MLA 9", "Vancouver"].map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
               </select>
             </div>
-
-            {/* Orthography */}
             <div className="space-y-1.5">
               <label htmlFor="orthography-select" className="text-xs font-bold text-[color:var(--text-primary)]">
-                Orthography & Spelling
+                Spelling
               </label>
-              <select
-                id="orthography-select"
-                value={orthography}
-                onChange={(e) => {
-                  handleSaveFormattingProfile(targetTotalWords, template, citationStyle, e.target.value);
-                }}
-                className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-xl px-3 py-2 text-xs font-semibold text-[color:var(--text-primary)] outline-none cursor-pointer"
-              >
-                <option value="British / Oxford English (-ise/-our/-re)">
-                  British / Oxford English (-ise/-our/-re) [Default]
-                </option>
-                <option value="US English">US English (-ize/-or/-er)</option>
+              <select id="orthography-select" value={orthography} onChange={(e) => void handleSaveFormattingProfile(targetTotalWords, template, citationStyle, e.target.value)} className={`${field} cursor-pointer`}>
+                {SPELLING_OPTIONS.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
+          <p className="text-[11px] text-[color:var(--text-muted)]">
+            These are set from the journal's guidelines when you save them above; change them here if you know better.
+            {answers["peer_review_format"] ? ` Review model: ${answers["peer_review_format"]}.` : ""}
+          </p>
         </section>
 
-        {/* CARD C: Interactive Sub-Section Word Budget Table */}
-        <section aria-labelledby="word-budget-heading" className="bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-2xl p-6 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[color:var(--border-subtle)] pb-4">
-            <div>
-              <h2 id="word-budget-heading" className="text-sm font-bold text-[color:var(--text-primary)] flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-purple-500" />
-                C. Sub-Section Word Budget Blueprint (350–500 Word Slices)
-              </h2>
-              <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-                Every section is partitioned into 350–500 word micro-sections to guarantee zero LLM token truncation and deterministic citation grounding.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              disabled={isAllocatingBudget}
-              onClick={() => handleAllocateBudget(targetTotalWords, template)}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-            >
-              <svg className={`w-3.5 h-3.5 text-[color:var(--accent)] ${isAllocatingBudget ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span>Rebalance Budget</span>
-            </button>
+        {/* STEP 3 */}
+        <section aria-labelledby="bp-step3" className={card}>
+          <div id="bp-step3">
+            <StepHeading n={3} title="Word budget and lock" done={locked} hint="Each section is split into writing units of about 350–500 words. Adjust any unit, then lock the blueprint." />
           </div>
 
-          {blueprint ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs font-mono px-1 text-[color:var(--text-secondary)]">
+          <ul className="grid sm:grid-cols-2 gap-2 text-xs" aria-label="Blueprint checklist">
+            {[
+              ["Research gap or problem", Boolean(problem.trim())],
+              ["At least one research question", questions.some((q) => q.trim())],
+              ["Working title", Boolean(title.trim())],
+              ["Target journal", Boolean(journal)],
+              ["Word budget", Boolean(blueprint?.sections.length)],
+            ].map(([label, ok]) => (
+              <li key={String(label)} className="flex items-center gap-2 text-[color:var(--text-secondary)]">
+                {ok ? <CheckCircle2 className="w-4 h-4 text-[color:var(--state-success)]" aria-hidden="true" /> : <Circle className="w-4 h-4" aria-hidden="true" />}
                 <span>
-                  Total Target: <strong className="text-[color:var(--text-primary)]">{blueprint.targetTotalWords.toLocaleString()} words</strong>
+                  {label}
+                  <span className="sr-only">{ok ? " — done" : " — missing"}</span>
                 </span>
-                <span>
-                  Allocated: <strong className="text-[color:var(--text-primary)]">{blueprint.allocatedTotalWords.toLocaleString()} words</strong> ({blueprint.totalSubSections} Sub-Sections)
-                </span>
-              </div>
+              </li>
+            ))}
+          </ul>
 
+          {blueprint ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-xs font-mono px-1 text-[color:var(--text-secondary)] flex-wrap gap-2">
+                <span>
+                  Target: <strong className="text-[color:var(--text-primary)]">{blueprint.targetTotalWords.toLocaleString()} words</strong>
+                </span>
+                <span>
+                  Allocated: <strong className="text-[color:var(--text-primary)]">{blueprint.allocatedTotalWords.toLocaleString()} words</strong>
+                  {blueprint.totalSubSections ? ` (${blueprint.totalSubSections} units)` : ""}
+                </span>
+                <button type="button" disabled={isAllocatingBudget} onClick={() => void handleAllocateBudget(targetTotalWords, template)} className="studio-btn">
+                  Rebalance
+                </button>
+              </div>
               <div className="border border-[color:var(--border-subtle)] rounded-xl overflow-hidden divide-y divide-[color:var(--border-subtle)]">
                 {blueprint.sections.map((sec) => (
-                  <div key={sec.id} className="bg-[color:var(--surface-canvas)]">
-                    {/* Major Section Header */}
+                  <div key={sec.id}>
                     <div className="bg-[color:var(--surface-sunken)] px-4 py-2.5 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[color:var(--text-primary)]">
-                          {sec.order}. {sec.sectionName}
+                      <span className="text-xs font-bold text-[color:var(--text-primary)]">
+                        {sec.order}. {sec.sectionName}
+                      </span>
+                      <span className="text-xs font-mono font-bold text-[color:var(--accent)]">{sec.targetWords} words</span>
+                    </div>
+                    {sec.subSections.map((sub, sIdx) => (
+                      <div key={sub.id} className="px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <span className="text-xs text-[color:var(--text-primary)] min-w-0 truncate">
+                          <span className="text-[10px] font-mono text-[color:var(--text-muted)] mr-2">
+                            § {sec.order}.{sIdx + 1}
+                          </span>
+                          {sub.title}
                         </span>
-                        <span className="text-[10px] font-semibold text-[color:var(--text-muted)] bg-[color:var(--surface-raised)] px-2 py-0.5 rounded border border-[color:var(--border-subtle)]">
-                          {sec.subSections.length} slices
+                        <span className="flex items-center gap-2 shrink-0">
+                          <input
+                            aria-label={`Target words for ${sub.title}`}
+                            type="number"
+                            min={100}
+                            max={1000}
+                            step={25}
+                            value={sub.targetWords}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              if (!isNaN(val)) void handleUpdateSubSectionTarget(sec.id, sub.id, val);
+                            }}
+                            className="w-20 bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-lg px-2 py-1 text-xs font-mono text-right text-[color:var(--text-primary)] outline-none"
+                          />
+                          <span className="text-[10px] text-[color:var(--text-muted)] font-mono">words</span>
                         </span>
                       </div>
-                      <span className="text-xs font-mono font-bold text-[color:var(--accent)]">
-                        {sec.targetWords} words
-                      </span>
-                    </div>
-
-                    {/* Sub-Section Table Rows */}
-                    <div className="divide-y divide-[color:var(--border-subtle)]/60">
-                      {sec.subSections.map((sub, sIdx) => (
-                        <div
-                          key={sub.id}
-                          className="px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[color:var(--surface-hover)]/40 transition-colors"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-[10px] font-mono text-[color:var(--text-muted)] w-8 shrink-0">
-                              § {sec.order}.{sIdx + 1}
-                            </span>
-                            <span className="text-xs text-[color:var(--text-primary)] font-medium truncate">
-                              {sub.title}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                            <label htmlFor={`target-words-${sub.id}`} className="text-[10px] text-[color:var(--text-muted)] uppercase tracking-wider font-semibold">
-                              Target:
-                            </label>
-                            <input
-                              id={`target-words-${sub.id}`}
-                              aria-label={`Target words for ${sub.title}`}
-                              type="number"
-                              min={100}
-                              max={1000}
-                              step={25}
-                              value={sub.targetWords}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                if (!isNaN(val)) {
-                                  handleUpdateSubSectionTarget(sec.id, sub.id, val);
-                                }
-                              }}
-                              className="w-18 bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-lg px-2 py-1 text-xs font-mono text-right text-[color:var(--text-primary)] outline-none"
-                            />
-                            <span className="text-[10px] text-[color:var(--text-muted)] font-mono">words</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    ))}
                   </div>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="p-8 text-center bg-[color:var(--surface-sunken)] rounded-xl border border-[color:var(--border-subtle)]">
-              <div className="spinner w-6 h-6 mx-auto mb-2" />
-              <p className="text-xs text-[color:var(--text-secondary)] font-medium">
-                Generating sub-section word budget partition…
-              </p>
-            </div>
+            <p className="text-xs text-[color:var(--text-secondary)]">{isAllocatingBudget ? "Working out the word budget…" : "The word budget appears once the project has loaded."}</p>
           )}
+
+          {lockError && (
+            <p role="alert" className="text-xs text-[color:var(--state-danger)]">
+              {lockError}
+            </p>
+          )}
+          <div className="flex items-center gap-3 flex-wrap">
+            <button type="button" onClick={() => void lockAndContinue()} disabled={missing.length > 0} className="studio-btn studio-btn-primary">
+              <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+              Lock blueprint and continue to Mode 2 (Evidence Matrix)
+            </button>
+            {missing.length > 0 ? (
+              <span className="text-[11px] text-[color:var(--text-muted)]">Still needed: {missing.join(", ")}.</span>
+            ) : locked ? (
+              <span className="text-[11px] text-[color:var(--state-success)]">Locked. Editing any field above reopens it.</span>
+            ) : null}
+          </div>
         </section>
       </div>
     </div>

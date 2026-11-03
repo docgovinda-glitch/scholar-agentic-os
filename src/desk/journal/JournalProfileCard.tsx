@@ -5,6 +5,7 @@ import { authedJsonFetch, getJournalRequirements, saveIntakeAnswers, saveJournal
 import { requestAppConfirm } from "../../components/ui/FeedbackSystem";
 import { safeParseAnswerField } from "../../shared/projectStateSchema";
 import { blueprintFromStructure, citationStyleOption } from "./journalProfile";
+import { reviewFormatFromGuidelines, spellingFromGuidelines } from "../../domain/journal/blueprintFunnel";
 
 type Fields = {
   journalName: string;
@@ -14,9 +15,20 @@ type Fields = {
   citationStyle: string;
   declarations: string;
   notes: string;
+  spelling: string;
+  reviewFormat: string;
 };
 
-const EMPTY: Fields = { journalName: "", articleType: "", wordMax: "", sections: "", citationStyle: "", declarations: "", notes: "" };
+const EMPTY: Fields = { journalName: "", articleType: "", wordMax: "", sections: "", citationStyle: "", declarations: "", notes: "", spelling: "", reviewFormat: "" };
+
+export const SPELLING_OPTIONS = ["British / Oxford English (-ise/-our/-re)", "US English"];
+
+/** A journal picked in the matcher: the form opens with its name and a link to its site. */
+export interface SuggestedJournal {
+  journalName: string;
+  publisher?: string;
+  homepage?: string;
+}
 
 const fromRequirements = (r: Partial<JournalRequirements> | JournalRequirementsProposal): Fields => ({
   journalName: r.journalName ?? "",
@@ -26,6 +38,8 @@ const fromRequirements = (r: Partial<JournalRequirements> | JournalRequirementsP
   citationStyle: r.citationStyle ?? "",
   declarations: (r.requiredDeclarations ?? []).join("\n"),
   notes: r.notes ?? "",
+  spelling: "",
+  reviewFormat: "",
 });
 
 const lines = (s: string) => s.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -39,14 +53,17 @@ const lines = (s: string) => s.split("\n").map((l) => l.trim()).filter(Boolean);
 export default function JournalProfileCard({
   project,
   onApplied,
+  suggested,
 }: {
   project: ProjectView;
   onApplied: (updated: ProjectView) => void;
+  /** Set when the author picks a journal in the matcher; remount (key) to apply. */
+  suggested?: SuggestedJournal | null;
 }) {
   const pid = project.projectId;
   const [saved, setSaved] = useState<JournalRequirements | null>(null);
   const [editing, setEditing] = useState(false);
-  const [fields, setFields] = useState<Fields>(EMPTY);
+  const [fields, setFields] = useState<Fields>(() => (suggested ? { ...EMPTY, journalName: suggested.journalName } : EMPTY));
   const [guidelines, setGuidelines] = useState("");
   const [unresolved, setUnresolved] = useState<string[]>([]);
   const [busy, setBusy] = useState<"extract" | "save" | null>(null);
@@ -61,7 +78,7 @@ export default function JournalProfileCard({
       .then((r) => {
         if (!alive) return;
         setSaved(r);
-        if (!r) setEditing(true);
+        if (!r || suggested) setEditing(true);
       })
       .catch(() => alive && setEditing(true));
     return () => {
@@ -85,7 +102,11 @@ export default function JournalProfileCard({
         // Keep what the author already typed where the guidelines said nothing.
         return Object.fromEntries(Object.entries(next).map(([k, v]) => [k, v || f[k as keyof Fields]])) as Fields;
       });
-      setUnresolved(proposal.unresolvedFields ?? []);
+      // Spelling and review model are read from the pasted text itself, never guessed.
+      const spelling = spellingFromGuidelines(guidelines);
+      const reviewFormat = reviewFormatFromGuidelines(guidelines);
+      setFields((f) => ({ ...f, spelling: spelling ?? f.spelling, reviewFormat: reviewFormat ?? f.reviewFormat }));
+      setUnresolved([...(proposal.unresolvedFields ?? []), ...(spelling ? [] : ["spelling"]), ...(reviewFormat ? [] : ["reviewFormat"])]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "The guidelines could not be read.");
     } finally {
@@ -133,6 +154,9 @@ export default function JournalProfileCard({
       };
       if (Number.isFinite(max) && max > 0) patch.target_word_count = String(max);
       if (style) patch.citation_style = style;
+      if (fields.spelling) patch.orthography = fields.spelling;
+      if (fields.reviewFormat.trim()) patch.peer_review_format = fields.reviewFormat.trim();
+      if (suggested?.publisher && suggested.journalName === fields.journalName.trim()) patch.publisher = suggested.publisher;
       if (replacesOutline) patch.word_budget_blueprint = JSON.stringify(blueprintFromStructure(pid, sections, total));
       const updated = await saveIntakeAnswers(pid, patch);
       setSaved(journalRequirements);
@@ -156,7 +180,7 @@ export default function JournalProfileCard({
         <div>
           <h2 id="journal-profile-heading" className="text-sm font-bold text-[color:var(--text-primary)]">Target journal</h2>
           <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
-            Start here: the journal's rules set your outline, word target, citation style and the statements you will need.
+            The journal's rules set your outline, word target, citation style and the statements you will need.
           </p>
         </div>
         {saved && !editing && (
@@ -180,10 +204,27 @@ export default function JournalProfileCard({
           <div><dt className="text-[color:var(--text-muted)]">Word limit</dt><dd className="text-[color:var(--text-primary)]">{saved.wordLimit?.max ? `${saved.wordLimit.max.toLocaleString()} words` : "Not set"}</dd></div>
           <div><dt className="text-[color:var(--text-muted)]">Sections</dt><dd className="text-[color:var(--text-primary)]">{saved.structureOverride?.length ? saved.structureOverride.join(" · ") : "Not set (generic outline)"}</dd></div>
           <div><dt className="text-[color:var(--text-muted)]">Citation style</dt><dd className="text-[color:var(--text-primary)]">{saved.citationStyle || "Not set"}</dd></div>
+          <div><dt className="text-[color:var(--text-muted)]">Spelling</dt><dd className="text-[color:var(--text-primary)]">{project.answers?.["orthography"] || "Not set"}</dd></div>
+          <div><dt className="text-[color:var(--text-muted)]">Peer review</dt><dd className="text-[color:var(--text-primary)]">{project.answers?.["peer_review_format"] || "Not stated"}</dd></div>
           <div className="sm:col-span-2"><dt className="text-[color:var(--text-muted)]">Required statements</dt><dd className="text-[color:var(--text-primary)]">{saved.requiredDeclarations.length ? saved.requiredDeclarations.join(" · ") : "None listed"}</dd></div>
         </dl>
       ) : (
         <div className="space-y-4">
+          {suggested && (
+            <p className="text-xs text-[color:var(--text-secondary)] rounded-lg bg-[color:var(--surface-sunken)] p-3" data-testid="journal-guidelines-prompt">
+              <strong className="text-[color:var(--text-primary)]">{suggested.journalName}</strong>
+              {suggested.publisher ? ` (${suggested.publisher})` : ""}: its word limit, citation style, spelling and review model are in its author guidelines, not in
+              public indexes.{" "}
+              {suggested.homepage ? (
+                <a href={suggested.homepage} target="_blank" rel="noopener noreferrer" className="underline text-[color:var(--text-primary)]">
+                  Open the journal's site
+                </a>
+              ) : (
+                "Find its Guide for Authors"
+              )}
+              , copy the guidelines and paste them below; the settings are filled from what they state.
+            </p>
+          )}
           <div className="space-y-1.5">
             <label htmlFor="jp-guidelines" className={label}>
               Author guidelines <span className="font-normal text-[color:var(--text-muted)]">(optional: paste them and AI fills the form)</span>
@@ -210,6 +251,17 @@ export default function JournalProfileCard({
                 <span className="block text-[11px] text-[color:var(--text-muted)]">Not one the workspace formats yet; your current style stays.</span>
               )}
             </div>
+            <div className="space-y-1">
+              <label htmlFor="jp-spelling" className={label}>Spelling</label>
+              <select id="jp-spelling" value={fields.spelling} onChange={set("spelling")} className={input}>
+                <option value="">Not stated (keep current)</option>
+                {SPELLING_OPTIONS.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+              {hint("spelling")}
+            </div>
+            <div className="space-y-1"><label htmlFor="jp-review" className={label}>Peer review model</label><input id="jp-review" value={fields.reviewFormat} onChange={set("reviewFormat")} placeholder="e.g. Double-anonymised peer review" className={input} />{hint("reviewFormat")}</div>
             <div className="space-y-1"><label htmlFor="jp-sections" className={label}>Sections, in order <span className="font-normal text-[color:var(--text-muted)]">(one per line)</span></label><textarea id="jp-sections" rows={5} value={fields.sections} onChange={set("sections")} placeholder={"Abstract\nIntroduction\nMethods\nResults\nDiscussion"} className={input} />{hint("structureOverride")}</div>
             <div className="space-y-1"><label htmlFor="jp-decl" className={label}>Required statements <span className="font-normal text-[color:var(--text-muted)]">(one per line)</span></label><textarea id="jp-decl" rows={5} value={fields.declarations} onChange={set("declarations")} placeholder={"Data availability\nCompeting interests"} className={input} />{hint("requiredDeclarations")}</div>
           </div>

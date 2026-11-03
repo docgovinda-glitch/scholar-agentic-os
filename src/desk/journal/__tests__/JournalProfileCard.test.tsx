@@ -42,7 +42,32 @@ describe("JournalProfileCard", () => {
     await waitFor(() => expect((screen.getByLabelText("Journal name *") as HTMLInputElement).value).toBe("J Quantum Syst"));
     expect(api.authedJsonFetch).toHaveBeenCalledWith("/api/projects/p1/agentic/journal-profile/extract", "POST", { guidelinesText: GUIDE });
     expect((screen.getByLabelText("Word limit") as HTMLInputElement).value).toBe("4500");
-    expect(screen.getByText(/Not stated in the guidelines/)).toBeInTheDocument();
+    // Citation style, spelling and review model are not stated in this text: each is marked.
+    expect(screen.getAllByText(/Not stated in the guidelines/)).toHaveLength(3);
+  });
+
+  it("reads spelling and review model from the guidelines text itself, and saves them", async () => {
+    api.authedJsonFetch.mockResolvedValue(new Response(JSON.stringify({ proposal: { journalName: "Health Policy", requiredDeclarations: [], unresolvedFields: [] } }), { status: 200 }));
+    const onApplied = vi.fn();
+    render(<JournalProfileCard project={project} onApplied={onApplied} />);
+    const text = `${GUIDE} Manuscripts must be written in British English spelling. The journal operates a double-blind peer review process.`;
+    fireEvent.change(await screen.findByLabelText(/Author guidelines/), { target: { value: text } });
+    fireEvent.click(screen.getByRole("button", { name: /Fill from guidelines with AI/ }));
+    await waitFor(() => expect((screen.getByLabelText("Spelling") as HTMLSelectElement).value).toMatch(/British/));
+    expect((screen.getByLabelText("Peer review model") as HTMLInputElement).value).toBe("Double-anonymised peer review");
+    expect(screen.queryByText(/Not stated in the guidelines/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save journal profile" }));
+    await waitFor(() => expect(onApplied).toHaveBeenCalled());
+    expect(api.saveIntakeAnswers.mock.calls[0][1]).toMatchObject({ orthography: "British / Oxford English (-ise/-our/-re)", peer_review_format: "Double-anonymised peer review" });
+  });
+
+  it("opens with a journal picked in the matcher and points to its guidelines", async () => {
+    api.getJournalRequirements.mockResolvedValue({ journalName: "Old J", requiredDeclarations: [], source: "manual", capturedAt: "", capturedBy: "" });
+    render(<JournalProfileCard project={project} onApplied={vi.fn()} suggested={{ journalName: "Health Policy", publisher: "Elsevier", homepage: "https://example.org/hp" }} />);
+    expect(((await screen.findByLabelText("Journal name *")) as HTMLInputElement).value).toBe("Health Policy");
+    const prompt = screen.getByTestId("journal-guidelines-prompt");
+    expect(prompt).toHaveTextContent("not in public indexes");
+    expect(screen.getByRole("link", { name: /Open the journal's site/ })).toHaveAttribute("href", "https://example.org/hp");
   });
 
   it("saving sets the word target, citation style and an outline of the journal's sections", async () => {
