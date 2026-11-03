@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Delivery tab fixed.** Clicking Delivery in the header sent the author back to Blueprint; it now opens Delivery, and moving between views no longer reloads the whole project.
 - **Retired stage screens deleted.** The 25 stage screens (unreachable since the five views replaced them), their sidebar, registry and tests were removed with the owner's approval. Saved answers they wrote remain in projects.
 
+### Coursework and essay drafting fixed
+- **Typing no longer closes the editor.** Every keystroke was saved, and each save closed the editor, so writing a section by hand stopped after the first letter. The editor now stays open while you type and still saves as you go.
+- **Drafts are no longer lost.** Each section save was built from the outline as it was when the action started, so saves erased each other: "Draft all remaining" kept only the last section, and an AI draft finishing while you typed could wipe your text (or the other way round). Saves now build on the latest text and go to the server one at a time.
+- **More room to write.** A one-line header with the word count; an outline that can be hidden (hidden by default on phones); the side panel closes on arrival (the Inspector button reopens it); a writing box that grows with the text instead of a small scrolling box; the bibliography folds away. Errors from AI drafting show above the editor instead of in the footer.
+- **Plainer labels:** "Edit text", "Done", "Draft with AI", "Write it myself".
+
 ### Journal Mode 1: discovery funnel
 - **Two ways in.** "Explore and discover" starts from a broad interest; "I have my topic or journal" takes the problem, questions, title and journal directly. Three steps follow, each marked done as it is completed.
 - **Gaps from real papers.** The old gap finder asked the AI for gaps "with supporting DOIs" without giving it any papers, and showed whatever DOI and "Significance %" it typed. Gaps are now proposed by the author's AI from 15 recent papers with abstracts found on OpenAlex (Crossref when OpenAlex is unavailable); each gap quotes the papers it rests on, linked to their DOI, and a gap whose quote is not in the paper is dropped and counted. No significance scores.
