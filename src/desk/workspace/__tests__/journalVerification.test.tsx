@@ -87,3 +87,35 @@ describe("Verification in Delivery", () => {
     expect(within(panel).getByText("No problems found")).toBeInTheDocument();
   });
 });
+
+describe("Reporting checklist in Delivery", () => {
+  it("suggests the guideline, records where each item is reported, and saves", async () => {
+    let answers: Record<string, string> = {
+      manuscript_markdown: "### § Methods\n\nWe ran a randomised controlled trial of 60 adults.\n\n### § Results\n\nRecall rose.",
+    };
+    vi.mocked(api.getProject).mockImplementation(async () => projectWith(answers));
+    vi.mocked(api.saveIntakeAnswers).mockImplementation(async (_id, updates) => {
+      answers = { ...answers, ...(updates as Record<string, string>) };
+      return projectWith(answers);
+    });
+    mount();
+    const panel = await screen.findByRole("region", { name: "Reporting checklist" });
+    const select = within(panel).getByRole("combobox", { name: "Reporting guideline" }) as HTMLSelectElement;
+    expect(within(select).getByRole("option", { name: /CONSORT 2025 .*\(suggested for this study\)/ })).toBeInTheDocument();
+    fireEvent.change(select, { target: { value: "consort" } });
+    await waitFor(() => expect(JSON.parse(answers.reporting_checklist).checklistId).toBe("consort"));
+
+    expect(within(panel).getByText("Identification as a randomised trial")).toBeInTheDocument();
+    fireEvent.change(within(panel).getByLabelText("Item 1a status"), { target: { value: "reported" } });
+    const where = within(panel).getByLabelText("Item 1a location");
+    fireEvent.change(where, { target: { value: "Title" } });
+    fireEvent.blur(where);
+    await waitFor(() => expect(JSON.parse(answers.reporting_checklist).entries["1a"]).toEqual({ status: "reported", location: "Title", note: "" }));
+    expect(within(panel).getByText("1 of 42 items done")).toBeInTheDocument();
+
+    fireEvent.change(within(panel).getByLabelText("Item 2 status"), { target: { value: "not_applicable" } });
+    expect(await within(panel).findByText("Item 2: marked not applicable without a reason.")).toBeInTheDocument();
+    expect(within(panel).getByRole("link", { name: "Official checklist" })).toHaveAttribute("href", "https://www.consort-spirit.org/");
+  });
+});
+
