@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Circle, Compass, Lock, PenLine } from "lucide-react";
 import type { WordBudgetBlueprint, SectionBudget, SubSectionBudget, ManuscriptTemplate } from "./types";
 import { useResearchWorkspace } from "./ResearchContext";
-import { saveIntakeAnswers, allocateProjectWordBudget } from "../api";
+import { saveIntakeAnswers } from "../api";
 import { normalizeUnicodeNFC } from "../../document_intelligence/index";
 import { safeParseAnswerField } from "../../shared/projectStateSchema";
 import JournalProfileCard, { SPELLING_OPTIONS, type SuggestedJournal } from "../journal/JournalProfileCard";
@@ -10,7 +10,8 @@ import { blueprintFromStructure } from "../journal/journalProfile";
 import GapFinder, { type SavedGaps } from "../journal/blueprint/GapFinder";
 import QuestionsAndTitle from "../journal/blueprint/QuestionsAndTitle";
 import JournalMatcher, { type SavedJournals } from "../journal/blueprint/JournalMatcher";
-import { suggestQuestions } from "../journal/blueprintApi";
+import { suggestQuestions, writeOutline } from "../journal/blueprintApi";
+import { isAiOutline, rescaleOutline } from "../../domain/journal/aiOutline";
 import { ARTICLE_TYPES, missingForLock, templateForArticleType, type GroundedGap } from "../../domain/journal/blueprintFunnel";
 
 type Path = "explore" | "own";
@@ -99,7 +100,45 @@ export default function ProtocolBlueprintMode() {
     const parsed = safeParseAnswerField<WordBudgetBlueprint | null>(answers["word_budget_blueprint"], null);
     return parsed && Array.isArray(parsed.sections) ? parsed : null;
   });
-  const [isAllocatingBudget, setIsAllocatingBudget] = useState(false);
+  // The project can load after this view appears: fill in what was saved,
+  // once, without touching anything the author has typed since.
+  const hydratedRef = useRef(false);
+  const skipSaveRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current || !project?.projectId) return;
+    hydratedRef.current = true;
+    skipSaveRef.current = true; // filling in is not an edit
+    const a = project.answers || {};
+    setInterest((v) => v || a["interest_area"] || "");
+    setProblem((v) => v || a["core_problem"] || a["thesis_statement"] || "");
+    setTitle((v) => v || a["working_title"] || a["title"] || "");
+    setQuestions((v) => {
+      if (v.some((q) => q.trim())) return v;
+      const saved = safeParseAnswerField<string[]>(a["research_questions"], []);
+      return Array.isArray(saved) && saved.length ? saved : a["primary_research_question"] ? [a["primary_research_question"]] : v;
+    });
+    setArticleType((v) => v || a["article_type_id"] || "");
+    const words = parseInt(a["target_word_count"] || "", 10);
+    if (Number.isFinite(words) && words > 0) setTargetTotalWords(words);
+    if (a["citation_style"]) setCitationStyle(a["citation_style"]);
+    if (a["orthography"]) setOrthography(a["orthography"]);
+    if (a["blueprint_locked"] === "true") setLocked(true);
+    if (!a["blueprint_path"] && (a["working_title"] || (a["target_journal"] && !/^provisional$/i.test(a["target_journal"])))) setPath("own");
+  }, [project]);
+
+  // The saved outline arrives with the project, which may load after this view.
+  useEffect(() => {
+    if (blueprint) return;
+    const saved = safeParseAnswerField<WordBudgetBlueprint | null>(answers["word_budget_blueprint"], null);
+    if (saved && Array.isArray(saved.sections) && saved.sections.length) {
+      setBlueprint(saved);
+      if (saved.targetTotalWords > 0) setTargetTotalWords(saved.targetTotalWords);
+    }
+  }, [answers, blueprint]);
+  const [outlineBusy, setOutlineBusy] = useState(false);
+  const [outlineError, setOutlineError] = useState<string | null>(null);
+  const [outlineRequest, setOutlineRequest] = useState("");
+  const [previousOutline, setPreviousOutline] = useState<WordBudgetBlueprint | null>(null);
   const [locked, setLocked] = useState<boolean>(() => answers["blueprint_locked"] === "true");
   const [lockError, setLockError] = useState<string | null>(null);
 
@@ -125,8 +164,9 @@ export default function ProtocolBlueprintMode() {
   // after the lock reopens the blueprint.
   const first = useRef(true);
   useEffect(() => {
-    if (first.current) {
+    if (first.current || skipSaveRef.current) {
       first.current = false;
+      skipSaveRef.current = false;
       return;
     }
     const t = setTimeout(() => {
@@ -150,27 +190,58 @@ export default function ProtocolBlueprintMode() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- save on content changes only
   }, [path, interest, problem, questions, title]);
 
-  const handleAllocateBudget = useCallback(
-    async (words: number, tpl: ManuscriptTemplate) => {
-      if (!pid) return;
-      setIsAllocatingBudget(true);
-      try {
-        const res = await allocateProjectWordBudget(pid, words, tpl);
-        if (res.ok && res.blueprint) setBlueprint(res.blueprint);
-      } catch (err) {
-        console.warn("Failed to allocate budget:", err);
-      } finally {
-        setIsAllocatingBudget(false);
-      }
-    },
-    [pid]
-  );
+  /**
+   * The AI writes the table of contents for this article (or changes it as
+   * the author asks). What the author typed is saved first, so the AI sees it.
+   */
+  const runOutline = async (instruction?: string) => {
+    if (!pid || outlineBusy) return;
+    setOutlineBusy(true);
+    setOutlineError(null);
+    try {
+      const qs = questions.map((q) => q.trim()).filter(Boolean);
+      await save({
+        working_title: normalizeUnicodeNFC(title.trim()),
+        title: normalizeUnicodeNFC(title.trim()),
+        core_problem: normalizeUnicodeNFC(problem.trim()),
+        research_questions: JSON.stringify(qs),
+        primary_research_question: qs[0] ?? "",
+        target_word_count: String(targetTotalWords),
+        article_type_id: articleType,
+      });
+      const { blueprint: next } = await writeOutline(pid, instruction?.trim() || undefined);
+      setPreviousOutline(blueprint);
+      setBlueprint(next);
+      setTargetTotalWords(next.targetTotalWords);
+      setOutlineRequest("");
+      await save({ word_budget_blueprint: JSON.stringify(next), target_word_count: String(next.targetTotalWords) });
+    } catch (e) {
+      setOutlineError(e instanceof Error ? e.message : "The outline could not be written.");
+    } finally {
+      setOutlineBusy(false);
+    }
+  };
 
-  // A budget exists from the start, so the author always sees the shape of the article.
-  useEffect(() => {
-    if (!blueprint && pid && !isAllocatingBudget) void handleAllocateBudget(targetTotalWords, template);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per project
-  }, [pid]);
+  const undoOutline = async () => {
+    if (!previousOutline) return;
+    setBlueprint(previousOutline);
+    setTargetTotalWords(previousOutline.targetTotalWords);
+    await save({ word_budget_blueprint: JSON.stringify(previousOutline), target_word_count: String(previousOutline.targetTotalWords) });
+    setPreviousOutline(null);
+  };
+
+  const renameSubSection = async (sectionId: string, subSectionId: string, newTitle: string) => {
+    if (!blueprint || !newTitle.trim()) return;
+    const next: WordBudgetBlueprint = {
+      ...blueprint,
+      sections: blueprint.sections.map((sec) =>
+        sec.id !== sectionId ? sec : { ...sec, subSections: sec.subSections.map((u) => (u.id === subSectionId ? { ...u, title: newTitle.trim() } : u)) }
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+    setBlueprint(next);
+    await save({ word_budget_blueprint: JSON.stringify(next) });
+  };
 
   const chooseGap = (gap: GroundedGap) => {
     setSelectedGapId(gap.id);
@@ -219,15 +290,20 @@ export default function ProtocolBlueprintMode() {
     };
     // An outline taken from the journal keeps its sections; a new word target only resizes them.
     const journalSections = blueprint?.sections.length && blueprint.sections.every((s) => s.id.startsWith("jp-")) ? blueprint.sections.map((s) => s.sectionName) : null;
-    if (journalSections) {
+    if (journalSections && !isAiOutline(blueprint)) {
       const resized = blueprintFromStructure(pid, journalSections, newWords);
       patch.word_budget_blueprint = JSON.stringify(resized);
       setBlueprint(resized);
       await save(patch);
       return;
     }
+    // Any other outline keeps its sections; a new word target only rescales them.
+    if (blueprint?.sections.length && newWords !== blueprint.targetTotalWords) {
+      const resized = rescaleOutline(blueprint, newWords);
+      patch.word_budget_blueprint = JSON.stringify(resized);
+      setBlueprint(resized);
+    }
     await save(patch);
-    await handleAllocateBudget(newWords, newTemplate);
   };
 
   const handleUpdateSubSectionTarget = async (sectionId: string, subSectionId: string, newTarget: number) => {
@@ -488,7 +564,12 @@ export default function ProtocolBlueprintMode() {
         {/* STEP 3 */}
         <section aria-labelledby="bp-step3" className={card}>
           <div id="bp-step3">
-            <StepHeading n={3} title="Word budget and lock" done={locked} hint="Each section is split into writing units of about 350–500 words. Adjust any unit, then lock the blueprint." />
+            <StepHeading
+              n={3}
+              title="Table of contents and lock"
+              done={locked}
+              hint="Your AI designs the sections for this article and splits them into writing units. Ask it for any change, edit headings and word counts yourself, then lock the blueprint."
+            />
           </div>
 
           <ul className="grid sm:grid-cols-2 gap-2 text-xs" aria-label="Blueprint checklist">
@@ -497,7 +578,7 @@ export default function ProtocolBlueprintMode() {
               ["At least one research question", questions.some((q) => q.trim())],
               ["Working title", Boolean(title.trim())],
               ["Target journal", Boolean(journal)],
-              ["Word budget", Boolean(blueprint?.sections.length)],
+              ["Table of contents", Boolean(blueprint?.sections.length)],
             ].map(([label, ok]) => (
               <li key={String(label)} className="flex items-center gap-2 text-[color:var(--text-secondary)]">
                 {ok ? <CheckCircle2 className="w-4 h-4 text-[color:var(--state-success)]" aria-hidden="true" /> : <Circle className="w-4 h-4" aria-hidden="true" />}
@@ -509,43 +590,95 @@ export default function ProtocolBlueprintMode() {
             ))}
           </ul>
 
+          {outlineError && (
+            <p role="alert" className="text-xs text-[color:var(--state-danger)]">
+              {outlineError}
+            </p>
+          )}
+
           {blueprint ? (
             <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs font-mono px-1 text-[color:var(--text-secondary)] flex-wrap gap-2">
+              <div className="flex items-center justify-between text-xs px-1 text-[color:var(--text-secondary)] flex-wrap gap-2">
                 <span>
-                  Target: <strong className="text-[color:var(--text-primary)]">{blueprint.targetTotalWords.toLocaleString()} words</strong>
+                  {blueprint.sections.length} sections · {blueprint.totalSubSections || blueprint.sections.reduce((n, s) => n + s.subSections.length, 0)} writing units ·{" "}
+                  <strong className="text-[color:var(--text-primary)]">{blueprint.allocatedTotalWords.toLocaleString()}</strong> of {blueprint.targetTotalWords.toLocaleString()} words
                 </span>
-                <span>
-                  Allocated: <strong className="text-[color:var(--text-primary)]">{blueprint.allocatedTotalWords.toLocaleString()} words</strong>
-                  {blueprint.totalSubSections ? ` (${blueprint.totalSubSections} units)` : ""}
+                <span className="flex items-center gap-2">
+                  {previousOutline && (
+                    <button type="button" onClick={() => void undoOutline()} className="studio-btn">
+                      Undo last change
+                    </button>
+                  )}
+                  <button type="button" onClick={() => void runOutline()} disabled={outlineBusy || (!title.trim() && !problem.trim())} className="studio-btn">
+                    {outlineBusy ? "Working…" : isAiOutline(blueprint) ? "Rewrite with AI" : "Write for my article with AI"}
+                  </button>
                 </span>
-                <button type="button" disabled={isAllocatingBudget} onClick={() => void handleAllocateBudget(targetTotalWords, template)} className="studio-btn">
-                  Rebalance
-                </button>
               </div>
+
+              <form
+                className="flex flex-col sm:flex-row gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (outlineRequest.trim()) void runOutline(outlineRequest);
+                }}
+              >
+                <label htmlFor="bp-outline-request" className="sr-only">
+                  Ask AI to change the outline
+                </label>
+                <input
+                  id="bp-outline-request"
+                  value={outlineRequest}
+                  onChange={(e) => setOutlineRequest(e.target.value)}
+                  placeholder="Ask AI to change it, e.g. “shorten the literature review to 1,000 words” or “make it 8,000 words”"
+                  className={field}
+                />
+                <button type="submit" disabled={outlineBusy || !outlineRequest.trim()} className="studio-btn studio-btn-primary shrink-0">
+                  {outlineBusy ? "Changing…" : "Apply"}
+                </button>
+              </form>
+              <div className="flex flex-wrap gap-1.5" aria-label="Example changes">
+                {["Add a section on policy implications", "Shorten the literature review", "Merge results and discussion", "Make it 8,000 words"].map((ex) => (
+                  <button key={ex} type="button" disabled={outlineBusy} onClick={() => void runOutline(ex)} className="px-2 py-0.5 rounded-md text-[11px] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer disabled:opacity-50">
+                    {ex}
+                  </button>
+                ))}
+              </div>
+              {!isAiOutline(blueprint) && !blueprint.sections.every((s) => s.id.startsWith("jp-")) && (
+                <p className="text-[11px] text-[color:var(--state-warning)]">This is a generic starting outline, not one written for your article. Use “Write for my article with AI”.</p>
+              )}
+
               <div className="border border-[color:var(--border-subtle)] rounded-xl overflow-hidden divide-y divide-[color:var(--border-subtle)]">
                 {blueprint.sections.map((sec) => (
                   <div key={sec.id}>
-                    <div className="bg-[color:var(--surface-sunken)] px-4 py-2.5 flex items-center justify-between">
+                    <div className="bg-[color:var(--surface-sunken)] px-4 py-2.5 flex items-center justify-between gap-2">
                       <span className="text-xs font-bold text-[color:var(--text-primary)]">
                         {sec.order}. {sec.sectionName}
                       </span>
-                      <span className="text-xs font-mono font-bold text-[color:var(--accent)]">{sec.targetWords} words</span>
+                      <span className="text-xs font-mono font-bold text-[color:var(--accent)] shrink-0">{sec.targetWords} words</span>
                     </div>
                     {sec.subSections.map((sub, sIdx) => (
                       <div key={sub.id} className="px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <span className="text-xs text-[color:var(--text-primary)] min-w-0 truncate">
-                          <span className="text-[10px] font-mono text-[color:var(--text-muted)] mr-2">
+                        <span className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-[10px] font-mono text-[color:var(--text-muted)] shrink-0">
                             § {sec.order}.{sIdx + 1}
                           </span>
-                          {sub.title}
+                          <input
+                            aria-label={`Heading for § ${sec.order}.${sIdx + 1}`}
+                            defaultValue={sub.title}
+                            key={`${sub.id}-${sub.title}`}
+                            onBlur={(e) => {
+                              if (e.target.value.trim() && e.target.value.trim() !== sub.title) void renameSubSection(sec.id, sub.id, e.target.value);
+                            }}
+                            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                            className="flex-1 min-w-0 bg-transparent border border-transparent hover:border-[color:var(--border-subtle)] focus:border-[color:var(--border-control)] rounded-md px-1.5 py-0.5 text-xs text-[color:var(--text-primary)] outline-none"
+                          />
                         </span>
                         <span className="flex items-center gap-2 shrink-0">
                           <input
                             aria-label={`Target words for ${sub.title}`}
                             type="number"
                             min={100}
-                            max={1000}
+                            max={1500}
                             step={25}
                             value={sub.targetWords}
                             onChange={(e) => {
@@ -563,7 +696,16 @@ export default function ProtocolBlueprintMode() {
               </div>
             </div>
           ) : (
-            <p className="text-xs text-[color:var(--text-secondary)]">{isAllocatingBudget ? "Working out the word budget…" : "The word budget appears once the project has loaded."}</p>
+            <div className="p-6 rounded-xl border border-dashed border-[color:var(--border-control)] text-center space-y-2" data-testid="outline-empty">
+              <p className="text-sm font-semibold text-[color:var(--text-primary)]">No table of contents yet</p>
+              <p className="text-xs text-[color:var(--text-secondary)] max-w-md mx-auto">
+                Your AI designs the sections and writing units for this article from your title, gap, questions, article type and journal, at {targetTotalWords.toLocaleString()} words.
+              </p>
+              <button type="button" onClick={() => void runOutline()} disabled={outlineBusy || (!title.trim() && !problem.trim())} className="studio-btn studio-btn-primary">
+                {outlineBusy ? "Writing the table of contents…" : "Write my table of contents with AI"}
+              </button>
+              {!title.trim() && !problem.trim() && <p className="text-[11px] text-[color:var(--text-muted)]">Add a working title or a research problem in step 1 first.</p>}
+            </div>
           )}
 
           {lockError && (

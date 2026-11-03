@@ -26,3 +26,7 @@ export const suggestQuestions = (pid: string, interest: string, gap: { statement
 
 export const findJournals = (pid: string, query: string) =>
   call<{ since: number; journals: JournalMatch[] }>(pid, "journals", { query }, "Journals could not be found.");
+
+/** The table of contents for this article, written (or revised as asked) by the author's AI. */
+export const writeOutline = (pid: string, instruction?: string) =>
+  call<{ blueprint: import("../workspace/types").WordBudgetBlueprint }>(pid, "outline", instruction ? { instruction } : {}, "The outline could not be written.");

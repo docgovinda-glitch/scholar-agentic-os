@@ -127,4 +127,47 @@ describe("Mode 1 blueprint funnel routes", () => {
     expect(second.name).toBe("JMIR AI");
     for (const k of ["wordLimit", "citationStyle", "reviewFormat"]) expect(first).not.toHaveProperty(k);
   });
+
+  it("writes the table of contents for this article with the user's AI, scaled to the target, and revises it on request", async () => {
+    const id = await project("proj-bp-6");
+    const rec = (await getProjectStore().get(id))!;
+    rec.answers = { ...rec.answers, working_title: "Governing clinical AI in rural hospitals", core_problem: "Rural hospitals are unstudied.", research_questions: JSON.stringify(["Who approves clinical AI tools?"]), target_word_count: "5000", target_journal: "provisional" };
+    await getProjectStore().save(rec);
+
+    aiCallMock.mockResolvedValueOnce(JSON.stringify({ sections: [
+      { title: "Introduction", subsections: [{ title: "Clinical AI in rural district hospitals", words: 600 }] },
+      { title: "Methods", subsections: [{ title: "Interviews with hospital managers", words: 1000 }] },
+      { title: "Findings", subsections: [{ title: "Who approves AI tools", words: 1200 }] },
+    ] }));
+    const res = await request(app).post(`/api/projects/${id}/agentic/blueprint/outline`).set(AI_HEADERS).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.blueprint.sections.map((s: { sectionName: string }) => s.sectionName)).toEqual(["Introduction", "Methods", "Findings"]);
+    expect(res.body.blueprint.allocatedTotalWords).toBe(5000);
+    const prompt = aiCallMock.mock.calls[0][0].userPrompt as string;
+    expect(prompt).toContain("Working title: Governing clinical AI in rural hospitals");
+    expect(prompt).toContain("1. Who approves clinical AI tools?");
+    // The placeholder journal is not presented as a choice.
+    expect(prompt).toContain("Target journal: (not set)");
+    expect(JSON.parse((await getProjectStore().get(id))!.answers.word_budget_blueprint as string).sections).toHaveLength(3);
+
+    // Revising: the current outline and the request reach the AI; a new total is kept only when asked for.
+    aiCallMock.mockResolvedValueOnce(JSON.stringify({ totalWords: 7000, sections: [
+      { title: "Introduction", subsections: [{ title: "Clinical AI in rural district hospitals", words: 800 }] },
+      { title: "Methods", subsections: [{ title: "Interviews with hospital managers", words: 1500 }] },
+    ] }));
+    const res2 = await request(app).post(`/api/projects/${id}/agentic/blueprint/outline`).set(AI_HEADERS).send({ instruction: "Drop Findings and make it 7,000 words" });
+    expect(res2.status).toBe(200);
+    expect(res2.body.blueprint.allocatedTotalWords).toBe(7000);
+    const prompt2 = aiCallMock.mock.calls[1][0].userPrompt as string;
+    expect(prompt2).toContain("Current outline:");
+    expect(prompt2).toContain("The author asks: Drop Findings and make it 7,000 words");
+  });
+
+  it("asks for a title or problem before writing an outline, and needs an AI", async () => {
+    const id = await project("proj-bp-7");
+    const res = await request(app).post(`/api/projects/${id}/agentic/blueprint/outline`).set(AI_HEADERS).send({});
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("missing_context");
+    expect(aiCallMock).not.toHaveBeenCalled();
+  });
 });

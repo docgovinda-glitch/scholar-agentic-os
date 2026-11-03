@@ -12,6 +12,10 @@ import {
   questionsUserPrompt,
   scopeRationale,
 } from "../../../../src/domain/journal/blueprintFunnel.ts";
+import { outlineFromAi, outlinePrompt, outlineUserPrompt } from "../../../../src/domain/journal/aiOutline.ts";
+import { ARTICLE_TYPES } from "../../../../src/domain/journal/blueprintFunnel.ts";
+import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
+import type { WordBudgetBlueprint } from "../../../../src/desk/workspace/types.ts";
 import { getProjectSafe } from "./helpers.ts";
 
 export const blueprintRoutes = express.Router({ mergeParams: true });
@@ -94,5 +98,77 @@ blueprintRoutes.post("/blueprint/journals", async (req: express.Request<{ id: st
     return res.json({ since, journals: journals.map((j) => ({ ...j, rationale: scopeRationale(j, since) })) });
   } catch {
     return indexDown(res);
+  }
+});
+
+const outlineBody = z.object({ instruction: z.string().trim().max(600).optional() });
+
+function parseList(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((x): x is string => typeof x === "string" && Boolean(x.trim()));
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && Boolean(x.trim())) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * POST /api/projects/:id/agentic/blueprint/outline  { instruction? }
+ * The table of contents for this article, written by the author's AI from
+ * the project's own title, gap, questions, article type, journal and word
+ * target (and the journal's required sections when its guidelines were
+ * saved). With an instruction, the current outline is revised as asked.
+ * Word targets are scaled in code to add up exactly. Saved on success.
+ */
+blueprintRoutes.post("/blueprint/outline", async (req: express.Request<{ id: string }>, res: express.Response) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const body = outlineBody.safeParse(req.body ?? {});
+  if (!body.success) return res.status(400).json({ error: "Keep the request under 600 characters.", code: "invalid_input" });
+  const a = project.answers as Record<string, unknown>;
+  const str = (k: string) => (typeof a[k] === "string" ? (a[k] as string).trim() : "");
+  const journal = /^provisional$/i.test(str("target_journal")) ? "" : str("target_journal");
+  const target = parseInt(str("target_word_count"), 10);
+  let current: WordBudgetBlueprint | null = null;
+  try {
+    const parsed = typeof a.word_budget_blueprint === "string" ? JSON.parse(a.word_budget_blueprint) : a.word_budget_blueprint;
+    if (parsed && Array.isArray(parsed.sections)) current = parsed as WordBudgetBlueprint;
+  } catch {
+    current = null;
+  }
+  const title = str("working_title") || str("title");
+  const problem = str("core_problem");
+  if (!title && !problem) {
+    return res.status(400).json({ error: "Add a working title or a research problem first, so the outline can be about your article.", code: "missing_context" });
+  }
+  const instruction = body.data.instruction || undefined;
+  const ctx = {
+    title,
+    problem,
+    questions: parseList(a.research_questions),
+    articleType: ARTICLE_TYPES.find((t) => t.id === str("article_type_id"))?.label ?? "",
+    journal,
+    requiredSections: project.journalRequirements?.structureOverride ?? [],
+    targetWords: Number.isFinite(target) && target > 0 ? target : 6000,
+    instruction,
+    current: instruction ? current : null,
+  };
+  try {
+    const aiText = await routedCompletion(req, { task: "reasoning", systemPrompt: outlinePrompt(), userPrompt: outlineUserPrompt(ctx) });
+    const blueprint = outlineFromAi(aiText ?? "", project.projectId, ctx.targetWords, instruction);
+    if (!blueprint) {
+      return res.status(502).json({ error: "The AI's answer had no usable outline. Nothing was changed; try again.", code: "ai_unusable" });
+    }
+    project.answers = {
+      ...project.answers,
+      word_budget_blueprint: JSON.stringify(blueprint),
+      target_word_count: String(blueprint.targetTotalWords),
+    };
+    await getProjectStore().save(project);
+    return res.json({ blueprint });
+  } catch (err) {
+    return sendAiFailure(res, err, "Outline");
   }
 });
