@@ -24,11 +24,6 @@ import type { CandidateProvider } from "../../platform/gateway/types";
 import { getCloudProvider } from "../../config/providerCatalog";
 import { startExecutionScope, updateExecutionScope, endExecutionScope } from "../../services/executionState";
 import type { FailoverEvent } from "../../services/providerFailover";
-import {
-  getLiveSearchGroundingEnabled,
-  executeLiveSearch,
-  injectLiveGroundingToSystemPrompt,
-} from "../../services/liveSearchService";
 import { applyScholarGuardrails } from "../../shared/scholarGuardrails";
 import { parseAndRepairLLMJson } from "../../shared/llmJsonParser";
 
@@ -448,22 +443,10 @@ export async function executeAgenticLLM(
   onChunk?: (chunk: string) => void,
   onFailoverEvent?: (event: FailoverEvent) => void
 ) {
-  // If Live Web Search Grounding is enabled, inject fresh live snippets unless already present
-  let effectiveSystemPrompt = systemPrompt;
-  if (
-    getLiveSearchGroundingEnabled() &&
-    !systemPrompt.includes("[Live Web Grounding Context") &&
-    !userPrompt.includes("[Live Web Grounding Context")
-  ) {
-    try {
-      const searchResults = await executeLiveSearch(userPrompt, { limit: 5 });
-      if (searchResults.length > 0) {
-        effectiveSystemPrompt = injectLiveGroundingToSystemPrompt(systemPrompt, searchResults);
-      }
-    } catch {
-      // Non-blocking failover to standard generation
-    }
-  }
+  // Searching is done by the conversations that need it (Ask Scholar and the
+  // workspace chats ground every answer). Structured tasks (outlines, JSON,
+  // drafts) get exactly the prompt they were given.
+  const effectiveSystemPrompt = systemPrompt;
 
   // 1. Resolve candidates client-side first using policy-driven client router
   const clientDecision = await resolveClientCandidates(taskType, {

@@ -24,11 +24,6 @@ import {
   type OfferedPlan,
   type MyPremiumRequest,
 } from "./aiAccessApi";
-import {
-  getLiveSearchGroundingEnabled,
-  setLiveSearchGroundingEnabled,
-  onLiveSearchGroundingChange,
-} from "../../services/liveSearchService";
 import CredentialResetNotice from "../security/CredentialResetNotice";
 
 /**
@@ -1016,13 +1011,6 @@ function PreferencesSection({
   const fallback = access.settings.preferences.fallbackProvider ?? "";
   const privacy = access.settings.preferences.privacyPreference ?? "any";
   const [showPrivacyTooltip, setShowPrivacyTooltip] = useState(false);
-  const [liveGrounding, setLiveGrounding] = useState<boolean>(() => getLiveSearchGroundingEnabled());
-
-  useEffect(() => {
-    return onLiveSearchGroundingChange((enabled) => {
-      setLiveGrounding(enabled);
-    });
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -1245,34 +1233,18 @@ function PreferencesSection({
               🌐 Live Web Search Grounding
             </h3>
             <p className="mt-0.5 text-xs text-[color:var(--text-muted)]">
-              Automatically retrieve up-to-date open scholarly papers and web sources before generating responses.
+              Answers in Ask Scholar are based on the latest search results.
             </p>
           </div>
           <span className="text-[11px] font-mono text-sky-600 dark:text-sky-400 border border-sky-300 dark:border-sky-800/60 px-2 py-0.5 rounded-full bg-sky-50 dark:bg-sky-950/40">
-            Real-Time Citations
+            Always on
           </span>
         </div>
 
-        <label className="flex items-start gap-2.5 text-sm text-[color:var(--text-secondary)] cursor-pointer pt-1">
-          <input
-            type="checkbox"
-            checked={liveGrounding}
-            onChange={(e) => {
-              const next = e.target.checked;
-              setLiveGrounding(next);
-              setLiveSearchGroundingEnabled(next);
-            }}
-            className="mt-0.5 rounded border-[color:var(--border-control)] text-sky-600 focus:ring-sky-500 cursor-pointer"
-          />
-          <span>
-            <span className="font-medium text-[color:var(--text-primary)]">
-              Enable real-time web & open scholarly search grounding by default
-            </span>
-            <span className="mt-0.5 block text-xs text-[color:var(--text-muted)] leading-relaxed">
-              When active, prompt execution automatically queries OpenAlex, Crossref, and authoritative web indices, injecting fresh evidence snippets into the model's context for verifiable, hallucination-resistant answers.
-            </span>
-          </span>
-        </label>
+        <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed" data-testid="live-grounding-always-on">
+          Always on for Ask Scholar and the workspace chats: each answer starts from a fresh search of OpenAlex, Crossref and the web, and
+          lists the sources it used. Drafting and other structured AI steps use your own sources instead.
+        </p>
       </section>
     </div>
   );

@@ -287,14 +287,14 @@ export function formatLiveSearchGroundingContext(
     return "";
   }
 
-  const snippets = results.slice(0, 5).map((r, idx) => {
+  const snippets = results.slice(0, 8).map((r, idx) => {
     const authors = r.authors && r.authors.length > 0 ? r.authors.join(", ") : "Unknown Author";
     const date = r.publicationDate ? ` | Date: ${r.publicationDate}` : "";
     const source = r.source ? ` | Source: ${r.source}` : "";
     return `[${idx + 1}] "${r.title}" (${authors}${date}${source})\nURL: ${r.url}\nSummary / Evidence Snippet: ${r.snippet}`;
   });
 
-  return `[Live Web Grounding Context (Retrieved: ${currentDate})]:\n${snippets.join("\n\n")}\n\n[Grounding Instructions]: Ground your response exclusively in the verified facts and evidence from these live snippets. Whenever you state facts or draw findings from a source, provide inline citation links using markdown format (e.g. [[1]](URL) or [Author, Year](URL)). If the retrieved sources do not contain sufficient evidence to answer, state this explicitly rather than fabricating details.`;
+  return `[Live Web Grounding Context (Retrieved: ${currentDate})]:\n${snippets.join("\n\n")}\n\n[Grounding Instructions]: Ground your response exclusively in the verified facts and evidence from these live snippets. Whenever you state facts or draw findings from a source, provide inline citation links using markdown format (e.g. [[1]](URL) or [Author, Year](URL)), using the source numbers above so readers can match them to the source list. Prefer the most recent sources and mention when evidence is dated or contested. If the retrieved sources do not contain sufficient evidence to answer, state this explicitly rather than fabricating details.`;
 }
 
 /**
@@ -324,4 +324,19 @@ export function injectLiveGroundingToSystemPrompt(
   const contextBlock = formatLiveSearchGroundingContext(results, currentDate);
   if (!contextBlock) return systemPrompt;
   return `${systemPrompt}\n\n${contextBlock}`;
+}
+
+const FOLLOW_UP = /^(and|but|also|then|so|what about|how about|what else|tell me more|more on|same for|and in)\b/i;
+
+/**
+ * The words to search for. A short or follow-up question ("what about in
+ * Nepal?") is searched together with the previous question, so the results
+ * match the conversation rather than three words out of context.
+ */
+export function buildRetrievalQuery(question: string, previousQuestions: string[] = []): string {
+  const q = question.trim();
+  const prev = [...previousQuestions].reverse().find((p) => p.trim());
+  const words = q.split(/\s+/).filter(Boolean).length;
+  if (!prev || (words >= 7 && !FOLLOW_UP.test(q))) return q;
+  return `${prev.trim()} ${q}`.slice(0, 300);
 }

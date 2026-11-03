@@ -50,6 +50,8 @@ export interface WebsiteAssistantMessage {
     sourceType?: "official" | "scholarly" | "media" | "web" | "vault";
   }>;
   liveSources?: LiveSearchResult[];
+  /** When the search behind this answer ran (shown with its sources). */
+  searchedAt?: string;
   attachments?: Array<{ name: string; isImage: boolean; previewUrl?: string }>;
   error?: boolean;
   wordCount?: number;
