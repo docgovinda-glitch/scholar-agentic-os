@@ -300,7 +300,7 @@ export default function SourceDetailModal({
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-[color:var(--text-secondary)]">
-                    Key Points & Project Takeaways:
+                    Key sentences from the abstract:
                   </span>
                   <button
                     type="button"

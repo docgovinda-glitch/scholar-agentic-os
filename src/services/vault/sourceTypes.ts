@@ -118,7 +118,11 @@ export function vaultItemToSource(item: VaultItem): Source {
   // Infer source type
   let type: SourceType = "paper";
   const rawType = item.sourceType || (item as any).source_type || meta.type;
-  if (rawType === "web" || rawType === "website" || item.externalReference?.startsWith("http")) {
+  // The type chosen when the source was saved wins: a paper saved with its
+  // doi.org link is still a paper, not a website.
+  if (meta.type === "paper" || meta.type === "website" || meta.type === "book" || meta.type === "other") {
+    type = meta.type;
+  } else if (rawType === "web" || rawType === "website" || item.externalReference?.startsWith("http")) {
     type = "website";
   } else if (item.canonicalReference?.kind === "Book" || rawType === "book") {
     type = "book";
@@ -221,7 +225,7 @@ export function vaultItemToSource(item: VaultItem): Source {
     citationFormats: meta.citationFormats || { apa7: citationStr },
     citationStatus: item.citationStatus || (item.citation ? "confirmed" : "needs_user_review"),
     integrity,
-    integrityStatus: item.retractionStatus || (intStatus === "retracted" || intStatus === "expression_of_concern" ? intStatus : "clean"),
+    integrityStatus: item.retractionStatus || "unknown",
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   };
@@ -270,12 +274,15 @@ export function sourceToVaultItemPayload(
     sourceType = "web";
   }
 
+  // "clean" only after a real Crossref check found no notice; until then "unknown".
   const legacyRetractionStatus: RetractionStatus =
     source.integrity?.status === "retracted" || source.integrityStatus === "retracted"
       ? "retracted"
       : source.integrity?.status === "expression_of_concern" || source.integrityStatus === "expression_of_concern"
       ? "expression_of_concern"
-      : "clean";
+      : source.integrity?.status === "checked" && source.integrity.checkedAt
+      ? "clean"
+      : "unknown";
 
   return {
     title: source.metadata.title,

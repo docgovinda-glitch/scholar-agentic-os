@@ -491,7 +491,7 @@ export default function AddSourceModal({
           setWebUrl(res.metadata.url || `https://doi.org/${res.metadata.doi || cleanDoi}`);
           setSourceType("paper");
           applyTakeaways(res);
-          setFetchStatus("✓ DOI verified & key points auto-extracted");
+          setFetchStatus("✓ Found at the DOI registry");
 
           const dup = checkForDuplicates(
             {
@@ -522,7 +522,7 @@ export default function AddSourceModal({
         setWebUrl(res.metadata.url || raw);
         setSourceType(res.metadata.type === "paper" || res.metadata.doi || res.metadata.journal ? "paper" : "website");
         applyTakeaways(res);
-        setFetchStatus(res.confidence === "verified" ? "✓ Metadata & key points auto-extracted" : "Source details fetched");
+        setFetchStatus(res.confidence === "verified" ? "✓ Details found" : "Some details found; check them below");
 
         const dup = checkForDuplicates(
           {
@@ -1450,7 +1450,7 @@ export default function AddSourceModal({
               <span>{showExtras ? "Hide tags and writing notes" : "+ Add tags or notes (optional)"}</span>
               {keyPoints.length > 0 && (
                 <span className="ml-1 px-1.5 py-0.2 text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 rounded-full border border-amber-500/30">
-                  ✨ {keyPoints.length} Key {keyPoints.length === 1 ? "Point" : "Points"}
+                  ✨ {keyPoints.length} from the abstract
                 </span>
               )}
               {selectedProjects.length > 0 && (
@@ -1555,7 +1555,7 @@ export default function AddSourceModal({
                     <div>
                       <label className="text-[11px] font-bold text-[color:var(--text-secondary)] flex items-center gap-1.5">
                         <span>💡</span>
-                        <span>Key Points & Project Takeaways</span>
+                        <span>Key sentences from the abstract</span>
                       </label>
                       <p className="text-[10px] text-[color:var(--text-muted)]">
                         Core arguments and claims auto-fetched or saved for project writing and evidence.

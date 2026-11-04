@@ -485,7 +485,13 @@ const STOP_WORDS = new Set([
   "they", "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "we", "were", "what",
   "when", "where", "which", "while", "who", "whom", "why", "with", "would", "you", "your", "yours", "yourself",
   "towards", "study", "paper", "review", "using", "based", "new", "via", "across", "within", "et", "al", "with",
-  "journal", "article", "vol", "issue", "published", "author"
+  "journal", "article", "vol", "issue", "published", "author",
+  // Common verbs and filler that made poor tags (e.g. "#provides").
+  "provides", "provide", "provided", "shows", "show", "showed", "shown", "uses", "used", "use", "make", "makes", "made",
+  "found", "finds", "find", "also", "many", "much", "well", "however", "including", "include", "includes", "between",
+  "results", "result", "approach", "approaches", "method", "methods", "data", "analysis", "effect", "effects", "role",
+  "first", "second", "three", "two", "one", "high", "large", "different", "various", "several", "among", "upon", "toward",
+  "https", "http", "www", "abstract", "introduction", "conclusion", "conclusions"
 ]);
 
 /**
@@ -561,22 +567,15 @@ export function generateKeyPointsAndNotes(params: {
       }
     }
 
-    keyQuote = findings || objective || sentences[0] || "";
-    whySaved = `Core evidence on ${title}${authors.length > 0 ? ` (${authors[0]})` : ""} for project literature and synthesis.`;
   }
 
-  // Fallback / standard academic structure if text was brief
-  if (keyPoints.length === 0) {
-    keyPoints.push(`Core Research Thesis: Investigates ${title}.`);
-    keyPoints.push(
-      `Analytical Scope: Scholarly study in ${journal || "academic domain"}${year ? ` (${year})` : ""}.`
-    );
-    keyPoints.push(
-      `Project Relevance: Primary reference for literature review, theoretical framework, and evidence extraction.`
-    );
-    whySaved = `Supports project theoretical framework and literature synthesis on ${title}.`;
-    keyQuote = `"${title}"`;
-  }
+  // Key points are sentences quoted from the source's own abstract or text,
+  // and nothing else. "Why I saved it" and the key quote are the student's
+  // own words, so they are left empty: canned notes ("Core evidence on…",
+  // "Project Relevance: Primary reference…") used to be written for them,
+  // and three invented "takeaways" appeared when there was no abstract.
+  void authors;
+  void year;
 
   return {
     keyPoints,

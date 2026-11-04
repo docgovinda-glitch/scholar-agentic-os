@@ -29,7 +29,7 @@ export function extractDoiFromItem(item: VaultItem): string | null {
     const match = item.externalReference.match(/\b(10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+)\b/i);
     if (match) return cleanDoi(match[1]);
   }
-  const contentMatch = (item.title + " " + item.content.slice(0, 1500)).match(/\b(10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+)\b/i);
+  const contentMatch = ((item.title ?? "") + " " + (item.content ?? "").slice(0, 1500)).match(/\b(10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+)\b/i);
   if (contentMatch) {
     return cleanDoi(contentMatch[1]);
   }
@@ -68,7 +68,8 @@ export async function checkItemRetraction(item: VaultItem): Promise<RetractionCh
 
   const doi = extractDoiFromItem(item);
   if (!doi) {
-    return { status: "clean", isRetracted: false };
+    // Without a DOI there is nothing to look up: not checked, not "clean".
+    return { status: "unknown", isRetracted: false };
   }
 
   // 2. Query Crossref API for updates, retractions, and Crossmark assertions
@@ -155,7 +156,11 @@ export async function scanVaultRetractions(
     const item = items[i];
     if (onProgress) onProgress(i + 1, items.length);
 
-    const check = await checkItemRetraction(item);
+    let check = await checkItemRetraction(item);
+    // A failed lookup (offline, Crossref down) keeps the last real result.
+    if (check.status === "unknown" && extractDoiFromItem(item) && item.retractionStatus && item.retractionStatus !== "unknown") {
+      check = { status: item.retractionStatus, isRetracted: item.retractionStatus !== "clean", reason: item.retractionDetails?.reason, noticeUrl: item.retractionDetails?.noticeUrl };
+    }
     if (check.status === "retracted" || check.status === "expression_of_concern") {
       retractedCount++;
     }

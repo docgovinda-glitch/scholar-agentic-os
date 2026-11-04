@@ -137,10 +137,11 @@ export default function SourceLibraryScreen({
     if (items.length === 0) return;
     const timer = setTimeout(async () => {
       try {
+        // Show every result, not only retractions: "checked" must mean checked.
         const result = await scanVaultRetractions(userId, items);
-        if (result.retractedCount > 0) {
-          setItems(result.updatedItems);
-        }
+        const byId = new Map(result.updatedItems.map((u) => [u.id, u]));
+        // Merge by id: sources added while the check ran are kept.
+        setItems((prev) => prev.map((p) => byId.get(p.id) ?? p));
       } catch {}
     }, 2000);
     return () => clearTimeout(timer);
@@ -345,9 +346,12 @@ export default function SourceLibraryScreen({
           <div>
             <h1 className="text-xl font-bold tracking-tight text-[color:var(--text-primary)] flex items-center gap-2">
               <span>Source Library</span>
-              <span className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                Cloud Connected
-              </span>
+              {/* Only when a drive is really connected (this badge was always shown). */}
+              {connectedDrives.length > 0 && (
+                <span data-testid="cloud-connected-badge" className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  {Array.from(new Set(connectedDrives.map((d) => (d.provider === "google_drive" ? "Google Drive" : "OneDrive")))).join(" + ")} connected
+                </span>
+              )}
             </h1>
             <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
               Save your sources. Find them when you write.
@@ -915,7 +919,9 @@ export default function SourceLibraryScreen({
                           {/* Authors & Publication line */}
                           <div className="text-xs text-[color:var(--text-secondary)] mt-1 pl-6">
                             {source.metadata.authors && source.metadata.authors.length > 0
-                              ? source.metadata.authors.join(", ")
+                              ? (source.metadata.authors.length > 4
+                                  ? `${source.metadata.authors.slice(0, 3).join(", ")} and ${source.metadata.authors.length - 3} more`
+                                  : source.metadata.authors.join(", "))
                               : "Unknown Author"}
                             {source.metadata.year ? ` · ${source.metadata.year}` : ""}
                             {source.metadata.journal ? ` · ${source.metadata.journal}` : ""}
@@ -964,7 +970,7 @@ export default function SourceLibraryScreen({
                               className="flex items-center gap-1.5 font-semibold text-[color:var(--text-primary)] hover:text-[color:var(--accent)] cursor-pointer"
                             >
                               <span>💡</span>
-                              <span>{keyPoints.length} Key Takeaway{keyPoints.length > 1 ? "s" : ""}</span>
+                              <span>{keyPoints.length} key sentence{keyPoints.length > 1 ? "s" : ""} from the abstract</span>
                               <span className="text-[10px] text-[color:var(--text-muted)]">
                                 {isKeyPointsExpanded ? "▲ Hide" : "▼ Show"}
                               </span>
@@ -975,7 +981,7 @@ export default function SourceLibraryScreen({
                               className="text-[10px] font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--accent)] cursor-pointer flex items-center gap-1"
                             >
                               <span>{copiedKeyPointsId === source.id ? "✓" : "📋"}</span>
-                              <span>{copiedKeyPointsId === source.id ? "Copied" : "Copy Takeaways"}</span>
+                              <span>{copiedKeyPointsId === source.id ? "Copied" : "Copy"}</span>
                             </button>
                           </div>
 
@@ -1106,9 +1112,13 @@ export default function SourceLibraryScreen({
                             <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 font-bold border border-red-500/20">
                               RETRACTION NOTICE
                             </span>
+                          ) : source.integrityStatus === "clean" ? (
+                            <span className="text-[10px] text-[color:var(--text-muted)] font-medium" title="Checked at Crossref">
+                              No retraction on record
+                            </span>
                           ) : (
-                            <span className="text-[10px] text-[color:var(--text-muted)] font-medium">
-                              Integrity checked
+                            <span className="text-[10px] text-[color:var(--text-muted)] font-medium" title={source.metadata.doi ? "Crossref could not be reached; it is checked again next time" : "Only sources with a DOI can be checked"}>
+                              Retractions not checked
                             </span>
                           )}
                         </div>
