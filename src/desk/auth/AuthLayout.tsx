@@ -20,7 +20,7 @@ import ScholarCoreLogo from "../../components/ScholarCoreLogo";
  * Applied to a required field's <label> to paint a trailing " *" via CSS.
  */
 function labelClass(required: boolean): string {
-  return `text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-neutral-300${required ? " required-mark" : ""}`;
+  return `text-[13px] font-semibold tracking-tight text-neutral-800 dark:text-neutral-200${required ? " required-mark" : ""}`;
 }
 
 export function AuthShell({
@@ -32,9 +32,18 @@ export function AuthShell({
   className?: string;
   maxWidth?: string;
 }) {
+  if (className) {
+    return (
+      <div className={className}>
+        <div className={`mx-auto w-full ${maxWidth}`}>{children}</div>
+      </div>
+    );
+  }
   return (
-    <div className={className ?? "min-h-screen bg-slate-50 dark:bg-neutral-950 flex flex-col justify-center px-4 py-10"}>
-      <div className={`mx-auto w-full ${maxWidth}`}>{children}</div>
+    <div className="min-h-[100dvh] bg-paper-sand dark:bg-ink-900 flex flex-col justify-center px-4 py-8 sm:py-12">
+      <div className={`mx-auto w-full ${maxWidth} bg-white dark:bg-ink-800 border border-neutral-200/90 dark:border-white/10 rounded-2xl shadow-sm p-6 sm:p-8`}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -49,29 +58,29 @@ export function AuthHeading({
   badge?: string;
 }) {
   return (
-    <header className="mb-6 text-left">
-      <div className="flex items-center gap-2.5">
-        <div className="p-1.5 rounded-xl bg-amber-500/10 dark:bg-amber-400/10 border border-amber-500/20 shadow-2xs flex items-center justify-center shrink-0">
+    <header className="mb-4 text-left">
+      <div className="flex items-center gap-2">
+        <div className="w-7 h-7 rounded-md bg-neutral-100 dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 flex items-center justify-center shrink-0">
           <ScholarCoreLogo size="sm" className="text-[color:var(--text-primary)]" />
         </div>
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-bold tracking-wider uppercase text-amber-700 dark:text-amber-400">
+            <span className="text-[10.5px] font-bold tracking-wider uppercase text-neutral-800 dark:text-neutral-200 leading-none">
               {badge}
             </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
           </div>
-          <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-medium">
+          <span className="text-[10.5px] text-neutral-500 dark:text-neutral-400 font-medium leading-tight mt-0.5">
             Research & Academic Workspace
           </span>
         </div>
       </div>
       {/* h1 is the screen's own title for accessibility and page structure */}
-      <h1 className="mt-3.5 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+      <h1 className="mt-2.5 text-xl sm:text-[22px] font-bold tracking-tight text-neutral-900 dark:text-white">
         {title}
       </h1>
       {subtitle && (
-        <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
+        <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
           {subtitle}
         </p>
       )}
@@ -116,6 +125,11 @@ export function Field({
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
   const resolvedType = showPasswordToggle ? (visible ? "text" : "password") : type;
+  const isIdentifier =
+    type === "email" ||
+    type === "tel" ||
+    autoComplete === "username" ||
+    autoComplete === "email";
 
   return (
     <div className="flex flex-col gap-1.5 text-left">
@@ -132,34 +146,37 @@ export function Field({
           disabled={disabled}
           autoComplete={autoComplete}
           autoFocus={autoFocus}
+          spellCheck={isIdentifier ? false : undefined}
+          autoCapitalize={isIdentifier ? "off" : undefined}
           aria-describedby={describedBy}
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
-          className={`w-full px-3.5 py-2.5 text-sm bg-white dark:bg-neutral-900 border ${
+          className={`w-full h-11 px-3.5 py-2 text-sm bg-white dark:bg-ink-900 border ${
             error
-              ? "border-rose-400 dark:border-rose-600 focus:border-rose-500 focus:ring-rose-500/10"
-              : "border-slate-300 dark:border-neutral-700 hover:border-slate-400 dark:hover:border-neutral-600 focus:border-slate-900 dark:focus:border-neutral-200 focus:ring-slate-900/5 dark:focus:ring-white/10"
-          } rounded-xl text-slate-900 dark:text-neutral-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-4 transition-all duration-150 shadow-2xs disabled:bg-slate-50 disabled:text-slate-400 ${
-            showPasswordToggle ? "pr-16" : ""
+              ? "border-rose-400 dark:border-rose-500/80 focus:border-rose-600"
+              : "border-neutral-300 dark:border-white/15 hover:border-neutral-400 dark:hover:border-white/25 focus:border-neutral-900 dark:focus:border-white"
+          } rounded-md text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-hidden transition-colors duration-150 disabled:bg-neutral-50 dark:disabled:bg-ink-850 disabled:text-neutral-400 ${
+            showPasswordToggle ? "pr-20" : ""
           }`}
         />
         {showPasswordToggle && (
           <button
             type="button"
+            data-compact="true"
             onClick={() => setVisible((v) => !v)}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 px-2 py-1 text-xs font-semibold text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+            className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 rounded-sm transition-colors cursor-pointer flex items-center gap-1"
             aria-label={visible ? "Hide password" : "Show password"}
           >
             {visible ? (
               <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
                 </svg>
                 <span>Hide</span>
               </>
             ) : (
               <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
@@ -170,13 +187,13 @@ export function Field({
         )}
       </div>
       {hint && (
-        <p id={hintId} className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 leading-normal">
+        <p id={hintId} className="text-[11.5px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
           {hint}
         </p>
       )}
       {error && (
-        <p id={errorId} role="alert" className="text-xs font-semibold text-rose-600 dark:text-rose-400 mt-0.5 flex items-center gap-1">
-          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <p id={errorId} role="alert" className="text-xs font-medium text-rose-600 dark:text-rose-400 mt-0.5 flex items-center gap-1.5">
+          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>{error}</span>
@@ -219,25 +236,25 @@ export function SelectField({
           required={required}
           aria-describedby={hintId}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none px-3.5 py-2.5 pr-10 text-sm bg-white dark:bg-neutral-900 border border-slate-300 dark:border-neutral-700 hover:border-slate-400 dark:hover:border-neutral-600 focus:border-slate-900 dark:focus:border-neutral-200 focus:ring-4 focus:ring-slate-900/5 dark:focus:ring-white/10 rounded-xl text-slate-900 dark:text-neutral-100 focus:outline-hidden transition-all duration-150 shadow-2xs cursor-pointer"
+          className="w-full h-11 appearance-none px-3.5 py-2 pr-9 text-sm bg-white dark:bg-ink-900 border border-neutral-300 dark:border-white/15 hover:border-neutral-400 dark:hover:border-white/25 focus:border-neutral-900 dark:focus:border-white rounded-md text-neutral-900 dark:text-neutral-100 focus:outline-hidden transition-colors duration-150 cursor-pointer"
         >
           <option value="" disabled={required}>
             {placeholder}
           </option>
           {options.map((o) => (
-            <option key={o.value} value={o.value} className="bg-white dark:bg-neutral-900 text-slate-900 dark:text-neutral-100">
+            <option key={o.value} value={o.value} className="bg-white dark:bg-ink-900 text-neutral-900 dark:text-neutral-100">
               {o.label}
             </option>
           ))}
         </select>
-        <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </div>
       </div>
       {hint && (
-        <p id={hintId} className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 leading-normal">
+        <p id={hintId} className="text-[11.5px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
           {hint}
         </p>
       )}
@@ -288,24 +305,25 @@ export function FileField({
           required={required}
           aria-describedby={hintId}
           onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-          className="w-full text-sm py-2 px-3 bg-white dark:bg-neutral-900 border border-slate-300 dark:border-neutral-700 rounded-xl cursor-pointer"
+          className="w-full text-sm py-2 px-3 bg-white dark:bg-ink-900 border border-neutral-300 dark:border-white/15 rounded-md cursor-pointer"
         />
       )}
       {file && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-900/60 px-3.5 py-2.5 text-sm">
-          <span className="truncate text-slate-900 dark:text-white font-medium">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-ink-900/60 px-3.5 py-2.5 text-sm">
+          <span className="truncate text-neutral-900 dark:text-white font-medium">
             {file.name} ({formatBytes(file.size)})
           </span>
           <button
             type="button"
+            data-compact="true"
             onClick={() => onChange(null)}
-            className="shrink-0 text-xs font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 cursor-pointer"
+            className="shrink-0 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 cursor-pointer"
           >
             Remove
           </button>
         </div>
       )}
-      <p id={hintId} className="text-xs text-slate-500 dark:text-neutral-400">
+      <p id={hintId} className="text-[11.5px] text-neutral-500 dark:text-neutral-400">
         {helpText}
         {maxBytes ? ` Max size ${formatBytes(maxBytes)}.` : ""}
       </p>
@@ -352,32 +370,32 @@ export function PhoneField({
         {label}
       </label>
       <div
-        className={`flex rounded-xl border ${
+        className={`flex items-stretch h-11 rounded-md border ${
           error
-            ? "border-rose-400 dark:border-rose-600 focus-within:border-rose-500 focus-within:ring-rose-500/10"
-            : "border-slate-300 dark:border-neutral-700 hover:border-slate-400 dark:hover:border-neutral-600 focus-within:border-slate-900 dark:focus-within:border-neutral-200 focus-within:ring-slate-900/5 dark:focus-within:ring-white/10"
-        } focus-within:ring-4 transition-all duration-150 shadow-2xs overflow-hidden bg-white dark:bg-neutral-900`}
+            ? "border-rose-400 dark:border-rose-500/80 focus-within:border-rose-600"
+            : "border-neutral-300 dark:border-white/15 hover:border-neutral-400 dark:hover:border-white/25 focus-within:border-neutral-900 dark:focus-within:border-white"
+        } focus-within:ring-3 focus-within:ring-neutral-900/8 dark:focus-within:ring-white/10 transition-colors duration-150 overflow-hidden bg-white dark:bg-ink-900`}
       >
         <label className="sr-only" htmlFor={countryId}>
           Country code
         </label>
-        <div className="relative border-r border-slate-200 dark:border-neutral-800 bg-slate-50/70 dark:bg-neutral-800/40 shrink-0">
+        <div className="relative flex items-center border-r border-neutral-200 dark:border-white/10 bg-neutral-50/80 dark:bg-ink-800/70 shrink-0">
           <select
             id={countryId}
             name={countryId}
             value={selected ? `${selected.iso2}:${selected.dialCode}` : ""}
             onChange={(e) => onCountryCodeChange(e.target.value.split(":")[1] ?? e.target.value)}
-            className="appearance-none pl-3 pr-7 py-2.5 text-sm bg-transparent border-0 text-slate-800 dark:text-neutral-200 font-medium focus:outline-hidden cursor-pointer"
+            className="prompt-bare-input border-0 bg-transparent h-full appearance-none pl-2.5 pr-6 text-sm text-neutral-800 dark:text-neutral-200 font-medium focus:outline-hidden cursor-pointer"
           >
             <option value="" disabled>Code</option>
             {COUNTRIES.map((c) => (
-              <option key={c.iso2} value={`${c.iso2}:${c.dialCode}`} className="bg-white dark:bg-neutral-900 text-slate-900 dark:text-neutral-100">
+              <option key={c.iso2} value={`${c.iso2}:${c.dialCode}`} className="bg-white dark:bg-ink-900 text-neutral-900 dark:text-neutral-100">
                 {c.flag} {c.dialCode}
               </option>
             ))}
           </select>
-          <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </div>
@@ -387,16 +405,17 @@ export function PhoneField({
           name={numberId}
           type="tel"
           inputMode="numeric"
+          autoComplete="tel-national"
           value={number}
           required={required}
           placeholder="e.g., 5551234567"
           onChange={(e) => onNumberChange(e.target.value)}
           onBlur={onBlur}
-          className="w-full px-3.5 py-2.5 text-sm bg-transparent border-0 text-slate-900 dark:text-neutral-100 placeholder:text-slate-400 focus:outline-hidden"
+          className="prompt-bare-input border-0 bg-transparent w-full h-full px-3 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-hidden"
         />
       </div>
       {hint && (
-        <p id={hintId} className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 leading-normal">
+        <p id={hintId} className="text-[11.5px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
           {hint}
         </p>
       )}
@@ -410,12 +429,12 @@ export function AuthError({ children }: { children: ReactNode }) {
   return (
     <div
       role="alert"
-      className="flex items-start gap-2.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/90 dark:bg-rose-950/40 p-3 text-xs text-rose-700 dark:text-rose-300 shadow-2xs animate-in fade-in duration-150 text-left"
+      className="flex items-start gap-2.5 rounded-md border border-rose-200 dark:border-rose-900/60 bg-rose-50/90 dark:bg-rose-950/40 p-3 text-xs text-rose-700 dark:text-rose-300 animate-in fade-in duration-150 text-left"
     >
-      <svg className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <div className="flex-1 font-medium">{children}</div>
+      <div className="flex-1 font-medium leading-relaxed">{children}</div>
     </div>
   );
 }
@@ -427,12 +446,12 @@ export function AuthNotice({ children }: { children: ReactNode }) {
   return (
     <div
       role="status"
-      className="flex items-start gap-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/90 dark:bg-emerald-950/40 p-3 text-xs text-emerald-800 dark:text-emerald-300 shadow-2xs animate-in fade-in duration-150 text-left"
+      className="flex items-start gap-2.5 rounded-md border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/90 dark:bg-emerald-950/40 p-3.5 text-xs text-emerald-800 dark:text-emerald-300 animate-in fade-in duration-150 text-left"
     >
-      <svg className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <div className="flex-1 font-medium">{children}</div>
+      <div className="flex-1 font-medium leading-relaxed">{children}</div>
     </div>
   );
 }
@@ -456,17 +475,17 @@ export function SubmitButton({
       onClick={onClick}
       disabled={busy || disabled}
       aria-busy={busy}
-      className="mt-3 w-full rounded-xl bg-slate-900 hover:bg-black dark:bg-white dark:hover:bg-slate-100 dark:text-slate-950 text-white font-semibold px-4 py-3 text-sm shadow-md hover:shadow-lg shadow-slate-900/10 active:scale-[0.99] transition-all duration-150 disabled:opacity-45 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100 cursor-pointer inline-flex items-center justify-center gap-2 group"
+      className="mt-1.5 w-full h-11 rounded-md bg-neutral-900 hover:bg-ink-950 dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-900 text-white font-semibold px-4 text-sm shadow-xs hover:shadow-sm active:scale-[0.99] transition-all duration-150 disabled:bg-neutral-800 disabled:text-white/90 dark:disabled:bg-neutral-200 dark:disabled:text-neutral-900 disabled:!opacity-85 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100 cursor-pointer inline-flex items-center justify-center gap-2 group"
     >
       {busy ? (
         <>
-          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
+          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" aria-hidden="true" />
           <span>{busyLabel}</span>
         </>
       ) : (
         <span className="flex items-center justify-center gap-2">
           <span>{children}</span>
-          <svg className="w-4 h-4 transition-transform group-hover:translate-x-0.5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 transition-transform group-hover:translate-x-0.5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
           </svg>
         </span>
@@ -480,8 +499,9 @@ export function AuthLink({ onClick, children }: { onClick: () => void; children:
   return (
     <button
       type="button"
+      data-compact="true"
       onClick={onClick}
-      className="text-xs font-semibold text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+      className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white underline-offset-4 hover:underline transition-colors cursor-pointer"
     >
       {children}
     </button>
@@ -496,7 +516,7 @@ export function AuthForm({
   children: ReactNode;
 }) {
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-3.5" noValidate>
+    <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
       {children}
     </form>
   );
@@ -504,12 +524,12 @@ export function AuthForm({
 
 export function AuthDivider() {
   return (
-    <div className="relative flex items-center py-2">
-      <div className="flex-grow border-t border-slate-200 dark:border-neutral-800"></div>
-      <span className="shrink-0 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+    <div className="relative flex items-center py-1.5">
+      <div className="flex-grow border-t border-neutral-200 dark:border-white/10"></div>
+      <span className="shrink-0 px-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
         Or continue with
       </span>
-      <div className="flex-grow border-t border-slate-200 dark:border-neutral-800"></div>
+      <div className="flex-grow border-t border-neutral-200 dark:border-white/10"></div>
     </div>
   );
 }
@@ -521,16 +541,16 @@ export function GoogleSignInButton({ onClick, busy }: { onClick: () => void; bus
       onClick={onClick}
       disabled={busy}
       aria-busy={busy}
-      className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-850 hover:bg-slate-50 dark:hover:bg-neutral-800 hover:border-slate-300 dark:hover:border-neutral-700 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-2xs hover:shadow-xs active:scale-[0.99] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+      className="flex w-full h-11 items-center justify-center gap-3 rounded-md border border-neutral-300 dark:border-white/15 bg-white dark:bg-ink-750 hover:bg-neutral-50 dark:hover:bg-ink-700 hover:border-neutral-400 dark:hover:border-white/25 px-4 text-sm font-semibold text-neutral-800 dark:text-neutral-100 shadow-2xs active:scale-[0.99] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
     >
       {busy ? (
         <>
-          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
+          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" aria-hidden="true" />
           <span>Connecting to Google…</span>
         </>
       ) : (
         <>
-          <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24">
+          <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
             <path
               d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
               fill="#4285F4"

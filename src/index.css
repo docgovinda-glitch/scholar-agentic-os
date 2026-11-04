@@ -586,11 +586,21 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   input:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input):focus,
+  input:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input):focus-visible,
   select:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input):focus,
-  textarea:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input):focus {
+  select:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input):focus-visible,
+  textarea:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input):focus,
+  textarea:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input):focus-visible {
     border-color: var(--accent);
     outline: none;
     box-shadow: 0 0 0 3px var(--accent-subtle);
+  }
+
+  /* Keyboard focus inside @layer base so component-level Tailwind focus utilities
+     and custom border-radius classes are respected without double outlines. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 }
 
@@ -622,15 +632,6 @@ h1, h2, h3, h4, h5, h6 {
 button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
-}
-
-/* Keyboard focus. Declared once — the previous revision defined
-   `:focus-visible` twice with conflicting colours, the second silently
-   winning. --border-strong clears 3:1 against every surface in both themes. */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
 }
 
 /* Scrollbars — tokenised so they follow the theme. */

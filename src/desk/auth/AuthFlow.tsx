@@ -237,14 +237,14 @@ export function SignInScreen({
         </SubmitButton>
       </AuthForm>
 
-      <div className="mt-4">
+      <div className="mt-3.5">
         <AuthDivider />
       </div>
-      <div className="mt-4">
+      <div className="mt-3.5">
         <GoogleIdentityButton onSuccess={() => navigate("/desk")} onError={(msg) => setError(msg)} />
       </div>
-      <div className="mt-6 pt-4 border-t border-slate-200/80 dark:border-neutral-800 text-center">
-        <p className="text-xs text-slate-500 dark:text-neutral-400">
+      <div className="mt-5 pt-4 border-t border-neutral-200/80 dark:border-white/10 text-center">
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
           Don't have an account?{" "}
           <AuthLink onClick={onRegister}>Create an account</AuthLink>
         </p>
@@ -385,13 +385,13 @@ export function SignUpScreen({
   }
 
   return (
-    <AuthShell className={embedded ? "w-full" : undefined} maxWidth={embedded ? "w-full" : "max-w-2xl"}>
+    <AuthShell className={embedded ? "w-full" : undefined} maxWidth={embedded ? "w-full" : "max-w-[560px]"}>
       <AuthHeading
         title="Create your account"
         subtitle="Verify your email to get started."
       />
       <AuthForm onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3.5 gap-y-2.5 items-start">
           <Field
             id="signup-fullName"
             label="Full name"
@@ -434,18 +434,6 @@ export function SignUpScreen({
             onBlur={checkPhoneField}
             error={phoneStatus?.status === "taken" ? PHONE_TAKEN_MESSAGE : null}
           />
-          <div className="sm:col-span-2">
-            <Field
-              id="signup-affiliation"
-              label="Institution"
-              type="text"
-              autoComplete="organization"
-              hint="University, department, or organisation — leave blank if this doesn't apply to you."
-              required={false}
-              value={fields.affiliation}
-              onChange={set("affiliation")}
-            />
-          </div>
           <SelectField
             id="signup-userType"
             label="User Type"
@@ -460,17 +448,26 @@ export function SignUpScreen({
             onChange={set("educationLevel")}
             options={EDUCATION_LEVELS}
           />
-          <div className="sm:col-span-2">
-            <Field
-              id="signup-password"
-              label="Password"
-              type="password"
-              autoComplete="new-password"
-              value={fields.password}
-              onChange={set("password")}
-              showPasswordToggle
-            />
-          </div>
+          <Field
+            id="signup-affiliation"
+            label="Institution"
+            type="text"
+            autoComplete="organization"
+            hint="University or organisation (optional)."
+            required={false}
+            value={fields.affiliation}
+            onChange={set("affiliation")}
+          />
+          <Field
+            id="signup-password"
+            label="Password"
+            type="password"
+            autoComplete="new-password"
+            hint="At least 8 characters."
+            value={fields.password}
+            onChange={set("password")}
+            showPasswordToggle
+          />
         </div>
 
         <CaptchaWidget onTokenReady={setCaptchaToken} />
@@ -480,15 +477,15 @@ export function SignUpScreen({
         </SubmitButton>
       </AuthForm>
 
-      <div className="mt-4">
+      <div className="mt-2.5">
         <AuthDivider />
       </div>
-      <div className="mt-4">
+      <div className="mt-2.5">
         <GoogleIdentityButton onSuccess={() => navigate("/desk")} onError={(msg) => setError(msg)} />
       </div>
 
-      <div className="mt-6 pt-4 border-t border-slate-200/80 dark:border-neutral-800 text-center">
-        <p className="text-xs text-slate-500 dark:text-neutral-400">
+      <div className="mt-3.5 pt-3 border-t border-neutral-200/80 dark:border-white/10 text-center">
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
           Already have an account?{" "}
           <AuthLink onClick={onBack}>Back to sign in</AuthLink>
         </p>

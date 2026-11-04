@@ -88,18 +88,29 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
         });
 
         // Clear container and render Google standard button directly into containerRef
-        if (containerRef.current) {
+        const renderGsiButton = () => {
+          if (!containerRef.current) return;
+          const parentWidth = containerRef.current.parentElement?.getBoundingClientRect().width || 0;
+          const selfWidth = containerRef.current.getBoundingClientRect().width || containerRef.current.clientWidth || 0;
+          const rawWidth = parentWidth || selfWidth || 380;
+          const computedWidth = Math.min(400, Math.max(240, Math.floor(rawWidth)));
+          const isDark =
+            document.documentElement.classList.contains("dark") ||
+            document.documentElement.getAttribute("data-theme") === "dark";
           containerRef.current.innerHTML = "";
           google.accounts.id.renderButton(containerRef.current, {
             type: "standard",
-            theme: "outline",
+            theme: isDark ? "filled_black" : "outline",
             size: "large",
-            width: 320,
+            width: computedWidth,
             text: "continue_with",
             shape: "rectangular",
             logo_alignment: "left",
+            locale: "en",
           });
-        }
+        };
+
+        renderGsiButton();
 
         setGsiLoaded(true);
 
@@ -146,8 +157,8 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
 
       {/* Loading placeholder while GIS script is downloading */}
       {!gsiLoaded && (
-        <div className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-4 py-2.5 text-sm font-medium text-slate-500 dark:text-neutral-400 shadow-2xs">
-          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
+        <div className="flex w-full h-11 items-center justify-center gap-3 rounded-md border border-neutral-200 dark:border-white/15 bg-white dark:bg-ink-900 px-4 text-sm font-medium text-neutral-500 dark:text-neutral-400">
+          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" aria-hidden="true" />
           <span>Loading Google Sign-In…</span>
         </div>
       )}
@@ -155,8 +166,9 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
       {gsiLoaded && !busy && (
         <button
           type="button"
+          data-compact="true"
           onClick={handleOAuthFallback}
-          className="mt-2.5 text-[11px] font-medium text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+          className="mt-2 text-[11px] font-medium text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
         >
           Having trouble with popup? Use redirect sign-in →
         </button>

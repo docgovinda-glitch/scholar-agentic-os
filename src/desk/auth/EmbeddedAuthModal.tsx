@@ -48,6 +48,17 @@ export default function EmbeddedAuthModal({
     }
   }, [isOpen, initialMode]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   // When session flips to signed-in, auto-close the modal and handle redirects/format booting
   useEffect(() => {
     if (isOpen && session.status === "signed-in") {
@@ -80,86 +91,109 @@ export default function EmbeddedAuthModal({
   }
 
   const isWide = screen === "signup";
-  const modalWidth = isWide ? "max-w-2xl" : "max-w-md";
+  const modalWidth = isWide ? "max-w-[560px]" : "max-w-[440px]";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 dark:bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-ink-950/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       <div
-        className={`relative w-full ${modalWidth} max-h-[92vh] overflow-hidden bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl border border-slate-200/90 dark:border-neutral-800 rounded-3xl shadow-2xl shadow-slate-950/20 flex flex-col transition-all duration-200`}
+        className={`relative w-full ${modalWidth} max-h-[94dvh] overflow-hidden bg-white dark:bg-ink-800 border border-neutral-200/90 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col transition-all duration-200`}
         role="dialog"
         aria-modal="true"
+        aria-label={screen === "signup" ? "Create account" : "Sign in"}
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Subtle luminous ambient background aura at the top of the modal */}
-        <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-amber-500/10 via-orange-500/5 to-transparent pointer-events-none z-0" />
-
-        {/* Close Button */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100/80 hover:bg-slate-200 dark:bg-neutral-800/80 dark:hover:bg-neutral-700 text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer z-30"
-          aria-label="Close"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        {/* Scrollable Container */}
-        <div className="overflow-y-auto p-6 sm:p-8 scholar-scrollbar relative z-10">
-          {/* Quick Segmented Mode Switcher */}
-          {(screen === "signin" || screen === "signup") && (
-            <div className="flex p-1 bg-slate-100/90 dark:bg-neutral-800/90 rounded-2xl mb-5 border border-slate-200/70 dark:border-neutral-700/70 shadow-2xs">
+        {/* Top Header Bar: Mode Switcher + Dedicated Close Button (Zero Overlap) */}
+        <div className="flex items-center justify-between gap-2.5 px-4 pt-3.5 pb-3 sm:px-6 sm:pt-4 sm:pb-3.5 border-b border-neutral-200/70 dark:border-white/10 bg-white dark:bg-ink-800 shrink-0 z-20">
+          {(screen === "signin" || screen === "signup") ? (
+            <div className="flex flex-1 p-1 bg-neutral-100 dark:bg-ink-900 rounded-md border border-neutral-200/70 dark:border-white/10">
               <button
                 type="button"
+                data-compact="true"
                 onClick={() => setScreen("signin")}
-                className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer ${
+                className={`flex-1 py-1.5 px-3 text-xs rounded-sm transition-all duration-150 cursor-pointer ${
                   screen === "signin"
-                    ? "bg-white dark:bg-neutral-900 text-slate-900 dark:text-white shadow-xs font-bold"
-                    : "text-slate-500 hover:text-slate-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+                    ? "bg-white dark:bg-ink-750 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                    : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 font-medium"
                 }`}
               >
                 Sign In
               </button>
               <button
                 type="button"
+                data-compact="true"
                 onClick={() => setScreen("signup")}
-                className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer ${
+                className={`flex-1 py-1.5 px-3 text-xs rounded-sm transition-all duration-150 cursor-pointer ${
                   screen === "signup"
-                    ? "bg-white dark:bg-neutral-900 text-slate-900 dark:text-white shadow-xs font-bold"
-                    : "text-slate-500 hover:text-slate-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+                    ? "bg-white dark:bg-ink-750 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                    : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 font-medium"
                 }`}
               >
                 Create Account
               </button>
             </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-compact="true"
+                onClick={() => setScreen("signin")}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span>Back to Sign In</span>
+              </button>
+            </div>
           )}
 
+          <button
+            type="button"
+            data-compact="true"
+            onClick={onClose}
+            className="w-8 h-8 rounded-md bg-neutral-100 hover:bg-neutral-200/80 dark:bg-ink-750 dark:hover:bg-ink-700 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            aria-label="Close"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Scrollable Container */}
+        <div className="overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 scholar-scrollbar relative z-10">
           {/* Contextual Notice (e.g. from clicking a format card) */}
           {initialMessage && (
-            <div className="mb-4 p-3 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
+            <div className="mb-3.5 p-2.5 rounded-md bg-neutral-100 dark:bg-ink-750 border border-neutral-200 dark:border-white/10 text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
               <span className="font-medium">{initialMessage}</span>
             </div>
           )}
 
           {/* Guest Quick-Access for testing without compulsory login */}
-          <div className="mb-5 p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-400/10 border border-amber-500/30 flex items-center justify-between gap-3 shadow-xs">
-            <div className="flex flex-col text-left">
-              <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                <span>⚡</span> Testing locally? Sign-in is optional
+          <div className="mb-3.5 px-3 py-2 rounded-md bg-neutral-50 dark:bg-ink-750/90 border border-neutral-200/90 dark:border-white/10 flex items-center justify-between gap-2">
+            <div className="flex flex-col text-left min-w-0">
+              <span className="text-[11.5px] font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" aria-hidden="true" />
+                <span className="sm:hidden">Local mode — sign-in optional</span>
+                <span className="hidden sm:inline">Testing locally? Sign-in is optional</span>
               </span>
-              <span className="text-[11px] text-slate-600 dark:text-neutral-400 mt-0.5">
-                Open {selectedFormatId === "OT-22" ? "Presentation Studio" : "workspace"} immediately as guest
+              <span className="hidden sm:block text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
+                Open {selectedFormatId === "OT-22" ? "Slides & Keynotes" : "workspace"} immediately as guest
               </span>
             </div>
             <button
               type="button"
+              data-compact="true"
               onClick={() => {
                 const draft = createEphemeralProject(selectedFormatId || "OT-22", "Academic Presentation Deck");
                 onClose();
                 navigate(`/projects/${draft.projectId}`);
               }}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold text-xs transition-all shadow-sm shrink-0 cursor-pointer"
+              className="px-2.5 py-1.5 rounded-sm bg-white hover:bg-neutral-100 dark:bg-ink-700 dark:hover:bg-ink-650 border border-neutral-300 dark:border-white/15 active:scale-[0.99] text-neutral-900 dark:text-white font-semibold text-[11.5px] transition-all shadow-2xs shrink-0 cursor-pointer whitespace-nowrap"
             >
               Try as Guest →
             </button>
