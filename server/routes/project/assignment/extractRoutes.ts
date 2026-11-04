@@ -520,53 +520,73 @@ router.post("/analyze", handleDeconstruct);
  * current one as asked ("add a section on ethics", "make it 3,000 words").
  * Text already written is kept. Saves and returns the new outline.
  */
+/**
+ * Writes (or revises) the outline with the student's AI and saves it on the
+ * project. Text already written is kept. Throws an AI error, or
+ * UnusableAiResponseError when the answer had no usable outline.
+ */
+export async function writeOutlineForProject(
+  req: express.Request<{ id: string }>,
+  project: any,
+  opts: { instruction?: string; plan?: string } = {}
+) {
+  const a = project.answers;
+  const question = cleanAnswerString(a["assignment_question"]) || extractStandardizedInstructions(a);
+  const briefText = cleanAnswerString(a["assignment_brief_text"]) || question;
+  const targetWords = Number(a["targetWordCount"] || a["word_count"] || a["word_limit"] || 1500) || 1500;
+  const assignmentType = String(a["assignmentType"] || a["assignment_type"] || "essay");
+  const current = safeParseObject(a["assignment_structure"] || a["structure"]) as any;
+  const previous = (safeParseObject(a["assignment_internal_sections"]) as AssignmentDraftingSection[] | undefined) ?? [];
+  const ledger = safeParseObject(a["brief_ledger"]) as Array<{ category?: string; verbatimText?: string }> | undefined;
+  const extraction = safeParseObject(a["assignment_extraction"]) as { criteria?: Array<{ criterion: string; weight?: number }> } | null;
+  const criteria = extraction?.criteria?.length
+    ? extraction.criteria.map((c) => `${c.criterion}${c.weight ? ` ${c.weight}%` : ""}`)
+    : (Array.isArray(ledger) ? ledger : []).filter((l) => l.category === "rubric_band" && (l.verbatimText ?? "").length >= 15).map((l) => String(l.verbatimText));
+  const discipline =
+    (typeof a["assignment_discipline"] === "string" && a["assignment_discipline"]) || scopeBrief(`${question} ${briefText}`).discipline;
+
+  const aiText = await routedCompletion(req, {
+    task: "drafting",
+    systemPrompt: assignmentOutlinePrompt(),
+    userPrompt: assignmentOutlineUserPrompt({
+      brief: briefText,
+      question,
+      assignmentType,
+      academicLevel: String(a["academicLevel"] || a["academic_level"] || "undergraduate"),
+      discipline: discipline || undefined,
+      citationStyle: cleanAnswerString(a["citationStyle"] || a["citation_style"]) || undefined,
+      targetWords,
+      criteria,
+      instruction: opts.instruction,
+      plan: opts.plan,
+      current: current?.headings?.length ? current : null,
+      written: Array.isArray(previous) ? previous.filter((p) => (p.draftContent ?? "").trim()).map((p) => p.id) : [],
+    }),
+  });
+  const structure = structureFromAi(aiText ?? "", targetWords, { instruction: opts.instruction, previous: Array.isArray(previous) ? previous : [] });
+  if (!structure) throw new UnusableAiResponseError("outline");
+  structure.version = (Number(current?.version) || 0) + 1;
+  project.answers.assignment_structure = JSON.stringify(structure);
+  project.answers.structure = JSON.stringify(structure);
+  if (structure.targetWordCount !== targetWords) project.answers.targetWordCount = String(structure.targetWordCount);
+  delete project.answers.assignment_internal_sections;
+  delete project.answers.assignment_outline;
+  await getProjectStore().save(project);
+  return structure;
+}
+
 router.post("/outline", async (req: express.Request<{ id: string }>, res: express.Response) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
   const raw = req.body?.instruction;
   const instruction = typeof raw === "string" ? raw.trim().slice(0, 600) || undefined : undefined;
   const a = project.answers;
-  const question = cleanAnswerString(a["assignment_question"]) || extractStandardizedInstructions(a);
-  const briefText = cleanAnswerString(a["assignment_brief_text"]) || question;
+  const briefText = cleanAnswerString(a["assignment_brief_text"]) || cleanAnswerString(a["assignment_question"]) || extractStandardizedInstructions(a);
   if (!briefText || briefText.trim().length < 10) {
     return res.status(400).json({ error: "Add your assignment brief first, so the outline can be about your assignment.", code: "missing_brief" });
   }
-  const targetWords = Number(a["targetWordCount"] || a["word_count"] || a["word_limit"] || 1500) || 1500;
-  const assignmentType = String(a["assignmentType"] || a["assignment_type"] || "essay");
-  const current = safeParseObject(a["assignment_structure"] || a["structure"]) as any;
-  const previous = (safeParseObject(a["assignment_internal_sections"]) as AssignmentDraftingSection[] | undefined) ?? [];
-  const ledger = safeParseObject(a["brief_ledger"]) as Array<{ category?: string; verbatimText?: string }> | undefined;
-  const criteria = (Array.isArray(ledger) ? ledger : []).filter((l) => l.category === "rubric_band" && (l.verbatimText ?? "").length >= 15).map((l) => String(l.verbatimText));
-  const discipline =
-    (typeof a["assignment_discipline"] === "string" && a["assignment_discipline"]) || scopeBrief(`${question} ${briefText}`).discipline;
-
   try {
-    const aiText = await routedCompletion(req, {
-      task: "drafting",
-      systemPrompt: assignmentOutlinePrompt(),
-      userPrompt: assignmentOutlineUserPrompt({
-        brief: briefText,
-        question,
-        assignmentType,
-        academicLevel: String(a["academicLevel"] || a["academic_level"] || "undergraduate"),
-        discipline: discipline || undefined,
-        citationStyle: cleanAnswerString(a["citationStyle"] || a["citation_style"]) || undefined,
-        targetWords,
-        criteria,
-        instruction,
-        current: current?.headings?.length ? current : null,
-        written: Array.isArray(previous) ? previous.filter((p) => (p.draftContent ?? "").trim()).map((p) => p.id) : [],
-      }),
-    });
-    const structure = structureFromAi(aiText ?? "", targetWords, { instruction, previous: Array.isArray(previous) ? previous : [] });
-    if (!structure) return sendAiFailure(res, new UnusableAiResponseError("outline"), "Outline");
-    structure.version = (Number(current?.version) || 0) + 1;
-    project.answers.assignment_structure = JSON.stringify(structure);
-    project.answers.structure = JSON.stringify(structure);
-    if (structure.targetWordCount !== targetWords) project.answers.targetWordCount = String(structure.targetWordCount);
-    delete project.answers.assignment_internal_sections;
-    delete project.answers.assignment_outline;
-    await getProjectStore().save(project);
+    const structure = await writeOutlineForProject(req, project, { instruction });
     res.json({ structure });
   } catch (err) {
     sendAiFailure(res, err, "Outline");

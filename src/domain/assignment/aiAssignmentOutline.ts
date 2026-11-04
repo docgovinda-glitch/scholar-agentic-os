@@ -26,6 +26,8 @@ export interface AssignmentOutlineContext {
   /** The current outline and which sections already have text, when revising. */
   current?: AssignmentStructure | null;
   written?: string[];
+  /** The agent's plan from the Understand step (approach, structure, criteria). */
+  plan?: string;
 }
 
 export function assignmentOutlinePrompt(): string {
@@ -51,6 +53,7 @@ export function assignmentOutlineUserPrompt(c: AssignmentOutlineContext): string
     `Target length: ${c.targetWords} words.`,
     c.criteria?.length ? `Marking criteria from the brief:\n- ${c.criteria.slice(0, 10).map((x) => clip(x, 200)).join("\n- ")}` : "The brief gives no marking criteria.",
     structureLens(c.discipline, c.assignmentType),
+    c.plan ? `Plan for this assignment (from reading the brief):\n${clip(c.plan, 2500)}` : "",
   ];
   if (c.current?.headings?.length) {
     lines.push(

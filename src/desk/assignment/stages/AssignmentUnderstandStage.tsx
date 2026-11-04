@@ -1,3 +1,4 @@
+import { UnderstandAgentPanel } from "../components/AgentPanels";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import BriefScopePanel from "../components/BriefScopePanel";
 import { useAssignmentWorkspace } from "../AssignmentContext";
@@ -140,14 +141,10 @@ export const ARCHETYPE_DEFAULT_TONES: Record<string, string> = {
   other: "formal_academic",
 };
 
-export const AGENTIC_THINKING_STAGES = [
-  "Extracting your assignment",
-  "Identifying the core questions",
-  "Researching relevant scholarship",
-  "Connecting evidence to the questions",
-  "Building your research structure",
-  "Preparing your outline",
-];
+// What is really happening while the brief is analysed: one request to the
+// student's AI. (This used to cycle through steps such as "Researching
+// relevant scholarship" on a timer, none of which were taking place.)
+export const AGENTIC_THINKING_STAGES = ["Your AI is reading the brief and writing the outline…"];
 
 function cleanTopic(question: string): string {
   if (!question) return "your assignment topic";
@@ -378,7 +375,7 @@ export default function AssignmentUnderstandStage({
     ensurePersisted,
     isLoading,
     executionMode,
-    setExecutionMode,
+    agent,
   } = useAssignmentWorkspace();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1858,6 +1855,13 @@ export default function AssignmentUnderstandStage({
       ) : (
         /* Step 2: Understand 4 Human-Centered Cards */
         <div className="space-y-6 animate-in fade-in duration-200">
+          {/* The agent: the AI's understanding of the assignment, and the outline from it */}
+          <UnderstandAgentPanel />
+          {!agent.understanding && (
+            <p className="text-xs text-neutral-600 dark:text-neutral-400 rounded-xl border border-dashed border-neutral-300 dark:border-white/15 p-3" data-testid="rules-note">
+              The cards below are drafted by rules from your brief&apos;s wording, not by your AI. Run &quot;Plan the assignment&quot; above for a full analysis; they are replaced by it.
+            </p>
+          )}
           {/* Top Locked Brief Summary Bar */}
           <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-4 sm:p-5 shadow-xs space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-neutral-100 dark:border-white/5">
@@ -1915,6 +1919,8 @@ export default function AssignmentUnderstandStage({
             </div>
           </div>
 
+          {!agent.understanding && (
+          <>
           {/* ========================================================
               CARD 1: Plain-English Assignment Deconstruction
              ======================================================== */}
@@ -2011,6 +2017,9 @@ export default function AssignmentUnderstandStage({
               </div>
             </div>
           </div>
+
+          </>
+          )}
 
           {/* ========================================================
               CARD 2: Thesis & Stance Selector (Pick Your Angle)
@@ -2128,6 +2137,8 @@ export default function AssignmentUnderstandStage({
             </div>
           </div>
 
+          {!agent.understanding && (
+          <>
           {/* ========================================================
               CARD 3: Visual Storyline Roadmap (Zero Math Anxiety)
              ======================================================== */}
@@ -2545,6 +2556,9 @@ export default function AssignmentUnderstandStage({
               </div>
             </div>
           </div>
+
+          </>
+          )}
 
           {/* ========================================================
               BOTTOM NAVIGATION BAR & PHASE 3 CONNECTION

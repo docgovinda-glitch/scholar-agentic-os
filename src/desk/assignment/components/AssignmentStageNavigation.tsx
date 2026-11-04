@@ -34,7 +34,6 @@ export default function AssignmentStageNavigation({
     question,
     approvedSourceIds = [],
     submissionReport,
-    executionMode,
   } = useAssignmentWorkspace();
 
   const isOverLimit = currentWordCount > targetWordCount * 1.1;
@@ -42,18 +41,7 @@ export default function AssignmentStageNavigation({
     currentWordCount >= targetWordCount * 0.9 &&
     currentWordCount <= targetWordCount * 1.1;
 
-  const visiblePhases = useMemo(() => {
-    if (executionMode === "minimal") {
-      return ASSIGNMENT_PHASES.filter((p) => p.id !== "understand").map((p, idx) => ({
-        ...p,
-        displayNumber: idx + 1,
-      }));
-    }
-    return ASSIGNMENT_PHASES.map((p, idx) => ({
-      ...p,
-      displayNumber: idx + 1,
-    }));
-  }, [executionMode]);
+  const visiblePhases = useMemo(() => ASSIGNMENT_PHASES.map((p, idx) => ({ ...p, displayNumber: idx + 1 })), []);
 
   // Global Progress Percentages for each phase
   const phasePercentages = useMemo(() => {

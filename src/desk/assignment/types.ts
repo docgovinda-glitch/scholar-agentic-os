@@ -375,6 +375,11 @@ export interface DiscoveredSource {
   publisher?: string;
   volumeIssue?: string;
 
+  // The agent's reading of the abstract (Sources step)
+  aiRelevance?: "high" | "medium" | "low";
+  aiCredibility?: string;
+  aiSections?: string[];
+
   // Manually Added / User Uploaded Provenance & Extracted Evidence
   isUserUploaded?: boolean;
   userDocumentId?: string;

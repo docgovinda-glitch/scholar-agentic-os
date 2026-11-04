@@ -322,7 +322,6 @@ function AssignmentWorkspaceInner({
     projectState,
     executionMode,
     saveStatus,
-    setExecutionMode,
   } = useAssignmentWorkspace();
 
   const currentPhaseDef = ASSIGNMENT_PHASES.find((p) => p.id === currentPhase);
@@ -457,7 +456,7 @@ function AssignmentWorkspaceInner({
       case "extract":
         return (
           <AssignmentExtractStage
-            onProceed={() => setPhase(executionMode === "minimal" ? "sources" : "understand")}
+            onProceed={() => setPhase("understand")}
           />
         );
       case "understand":
@@ -471,7 +470,7 @@ function AssignmentWorkspaceInner({
         return (
           <AssignmentSourcesStage
             onProceed={() => setPhase("drafting")}
-            onBack={() => setPhase(executionMode === "minimal" ? "extract" : "understand")}
+            onBack={() => setPhase("understand")}
           />
         );
       case "drafting":
@@ -486,7 +485,7 @@ function AssignmentWorkspaceInner({
       default:
         return (
           <AssignmentExtractStage
-            onProceed={() => setPhase(executionMode === "minimal" ? "sources" : "understand")}
+            onProceed={() => setPhase("understand")}
           />
         );
     }
@@ -514,7 +513,7 @@ function AssignmentWorkspaceInner({
         onPhaseSelect={(phase: AppleStudioPhaseId) => {
           const map: Record<AppleStudioPhaseId, AssignmentPhaseId> = {
             blueprint: "extract",
-            evidence: executionMode === "minimal" ? "sources" : "understand",
+            evidence: "understand",
             studio: "drafting",
             review: "sources",
             delivery: "submission",
@@ -525,7 +524,7 @@ function AssignmentWorkspaceInner({
           if (onClose) onClose();
           else if (typeof window !== "undefined") window.location.href = "/";
         }}
-        metricLabel={`${executionMode === "minimal" ? "Quick 4-Step" : "Guided 5-Step"}`}
+        metricLabel="5 stages"
         aiModelLabel="Socratic Tutor AI"
         onOpenAiAccess={onOpenAiAccess}
         autosaveStatus={saveStatus}
@@ -566,45 +565,6 @@ function AssignmentWorkspaceInner({
             </div>
           </div>
 
-          {/* Right Section: Minimal vs Detailed flow (the tutor toggle lives in the studio header) */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            {/* Minimal vs Detailed Segmented Control (OT-10 Parity) */}
-            <div
-              role="radiogroup"
-              aria-label="Workspace Display Mode"
-              className="flex items-center p-0.5 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-[11px] font-medium select-none"
-            >
-              <button
-                type="button"
-                role="radio"
-                aria-checked={executionMode === "minimal"}
-                onClick={() => setExecutionMode("minimal")}
-                className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer flex items-center gap-1.5 ${
-                  executionMode === "minimal"
-                    ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white font-semibold shadow-2xs"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                }`}
-                title="Minimal (Quick Flow): 4 steps (01 Extract → 02 Sources → 03 Drafting → 04 Submission) — AI automatically structures your outline and word budgets"
-              >
-                <span>Minimal</span>
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={executionMode === "detailed"}
-                onClick={() => setExecutionMode("detailed")}
-                className={`py-1 px-2.5 rounded-md transition-all text-center cursor-pointer flex items-center gap-1.5 ${
-                  executionMode === "detailed"
-                    ? "bg-white dark:bg-ink-500 text-neutral-900 dark:text-white font-semibold shadow-2xs"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                }`}
-                title="Detailed (Guided Architect): 5 steps (01 Extract → 02 Understand → 03 Sources → 04 Drafting → 05 Submission) — Review thesis angles, narrative roadmap, and fine-tune section headings before finding sources"
-              >
-                <span>Detailed</span>
-              </button>
-            </div>
-
-          </div>
         </div>
       </header>
 

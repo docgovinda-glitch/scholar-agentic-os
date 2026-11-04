@@ -1,3 +1,4 @@
+import { SourcesAgentPanel } from "../components/AgentPanels";
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { ReferenceBarItem } from "../ReferenceBarItem";
@@ -99,7 +100,6 @@ export default function AssignmentSourcesStage({
     addEvidenceItem,
     advancePhase,
     setPhase,
-    executionMode,
   } = useAssignmentWorkspace();
 
   // Active Main View: Unified Evidence Vault vs AI Analysis Workspace
@@ -119,13 +119,8 @@ export default function AssignmentSourcesStage({
   // Outline subheadings & view mode
   const subheadings = useMemo(() => flattenStructureSubheadings(structure), [structure]);
   const [selectedSubheadingId, setSelectedSubheadingId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"bar" | "card">(() => {
-    return executionMode === "detailed" ? "card" : "bar";
-  });
-
-  useEffect(() => {
-    setViewMode(executionMode === "detailed" ? "card" : "bar");
-  }, [executionMode]);
+  // Compact list by default; cards are one click away in the view switcher.
+  const [viewMode, setViewMode] = useState<"bar" | "card">("bar");
 
   const getSubheadingSources = useCallback(
     (subId: string, sourceList: DiscoveredSource[]) => {
@@ -957,6 +952,9 @@ export default function AssignmentSourcesStage({
         )}
       </div>
 
+      {/* The agent: real search, AI reading of abstracts, links to the outline */}
+      <div className="mb-5"><SourcesAgentPanel /></div>
+
       {/* Minimal Step Guidance Banner */}
       <div className="p-3.5 sm:p-4 rounded-xl bg-neutral-100/60 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2.5">
@@ -1105,7 +1103,7 @@ export default function AssignmentSourcesStage({
           {/* Section 2: Curated Academic Literature & Source Collection */}
           <section className="space-y-4 pt-4 border-t border-neutral-200/60 dark:border-white/5">
             {/* Detailed Mode Evidence Grounding Matrix Banner */}
-            {executionMode === "detailed" && (
+            <>
               <div className="rounded-2xl p-4 bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 text-xs space-y-2 font-sans animate-in fade-in duration-200">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -1122,7 +1120,7 @@ export default function AssignmentSourcesStage({
                   Every approved source excerpt is assigned a deterministic token (e.g. <code>[1]</code> or <code>[ev-uuid]</code>) to ground factual statements before section drafting.
                 </p>
               </div>
-            )}
+            </>
             {/* Workspace Toolbar Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
