@@ -31,4 +31,22 @@ describe("authedFetch: the AI keyring travels only with AI requests", () => {
     await authedFetch("/api/projects/p1/document");
     expect(sentHeaders()["x-ai-keyring"]).toBeUndefined();
   });
+
+  it("sanitizes non-ISO-8859-1 characters (such as em-dash or bullets) from headers so window.fetch never throws", async () => {
+    await authedFetch("/api/ai/agent", {
+      method: "POST",
+      headers: {
+        "x-ai-model": "gemini-2.5-flash — unverified",
+        "x-ai-api-key": "\u200Bsk-test-key•123\u200B",
+      },
+    });
+    const headers = sentHeaders();
+    expect(headers["x-ai-model"]).toBe("gemini-2.5-flash");
+    expect(headers["x-ai-api-key"]).toBe("sk-test-key123");
+    for (const val of Object.values(headers)) {
+      for (let i = 0; i < val.length; i++) {
+        expect(val.charCodeAt(i)).toBeLessThanOrEqual(126);
+      }
+    }
+  });
 });

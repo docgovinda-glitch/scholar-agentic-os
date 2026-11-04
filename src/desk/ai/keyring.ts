@@ -18,8 +18,26 @@ export interface KeyringEntry {
 }
 
 /** Catalog ids (AI Access) → router provider ids. */
-const CLOUD: Record<string, ProviderId> = { openai: "openai", anthropic: "anthropic", gemini: "google", google: "google", groq: "groq", deepseek: "deepseek", mistral: "mistral" };
+const CLOUD: Record<string, ProviderId> = {
+  openai: "openai",
+  anthropic: "anthropic",
+  claude: "anthropic",
+  gemini: "google",
+  google: "google",
+  groq: "groq",
+  deepseek: "deepseek",
+  mistral: "mistral",
+};
 const LOCAL: Record<string, ProviderId> = { ollama: "ollama", lmstudio: "lmstudio" };
+
+function cleanModelChoice(rawModel: string): string {
+  const stripped = rawModel
+    .split(/\s*(?:—|–|\u2014|\u2013|\u00B7)\s*/)[0]
+    .replace(/\s*\((?:Live Discovered|deprecated|preview|unverified)\)\s*$/i, "")
+    .replace(/[^\x20-\x7E]/g, "")
+    .trim();
+  return stripped || rawModel.replace(/[^\x20-\x7E]/g, "").trim();
+}
 
 /** Models the user picked in AI Access, plus their known limits when the catalog had them. */
 export interface ModelChoice { model: string; contextWindow?: number; maxOutputTokens?: number }
@@ -32,7 +50,9 @@ export async function buildKeyring(
   const s = settings ?? (await loadUserAiSettings());
   const prefs = s.preferences ?? {};
   const pick = (id: string): ModelChoice | null => {
-    const model = prefs[`${id}Model`];
+    const rawModel = prefs[`${id}Model`];
+    if (!rawModel) return null;
+    const model = cleanModelChoice(rawModel);
     if (!model) return null;
     const ctx = Number(prefs[`${id}ContextWindow`]);
     const out = Number(prefs[`${id}MaxOutput`]);
@@ -45,17 +65,22 @@ export async function buildKeyring(
   for (const id of order) {
     const provider = CLOUD[id];
     if (!provider) continue;
-    const key = await readKey(id);
+    const rawKey = await readKey(id);
+    const key = rawKey ? rawKey.replace(/^\s*bearer\s+/i, "").replace(/[^\x21-\x7E]/g, "").trim() : null;
     const choice = pick(id);
     if (!key || !choice) continue;
-    entries.push({ provider, apiKey: key, ...choice, ...(prefs[`${id}Endpoint`] ? { baseUrl: prefs[`${id}Endpoint`] } : {}) });
+    const endpoint = prefs[`${id}Endpoint`] || prefs[`${id}BaseUrl`];
+    const cleanBase = endpoint ? endpoint.replace(/[^\x20-\x7E]/g, "").trim() : "";
+    entries.push({ provider, apiKey: key, ...choice, ...(cleanBase ? { baseUrl: cleanBase } : {}) });
   }
   // A local model goes last: it is the fallback that works offline.
   for (const id of Object.keys(LOCAL)) {
     const choice = pick(id);
     if (!choice) continue;
     if (id !== s.provider && !prefs[`${id}Enabled`]) continue;
-    entries.push({ provider: LOCAL[id], ...choice, ...(prefs[`${id}Endpoint`] ? { baseUrl: prefs[`${id}Endpoint`] } : {}) });
+    const endpoint = prefs[`${id}Endpoint`] || prefs[`${id}BaseUrl`];
+    const cleanBase = endpoint ? endpoint.replace(/[^\x20-\x7E]/g, "").trim() : "";
+    entries.push({ provider: LOCAL[id], ...choice, ...(cleanBase ? { baseUrl: cleanBase } : {}) });
   }
   return entries;
 }

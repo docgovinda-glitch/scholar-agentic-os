@@ -623,6 +623,56 @@ export async function searchWikipedia(query: string, maxResults = 4): Promise<Se
   }
 }
 
+const WEB_QUERY_STOPWORDS = new Set([
+  "what", "who", "when", "where", "why", "how", "can", "you", "please", "search",
+  "for", "tell", "me", "about", "the", "and", "or", "in", "on", "at", "to", "from",
+  "of", "with", "by", "is", "are", "was", "were", "be", "been", "being", "have",
+  "has", "had", "do", "does", "did", "will", "would", "should", "could", "may",
+  "might", "a", "an", "this", "that", "these", "those", "between", "among", "into",
+  "over", "under", "after", "before", "during", "since", "until", "explain",
+  "analyze", "analyse", "compare", "evaluate", "discuss", "describe", "give",
+  "write", "draft", "summary", "overview", "difference", "differences", "impact",
+]);
+
+function extractWebQueryKeywords(query: string): string[] {
+  return query
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 3 && !WEB_QUERY_STOPWORDS.has(w));
+}
+
+function computeWebQueryRelevance(
+  query: string,
+  title: string,
+  snippet: string
+): { matches: number; titleMatches: number; ratio: number; keywordCount: number } {
+  const keywords = extractWebQueryKeywords(query);
+  if (keywords.length === 0) {
+    return { matches: 1, titleMatches: 1, ratio: 1, keywordCount: 0 };
+  }
+  const titleLower = (title || "").toLowerCase();
+  const haystack = `${titleLower} ${(snippet || "").toLowerCase()}`;
+  let matches = 0;
+  let titleMatches = 0;
+  for (const kw of keywords) {
+    const stem = kw.length > 5 ? kw.slice(0, kw.length - 1) : kw;
+    if (haystack.includes(stem)) {
+      matches++;
+    }
+    if (titleLower.includes(stem)) {
+      titleMatches++;
+    }
+  }
+  return {
+    matches,
+    titleMatches,
+    ratio: matches / keywords.length,
+    keywordCount: keywords.length,
+  };
+}
+
 /**
  * Search CrossRef API for peer-reviewed academic journal publications.
  */
@@ -635,9 +685,10 @@ export async function searchCrossRef(query: string, maxResults = 4): Promise<Sea
     const effective = clean.length > 2 ? clean : query;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 6000);
+    const fetchRows = Math.max(maxResults * 2, 6);
 
     const res = await fetch(
-      `https://api.crossref.org/works?query=${encodeURIComponent(effective)}&rows=${maxResults}&mailto=researcher@scholarcore.org`,
+      `https://api.crossref.org/works?query=${encodeURIComponent(effective)}&rows=${fetchRows}&mailto=researcher@scholarcore.org`,
       { signal: controller.signal }
     ).finally(() => clearTimeout(timer));
 
@@ -645,7 +696,7 @@ export async function searchCrossRef(query: string, maxResults = 4): Promise<Sea
     const data = (await res.json()) as any;
     const items = data.message?.items || [];
 
-    return items.map((item: any) => {
+    const mapped = items.map((item: any) => {
       const title = Array.isArray(item.title) ? item.title[0] : item.title || "Scholarly Paper";
       const author = item.author?.[0] ? `${item.author[0].family || ""} ${item.author[0].given || ""}`.trim() : undefined;
       const year = item.created?.["date-parts"]?.[0]?.[0] || item.published?.["date-parts"]?.[0]?.[0];
@@ -653,22 +704,37 @@ export async function searchCrossRef(query: string, maxResults = 4): Promise<Sea
       const venue = item["container-title"]?.[0] || "";
       const snippet = `${author || "Unknown author"} (${year || "n.d."})${venue ? ` — ${venue}` : ""}. DOI: ${item.DOI || "N/A"}`;
       const auth = evaluateSourceAuthority(url, title, snippet, year);
+      const rel = computeWebQueryRelevance(effective, title, snippet);
 
       return {
-        title,
-        url,
-        snippet,
-        domain: auth.domain,
-        publisher: venue || auth.publisher,
-        sourceType: "scholarly" as const,
-        authorityTier: "A" as const,
-        authorityBadge: "DOI-registered publication",
-        score: 92,
-        isPrimary: true,
-        publishedDate: year ? String(year) : undefined,
-        author,
+        item: {
+          title,
+          url,
+          snippet,
+          domain: auth.domain,
+          publisher: venue || auth.publisher,
+          sourceType: "scholarly" as const,
+          authorityTier: "A" as const,
+          authorityBadge: "DOI-registered publication",
+          score: Math.min(90, 74 + Math.round(rel.ratio * 14) + rel.titleMatches * 2),
+          isPrimary: true,
+          publishedDate: year ? String(year) : undefined,
+          author,
+        },
+        rel,
       };
     });
+
+    return mapped
+      .filter(({ rel }: { rel: ReturnType<typeof computeWebQueryRelevance> }) => {
+        if (rel.keywordCount === 0) return true;
+        if (rel.titleMatches < 1) return false;
+        if (rel.keywordCount >= 2 && rel.ratio < 0.45) return false;
+        if (rel.keywordCount >= 3 && rel.titleMatches < 2) return false;
+        return true;
+      })
+      .map(({ item }: { item: SearchResultItem }) => item)
+      .slice(0, maxResults);
   } catch {
     return [];
   }
@@ -679,31 +745,46 @@ export async function searchCrossRef(query: string, maxResults = 4): Promise<Sea
  */
 export async function searchScholarlySources(query: string, maxResults = 4): Promise<SearchResultItem[]> {
   try {
-    const results = await discoverOpenAlexSources(query, maxResults).catch(() => []);
-    return results.map((r) => {
+    const results = await discoverOpenAlexSources(query, Math.max(maxResults * 2, 6)).catch(() => []);
+    const mapped = results.map((r) => {
       const url = r.url || (r.doi ? `https://doi.org/${r.doi}` : `https://openalex.org`);
       const snippet = `${r.authors?.slice(0, 3).join(", ") || "Unknown author"} (${r.year || "n.d."})${r.venue ? ` — ${r.venue}` : ""}`;
       const auth = evaluateSourceAuthority(url, r.title, snippet, r.year);
+      const rel = computeWebQueryRelevance(query, r.title, snippet);
 
       return {
-        title: r.title,
-        url,
-        snippet,
-        domain: auth.domain,
-        publisher: r.venue || auth.publisher,
-        venue: r.venue,
-        doi: r.doi,
-        year: r.year,
-        authors: r.authors,
-        sourceType: "scholarly" as const,
-        authorityTier: "A" as const,
-        authorityBadge: "Scholarly index (OpenAlex)",
-        score: 91,
-        isPrimary: true,
-        publishedDate: r.year ? String(r.year) : undefined,
-        author: r.authors?.[0],
+        item: {
+          title: r.title,
+          url,
+          snippet,
+          domain: auth.domain,
+          publisher: r.venue || auth.publisher,
+          venue: r.venue,
+          doi: r.doi,
+          year: r.year,
+          authors: r.authors,
+          sourceType: "scholarly" as const,
+          authorityTier: "A" as const,
+          authorityBadge: "Scholarly index (OpenAlex)",
+          score: Math.min(90, 74 + Math.round(rel.ratio * 14) + rel.titleMatches * 2),
+          isPrimary: true,
+          publishedDate: r.year ? String(r.year) : undefined,
+          author: r.authors?.[0],
+        },
+        rel,
       };
     });
+
+    return mapped
+      .filter(({ rel }) => {
+        if (rel.keywordCount === 0) return true;
+        if (rel.titleMatches < 1) return false;
+        if (rel.keywordCount >= 2 && rel.ratio < 0.45) return false;
+        if (rel.keywordCount >= 3 && rel.titleMatches < 2) return false;
+        return true;
+      })
+      .map(({ item }) => item)
+      .slice(0, maxResults);
   } catch {
     return [];
   }
@@ -987,12 +1068,18 @@ export async function executeWebSearch(
     }
   }
 
-  // Score and Rank: Prioritize Tier A (Gov & Peer-Reviewed) and Tier B (Think Tanks & Reputable News)
-  const isTimeSensitive = /latest|current|recent|today|now|developments|update|202[4-6]/i.test(effectiveQuery);
+  // Score and Rank: Prioritize topical relevance, Tier A/B authority, and recency
+  const isTimeSensitive = /latest|current|recent|today|now|developments|update|election|midterm|202[4-6]/i.test(effectiveQuery);
   const currentYear = new Date().getFullYear();
 
   const rankedItems = uniqueItems.map((item) => {
     let finalScore = item.score;
+    const rel = computeWebQueryRelevance(effectiveQuery, item.title, item.snippet);
+
+    if (rel.keywordCount > 0) {
+      finalScore += Math.round(rel.ratio * 16) + rel.titleMatches * 4;
+      if (rel.matches === 0) finalScore -= 25;
+    }
 
     // Recency bonus for time-sensitive questions
     if (item.publishedDate) {
@@ -1013,7 +1100,29 @@ export async function executeWebSearch(
 
   rankedItems.sort((a, b) => b.score - a.score);
 
-  const selected = rankedItems.slice(0, maxResults);
+  const wantsExplicitPapers = /paper|study|studies|journal|literature|peer-reviewed|doi|citation|meta-analysis|systematic review/i.test(effectiveQuery);
+  const nonIndexItems = rankedItems.filter(
+    (item) => item.authorityBadge !== "Scholarly index (OpenAlex)" && item.authorityBadge !== "DOI-registered publication"
+  );
+  let selected: SearchResultItem[];
+  if (!wantsExplicitPapers && nonIndexItems.length >= 2) {
+    const maxScholarlyIndex = Math.min(2, Math.max(1, Math.floor(maxResults / 3)));
+    let scholarlyCount = 0;
+    selected = [];
+    for (const item of rankedItems) {
+      if (selected.length >= maxResults) break;
+      const isScholarlyIndex =
+        item.authorityBadge === "Scholarly index (OpenAlex)" ||
+        item.authorityBadge === "DOI-registered publication";
+      if (isScholarlyIndex) {
+        if (scholarlyCount >= maxScholarlyIndex) continue;
+        scholarlyCount++;
+      }
+      selected.push(item);
+    }
+  } else {
+    selected = rankedItems.slice(0, maxResults);
+  }
 
   // If full content is requested, safely fetch & parse the top 4 web pages via SSRF-guarded safeFetchHtml
   if (options.fetchFullContent && selected.length > 0) {

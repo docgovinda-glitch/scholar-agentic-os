@@ -96,12 +96,57 @@ function cleanHtmlTags(html: string): string {
     .trim();
 }
 
+const CLIENT_STOPWORDS = new Set([
+  "why", "what", "how", "when", "where", "who", "which", "whom", "whose",
+  "did", "does", "do", "is", "are", "was", "were", "be", "been", "being",
+  "have", "has", "had", "can", "could", "would", "should", "will", "shall",
+  "the", "and", "for", "with", "from", "into", "about", "that", "this",
+  "these", "those", "their", "there", "than", "then", "between", "among",
+  "explain", "analyze", "describe", "tell", "give", "discuss", "overview",
+]);
+
+function cleanClientTopic(query: string): string {
+  const stripped = query
+    .replace(/^(?:why|what|how|when|where|who|which|did|does|do|is|are|was|were|can|could|would|should|please|tell me about|explain|analyze|describe|search for)\s+/gi, "")
+    .replace(/^(?:did|does|do|is|are|was|were|the)\s+/gi, "")
+    .replace(/[?.,!;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return stripped.length >= 3 ? stripped : query.replace(/[?.,!;:]+/g, " ").trim();
+}
+
+function scoreClientOpenAlexRelevance(query: string, title: string, snippet: string): { titleMatches: number; totalMatches: number; keywordCount: number; ratio: number } {
+  const keywords = cleanClientTopic(query)
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 3 && !CLIENT_STOPWORDS.has(w));
+  if (keywords.length === 0) {
+    return { titleMatches: 1, totalMatches: 1, keywordCount: 1, ratio: 1 };
+  }
+  const lowerTitle = (title || "").toLowerCase();
+  const lowerCombined = `${lowerTitle} ${(snippet || "").toLowerCase()}`;
+  let titleMatches = 0;
+  let totalMatches = 0;
+  for (const kw of keywords) {
+    const stem = kw.length > 5 ? kw.slice(0, -1) : kw;
+    if (lowerTitle.includes(stem)) titleMatches++;
+    if (lowerCombined.includes(stem)) totalMatches++;
+  }
+  return {
+    titleMatches,
+    totalMatches,
+    keywordCount: keywords.length,
+    ratio: totalMatches / keywords.length,
+  };
+}
+
 /**
  * Direct client-side CORS query for OpenAlex (works in browser without backend proxy).
  */
 async function searchOpenAlexClient(query: string, limit = 4, signal?: AbortSignal): Promise<LiveSearchResult[]> {
   try {
-    const params = new URLSearchParams({ search: query, "per-page": String(limit) });
+    const topic = cleanClientTopic(query);
+    const params = new URLSearchParams({ search: topic, "per-page": String(Math.max(limit, 6)) });
     const res = await fetch(`https://api.openalex.org/works?${params.toString()}`, { signal });
     if (!res.ok) return [];
     const data = (await res.json()) as {
@@ -118,7 +163,7 @@ async function searchOpenAlexClient(query: string, limit = 4, signal?: AbortSign
       }>;
     };
 
-    return (data.results ?? []).map((w) => {
+    const mapped = (data.results ?? []).map((w) => {
       const url = w.doi ?? w.primary_location?.landing_page_url ?? w.id ?? "";
       const authors = (w.authorships ?? [])
         .map((a) => a.author?.display_name)
@@ -142,15 +187,33 @@ async function searchOpenAlexClient(query: string, limit = 4, signal?: AbortSign
         snippet = `Scholarly work indexed by OpenAlex (${w.publication_year || "Recent"}).`;
       }
 
+      const title = w.title || w.display_name || "Scholarly Publication";
+      const rel = scoreClientOpenAlexRelevance(query, title, snippet);
       return {
-        title: w.title || w.display_name || "Scholarly Publication",
+        title,
         url,
         snippet,
         publicationDate: w.publication_date || (w.publication_year ? String(w.publication_year) : undefined),
         authors,
         source: "openalex" as const,
+        score: Math.round(rel.ratio * 100) + rel.titleMatches * 15,
+        _rel: rel,
       };
     });
+
+    if (mapped.length <= 1) {
+      return mapped.map(({ _rel, ...rest }) => rest);
+    }
+
+    const filtered = mapped
+      .filter((item) => {
+        if (item._rel.keywordCount <= 1) return item._rel.totalMatches >= 1;
+        if (item._rel.keywordCount === 2) return item._rel.titleMatches >= 1 && item._rel.totalMatches >= 2;
+        return item._rel.titleMatches >= 2 && item._rel.ratio >= 0.5;
+      })
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+
+    return filtered.slice(0, limit).map(({ _rel, ...rest }) => rest);
   } catch {
     return [];
   }
@@ -161,10 +224,11 @@ async function searchOpenAlexClient(query: string, limit = 4, signal?: AbortSign
  */
 async function searchWikipediaClient(query: string, limit = 3, signal?: AbortSignal): Promise<LiveSearchResult[]> {
   try {
+    const topic = cleanClientTopic(query);
     const params = new URLSearchParams({
       action: "query",
       list: "search",
-      srsearch: query,
+      srsearch: topic,
       utf8: "",
       format: "json",
       origin: "*",
@@ -215,8 +279,9 @@ export async function executeLiveSearch(
     if (isSupabaseConfigured()) {
       try {
         const { data } = await getSupabaseClient().auth.getSession();
-        if (data?.session?.access_token) {
-          headers["Authorization"] = `Bearer ${data.session.access_token}`;
+        const token = data?.session?.access_token?.replace(/[^\x20-\x7E]/g, "").trim();
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
         }
       } catch {
         // Ignore session retrieval error and proceed
@@ -242,20 +307,27 @@ export async function executeLiveSearch(
   // 2. Direct browser CORS fallback
   const promises: Array<Promise<LiveSearchResult[]>> = [];
   if (mode === "all" || mode === "scholarly") {
-    promises.push(searchOpenAlexClient(cleanQuery, limit, options.signal));
+    promises.push(searchOpenAlexClient(cleanQuery, mode === "scholarly" ? limit : Math.min(2, limit), options.signal));
   }
   if (mode === "all" || mode === "web") {
-    promises.push(searchWikipediaClient(cleanQuery, Math.min(3, limit), options.signal));
+    promises.push(searchWikipediaClient(cleanQuery, Math.min(4, limit), options.signal));
   }
 
   const settled = await Promise.allSettled(promises);
-  const candidates: LiveSearchResult[] = [];
+  const openAlexItems: LiveSearchResult[] = [];
+  const wikiItems: LiveSearchResult[] = [];
 
   for (const s of settled) {
     if (s.status === "fulfilled" && Array.isArray(s.value)) {
-      candidates.push(...s.value);
+      for (const item of s.value) {
+        if (item.source === "wikipedia" || item.source === "web") wikiItems.push(item);
+        else openAlexItems.push(item);
+      }
     }
   }
+
+  // Put general/Wikipedia web context first so OpenAlex never crowds out encyclopedic/web results
+  const candidates: LiveSearchResult[] = [...wikiItems, ...openAlexItems];
 
   // Deduplicate
   const seenUrls = new Set<string>();

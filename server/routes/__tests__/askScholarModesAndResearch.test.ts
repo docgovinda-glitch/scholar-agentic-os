@@ -384,4 +384,74 @@ Archival diplomatic records in your Knowledge Vault demonstrate how early tariff
       expect(bodyText).not.toContain("Menu items");
     });
   });
+
+  describe("Test 6 — Political & General Questions Without OpenAlex Lock & ISO-8859-1 Header Sanitization", () => {
+    it("answers political/electoral questions comprehensively via web search without locking to random OpenAlex papers or failing on non-ASCII model headers", async () => {
+      const retrieveSpy = vi.spyOn(scholarBrain, "retrieveEvidence");
+      mockExecuteWebSearch.mockResolvedValue({
+        query: "Why Republican Lost mid term elections in United States?",
+        timestamp: new Date().toISOString(),
+        results: [
+          {
+            title: "Why Republicans Underperformed in the 2022 U.S. Midterm Elections",
+            url: "https://www.brookings.edu/articles/midterm-elections-analysis/",
+            snippet: "Candidate quality in swing states, the Dobbs Supreme Court ruling on abortion rights, and strong independent voter turnout blunted the expected Republican wave.",
+            venue: "Brookings Institution",
+            year: "2022",
+            authors: ["William A. Galston"],
+            sourceType: "official",
+            authorityScore: 88,
+            authorityBadge: "Policy & Strategic Institute",
+            isPrimary: true,
+          },
+          {
+            title: "Behind the 2022 Midterm Election Turnout and Voting Patterns",
+            url: "https://www.pewresearch.org/politics/2023/07/12/voting-patterns-in-the-2022-elections/",
+            snippet: "Pew Research Center validated voter study examining demographic turnout, inflation concerns, and split-ticket voting across key battleground states.",
+            venue: "Pew Research Center",
+            year: "2023",
+            authors: ["Pew Research Center"],
+            sourceType: "official",
+            authorityScore: 87,
+            authorityBadge: "Policy & Strategic Institute",
+            isPrimary: true,
+          },
+        ],
+      });
+
+      vi.spyOn(scholarBrain, "complete").mockResolvedValue({
+        text: `## Key Factors Behind Republican Underperformance in Recent U.S. Midterm Elections
+
+While the party out of the White House historically makes sweeping gains in U.S. midterm elections, Republicans fell short of the anticipated "red wave" in the 2022 midterms — losing a net seat in the Senate and winning only a narrow majority in the House of Representatives [1] [2].
+
+### 1. The Supreme Court's *Dobbs* Decision and Voter Mobilization
+The June 2022 *Dobbs v. Jackson Women's Health Organization* ruling overturning *Roe v. Wade* energized Democratic, independent, and younger voters across swing states such as Michigan, Pennsylvania, and Arizona, neutralizing traditional midterm turnout advantages [1].
+
+### 2. Candidate Quality and Swing-Voter Rejection of Extremism
+In several competitive Senate and gubernatorial races (including Pennsylvania, Arizona, Georgia, and New Hampshire), Republican primary voters nominated candidates whose positions alienated moderate and independent voters, leading to widespread split-ticket voting [1] [2].`,
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+        usage: { inputTokens: 280, outputTokens: 220 },
+      });
+
+      const res = await request(app)
+        .post("/api/ai/agent")
+        .set("x-ai-provider", "gemini")
+        .set("x-ai-model", "gemini-2.5-flash -- unverified")
+        .set("x-ai-api-key", "test-key")
+        .send({
+          prompt: "Why Republican Lost mid term elections in United States?",
+          citationStyle: "apa",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(retrieveSpy).not.toHaveBeenCalled();
+      expect(res.body.text).toContain("Dobbs");
+      expect(res.body.text).toContain("[1]");
+      expect(res.body.text).not.toContain("[Unverified Claim — Vault Citation Required]");
+      expect(res.body.citations).toHaveLength(2);
+      expect(res.body.citations[0].url).toContain("brookings.edu");
+    });
+  });
 });

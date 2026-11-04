@@ -12,7 +12,70 @@ import { loadUserAiSettings, readProviderKey, providersWithStoredKey, type UserA
 import { getCloudProvider } from "../config/providerCatalog";
 import { LOCAL_RUNNERS } from "../config/localRunnerCatalog";
 import { getCachedDiscoveredModels } from "./modelDiscovery";
-import { getDefaultModelId } from "../config/modelCatalog";
+import { getDefaultModelId, MODEL_CATALOG } from "../config/modelCatalog";
+
+/**
+ * Strips any non-ISO-8859-1 / non-printable ASCII characters so a header value
+ * never causes `window.fetch` to throw `String contains non ISO-8859-1 code point`.
+ */
+export function sanitizeHeaderAscii(value: string | null | undefined): string {
+  if (!value || typeof value !== "string") return "";
+  return value.replace(/[^\x20-\x7E]/g, "").trim();
+}
+
+/**
+ * Cleans a user-entered API key: strips accidental "Bearer " prefixes, smart quotes,
+ * zero-width spaces, or non-ASCII characters, and rejects masked bullet strings (••••).
+ */
+export function sanitizeClientApiKey(raw: string | null | undefined): string {
+  if (!raw || typeof raw !== "string") return "";
+  const hadBullets = /[\u2022\u25CF\u2217]/.test(raw);
+  const cleaned = raw
+    .replace(/^\s*bearer\s+/i, "")
+    .replace(/["'“”‘’]/g, "")
+    .replace(/[^\x21-\x7E]/g, "")
+    .trim();
+  if (hadBullets && cleaned.length < 12) return "";
+  return cleaned;
+}
+
+/**
+ * Cleans a stored or user-entered model ID: strips UI badge suffixes (e.g. " — unverified",
+ * " (Live Discovered)"), maps human display names back to catalog model IDs, and ensures
+ * pure printable ASCII with no spaces.
+ */
+export function sanitizeClientModelId(
+  providerId: string,
+  rawModel: string | null | undefined,
+  fallbackModel?: string
+): string {
+  const defaultId = fallbackModel || (providerId ? getDefaultModelId(providerId) : "");
+  if (!rawModel || typeof rawModel !== "string") return sanitizeHeaderAscii(defaultId);
+
+  const stripped = rawModel
+    .split(/\s*(?:—|–|\u2014|\u2013|\u00B7)\s*/)[0]
+    .replace(/\s*\((?:Live Discovered|deprecated|preview|unverified)\)\s*$/i, "")
+    .replace(/[^\x20-\x7E]/g, "")
+    .trim();
+
+  if (!stripped) return sanitizeHeaderAscii(defaultId);
+
+  // If the stored value is a human displayName (e.g. "Gemini 2.5 Flash"), map it to its catalog modelId
+  const catalogMatch = MODEL_CATALOG.find(
+    (m) =>
+      (m.providerId === providerId || !providerId) &&
+      (m.modelId.toLowerCase() === stripped.toLowerCase() ||
+        m.displayName.toLowerCase() === stripped.toLowerCase())
+  );
+  if (catalogMatch) return catalogMatch.modelId;
+
+  // API model IDs do not contain spaces; if spaces remain, fall back to the provider default
+  if (/\s/.test(stripped)) {
+    return sanitizeHeaderAscii(defaultId);
+  }
+
+  return stripped;
+}
 
 export interface ClientAiRuntimeConfig {
   provider: string;
@@ -46,11 +109,11 @@ export async function getClientAiRuntimeConfig(forceFresh = false): Promise<Clie
     // 1. Check if configured as a local runner
     const localRunner = LOCAL_RUNNERS.find((r) => r.id === providerId);
     if (localRunner) {
-      const endpoint = prefs[`${providerId}Endpoint`] || localRunner.defaultEndpoint;
-      const model = prefs[`${providerId}Model`] || prefs.model || "";
+      const endpoint = sanitizeHeaderAscii(prefs[`${providerId}Endpoint`] || localRunner.defaultEndpoint);
+      const model = sanitizeHeaderAscii(prefs[`${providerId}Model`] || prefs.model || "");
       const isConfigured = Boolean(endpoint);
       const config: ClientAiRuntimeConfig = {
-        provider: providerId,
+        provider: sanitizeHeaderAscii(providerId),
         providerName: localRunner.name,
         modelId: model || "default",
         baseUrl: endpoint,
@@ -66,15 +129,17 @@ export async function getClientAiRuntimeConfig(forceFresh = false): Promise<Clie
 
     // 2. Cloud provider check
     const cloudSpec = getCloudProvider(providerId);
-    const key = await readProviderKey(providerId);
-    const customBaseUrl = prefs[`${providerId}BaseUrl`];
+    const rawKey = await readProviderKey(providerId);
+    const key = sanitizeClientApiKey(rawKey);
+    const customBaseUrl = sanitizeHeaderAscii(prefs[`${providerId}BaseUrl`] || prefs[`${providerId}Endpoint`]);
     const preferredModel = prefs[`${providerId}Model`] || prefs.model;
 
     if (key) {
       const discovered = getCachedDiscoveredModels(providerId, key) || [];
-      const activeModel = preferredModel || discovered[0]?.id || (cloudSpec ? getDefaultModelId(cloudSpec.id) : "");
+      const fallbackModel = discovered[0]?.id || (cloudSpec ? getDefaultModelId(cloudSpec.id) : "");
+      const activeModel = sanitizeClientModelId(providerId, preferredModel, fallbackModel);
       const config: ClientAiRuntimeConfig = {
-        provider: providerId,
+        provider: sanitizeHeaderAscii(providerId),
         providerName: cloudSpec?.name || providerId,
         modelId: activeModel,
         apiKey: key,
@@ -91,17 +156,20 @@ export async function getClientAiRuntimeConfig(forceFresh = false): Promise<Clie
     // 3. Fallback: check if any other provider has a stored key on this device
     const stored = providersWithStoredKey();
     for (const altProviderId of stored) {
-      const altKey = await readProviderKey(altProviderId);
+      const rawAltKey = await readProviderKey(altProviderId);
+      const altKey = sanitizeClientApiKey(rawAltKey);
       if (altKey) {
         const spec = getCloudProvider(altProviderId);
         const altDiscovered = getCachedDiscoveredModels(altProviderId, altKey) || [];
-        const altModel = prefs[`${altProviderId}Model`] || altDiscovered[0]?.id || (spec ? getDefaultModelId(spec.id) : "");
+        const altFallback = altDiscovered[0]?.id || (spec ? getDefaultModelId(spec.id) : "");
+        const altModel = sanitizeClientModelId(altProviderId, prefs[`${altProviderId}Model`], altFallback);
+        const altBaseUrl = sanitizeHeaderAscii(prefs[`${altProviderId}BaseUrl`] || prefs[`${altProviderId}Endpoint`]);
         const config: ClientAiRuntimeConfig = {
-          provider: altProviderId,
+          provider: sanitizeHeaderAscii(altProviderId),
           providerName: spec?.name || altProviderId,
           modelId: altModel,
           apiKey: altKey,
-          baseUrl: prefs[`${altProviderId}BaseUrl`] || undefined,
+          baseUrl: altBaseUrl || undefined,
           isConfigured: true,
           isLocal: false,
           tier: "byok",

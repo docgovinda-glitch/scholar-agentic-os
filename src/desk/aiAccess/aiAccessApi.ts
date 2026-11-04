@@ -27,11 +27,18 @@ async function api<T>(path: string, init: ApiOptions = {}): Promise<T> {
   const maxRetries = init.retries ?? (method === "GET" ? 2 : 0);
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const headers = {
+    const rawHeaders: Record<string, string> = {
       "Content-Type": "application/json",
       ...(init.headers as Record<string, string> | undefined),
       ...(await authHeaders()),
     };
+    const headers: Record<string, string> = {};
+    for (const [k, v] of Object.entries(rawHeaders)) {
+      if (typeof v === "string") {
+        const cleanVal = v.replace(/[^\x20-\x7E]/g, "").trim();
+        if (cleanVal) headers[k] = cleanVal;
+      }
+    }
 
     try {
       const res = await fetch(path, { ...init, headers });

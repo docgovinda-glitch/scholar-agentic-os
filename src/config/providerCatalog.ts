@@ -884,13 +884,14 @@ export function buildAuthHeaders(spec: CloudProviderSpec, apiKey: string): Recor
     "Content-Type": "application/json",
     ...(spec.extraHeaders || {}),
   };
-  if (!apiKey) return headers;
+  const cleanKey = (apiKey || "").replace(/^\s*bearer\s+/i, "").replace(/[^\x21-\x7E]/g, "").trim();
+  if (!cleanKey) return headers;
 
   if (spec.apiStyle === "anthropic") {
-    headers["x-api-key"] = apiKey;
+    headers["x-api-key"] = cleanKey;
     headers["anthropic-version"] = "2023-06-01";
   } else {
-    headers["Authorization"] = `Bearer ${apiKey}`;
+    headers["Authorization"] = `Bearer ${cleanKey}`;
   }
   return headers;
 }

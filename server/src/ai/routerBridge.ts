@@ -50,7 +50,18 @@ interface BridgeDeps { adapters: Partial<Record<ProviderId, ProviderAdapter>>; b
 let deps: BridgeDeps = { adapters: serverAdapters(), breaker: new CircuitBreaker(new MemoryBreakerStore()) };
 export function configureRouterBridge(next: Partial<BridgeDeps>): void { deps = { ...deps, ...next }; }
 
-const PROVIDER_ALIAS: Record<string, ProviderId> = { custom: "custom", gemini: "google", google: "google", openai: "openai", anthropic: "anthropic", groq: "groq", deepseek: "deepseek", mistral: "mistral", ollama: "ollama", lmstudio: "lmstudio" };
+const PROVIDER_ALIAS: Record<string, ProviderId> = { custom: "custom", gemini: "google", google: "google", openai: "openai", anthropic: "anthropic", claude: "anthropic", groq: "groq", deepseek: "deepseek", mistral: "mistral", ollama: "ollama", lmstudio: "lmstudio" };
+
+const DEFAULT_MODEL_BY_PROVIDER: Partial<Record<ProviderId, string>> = {
+  google: "gemini-2.5-flash",
+  openai: "gpt-4o-mini",
+  anthropic: "claude-sonnet-4-20250514",
+  groq: "openai/gpt-oss-120b",
+  deepseek: "deepseek-chat",
+  mistral: "mistral-small-latest",
+  ollama: "auto",
+  lmstudio: "auto",
+};
 
 /**
  * The user's AI connections for this request: the keyring, with the legacy
@@ -67,12 +78,18 @@ export function keyringFromRequest(req: { headers?: Request["headers"] }): Keyri
 }
 
 function legacyEntry(headers: Request["headers"]): KeyringEntry | undefined {
-  const h = (n: string) => { const v = headers[n]; return typeof v === "string" && v ? v : undefined; };
+  const h = (n: string) => {
+    const v = headers[n];
+    if (typeof v !== "string" || !v) return undefined;
+    const clean = v.replace(/[^\x20-\x7E]/g, "").trim();
+    return clean || undefined;
+  };
   const named = h("x-ai-provider");
   // Any other provider name with an endpoint is read as an OpenAI-compatible endpoint.
   const provider = PROVIDER_ALIAS[named ?? ""] ?? (named && h("x-ai-base-url") ? "custom" : undefined);
   // A local runner may arrive without a model: the browser picks one on hand-off.
-  const model = h("x-ai-model") ?? (provider === "ollama" || provider === "lmstudio" ? "auto" : undefined);
+  const rawModel = h("x-ai-model")?.split(/\s*(?:—|–|\u2014|\u2013)\s*/)[0]?.trim();
+  const model = (rawModel && !/\s/.test(rawModel) ? rawModel : undefined) ?? (provider ? DEFAULT_MODEL_BY_PROVIDER[provider] : undefined);
   if (!provider || !model) return undefined;
   return { provider, model, apiKey: h("x-ai-api-key"), baseUrl: h("x-ai-base-url") };
 }

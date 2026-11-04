@@ -6,7 +6,59 @@
  */
 
 import { getSupabaseRestConfig } from "../supabaseRest.ts";
-import { searchConfiguredWebApi, searchGoogleNewsRss } from "../research/webSearchEngine.ts";
+import { searchConfiguredWebApi, searchDuckDuckGo, searchGoogleNewsRss } from "../research/webSearchEngine.ts";
+
+const STOPWORDS = new Set([
+  "why", "what", "how", "when", "where", "who", "which", "whom", "whose",
+  "did", "does", "do", "is", "are", "was", "were", "be", "been", "being",
+  "have", "has", "had", "can", "could", "would", "should", "will", "shall",
+  "the", "and", "for", "with", "from", "into", "about", "that", "this",
+  "these", "those", "their", "there", "than", "then", "between", "among",
+  "explain", "analyze", "describe", "tell", "give", "discuss", "overview",
+]);
+
+export function cleanSearchTopic(query: string): string {
+  const stripped = query
+    .replace(/^(?:why|what|how|when|where|who|which|did|does|do|is|are|was|were|can|could|would|should|please|tell me about|explain|analyze|describe|search for)\s+/gi, "")
+    .replace(/^(?:did|does|do|is|are|was|were|the)\s+/gi, "")
+    .replace(/[?.,!;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return stripped.length >= 3 ? stripped : query.replace(/[?.,!;:]+/g, " ").trim();
+}
+
+export function extractQueryKeywords(query: string): string[] {
+  return cleanSearchTopic(query)
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 3 && !STOPWORDS.has(w));
+}
+
+export function computeLiveSearchRelevance(
+  query: string,
+  title: string,
+  snippet: string
+): { titleMatches: number; totalMatches: number; keywordCount: number; ratio: number } {
+  const keywords = extractQueryKeywords(query);
+  if (keywords.length === 0) {
+    return { titleMatches: 1, totalMatches: 1, keywordCount: 1, ratio: 1 };
+  }
+  const lowerTitle = (title || "").toLowerCase();
+  const lowerCombined = `${lowerTitle} ${(snippet || "").toLowerCase()}`;
+  let titleMatches = 0;
+  let totalMatches = 0;
+  for (const kw of keywords) {
+    const stem = kw.length > 5 ? kw.slice(0, -1) : kw;
+    if (lowerTitle.includes(stem)) titleMatches++;
+    if (lowerCombined.includes(stem)) totalMatches++;
+  }
+  return {
+    titleMatches,
+    totalMatches,
+    keywordCount: keywords.length,
+    ratio: totalMatches / keywords.length,
+  };
+}
 
 export interface LiveSearchResult {
   title: string;
@@ -116,9 +168,10 @@ export function reconstructOpenAlexAbstract(invertedIndex?: Record<string, numbe
  * Queries OpenAlex public REST API.
  */
 export async function searchOpenAlexLive(query: string, limit = 5): Promise<LiveSearchResult[]> {
+  const topic = cleanSearchTopic(query);
   const params = new URLSearchParams({
-    search: query,
-    "per-page": String(limit),
+    search: topic,
+    "per-page": String(Math.max(limit, 8)),
   });
   const mailto = process.env.OPENALEX_MAILTO;
   if (mailto) params.set("mailto", mailto);
@@ -131,8 +184,7 @@ export async function searchOpenAlexLive(query: string, limit = 5): Promise<Live
     const data = (await res.json()) as OpenAlexApiResponse;
     const works = data.results ?? [];
 
-    return works.map((w) => {
-      const doi = w.doi ? w.doi.replace(/^https?:\/\/doi\.org\//, "") : undefined;
+    const mapped = works.map((w) => {
       const url = w.doi ?? w.primary_location?.landing_page_url ?? w.id;
       const authors = (w.authorships ?? [])
         .map((a) => a.author?.display_name)
@@ -145,15 +197,33 @@ export async function searchOpenAlexLive(query: string, limit = 5): Promise<Live
         ? `Published in ${venue} (${w.publication_year || "Recent"}). Scholarly research work.`
         : `Scholarly work indexed by OpenAlex (${w.publication_year || "Recent"}).`;
 
+      const title = w.title || w.display_name || "Untitled Scholarly Work";
+      const rel = computeLiveSearchRelevance(query, title, snippet);
       return {
-        title: w.title || w.display_name || "Untitled Scholarly Work",
+        title,
         url,
         snippet,
         publicationDate: w.publication_date || (w.publication_year ? String(w.publication_year) : undefined),
         authors,
         source: "openalex" as const,
+        score: Math.round(rel.ratio * 100) + rel.titleMatches * 15,
+        _rel: rel,
       };
     });
+
+    if (mapped.length <= 1) {
+      return mapped.map(({ _rel, ...rest }) => rest);
+    }
+
+    const filtered = mapped
+      .filter((item) => {
+        if (item._rel.keywordCount <= 1) return item._rel.totalMatches >= 1;
+        if (item._rel.keywordCount === 2) return item._rel.titleMatches >= 1 && item._rel.totalMatches >= 2;
+        return item._rel.titleMatches >= 2 && item._rel.ratio >= 0.5;
+      })
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+
+    return filtered.slice(0, limit).map(({ _rel, ...rest }) => rest);
   } catch {
     return [];
   }
@@ -314,60 +384,97 @@ export async function executeLiveSearch(
 
   const limit = Math.max(1, Math.min(options.limit ?? 5, 20));
   const mode = options.mode ?? "all";
+  const topicQuery = cleanSearchTopic(cleanQuery);
 
-  const searchTasks: Array<Promise<LiveSearchResult[]>> = [];
-
-  if (mode === "all" || mode === "scholarly") {
-    searchTasks.push(searchOpenAlexLive(cleanQuery, Math.max(3, limit)));
-    searchTasks.push(searchCrossrefLive(cleanQuery, Math.max(3, limit)));
-  }
+  const webTasks: Array<Promise<LiveSearchResult[]>> = [];
+  const scholarlyTasks: Array<Promise<LiveSearchResult[]>> = [];
 
   if (mode === "all" || mode === "web") {
-    searchTasks.push(searchWikipediaLive(cleanQuery, Math.min(3, limit)));
-    searchTasks.push(searchProxyWebLive(cleanQuery, Math.min(3, limit)));
-    searchTasks.push(
-      searchConfiguredWebApi(cleanQuery, Math.min(4, limit)).then((items) =>
+    webTasks.push(
+      searchConfiguredWebApi(cleanQuery, Math.min(5, limit)).then((items) =>
         items.map((item) => ({
           title: item.title,
           url: item.url,
           snippet: item.snippet,
-          publicationDate: item.year ? String(item.year) : undefined,
-          authors: item.authors && item.authors.length > 0 ? item.authors : item.venue ? [item.venue] : [],
+          publicationDate: item.publishedDate || (item.year ? String(item.year) : undefined),
+          authors: item.authors && item.authors.length > 0 ? item.authors : item.publisher ? [item.publisher] : item.venue ? [item.venue] : [],
           source: "web" as const,
-          score: item.score,
+          score: (item.score ?? 80) + 15,
         }))
       )
     );
-    searchTasks.push(
-      searchGoogleNewsRss(cleanQuery, Math.min(4, limit)).then((items) =>
+    webTasks.push(
+      searchGoogleNewsRss(topicQuery, Math.min(4, limit)).then((items) =>
         items.map((item) => ({
           title: item.title,
           url: item.url,
           snippet: item.snippet,
-          publicationDate: item.year ? String(item.year) : undefined,
-          authors: item.authors && item.authors.length > 0 ? item.authors : item.venue ? [item.venue] : [],
+          publicationDate: item.publishedDate || (item.year ? String(item.year) : undefined),
+          authors: item.authors && item.authors.length > 0 ? item.authors : item.publisher ? [item.publisher] : item.venue ? [item.venue] : [],
           source: "web" as const,
-          score: item.score,
+          score: (item.score ?? 78) + 12,
         }))
+      )
+    );
+    webTasks.push(
+      searchDuckDuckGo(topicQuery, Math.min(4, limit)).then((items) =>
+        items.map((item) => ({
+          title: item.title,
+          url: item.url,
+          snippet: item.snippet,
+          publicationDate: item.publishedDate || (item.year ? String(item.year) : undefined),
+          authors: item.authors && item.authors.length > 0 ? item.authors : item.publisher ? [item.publisher] : [],
+          source: "web" as const,
+          score: (item.score ?? 70) + 10,
+        }))
+      )
+    );
+    webTasks.push(searchWikipediaLive(topicQuery, Math.min(3, limit)));
+    webTasks.push(searchProxyWebLive(topicQuery, Math.min(3, limit)));
+  }
+
+  if (mode === "all" || mode === "scholarly") {
+    const scholarlyCap = mode === "scholarly" ? Math.max(4, limit) : 2;
+    scholarlyTasks.push(searchOpenAlexLive(topicQuery, scholarlyCap));
+    scholarlyTasks.push(
+      searchCrossrefLive(topicQuery, scholarlyCap).then((items) =>
+        items.filter((item) => {
+          const rel = computeLiveSearchRelevance(cleanQuery, item.title, item.snippet);
+          return rel.keywordCount <= 1 ? rel.totalMatches >= 1 : rel.titleMatches >= 1 && rel.ratio >= 0.45;
+        })
       )
     );
   }
 
-  const results = await Promise.allSettled(searchTasks);
-  const pool: LiveSearchResult[] = [];
+  const [webSettled, scholarlySettled] = await Promise.all([
+    Promise.allSettled(webTasks),
+    Promise.allSettled(scholarlyTasks),
+  ]);
 
-  for (const r of results) {
+  const webPool: LiveSearchResult[] = [];
+  for (const r of webSettled) {
     if (r.status === "fulfilled" && Array.isArray(r.value)) {
-      pool.push(...r.value);
+      webPool.push(...r.value);
     }
   }
+
+  const scholarlyPool: LiveSearchResult[] = [];
+  for (const r of scholarlySettled) {
+    if (r.status === "fulfilled" && Array.isArray(r.value)) {
+      scholarlyPool.push(...r.value);
+    }
+  }
+
+  // Prioritize live web, news, and Wikipedia first; append up to 2 relevant scholarly works in "all" mode
+  const maxScholarlyInAll = mode === "all" && webPool.length >= 2 ? Math.min(2, Math.floor(limit / 3) || 1) : limit;
+  const combinedPool = [...webPool, ...scholarlyPool.slice(0, maxScholarlyInAll)];
 
   // Deduplicate by URL or normalized Title
   const seenUrls = new Set<string>();
   const seenTitles = new Set<string>();
   const deduplicated: LiveSearchResult[] = [];
 
-  for (const item of pool) {
+  for (const item of combinedPool) {
     const cleanUrl = item.url.toLowerCase().trim();
     const normTitle = item.title.toLowerCase().replace(/[\W_]+/g, " ").trim();
 

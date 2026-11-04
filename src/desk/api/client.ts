@@ -141,6 +141,26 @@ export function routeUsesClientAi(input: string): boolean {
   return AI_ROUTE_PATTERNS.some((re) => re.test(path));
 }
 
+function sanitizeHttpHeaderValue(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.replace(/[^\x20-\x7E]/g, "").trim();
+}
+
+function sanitizeHttpHeaderRecord(raw: Record<string, string>): Record<string, string> {
+  const clean: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const rawVal =
+      typeof v === "string" && k.toLowerCase() === "x-ai-model"
+        ? v.split(/\s*(?:—|–|\u2014|\u2013|--)\s*/)[0]
+        : v;
+    const cleanVal = sanitizeHttpHeaderValue(rawVal);
+    if (cleanVal) {
+      clean[k] = cleanVal;
+    }
+  }
+  return clean;
+}
+
 /** GET/DELETE with credentials attached */
 export async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const draftMatch = typeof input === "string" ? input.match(/\/api\/projects\/(draft-[^/]+)(\/.*)?/) : null;
@@ -164,10 +184,14 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
   const aiConfig = routeUsesClientAi(input) ? await getClientAiRuntimeConfig().catch(() => null) : null;
   const transientAiHeaders: Record<string, string> = {};
   if (aiConfig && aiConfig.isConfigured) {
-    if (aiConfig.provider) transientAiHeaders["x-ai-provider"] = aiConfig.provider;
-    if (aiConfig.modelId) transientAiHeaders["x-ai-model"] = aiConfig.modelId;
-    if (aiConfig.apiKey) transientAiHeaders["x-ai-api-key"] = aiConfig.apiKey;
-    if (aiConfig.baseUrl) transientAiHeaders["x-ai-base-url"] = aiConfig.baseUrl;
+    const cleanProvider = sanitizeHttpHeaderValue(aiConfig.provider);
+    const cleanModel = sanitizeHttpHeaderValue(aiConfig.modelId?.split(/\s*(?:—|–|\u2014|\u2013)\s*/)[0]);
+    const cleanKey = sanitizeHttpHeaderValue(aiConfig.apiKey);
+    const cleanBase = sanitizeHttpHeaderValue(aiConfig.baseUrl);
+    if (cleanProvider) transientAiHeaders["x-ai-provider"] = cleanProvider;
+    if (cleanModel) transientAiHeaders["x-ai-model"] = cleanModel;
+    if (cleanKey) transientAiHeaders["x-ai-api-key"] = cleanKey;
+    if (cleanBase) transientAiHeaders["x-ai-base-url"] = cleanBase;
   }
   // Every AI connection on this device, in order, so the server can switch to
   // the next one visibly when a provider fails.
@@ -176,11 +200,11 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
     if (ring.length) transientAiHeaders["x-ai-keyring"] = encodeKeyring(ring);
   }
 
-  const headers = {
+  const headers = sanitizeHttpHeaderRecord({
     ...transientAiHeaders,
     ...(init.headers as Record<string, string> | undefined),
     ...(await authHeaders()),
-  };
+  });
   const res = await originalFetch(input, { ...init, headers });
   if (routeUsesClientAi(input)) inspectAiResponse(res);
   return res;

@@ -858,7 +858,7 @@ export default function ProjectListScreen({
 
         let agentResponse: (AgenticQueryResponse & { ok?: boolean }) | undefined;
         const styleInfo = getCitationStyleInfo(askCitationStyle);
-        const systemPrompt = `You are Scholar Core Research Copilot, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers. Prefer recent, peer-reviewed and credible sources. Format citations and references strictly according to ${styleInfo.name}. Ground all assertions in verified literature without fabricating sources or DOIs.\n\n${ASK_ANSWER_GUIDE}`;
+        const systemPrompt = `You are Ask Scholar (Scholar Core AI Assistant), a world-class conversational, analytical, and research assistant on par with ChatGPT, Claude, and Gemini. Provide clear, comprehensive, insightful, and well-structured answers across political, historical, scientific, technical, academic, and general topics. Format citations and references according to ${styleInfo.name} when citing sources, ignore any retrieved snippet that is off-topic to the user's question, and never fabricate sources or DOIs.\n\n${ASK_ANSWER_GUIDE}`;
 
         // Every research answer starts from a fresh search; a follow-up is
         // searched together with the question before it (unless the user explicitly selected Normal Chat mode).
@@ -936,6 +936,21 @@ export default function ProjectListScreen({
         }
 
         if (agentResponse && agentResponse.ok && agentResponse.text) {
+          const resolvedLiveSources: LiveSearchResult[] | undefined = isExplicitChatOnly
+            ? undefined
+            : agentResponse.citations &&
+              agentResponse.citations.length > 0 &&
+              (targetMode === "search" || targetMode === "deep-research" || liveRetrievedSources.length === 0)
+            ? agentResponse.citations.map((c, idx) => ({
+                id: `cite-${idx + 1}`,
+                title: c.title || `Source ${idx + 1}`,
+                url: c.url || (c.doi ? `https://doi.org/${c.doi}` : ""),
+                snippet: c.snippet || c.title || "",
+                source: c.sourceType === "scholarly" ? ("openalex" as const) : ("web" as const),
+                publishedDate: c.year ? String(c.year) : undefined,
+                authors: Array.isArray(c.authors) ? c.authors : c.venue ? [c.venue] : [],
+              }))
+            : liveRetrievedSources;
           const assistantMsg: WebsiteAssistantMessage = {
             id: `assistant-${Date.now()}`,
             sender: "assistant",
@@ -948,7 +963,7 @@ export default function ProjectListScreen({
             stages: agentResponse.stages,
             citationStyle: agentResponse.citationStyle || askCitationStyle,
             citations: agentResponse.citations,
-            liveSources: isExplicitChatOnly ? undefined : liveRetrievedSources,
+            liveSources: resolvedLiveSources,
             searchedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             wordCount: agentResponse.wordCount,
             verifiedSourcesCount: agentResponse.verifiedSourcesCount,
