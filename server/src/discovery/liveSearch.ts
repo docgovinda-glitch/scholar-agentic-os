@@ -6,6 +6,7 @@
  */
 
 import { getSupabaseRestConfig } from "../supabaseRest.ts";
+import { searchConfiguredWebApi, searchGoogleNewsRss } from "../research/webSearchEngine.ts";
 
 export interface LiveSearchResult {
   title: string;
@@ -324,6 +325,32 @@ export async function executeLiveSearch(
   if (mode === "all" || mode === "web") {
     searchTasks.push(searchWikipediaLive(cleanQuery, Math.min(3, limit)));
     searchTasks.push(searchProxyWebLive(cleanQuery, Math.min(3, limit)));
+    searchTasks.push(
+      searchConfiguredWebApi(cleanQuery, Math.min(4, limit)).then((items) =>
+        items.map((item) => ({
+          title: item.title,
+          url: item.url,
+          snippet: item.snippet,
+          publicationDate: item.year ? String(item.year) : undefined,
+          authors: item.authors && item.authors.length > 0 ? item.authors : item.venue ? [item.venue] : [],
+          source: "web" as const,
+          score: item.score,
+        }))
+      )
+    );
+    searchTasks.push(
+      searchGoogleNewsRss(cleanQuery, Math.min(4, limit)).then((items) =>
+        items.map((item) => ({
+          title: item.title,
+          url: item.url,
+          snippet: item.snippet,
+          publicationDate: item.year ? String(item.year) : undefined,
+          authors: item.authors && item.authors.length > 0 ? item.authors : item.venue ? [item.venue] : [],
+          source: "web" as const,
+          score: item.score,
+        }))
+      )
+    );
   }
 
   const results = await Promise.allSettled(searchTasks);

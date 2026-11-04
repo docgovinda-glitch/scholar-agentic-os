@@ -624,13 +624,20 @@ button:disabled {
   opacity: 0.55;
 }
 
-/* Keyboard focus. Declared once — the previous revision defined
-   `:focus-visible` twice with conflicting colours, the second silently
-   winning. --border-strong clears 3:1 against every surface in both themes. */
+/* Keyboard focus. Declared once — --accent clears 3:1 against every surface in both themes. */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: var(--radius-sm);
+}
+
+/* Auth card inputs use a soft radius-matched focus ring instead of a double outer outline */
+.auth-card-shell input:focus,
+.auth-card-shell input:focus-visible,
+.auth-card-shell select:focus,
+.auth-card-shell select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
 /* Scrollbars — tokenised so they follow the theme. */

@@ -1,4 +1,5 @@
 import type { LiveSearchResult } from "../../services/liveSearchService";
+import type { ResearchStageTelemetry } from "../api/types";
 
 export interface Attachment {
   file: File;
@@ -34,6 +35,7 @@ export interface WebsiteAssistantMessage {
   provider?: string;
   model?: string;
   plan?: string[];
+  stages?: ResearchStageTelemetry[];
   citationStyle?: string;
   citations?: Array<{
     title?: string;

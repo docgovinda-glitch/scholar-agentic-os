@@ -440,6 +440,18 @@ export default function ProjectListScreen({
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
+  // Close mobile navigation drawer on Escape key
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    function handleMobileEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setMobileMenuOpen(false);
+      }
+    }
+    window.addEventListener("keydown", handleMobileEscape);
+    return () => window.removeEventListener("keydown", handleMobileEscape);
+  }, [mobileMenuOpen]);
+
   // Split-panel mouse drag resizing for AI assistant drawer
   useEffect(() => {
     if (!isResizingAiSidebar) return;
@@ -850,27 +862,33 @@ export default function ProjectListScreen({
         const systemPrompt = `You are Scholar Core Research Copilot, an authoritative academic companion. Provide precise, rigorous, intellectually honest answers. Prefer recent, peer-reviewed and credible sources. Format citations and references strictly according to ${styleInfo.name}. Ground all assertions in verified literature without fabricating sources or DOIs.\n\n${ASK_ANSWER_GUIDE}`;
 
         // Every research answer starts from a fresh search; a follow-up is
-        // searched together with the question before it.
+        // searched together with the question before it (unless the user explicitly selected Normal Chat mode).
         let liveRetrievedSources: LiveSearchResult[] = [];
-        setAskPhase({ step: "searching" });
-        try {
-          const previousQuestions = guideMessages.filter((m) => m.sender === "user").map((m) => m.text);
-          liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { limit: 6 });
-          sourcesFound = liveRetrievedSources;
-        } catch {
-          // The answer still comes, marked as not based on a search.
+        const isExplicitChatOnly = sidebarAiMode === "chat" && modeToSend === undefined;
+        if (!isExplicitChatOnly) {
+          setAskPhase({ step: "searching" });
+          try {
+            const previousQuestions = guideMessages.filter((m) => m.sender === "user").map((m) => m.text);
+            liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { limit: 6 });
+            sourcesFound = liveRetrievedSources;
+          } catch {
+            // The answer still comes, marked as not based on a search.
+          }
+          setAskPhase({ step: "writing", found: liveRetrievedSources.length });
+        } else {
+          setAskPhase({ step: "writing", found: 0 });
         }
-        setAskPhase({ step: "writing", found: liveRetrievedSources.length });
 
         const effectiveSystemPrompt = liveRetrievedSources.length > 0
           ? injectLiveGroundingToSystemPrompt(systemPrompt, liveRetrievedSources)
           : systemPrompt;
 
         const isAcademicOrDeliverable =
-          targetMode !== "normal" ||
-          query.toLowerCase().includes("deep research") ||
-          query.toLowerCase().includes("search the web") ||
-          /\b(?:essay|paper|coursework|thesis|dissertation|proposal|review|analysis|history|nepal|congress|study|clinical)\b/i.test(query);
+          !isExplicitChatOnly &&
+          (targetMode !== "normal" ||
+            query.toLowerCase().includes("deep research") ||
+            query.toLowerCase().includes("search the web") ||
+            /\b(?:essay|paper|coursework|thesis|dissertation|proposal|review|analysis|history|nepal|congress|study|clinical)\b/i.test(query));
 
         if (currentAttachments.length === 0 && targetMode === "normal" && !isAcademicOrDeliverable) {
           // Standard text generation — calls executeAgenticLLM first (compatible with unit tests and client router)
@@ -924,13 +942,14 @@ export default function ProjectListScreen({
             sender: "assistant",
             text: agentResponse.text.trim(),
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            mode: (agentResponse.mode as WebsiteAssistantMessage["mode"]) || (targetMode === "deep-research" ? "deep-research" : "chat"),
+            mode: (agentResponse.mode as WebsiteAssistantMessage["mode"]) || (targetMode === "deep-research" ? "deep-research" : targetMode === "search" ? "search" : "chat"),
             provider: agentResponse.provider,
             model: agentResponse.model,
             plan: agentResponse.plan,
+            stages: agentResponse.stages,
             citationStyle: agentResponse.citationStyle || askCitationStyle,
             citations: agentResponse.citations,
-            liveSources: liveRetrievedSources,
+            liveSources: isExplicitChatOnly ? undefined : liveRetrievedSources,
             searchedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             wordCount: agentResponse.wordCount,
             verifiedSourcesCount: agentResponse.verifiedSourcesCount,
@@ -1337,7 +1356,7 @@ export default function ProjectListScreen({
       <div className="w-full flex items-center">
         <textarea
           ref={guideTextareaRef}
-          rows={isPhone ? 3 : 1}
+          rows={isPhone ? 2 : 1}
           value={mainPromptInput}
           onChange={(e) => {
             setMainPromptInput(e.target.value);
@@ -1345,6 +1364,7 @@ export default function ProjectListScreen({
             e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
           }}
           onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing || (e as unknown as { keyCode?: number }).keyCode === 229) return;
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               if (mainPromptInput.trim() || mainAttachments.length > 0) {
@@ -1373,13 +1393,13 @@ export default function ProjectListScreen({
           name="researchInstructions"
           aria-label="Research instructions or assignment guidelines"
           placeholder={isPhone ? "Ask a research question or paste your brief…" : "Paste text, drop files/images, or draft research instructions..."}
-          style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
+          style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent", fieldSizing: "content" } as React.CSSProperties}
           className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input max-h-28 overflow-y-auto scholar-scrollbar"
         />
       </div>
 
       {/* Bottom Action Row: Attachments & Mode Selector on left, Submit button on right */}
-      <div className="flex items-center justify-between gap-2 mt-1.5 pt-1 border-t border-neutral-200/40 dark:border-white/5 w-full">
+      <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-neutral-200/50 dark:border-white/5 w-full">
         <PromptBarActionMenu
           currentMode={mainAiMode}
           onSelectMode={setMainAiMode}
@@ -1392,15 +1412,12 @@ export default function ProjectListScreen({
             title="Send message (Enter)"
             aria-label="Send message"
             disabled={(!mainPromptInput.trim() && mainAttachments.length === 0) || isGuideThinking}
-            className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-sm disabled:bg-neutral-200 dark:disabled:bg-white/10 disabled:text-neutral-400 dark:disabled:text-neutral-600 disabled:cursor-not-allowed"
+            className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer bg-neutral-900 text-white hover:bg-neutral-800 active:scale-95 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-sm disabled:bg-neutral-200/80 dark:disabled:bg-white/10 disabled:text-neutral-400 dark:disabled:text-neutral-500 disabled:shadow-none disabled:cursor-not-allowed"
           >
             {isGuideThinking ? (
               <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
             ) : (
-              <>
-                <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span className="text-[10px] font-mono opacity-60">↵</span>
-              </>
+              <ArrowUp className="w-4 h-4 stroke-[2.25]" />
             )}
           </button>
           <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
@@ -1412,7 +1429,7 @@ export default function ProjectListScreen({
   );
 
   return (
-    <div className="h-screen w-full flex overflow-hidden bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-white font-sans selection:bg-neutral-100 selection:text-ink-850">
+    <div className="h-screen h-[100dvh] w-full flex overflow-hidden bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-white font-sans selection:bg-neutral-100 selection:text-ink-850">
       {/* Mobile Backdrop Overlay */}
       {mobileMenuOpen && (
         <div
@@ -1424,6 +1441,7 @@ export default function ProjectListScreen({
 
       {/* Left Sidebar (Navigation Pane) */}
       <aside
+        aria-label="Workspace navigation"
         className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
           mobileMenuOpen
             ? "translate-x-0 w-[260px] shadow-2xl"
@@ -1442,7 +1460,7 @@ export default function ProjectListScreen({
                 setActiveView("projects");
                 scrollToProjects();
               }}
-              className="flex items-center gap-2.5 min-w-0 cursor-pointer transition-opacity duration-200 hover:opacity-70 text-left"
+              className="flex items-center gap-2.5 min-w-0 cursor-pointer transition-opacity duration-200 hover:opacity-75 text-left"
               title="Scholar Core Workspace"
             >
               <div className="w-9 h-9 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center flex-shrink-0 shadow-xs">
@@ -1475,7 +1493,7 @@ export default function ProjectListScreen({
             <button
               type="button"
               onClick={() => setMobileMenuOpen(false)}
-              className="md:hidden p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+              className="md:hidden p-2 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
               title="Close navigation"
               aria-label="Close navigation"
             >
@@ -1522,7 +1540,7 @@ export default function ProjectListScreen({
                 onOpenVault?.();
               }}
               aria-label="Knowledge Vault"
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
+              className={`flex items-center gap-3 px-3 py-2.5 md:py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
                 activeView === "vault"
                   ? "bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold"
                   : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
@@ -1544,7 +1562,7 @@ export default function ProjectListScreen({
                 onOpenAiAccess?.();
               }}
               aria-label="Manage AI Access"
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
+              className={`flex items-center gap-3 px-3 py-2.5 md:py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
                 activeView === "ai-access"
                   ? "bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold"
                   : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
@@ -1558,44 +1576,65 @@ export default function ProjectListScreen({
               type="button"
               onClick={() => {
                 setMobileMenuOpen(false);
-                if (typeof window !== "undefined") {
-                  window.location.href = "/presentation";
-                }
+                navigate("/presentation");
               }}
-              aria-label="Presentation Studio"
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+              aria-label="Slides & Keynotes"
+              title="Slides & Keynotes — Open Presentation Studio"
+              className="flex items-center gap-3 px-3 py-2.5 md:py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
             >
-              <Presentation className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 flex-shrink-0" />
-              <span>Presentation Studio</span>
+              <Presentation className="h-4 w-4 text-neutral-400 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors flex-shrink-0" />
+              <span>Slides & Keynotes</span>
             </button>
 
-            {/* Phase 1: Ask Scholar toggle button allowing opening and closing on click */}
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                setIsAiSidebarOpen((prev) => {
-                  const next = !prev;
-                  if (next && typeof window !== "undefined" && window.innerWidth < 1280) {
-                    setIsSidebarOpen(false);
-                  }
-                  return next;
-                });
-              }}
-              aria-label="Ask Scholar"
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
-                isAiSidebarOpen
-                  ? "bg-sky-500/10 text-sky-600 dark:text-sky-300 font-semibold border border-sky-500/20 shadow-2xs"
-                  : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
-              }`}
-            >
-              <MessageSquare className={`h-4 w-4 flex-shrink-0 transition-colors ${
-                isAiSidebarOpen
-                  ? "text-sky-600 dark:text-sky-300"
-                  : "text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200"
-              }`} />
-              <span>Ask Scholar</span>
-            </button>
+            {/* Phase 1: Ask Scholar toggle button — distinct AI Copilot entry with Lightbulb icon */}
+            <div className="pt-1.5 mt-1.5 border-t border-neutral-200/60 dark:border-white/5">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setIsAiSidebarOpen((prev) => {
+                    const next = !prev;
+                    if (next && typeof window !== "undefined" && window.innerWidth < 1280) {
+                      setIsSidebarOpen(false);
+                    }
+                    if (next) {
+                      setTimeout(() => guideInputRef.current?.focus(), 150);
+                    }
+                    return next;
+                  });
+                }}
+                aria-label="Ask Scholar"
+                aria-expanded={isAiSidebarOpen}
+                className={`flex items-center justify-between gap-2.5 px-3 py-2.5 md:py-2 rounded-xl text-[13px] transition-all duration-200 cursor-pointer text-left w-full group font-sans border ${
+                  isAiSidebarOpen
+                    ? "bg-amber-500/12 dark:bg-amber-400/15 text-neutral-900 dark:text-white font-semibold border-amber-500/35 dark:border-amber-400/30 shadow-2xs"
+                    : "bg-amber-500/[0.05] dark:bg-amber-400/[0.05] hover:bg-amber-500/10 dark:hover:bg-amber-400/10 text-neutral-800 dark:text-neutral-200 hover:text-neutral-900 dark:hover:text-white font-medium border-amber-500/20 dark:border-amber-400/15 shadow-2xs"
+                }`}
+              >
+                <span className="flex items-center gap-2.5 min-w-0">
+                  <span
+                    className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 ${
+                      isAiSidebarOpen
+                        ? "bg-amber-500 text-white dark:bg-amber-400 dark:text-neutral-900 shadow-2xs"
+                        : "bg-amber-500/15 dark:bg-amber-400/15 text-amber-600 dark:text-amber-300"
+                    }`}
+                  >
+                    <Lightbulb className="h-3.5 w-3.5 stroke-[2.1] flex-shrink-0" />
+                  </span>
+                  <span className="truncate">Ask Scholar</span>
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md flex-shrink-0 transition-colors ${
+                    isAiSidebarOpen
+                      ? "bg-amber-500/20 dark:bg-amber-400/20 text-amber-800 dark:text-amber-200"
+                      : "bg-amber-500/10 dark:bg-white/10 text-amber-700 dark:text-amber-300"
+                  }`}
+                >
+                  AI
+                </span>
+              </button>
+            </div>
           </div>
 
           {userEmail && projectsLoadError && (
@@ -1816,10 +1855,10 @@ export default function ProjectListScreen({
       <main className={`${
         isLandingPage && isAiSidebarOpen
           ? "hidden"
-          : "flex-1 flex flex-col h-screen w-full bg-paper-cool dark:bg-ink-850 overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out"
+          : "flex-1 flex flex-col h-screen h-[100dvh] w-full bg-paper-cool dark:bg-ink-850 overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out"
       }`}>
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
-        <div className="apple-glass-header sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-paper-cool/85 dark:bg-ink-850/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
+        <div className="apple-glass-header sticky top-0 z-20 px-4 sm:px-6 py-3 flex items-center justify-between bg-paper-cool/85 dark:bg-ink-850/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
           <div className="flex items-center gap-3">
             {/* Mobile Drawer Trigger Button */}
             <button
@@ -1902,12 +1941,15 @@ export default function ProjectListScreen({
             {!isAiSidebarOpen && (
               <button
                 type="button"
-                onClick={() => setIsAiSidebarOpen((prev) => !prev)}
+                onClick={() => {
+                  setIsAiSidebarOpen(true);
+                  setTimeout(() => guideInputRef.current?.focus(), 150);
+                }}
                 title="Ask Scholar"
-                className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-neutral-900/5 dark:bg-white/5 hover:bg-neutral-900/10 dark:hover:bg-white/10 border-neutral-200 dark:border-white/10 text-amber-500 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-300 animate-in fade-in zoom-in-95 duration-150"
+                className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-amber-500/[0.08] dark:bg-amber-400/[0.08] hover:bg-amber-500/15 dark:hover:bg-amber-400/15 border-amber-500/25 dark:border-amber-400/25 text-amber-600 dark:text-amber-300 hover:text-amber-700 dark:hover:text-amber-200 animate-in fade-in zoom-in-95 duration-150"
                 aria-label="Toggle Scholar Core AI Assistant"
               >
-                <Lightbulb className="w-5 h-5 stroke-[1.8]" />
+                <Lightbulb className="w-5 h-5 stroke-[1.9]" />
               </button>
             )}
           </div>
@@ -1946,7 +1988,7 @@ export default function ProjectListScreen({
         ) : (
           <>
             {/* Scrollable / Flexible Center Area */}
-            <div className="flex-1 flex flex-col items-center justify-start md:justify-center px-4 overflow-y-auto scholar-scrollbar">
+            <div className="flex-1 flex flex-col items-center justify-start md:justify-center px-4 sm:px-6 overflow-y-auto scholar-scrollbar">
               <div className={`w-full max-w-5xl flex flex-col items-center gap-6 pb-4 ${isPhone ? "pt-3" : "my-auto"}`}>
                 {/* Onboarding welcome banner */}
                 {welcomeVisible && (
@@ -1991,9 +2033,11 @@ export default function ProjectListScreen({
                 {isPhone && !isAiSidebarOpen && !hasStartedChatting ? (
                   <>
                     <section aria-label="Ask Scholar" className="w-full">
-                      <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
                         <h1 className="text-xl font-semibold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
-                          <MessageSquare className="w-5 h-5 text-sky-500" aria-hidden="true" />
+                          <span className="w-7 h-7 rounded-lg bg-amber-500/15 dark:bg-amber-400/15 text-amber-600 dark:text-amber-300 flex items-center justify-center">
+                            <Lightbulb className="w-4 h-4 stroke-[2.1]" aria-hidden="true" />
+                          </span>
                           Ask Scholar
                         </h1>
                         {userEmail && (
@@ -2019,7 +2063,7 @@ export default function ProjectListScreen({
                           </button>
                         )}
                       </div>
-                      <p className="text-[13px] text-neutral-600 dark:text-neutral-400 mb-3">
+                      <p className="text-[13px] text-neutral-600 dark:text-neutral-400 mb-3 leading-relaxed">
                         Ask a research question or paste your assignment brief. Each answer starts from a fresh search of scholarly sources.
                       </p>
                       {mainPromptForm}
@@ -2042,7 +2086,10 @@ export default function ProjectListScreen({
                     </section>
 
                     <section aria-label="Start a workspace" className="w-full">
-                      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2">Start a workspace</h2>
+                      <div className="flex items-center justify-between mb-2">
+                        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Start a workspace</h2>
+                        <span className="text-[11px] text-neutral-400 dark:text-neutral-500">4 Core Formats</span>
+                      </div>
                       <div className="grid grid-cols-2 gap-2.5">
                         {FORMAT_TILES.map((tile) => {
                           const isBootingThis = creatingFormatId === tile.id;
@@ -2061,7 +2108,7 @@ export default function ProjectListScreen({
                                 handleCreate(tile.id);
                               }}
                               disabled={creating && !isBootingThis}
-                              className="flex flex-col items-start gap-2 rounded-xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-ink-750 p-3 text-left cursor-pointer active:scale-[0.98] transition-transform disabled:opacity-50 min-h-[6.5rem]"
+                              className="flex flex-col items-start justify-between gap-2 rounded-2xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-ink-750 p-3.5 text-left cursor-pointer active:scale-[0.98] transition-all shadow-2xs disabled:opacity-50 min-h-[7rem]"
                             >
                               <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${tileTheme.badgeBg}`}>
                                 {isBootingThis ? (
@@ -2070,8 +2117,10 @@ export default function ProjectListScreen({
                                   <FormatIcon id={tile.id} className="w-4 h-4" />
                                 )}
                               </span>
-                              <span className="text-[13px] font-semibold leading-snug text-neutral-900 dark:text-white">{tile.label}</span>
-                              {length && <span className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-tight">{length}</span>}
+                              <div>
+                                <span className="block text-[13px] font-semibold leading-snug text-neutral-900 dark:text-white">{tile.label}</span>
+                                {length && <span className="block text-[11px] text-neutral-500 dark:text-neutral-400 leading-tight mt-0.5">{length}</span>}
+                              </div>
                             </button>
                           );
                         })}
@@ -2080,11 +2129,17 @@ export default function ProjectListScreen({
                   </>
                 ) : !isAiSidebarOpen && !hasStartedChatting ? (
                   <>
-                    <div className="text-center mb-2">
-                      <h1 className="text-2xl font-semibold text-neutral-900 dark:text-white tracking-tight">
+                    <div className="text-center mb-1 flex flex-col items-center">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-[11px] font-medium text-neutral-600 dark:text-neutral-300 mb-3 shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                        <span>Evidence-Grounded Academic OS</span>
+                        <span className="text-neutral-300 dark:text-white/20" aria-hidden="true">·</span>
+                        <span className="text-neutral-500 dark:text-neutral-400">OpenAlex, Crossref &amp; Vault</span>
+                      </div>
+                      <h1 className="text-2xl sm:text-[28px] font-semibold text-neutral-900 dark:text-white tracking-tight leading-tight">
                         Where will your research begin?
                       </h1>
-                      <p className="text-[13px] text-neutral-500 dark:text-neutral-400 mt-1">
+                      <p className="text-[13px] sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1.5 max-w-xl mx-auto">
                         Select an academic deliverable or paste your assignment guidelines below.
                       </p>
                     </div>
@@ -2108,7 +2163,7 @@ export default function ProjectListScreen({
                                 handleCreate(tile.id);
                               }}
                               disabled={isOtherBooting}
-                              className={`apple-card group bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
+                              className={`apple-card group bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
                                 isOtherBooting
                                   ? "opacity-50 cursor-not-allowed"
                                   : isBootingThis
@@ -2116,29 +2171,35 @@ export default function ProjectListScreen({
                                   : ""
                               }`}
                             >
-                              {/* Top Row: Clean Category Icon Container */}
+                              {/* Top Row: Clean Category Icon Container & Hover Affordance */}
                               <div className="flex items-center justify-between w-full">
-                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
                                   {isBootingThis ? (
                                     <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                                   ) : (
                                     <FormatIcon id={tile.id} className="w-4 h-4" />
                                   )}
                                 </div>
+                                <span
+                                  aria-hidden="true"
+                                  className="w-7 h-7 rounded-full flex items-center justify-center text-neutral-400 dark:text-neutral-500 group-hover:text-neutral-900 dark:group-hover:text-white group-hover:bg-neutral-100 dark:group-hover:bg-white/10 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200"
+                                >
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                </span>
                               </div>
 
                               {/* Middle Content: Title & Actionable Workflow Guidance */}
-                              <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-start">
+                              <div className="mt-4 mb-2 flex-1 flex flex-col justify-start">
                                 <h2 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-white group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
                                   {tile.label}
                                 </h2>
-                                <p className="text-[12px] leading-relaxed font-normal text-neutral-600 dark:text-neutral-400 mt-2 line-clamp-3">
+                                <p className="text-[12.5px] leading-relaxed font-normal text-neutral-600 dark:text-neutral-400 mt-2">
                                   {tile.guidance}
                                 </p>
                               </div>
 
                               {/* Bottom Row: Divider & Actionable Deliverables Spec */}
-                              <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
+                              <div className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
                                 {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
                                   <React.Fragment key={idx}>
                                     {idx > 0 && <span className="text-neutral-400 dark:text-neutral-400 opacity-60 font-bold">·</span>}
@@ -2154,8 +2215,8 @@ export default function ProjectListScreen({
                   </>
                 ) : (
                   <div className="text-center py-8 flex flex-col items-center gap-3 animate-in fade-in duration-200">
-                    <div className="w-10 h-10 rounded-2xl bg-sky-500/10 text-sky-500 flex items-center justify-center">
-                      <MessageSquare className="w-5 h-5" />
+                    <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-300 flex items-center justify-center">
+                      <Lightbulb className="w-5 h-5" />
                     </div>
                     <div>
                       <h2 className="text-base font-semibold text-neutral-900 dark:text-white">Ask Scholar Copilot Active</h2>
@@ -2186,7 +2247,7 @@ export default function ProjectListScreen({
 
             {/* Main AI Prompt Bar — Parallel to the line above settings (on phones it sits in the Ask Scholar hero instead) */}
             {!(isPhone && !isAiSidebarOpen && !hasStartedChatting) && (
-            <div className="sticky bottom-0 z-20 w-full relative pointer-events-none flex flex-col justify-start bg-gradient-to-t from-paper-cool dark:from-ink-850 via-paper-cool/95 dark:via-ink-850/95 to-transparent px-4 pb-3">
+            <div className="sticky bottom-0 z-20 w-full relative pointer-events-none flex flex-col justify-start bg-gradient-to-t from-paper-cool dark:from-ink-850 via-paper-cool/95 dark:via-ink-850/95 to-transparent px-4 sm:px-6 pb-3.5">
               <div className="w-full max-w-4xl mx-auto relative pointer-events-auto flex flex-col items-center">
                 {/* Contextual Clarification when Ask Scholar is Open */}
                 {isAiSidebarOpen && (
@@ -2216,7 +2277,7 @@ export default function ProjectListScreen({
             {[
               {
                 label: "Ask",
-                icon: MessageSquare,
+                icon: Lightbulb,
                 active: activeView === "projects" && !choosing,
                 onClick: () => {
                   if (activeView !== "projects") handleCloseCentralView();
@@ -2258,7 +2319,7 @@ export default function ProjectListScreen({
                 type="button"
                 onClick={item.onClick}
                 aria-current={item.active ? "page" : undefined}
-                className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium cursor-pointer ${
+                className={`flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium cursor-pointer ${
                   item.active ? "text-neutral-900 dark:text-white" : "text-neutral-500 dark:text-neutral-400"
                 }`}
               >
@@ -2277,7 +2338,7 @@ export default function ProjectListScreen({
             ? { width: `min(${aiSidebarWidth}px, 100vw)` }
             : undefined
         }
-        className={`h-full bg-white dark:bg-ink-800 text-neutral-800 dark:text-neutral-200 flex flex-col relative transition-all duration-300 ease-in-out ${
+        className={`h-full max-h-[100dvh] bg-white dark:bg-ink-800 text-neutral-800 dark:text-neutral-200 flex flex-col relative transition-all duration-300 ease-in-out ${
           isAiSidebarOpen
             ? isLandingPage
               ? "flex-1 w-full min-w-0 border-none shadow-none z-20 translate-x-0"
@@ -2305,14 +2366,14 @@ export default function ProjectListScreen({
         {isAiSidebarOpen && (
           <div className="h-full flex flex-col w-full">
             {/* Sidebar Header with glassmorphism & elevated badge */}
-            <header className="px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/95 dark:bg-ink-800/95 backdrop-blur-md sticky top-0 z-20">
+            <header className="px-4 sm:px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/95 dark:bg-ink-800/95 backdrop-blur-md sticky top-0 z-20">
               <div className="flex items-center gap-3">
                 {isLandingPage && (
                   <>
                     <button
                       type="button"
                       onClick={() => setMobileMenuOpen(true)}
-                      className="md:hidden p-1.5 rounded-lg border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer"
+                      className="md:hidden p-2 rounded-lg border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer"
                       aria-label="Open navigation"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -2323,7 +2384,7 @@ export default function ProjectListScreen({
                       <button
                         type="button"
                         onClick={() => setIsSidebarOpen(true)}
-                        className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-lg border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 text-xs font-medium cursor-pointer transition-all"
+                        className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 text-xs font-medium cursor-pointer transition-all"
                         title="Expand sidebar"
                         aria-label="Expand sidebar"
                       >
@@ -2338,8 +2399,8 @@ export default function ProjectListScreen({
                   </>
                 )}
                 <div className="relative flex items-center justify-center">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500/10 via-indigo-500/10 to-purple-500/10 dark:from-sky-500/20 dark:via-indigo-500/20 dark:to-purple-500/20 border border-sky-500/20 dark:border-white/10 flex items-center justify-center shadow-2xs">
-                    <ScholarCoreLogo size="sm" withText={false} className="scale-85" />
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/15 dark:bg-amber-400/15 border border-amber-500/25 dark:border-amber-400/25 text-amber-600 dark:text-amber-300 flex items-center justify-center shadow-2xs">
+                    <Lightbulb className="w-4 h-4 stroke-[2.1]" />
                   </div>
                   <span
                     className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-ink-800 ${aiStatus?.connected ? "bg-emerald-500" : "bg-amber-500"}`}
@@ -2351,7 +2412,7 @@ export default function ProjectListScreen({
                     <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">
                       Ask Scholar
                     </h2>
-                    <span className="hidden sm:inline text-[10px] bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 px-2 py-0.5 rounded-full font-medium border border-sky-200 dark:border-sky-800/40">
+                    <span className="hidden sm:inline text-[10px] bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-200 dark:border-amber-800/40">
                       Research Copilot
                     </span>
                   </div>
@@ -2421,10 +2482,10 @@ export default function ProjectListScreen({
             )}
 
             {/* Chat Canvas (flex-1 overflow-y-auto) */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm scholar-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-sm scholar-scrollbar">
               {/* On Landing page before chatting begins: render the 4 deliverable cards in full glory */}
               {isLandingPage && !hasStartedChatting && (
-                <div className="w-full max-w-5xl mx-auto my-auto py-6 flex flex-col items-center justify-center animate-in fade-in duration-200">
+                <div className="w-full max-w-5xl mx-auto my-auto py-4 flex flex-col items-center justify-center animate-in fade-in duration-200">
                   {/* Any assistant greeting messages (e.g. from Reset Chat) */}
                   {guideMessages.map((msg) => (
                     <div key={msg.id} className="w-full max-w-2xl mx-auto mb-6">
@@ -2443,11 +2504,15 @@ export default function ProjectListScreen({
                   ))}
 
                   {/* Heading */}
-                  <div className="text-center mb-6">
-                    <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-white tracking-tight">
+                  <div className="text-center mb-6 flex flex-col items-center">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 dark:bg-amber-400/10 border border-amber-500/20 dark:border-amber-400/20 text-[11px] font-medium text-amber-700 dark:text-amber-300 mb-3 shadow-2xs">
+                      <Lightbulb className="w-3.5 h-3.5" aria-hidden="true" />
+                      <span>Ask Scholar Copilot Ready · Type a question below or pick a workspace</span>
+                    </div>
+                    <h1 className="text-2xl sm:text-[28px] font-semibold text-neutral-900 dark:text-white tracking-tight leading-tight">
                       Where will your research begin?
                     </h1>
-                    <p className="text-[13px] sm:text-sm text-neutral-500 dark:text-neutral-400 mt-2 max-w-lg mx-auto leading-relaxed">
+                    <p className="text-[13px] sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1.5 max-w-lg mx-auto leading-relaxed">
                       Select an academic deliverable or paste your assignment guidelines below.
                     </p>
                   </div>
@@ -2472,7 +2537,7 @@ export default function ProjectListScreen({
                               handleCreate(tile.id);
                             }}
                             disabled={isOtherBooting}
-                            className={`group bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
+                            className={`group bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${
                               isOtherBooting
                                 ? "opacity-50 cursor-not-allowed"
                                 : isBootingThis
@@ -2480,29 +2545,35 @@ export default function ProjectListScreen({
                                 : ""
                             }`}
                           >
-                            {/* Top Row: Clean Category Icon Container */}
+                            {/* Top Row: Clean Category Icon Container & Hover Affordance */}
                             <div className="flex items-center justify-between w-full">
-                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
                                 {isBootingThis ? (
                                   <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                                 ) : (
                                   <FormatIcon id={tile.id} className="w-4 h-4" />
                                 )}
                               </div>
+                              <span
+                                aria-hidden="true"
+                                className="w-7 h-7 rounded-full flex items-center justify-center text-neutral-400 dark:text-neutral-500 group-hover:text-neutral-900 dark:group-hover:text-white group-hover:bg-neutral-100 dark:group-hover:bg-white/10 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200"
+                              >
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </span>
                             </div>
 
                             {/* Middle Content: Title & Actionable Workflow Guidance */}
-                            <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-start">
+                            <div className="mt-4 mb-2 flex-1 flex flex-col justify-start">
                               <h2 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-white group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
                                 {tile.label}
                               </h2>
-                              <p className="text-[12px] leading-relaxed font-normal text-neutral-600 dark:text-neutral-400 mt-2 line-clamp-3">
+                              <p className="text-[12.5px] leading-relaxed font-normal text-neutral-600 dark:text-neutral-400 mt-2">
                                 {tile.guidance}
                               </p>
                             </div>
 
                             {/* Bottom Row: Divider & Actionable Deliverables Spec */}
-                            <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
+                            <div className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
                               {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
                                 <React.Fragment key={idx}>
                                   {idx > 0 && <span className="text-neutral-400 dark:text-neutral-400 opacity-60 font-bold">·</span>}
@@ -2618,8 +2689,8 @@ export default function ProjectListScreen({
                       <div className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.text}</div>
                     )}
 
-                    {/* Deep Research Plan — Interactive Collapsible Trajectory Accordion */}
-                    {msg.plan && msg.plan.length > 0 && (
+                    {/* Deep Research Plan & 7-Stage Agentic Workflow — Interactive Collapsible Trajectory Accordion */}
+                    {((msg.plan && msg.plan.length > 0) || (msg.stages && msg.stages.length > 0)) && (
                       <div className="mt-3 rounded-xl bg-purple-500/5 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/30 text-xs overflow-hidden">
                         <button
                           type="button"
@@ -2628,7 +2699,11 @@ export default function ProjectListScreen({
                         >
                           <div className="font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
                             <Compass className="w-3.5 h-3.5 text-purple-500" />
-                            <span>Research Trajectory ({msg.plan.length} Steps)</span>
+                            <span>
+                              {msg.stages && msg.stages.length > 0
+                                ? `Deep Research Workflow (${msg.stages.length} Stages · ${msg.plan?.length || 0} Sub-Questions)`
+                                : `Research Trajectory (${msg.plan?.length || 0} Steps)`}
+                            </span>
                           </div>
                           <span className="text-neutral-400">
                             {expandedPlanIds[msg.id] !== false ? (
@@ -2639,15 +2714,39 @@ export default function ProjectListScreen({
                           </span>
                         </button>
                         {expandedPlanIds[msg.id] !== false && (
-                          <div className="px-2.5 pb-2.5 pt-0.5 border-t border-purple-200/40 dark:border-purple-800/20">
-                            <ul className="space-y-1.5 text-neutral-600 dark:text-neutral-400 text-[11px] pt-1.5">
-                              {msg.plan.map((step, sIdx) => (
-                                <li key={sIdx} className="flex items-start gap-1.5">
-                                  <span className="text-purple-500 font-bold shrink-0">✓</span>
-                                  <span>{step}</span>
-                                </li>
-                              ))}
-                            </ul>
+                          <div className="px-2.5 pb-2.5 pt-1 border-t border-purple-200/40 dark:border-purple-800/20 space-y-2.5">
+                            {msg.stages && msg.stages.length > 0 && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                                {msg.stages.map((stage) => (
+                                  <div
+                                    key={stage.id}
+                                    className="p-2 rounded-lg bg-white/70 dark:bg-white/[0.03] border border-purple-200/50 dark:border-purple-800/30 flex flex-col gap-0.5"
+                                  >
+                                    <div className="flex items-center justify-between gap-1.5">
+                                      <span className="font-semibold text-[11px] text-neutral-800 dark:text-neutral-200">
+                                        {stage.label}
+                                      </span>
+                                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                                        ✓ {stage.status}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-snug">
+                                      {stage.summary}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {msg.plan && msg.plan.length > 0 && (
+                              <ul className="space-y-1.5 text-neutral-600 dark:text-neutral-400 text-[11px] pt-1">
+                                {msg.plan.map((step, sIdx) => (
+                                  <li key={sIdx} className="flex items-start gap-1.5">
+                                    <span className="text-purple-500 font-bold shrink-0">✓</span>
+                                    <span>{step}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                           </div>
                         )}
                       </div>
@@ -2790,11 +2889,15 @@ export default function ProjectListScreen({
                                   </div>
 
                                   <div className="flex items-center justify-between gap-1.5 mt-2 pt-1.5 border-t border-neutral-100 dark:border-white/5 text-[9px]">
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
                                       <span
                                         className={`px-1.5 py-0.2 rounded-full font-medium ${
-                                          isGovOrAcademic
+                                          c.sourceType === "vault" || badge.toLowerCase().includes("vault")
+                                            ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40"
+                                            : isGovOrAcademic
                                             ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
+                                            : badge.toLowerCase().includes("policy") || badge.toLowerCase().includes("institute")
+                                            ? "bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/40"
                                             : "bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300"
                                         }`}
                                       >
@@ -2877,8 +2980,8 @@ export default function ProjectListScreen({
 
                     {/* Response Utility Action Bar */}
                     {msg.sender === "assistant" && !msg.error && (
-                      <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-neutral-200/60 dark:border-white/10 text-[11px] text-neutral-500 dark:text-neutral-400">
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-between flex-wrap gap-2 pt-2.5 mt-2.5 border-t border-neutral-200/60 dark:border-white/10 text-[11px] text-neutral-500 dark:text-neutral-400">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <button
                             type="button"
                             onClick={() => handleCopyResponse(msg.id, msg.text)}
@@ -2897,6 +3000,57 @@ export default function ProjectListScreen({
                               </>
                             )}
                           </button>
+
+                          {msg.id !== "init" && msg.id !== "reset-assistant" && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const msgIdx = guideMessages.findIndex((m) => m.id === msg.id);
+                                  const precedingUser =
+                                    msgIdx > 0
+                                      ? guideMessages.slice(0, msgIdx).filter((m) => m.sender === "user").slice(-1)[0]
+                                      : guideMessages.filter((m) => m.sender === "user").slice(-1)[0];
+                                  if (precedingUser) {
+                                    handleSendGuideMessage(
+                                      precedingUser.text,
+                                      undefined,
+                                      msg.mode === "deep-research"
+                                        ? "deep-research"
+                                        : msg.mode === "search"
+                                        ? "search"
+                                        : "normal"
+                                    );
+                                  }
+                                }}
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                                title="Regenerate response"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>Regenerate</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleSendGuideMessage(
+                                    "Continue and expand on the preceding analysis with additional depth, concrete examples, and key implications.",
+                                    undefined,
+                                    msg.mode === "deep-research"
+                                      ? "deep-research"
+                                      : msg.mode === "search"
+                                      ? "search"
+                                      : "normal"
+                                  );
+                                }}
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                                title="Continue and expand this conversation"
+                              >
+                                <ArrowRight className="w-3 h-3" />
+                                <span>Continue</span>
+                              </button>
+                            </>
+                          )}
 
                           <button
                             type="button"
@@ -3039,12 +3193,12 @@ export default function ProjectListScreen({
             </div>
 
             {/* Pinned Floating Input Component (Module 3.4) */}
-            <div className="p-3.5 bg-white/95 dark:bg-ink-800/95 backdrop-blur-md border-t border-neutral-200/80 dark:border-white/10 shrink-0">
+            <div className="p-3 sm:p-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] bg-white/95 dark:bg-ink-800/95 backdrop-blur-md border-t border-neutral-200/80 dark:border-white/10 shrink-0">
               <div className={isLandingPage ? "w-full max-w-4xl mx-auto" : "w-full"}>
               {/* Status & Reset Bar */}
               <div className="flex items-center justify-between px-1 mb-2">
                 <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
-                  <ScholarCoreLogo size="sm" withText={false} className="scale-75" />
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" aria-hidden="true" />
                   <span className="font-medium text-neutral-700 dark:text-neutral-300">Ask Scholar</span>
                   {aiStatus ? (
                     aiStatus.connected ? (
@@ -3133,9 +3287,20 @@ export default function ProjectListScreen({
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  handleSendGuideMessage();
+                  if (guideInput.trim() || sidebarAttachments.length > 0) {
+                    handleSendGuideMessage();
+                  }
                 }}
-                className="relative flex flex-col rounded-2xl bg-neutral-100/90 dark:bg-white/[0.06] p-2.5 shadow-xs border border-neutral-200 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] focus-within:bg-white dark:focus-within:bg-ink-700 focus-within:shadow-md transition-all"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (e.dataTransfer.files?.length) {
+                    handleSidebarFileSelect(Array.from(e.dataTransfer.files));
+                  }
+                }}
+                className="relative flex flex-col rounded-2xl bg-white dark:bg-ink-750 p-3 shadow-sm border border-neutral-200/90 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] focus-within:shadow-md transition-all duration-200"
               >
                 <div className="w-full px-1">
                   <textarea
@@ -3148,6 +3313,7 @@ export default function ProjectListScreen({
                       e.target.style.height = `${Math.min(e.target.scrollHeight, 130)}px`;
                     }}
                     onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing || (e as unknown as { keyCode?: number }).keyCode === 229) return;
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
                         if (guideInput.trim() || sidebarAttachments.length > 0) {
@@ -3157,33 +3323,90 @@ export default function ProjectListScreen({
                         removeSidebarAttachment(sidebarAttachments[sidebarAttachments.length - 1].id);
                       }
                     }}
+                    onPaste={(e) => {
+                      const items = e.clipboardData?.items;
+                      if (!items) return;
+                      const newFiles: File[] = [];
+                      for (let i = 0; i < items.length; i++) {
+                        if (items[i].kind === "file") {
+                          const file = items[i].getAsFile();
+                          if (file) newFiles.push(file);
+                        }
+                      }
+                      if (newFiles.length > 0) {
+                        e.preventDefault();
+                        handleSidebarFileSelect(newFiles);
+                      }
+                    }}
+                    aria-label="Ask Scholar question input"
                     placeholder="Ask a research question…"
-                    style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                    className="w-full bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-[13px] text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none resize-none prompt-bare-input max-h-32 min-h-[36px] overflow-y-auto scholar-scrollbar leading-relaxed"
+                    style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent", fieldSizing: "content" } as React.CSSProperties}
+                    className="w-full bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none resize-none prompt-bare-input max-h-32 min-h-[36px] overflow-y-auto scholar-scrollbar leading-relaxed"
                   />
                 </div>
 
-                <div className="flex items-center justify-between pt-1.5 mt-1 border-t border-neutral-200/50 dark:border-white/5">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2 pt-1.5 mt-1 border-t border-neutral-200/50 dark:border-white/5 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <PromptBarActionMenu
                       currentMode={sidebarAiMode}
                       onSelectMode={setSidebarAiMode}
                       onAttachFiles={handleSidebarFileSelect}
                     />
-                    <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400" title="Each answer starts from a fresh search of scholarly indexes and the web">
-                      <span aria-hidden="true">🌐</span>
-                      <span>Searches recent sources for every answer</span>
-                    </span>
+                    <div
+                      role="group"
+                      aria-label="Ask Scholar mode selector"
+                      className="inline-flex items-center p-0.5 rounded-full bg-neutral-100/90 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/10"
+                    >
+                      <button
+                        type="button"
+                        aria-pressed={sidebarAiMode === "chat"}
+                        onClick={() => setSidebarAiMode(sidebarAiMode === "chat" ? "auto" : "chat")}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors cursor-pointer ${
+                          sidebarAiMode === "chat"
+                            ? "bg-white dark:bg-ink-700 text-neutral-900 dark:text-white shadow-2xs"
+                            : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
+                        }`}
+                        title="Normal Chat — Fast conversational & analytical assistant"
+                      >
+                        Chat
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={sidebarAiMode === "search"}
+                        onClick={() => setSidebarAiMode(sidebarAiMode === "search" ? "auto" : "search")}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors cursor-pointer ${
+                          sidebarAiMode === "search"
+                            ? "bg-blue-600 text-white shadow-2xs"
+                            : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
+                        }`}
+                        title="Web Search — Live internet, official .gov/.int, policy & news retrieval"
+                      >
+                        Web Search
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={sidebarAiMode === "deep_research"}
+                        onClick={() => setSidebarAiMode(sidebarAiMode === "deep_research" ? "auto" : "deep_research")}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors cursor-pointer ${
+                          sidebarAiMode === "deep_research"
+                            ? "bg-purple-600 text-white shadow-2xs"
+                            : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
+                        }`}
+                        title="Deep Research — 7-stage multi-source investigation & structured synthesis"
+                      >
+                        Deep Research
+                      </button>
+                    </div>
                   </div>
 
                   <div className="relative group">
                     <button
                       type="submit"
                       disabled={(!guideInput.trim() && sidebarAttachments.length === 0) || isGuideThinking}
-                      className={`h-7 px-2.5 rounded-full flex items-center justify-center gap-1 transition-all duration-200 cursor-pointer ${
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
                         (guideInput.trim() || sidebarAttachments.length > 0) && !isGuideThinking
                           ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-xs active:scale-95"
-                          : "bg-neutral-200 dark:bg-white/10 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
+                          : "bg-neutral-200/80 dark:bg-white/10 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
                       }`}
                       title="Send question (Enter)"
                       aria-label="Send question"
@@ -3191,10 +3414,7 @@ export default function ProjectListScreen({
                       {isGuideThinking ? (
                         <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <>
-                          <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span className="text-[10px] font-mono opacity-60">↵</span>
-                        </>
+                        <ArrowUp className="w-4 h-4 stroke-[2.25]" />
                       )}
                     </button>
                     <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">

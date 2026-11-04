@@ -563,7 +563,7 @@ export default function SourceLibraryScreen({
                   placeholder="Search your sources (title, author, journal, tags, notes)..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-lg)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden focus:border-[color:var(--accent)] shadow-xs transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-lg)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-subtle)] shadow-xs transition-colors"
                 />
                 {searchQuery && (
                   <button

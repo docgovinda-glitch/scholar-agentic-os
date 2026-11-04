@@ -215,4 +215,33 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
     expect(screen.getByRole("heading", { name: "Coursework & Essays" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
   });
+
+  it("restructures left sidebar with Slides & Keynotes replacing Presentation Studio and visually distinct Ask Scholar with Lightbulb icon", () => {
+    const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+    const navAside = container.querySelector("aside[aria-label='Workspace navigation']") || container.querySelector("aside")!;
+
+    // Separate Presentation Studio entry is removed
+    expect(screen.queryByRole("button", { name: /^Presentation Studio$/i })).not.toBeInTheDocument();
+
+    // Slides & Keynotes is the primary presentation navigation entry in the sidebar
+    const slidesNavBtn = screen.getByRole("button", { name: /^Slides & Keynotes$/i });
+    expect(slidesNavBtn).toBeInTheDocument();
+    expect(navAside.contains(slidesNavBtn)).toBe(true);
+
+    // Ask Scholar in sidebar uses the recognizable Lightbulb icon and distinct AI badge
+    const askScholarBtn = screen.getByRole("button", { name: /^Ask Scholar$/i });
+    expect(askScholarBtn).toBeInTheDocument();
+    expect(askScholarBtn.querySelector(".lucide-lightbulb")).toBeInTheDocument();
+    expect(askScholarBtn).toHaveTextContent("AI");
+  });
+
+  it("closes the mobile navigation drawer when Escape key is pressed", () => {
+    const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+    const openNavBtn = screen.getByRole("button", { name: "Open navigation" });
+    fireEvent.click(openNavBtn);
+
+    expect(container.querySelector(".fixed.inset-0.z-40.bg-black\\/40")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(container.querySelector(".fixed.inset-0.z-40.bg-black\\/40")).not.toBeInTheDocument();
+  });
 });

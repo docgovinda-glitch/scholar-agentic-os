@@ -269,11 +269,11 @@ export default function ScholarAgenticDashboard() {
               aria-label="Ask Scholar"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group ${
                 isSidebarOpen
-                  ? "bg-white/10 text-neutral-100 font-semibold"
-                  : "hover:bg-white/5 text-neutral-400 hover:text-neutral-200"
+                  ? "bg-amber-500/15 text-amber-200 font-semibold border border-amber-400/30"
+                  : "hover:bg-white/5 text-neutral-300 hover:text-neutral-100"
               }`}
             >
-              <MessageSquare className="h-4 w-4 text-neutral-400 group-hover:text-neutral-200 flex-shrink-0" />
+              <Lightbulb className="h-4 w-4 text-amber-400 group-hover:text-amber-300 flex-shrink-0" />
               <span>Ask Scholar</span>
             </button>
           </div>

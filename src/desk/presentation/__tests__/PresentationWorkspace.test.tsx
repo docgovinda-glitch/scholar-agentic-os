@@ -336,8 +336,8 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
     expect(screen.queryByTestId("user-profile-card")).not.toBeInTheDocument();
     expect(screen.getByTestId("sidebar-no-projects")).toHaveTextContent("No projects yet");
 
-    // Presentation Studio item has active highlight
-    const presStudioNavBtn = screen.getByRole("button", { name: "Presentation Studio" });
+    // Slides & Keynotes item has active highlight
+    const presStudioNavBtn = screen.getByRole("button", { name: "Slides & Keynotes" });
     expect(presStudioNavBtn).toBeInTheDocument();
     expect(presStudioNavBtn.className).toContain("font-bold");
 
@@ -460,6 +460,18 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
 
     fireEvent.click(screen.getByRole("button", { name: /Done Rehearsing/i }));
     expect(screen.queryByTestId("audience-qa-simulator-modal")).not.toBeInTheDocument();
+  });
+
+  it("toggles the Ask Scholar drawer when clicking Ask Scholar in the left ScholarSidebar", () => {
+    render(<PresentationWorkspace projectId="proj-ask-sidebar" />);
+    const sidebarAskBtn = screen.getByRole("button", { name: /^Ask Scholar$/i });
+    expect(sidebarAskBtn.querySelector(".lucide-lightbulb")).toBeInTheDocument();
+
+    fireEvent.click(sidebarAskBtn);
+    expect(screen.getByTestId("ask-scholar-drawer")).toBeInTheDocument();
+
+    fireEvent.click(sidebarAskBtn);
+    expect(screen.queryByTestId("ask-scholar-drawer")).not.toBeInTheDocument();
   });
 });
 
