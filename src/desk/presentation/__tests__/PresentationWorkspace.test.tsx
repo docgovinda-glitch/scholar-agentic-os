@@ -336,10 +336,9 @@ Multi-agent verification delivers 100% citation accuracy across 5,000 tested ref
     expect(screen.queryByTestId("user-profile-card")).not.toBeInTheDocument();
     expect(screen.getByTestId("sidebar-no-projects")).toHaveTextContent("No projects yet");
 
-    // Slides & Keynotes item has active highlight
-    const presStudioNavBtn = screen.getByRole("button", { name: "Slides & Keynotes" });
-    expect(presStudioNavBtn).toBeInTheDocument();
-    expect(presStudioNavBtn.className).toContain("font-bold");
+    // Ask Scholar item is in the sidebar without duplicate Slides & Keynotes entry
+    expect(screen.queryByRole("button", { name: "Slides & Keynotes" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ask Scholar" })).toBeInTheDocument();
 
     // Collapse toggle button («) collapses sidebar
     const collapseBtn = screen.getByTestId("collapse-sidebar-btn");

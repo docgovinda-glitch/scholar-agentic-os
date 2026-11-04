@@ -216,23 +216,20 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
   });
 
-  it("restructures left sidebar with Slides & Keynotes replacing Presentation Studio and visually distinct Ask Scholar with Lightbulb icon", () => {
+  it("keeps left sidebar minimal without duplicate Slides & Keynotes entry and renders Ask Scholar with Lightbulb icon", () => {
     const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
     const navAside = container.querySelector("aside[aria-label='Workspace navigation']") || container.querySelector("aside")!;
 
-    // Separate Presentation Studio entry is removed
+    // Neither Presentation Studio nor Slides & Keynotes is duplicated in the left sidebar (Slides & Keynotes is on the landing page cards)
     expect(screen.queryByRole("button", { name: /^Presentation Studio$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Slides & Keynotes$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Slides & Keynotes" })).toBeInTheDocument();
 
-    // Slides & Keynotes is the primary presentation navigation entry in the sidebar
-    const slidesNavBtn = screen.getByRole("button", { name: /^Slides & Keynotes$/i });
-    expect(slidesNavBtn).toBeInTheDocument();
-    expect(navAside.contains(slidesNavBtn)).toBe(true);
-
-    // Ask Scholar in sidebar uses the recognizable Lightbulb icon and distinct AI badge
+    // Ask Scholar in sidebar uses the recognizable Lightbulb icon in clean neutral style
     const askScholarBtn = screen.getByRole("button", { name: /^Ask Scholar$/i });
     expect(askScholarBtn).toBeInTheDocument();
+    expect(navAside.contains(askScholarBtn)).toBe(true);
     expect(askScholarBtn.querySelector(".lucide-lightbulb")).toBeInTheDocument();
-    expect(askScholarBtn).toHaveTextContent("AI");
   });
 
   it("closes the mobile navigation drawer when Escape key is pressed", () => {

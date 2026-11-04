@@ -651,8 +651,8 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(journalCard.className).toContain("dark:border-white/10");
     expect(journalHeading.className).toContain("dark:text-white");
     expect(journalCard.innerHTML).toContain("text-neutral-600");
-    expect(journalCard.innerHTML).toContain("dark:text-amber-400/90");
-    expect(journalCard.innerHTML).toContain("dark:bg-amber-500/10");
+    expect(journalCard.innerHTML).toContain("dark:text-slate-300");
+    expect(journalCard.innerHTML).toContain("dark:bg-white/10");
 
     const proposalHeading = screen.getByRole("heading", { name: "Research Proposal" });
     const proposalCard = proposalHeading.closest("button")!;
@@ -698,9 +698,9 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(sharedParent.className).toContain("flex-col");
     expect(sharedParent.className).toContain("items-center");
 
-    // 3. Welcome workspace heading and removed disclaimer footer
+    // 3. Welcome workspace heading (single one-liner above the four cards) and removed disclaimer footer
     expect(screen.getByRole("heading", { name: "Where will your research begin?" })).toBeInTheDocument();
-    expect(screen.getByText("Select an academic deliverable or paste your assignment guidelines below.")).toBeInTheDocument();
+    expect(screen.queryByText("Select an academic deliverable or paste your assignment guidelines below.")).not.toBeInTheDocument();
     expect(screen.queryByText("Scholar Core Socratic Engine · Verify citations against official institutional rubrics.")).not.toBeInTheDocument();
 
     // 4. Shadow & Border Fix on prompt bar
@@ -719,23 +719,18 @@ describe("landing workspace hero & academic workspace cards", () => {
 });
 
 describe("minimal website assistant", () => {
-  it("renders slide-in AI assistant sidebar with clean conversation UI, FAQ suggestions, and input", async () => {
+  it("renders slide-in AI assistant sidebar with clean conversation UI and input", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
     fireEvent.click(toggleBtn);
 
-    // Assistant container exists in the slide-in sidebar with humanized header & greeting
+    // Assistant container exists in the slide-in sidebar with clean header and single one-liner above the 4 cards
     const assistantHeading = await screen.findByRole("heading", { name: "Ask Scholar" });
     expect(assistantHeading).toBeInTheDocument();
-    expect(screen.getByText(/How can I help you with your research today\?/i)).toBeInTheDocument();
     expect(screen.getAllByText("Ask Scholar").length).toBeGreaterThanOrEqual(2); // Header and bottom status bar
-
-    // FAQ suggested topic chips
-    expect(screen.getByText("How do I set up AI?")).toBeInTheDocument();
-    expect(screen.getByText("What is Knowledge Vault?")).toBeInTheDocument();
-    expect(screen.getByText("How do I create a research project?")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Where will your research begin?" })).toBeInTheDocument();
 
     // Clean pill-shaped input and Send button
     const input = screen.getByPlaceholderText(/Ask a research question/i);
@@ -752,9 +747,9 @@ describe("minimal website assistant", () => {
     const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
     fireEvent.click(toggleBtn);
 
-    // Click "How do I set up AI?" chip
-    const aiChip = await screen.findByRole("button", { name: "How do I set up AI?" });
-    fireEvent.click(aiChip);
+    const input = await screen.findByPlaceholderText(/Ask a research question/i);
+    fireEvent.change(input, { target: { value: "How do I set up AI?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send question" }));
 
     // Assistant provides accurate guidance on AI Access and BYOK
     expect(await screen.findByText(/To configure AI in Scholar Core/i, {}, { timeout: 2000 })).toBeInTheDocument();
@@ -875,10 +870,6 @@ describe("minimal website assistant", () => {
 
     const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
     fireEvent.click(toggleBtn);
-
-    // Platform questions are visible as suggestions
-    expect(screen.getByText("How do I set up AI?")).toBeInTheDocument();
-    expect(screen.getByText("What is Knowledge Vault?")).toBeInTheDocument();
 
     const input = screen.getByPlaceholderText(/Ask a research question/i);
     fireEvent.change(input, { target: { value: "Explain quantum coherence in biological systems" } });

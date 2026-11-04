@@ -202,55 +202,21 @@ export default function ScholarSidebar({
               <span>AI Access</span>
             </button>
 
-            {/* Active Pill: Slides & Keynotes (Presentation Studio) */}
             <button
               type="button"
-              onClick={() => handleNav('/presentation')}
-              aria-label="Slides & Keynotes"
-              title="Slides & Keynotes"
+              onClick={() => {
+                if (onOpenAskScholar) onOpenAskScholar();
+              }}
+              aria-label="Ask Scholar"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group ${
-                activeItem === 'presentation'
-                  ? 'bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-bold border-l-2 border-neutral-900 dark:border-white pl-2.5'
+                activeItem === 'ask-scholar'
+                  ? 'bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold'
                   : 'hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
               }`}
             >
-              <Presentation className="h-4 w-4 text-neutral-900 dark:text-white flex-shrink-0" />
-              <span>Slides &amp; Keynotes</span>
+              <Lightbulb className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 flex-shrink-0" />
+              <span>Ask Scholar</span>
             </button>
-
-            <div className="pt-1.5 mt-1.5 border-t border-neutral-200/60 dark:border-white/5">
-              <button
-                type="button"
-                onClick={() => {
-                  if (onOpenAskScholar) onOpenAskScholar();
-                }}
-                aria-label="Ask Scholar"
-                className={`flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl text-[13px] transition-all duration-200 cursor-pointer text-left w-full group border ${
-                  activeItem === 'ask-scholar'
-                    ? 'bg-amber-500/12 dark:bg-amber-400/15 text-neutral-900 dark:text-white font-semibold border-amber-500/35 dark:border-amber-400/30 shadow-2xs'
-                    : 'bg-amber-500/[0.05] dark:bg-amber-400/[0.05] hover:bg-amber-500/10 dark:hover:bg-amber-400/10 text-neutral-800 dark:text-neutral-200 hover:text-neutral-900 dark:hover:text-white font-medium border-amber-500/20 dark:border-amber-400/15 shadow-2xs'
-                }`}
-              >
-                <span className="flex items-center gap-2.5 min-w-0">
-                  <span
-                    className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 ${
-                      activeItem === 'ask-scholar'
-                        ? 'bg-amber-500 text-white dark:bg-amber-400 dark:text-neutral-900 shadow-2xs'
-                        : 'bg-amber-500/15 dark:bg-amber-400/15 text-amber-600 dark:text-amber-300'
-                    }`}
-                  >
-                    <Lightbulb className="h-3.5 w-3.5 stroke-[2.1] flex-shrink-0" />
-                  </span>
-                  <span className="truncate">Ask Scholar</span>
-                </span>
-                <span
-                  aria-hidden="true"
-                  className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-amber-500/10 dark:bg-white/10 text-amber-700 dark:text-amber-300 flex-shrink-0"
-                >
-                  AI
-                </span>
-              </button>
-            </div>
           </nav>
 
           {/* Project History & Search Section */}

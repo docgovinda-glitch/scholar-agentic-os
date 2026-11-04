@@ -85,7 +85,7 @@ export function PromptBarActionMenu({
             }`}
           >
             <MessageSquare className="w-4 h-4 text-neutral-500" />
-            <span>Normal chat</span>
+            <span>Chat</span>
           </button>
 
           <button

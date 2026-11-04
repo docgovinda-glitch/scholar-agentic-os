@@ -133,9 +133,9 @@ export function getFormatTileTheme(id: string) {
       };
     case "OT-10":
       return {
-        badgeBg: "bg-amber-50/90 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400/90 border border-amber-100 dark:border-amber-500/20",
-        accentText: "text-amber-600 dark:text-amber-400/90",
-        hoverBorder: "hover:border-amber-300 dark:hover:border-amber-500/40",
+        badgeBg: "bg-slate-100/90 text-slate-700 dark:bg-white/10 dark:text-slate-300 border border-slate-200/80 dark:border-white/10",
+        accentText: "text-slate-700 dark:text-slate-300",
+        hoverBorder: "hover:border-slate-300 dark:hover:border-white/25",
       };
     case "OT-19":
       return {

@@ -71,7 +71,6 @@ import {
   Info,
   BookOpen,
   BookmarkCheck,
-  Presentation,
 } from "lucide-react";
 import { getCloudProvider } from "../config/providerCatalog";
 import { useDeviceClass } from "../hooks/useDeviceClass";
@@ -1576,65 +1575,28 @@ export default function ProjectListScreen({
               type="button"
               onClick={() => {
                 setMobileMenuOpen(false);
-                navigate("/presentation");
+                setIsAiSidebarOpen((prev) => {
+                  const next = !prev;
+                  if (next && typeof window !== "undefined" && window.innerWidth < 1280) {
+                    setIsSidebarOpen(false);
+                  }
+                  if (next) {
+                    setTimeout(() => guideInputRef.current?.focus(), 150);
+                  }
+                  return next;
+                });
               }}
-              aria-label="Slides & Keynotes"
-              title="Slides & Keynotes — Open Presentation Studio"
-              className="flex items-center gap-3 px-3 py-2.5 md:py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+              aria-label="Ask Scholar"
+              aria-expanded={isAiSidebarOpen}
+              className={`flex items-center gap-3 px-3 py-2.5 md:py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
+                isAiSidebarOpen
+                  ? "bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold"
+                  : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+              }`}
             >
-              <Presentation className="h-4 w-4 text-neutral-400 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors flex-shrink-0" />
-              <span>Slides & Keynotes</span>
+              <Lightbulb className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 flex-shrink-0" />
+              <span>Ask Scholar</span>
             </button>
-
-            {/* Phase 1: Ask Scholar toggle button — distinct AI Copilot entry with Lightbulb icon */}
-            <div className="pt-1.5 mt-1.5 border-t border-neutral-200/60 dark:border-white/5">
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setIsAiSidebarOpen((prev) => {
-                    const next = !prev;
-                    if (next && typeof window !== "undefined" && window.innerWidth < 1280) {
-                      setIsSidebarOpen(false);
-                    }
-                    if (next) {
-                      setTimeout(() => guideInputRef.current?.focus(), 150);
-                    }
-                    return next;
-                  });
-                }}
-                aria-label="Ask Scholar"
-                aria-expanded={isAiSidebarOpen}
-                className={`flex items-center justify-between gap-2.5 px-3 py-2.5 md:py-2 rounded-xl text-[13px] transition-all duration-200 cursor-pointer text-left w-full group font-sans border ${
-                  isAiSidebarOpen
-                    ? "bg-amber-500/12 dark:bg-amber-400/15 text-neutral-900 dark:text-white font-semibold border-amber-500/35 dark:border-amber-400/30 shadow-2xs"
-                    : "bg-amber-500/[0.05] dark:bg-amber-400/[0.05] hover:bg-amber-500/10 dark:hover:bg-amber-400/10 text-neutral-800 dark:text-neutral-200 hover:text-neutral-900 dark:hover:text-white font-medium border-amber-500/20 dark:border-amber-400/15 shadow-2xs"
-                }`}
-              >
-                <span className="flex items-center gap-2.5 min-w-0">
-                  <span
-                    className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 ${
-                      isAiSidebarOpen
-                        ? "bg-amber-500 text-white dark:bg-amber-400 dark:text-neutral-900 shadow-2xs"
-                        : "bg-amber-500/15 dark:bg-amber-400/15 text-amber-600 dark:text-amber-300"
-                    }`}
-                  >
-                    <Lightbulb className="h-3.5 w-3.5 stroke-[2.1] flex-shrink-0" />
-                  </span>
-                  <span className="truncate">Ask Scholar</span>
-                </span>
-                <span
-                  aria-hidden="true"
-                  className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md flex-shrink-0 transition-colors ${
-                    isAiSidebarOpen
-                      ? "bg-amber-500/20 dark:bg-amber-400/20 text-amber-800 dark:text-amber-200"
-                      : "bg-amber-500/10 dark:bg-white/10 text-amber-700 dark:text-amber-300"
-                  }`}
-                >
-                  AI
-                </span>
-              </button>
-            </div>
           </div>
 
           {userEmail && projectsLoadError && (
@@ -1908,14 +1870,14 @@ export default function ProjectListScreen({
                 } items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border cursor-pointer shadow-2xs ${
                   aiStatus?.connected
                     ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
-                    : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                    : "border-neutral-200 dark:border-white/10 bg-neutral-100/80 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200/70 dark:hover:bg-white/10"
                 }`}
                 title="AI Access • Click to configure"
                 data-testid="active-ai-pill"
               >
                 {/* Only an AI that is actually connected is shown as active; a saved
                     preference with no key behind it is not. */}
-                <span className={`w-1.5 h-1.5 rounded-full ${aiStatus?.connected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${aiStatus?.connected ? "bg-emerald-500 animate-pulse" : "bg-neutral-400"}`} />
                 <span>
                   {aiStatus?.connected
                     ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
@@ -1946,7 +1908,7 @@ export default function ProjectListScreen({
                   setTimeout(() => guideInputRef.current?.focus(), 150);
                 }}
                 title="Ask Scholar"
-                className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-amber-500/[0.08] dark:bg-amber-400/[0.08] hover:bg-amber-500/15 dark:hover:bg-amber-400/15 border-amber-500/25 dark:border-amber-400/25 text-amber-600 dark:text-amber-300 hover:text-amber-700 dark:hover:text-amber-200 animate-in fade-in zoom-in-95 duration-150"
+                className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 border-neutral-200/90 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white animate-in fade-in zoom-in-95 duration-150"
                 aria-label="Toggle Scholar Core AI Assistant"
               >
                 <Lightbulb className="w-5 h-5 stroke-[1.9]" />
@@ -2035,7 +1997,7 @@ export default function ProjectListScreen({
                     <section aria-label="Ask Scholar" className="w-full">
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <h1 className="text-xl font-semibold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
-                          <span className="w-7 h-7 rounded-lg bg-amber-500/15 dark:bg-amber-400/15 text-amber-600 dark:text-amber-300 flex items-center justify-center">
+                          <span className="w-7 h-7 rounded-lg bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-200 flex items-center justify-center">
                             <Lightbulb className="w-4 h-4 stroke-[2.1]" aria-hidden="true" />
                           </span>
                           Ask Scholar
@@ -2051,10 +2013,10 @@ export default function ProjectListScreen({
                             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer ${
                               aiStatus?.connected
                                 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                                : "border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300"
                             }`}
                           >
-                            <span className={`w-1.5 h-1.5 rounded-full ${aiStatus?.connected ? "bg-emerald-500" : "bg-amber-500"}`} />
+                            <span className={`w-1.5 h-1.5 rounded-full ${aiStatus?.connected ? "bg-emerald-500" : "bg-neutral-400"}`} />
                             {aiStatus?.connected
                               ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
                               : aiStatus
@@ -2078,7 +2040,7 @@ export default function ProjectListScreen({
                             }}
                             className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-300 px-3 py-1.5 text-xs font-medium whitespace-nowrap cursor-pointer shrink-0 active:scale-95"
                           >
-                            <Sparkles className="w-3 h-3 text-amber-500" aria-hidden="true" />
+                            <Sparkles className="w-3 h-3 text-neutral-400" aria-hidden="true" />
                             {faq.shortLabel}
                           </button>
                         ))}
@@ -2129,19 +2091,10 @@ export default function ProjectListScreen({
                   </>
                 ) : !isAiSidebarOpen && !hasStartedChatting ? (
                   <>
-                    <div className="text-center mb-1 flex flex-col items-center">
-                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-[11px] font-medium text-neutral-600 dark:text-neutral-300 mb-3 shadow-2xs">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-                        <span>Evidence-Grounded Academic OS</span>
-                        <span className="text-neutral-300 dark:text-white/20" aria-hidden="true">·</span>
-                        <span className="text-neutral-500 dark:text-neutral-400">OpenAlex, Crossref &amp; Vault</span>
-                      </div>
+                    <div className="text-center mb-2 flex flex-col items-center">
                       <h1 className="text-2xl sm:text-[28px] font-semibold text-neutral-900 dark:text-white tracking-tight leading-tight">
                         Where will your research begin?
                       </h1>
-                      <p className="text-[13px] sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1.5 max-w-xl mx-auto">
-                        Select an academic deliverable or paste your assignment guidelines below.
-                      </p>
                     </div>
 
                     <div className="w-full">
@@ -2215,7 +2168,7 @@ export default function ProjectListScreen({
                   </>
                 ) : (
                   <div className="text-center py-8 flex flex-col items-center gap-3 animate-in fade-in duration-200">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-300 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-2xl bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-200 flex items-center justify-center">
                       <Lightbulb className="w-5 h-5" />
                     </div>
                     <div>
@@ -2399,26 +2352,18 @@ export default function ProjectListScreen({
                   </>
                 )}
                 <div className="relative flex items-center justify-center">
-                  <div className="w-8 h-8 rounded-xl bg-amber-500/15 dark:bg-amber-400/15 border border-amber-500/25 dark:border-amber-400/25 text-amber-600 dark:text-amber-300 flex items-center justify-center shadow-2xs">
-                    <Lightbulb className="w-4 h-4 stroke-[2.1]" />
+                  <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-white/10 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-200 flex items-center justify-center">
+                    <Lightbulb className="w-4 h-4 stroke-[2]" />
                   </div>
                   <span
-                    className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-ink-800 ${aiStatus?.connected ? "bg-emerald-500" : "bg-amber-500"}`}
+                    className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-ink-800 ${aiStatus?.connected ? "bg-emerald-500" : "bg-neutral-400"}`}
                     title={aiStatus?.connected ? "AI connected" : "No AI connected"}
                   />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">
-                      Ask Scholar
-                    </h2>
-                    <span className="hidden sm:inline text-[10px] bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-200 dark:border-amber-800/40">
-                      Research Copilot
-                    </span>
-                  </div>
-                  <p className="hidden sm:block text-[11px] text-neutral-500 dark:text-neutral-400">
-                    How can I help you with your research today?
-                  </p>
+                  <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 tracking-tight">
+                    Ask Scholar
+                  </h2>
                 </div>
               </div>
 
@@ -2462,25 +2407,6 @@ export default function ProjectListScreen({
               </div>
             </header>
 
-            {/* Horizontally Scrolling Suggested Questions (Module 3.3); on phones they make room for the answer once a chat starts */}
-            {!(isPhone && hasStartedChatting) && (
-            <div className="relative border-b border-neutral-200/80 dark:border-white/10 shrink-0 bg-neutral-50/70 dark:bg-ink-900/70">
-              <div className={`overflow-x-auto scrollbar-hide flex items-center gap-2 px-4 py-2.5 ${isLandingPage ? "max-w-4xl mx-auto" : ""}`}>
-                {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleSendGuideMessage(faq.question)}
-                    className="group inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white px-3 py-1.5 text-[11px] font-medium whitespace-nowrap cursor-pointer hover:bg-neutral-50 dark:hover:bg-white/10 hover:border-neutral-300 dark:hover:border-white/20 transition-all shadow-2xs shrink-0 active:scale-95"
-                  >
-                    <Sparkles className="w-3 h-3 text-neutral-400 group-hover:text-amber-500 transition-colors" />
-                    <span>{faq.shortLabel}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            )}
-
             {/* Chat Canvas (flex-1 overflow-y-auto) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-sm scholar-scrollbar">
               {/* On Landing page before chatting begins: render the 4 deliverable cards in full glory */}
@@ -2505,16 +2431,9 @@ export default function ProjectListScreen({
 
                   {/* Heading */}
                   <div className="text-center mb-6 flex flex-col items-center">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 dark:bg-amber-400/10 border border-amber-500/20 dark:border-amber-400/20 text-[11px] font-medium text-amber-700 dark:text-amber-300 mb-3 shadow-2xs">
-                      <Lightbulb className="w-3.5 h-3.5" aria-hidden="true" />
-                      <span>Ask Scholar Copilot Ready · Type a question below or pick a workspace</span>
-                    </div>
                     <h1 className="text-2xl sm:text-[28px] font-semibold text-neutral-900 dark:text-white tracking-tight leading-tight">
                       Where will your research begin?
                     </h1>
-                    <p className="text-[13px] sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1.5 max-w-lg mx-auto leading-relaxed">
-                      Select an academic deliverable or paste your assignment guidelines below.
-                    </p>
                   </div>
 
                   {/* 4 Cards Grid - Responsive full 4-column layout */}
@@ -3198,7 +3117,7 @@ export default function ProjectListScreen({
               {/* Status & Reset Bar */}
               <div className="flex items-center justify-between px-1 mb-2">
                 <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
-                  <Lightbulb className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" aria-hidden="true" />
+                  <Lightbulb className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400 shrink-0" aria-hidden="true" />
                   <span className="font-medium text-neutral-700 dark:text-neutral-300">Ask Scholar</span>
                   {aiStatus ? (
                     aiStatus.connected ? (
@@ -3210,10 +3129,10 @@ export default function ProjectListScreen({
                       <button
                         type="button"
                         onClick={onOpenAiAccess}
-                        className="text-amber-600 dark:text-amber-400 font-medium hover:underline cursor-pointer flex items-center gap-1"
+                        className="text-neutral-600 dark:text-neutral-400 font-medium hover:underline cursor-pointer flex items-center gap-1"
                         title="No operational AI providers. Click to configure AI Access."
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
                         <span>AI Disconnected</span>
                         <span className="text-[9px] underline">Configure ↗</span>
                       </button>
@@ -3352,51 +3271,6 @@ export default function ProjectListScreen({
                       onSelectMode={setSidebarAiMode}
                       onAttachFiles={handleSidebarFileSelect}
                     />
-                    <div
-                      role="group"
-                      aria-label="Ask Scholar mode selector"
-                      className="inline-flex items-center p-0.5 rounded-full bg-neutral-100/90 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/10"
-                    >
-                      <button
-                        type="button"
-                        aria-pressed={sidebarAiMode === "chat"}
-                        onClick={() => setSidebarAiMode(sidebarAiMode === "chat" ? "auto" : "chat")}
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors cursor-pointer ${
-                          sidebarAiMode === "chat"
-                            ? "bg-white dark:bg-ink-700 text-neutral-900 dark:text-white shadow-2xs"
-                            : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
-                        }`}
-                        title="Normal Chat — Fast conversational & analytical assistant"
-                      >
-                        Chat
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={sidebarAiMode === "search"}
-                        onClick={() => setSidebarAiMode(sidebarAiMode === "search" ? "auto" : "search")}
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors cursor-pointer ${
-                          sidebarAiMode === "search"
-                            ? "bg-blue-600 text-white shadow-2xs"
-                            : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
-                        }`}
-                        title="Web Search — Live internet, official .gov/.int, policy & news retrieval"
-                      >
-                        Web Search
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={sidebarAiMode === "deep_research"}
-                        onClick={() => setSidebarAiMode(sidebarAiMode === "deep_research" ? "auto" : "deep_research")}
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors cursor-pointer ${
-                          sidebarAiMode === "deep_research"
-                            ? "bg-purple-600 text-white shadow-2xs"
-                            : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
-                        }`}
-                        title="Deep Research — 7-stage multi-source investigation & structured synthesis"
-                      >
-                        Deep Research
-                      </button>
-                    </div>
                   </div>
 
                   <div className="relative group">
