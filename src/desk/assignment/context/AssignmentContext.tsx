@@ -64,6 +64,7 @@ import { generateReferenceListBlock } from "../services/referenceListGenerator";
 import { stripCircularReferences } from "../../../utils/briefExtractor";
 import type { CourseworkExecutionMode } from "../../../features/coursework/types/orchestrator";
 import { safeParseAnswerField } from "../../../shared/projectStateSchema";
+import { useCourseworkAgent, type CourseworkAgent } from "./useCourseworkAgent";
 
 export interface AssignmentContextValue {
   projectId: string;
@@ -90,10 +91,10 @@ export interface AssignmentContextValue {
 
   isLoading: boolean;
   error: string | null;
-
+  // Stage flow (always the five-stage detailed flow)
   // Minimal vs Detailed Execution Mode (OT-10 Parity)
+  /** Always "detailed": the five-stage flow is the only one. */
   executionMode: CourseworkExecutionMode;
-  setExecutionMode: (mode: CourseworkExecutionMode) => Promise<void>;
 
   // Key Domain Properties
   academicLevel: AcademicLevel;
@@ -161,6 +162,8 @@ export interface AssignmentContextValue {
   rewriteOutline: (instruction?: string) => Promise<{ ok: true; structure: AssignmentStructure } | { ok: false; error: string }>;
   /** Puts back an earlier outline (undo). */
   restoreOutline: (previous: AssignmentStructure) => Promise<void>;
+  /** The coursework agent: each stage's AI step, its status and results. */
+  agent: CourseworkAgent;
   setGeneratingSection: (sectionId: string, isGenerating: boolean) => void;
   generatingSectionIds: Record<string, boolean>;
   initializeDraftingPlan: () => AssignmentDraftingSection[];
@@ -289,25 +292,8 @@ export function AssignmentProvider({
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [generatingSectionIds, setGeneratingSectionIds] = useState<Record<string, boolean>>({});
 
-  // Minimal vs Detailed Execution Mode (OT-10 Parity)
-  const [executionMode, setExecutionModeState] = useState<CourseworkExecutionMode>(() => {
-    try {
-      const saved = localStorage.getItem("scholar_coursework_mode");
-      if (saved === "detailed" || saved === "minimal") return saved;
-    } catch {
-      // Ignore
-    }
-    const raw = project?.answers?.["execution_mode"] || project?.answers?.["orchestration_mode"];
-    if (raw === "detailed" || raw === "minimal") return raw;
-    return "minimal";
-  });
-
-  useEffect(() => {
-    const raw = project?.answers?.["execution_mode"] || project?.answers?.["orchestration_mode"];
-    if (raw === "detailed" || raw === "minimal") {
-      setExecutionModeState(raw);
-    }
-  }, [project?.answers?.["execution_mode"], project?.answers?.["orchestration_mode"]]);
+  // The workspace has one flow: Extract → Understand → Sources → Drafting → Submission.
+  const executionMode: CourseworkExecutionMode = "detailed";
 
   // Load project data with phase auto-migration
   const load = useCallback(async () => {
@@ -1251,6 +1237,27 @@ export function AssignmentProvider({
     [saveAnswers, setStructure, targetWordCount]
   );
 
+  const agent = useCourseworkAgent({
+    projectId: activeProjectId,
+    answers,
+    question,
+    citationStyle,
+    sources,
+    approvedSourceIds,
+    structure,
+    latestSections: () => latestSections() as AssignmentDraftingSection[],
+    flushSaves: async () => {
+      await saveChainRef.current;
+    },
+    reload: async () => {
+      const fresh = await getProject(activeProjectId);
+      projectRef.current = fresh;
+      setProject(fresh);
+      return (fresh.answers ?? {}) as Record<string, unknown>;
+    },
+    saveAnswers,
+  });
+
   const updateSectionDraft = useCallback(
     async (sectionId: string, content: string) => {
       await updateSectionContent(sectionId, content);
@@ -1776,6 +1783,7 @@ export function AssignmentProvider({
         saveStatus,
         rewriteOutline,
         restoreOutline,
+        agent,
         setGeneratingSection,
         generatingSectionIds,
         initializeDraftingPlan,
@@ -1799,18 +1807,6 @@ export function AssignmentProvider({
         estimateRubricGrade,
         applyTutorSuggestionToDraft,
         executionMode,
-        setExecutionMode: async (newMode: CourseworkExecutionMode) => {
-          setExecutionModeState(newMode);
-          try {
-            localStorage.setItem("scholar_coursework_mode", newMode);
-          } catch {
-            // Ignore
-          }
-          await saveAnswers({
-            execution_mode: newMode,
-            orchestration_mode: newMode,
-          });
-        },
         saveAnswers,
         updateProjectAnswers: saveAnswers,
       }}

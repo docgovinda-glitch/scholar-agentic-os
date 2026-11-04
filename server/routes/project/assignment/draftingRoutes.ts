@@ -379,18 +379,40 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
 - Explanation: 70% critical analysis & evaluation / 30% descriptive exposition.
 - Link: Clear concluding transition linking back to the primary assessment prompt.`;
 
+    // What the agent learned in earlier stages: the plan, the brief's
+    // requirements, and evidence quoted from each linked source's abstract.
+    const agentUnderstanding = safeParseObject(project.answers["assignment_understanding"]) as { produce?: string; approach?: string; thesisDirection?: string } | null;
+    const agentExtraction = safeParseObject(project.answers["assignment_extraction"]) as { requirements?: Array<{ text: string; kind?: string }> } | null;
+    const agentAnalysis = (safeParseObject(project.answers["assignment_source_analysis"]) as Record<string, { evidence?: Array<{ claim: string; quote: string }> }> | null) ?? {};
+    const agentEvidence = mappedSources
+      .map((src, i) => {
+        const ev = agentAnalysis[String(src.id)]?.evidence ?? [];
+        return ev.length ? `[${i + 1}] ${ev.map((e) => `"${e.quote}" (supports: ${e.claim})`).join("; ")}` : "";
+      })
+      .filter(Boolean)
+      .join("\n");
+    const agentBlock = [
+      agentUnderstanding?.produce ? `WHAT THE PIECE MUST BE: ${agentUnderstanding.produce}` : "",
+      agentUnderstanding?.approach ? `APPROACH: ${agentUnderstanding.approach}` : "",
+      agentExtraction?.requirements?.length ? `REQUIREMENTS FROM THE BRIEF (keep to those relevant to this section):\n- ${agentExtraction.requirements.slice(0, 12).map((r) => r.text).join("\n- ")}` : "",
+      agentEvidence ? `EVIDENCE QUOTED FROM THE SOURCES' ABSTRACTS (quote only these words; never invent quotations or page numbers):\n${agentEvidence}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
     const prompt = `You are the Scholar Core Grounded Academic Drafting Agent.
 Write the section prose for: "${sectionTitle}".
 Academic Function: ${academicFunction}
 Target Word Count: ~${targetWordCount} words
 Academic Level: ${academicLevel}
 Citation Style: ${citationStyle}
-Central Thesis: "${thesis}"
+Central Thesis: "${thesis || String(project.answers["assignment_thesis"] || project.answers["thesis_statement"] || "")}"
 Assignment Topic: "${assignmentTopic}"
 
 ${revisionInstruction}
 ${existingBlock}
 ${evidencePackPrompt ? evidenceBlock : `BOUND EVIDENCE (Use these sources for in-text citations; do NOT fabricate external sources):\n${evidenceBlock || "Use standard scholarly reasoning."}`}
+${agentBlock}
 
 ${frameworkGuidelines}
 

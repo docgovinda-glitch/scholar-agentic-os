@@ -1,3 +1,4 @@
+import { ReviewAgentPanel } from "../components/AgentPanels";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { RubricComplianceCard } from "../components/RubricComplianceCard";
@@ -51,13 +52,11 @@ export function AssignmentSubmissionStage({
     flowAuditResult,
     setPhase,
     saveAnswers,
-    executionMode,
   } = useAssignmentWorkspace();
 
   const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [showDetailedAudit, setShowDetailedAudit] = useState(false);
 
   // Customizable Cover Sheet Metadata
   const [studentName, setStudentName] = useState(
@@ -507,6 +506,9 @@ export function AssignmentSubmissionStage({
         )}
       </div>
 
+      {/* The agent: review of the draft against the brief */}
+      <ReviewAgentPanel />
+
       {/* Export Error Alert if any */}
       {exportError && (
         <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/5 dark:bg-rose-500/10 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
@@ -515,50 +517,13 @@ export function AssignmentSubmissionStage({
         </div>
       )}
 
-      {/* Dynamic Layout Based on Minimal vs Detailed Mode */}
-      {executionMode === "detailed" ? (
+      {/* Full audit, citation coverage and packaging */}
         <>
           {/* Detailed Mode: Full Two-Column Audit Granularity First */}
           {renderAuditLayout()}
           {renderCitationCoverage()}
           {renderPackagingControls()}
         </>
-      ) : (
-        <>
-          {/* Minimal Mode: Streamlined Camera-Ready Packaging Front & Center */}
-          {renderPackagingControls()}
-
-          {/* Collapsible Secondary Telemetry */}
-          <div className="rounded-xl border border-neutral-200/70 dark:border-white/10 p-4 bg-neutral-50/60 dark:bg-white/[0.02] transition-colors">
-            <button
-              type="button"
-              onClick={() => setShowDetailedAudit((prev) => !prev)}
-              className="w-full flex items-center justify-between text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                <span className="font-semibold text-neutral-800 dark:text-neutral-200">
-                  Checks and citations in detail
-                </span>
-                <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-neutral-200/70 dark:bg-white/10 text-neutral-600 dark:text-neutral-400">
-                  Optional Inspector
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                <span>{showDetailedAudit ? "Hide details" : "Show details"}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showDetailedAudit ? "rotate-180" : ""}`} />
-              </div>
-            </button>
-
-            {showDetailedAudit && (
-              <div className="mt-5 space-y-6 pt-5 border-t border-neutral-200/70 dark:border-white/5">
-                {renderAuditLayout()}
-                {renderCitationCoverage()}
-              </div>
-            )}
-          </div>
-        </>
-      )}
     </div>
   );
 }

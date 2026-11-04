@@ -65,7 +65,6 @@ export function AssignmentDraftingStage({
     setGeneratingSection,
     generatingSectionIds,
     initializeDraftingPlan,
-    executionMode,
     isLoading,
     structure,
     rewriteOutline,
@@ -452,7 +451,7 @@ export function AssignmentDraftingStage({
       )}
 
       {/* Detailed Mode Telemetry Panel: Overlap Validation (< 20%), Active-Voice & Anti-Fluff Metrics, Citation Tokens */}
-      {executionMode === "detailed" && (
+      <>
         <section
           aria-label="Detailed Drafting Telemetry & Validation"
           className="rounded-2xl p-5 bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-4 font-sans animate-in fade-in duration-200"
@@ -543,7 +542,7 @@ export function AssignmentDraftingStage({
             </div>
           </div>
         </section>
-      )}
+      </>
 
       {/* Outline (can be hidden) beside a wide writing area */}
       <div className={`grid grid-cols-1 gap-5 items-start ${showOutline ? "lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]" : ""}`}>

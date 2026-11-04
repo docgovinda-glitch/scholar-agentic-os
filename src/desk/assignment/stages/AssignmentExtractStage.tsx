@@ -1,3 +1,4 @@
+import { ExtractAgentPanel } from "../components/AgentPanels";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { authedJsonFetch, authedFetch } from "../../api";
@@ -118,8 +119,6 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     setAnalysis,
     ensurePersisted,
     isLoading,
-    executionMode,
-    setExecutionMode,
   } = useAssignmentWorkspace() as any;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -687,9 +686,9 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           </p>
         </div>
 
-        {/* Next step. The Minimal/Detailed flow choice lives in the assignment bar above. */}
+        {/* Next step */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          {onProceed && executionMode === "detailed" && (
+          {onProceed && (
             <button
               type="button"
               onClick={onProceed}
@@ -702,20 +701,19 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
             </button>
           )}
 
-          {onProceed && executionMode === "minimal" && (
-            <button
-              type="button"
-              onClick={onProceed}
-              disabled={!canGenerate}
-              title={canGenerate ? undefined : "Add the assignment question, word count and citation style first"}
-              className="disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 rounded-xl border border-neutral-200/80 dark:border-white/10 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <span>Proceed to Phase 2: Sources</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
         </div>
       </div>
+
+      {/* The agent: reads the brief and can work through the stages */}
+      <ExtractAgentPanel
+        brief={localQuestion}
+        saveBrief={async () => {
+          const clean = cleanAnswerString(localQuestion);
+          if (clean && clean !== cleanAnswerString(question)) {
+            await saveAnswers({ instructions: clean, assignment_question: clean, assignment_prompt: clean });
+          }
+        }}
+      />
 
       {/* Unified Assignment Setup Box (Step 1: Brief Input) */}
       <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-5">
