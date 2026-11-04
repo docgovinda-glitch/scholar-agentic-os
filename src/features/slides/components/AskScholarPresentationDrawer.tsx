@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowRight, ChevronRight, ChevronsRight, Sparkles, Check, AlertTriangle, Send } from 'lucide-react';
+import { ArrowRight, ChevronRight, ChevronsRight, Sparkles, Lightbulb, Check, AlertTriangle, Send } from 'lucide-react';
 import type { SlideDeck, SlideCard } from '../types/slides';
 import ScholarCoreLogo from '../../../components/ScholarCoreLogo';
 
@@ -167,15 +167,15 @@ export default function AskScholarPresentationDrawer({
 
   return (
     <aside
-      className={`w-80 lg:w-96 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] flex flex-col h-full shadow-lg z-20 transition-all duration-300 select-text ${className}`}
+      className={`w-full sm:w-80 lg:w-96 fixed sm:relative inset-y-0 right-0 flex-shrink-0 border-l border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] flex flex-col h-full max-h-[100dvh] shadow-lg z-30 sm:z-20 transition-all duration-300 select-text ${className}`}
       data-testid="ask-scholar-drawer"
       aria-label="Ask Scholar Presentation Copilot"
     >
       {/* Drawer Header */}
       <div className="p-4 sm:p-5 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-full bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 flex items-center justify-center shrink-0 shadow-2xs overflow-hidden">
-            <ScholarCoreLogo size="sm" withText={false} />
+          <div className="w-9 h-9 rounded-xl bg-amber-500/15 dark:bg-amber-400/15 border border-amber-500/25 dark:border-amber-400/25 text-amber-600 dark:text-amber-300 flex items-center justify-center shrink-0 shadow-2xs overflow-hidden">
+            <Lightbulb className="w-4 h-4 stroke-[2.1]" />
           </div>
           <div className="min-w-0">
             <h3 className="font-bold text-sm text-neutral-900 dark:text-white truncate">
@@ -290,7 +290,7 @@ export default function AskScholarPresentationDrawer({
       )}
 
       {/* Bottom Dock Input Pill */}
-      <div className="border-t border-neutral-200/60 dark:border-white/10 p-4 bg-white dark:bg-[#1C1C1E] shrink-0">
+      <div className="border-t border-neutral-200/60 dark:border-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white dark:bg-[#1C1C1E] shrink-0">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -303,6 +303,13 @@ export default function AskScholarPresentationDrawer({
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing || (e as unknown as { keyCode?: number }).keyCode === 229) return;
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
             disabled={isTyping}
             placeholder="Ask Scholar for presentation advice..."
             aria-label="Ask Scholar for presentation advice"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, MessagesSquare, PanelLeftOpen, Play, Sparkles } from 'lucide-react';
+import { ArrowLeft, Lightbulb, MessagesSquare, PanelLeftOpen, Play } from 'lucide-react';
 import type { PresentationStudioStep } from '../types/slides';
 import { WorkspaceAutosaveBadge } from '../../../components/ui/WorkspaceAutosaveBadge';
 
@@ -170,11 +170,11 @@ export default function PresentationHeader({
           onClick={onToggleAskScholar}
           data-testid="toggle-ask-scholar-btn"
           aria-pressed={isAskScholarOpen}
-          className={`${ghostBtn} ${isAskScholarOpen ? 'bg-neutral-900/[0.06] text-neutral-900 dark:bg-white/[0.08] dark:text-white' : ''}`}
+          className={`${ghostBtn} ${isAskScholarOpen ? 'bg-amber-500/15 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300' : ''}`}
           title="Ask Scholar"
           aria-label="Toggle Ask Scholar"
         >
-          <Sparkles className="w-3.5 h-3.5" />
+          <Lightbulb className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
           <span className="hidden 2xl:inline whitespace-nowrap">Ask Scholar</span>
         </button>
         {currentStep === 'delivery' && onStartPresentation && (
