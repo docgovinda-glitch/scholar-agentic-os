@@ -567,8 +567,8 @@ describe("AddSourceModal — Streamlined 1-Step Intake", () => {
     fireEvent.click(screen.getByRole("button", { name: "Fetch" }));
 
     await waitFor(() => {
-      expect(screen.getByText(/✓ DOI verified & key points auto-extracted/i)).toBeInTheDocument();
-      expect(screen.getByText(/✨ 2 Key Points/i)).toBeInTheDocument();
+      expect(screen.getByText(/✓ Found at the DOI registry/i)).toBeInTheDocument();
+      expect(screen.getByText(/✨ 2 from the abstract/i)).toBeInTheDocument();
     });
 
     // Expand writing notes accordion
