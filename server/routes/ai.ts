@@ -167,10 +167,13 @@ function determineExecutionMode(
 
 export function registerAIRoutes(
   app: express.Express,
-  _aiAbuseLimit?: any,
+  aiAbuseLimit?: express.RequestHandler,
   _citationStyleRegistry?: CitationStyleRegistry
 ): void {
   const router = express.Router();
+  if (aiAbuseLimit) {
+    router.use(aiAbuseLimit);
+  }
 
   /**
    * GET /api/ai/status

@@ -160,13 +160,27 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   }));
   
   // Manual Human Editor Routes for relational data overrides
+  function pickAllowedFields(body: unknown, allowedKeys: readonly string[]): Record<string, unknown> {
+    if (!body || typeof body !== "object" || Array.isArray(body)) return {};
+    const src = body as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const key of allowedKeys) {
+      if (Object.prototype.hasOwnProperty.call(src, key) && src[key] !== undefined) {
+        out[key] = src[key];
+      }
+    }
+    return out;
+  }
+
   router.put("/:id/editor/gaps/:gapId", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const config = getSupabaseRestConfig();
     if (!config) return res.status(500).json({ error: "Supabase config missing" });
-    const table = new SupabaseTable(config, "project_evidence"); // Gaps are saved here by agent
-    await table.update(`id=eq.${encodeURIComponent(req.params.gapId)}&project_id=eq.${encodeURIComponent(record.projectId)}`, req.body);
+    const patch = pickAllowedFields(req.body, ["state", "quote", "locator", "proposed_claim_id", "history"]);
+    if (Object.keys(patch).length === 0) return res.status(400).json({ error: "No valid fields to update" });
+    const table = new SupabaseTable(config, "project_evidence_items");
+    await table.update(`evidence_id=eq.${encodeURIComponent(req.params.gapId)}&project_id=eq.${encodeURIComponent(record.projectId)}`, patch);
     res.json({ ok: true });
   }));
 
@@ -175,8 +189,10 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     if (!record) return;
     const config = getSupabaseRestConfig();
     if (!config) return res.status(500).json({ error: "Supabase config missing" });
-    const table = new SupabaseTable(config, "project_evidence");
-    await table.update(`id=eq.${encodeURIComponent(req.params.evidenceId)}&project_id=eq.${encodeURIComponent(record.projectId)}`, req.body);
+    const patch = pickAllowedFields(req.body, ["state", "quote", "locator", "proposed_claim_id", "history"]);
+    if (Object.keys(patch).length === 0) return res.status(400).json({ error: "No valid fields to update" });
+    const table = new SupabaseTable(config, "project_evidence_items");
+    await table.update(`evidence_id=eq.${encodeURIComponent(req.params.evidenceId)}&project_id=eq.${encodeURIComponent(record.projectId)}`, patch);
     res.json({ ok: true });
   }));
 
@@ -185,8 +201,10 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     if (!record) return;
     const config = getSupabaseRestConfig();
     if (!config) return res.status(500).json({ error: "Supabase config missing" });
+    const patch = pickAllowedFields(req.body, ["text", "draft_span_id", "status", "unsupported_reason", "unsupported_actor"]);
+    if (Object.keys(patch).length === 0) return res.status(400).json({ error: "No valid fields to update" });
     const table = new SupabaseTable(config, "project_claims");
-    await table.update(`id=eq.${encodeURIComponent(req.params.claimId)}&project_id=eq.${encodeURIComponent(record.projectId)}`, req.body);
+    await table.update(`claim_id=eq.${encodeURIComponent(req.params.claimId)}&project_id=eq.${encodeURIComponent(record.projectId)}`, patch);
     res.json({ ok: true });
   }));
 

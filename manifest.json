@@ -1,22 +1,32 @@
 {
   "name": "Scholar Agentic OS",
   "short_name": "Scholar",
-  "description": "AI-powered research and publication platform for doctoral scholars",
+  "description": "Autonomous multi-agent research workspace for academic writing, citations, and scholarly publishing",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#3b82f6",
   "orientation": "portrait-primary",
+  "theme_color": "#171717",
+  "background_color": "#171717",
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23171717' width='192' height='192' rx='36'/><text x='96' y='132' font-size='104' font-family='serif' font-weight='bold' fill='%23FAFAFA' text-anchor='middle'>S</text></svg>",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/svg+xml",
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect fill='%23171717' width='512' height='512' rx='96'/><text x='256' y='352' font-size='280' font-family='serif' font-weight='bold' fill='%23FAFAFA' text-anchor='middle'>S</text></svg>",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23171717' width='192' height='192'/><text x='96' y='132' font-size='104' font-family='serif' font-weight='bold' fill='%23FAFAFA' text-anchor='middle'>S</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "categories": ["productivity", "education"]
 }

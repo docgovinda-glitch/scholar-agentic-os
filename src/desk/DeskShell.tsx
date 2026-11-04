@@ -355,17 +355,15 @@ export default function DeskShell({
             />
           </>
         )}
-        <div className="relative shrink-0 border-l border-[color:var(--border-subtle)] flex flex-col w-80">
-          <Aside
-            projectId={projectId}
-            rubric={rubric}
-            sessionId={`desk-${projectId}`}
-            onChanged={(updated, newRubric) => {
-              setProject(updated);
-              setRubric(newRubric);
-            }}
-          />
-        </div>
+        <Aside
+          projectId={projectId}
+          rubric={rubric}
+          sessionId={`desk-${projectId}`}
+          onChanged={(updated, newRubric) => {
+            setProject(updated);
+            setRubric(newRubric);
+          }}
+        />
       </div>
       {trayOpen && (
         <Tray projectId={projectId} onClose={() => setTrayOpen(false)} />

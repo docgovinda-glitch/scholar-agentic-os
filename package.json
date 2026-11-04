@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "scholar-agentic-os",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -14,9 +14,6 @@
     "test:coverage": "vitest run --coverage",
     "migrate:users-to-supabase": "tsx scripts/migrate-users-to-supabase.ts",
     "seed:ai-registry": "tsx -r dotenv/config scripts/seedAiRegistry.ts",
-    "generate:knowledge": "node .claude/scripts/generate-knowledge.js",
-    "validate:knowledge": "node .claude/scripts/validate-knowledge.js",
-    "check:knowledge": "node .claude/scripts/check-drift.js",
     "verify:contrast": "node scripts/verify-contrast.mjs",
     "verify:csp-hash": "node scripts/verify-csp-hash.mjs",
     "verify:slide-parity": "node scripts/slide-parity/run.mjs",
@@ -36,7 +33,6 @@
     "@tiptap/pm": "^3.32.0",
     "@tiptap/react": "^3.32.0",
     "@tiptap/starter-kit": "^3.32.0",
-    "@types/pg": "^8.20.0",
     "docx": "^9.7.1",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
@@ -64,7 +60,8 @@
     "@vitejs/devtools-vitest": {
       "vitest": "^4.1.12"
     },
-    "image-size": "^2.0.4"
+    "image-size": "^2.0.4",
+    "minimatch": "^11.0.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
@@ -76,6 +73,7 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^22.14.0",
     "@types/pdfmake": "^0.3.3",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/supertest": "^7.2.1",

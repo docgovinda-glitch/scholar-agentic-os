@@ -1093,9 +1093,12 @@ export default function ProjectListScreen({
     setActiveRecentMenuId(null);
 
     if (action === "share") {
-      const shareUrl = `${window.location.origin}${item.projectId ? `/projects?id=${encodeURIComponent(item.projectId)}` : "/"}`;
+      const shareUrl = `${window.location.origin}${item.projectId ? `/projects/${encodeURIComponent(item.projectId)}` : "/"}`;
       if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(shareUrl).catch(() => {});
+        navigator.clipboard
+          .writeText(shareUrl)
+          .then(() => showAppToast("Project link copied to clipboard.", "success"))
+          .catch(() => {});
       }
     } else if (action === "pin") {
       setPinnedRecentIds((prev) =>
@@ -1195,47 +1198,19 @@ export default function ProjectListScreen({
     const targetId = projectToDelete.projectId;
     const previousProjects = projects;
 
-    const targetTitle = (
-      projectToDelete.title ||
-      (projectToDelete.answers as any)?.title ||
-      getProjectDisplayName(projectToDelete, projects || [])
-    ).trim().toLowerCase();
-
-    // Identify any companion duplicate projects sharing the exact same title
-    const companionIds = targetTitle
-      ? (projects || [])
-          .filter((p) => {
-            if (!p || p.projectId === targetId) return false;
-            const pTitle = (
-              p.title ||
-              (p.answers as any)?.title ||
-              getProjectDisplayName(p, projects || [])
-            ).trim().toLowerCase();
-            return pTitle === targetTitle;
-          })
-          .map((p) => p.projectId)
-      : [];
-
-    const allIdsToDelete = [targetId, ...companionIds];
-
     // 1. Instantly close the modal dialog without delay
     setProjectToDelete(null);
 
-    // 2. Mark project(s) as deleted immediately to prevent race conditions & ghost resurrection
-    allIdsToDelete.forEach((id) => markProjectAsDeleted(id));
+    // 2. Mark project as deleted immediately to prevent race conditions & ghost resurrection
+    markProjectAsDeleted(targetId);
 
     // 3. Instantly filter the project out of the local state
-    setProjects((curr) => (curr ? curr.filter((p) => !allIdsToDelete.includes(p.projectId)) : []));
+    setProjects((curr) => (curr ? curr.filter((p) => p.projectId !== targetId) : []));
 
     // 4. Perform backend deletion
     try {
       if (!targetId.startsWith("demo-")) {
         await deleteProject(targetId);
-      }
-      for (const compId of companionIds) {
-        if (!compId.startsWith("demo-")) {
-          deleteProject(compId).catch(() => {});
-        }
       }
       // Re-sync project list with server in background, filtering out any deleted IDs
       const res = await listProjects();
@@ -1251,7 +1226,7 @@ export default function ProjectListScreen({
     } catch (e) {
       console.error("Failed to delete project:", e);
       // Rollback on failure
-      allIdsToDelete.forEach((id) => unmarkProjectAsDeleted(id));
+      unmarkProjectAsDeleted(targetId);
       setProjects(previousProjects);
       setError((e as Error).message || "Failed to delete project. Please try again.");
     }

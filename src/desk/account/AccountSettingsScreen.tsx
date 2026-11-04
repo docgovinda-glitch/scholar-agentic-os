@@ -608,7 +608,6 @@ export default function AccountSettingsScreen({
                   <button
                     type="submit"
                     form="account-profile-form"
-                    onClick={() => void handleSaveProfile()}
                     disabled={saving || phoneProblem !== null}
                     aria-busy={saving}
                     className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-1.5 text-xs font-semibold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] disabled:opacity-60 cursor-pointer inline-flex items-center justify-center gap-2 shadow-xs transition-colors"

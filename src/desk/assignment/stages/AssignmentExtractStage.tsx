@@ -36,11 +36,11 @@ import { scopeBrief } from "../../../domain/assignment/briefScoping";
 import {
   ACADEMIC_LEVEL_OPTIONS,
   ASSIGNMENT_TYPE_OPTIONS,
-  CITATION_STYLES,
+  STAGE_CITATION_STYLES as CITATION_STYLES,
   WRITING_TONE_OPTIONS,
   ARCHETYPE_DEFAULT_TONES,
   AGENTIC_THINKING_STAGES,
-} from "./AssignmentUnderstandStage";
+} from "../types";
 
 export const ASSIGNMENT_TYPE_TONE_MAP: Record<string, string> = {
   essay: 'formal',

@@ -76,5 +76,7 @@ export async function deleteSourceFromRelational(projectId: string, sourceId: st
   const config = getSupabaseRestConfig();
   if (!config) return;
   const table = new SupabaseTable(config, "project_sources");
-  await table.delete(`project_id=eq.${projectId}&source_id=eq.${sourceId}`).catch(e => console.error("deleteSourceFromRelational failed:", e));
+  await table
+    .delete(`project_id=eq.${encodeURIComponent(projectId)}&source_id=eq.${encodeURIComponent(sourceId)}`)
+    .catch(e => console.error("deleteSourceFromRelational failed:", e));
 }

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { SlideCanvas, extractSlidesFromAcademicText, type SlideDeck } from "../../../features/slides";
 import { buildFormattedBibliography } from "../services/assignmentExportService";
+import { formatReferenceHtml } from "../services/referenceListGenerator";
 import { validateSectionUniqueness } from "../../../features/drafting/services/sectionDraftingEngine";
 import { auditAndEnforceCollegiateStyle } from "../../../features/coursework/services/courseworkOrchestrator";
 
@@ -606,9 +607,28 @@ export function AssignmentDraftingStage({
                 <span className="text-sm font-semibold text-neutral-900 dark:text-white">Bibliography ({approvedSources.length})</span>
               </summary>
               <div className="p-5 text-[13px] text-neutral-700 dark:text-neutral-300 leading-relaxed space-y-4">
-                {buildFormattedBibliography(approvedSources, citationStyle || "harvard").map((bib, i) => (
-                  <p key={i} className="pl-6 -indent-6" dangerouslySetInnerHTML={{ __html: bib }} />
-                ))}
+                {buildFormattedBibliography(approvedSources, citationStyle || "harvard").map((bib, i) => {
+                  const safeHtml = formatReferenceHtml(bib);
+                  return (
+                    <p
+                      key={i}
+                      className="pl-6 -indent-6"
+                      ref={(el) => {
+                        if (!el) return;
+                        const anyEl = el as unknown as {
+                          setHTML?: (html: string, opts?: { sanitizer?: { elements?: string[]; attributes?: string[] } }) => void;
+                        };
+                        if (typeof anyEl.setHTML === "function") {
+                          anyEl.setHTML(safeHtml, {
+                            sanitizer: { elements: ["i", "em", "b", "strong"], attributes: [] },
+                          });
+                        } else {
+                          el.innerHTML = safeHtml;
+                        }
+                      }}
+                    />
+                  );
+                })}
               </div>
             </details>
           )}

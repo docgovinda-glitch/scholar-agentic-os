@@ -45,6 +45,8 @@ export interface SourceLibraryScreenProps {
   onLock?: () => void;
   onResetVault?: () => void;
   onOpenProject?: (projectId: string) => void;
+  onSwitchToProjects?: () => void;
+  projectCount?: number;
 }
 
 type MainTab = "sources" | "settings";
@@ -55,6 +57,8 @@ export default function SourceLibraryScreen({
   onLock,
   onResetVault,
   onOpenProject,
+  onSwitchToProjects,
+  projectCount,
 }: SourceLibraryScreenProps) {
   const [items, setItems] = useState<VaultItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -416,6 +420,15 @@ export default function SourceLibraryScreen({
           >
             Sources ({sources.length})
           </button>
+          {onSwitchToProjects && (
+            <button
+              type="button"
+              onClick={onSwitchToProjects}
+              className="py-3 border-b-2 border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
+            >
+              Projects{typeof projectCount === "number" ? ` (${projectCount})` : ""}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setActiveTab("settings")}

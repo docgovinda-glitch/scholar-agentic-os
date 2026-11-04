@@ -285,7 +285,7 @@ export default function PresentationWorkspace({
               new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
             );
           } else {
-            setAutosaveStatus('saved');
+            setAutosaveStatus(projectId === 'demo-presentation' ? 'saved' : 'error');
           }
         } catch {
           // Fallback for offline tests

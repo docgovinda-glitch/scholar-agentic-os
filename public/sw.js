@@ -1,13 +1,12 @@
 /**
- * Pocket Service Worker — offline support and caching strategy.
- * Implements cache-first for static assets, network-first for API calls.
- * Handles background sync for queued approvals and comments.
+ * Scholar Agentic OS Service Worker — offline support and static asset caching.
+ * Implements cache-first for static assets and network-first for HTML navigation.
+ * Never caches non-GET requests or authenticated /api/* endpoints.
  */
 
-const CACHE_VERSION = 'pocket-v1';
+const CACHE_VERSION = 'scholar-v2';
 const CACHE_STATIC = `${CACHE_VERSION}-static`;
 const CACHE_DYNAMIC = `${CACHE_VERSION}-dynamic`;
-const CACHE_API = `${CACHE_VERSION}-api`;
 
 const STATIC_ASSETS = [
   '/',
@@ -17,30 +16,29 @@ const STATIC_ASSETS = [
 
 const STATIC_EXTENSIONS = ['.js', '.css', '.woff2', '.png', '.svg'];
 
-// Install: cache static assets
+// Install: cache static shell assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_STATIC).then((cache) => {
-      console.log('[SW] Caching static assets');
       return cache.addAll(STATIC_ASSETS).catch(() => {
-        // Fail gracefully if some assets don't exist
-        console.log('[SW] Some static assets unavailable during install');
+        // Fail gracefully if some assets are unavailable during install
       });
     })
   );
   self.skipWaiting();
 });
 
-// Activate: clean up old caches
+// Activate: clean up old caches (including legacy pocket-* caches)
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName.startsWith('pocket-') && cacheName !== CACHE_STATIC && cacheName !== CACHE_DYNAMIC && cacheName !== CACHE_API) {
-            console.log('[SW] Deleting old cache:', cacheName);
+          const isManaged = cacheName.startsWith('pocket-') || cacheName.startsWith('scholar-');
+          if (isManaged && cacheName !== CACHE_STATIC && cacheName !== CACHE_DYNAMIC) {
             return caches.delete(cacheName);
           }
+          return undefined;
         })
       );
     })
@@ -51,6 +49,12 @@ self.addEventListener('activate', (event) => {
 // Fetch: implement caching strategy
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+
+  // Never intercept or cache non-GET requests (POST/PUT/DELETE/PATCH)
+  if (request.method !== 'GET') {
+    return;
+  }
+
   const url = new URL(request.url);
 
   // Skip cross-origin requests
@@ -58,52 +62,46 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API calls: network-first with cache fallback
+  // Never cache authenticated or dynamic API responses in Service Worker storage
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirstStrategy(request, CACHE_API));
     return;
   }
 
   // Static assets: cache-first with network fallback
-  if (STATIC_EXTENSIONS.some(ext => url.pathname.endsWith(ext))) {
+  if (STATIC_EXTENSIONS.some((ext) => url.pathname.endsWith(ext))) {
     event.respondWith(cacheFirstStrategy(request, CACHE_STATIC));
     return;
   }
 
-  // HTML pages: network-first with cache fallback
-  if (request.mode === 'navigate') {
-    event.respondWith(networkFirstStrategy(request, CACHE_DYNAMIC));
-    return;
-  }
-
-  // Default: network-first
+  // HTML navigation & other GET requests: network-first with cache fallback
   event.respondWith(networkFirstStrategy(request, CACHE_DYNAMIC));
 });
 
 /**
  * Cache-first strategy: try cache, fall back to network.
- * Best for static assets that change infrequently.
+ * Best for hashed static assets that change infrequently.
  */
 function cacheFirstStrategy(request, cacheName) {
   return caches.match(request).then((response) => {
     if (response) {
       return response;
     }
-    return fetch(request).then((response) => {
-      if (!response || response.status !== 200) {
-        return response;
+    return fetch(request).then((networkResponse) => {
+      if (!networkResponse || networkResponse.status !== 200) {
+        return networkResponse;
       }
+      const cloned = networkResponse.clone();
       caches.open(cacheName).then((cache) => {
-        cache.put(request, response.clone());
+        cache.put(request, cloned);
       });
-      return response;
+      return networkResponse;
     });
   });
 }
 
 /**
  * Network-first strategy: try network, fall back to cache.
- * Best for API calls and dynamic content that changes frequently.
+ * Best for HTML navigation shells.
  */
 function networkFirstStrategy(request, cacheName) {
   return fetch(request)
@@ -111,8 +109,9 @@ function networkFirstStrategy(request, cacheName) {
       if (!response || response.status !== 200) {
         return response;
       }
+      const cloned = response.clone();
       caches.open(cacheName).then((cache) => {
-        cache.put(request, response.clone());
+        cache.put(request, cloned);
       });
       return response;
     })
@@ -121,7 +120,6 @@ function networkFirstStrategy(request, cacheName) {
         if (response) {
           return response;
         }
-        // Return offline page or error response
         return new Response('Offline - cached data unavailable', {
           status: 503,
           statusText: 'Service Unavailable',
@@ -130,99 +128,7 @@ function networkFirstStrategy(request, cacheName) {
     });
 }
 
-// Background sync for queued actions
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-approvals') {
-    event.waitUntil(syncQueuedApprovals());
-  }
-  if (event.tag === 'sync-comments') {
-    event.waitUntil(syncQueuedComments());
-  }
-});
-
-async function syncQueuedApprovals() {
-  try {
-    const db = await openDatabase();
-    const approvals = await getAllFromStore(db, 'queued-approvals');
-
-    for (const approval of approvals) {
-      await fetch(`/api/projects/${approval.projectId}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(approval),
-      });
-
-      await deleteFromStore(db, 'queued-approvals', approval.id);
-    }
-  } catch (error) {
-    console.log('[SW] Sync approvals failed:', error);
-    throw error; // Retry sync
-  }
-}
-
-async function syncQueuedComments() {
-  try {
-    const db = await openDatabase();
-    const comments = await getAllFromStore(db, 'queued-comments');
-
-    for (const comment of comments) {
-      await fetch(`/api/documents/${comment.documentId}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(comment),
-      });
-
-      await deleteFromStore(db, 'queued-comments', comment.id);
-    }
-  } catch (error) {
-    console.log('[SW] Sync comments failed:', error);
-    throw error; // Retry sync
-  }
-}
-
-// IndexedDB helpers
-function openDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('pocket-sync', 1);
-
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains('queued-approvals')) {
-        db.createObjectStore('queued-approvals', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('queued-comments')) {
-        db.createObjectStore('queued-comments', { keyPath: 'id' });
-      }
-    };
-  });
-}
-
-function getAllFromStore(db, storeName) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([storeName], 'readonly');
-    const store = transaction.objectStore(storeName);
-    const request = store.getAll();
-
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-  });
-}
-
-function deleteFromStore(db, storeName, key) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([storeName], 'readwrite');
-    const store = transaction.objectStore(storeName);
-    const request = store.delete(key);
-
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve();
-  });
-}
-
-// Push notifications for approvals and comments
+// Push notifications for Scholar OS Pocket
 self.addEventListener('push', (event) => {
   if (!event.data) {
     return;
@@ -230,16 +136,16 @@ self.addEventListener('push', (event) => {
 
   const data = event.data.json();
   const options = {
-    body: data.body || 'New update in Scholar OS Pocket',
-    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect fill="%23334155" width="192" height="192"/><text x="96" y="120" font-size="96" font-family="serif" font-weight="bold" fill="%2300D9FF" text-anchor="middle">◍</text></svg>',
-    badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect fill="%2300D9FF" width="96" height="96"/><text x="48" y="64" font-size="48" font-family="serif" font-weight="bold" fill="%230F172A" text-anchor="middle">◍</text></svg>',
-    tag: data.tag || 'pocket-notification',
+    body: data.body || 'New update in Scholar Agentic OS',
+    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect fill="%23171717" width="192" height="192" rx="36"/><text x="96" y="132" font-size="104" font-family="serif" font-weight="bold" fill="%23FAFAFA" text-anchor="middle">S</text></svg>',
+    badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect fill="%23171717" width="96" height="96" rx="18"/><text x="48" y="66" font-size="52" font-family="serif" font-weight="bold" fill="%23FAFAFA" text-anchor="middle">S</text></svg>',
+    tag: data.tag || 'scholar-notification',
     requireInteraction: data.requireInteraction || false,
     data: data.data || {},
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Scholar OS Pocket', options)
+    self.registration.showNotification(data.title || 'Scholar Agentic OS', options)
   );
 });
 
@@ -247,7 +153,7 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const data = event.notification.data;
+  const data = event.notification.data || {};
   let url = '/pocket';
 
   if (data.url) {
@@ -258,16 +164,15 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Try to find existing window
-      for (let client of clientList) {
+      for (const client of clientList) {
         if (client.url === url && 'focus' in client) {
           return client.focus();
         }
       }
-      // Open new window if not found
       if (clients.openWindow) {
         return clients.openWindow(url);
       }
+      return undefined;
     })
   );
 });

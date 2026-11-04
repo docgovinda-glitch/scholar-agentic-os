@@ -293,41 +293,14 @@ export default function KnowledgeVault({
       }
     };
 
-    // Immediately close modal, mark deleted, and update local state
-    const targetTitle = (
-      targetProject.title ||
-      (targetProject.answers as any)?.title ||
-      getProjectDisplayName(targetProject, projects || [])
-    ).trim().toLowerCase();
-
-    const companionIds = targetTitle
-      ? (projects || [])
-          .filter((p) => {
-            if (!p || p.projectId === targetProject.projectId) return false;
-            const pTitle = (
-              p.title ||
-              (p.answers as any)?.title ||
-              getProjectDisplayName(p, projects || [])
-            ).trim().toLowerCase();
-            return pTitle === targetTitle;
-          })
-          .map((p) => p.projectId)
-      : [];
-
-    const allIdsToDelete = [targetProject.projectId, ...companionIds];
-
+    setIsDeleting(true);
     setProjectToDelete(null);
-    allIdsToDelete.forEach((id) => markDeleted(id));
-    setProjects((prev) => (prev ? prev.filter((p) => !allIdsToDelete.includes(p.projectId)) : []));
+    markDeleted(targetProject.projectId);
+    setProjects((prev) => (prev ? prev.filter((p) => p.projectId !== targetProject.projectId) : []));
 
     try {
       if (!targetProject.projectId.startsWith("demo-")) {
         await deleteProject(targetProject.projectId);
-      }
-      for (const compId of companionIds) {
-        if (!compId.startsWith("demo-")) {
-          deleteProject(compId).catch(() => {});
-        }
       }
     } catch (err: unknown) {
       console.error("Failed to delete project:", err);
@@ -336,6 +309,8 @@ export default function KnowledgeVault({
       setProjects(previousProjects);
       const msg = err instanceof Error ? err.message : "Failed to delete project";
       showAppToast(`Could not delete project: ${msg}`, "error");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -1013,6 +988,8 @@ export default function KnowledgeVault({
             onOpenProject={onOpenProject}
             onLock={onLock}
             onResetVault={onResetVault}
+            onSwitchToProjects={() => setActiveTab("projects")}
+            projectCount={projects?.length ?? 0}
           />
         )}
 

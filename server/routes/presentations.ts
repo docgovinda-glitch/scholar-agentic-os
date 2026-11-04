@@ -485,11 +485,10 @@ router.post("/:id/copilot", async (req: Request, res: Response) => {
 
   try {
     if (!userId) return res.status(401).json({ error: "Authentication required" });
-    const memDeck = memoryDecks.get(id);
-    if (memDeck && memDeck.user_id !== userId) {
-      return res.status(404).json({ error: "Presentation deck not found" });
-    }
-    const deck = memDeck;
+    const found = await lookupDeck(id, userId);
+    if (found.status === "unavailable") return unavailable(res);
+    if (found.status === "not-owned") return notFound(res, id);
+    const deck = found.status === "owned" ? found.row : undefined;
     const targetSlide = currentSlide || (deck && deck.slides && deck.slides[slideIndex]);
 
     if (!targetSlide) {
@@ -591,11 +590,21 @@ router.post("/:id/copilot", async (req: Request, res: Response) => {
       }
     }
 
-    // If deck exists in memory, update it
+    // If deck exists in database or memory, persist the mutated slide
     if (deck && deck.slides && deck.slides[slideIndex]) {
       deck.slides[slideIndex] = mutatedSlide;
       deck.updated_at = new Date().toISOString();
-      setMemoryDeck(id, deck);
+      if (found.status === "owned" && found.source === "db") {
+        const table = getDecksTable();
+        if (table) {
+          await table.update(
+            `id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}`,
+            { slides: deck.slides, updated_at: deck.updated_at }
+          );
+        }
+      } else {
+        setMemoryDeck(id, deck);
+      }
     }
 
     res.json({
