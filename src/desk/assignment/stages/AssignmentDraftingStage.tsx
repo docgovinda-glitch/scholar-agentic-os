@@ -382,7 +382,7 @@ export function AssignmentDraftingStage({
           <div className="min-w-0">
             <h1 className="text-base sm:text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">Drafting</h1>
             <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
-              Write each section yourself or draft it with your AI, then edit. Everything saves as you go.
+              Draft or stream each section. Changes auto-save.
             </p>
           </div>
         </div>
@@ -451,22 +451,51 @@ export function AssignmentDraftingStage({
         </div>
       )}
 
-      {/* Detailed Mode Telemetry Panel: Overlap Validation (< 20%), Active-Voice & Anti-Fluff Metrics, Citation Tokens */}
-      <>
-        <section
-          aria-label="Detailed Drafting Telemetry & Validation"
-          className="rounded-2xl p-5 bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-4 font-sans animate-in fade-in duration-200"
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200/60 dark:border-zinc-800/60 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
-                Detailed Mode · Academic Integrity & Citation Grounding Inspector
-              </h2>
-            </div>
-            <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
-              Live Collegiate Directives Active
+      {/* Progressive-Disclosure Telemetry Bar: Overlap Validation (< 20%), Active-Voice & Anti-Fluff Metrics, Citation Tokens */}
+      <details
+        aria-label="Detailed Drafting Telemetry & Validation"
+        className="group rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs font-sans transition-colors"
+      >
+        <summary className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 cursor-pointer list-none select-none">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100 truncate">
+              Detailed Mode · Academic Integrity & Citation Grounding Inspector
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono">
+            <span
+              className={`font-semibold px-2 py-0.5 rounded-full ${
+                uniquenessValidation.isUnique
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+              }`}
+            >
+              {uniquenessValidation.isUnique ? "< 20% Overlap (Pass)" : "Overlap Violation"}
             </span>
+            <span
+              className={`font-semibold px-2 py-0.5 rounded-full ${
+                !activeProseAudit || activeProseAudit.activeVoiceRatio >= 0.8
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+              }`}
+            >
+              {activeProseAudit ? `${Math.round(activeProseAudit.activeVoiceRatio * 100)}% Active Voice` : "Pending Draft"}
+            </span>
+            <span className="font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+              {detectedCitationTokens.length} Token{detectedCitationTokens.length !== 1 ? "s" : ""} Bound
+            </span>
+            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 pl-1 group-open:rotate-180 transition-transform">
+              ▾
+            </span>
+          </div>
+        </summary>
+
+        <div className="px-4 pb-4 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 space-y-3">
+          <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+            <span>Live Collegiate Directives Active</span>
+            <span>{citationStyle.toUpperCase()} Interceptor</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
@@ -542,8 +571,8 @@ export function AssignmentDraftingStage({
               </div>
             </div>
           </div>
-        </section>
-      </>
+        </div>
+      </details>
 
       {/* Outline (can be hidden) beside a wide writing area */}
       <div className={`grid grid-cols-1 gap-5 items-start ${showOutline ? "lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]" : ""}`}>

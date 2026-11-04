@@ -332,12 +332,22 @@ function AssignmentWorkspaceInner({
       ? true
       : window.matchMedia("(min-width: 640px)").matches
   );
+  const [isZenMode, setIsZenMode] = useState(false);
   useUnsavedChangesGuard(Boolean(isLoading));
   // Drafting needs the width: the side panel closes on arrival there and the
   // header's Inspector button reopens it.
   useEffect(() => {
     if (currentPhase === "drafting") setTutorPanelOpen(false);
   }, [currentPhase]);
+
+  useEffect(() => {
+    if (!isZenMode) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsZenMode(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isZenMode]);
 
   // Inline-editable title with auto-save on blur / Enter
   const initialTitle =
@@ -530,12 +540,17 @@ function AssignmentWorkspaceInner({
         autosaveStatus={saveStatus}
         hidePhaseTabs
         projectVersion={project?.version}
-        inspectorOpen={tutorPanelOpen}
-        onToggleInspector={() => setTutorPanelOpen((o) => !o)}
+        zenMode={isZenMode}
+        onToggleZenMode={() => setIsZenMode((z) => !z)}
+        inspectorOpen={!isZenMode && tutorPanelOpen}
+        onToggleInspector={() => {
+          setIsZenMode(false);
+          setTutorPanelOpen((o) => !o);
+        }}
       />
 
-      {/* Assignment bar: the title (also editable on phones, where the studio header hides it) and the flow mode */}
-      <header className="bg-white dark:bg-ink-750 z-20 shrink-0">
+      {/* Assignment bar: the title (editable on phones where the studio header hides it) */}
+      <header className={`${isZenMode ? "hidden" : "sm:hidden"} bg-white dark:bg-ink-750 border-b border-neutral-200/60 dark:border-white/5 z-20 shrink-0`}>
         <div className="flex items-center justify-between px-4 sm:px-6 pt-2.5 pb-1 gap-4">
           <div className="flex items-center gap-2.5 min-w-0">
             {/* Inline-Editable Project Title with Auto-Save onBlur */}
@@ -568,8 +583,8 @@ function AssignmentWorkspaceInner({
         </div>
       </header>
 
-      {/* Horizontal 4-Phase Progress Navigation Bar */}
-      <AssignmentStageNavigation />
+      {/* Horizontal 5-Phase Progress Navigation Bar */}
+      {!isZenMode && <AssignmentStageNavigation />}
 
       {/* Workspace Body: Center Content & Collapsible Right Socratic Tutor Drawer */}
       <div className="flex-1 flex overflow-hidden relative bg-paper-cool dark:bg-ink-850">
@@ -581,7 +596,7 @@ function AssignmentWorkspaceInner({
         </main>
 
         {/* Right Column: Collapsible Context Panel Copilot Drawer */}
-        {tutorPanelOpen && (
+        {!isZenMode && tutorPanelOpen && (
           <>
             {/* Mobile semi-transparent backdrop */}
             <div
