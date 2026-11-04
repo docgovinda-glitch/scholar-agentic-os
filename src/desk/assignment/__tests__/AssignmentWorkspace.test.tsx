@@ -72,17 +72,9 @@ describe("Scholar Core Assignment Workspace", () => {
       />
     );
 
-    // In Minimal mode (default 4-phase flow)
+    // One flow with five stages; there is no Minimal/Detailed choice any more.
     expect(await screen.findByRole("button", { name: /Phase 1: Extract/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 2: Sources/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 3: Drafting/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Phase 4: Submission/i })).toBeInTheDocument();
-
-    // Toggle to Detailed mode (5-phase guided architect flow)
-    const detailedRadio = screen.getByRole("radio", { name: /Detailed/i });
-    fireEvent.click(detailedRadio);
-
-    expect(screen.getByRole("button", { name: /Phase 1: Extract/i })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /Detailed|Minimal/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Phase 2: Understand/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Phase 3: Sources/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Phase 4: Drafting/i })).toBeInTheDocument();
@@ -246,10 +238,6 @@ describe("Scholar Core Assignment Workspace", () => {
     // 1. Wait for lazy-loaded Phase 1 and locate file input
     expect(await screen.findByText(/Phase 1: Understand the Assignment/i)).toBeInTheDocument();
 
-    // Switch to Detailed mode to inspect 5-phase workflow and Understand stage cards
-    const detailedRadio = screen.getByRole("radio", { name: /Detailed/i });
-    fireEvent.click(detailedRadio);
-
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeInTheDocument();
 
@@ -330,8 +318,8 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(within(nav).getByRole("button", { name: /Phase 1: Extract/i })).toHaveTextContent("0%");
     expect(await screen.findByRole("button", { name: /Proceed to Sources/i })).toBeDisabled();
     expect(screen.getByText(/Still needed: .*the assignment question/i)).toBeInTheDocument();
-    // Only one Minimal/Detailed choice on the page.
-    expect(screen.getAllByRole("radio", { name: /Detailed/i })).toHaveLength(1);
+    // No Minimal/Detailed choice: the five-stage flow is the only one.
+    expect(screen.queryByRole("radio", { name: /Detailed|Minimal/i })).not.toBeInTheDocument();
   });
 
   it("does not grade an empty paper on the Submission step", async () => {
