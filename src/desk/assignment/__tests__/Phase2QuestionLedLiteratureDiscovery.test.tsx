@@ -300,8 +300,9 @@ describe("Phase 02 — Strictly Question-Led, Evidence-Oriented, Discipline-Awar
 
       const grid = screen.getByTestId("curated-sources-grid");
       expect(grid).toBeInTheDocument();
-      // Filtered sources show their own year, e.g. Claude's 2006 book
-      const seminalItems = within(grid).getAllByText("2006");
+      // Filtered sources show their own catalog year (before 2020)
+      const seminalYear = seedSources(ukraineQuestion).find((s) => parseInt(s.year, 10) < 2020)!.year;
+      const seminalItems = within(grid).getAllByText(seminalYear);
       expect(seminalItems.length).toBeGreaterThan(0);
     });
   });

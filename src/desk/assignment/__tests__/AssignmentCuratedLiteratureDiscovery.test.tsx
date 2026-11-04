@@ -89,6 +89,17 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+
+// The workspace loads the catalog works for this question; tests read titles
+// and ids from it rather than naming entries, so they hold as the verified
+// catalog changes.
+const FIXTURE_QUESTION =
+  "Critically evaluate algorithmic governance, procedural due process, and predictive accountability in administrative public decision-making.";
+const fixtureSources = generateCuratedLiteratureSources(FIXTURE_QUESTION, "apa7");
+const firstSource = fixtureSources[0];
+const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const titleRe = (text: string) => new RegExp(escapeRe(text), "i");
+
 describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -100,7 +111,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
       answers: {
         assignment_question: "Critically evaluate algorithmic governance, procedural due process, and predictive accountability in administrative public decision-making.",
         // Fixture: sources a previous live search saved to this project.
-        assignment_sources: JSON.stringify(generateCuratedLiteratureSources("Critically evaluate algorithmic governance, procedural due process, and predictive accountability in administrative public decision-making.", "apa7")),
+        assignment_sources: JSON.stringify(fixtureSources),
         word_count: 2500,
         citation_style: "apa7",
         academic_level: "postgraduate",
@@ -131,16 +142,18 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
       const catalogTitles = new Set(CORE_SCHOLARLY_CATALOG.map((c) => c.title));
       sources.forEach((s) => expect(catalogTitles.has(s.title), s.title).toBe(true));
 
-      // Verify academic quality and diversity
-      const journals = sources.filter((s) => s.type === "journal");
-      const books = sources.filter((s) => s.type === "book");
-      const conferences = sources.filter((s) => s.type === "conference");
-      const institutional = sources.filter((s) => s.type === "institutional" || s.type === "report");
-
-      expect(journals.length).toBeGreaterThanOrEqual(10);
-      expect(books.length).toBeGreaterThanOrEqual(4);
-      expect(conferences.length).toBeGreaterThanOrEqual(2);
-      expect(institutional.length).toBeGreaterThanOrEqual(2);
+      // Each result is its catalog entry unchanged (no invented type mix to
+      // meet a quota), and a DOI, when given, is the registered DOI form.
+      const catalogById = new Map(CORE_SCHOLARLY_CATALOG.map((c) => [c.id, c]));
+      sources.forEach((s) => {
+        const entry = catalogById.get(s.id);
+        expect(entry, s.id).toBeDefined();
+        expect(s.authors).toEqual(entry!.authors);
+        expect(String(s.year)).toBe(entry!.year);
+        expect(s.type).toBe(entry!.type);
+        expect(s.doi).toBe(entry!.doi);
+        if (s.doi) expect(s.doi).toMatch(/^10\.\d{4,9}\/\S+$/);
+      });
 
       // Verify each item contains required academic metadata
       sources.forEach((source) => {
@@ -280,8 +293,8 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
       const approveBtns = within(grid).getAllByText(/\+ Add Source/i);
       expect(approveBtns.length).toBeGreaterThan(0);
 
-      // Specific first card title visible
-      expect(within(grid).getByText(/Algorithmic Governance and the Politics of Predictive Accountability/i)).toBeInTheDocument();
+      // A catalog work's title is visible on its card
+      expect(within(grid).getByText(titleRe(firstSource.title))).toBeInTheDocument();
     });
 
     it("toggles approve / added state on a source card", async () => {
@@ -296,7 +309,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
       expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
       const approveBtn = screen.getByRole("button", {
-        name: /Approve Algorithmic Governance and the Politics of Predictive Accountability/i,
+        name: new RegExp(`Approve ${escapeRe(firstSource.title)}`, "i"),
       });
       fireEvent.click(approveBtn);
 
@@ -305,7 +318,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
         expect(saveIntakeAnswers).toHaveBeenCalledWith(
           "proj-lit-1",
           expect.objectContaining({
-            approved_source_ids: expect.arrayContaining(["src-curated-1"]),
+            approved_source_ids: expect.arrayContaining([firstSource.id]),
           })
         );
       });
@@ -324,12 +337,17 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
 
       expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
+      // Search by the first work's lead author: it stays, a work without
+      // that name in its title or authors is filtered out.
+      const surname = firstSource.authors[0].split(",")[0];
+      const other = fixtureSources.find(
+        (s) => !s.authors.join(" ").includes(surname) && !s.title.includes(surname)
+      )!;
       const searchInput = screen.getByLabelText(/Search curated literature/i);
-      fireEvent.change(searchInput, { target: { value: "Pasquale" } });
+      fireEvent.change(searchInput, { target: { value: surname } });
 
-      // Should show matching item and filter out non-matching
-      expect(screen.getByText(/Algorithmic Governance and the Politics of Predictive Accountability/i)).toBeInTheDocument();
-      expect(screen.queryByText(/Critical Synthesis of Empirical Evidence in Socio-Technical Decision Making/i)).not.toBeInTheDocument();
+      expect(screen.getByText(titleRe(firstSource.title))).toBeInTheDocument();
+      expect(screen.queryByText(titleRe(other.title))).not.toBeInTheDocument();
     });
 
     it("allows bookmarking sources and viewing them under the Bookmarked tab", async () => {
@@ -353,7 +371,7 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
       fireEvent.click(bookmarkedTab);
 
       // Verify bookmarked item is shown
-      expect(screen.getByText(/Algorithmic Governance and the Politics of Predictive Accountability/i)).toBeInTheDocument();
+      expect(screen.getByText(titleRe(firstSource.title))).toBeInTheDocument();
     });
   });
 
@@ -381,16 +399,20 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
 
     it("retrieves genuinely relevant literature addressing China's rise, global influence, and international relations", () => {
       const sources = generateCuratedLiteratureSources(chinaQuestion, "apa7");
-      expect(sources.length).toBeGreaterThanOrEqual(30);
+      // As many works as the verified IR catalog holds for the question, and
+      // no more: the old floor of 30 was met by works that do not exist.
+      expect(sources.length).toBeGreaterThan(0);
+      const irIds = new Set(IR_CHINA_GEOPOLITICS_CATALOG.map((c) => c.id));
+      sources.forEach((s) => expect(irIds.has(s.id), s.id).toBe(true));
 
-      // Verify that literature directly addresses China, its rise, and geopolitics
+      // Every work returned addresses China
       const chinaSources = sources.filter(
         (s) =>
           s.title.toLowerCase().includes("china") ||
           s.abstract?.toLowerCase().includes("china") ||
           s.keyConcepts?.some((k) => k.toLowerCase().includes("china"))
       );
-      expect(chinaSources.length).toBeGreaterThanOrEqual(28);
+      expect(chinaSources).toHaveLength(sources.length);
 
       // Verify presence of seminal International Relations and China scholars
       const allAuthors = sources.flatMap((s) => s.authors).join(" ");
@@ -427,10 +449,13 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
       const initialSources = generateCuratedLiteratureSources(chinaQuestion, "apa7");
       const moreSources = fetchMoreLiteratureSources(initialSources, chinaQuestion, 10);
       // At most the batch size; a short batch stays short rather than padded.
-      expect(moreSources.length).toBeGreaterThan(0);
       expect(moreSources.length).toBeLessThanOrEqual(10);
 
       const initialIds = new Set(initialSources.map((s) => s.id));
+      // Once every verified IR work is listed, there is nothing more to find,
+      // and nothing is made up to fill the batch.
+      const unlisted = IR_CHINA_GEOPOLITICS_CATALOG.filter((c) => !initialIds.has(c.id));
+      if (unlisted.length === 0) expect(moreSources).toEqual([]);
       const initialDois = new Set(initialSources.map((s) => s.doi).filter(Boolean));
 
       moreSources.forEach((s) => {
@@ -445,32 +470,36 @@ describe("Phase 2 — Curated Literature & Course Sources Discovery", () => {
     it("handles specific variation: 'How has the rise of China affected the international order and US-China relations?'", () => {
       const prompt = "How has the rise of China affected the international order and US-China relations?";
       const sources = generateCuratedLiteratureSources(prompt, "apa7");
-      expect(sources.length).toBeGreaterThanOrEqual(30);
+      expect(sources.length).toBeGreaterThan(0);
 
       // Check top sources address international order and US-China relations
       const top3 = sources.slice(0, 3);
       const topTitles = top3.map((s) => s.title).join(" ");
-      expect(topTitles).toMatch(/Status Quo|Liberal System|Destined for War|Great-Power/i);
+      expect(topTitles).toMatch(/Status Quo|Destined for War|China Goes Global/i);
     });
 
     it("handles specific variation: 'The economic and geopolitical implications of the Belt and Road Initiative on developing nations'", () => {
       const prompt = "The economic and geopolitical implications of the Belt and Road Initiative on developing nations";
       const sources = generateCuratedLiteratureSources(prompt, "apa7");
-      expect(sources.length).toBeGreaterThanOrEqual(30);
+      expect(sources.length).toBeGreaterThan(0);
 
-      const briSources = sources.filter(
-        (s) =>
-          s.title.toLowerCase().includes("belt and road") ||
-          s.abstract?.toLowerCase().includes("belt and road") ||
-          s.abstract?.toLowerCase().includes("eurasian") ||
-          s.title.toLowerCase().includes("economic") ||
-          s.keyConcepts?.some((k) =>
-            k.toLowerCase().includes("belt and road") ||
-            k.toLowerCase().includes("economic") ||
-            k.toLowerCase().includes("geoeconomic")
-          )
-      );
-      expect(briSources.length).toBeGreaterThanOrEqual(8);
+      const isBriOrEconomic = (s: { title: string; abstract?: string; keyConcepts?: string[] }) =>
+        s.title.toLowerCase().includes("belt and road") ||
+        s.abstract?.toLowerCase().includes("belt and road") ||
+        s.abstract?.toLowerCase().includes("eurasian") ||
+        s.title.toLowerCase().includes("economic") ||
+        s.keyConcepts?.some((k) =>
+          k.toLowerCase().includes("belt and road") ||
+          k.toLowerCase().includes("economic") ||
+          k.toLowerCase().includes("geoeconomic")
+        );
+      const briSources = sources.filter(isBriOrEconomic);
+
+      // Every verified catalog work on the BRI or economic statecraft is
+      // found (there are few; none are made up to reach a count).
+      const briCatalog = IR_CHINA_GEOPOLITICS_CATALOG.filter(isBriOrEconomic);
+      expect(briSources.length).toBeGreaterThan(0);
+      expect(briSources.map((s) => s.id).sort()).toEqual(briCatalog.map((c) => c.id).sort());
     });
 
     it("generalizes to other domains such as Environmental Science & Climate Policy", () => {

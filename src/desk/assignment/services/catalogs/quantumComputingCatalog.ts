@@ -5,7 +5,7 @@ import type { ScholarlyCatalogItem } from "../scholarlyDiscoveryService";
  * Quantum Computing Architectures, NISQ Constraints, Algorithmic Paradigms (Shor, Grover),
  * Quantum Error Correction (Surface Codes, Threshold Theorem), and Quantum Cryptography (QKD, PQC).
  *
- * 38 Peer-Reviewed Journal Articles, Preeminent Treatises, and Standards by Leading Quantum Physicists:
+ * Peer-reviewed articles, treatises and standards by:
  * John Preskill, Michael Nielsen, Isaac Chuang, Austin Fowler, Peter Shor, Frank Arute,
  * Craig Gidney, John Martinis, Morten Kjaergaard, Charles Bennett, Gilles Brassard, Lov Grover,
  * Sergey Bravyi, Alexei Kitaev, Emanuel Knill, William Wootters, Wojciech Zurek, Michel Devoret,
@@ -13,6 +13,9 @@ import type { ScholarlyCatalogItem } from "../scholarlyDiscoveryService";
  * Christopher Monroe, Daniel Gottesman, Robert Calderbank, Andrew Steane, Kristan Temme,
  * Jay Gambetta, Ethan Bernstein, Umesh Vazirani, Aram Harrow, Hoi-Kwong Lo, Nicolas Gisin,
  * Oded Regev, and the NIST Post-Quantum Cryptography Standardization Team.
+ *
+ * Every entry was checked against Crossref, DataCite or OpenLibrary (November 2026).
+ * Add a work only when it has a registered record; use its DOI where one exists.
  */
 export const QUANTUM_COMPUTING_CATALOG: ScholarlyCatalogItem[] = [
   // --- 1. Foundational Hardware Architectures & NISQ ---
@@ -174,7 +177,7 @@ export const QUANTUM_COMPUTING_CATALOG: ScholarlyCatalogItem[] = [
     type: "journal",
     journal: "Annual Review of Condensed Matter Physics",
     volumeIssue: "11, 369–395",
-    doi: "10.1146/annurev-conmatphys-031119-014136",
+    doi: "10.1146/annurev-conmatphys-031119-050605",
     relevanceScore: 97,
     mainFinding: "Comprehensive experimental review of superconducting circuit QED, analyzing transmon design, fluxonium, microwave resonators, two-level system (TLS) dielectric loss, and microsecond coherence limits (T1, T2).",
     suggestedUse: "Essential technical review for Part 1 Question 1 (transmon Josephson junction physics, anharmonicity, and TLS loss mechanisms).",
@@ -243,7 +246,7 @@ export const QUANTUM_COMPUTING_CATALOG: ScholarlyCatalogItem[] = [
   },
   {
     id: "src-quantum-10",
-    title: "Post-Quantum Cryptography: Module-Lattice-Based Key-Encapsulation Mechanism Standard (FIPS 203)",
+    title: "Module-Lattice-Based Key-Encapsulation Mechanism Standard (FIPS 203)",
     authors: ["National Institute of Standards and Technology (NIST)"],
     year: "2024",
     type: "institutional",
@@ -576,7 +579,7 @@ export const QUANTUM_COMPUTING_CATALOG: ScholarlyCatalogItem[] = [
     type: "journal",
     journal: "Physical Review Letters",
     volumeIssue: "119(18), 180501",
-    doi: "10.1103/PhysRevLett.119.180501",
+    doi: "10.1103/PhysRevLett.119.180509",
     relevanceScore: 98,
     mainFinding: "Formulated the foundational mathematical frameworks for Zero-Noise Extrapolation (ZNE) and Probabilistic Error Cancellation (PEC) for NISQ processors without requiring physical ancillary qubits.",
     suggestedUse: "Primary mathematical paper for Part 1 Question 2 on NISQ error mitigation techniques, noise amplification, and quasiprobability sampling overheads.",
@@ -904,7 +907,7 @@ export const QUANTUM_COMPUTING_CATALOG: ScholarlyCatalogItem[] = [
     type: "journal",
     journal: "IACR Transactions on Cryptographic Hardware and Embedded Systems",
     volumeIssue: "2018(1), 238–268",
-    doi: "10.13154/tches.v2018.i1.238-268",
+    doi: "10.46586/tches.v2018.i1.238-268",
     relevanceScore: 97,
     mainFinding: "Engineered CRYSTALS-Dilithium, the module lattice-based signature scheme standardized as NIST FIPS 204 (ML-DSA) utilizing the 'Fiat-Shamir with Aborts' technique.",
     suggestedUse: "Key technical citation for Part 4 Question 7(a) detailing post-quantum digital signature standards and key sizes.",
@@ -919,31 +922,6 @@ export const QUANTUM_COMPUTING_CATALOG: ScholarlyCatalogItem[] = [
     isVerifiedAcademic: true,
     sourceCredibility: "peer-reviewed",
     roleInAssignment: "Original CRYSTALS-Dilithium specification",
-    relevanceCategory: "Very High",
-  },
-  {
-    id: "src-quantum-37",
-    title: "Post-quantum cryptography: dealing with packet fragmentation and latency in TLS 1.3",
-    authors: ["Paquin, C.", "Stebila, D.", "Tamvada, G."],
-    year: "2020",
-    type: "conference",
-    journal: "Proceedings of the 2020 ACM SIGSAC Conference on Computer and Communications Security (CCS)",
-    volumeIssue: "pp. 1025–1039",
-    doi: "10.1145/3372297.3417261",
-    relevanceScore: 96,
-    mainFinding: "Empirically quantified the network and latency impact of post-quantum cipher suites in TLS 1.3, discovering that key sizes exceeding standard MTUs (1,500 bytes) cause TCP packet drops and round-trip delays.",
-    suggestedUse: "Direct empirical citation for Part 4 Question 7(c) analyzing MTU boundaries, TLS handshake latency, and enterprise migration friction.",
-    citation: "Paquin, C., Stebila, D. & Tamvada, G. (2020). Post-quantum cryptography: dealing with packet fragmentation and latency in TLS 1.3. In Proceedings 2020 ACM CCS (pp. 1025–1039). ACM.",
-    abstract: "Paquin et al. benchmark post-quantum key encapsulation mechanisms and digital signatures within TLS 1.3. They measure transmission latency under realistic packet drop rates, identifying critical transition dilemmas where public keys and certificates span multiple Ethernet frames.",
-    citationCount: 290,
-    citationImpact: "Recent Landmark",
-    methodology: "Empirical Study",
-    keyConcepts: ["TLS 1.3 Handshake", "MTU Fragmentation", "Network Latency", "PQC Deployment", "Certificate Chain Size"],
-    domain: "Quantum Information & Computational Physics",
-    isOpenAccess: true,
-    isVerifiedAcademic: true,
-    sourceCredibility: "peer-reviewed",
-    roleInAssignment: "Empirical PQC networking benchmark",
     relevanceCategory: "Very High",
   },
   {

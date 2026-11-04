@@ -9,6 +9,7 @@ import {
   extractResearchIntent,
 } from "../services/scholarlyDiscoveryService";
 import type { UploadedSourceDocument } from "../types";
+import { UN_PEACE_SECURITY_CATALOG } from "../services/catalogs/unPeaceSecurityCatalog";
 import { generateCuratedLiteratureSources as seedSourcesFixture } from "../services/scholarlyDiscoveryService";
 const seedSources = (question: string) => seedSourcesFixture(question, "apa7");
 
@@ -130,7 +131,11 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
 
     it("retrieves authentic seminal UN literature without cross-topic leakage", () => {
       const sources = generateCuratedLiteratureSources(unQuestion, "apa7");
-      expect(sources.length).toBeGreaterThanOrEqual(30);
+      // As many works as the verified UN catalog holds, and no more (the old
+      // floor of 30 was met by works that could not be confirmed).
+      expect(sources.length).toBeGreaterThan(0);
+      const unIds = new Set(UN_PEACE_SECURITY_CATALOG.map((c) => c.id));
+      sources.forEach((s) => expect(unIds.has(s.id), s.id).toBe(true));
 
       // Verify seminal UN works are ranked at the top
       const topTitles = sources.slice(0, 10).map((s) => s.title);

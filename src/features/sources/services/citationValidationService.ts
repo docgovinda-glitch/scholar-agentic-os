@@ -14,6 +14,7 @@ export interface CandidateSource {
   year?: string;
   abstract?: string;
   journal?: string;
+  doi?: string;
   type?: string;
   relevanceScore?: number;
   citation?: string;
@@ -47,10 +48,10 @@ export const APPROVED_ORGANIZATIONAL_CULTURE_LITERATURE: CandidateSource[] = [
     title: "Delivering Happiness: A Path to Profits, Passion, and Purpose",
     authors: ["Hsieh, T."],
     year: "2010",
-    journal: "Grand Central Publishing",
+    journal: "Business Plus",
     type: "book",
     relevanceScore: 0.95,
-    citation: "Hsieh, T. (2010). Delivering Happiness: A Path to Profits, Passion, and Purpose. Grand Central Publishing.",
+    citation: "Hsieh, T. (2010). Delivering Happiness: A Path to Profits, Passion, and Purpose. Business Plus.",
     mainFinding: "Documents the business architecture of Zappos, detailing the $2,000 quit offer to screen for intrinsic cultural commitment.",
     suggestedUse: "Primary case evidence for the economic and cultural rationale behind Zappos onboarding incentive design.",
     abstract: "Tony Hsieh recounts the founding and scaling of Zappos, emphasizing company culture as the number one business priority and competitive advantage.",
@@ -69,27 +70,15 @@ export const APPROVED_ORGANIZATIONAL_CULTURE_LITERATURE: CandidateSource[] = [
     abstract: "Presents the Organizational Culture Assessment Instrument (OCAI) and provides evidence-based guidance for systemic cultural transformation.",
   },
   {
-    id: "src-oreilly-chatman-1996",
-    title: "Culture as Social Control: Corporations, Cults, and Commitment",
-    authors: ["O'Reilly, C. A.", "Chatman, J. A."],
-    year: "1996",
-    journal: "Research in Organizational Behavior, 18, 157-200",
-    type: "journal",
-    relevanceScore: 0.94,
-    citation: "O'Reilly, C. A., & Chatman, J. A. (1996). Culture as Social Control: Corporations, Cults, and Commitment. Research in Organizational Behavior, 18, 157–200.",
-    mainFinding: "Formalizes person-organization fit theory and explains how strong normative culture functions as an informal social control mechanism.",
-    suggestedUse: "Theoretical foundation for analyzing hiring self-selection, psychological contracts, and intrinsic alignment.",
-    abstract: "Examines how corporate culture develops psychological attachment, compliance, identification, and internalization among organizational members.",
-  },
-  {
     id: "src-lewin-1947",
-    title: "Frontiers in Group Dynamics: Concept, Method and Reality in Social Science",
+    title: "Frontiers in Group Dynamics: Concept, Method and Reality in Social Science; Social Equilibria and Social Change",
     authors: ["Lewin, K."],
     year: "1947",
+    doi: "10.1177/001872674700100103",
     journal: "Human Relations, 1(1), 5-41",
     type: "journal",
     relevanceScore: 0.90,
-    citation: "Lewin, K. (1947). Frontiers in Group Dynamics: Concept, Method and Reality in Social Science. Human Relations, 1(1), 5–41.",
+    citation: "Lewin, K. (1947). Frontiers in Group Dynamics: Concept, Method and Reality in Social Science; Social Equilibria and Social Change. Human Relations, 1(1), 5–41. https://doi.org/10.1177/001872674700100103",
     mainFinding: "Introduces the three-phase change model: unfreezing habitual group standards, moving toward new norms, and refreezing new equilibrium.",
     suggestedUse: "Theoretical foundation for explaining how leaders unfreeze entrenched assumptions to establish new organizational behaviors.",
     abstract: "Foundational paper establishing group dynamics, force field analysis, and systemic change processes in social psychology.",
