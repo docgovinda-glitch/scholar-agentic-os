@@ -171,9 +171,6 @@ export function registerAIRoutes(
   _citationStyleRegistry?: CitationStyleRegistry
 ): void {
   const router = express.Router();
-  if (aiAbuseLimit) {
-    router.use(aiAbuseLimit);
-  }
 
   /**
    * GET /api/ai/status
@@ -233,6 +230,10 @@ export function registerAIRoutes(
       });
     }
   });
+
+  if (aiAbuseLimit) {
+    router.use(aiAbuseLimit);
+  }
 
   /**
    * POST /api/ai/search
