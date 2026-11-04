@@ -13,6 +13,12 @@ import {
   type WritingStyleConfig,
   type WritingStylePreset,
   ASSIGNMENT_TYPE_LABELS,
+  ACADEMIC_LEVEL_OPTIONS,
+  ASSIGNMENT_TYPE_OPTIONS,
+  STAGE_CITATION_STYLES as CITATION_STYLES,
+  WRITING_TONE_OPTIONS,
+  ARCHETYPE_DEFAULT_TONES,
+  AGENTIC_THINKING_STAGES,
   cleanAnswerString,
   extractStandardizedInstructions,
   structureToInternalSections,
@@ -88,63 +94,14 @@ class DropzoneErrorBoundary extends React.Component<
   }
 }
 
-export const ACADEMIC_LEVEL_OPTIONS: { id: AcademicLevel; label: string }[] = [
-  { id: "high_school", label: "High School" },
-  { id: "undergraduate", label: "Undergraduate" },
-  { id: "postgraduate", label: "Postgraduate" },
-  { id: "doctoral", label: "Doctoral" },
-];
-
-export const ASSIGNMENT_TYPE_OPTIONS: { id: AssignmentType; label: string }[] = [
-  { id: "essay", label: "Essay" },
-  { id: "literature_review", label: "Literature Review" },
-  { id: "research_paper", label: "Research Paper" },
-  { id: "case_study", label: "Case Study" },
-  { id: "report", label: "Report" },
-  { id: "critical_essay", label: "Critical Essay" },
-  { id: "argumentative_essay", label: "Argumentative Essay" },
-  { id: "policy_analysis", label: "Policy Analysis" },
-  { id: "business_assignment", label: "Business Assignment" },
-];
-
-export const CITATION_STYLES = [
-  { id: "apa7", name: "APA 7th" },
-  { id: "mla9", name: "MLA 9th" },
-  { id: "chicago", name: "Chicago" },
-  { id: "harvard", name: "Harvard" },
-  { id: "ieee", name: "IEEE" },
-  { id: "vancouver", name: "Vancouver" },
-];
-
-export const WRITING_TONE_OPTIONS: { id: string; label: string }[] = [
-  { id: "formal_academic", label: "Formal Academic" },
-  { id: "analytical", label: "Analytical" },
-  { id: "persuasive", label: "Persuasive" },
-  { id: "objective", label: "Objective" },
-  { id: "critical", label: "Critical" },
-  { id: "conversational_academic", label: "Conversational Academic" },
-];
-
-export const ARCHETYPE_DEFAULT_TONES: Record<string, string> = {
-  essay: "formal_academic",
-  literature_review: "critical",
-  research_paper: "formal_academic",
-  case_study: "analytical",
-  report: "objective",
-  critical_essay: "critical",
-  argumentative_essay: "persuasive",
-  policy_analysis: "analytical",
-  business_assignment: "analytical",
-  analytical_essay: "analytical",
-  annotated_bibliography: "critical",
-  coursework: "formal_academic",
-  other: "formal_academic",
+export {
+  ACADEMIC_LEVEL_OPTIONS,
+  ASSIGNMENT_TYPE_OPTIONS,
+  CITATION_STYLES,
+  WRITING_TONE_OPTIONS,
+  ARCHETYPE_DEFAULT_TONES,
+  AGENTIC_THINKING_STAGES,
 };
-
-// What is really happening while the brief is analysed: one request to the
-// student's AI. (This used to cycle through steps such as "Researching
-// relevant scholarship" on a timer, none of which were taking place.)
-export const AGENTIC_THINKING_STAGES = ["Your AI is reading the brief and writing the outline…"];
 
 function cleanTopic(question: string): string {
   if (!question) return "your assignment topic";

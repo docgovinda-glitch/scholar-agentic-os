@@ -45,6 +45,8 @@ export interface SourceLibraryScreenProps {
   onLock?: () => void;
   onResetVault?: () => void;
   onOpenProject?: (projectId: string) => void;
+  onSwitchToProjects?: () => void;
+  projectCount?: number;
 }
 
 type MainTab = "sources" | "settings";
@@ -55,6 +57,8 @@ export default function SourceLibraryScreen({
   onLock,
   onResetVault,
   onOpenProject,
+  onSwitchToProjects,
+  projectCount,
 }: SourceLibraryScreenProps) {
   const [items, setItems] = useState<VaultItem[]>([]);
   const [loading, setLoading] = useState(true);

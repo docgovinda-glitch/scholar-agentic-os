@@ -17,7 +17,14 @@ export default function GlobalSearchModal({ onClose }: { onClose: () => void }) 
 
   useEffect(() => {
     inputRef.current?.focus();
-  }, []);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -77,7 +84,12 @@ export default function GlobalSearchModal({ onClose }: { onClose: () => void }) 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button onClick={onClose} className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close search"
+            className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] cursor-pointer"
+          >
             <kbd className="px-2 py-1 bg-[color:var(--surface-sunken)] rounded text-xs">ESC</kbd>
           </button>
         </div>
@@ -98,7 +110,7 @@ export default function GlobalSearchModal({ onClose }: { onClose: () => void }) 
                     {results.projects.map((p) => (
                       <a 
                         key={p.id}
-                        href={`/?project=${p.id}`}
+                        href={`/projects/${encodeURIComponent(p.id)}`}
                         className="block px-3 py-2 rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)]"
                       >
                         {p.title}

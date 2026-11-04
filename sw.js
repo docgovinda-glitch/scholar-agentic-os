@@ -1,67 +1,178 @@
 /**
- * Service Worker for Scholar Agentic OS PWA
- *
- * Fixed 2026-07-31: two real bugs found while diagnosing a blank-screen
- * report after a production deploy.
- *
- * 1. ASSETS_TO_CACHE referenced /icons/icon-192.png and /icons/icon-512.png,
- *    which don't exist anywhere in this repo (404). cache.addAll() is
- *    all-or-nothing — any single failing request fails the whole install,
- *    so a *fresh* service worker registration was silently failing outright
- *    (confirmed: a clean browser session never got one registered at all).
- *    Removed the nonexistent entries rather than adding icon files that
- *    don't exist yet.
- * 2. Never called self.skipWaiting()/self.clients.claim(), and reused the
- *    same hardcoded CACHE_NAME across every version of this file. A
- *    successfully-installed worker from an old deploy could keep
- *    controlling an already-open tab indefinitely — surviving many
- *    subsequent deploys (and even hard refreshes, which bypass the HTTP
- *    cache but not an already-active service worker) — running whatever
- *    caching logic that old version had, invisible to anyone reading only
- *    the current file. Now claims control immediately on activate, and the
- *    cache name changes whenever this file's cached asset list changes, so
- *    stale caches actually get cleaned up promptly instead of lingering.
+ * Scholar Agentic OS Service Worker — offline support and static asset caching.
+ * Implements cache-first for static assets and network-first for HTML navigation.
+ * Never caches non-GET requests or authenticated /api/* endpoints.
  */
 
-const CACHE_NAME = 'scholar-os-v5';
-const ASSETS_TO_CACHE = [
+const CACHE_VERSION = 'scholar-v2';
+const CACHE_STATIC = `${CACHE_VERSION}-static`;
+const CACHE_DYNAMIC = `${CACHE_VERSION}-dynamic`;
+
+const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/pocket',
 ];
 
-self.addEventListener('install', function(event) {
-  self.skipWaiting();
+const STATIC_EXTENSIONS = ['.js', '.css', '.woff2', '.png', '.svg'];
+
+// Install: cache static shell assets
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(function(cache) { return cache.addAll(ASSETS_TO_CACHE); })
+    caches.open(CACHE_STATIC).then((cache) => {
+      return cache.addAll(STATIC_ASSETS).catch(() => {
+        // Fail gracefully if some assets are unavailable during install
+      });
+    })
   );
+  self.skipWaiting();
 });
 
-self.addEventListener('fetch', function(event) {
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(function() { return caches.match('/index.html'); })
-    );
+// Activate: clean up old caches (including legacy pocket-* caches)
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          const isManaged = cacheName.startsWith('pocket-') || cacheName.startsWith('scholar-');
+          if (isManaged && cacheName !== CACHE_STATIC && cacheName !== CACHE_DYNAMIC) {
+            return caches.delete(cacheName);
+          }
+          return undefined;
+        })
+      );
+    })
+  );
+  self.clients.claim();
+});
+
+// Fetch: implement caching strategy
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+
+  // Never intercept or cache non-GET requests (POST/PUT/DELETE/PATCH)
+  if (request.method !== 'GET') {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then(function(response) {
-      return response || fetch(event.request);
+  const url = new URL(request.url);
+
+  // Skip cross-origin requests
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // Never cache authenticated or dynamic API responses in Service Worker storage
+  if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  // Static assets: cache-first with network fallback
+  if (STATIC_EXTENSIONS.some((ext) => url.pathname.endsWith(ext))) {
+    event.respondWith(cacheFirstStrategy(request, CACHE_STATIC));
+    return;
+  }
+
+  // HTML navigation & other GET requests: network-first with cache fallback
+  event.respondWith(networkFirstStrategy(request, CACHE_DYNAMIC));
+});
+
+/**
+ * Cache-first strategy: try cache, fall back to network.
+ * Best for hashed static assets that change infrequently.
+ */
+function cacheFirstStrategy(request, cacheName) {
+  return caches.match(request).then((response) => {
+    if (response) {
+      return response;
+    }
+    return fetch(request).then((networkResponse) => {
+      if (!networkResponse || networkResponse.status !== 200) {
+        return networkResponse;
+      }
+      const cloned = networkResponse.clone();
+      caches.open(cacheName).then((cache) => {
+        cache.put(request, cloned);
+      });
+      return networkResponse;
+    });
+  });
+}
+
+/**
+ * Network-first strategy: try network, fall back to cache.
+ * Best for HTML navigation shells.
+ */
+function networkFirstStrategy(request, cacheName) {
+  return fetch(request)
+    .then((response) => {
+      if (!response || response.status !== 200) {
+        return response;
+      }
+      const cloned = response.clone();
+      caches.open(cacheName).then((cache) => {
+        cache.put(request, cloned);
+      });
+      return response;
     })
+    .catch(() => {
+      return caches.match(request).then((response) => {
+        if (response) {
+          return response;
+        }
+        return new Response('Offline - cached data unavailable', {
+          status: 503,
+          statusText: 'Service Unavailable',
+        });
+      });
+    });
+}
+
+// Push notifications for Scholar OS Pocket
+self.addEventListener('push', (event) => {
+  if (!event.data) {
+    return;
+  }
+
+  const data = event.data.json();
+  const options = {
+    body: data.body || 'New update in Scholar Agentic OS',
+    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect fill="%23171717" width="192" height="192" rx="36"/><text x="96" y="132" font-size="104" font-family="serif" font-weight="bold" fill="%23FAFAFA" text-anchor="middle">S</text></svg>',
+    badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect fill="%23171717" width="96" height="96" rx="18"/><text x="48" y="66" font-size="52" font-family="serif" font-weight="bold" fill="%23FAFAFA" text-anchor="middle">S</text></svg>',
+    tag: data.tag || 'scholar-notification',
+    requireInteraction: data.requireInteraction || false,
+    data: data.data || {},
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Scholar Agentic OS', options)
   );
 });
 
-self.addEventListener('activate', function(event) {
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const data = event.notification.data || {};
+  let url = '/pocket';
+
+  if (data.url) {
+    url = data.url;
+  } else if (data.tab) {
+    url = `/pocket?tab=${data.tab}`;
+  }
+
   event.waitUntil(
-    caches.keys().then(function(keys) {
-      return Promise.all(
-        keys.filter(function(key) { return key !== CACHE_NAME; })
-          .map(function(key) { return caches.delete(key); })
-      );
-    }).then(function() {
-      return self.clients.claim();
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url === url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(url);
+      }
+      return undefined;
     })
   );
 });

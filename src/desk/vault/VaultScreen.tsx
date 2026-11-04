@@ -3,6 +3,7 @@ import {
   loadVault,
   hasVaultPassphraseOnThisDevice,
   updateVaultStorageMode,
+  resetVault,
   type VaultRecord,
 } from "../../services/userVault";
 import {
@@ -167,7 +168,10 @@ export default function VaultScreen({
         setUnlocked(false);
         setVaultPresence("this-device");
       }}
-      onResetVault={() => setVaultPresence("none")}
+      onResetVault={() => {
+        void resetVault(userId);
+        setVaultPresence("none");
+      }}
     />
   );
 }

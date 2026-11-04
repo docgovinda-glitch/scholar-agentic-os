@@ -420,3 +420,21 @@ export function getReferenceListHeading(style: string): string {
   if (norm.includes("mhra")) return "Bibliography";
   return "Reference List";
 }
+
+/**
+ * Escapes untrusted text for HTML contexts and converts markdown italics (*text*)
+ * into safe <i>text</i> tags.
+ */
+export function escapeHtml(str: string): string {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export function formatReferenceHtml(entry: string): string {
+  const escaped = escapeHtml(entry);
+  return escaped.replace(/\*([^*]+)\*/g, "<i>$1</i>");
+}

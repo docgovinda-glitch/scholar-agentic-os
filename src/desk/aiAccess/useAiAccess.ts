@@ -191,7 +191,11 @@ export function useAiAccess() {
       // The key goes to our server once, transiently, so the provider check
       // happens server-side (no CORS surprises, and no key in a URL). It is
       // never persisted there — see server/routes/aiAccess.ts.
-      const verification: VerifyKeyResult = await verifyProviderKey(input.providerId, input.apiKey).catch((e) => ({
+      const verification: VerifyKeyResult = await (
+        input.baseUrl
+          ? verifyProviderKey(input.providerId, input.apiKey, input.baseUrl)
+          : verifyProviderKey(input.providerId, input.apiKey)
+      ).catch((e) => ({
         ok: false,
         error: (e as Error).message,
       }));

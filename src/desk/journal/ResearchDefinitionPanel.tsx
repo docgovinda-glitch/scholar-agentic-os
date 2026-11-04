@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { saveIntakeAnswers } from "../api";
 import type { ProjectView } from "../types";
-import { Sparkles, Save, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { Save, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 
 interface ResearchDefinitionPanelProps {
   projectId: string;
@@ -12,35 +13,24 @@ export default function ResearchDefinitionPanel({ projectId, project, onSaved }:
   const [objectives, setObjectives] = useState(project.answers?.["objectives"] || "");
   const [questions, setQuestions] = useState(project.answers?.["questions"] || "");
   const [methodology, setMethodology] = useState(project.answers?.["methodology"] || "");
-  
+
   const [busy, setBusy] = useState(false);
-  const [validating, setValidating] = useState(false);
-  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
-  
+  const [status, setStatus] = useState<{ kind: "saved" | "error"; message: string } | null>(null);
+
   async function handleSave() {
     setBusy(true);
+    setStatus(null);
     try {
-      // Stub for actual API call, replacing saveIntakeAnswers
-      // In a real implementation this would map to the new normalized schema
-      const updated = { ...project, answers: { objectives, questions, methodology } };
+      const updated = await saveIntakeAnswers(projectId, { objectives, questions, methodology });
       onSaved(updated);
-      setAiFeedback(null); // Clear previous feedback on save
+      setStatus({ kind: "saved", message: "Definition saved." });
+    } catch (err) {
+      setStatus({
+        kind: "error",
+        message: err instanceof Error ? err.message : "Could not save your definition. Please try again.",
+      });
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function handleValidate() {
-    if (!objectives || !questions || !methodology) return;
-    setValidating(true);
-    try {
-      // Simulate AI validation delay
-      await new Promise(r => setTimeout(r, 1500));
-      setAiFeedback(
-        "Strong foundation. The objectives align well with the methodology. Consider narrowing the scope of Research Question 2 to be more testable."
-      );
-    } finally {
-      setValidating(false);
     }
   }
 
@@ -57,10 +47,14 @@ export default function ResearchDefinitionPanel({ projectId, project, onSaved }:
 
       <div className="grid gap-6">
         <div className="rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-6 transition-all duration-200">
-          <label className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider font-sans">
+          <label
+            htmlFor="research-def-objectives"
+            className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider font-sans"
+          >
             Research Objectives
           </label>
           <textarea
+            id="research-def-objectives"
             rows={3}
             value={objectives}
             onChange={(e) => setObjectives(e.target.value)}
@@ -70,10 +64,14 @@ export default function ResearchDefinitionPanel({ projectId, project, onSaved }:
         </div>
 
         <div className="rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-6 transition-all duration-200">
-          <label className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider font-sans">
+          <label
+            htmlFor="research-def-questions"
+            className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider font-sans"
+          >
             Core Questions
           </label>
           <textarea
+            id="research-def-questions"
             rows={3}
             value={questions}
             onChange={(e) => setQuestions(e.target.value)}
@@ -83,10 +81,14 @@ export default function ResearchDefinitionPanel({ projectId, project, onSaved }:
         </div>
 
         <div className="rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-6 transition-all duration-200">
-          <label className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider font-sans">
+          <label
+            htmlFor="research-def-methodology"
+            className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider font-sans"
+          >
             Methodology & Approach
           </label>
           <textarea
+            id="research-def-methodology"
             rows={3}
             value={methodology}
             onChange={(e) => setMethodology(e.target.value)}
@@ -95,32 +97,24 @@ export default function ResearchDefinitionPanel({ projectId, project, onSaved }:
           />
         </div>
 
-        {aiFeedback && (
-          <div className="rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 shadow-[var(--shadow-card)]">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-[var(--text-primary)]/10 flex items-center justify-center shrink-0">
-                <Sparkles className="w-4 h-4 text-[var(--text-primary)]" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-[var(--text-primary)] mb-1 font-sans">AI Research Architect</h4>
-                <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-sans">{aiFeedback}</p>
-              </div>
-            </div>
+        {status && (
+          <div
+            role={status.kind === "error" ? "alert" : "status"}
+            className="rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] p-4 shadow-[var(--shadow-card)] flex items-center gap-3 text-sm text-[var(--text-primary)] font-sans"
+          >
+            {status.kind === "error" ? (
+              <AlertCircle className="w-4 h-4 text-[var(--text-primary)] shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-[var(--text-primary)] shrink-0" />
+            )}
+            <span>{status.message}</span>
           </div>
         )}
       </div>
 
       <div className="mt-8 flex items-center justify-end gap-4 border-t border-[var(--border-subtle)] pt-6">
         <button
-          onClick={handleValidate}
-          disabled={validating || !objectives || !questions || !methodology}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-primary)] font-medium text-xs shadow-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-sans cursor-pointer"
-        >
-          {validating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-[var(--text-primary)]" />}
-          Validate Design
-        </button>
-
-        <button
+          type="button"
           onClick={handleSave}
           disabled={busy}
           className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-[var(--bg-button-primary)] text-[var(--text-button)] hover:opacity-90 font-medium text-xs shadow-sm transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed font-sans cursor-pointer"

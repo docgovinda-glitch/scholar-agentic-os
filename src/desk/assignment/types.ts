@@ -625,6 +625,45 @@ export const CITATION_STYLES = [
   { id: "vancouver", name: "Vancouver (Numbered in-text)" },
 ];
 
+export const ACADEMIC_LEVEL_OPTIONS: { id: AcademicLevel; label: string }[] = [
+  { id: "high_school", label: "High School" },
+  { id: "undergraduate", label: "Undergraduate" },
+  { id: "postgraduate", label: "Postgraduate" },
+  { id: "doctoral", label: "Doctoral" },
+];
+
+export const ASSIGNMENT_TYPE_OPTIONS: { id: AssignmentType; label: string }[] = [
+  { id: "essay", label: "Essay" },
+  { id: "literature_review", label: "Literature Review" },
+  { id: "research_paper", label: "Research Paper" },
+  { id: "case_study", label: "Case Study" },
+  { id: "report", label: "Report" },
+  { id: "critical_essay", label: "Critical Essay" },
+  { id: "argumentative_essay", label: "Argumentative Essay" },
+  { id: "policy_analysis", label: "Policy Analysis" },
+  { id: "business_assignment", label: "Business Assignment" },
+];
+
+export const STAGE_CITATION_STYLES = [
+  { id: "apa7", name: "APA 7th" },
+  { id: "mla9", name: "MLA 9th" },
+  { id: "chicago", name: "Chicago" },
+  { id: "harvard", name: "Harvard" },
+  { id: "ieee", name: "IEEE" },
+  { id: "vancouver", name: "Vancouver" },
+];
+
+export const WRITING_TONE_OPTIONS: { id: string; label: string }[] = [
+  { id: "formal_academic", label: "Formal Academic" },
+  { id: "analytical", label: "Analytical" },
+  { id: "persuasive", label: "Persuasive" },
+  { id: "objective", label: "Objective" },
+  { id: "critical", label: "Critical" },
+  { id: "conversational_academic", label: "Conversational Academic" },
+];
+
+export const AGENTIC_THINKING_STAGES = ["Your AI is reading the brief and writing the outline…"];
+
 export const COMMON_COMMAND_VERBS: Record<string, { definition: string; keyAction: string }> = {
   "critically discuss": {
     definition: "Give a balanced and reasoned argument investigating different viewpoints, with substantiated evaluation of strengths and flaws.",

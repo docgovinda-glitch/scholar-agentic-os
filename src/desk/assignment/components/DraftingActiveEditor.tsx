@@ -210,7 +210,7 @@ export function DraftingActiveEditor({
     const el = textareaRef.current;
     if (!el || isZenMode) return;
     el.style.height = "auto";
-    el.style.height = `${Math.max(el.scrollHeight, Math.round(window.innerHeight * 0.6))}px`;
+    el.style.height = `${Math.max(el.scrollHeight, Math.round(window.innerHeight * 0.68))}px`;
   }, [manualText, isEditingManually, isZenMode]);
 
   // Writer's Block Nudge Effect
@@ -935,7 +935,7 @@ export function DraftingActiveEditor({
       <main
         tabIndex={0}
         aria-label="Section Content"
-        className="flex-1 p-4 sm:p-6 min-h-[60vh] focus:outline-none"
+        className="flex-1 p-5 sm:p-8 lg:p-10 min-h-[68vh] focus:outline-none"
       >
         {isEditingManually ? (
           <div className="space-y-3 h-full flex flex-col">
@@ -1058,9 +1058,9 @@ export function DraftingActiveEditor({
               value={manualText}
               onChange={handleManualTextChange}
               placeholder="Write or refine your academic section prose here..."
-              rows={16}
+              rows={18}
               aria-label="Section text"
-              className="w-full flex-1 min-h-[60vh] p-5 text-base leading-relaxed text-neutral-900 dark:text-neutral-100 bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 resize-none overflow-hidden font-sans transition-colors"
+              className="w-full flex-1 min-h-[68vh] p-6 sm:p-8 text-base leading-relaxed text-neutral-900 dark:text-neutral-100 bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/20 resize-none overflow-hidden font-sans transition-colors"
             />
 
             <div className="flex justify-between items-center text-xs text-neutral-500 dark:text-neutral-400 px-1 pt-1">
