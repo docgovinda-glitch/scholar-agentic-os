@@ -12,11 +12,12 @@ export async function executeAgenticQuery(
   const payload = {
     prompt: req.prompt,
     systemPrompt: req.systemPrompt,
-    mode: req.mode && req.mode !== "normal" ? req.mode : undefined,
+    mode: req.mode,
     citationStyle: req.citationStyle,
     files: req.files,
     images: req.images,
     history: req.history,
+    vaultSources: req.vaultSources,
   };
 
   const res = await authedJsonFetch("/api/ai/agent", "POST", payload);

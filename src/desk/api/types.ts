@@ -52,6 +52,14 @@ export interface AiOperationalStatus {
   }>;
 }
 
+export interface ResearchStageTelemetry {
+  id: "planning" | "discovery" | "retrieval" | "analysis" | "iteration" | "synthesis" | "followup";
+  label: string;
+  status: "completed" | "skipped";
+  summary: string;
+  sourcesCount?: number;
+}
+
 export interface AgenticQueryRequest {
   prompt: string;
   systemPrompt?: string;
@@ -60,6 +68,16 @@ export interface AgenticQueryRequest {
   files?: Array<{ name: string; text?: string; content?: string; type?: string; size?: number }>;
   images?: Array<{ data?: string; dataUrl?: string; mimeType?: string; name?: string }>;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
+  vaultSources?: Array<{
+    id?: string;
+    title: string;
+    authors?: string[];
+    year?: number | string;
+    doi?: string;
+    url?: string;
+    venue?: string;
+    notes?: string;
+  }>;
   onChunk?: (chunk: string) => void;
 }
 
@@ -70,6 +88,7 @@ export interface AgenticQueryResponse {
   provider?: string;
   model?: string;
   plan?: string[];
+  stages?: ResearchStageTelemetry[];
   citations?: Array<{
     title?: string;
     url?: string;

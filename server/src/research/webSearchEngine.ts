@@ -21,20 +21,86 @@ export interface SearchResultItem {
   snippet: string;
   domain: string;
   publisher?: string;
-  sourceType: "official" | "scholarly" | "media" | "web";
+  sourceType: "official" | "scholarly" | "media" | "web" | "vault";
   authorityTier: SourceAuthorityTier;
   authorityBadge: string;
   score: number;
   publishedDate?: string;
+  year?: number | string;
   author?: string;
+  authors?: string[];
+  doi?: string;
+  venue?: string;
   isPrimary?: boolean;
 }
 
 export interface WebSearchResponse {
   query: string;
+  queriesExecuted?: string[];
   results: SearchResultItem[];
   retrievedAt: string;
   totalEvaluated: number;
+}
+
+/**
+ * Neutralizes prompt-injection patterns in untrusted external webpage or document content
+ * so retrieved text is strictly treated as passive evidence, never as system instructions.
+ */
+export function sanitizeUntrustedExternalText(raw: string): string {
+  if (!raw) return "";
+  return raw
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<\s*\/?\s*(?:system|instruction|prompt|assistant|developer|tool_call)\b[^>]*>/gi, "[filtered-tag]")
+    .replace(/(?:ignore|disregard|forget)\s+(?:all\s+)?(?:previous|prior|above|system)\s+(?:instructions|prompts|rules|directives)/gi, "[filtered-directive]")
+    .replace(/(?:<\|im_start\|>|<\|im_end\|>|<\|endoftext\|>|\[INST\]|\[\/INST\]|<<SYS>>|<\/SYS>>)/gi, " ")
+    .trim();
+}
+
+/**
+ * Extracts structured metadata (publication date, author, site publisher, and article body)
+ * from raw webpage HTML before stripping tags.
+ */
+export function extractPageMetadataFromHtml(html: string): {
+  publishedDate?: string;
+  author?: string;
+  siteName?: string;
+  articleHtml?: string;
+} {
+  if (!html) return {};
+
+  const dateMatch =
+    html.match(/<meta[^>]+(?:property|name)=["'](?:article:published_time|pubdate|publishdate|date|dc\.date|dcterms\.created|sailthru\.date)["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:article:published_time|pubdate|publishdate|date|dc\.date)["']/i) ||
+    html.match(/["']datePublished["']\s*:\s*["'](\d{4}-\d{2}-\d{2}[^"']*)["']/i) ||
+    html.match(/<time[^>]+datetime=["'](\d{4}-\d{2}-\d{2}[^"']*)["']/i);
+
+  let publishedDate: string | undefined;
+  if (dateMatch?.[1]) {
+    const yearMatch = dateMatch[1].match(/\b(19\d{2}|20[0-2]\d)\b/);
+    const isoMatch = dateMatch[1].match(/(\d{4}-\d{2}-\d{2})/);
+    publishedDate = isoMatch ? isoMatch[1] : yearMatch ? yearMatch[1] : undefined;
+  }
+
+  const authorMatch =
+    html.match(/<meta[^>]+(?:name|property)=["'](?:author|article:author|dc\.creator)["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/content=["']([^"']+)["'][^>]+(?:name|property)=["'](?:author|dc\.creator)["']/i);
+  const author = authorMatch?.[1]?.trim();
+
+  const siteMatch =
+    html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/content=["']([^"']+)["'][^>]+property=["']og:site_name["']/i);
+  const siteName = siteMatch?.[1]?.trim();
+
+  const articleMatch =
+    html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i) ||
+    html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i);
+
+  return {
+    publishedDate,
+    author: author && author.length < 80 && !author.startsWith("http") ? author : undefined,
+    siteName: siteName && siteName.length < 60 ? siteName : undefined,
+    articleHtml: articleMatch?.[1],
+  };
 }
 
 /**
@@ -43,13 +109,14 @@ export interface WebSearchResponse {
 export function cleanHtmlToText(html: string, maxLength = 8000): string {
   if (!html) return "";
 
-  // 1. Remove script, style, nav, footer, header, svg, noscript tags and contents
+  // 1. Remove script, style, nav, footer, header, aside, svg, noscript tags and contents
   let text = html
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, " ")
     .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, " ")
     .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, " ")
     .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, " ")
     .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, " ")
+    .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, " ")
     .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, " ")
     .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, " ");
 
@@ -67,14 +134,17 @@ export function cleanHtmlToText(html: string, maxLength = 8000): string {
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&#039;/g, "'")
     .replace(/&mdash;/g, "—")
     .replace(/&ndash;/g, "–");
 
-  // 4. Normalize multiple whitespaces and excessive newlines
-  text = text
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n\s*\n\s*\n+/g, "\n\n")
-    .trim();
+  // 4. Normalize multiple whitespaces and excessive newlines & sanitize prompt injections
+  text = sanitizeUntrustedExternalText(
+    text
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n\s*\n\s*\n+/g, "\n\n")
+      .trim()
+  );
 
   return text.length > maxLength ? text.slice(0, maxLength) + "..." : text;
 }
@@ -102,6 +172,8 @@ function resolvePublisherName(domain: string, title?: string): string {
   if (d.includes("imf.org")) return "International Monetary Fund";
   if (d.includes("oecd.org")) return "OECD";
   if (d.includes("wto.org")) return "World Trade Organization";
+  if (d.includes("adb.org")) return "Asian Development Bank";
+  if (d.includes("saarc-sec.org")) return "SAARC Secretariat";
   if (d.includes("nature.com")) return "Nature Portfolio";
   if (d.includes("science.org")) return "Science / AAAS";
   if (d.includes("thelancet.com")) return "The Lancet";
@@ -120,8 +192,31 @@ function resolvePublisherName(domain: string, title?: string): string {
   if (d.includes("economist.com")) return "The Economist";
   if (d.includes("wsj.com")) return "The Wall Street Journal";
   if (d.includes("nytimes.com")) return "The New York Times";
+  if (d.includes("washingtonpost.com")) return "The Washington Post";
+  if (d.includes("aljazeera.com")) return "Al Jazeera";
+  if (d.includes("kathmandupost.com")) return "The Kathmandu Post";
+  if (d.includes("thehindu.com")) return "The Hindu";
+  if (d.includes("indianexpress.com")) return "The Indian Express";
+  if (d.includes("himalayantimes.com")) return "The Himalayan Times";
+  if (d.includes("nepalitimes.com")) return "Nepali Times";
+  if (d.includes("myrepublica.nagariknetwork.com")) return "MyRepublica";
+  if (d.includes("thediplomat.com")) return "The Diplomat";
+  if (d.includes("foreignaffairs.com")) return "Foreign Affairs";
+  if (d.includes("foreignpolicy.com")) return "Foreign Policy";
+  if (d.includes("brookings.edu")) return "Brookings Institution";
+  if (d.includes("cfr.org")) return "Council on Foreign Relations";
+  if (d.includes("chathamhouse.org")) return "Chatham House";
+  if (d.includes("carnegieendowment.org")) return "Carnegie Endowment for International Peace";
+  if (d.includes("crisisgroup.org")) return "International Crisis Group";
+  if (d.includes("sipri.org")) return "SIPRI";
+  if (d.includes("orfonline.org")) return "Observer Research Foundation (ORF)";
+  if (d.includes("icwa.in")) return "Indian Council of World Affairs (ICWA)";
+  if (d.includes("idsa.in")) return "Manohar Parrikar IDSA";
   if (d.includes("wikipedia.org")) return "Wikipedia Foundation";
+  if (d.includes("mofa.gov.np")) return "Ministry of Foreign Affairs, Nepal";
+  if (d.includes("mea.gov.in")) return "Ministry of External Affairs, India";
   if (d.includes("gov.np")) return "Government of Nepal";
+  if (d.includes("gov.in")) return "Government of India";
   if (d.includes("gov.uk")) return "UK Government Portal";
 
   // Infer publisher from title suffix if standard e.g. "Title - The New York Times"
@@ -163,7 +258,7 @@ export function evaluateSourceAuthority(
   // Detect publication year from text if not provided
   let detectedYear = year ? String(year) : undefined;
   if (!detectedYear) {
-    const yearMatch = (title + " " + snippet).match(/\b(201[89]|202[0-6])\b/);
+    const yearMatch = (title + " " + snippet).match(/\b(19[5-9]\d|20[0-2]\d)\b/);
     if (yearMatch) {
       detectedYear = yearMatch[1];
     }
@@ -175,6 +270,7 @@ export function evaluateSourceAuthority(
     domain.includes(".gov.") ||
     domain.endsWith(".mil") ||
     domain.endsWith(".fed.us") ||
+    domain.endsWith(".int") ||
     domain === "europa.eu" ||
     domain.endsWith(".europa.eu");
 
@@ -186,10 +282,17 @@ export function evaluateSourceAuthority(
     "oecd.org",
     "wto.org",
     "unesco.org",
+    "unicef.org",
+    "undp.org",
+    "unhcr.org",
     "iaea.org",
     "wipo.int",
     "ilo.org",
     "fao.org",
+    "adb.org",
+    "saarc-sec.org",
+    "ipcc.ch",
+    "icj-cij.org",
   ].some((d) => domain === d || domain.endsWith("." + d));
 
   if (isGovDomain || isIntergovernmental) {
@@ -214,6 +317,7 @@ export function evaluateSourceAuthority(
     "thelancet.com",
     "nejm.org",
     "bmj.com",
+    "jamanetwork.com",
     "ieee.org",
     "acm.org",
     "arxiv.org",
@@ -227,12 +331,15 @@ export function evaluateSourceAuthority(
     "sciencedirect.com",
     "springer.com",
     "wiley.com",
+    "tandfonline.com",
+    "sagepub.com",
     "jstor.org",
     "oup.com",
     "cambridge.org",
     "plos.org",
     "frontiersin.org",
     "europepmc.org",
+    "semanticscholar.org",
     "ssrn.com",
     "pnas.org",
   ].some((d) => domain === d || domain.endsWith("." + d));
@@ -250,7 +357,43 @@ export function evaluateSourceAuthority(
     };
   }
 
-  // TIER B: High-Credibility Global News & Policy Think Tanks
+  // TIER B: Policy Think Tanks & Strategic Research Institutions
+  const isPolicyThinkTank = [
+    "brookings.edu",
+    "pewresearch.org",
+    "cfr.org",
+    "chathamhouse.org",
+    "csis.org",
+    "rand.org",
+    "carnegieendowment.org",
+    "crisisgroup.org",
+    "sipri.org",
+    "iiss.org",
+    "nber.org",
+    "orfonline.org",
+    "icwa.in",
+    "idsa.in",
+    "cepr.org",
+    "bruegel.org",
+    "lowyinstitute.org",
+    "foreignaffairs.com",
+    "foreignpolicy.com",
+  ].some((d) => domain === d || domain.endsWith("." + d));
+
+  if (isPolicyThinkTank) {
+    return {
+      domain,
+      publisher,
+      sourceType: "official",
+      authorityTier: "B",
+      authorityBadge: "Policy & Strategic Institute",
+      score: 85,
+      isPrimary: false,
+      publishedDate: detectedYear,
+    };
+  }
+
+  // TIER B: High-Credibility Global & Regional News Organizations
   const isReputableMedia = [
     "reuters.com",
     "apnews.com",
@@ -264,15 +407,21 @@ export function evaluateSourceAuthority(
     "nytimes.com",
     "washingtonpost.com",
     "aljazeera.com",
+    "dw.com",
+    "france24.com",
     "npr.org",
+    "pbs.org",
     "time.com",
     "afp.com",
-    "brookings.edu",
-    "pewresearch.org",
-    "cfr.org",
-    "chathamhouse.org",
-    "csis.org",
-    "rand.org",
+    "thehindu.com",
+    "indianexpress.com",
+    "kathmandupost.com",
+    "himalayantimes.com",
+    "nepalitimes.com",
+    "myrepublica.nagariknetwork.com",
+    "thediplomat.com",
+    "scmp.com",
+    "nikkei.com",
   ].some((d) => domain === d || domain.endsWith("." + d));
 
   if (isReputableMedia) {
@@ -542,6 +691,10 @@ export async function searchScholarlySources(query: string, maxResults = 4): Pro
         snippet,
         domain: auth.domain,
         publisher: r.venue || auth.publisher,
+        venue: r.venue,
+        doi: r.doi,
+        year: r.year,
+        authors: r.authors,
         sourceType: "scholarly" as const,
         authorityTier: "A" as const,
         authorityBadge: "Scholarly index (OpenAlex)",
@@ -557,6 +710,214 @@ export async function searchScholarlySources(query: string, maxResults = 4): Pro
 }
 
 /**
+ * Search Google News RSS feed for real-time international, diplomatic, policy, and current-affairs sources.
+ * Requires zero API keys and returns verified publication dates and publisher attributions.
+ */
+export async function searchGoogleNewsRss(query: string, maxResults = 5): Promise<SearchResultItem[]> {
+  try {
+    const clean = query.replace(/[?.,!]/g, " ").trim();
+    if (!clean) return [];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+
+    const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(clean)}&hl=en-US&gl=US&ceid=US:en`;
+    const res = await fetch(rssUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; ScholarCoreResearchBot/2.0)",
+        Accept: "application/rss+xml, application/xml, text/xml",
+      },
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timer));
+
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const itemBlocks = xml.split(/<item>/i).slice(1, maxResults + 2);
+    const items: SearchResultItem[] = [];
+
+    for (const block of itemBlocks) {
+      if (items.length >= maxResults) break;
+      const rawTitle = block.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || "";
+      const rawLink = block.match(/<link>([\s\S]*?)<\/link>/i)?.[1]?.trim() || "";
+      const rawPubDate = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/i)?.[1]?.trim() || "";
+      const sourceMatch = block.match(/<source\s+url=["']([^"']+)["'][^>]*>([\s\S]*?)<\/source>/i);
+      const rawDesc = block.match(/<description>([\s\S]*?)<\/description>/i)?.[1] || "";
+
+      const publisherUrl = sourceMatch?.[1]?.trim() || rawLink;
+      const publisherName = cleanHtmlToText(sourceMatch?.[2] || "", 80);
+      let title = cleanHtmlToText(rawTitle.replace(/<!\[CDATA\[|\]\]>/g, ""), 200);
+      if (publisherName && title.endsWith(` - ${publisherName}`)) {
+        title = title.slice(0, -(` - ${publisherName}`.length)).trim();
+      }
+      const snippetText = cleanHtmlToText(rawDesc.replace(/<!\[CDATA\[|\]\]>/g, ""), 360) || title;
+
+      let isoDate: string | undefined;
+      let yearNum: number | undefined;
+      if (rawPubDate) {
+        const parsedDate = new Date(rawPubDate);
+        if (!isNaN(parsedDate.getTime())) {
+          isoDate = parsedDate.toISOString().split("T")[0];
+          yearNum = parsedDate.getUTCFullYear();
+        }
+      }
+
+      const effectiveUrl = rawLink || publisherUrl;
+      if (!title || !effectiveUrl.startsWith("http")) continue;
+
+      const auth = evaluateSourceAuthority(publisherUrl || effectiveUrl, title, snippetText, yearNum);
+      items.push({
+        title,
+        url: effectiveUrl,
+        snippet: `${snippetText}${publisherName ? ` (Published by ${publisherName}${isoDate ? ` on ${isoDate}` : ""})` : ""}`,
+        domain: auth.domain,
+        publisher: publisherName || auth.publisher,
+        sourceType: auth.sourceType === "web" ? "media" : auth.sourceType,
+        authorityTier: auth.authorityTier === "C" ? "B" : auth.authorityTier,
+        authorityBadge: auth.authorityBadge === "Verified Web" ? "Verified News / Current Affairs" : auth.authorityBadge,
+        score: Math.max(auth.score, 78),
+        isPrimary: auth.isPrimary,
+        publishedDate: isoDate || auth.publishedDate,
+        year: yearNum || auth.publishedDate,
+        author: publisherName || auth.publisher,
+        authors: publisherName ? [publisherName] : undefined,
+      });
+    }
+
+    return items;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Optional modular external search API adapter (Tavily / Serper / Brave Search)
+ * when environment keys are configured on the server.
+ */
+export async function searchConfiguredWebApi(query: string, maxResults = 6): Promise<SearchResultItem[]> {
+  const tavilyKey = process.env.TAVILY_API_KEY?.trim();
+  const serperKey = process.env.SERPER_API_KEY?.trim();
+  const braveKey = process.env.BRAVE_SEARCH_API_KEY?.trim();
+
+  if (tavilyKey) {
+    try {
+      const res = await fetch("https://api.tavily.com/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: tavilyKey,
+          query,
+          search_depth: "advanced",
+          max_results: maxResults,
+        }),
+        signal: AbortSignal.timeout(6500),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as {
+          results?: Array<{ title?: string; url?: string; content?: string; published_date?: string }>;
+        };
+        return (data.results ?? [])
+          .filter((r): r is { title: string; url: string; content?: string; published_date?: string } => Boolean(r.title && r.url))
+          .map((r) => {
+            const snippet = cleanHtmlToText(r.content || "", 500);
+            const auth = evaluateSourceAuthority(r.url, r.title, snippet, r.published_date);
+            return {
+              title: r.title,
+              url: r.url,
+              snippet,
+              domain: auth.domain,
+              publisher: auth.publisher,
+              sourceType: auth.sourceType,
+              authorityTier: auth.authorityTier,
+              authorityBadge: auth.authorityBadge,
+              score: auth.score + 5,
+              isPrimary: auth.isPrimary,
+              publishedDate: r.published_date || auth.publishedDate,
+            };
+          });
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  if (serperKey) {
+    try {
+      const res = await fetch("https://google.serper.dev/search", {
+        method: "POST",
+        headers: { "X-API-KEY": serperKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ q: query, num: maxResults }),
+        signal: AbortSignal.timeout(6000),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as {
+          organic?: Array<{ title?: string; link?: string; snippet?: string; date?: string }>;
+        };
+        return (data.organic ?? [])
+          .filter((r): r is { title: string; link: string; snippet?: string; date?: string } => Boolean(r.title && r.link))
+          .map((r) => {
+            const snippet = cleanHtmlToText(r.snippet || "", 400);
+            const auth = evaluateSourceAuthority(r.link, r.title, snippet, r.date);
+            return {
+              title: r.title,
+              url: r.link,
+              snippet,
+              domain: auth.domain,
+              publisher: auth.publisher,
+              sourceType: auth.sourceType,
+              authorityTier: auth.authorityTier,
+              authorityBadge: auth.authorityBadge,
+              score: auth.score + 4,
+              isPrimary: auth.isPrimary,
+              publishedDate: r.date || auth.publishedDate,
+            };
+          });
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  if (braveKey) {
+    try {
+      const res = await fetch(
+        `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${maxResults}`,
+        {
+          headers: { Accept: "application/json", "X-Subscription-Token": braveKey },
+          signal: AbortSignal.timeout(6000),
+        }
+      );
+      if (res.ok) {
+        const data = (await res.json()) as {
+          web?: { results?: Array<{ title?: string; url?: string; description?: string; page_age?: string }> };
+        };
+        return (data.web?.results ?? [])
+          .filter((r): r is { title: string; url: string; description?: string; page_age?: string } => Boolean(r.title && r.url))
+          .map((r) => {
+            const snippet = cleanHtmlToText(r.description || "", 400);
+            const auth = evaluateSourceAuthority(r.url, r.title, snippet, r.page_age);
+            return {
+              title: r.title,
+              url: r.url,
+              snippet,
+              domain: auth.domain,
+              publisher: auth.publisher,
+              sourceType: auth.sourceType,
+              authorityTier: auth.authorityTier,
+              authorityBadge: auth.authorityBadge,
+              score: auth.score + 4,
+              isPrimary: auth.isPrimary,
+              publishedDate: r.page_age || auth.publishedDate,
+            };
+          });
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  return [];
+}
+
+/**
  * Generate targeted multi-vector search queries from user inquiry.
  */
 export function generateMultiVectorQueries(query: string): string[] {
@@ -566,54 +927,59 @@ export function generateMultiVectorQueries(query: string): string[] {
   const currentYear = new Date().getFullYear();
   const lower = clean.toLowerCase();
 
-  // If query is time-sensitive or asks about recent status/events/economic metrics, add current temporal anchor
-  const hasTimeKeyword = /latest|current|recent|today|now|newest|update|status|who is|election|gdp|inflation|rate|price|market/i.test(lower);
+  // If query is time-sensitive or asks about recent status/events/diplomatic/economic metrics, add current temporal anchor
+  const hasTimeKeyword = /latest|current|recent|today|now|newest|update|developments|status|who is|election|summit|relations|bilateral|gdp|inflation|rate|price|market/i.test(lower);
   if (hasTimeKeyword && !lower.includes(String(currentYear))) {
     queries.push(`${clean} ${currentYear}`);
   }
 
-  // Generate official/primary domain targeted query if inquiry looks factual/regulatory/economic
-  const hasOfficialTopic = /gdp|inflation|policy|law|regulation|minister|president|statistic|treaty|health|vaccine/i.test(lower);
+  // Generate official/primary domain targeted query if inquiry looks factual/regulatory/diplomatic/economic
+  const hasOfficialTopic = /gdp|inflation|policy|law|regulation|minister|president|statistic|treaty|bilateral|diplomatic|relations|border|trade|hydropower|agreement|health|vaccine/i.test(lower);
   if (hasOfficialTopic) {
-    queries.push(`${clean} official report government`);
+    queries.push(`${clean} official report statement`);
   }
 
   return Array.from(new Set(queries)).slice(0, 3);
 }
 
 /**
- * Primary Unified Web Search: executes multi-vector search, ranks by authority & recency,
- * and fetches deep page content for top results.
+ * Primary Unified Web Search: executes multi-vector search across live web, news, official portals,
+ * and scholarly indices; ranks by authority & recency; and fetches deep page content via safeFetchHtml.
  */
 export async function executeWebSearch(
   query: string,
   options: { maxResults?: number; fetchFullContent?: boolean } = {}
 ): Promise<WebSearchResponse> {
-  const maxResults = options.maxResults ?? 6;
+  const maxResults = options.maxResults ?? 8;
   const effectiveQuery = query.trim();
   const multiQueries = generateMultiVectorQueries(effectiveQuery);
 
-  // Run DuckDuckGo across multi-vector queries concurrently
-  const searchPromises: Promise<SearchResultItem[]>[] = multiQueries.map((q) => searchDuckDuckGo(q, 6));
-
-  // Run academic and encyclopedic searches concurrently
-  searchPromises.push(searchWikipedia(effectiveQuery, 3));
-  searchPromises.push(searchCrossRef(effectiveQuery, 3));
-  searchPromises.push(searchScholarlySources(effectiveQuery, 3));
+  // Run configured API + DuckDuckGo across multi-vector queries concurrently
+  const searchPromises: Promise<SearchResultItem[]>[] = [
+    searchConfiguredWebApi(effectiveQuery, maxResults),
+    ...multiQueries.map((q) => searchDuckDuckGo(q, 6)),
+    searchGoogleNewsRss(effectiveQuery, 5),
+    searchWikipedia(effectiveQuery, 3),
+    searchCrossRef(effectiveQuery, 3),
+    searchScholarlySources(effectiveQuery, 3),
+  ];
 
   const allBatchResults = await Promise.all(searchPromises);
   const flattened = allBatchResults.flat();
 
-  // Deduplicate results by normalized URL
+  // Deduplicate results by normalized URL and normalized title
   const seenUrls = new Set<string>();
+  const seenTitles = new Set<string>();
   const uniqueItems: SearchResultItem[] = [];
 
   for (const item of flattened) {
     try {
       const parsed = new URL(item.url);
-      const normalized = parsed.hostname.toLowerCase() + parsed.pathname.replace(/\/+$/, "");
-      if (!seenUrls.has(normalized)) {
-        seenUrls.add(normalized);
+      const normalizedUrl = parsed.hostname.toLowerCase() + parsed.pathname.replace(/\/+$/, "");
+      const normalizedTitle = item.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      if (!seenUrls.has(normalizedUrl) && (!normalizedTitle || !seenTitles.has(normalizedTitle))) {
+        seenUrls.add(normalizedUrl);
+        if (normalizedTitle) seenTitles.add(normalizedTitle);
         uniqueItems.push(item);
       }
     } catch {
@@ -621,8 +987,8 @@ export async function executeWebSearch(
     }
   }
 
-  // Score and Rank: Prioritize Tier A (Gov & Peer-Reviewed) and Tier B (Reputable News)
-  const isTimeSensitive = /latest|current|recent|today|now|202[4-6]/i.test(effectiveQuery);
+  // Score and Rank: Prioritize Tier A (Gov & Peer-Reviewed) and Tier B (Think Tanks & Reputable News)
+  const isTimeSensitive = /latest|current|recent|today|now|developments|update|202[4-6]/i.test(effectiveQuery);
   const currentYear = new Date().getFullYear();
 
   const rankedItems = uniqueItems.map((item) => {
@@ -630,10 +996,11 @@ export async function executeWebSearch(
 
     // Recency bonus for time-sensitive questions
     if (item.publishedDate) {
-      const y = parseInt(item.publishedDate, 10);
+      const yearMatch = String(item.publishedDate).match(/\b(19\d{2}|20[0-2]\d)\b/);
+      const y = yearMatch ? parseInt(yearMatch[1], 10) : parseInt(String(item.publishedDate), 10);
       if (!isNaN(y)) {
-        if (y === currentYear) finalScore += isTimeSensitive ? 15 : 6;
-        else if (y === currentYear - 1) finalScore += isTimeSensitive ? 8 : 4;
+        if (y === currentYear || y === currentYear - 1) finalScore += isTimeSensitive ? 16 : 6;
+        else if (y === currentYear - 2) finalScore += isTimeSensitive ? 8 : 4;
         else if (y < currentYear - 5 && isTimeSensitive) finalScore -= 10;
       }
     }
@@ -648,16 +1015,29 @@ export async function executeWebSearch(
 
   const selected = rankedItems.slice(0, maxResults);
 
-  // If full content is requested, safely fetch the top 2 web pages
+  // If full content is requested, safely fetch & parse the top 4 web pages via SSRF-guarded safeFetchHtml
   if (options.fetchFullContent && selected.length > 0) {
-    const topItems = selected.slice(0, 2);
+    const topItems = selected.filter((item) => !item.url.includes("news.google.com/rss/")).slice(0, 4);
     await Promise.all(
       topItems.map(async (item) => {
         try {
-          const fetchRes = await safeFetchHtml(item.url, { timeoutMs: 4000, maxBytes: 500_000 });
+          const fetchRes = await safeFetchHtml(item.url, { timeoutMs: 4200, maxBytes: 500_000 });
           if (fetchRes && fetchRes.body) {
-            const extracted = cleanHtmlToText(fetchRes.body, 1400);
-            if (extracted.length > item.snippet.length) {
+            const meta = extractPageMetadataFromHtml(fetchRes.body);
+            if (meta.publishedDate && !item.publishedDate) {
+              item.publishedDate = meta.publishedDate;
+              item.year = meta.publishedDate.slice(0, 4);
+            }
+            if (meta.author && !item.author) {
+              item.author = meta.author;
+              item.authors = [meta.author];
+            }
+            if (meta.siteName && (!item.publisher || item.publisher === item.domain)) {
+              item.publisher = meta.siteName;
+            }
+            const sourceHtml = meta.articleHtml || fetchRes.body;
+            const extracted = cleanHtmlToText(sourceHtml, 2200);
+            if (extracted.length > item.snippet.length + 40) {
               item.snippet = extracted;
             }
           }
@@ -670,6 +1050,7 @@ export async function executeWebSearch(
 
   return {
     query: effectiveQuery,
+    queriesExecuted: multiQueries,
     results: selected,
     retrievedAt: new Date().toISOString(),
     totalEvaluated: uniqueItems.length,
@@ -677,7 +1058,8 @@ export async function executeWebSearch(
 }
 
 /**
- * Formats search results into a clean context block for LLM prompts with clear citation keys.
+ * Formats search results into a clean context block for LLM prompts with clear citation keys
+ * and prompt-injection delimiters.
  */
 export function formatSearchResultsForPrompt(results: SearchResultItem[]): string {
   if (results.length === 0) {
@@ -689,7 +1071,9 @@ export function formatSearchResultsForPrompt(results: SearchResultItem[]): strin
       const tierBadge = r.authorityBadge ? ` [${r.authorityBadge}]` : "";
       const dateStr = r.publishedDate ? ` | Date: ${r.publishedDate}` : "";
       const pubStr = r.publisher ? ` | Publisher: ${r.publisher}` : "";
-      return `[${i + 1}] Source: "${r.title}"\nURL: ${r.url}\nDomain: ${r.domain}${pubStr}${tierBadge}${dateStr}\nEvidence & Content:\n${r.snippet}\n`;
+      const authorStr = r.author ? ` | Author: ${r.author}` : "";
+      const doiStr = r.doi ? ` | DOI: ${r.doi}` : "";
+      return `[${i + 1}] Source: "${r.title}"\nURL: ${r.url}\nDomain: ${r.domain}${pubStr}${authorStr}${tierBadge}${dateStr}${doiStr}\n<untrusted_source_evidence index="${i + 1}">\n${sanitizeUntrustedExternalText(r.snippet)}\n</untrusted_source_evidence>\n`;
     })
     .join("\n---\n");
 }
