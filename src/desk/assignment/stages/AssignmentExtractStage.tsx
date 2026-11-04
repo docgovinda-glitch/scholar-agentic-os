@@ -871,7 +871,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
                           Extracted Brief Question / Prompt:
                         </span>
                         <p className="text-xs text-neutral-700 dark:text-neutral-300 line-clamp-3 bg-white dark:bg-ink-500 p-3 rounded-lg border border-neutral-200/60 dark:border-white/10 font-mono">
-                          {localQuestion}
+                          {localQuestion.length > 600 ? `${localQuestion.slice(0, 600)}…` : localQuestion}
                         </p>
                       </div>
                     )}

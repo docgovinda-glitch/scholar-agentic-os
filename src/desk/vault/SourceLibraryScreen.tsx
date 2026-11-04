@@ -420,15 +420,6 @@ export default function SourceLibraryScreen({
           >
             Sources ({sources.length})
           </button>
-          {onSwitchToProjects && (
-            <button
-              type="button"
-              onClick={onSwitchToProjects}
-              className="py-3 border-b-2 border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
-            >
-              Projects{typeof projectCount === "number" ? ` (${projectCount})` : ""}
-            </button>
-          )}
           <button
             type="button"
             onClick={() => setActiveTab("settings")}

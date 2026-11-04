@@ -609,7 +609,7 @@ export function extractBriefInquiriesAndConcepts(
   question: string,
   briefText?: string
 ): ExtractedBriefInquiries {
-  const combined = `${question}\n\n${briefText || ""}`.trim();
+  const combined = `${question}\n\n${briefText || ""}`.trim().slice(0, 15000);
   const cleanCombined = stripSlideArtifacts(combined);
   const lines = cleanCombined.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
@@ -1096,7 +1096,7 @@ export interface DeconstructedQuestion {
  * to generate tightly tailored headings, subheadings, and thesis statements.
  */
 export function deconstructQuestionSemantics(question: string): DeconstructedQuestion {
-  const qStr = typeof question === "string" ? question : String(question || "");
+  const qStr = (typeof question === "string" ? question : String(question || "")).slice(0, 2000);
   const cleanPrompt = qStr
     .replace(/^(critically\s+)?(examine|evaluate|assess|analyze|analyse|discuss|investigate|explore|to\s+what\s+extent\s+does|what\s+is\s+the\s+role\s+of|the\s+role\s+of|an\s+analysis\s+of|how\s+does|in\s+what\s+ways\s+does)\s+/i, "")
     .replace(/[?.!]+$/, "")
@@ -1104,7 +1104,7 @@ export function deconstructQuestionSemantics(question: string): DeconstructedQue
 
   // Pattern 1: Role of A in / within B
   // e.g. "Role of AI in machine learning" -> A = "AI", B = "machine learning"
-  const roleMatch = qStr.match(/(?:role|function|place|significance|position)\s+of\s+(.+?)\s+(?:in|within)\s+(.+?)(?:\.|\?|$)/i);
+  const roleMatch = qStr.match(/(?:role|function|place|significance|position)\s+of\s+([^\n.?]+?)\s+(?:in|within)\s+([^\n.?]+?)(?:\.|\?|$)/i);
   if (roleMatch) {
     const a = roleMatch[1].trim();
     const b = roleMatch[2].trim();
@@ -1124,7 +1124,7 @@ export function deconstructQuestionSemantics(question: string): DeconstructedQue
   }
 
   // Pattern 2: Impact / Effect / Influence of A on / upon B
-  const impactMatch = qStr.match(/(?:impact|effect|influence|consequence|implications)\s+of\s+(.+?)\s+(?:on|upon|across)\s+(.+?)(?:\.|\?|$)/i);
+  const impactMatch = qStr.match(/(?:impact|effect|influence|consequence|implications)\s+of\s+([^\n.?]+?)\s+(?:on|upon|across)\s+([^\n.?]+?)(?:\.|\?|$)/i);
   if (impactMatch) {
     const a = impactMatch[1].trim();
     const b = impactMatch[2].trim();
@@ -1145,8 +1145,8 @@ export function deconstructQuestionSemantics(question: string): DeconstructedQue
 
   // Pattern 3: Comparing / Contrast / Versus
   const vsMatch =
-    qStr.match(/(?:compare|contrast|distinction\s+between|relationship\s+between|interplay\s+between|nexus\s+between)\s+(.+?)\s+(?:and|with|versus|vs\.?)\s+(.+?)(?:\.|\?|$)/i) ||
-    qStr.match(/(.+?)\s+(?:versus|vs\.?)\s+(.+?)(?:\.|\?|$)/i);
+    qStr.match(/(?:compare|contrast|distinction\s+between|relationship\s+between|interplay\s+between|nexus\s+between)\s+([^\n.?]+?)\s+(?:and|with|versus|vs\.?)\s+([^\n.?]+?)(?:\.|\?|$)/i) ||
+    (/\b(?:versus|vs\.?)\b/i.test(qStr) ? qStr.match(/^([^\n.?]+?)\s+(?:versus|vs\.?)\s+([^\n.?]+?)(?:\.|\?|$)/i) : null);
   if (vsMatch) {
     const a = vsMatch[1].replace(/^(?:the\s+)/i, "").trim();
     const b = vsMatch[2].trim();
@@ -1166,7 +1166,7 @@ export function deconstructQuestionSemantics(question: string): DeconstructedQue
   }
 
   // Pattern 4: Evaluative / "To what extent..."
-  const evalMatch = qStr.match(/(?:evaluate|assess|appraise|effectiveness\s+of|success\s+of|limitations\s+of)\s+(.+?)(?:\.|\?|$)/i);
+  const evalMatch = qStr.match(/(?:evaluate|assess|appraise|effectiveness\s+of|success\s+of|limitations\s+of)\s+([^\n.?]+?)(?:\.|\?|$)/i);
   if (evalMatch) {
     const a = evalMatch[1].trim();
     const fA = formatAcademicTopicTitle(a);
@@ -1182,7 +1182,7 @@ export function deconstructQuestionSemantics(question: string): DeconstructedQue
   }
 
   // Pattern 5: Evolution / Development of X
-  const evolMatch = qStr.match(/(?:evolution|development|history|future|emergence)\s+of\s+(.+?)(?:\.|\?|$)/i);
+  const evolMatch = qStr.match(/(?:evolution|development|history|future|emergence)\s+of\s+([^\n.?]+?)(?:\.|\?|$)/i);
   if (evolMatch) {
     const a = evolMatch[1].trim();
     const fA = formatAcademicTopicTitle(a);
