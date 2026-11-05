@@ -863,6 +863,7 @@ Formatting & Verification Rules:
         citationStyle: cleanStyle,
         wordCount: fallbackWordCount,
         verifiedSourcesCount: (validated.citations || []).length,
+        peerReviewAudit: validated.peerReviewAudit,
         recommendedWorkspaceHandoff: deliverableIntent,
       });
     } catch (err) {

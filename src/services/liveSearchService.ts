@@ -15,6 +15,7 @@ export interface LiveSearchResult {
   authors: string[];
   source?: "openalex" | "crossref" | "web" | "wikipedia" | "arxiv";
   score?: number;
+  stance?: "supporting" | "contradicting" | "mentioning";
 }
 
 export interface LiveSearchOptions {

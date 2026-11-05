@@ -105,12 +105,25 @@ export interface AgenticQueryResponse {
     authors?: string[];
     isPrimary?: boolean;
     sourceType?: "official" | "scholarly" | "media" | "web" | "vault";
+    stance?: "supporting" | "contradicting" | "mentioning";
   }>;
   citationStyle?: string;
   followUps?: string[];
   error?: string;
   wordCount?: number;
   verifiedSourcesCount?: number;
+  peerReviewAudit?: {
+    overallVerdict: string;
+    rigorScore: number;
+    critiques: Array<{
+      type: "methodology" | "bias" | "counter_argument" | "sample_size" | "generalizability";
+      title: string;
+      explanation: string;
+      severity: "low" | "medium" | "high";
+    }>;
+    methodologicalStrengths: string[];
+    counterTheories: string[];
+  };
   burstinessMetrics?: {
     averageLength: number;
     variance: number;

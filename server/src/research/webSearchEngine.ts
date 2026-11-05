@@ -32,6 +32,7 @@ export interface SearchResultItem {
   doi?: string;
   venue?: string;
   isPrimary?: boolean;
+  stance?: "supporting" | "contradicting" | "mentioning";
 }
 
 export interface WebSearchResponse {
