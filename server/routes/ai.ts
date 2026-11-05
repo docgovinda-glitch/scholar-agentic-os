@@ -1132,13 +1132,13 @@ Formatting & Verification Rules:
 
 
   // Cross-Session AskScholar Thread Persistence Routes
-  router.get("/threads", (req: Request, res: Response) => {
+  router.get("/threads", requireAuth, (req: Request, res: Response) => {
     const userKey = String((req as unknown as { user?: { id?: string; email?: string } }).user?.id || (req as unknown as { user?: { email?: string } }).user?.email || "default-user");
     const threads = userAskScholarThreadsStore.get(userKey) || [];
     res.json({ ok: true, threads });
   });
 
-  router.post("/threads", (req: Request, res: Response) => {
+  router.post("/threads", requireAuth, (req: Request, res: Response) => {
     const userKey = String((req as unknown as { user?: { id?: string; email?: string } }).user?.id || (req as unknown as { user?: { email?: string } }).user?.email || "default-user");
     const incoming = Array.isArray(req.body?.threads) ? req.body.threads : [];
     const existing = userAskScholarThreadsStore.get(userKey) || [];

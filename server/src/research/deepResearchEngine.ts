@@ -160,6 +160,28 @@ Provide 3 to 4 focused subQuestions that cover foundational history/theory, prim
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
     if (parsed.subQuestions && Array.isArray(parsed.subQuestions) && parsed.subQuestions.length > 0) {
+      const normalizedSubQuestions: ResearchPlanSubQuestion[] = parsed.subQuestions
+        .slice(0, 4)
+        .map((item: any, idx: number) => {
+          if (typeof item === "string") {
+            const clean = item.replace(/[?.,!]/g, "").trim();
+            return {
+              question: item,
+              rationale: `Investigates core analytical dimension ${idx + 1}`,
+              searchQuery: clean,
+            };
+          }
+          const question = String(item.question || item.searchQuery || item.title || `Dimension ${idx + 1}`);
+          const searchQuery = String(item.searchQuery || item.query || item.question || question)
+            .replace(/[?.,!]/g, "")
+            .trim();
+          return {
+            question,
+            rationale: String(item.rationale || `Investigates core analytical dimension ${idx + 1}`),
+            searchQuery: searchQuery || question,
+          };
+        });
+
       return {
         topic: parsed.topic || topic,
         scope: parsed.scope || `Multi-dimensional investigation of ${topic}`,
@@ -170,7 +192,7 @@ Provide 3 to 4 focused subQuestions that cover foundational history/theory, prim
               `Evaluate primary empirical, policy, and institutional evidence`,
               `Contrast competing scholarly and analytical interpretations`,
             ],
-        subQuestions: parsed.subQuestions.slice(0, 4),
+        subQuestions: normalizedSubQuestions,
       };
     }
   } catch (err) {
@@ -228,7 +250,16 @@ const DEEP_SEARCH_CACHE_TTL_MS = 20 * 60 * 1000;
 const deepSearchCache = new Map<string, { at: number; value: Promise<Awaited<ReturnType<typeof executeWebSearch>>> }>();
 
 function cachedDeepWebSearch(query: string, maxResults: number): Promise<Awaited<ReturnType<typeof executeWebSearch>>> {
-  const key = `${query.trim().toLowerCase()}::${maxResults}`;
+  const safeQuery = String(query || "").trim();
+  const key = `${safeQuery.toLowerCase()}::${maxResults}`;
+  if (!safeQuery) {
+    return Promise.resolve({
+      query: "",
+      results: [],
+      retrievedAt: new Date().toISOString(),
+      totalEvaluated: 0,
+    });
+  }
   const hit = deepSearchCache.get(key);
   if (hit && Date.now() - hit.at < DEEP_SEARCH_CACHE_TTL_MS) return hit.value;
   const value = Promise.resolve(executeWebSearch(query, { maxResults, fetchFullContent: true, mode: "deep-research" })).then(

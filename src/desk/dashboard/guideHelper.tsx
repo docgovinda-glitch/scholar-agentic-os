@@ -292,10 +292,17 @@ export function InlineCitationBadge({
     citation?.credibilityLevel === "preprint - not peer-reviewed" ||
     Boolean(targetUrl && /arxiv\.org|biorxiv\.org|medrxiv\.org/i.test(targetUrl));
 
+  const isPeerReviewed =
+    !isPreprint &&
+    (citation?.sourceType === "scholarly" ||
+      /nature|science|ieee|acm|neurips|icml|lancet|cell|springer|elsevier|wiley|pnas|oxford|cambridge/i.test(venue) ||
+      (citation?.authorityBadge || "").toLowerCase().includes("peer"));
+
   const isOpenAccess =
     Boolean(citation?.openAccessUrl) ||
     Boolean(targetUrl && /arxiv\.org|biorxiv\.org|openalex|europepmc|doi\.org\/10\.48550/i.test(targetUrl)) ||
-    citation?.authorityTier === "open_access";
+    citation?.authorityTier === "open_access" ||
+    citation?.sourceType === "scholarly";
 
   const snippet = citation?.evidenceSnippet || citation?.snippet || citation?.mainFinding;
 
@@ -365,11 +372,11 @@ export function InlineCitationBadge({
                     : "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200/50 dark:border-indigo-800/40"
                   }`}
               >
-                {isPreprint ? "Preprint (Not Peer-Reviewed)" : sourceTypeBadge}
+                {isPreprint ? "Preprint (Not Peer-Reviewed)" : isPeerReviewed ? "Peer Reviewed" : sourceTypeBadge}
               </span>
               {isOpenAccess && (
                 <span className="px-1.5 py-0.5 rounded-full font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/40 text-[9px]">
-                  OA
+                  Open Access
                 </span>
               )}
             </span>
@@ -438,7 +445,7 @@ export function InlineCitationBadge({
                 onClick={(e) => e.stopPropagation()}
                 className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 font-medium ml-auto"
               >
-                <span>Open source</span>
+                <span>Read DOI</span>
                 <ExternalLink className="w-2.5 h-2.5" />
               </a>
             )}
