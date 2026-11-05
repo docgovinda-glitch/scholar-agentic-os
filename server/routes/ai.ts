@@ -59,6 +59,7 @@ function cachedAskScholarWebSearch(query: string, maxResults?: number): Promise<
 }
 
 const fullTextPassageCache = new Map<string, { at: number; snippet: string }>();
+const userAskScholarThreadsStore = new Map<string, Array<Record<string, unknown>>>();
 
 function extractPlainTextFromHtml(html: string, maxLength = 7500): string {
   if (!html) return "";
@@ -665,11 +666,31 @@ export function registerAIRoutes(
 
       if (mode === "deep-research") {
         const where = await aiAvailability(req, "reasoning").catch(() => "server" as const);
+        const wantsSse =
+          where === "server" &&
+          !hasBrowserResult &&
+          typeof req.headers.accept === "string" &&
+          req.headers.accept.includes("text/event-stream");
+
+        if (wantsSse) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+        }
+
         try {
           const research = await executeDeepResearch(
             effectivePrompt,
             researchLlm(req),
-            undefined,
+            wantsSse
+              ? (status, stage) => {
+                  try {
+                    res.write(`data: ${JSON.stringify({ type: "stage", status, stage })}\n\n`);
+                  } catch {
+                    // ignore stream write errors
+                  }
+                }
+              : undefined,
             files,
             normalizedImages,
             vaultSources,
@@ -686,7 +707,7 @@ export function registerAIRoutes(
           const cleanReport = research.synthesizedReport.replace(/\s*\[CITE:[^\]]+\]/gi, "");
           const exactWordCount = countExactWords(cleanReport);
           const burstiness = evaluateBurstiness(cleanReport);
-          return res.json({
+          const finalPayload = {
             ok: true,
             mode: "deep-research",
             text: cleanReport,
@@ -703,7 +724,12 @@ export function registerAIRoutes(
             verifiedSourcesCount: (research.allCitations || []).length,
             burstinessMetrics: burstiness,
             recommendedWorkspaceHandoff: deliverableIntent,
-          });
+          };
+          if (wantsSse) {
+            res.write(`data: ${JSON.stringify({ type: "complete", payload: finalPayload })}\n\n`);
+            return res.end();
+          }
+          return res.json(finalPayload);
         } catch (deepErr: unknown) {
           if (deepErr instanceof DeepResearchBrowserHandOffError) {
             return res.status(426).json({
@@ -1104,6 +1130,29 @@ Formatting & Verification Rules:
     }
   });
 
+
+  // Cross-Session AskScholar Thread Persistence Routes
+  router.get("/threads", (req: Request, res: Response) => {
+    const userKey = String((req as unknown as { user?: { id?: string; email?: string } }).user?.id || (req as unknown as { user?: { email?: string } }).user?.email || "default-user");
+    const threads = userAskScholarThreadsStore.get(userKey) || [];
+    res.json({ ok: true, threads });
+  });
+
+  router.post("/threads", (req: Request, res: Response) => {
+    const userKey = String((req as unknown as { user?: { id?: string; email?: string } }).user?.id || (req as unknown as { user?: { email?: string } }).user?.email || "default-user");
+    const incoming = Array.isArray(req.body?.threads) ? req.body.threads : [];
+    const existing = userAskScholarThreadsStore.get(userKey) || [];
+    const byId = new Map<string, Record<string, unknown>>();
+
+    for (const t of [...existing, ...incoming]) {
+      if (t && typeof t === "object" && typeof (t as { id?: unknown }).id === "string") {
+        byId.set((t as { id: string }).id, t as Record<string, unknown>);
+      }
+    }
+    const merged = Array.from(byId.values()).slice(0, 20);
+    userAskScholarThreadsStore.set(userKey, merged);
+    res.json({ ok: true, threads: merged });
+  });
 
   app.use("/api/ai", router);
 }

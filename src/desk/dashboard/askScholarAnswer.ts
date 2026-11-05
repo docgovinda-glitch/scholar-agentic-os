@@ -97,3 +97,94 @@ export function askFailureMessage(err: unknown, foundSources: number): { kind: "
     text: `${found ? `${found}the` : "The"} AI didn't return an answer${detail}. Try again in a moment; if it keeps failing, check your AI in AI Access.`,
   };
 }
+
+export interface ExtractedSeedClaim {
+  claim: {
+    id: string;
+    text: string;
+  };
+  binding?: {
+    id: string;
+    claimId: string;
+    evidence: Array<{
+      sourceId: string;
+      locator: { paragraph?: number };
+      quote: string;
+    }>;
+    strength: "strong" | "moderate";
+    rationale: string;
+  };
+}
+
+/**
+ * Extracts cited analytical claims and their bound source evidence from an AskScholar synthesis
+ * so "Continue to Workspace" pre-seeds both the Claim-Evidence Graph and Evidence Ledger.
+ */
+export function extractSeedClaimsFromSynthesis(
+  text: string,
+  sources: Array<{ id: string; title: string; snippet?: string }>
+): ExtractedSeedClaim[] {
+  if (!text || !text.trim()) return [];
+
+  const cleanLines = text
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter((l) => l.length >= 35 && !l.startsWith("#") && !/^(references|works cited|bibliography)$/i.test(l));
+
+  const candidateSentences: Array<{ sentence: string; citedIdx?: number }> = [];
+  for (const line of cleanLines) {
+    const sentences = line
+      .replace(/^(?:[-*•]|\d+\.)\s+/, "")
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length >= 35 && s.length <= 360);
+
+    for (const s of sentences) {
+      const bracketMatch = s.match(/\[(\d+)(?:\s*,\s*\d+)*\]/);
+      const citedIdx = bracketMatch ? parseInt(bracketMatch[1], 10) : undefined;
+      candidateSentences.push({
+        sentence: s.replace(/\s*\[\d+(?:\s*,\s*\d+)*\]/g, "").trim(),
+        citedIdx,
+      });
+    }
+  }
+
+  // Prioritize sentences that explicitly carried an in-text citation
+  const sorted = [
+    ...candidateSentences.filter((c) => c.citedIdx !== undefined),
+    ...candidateSentences.filter((c) => c.citedIdx === undefined),
+  ].slice(0, 6);
+
+  return sorted
+    .filter((c) => c.sentence.length >= 25)
+    .map((c, idx) => {
+      const claimId = `ask-claim-${idx + 1}`;
+      const matchedSource =
+        sources.length > 0
+          ? (c.citedIdx && sources[c.citedIdx - 1]) || sources[idx % sources.length]
+          : undefined;
+
+      if (!matchedSource) {
+        return {
+          claim: { id: claimId, text: c.sentence },
+        };
+      }
+
+      return {
+        claim: { id: claimId, text: c.sentence },
+        binding: {
+          id: `ask-bind-${idx + 1}`,
+          claimId,
+          evidence: [
+            {
+              sourceId: matchedSource.id,
+              locator: { paragraph: 1 },
+              quote: (matchedSource.snippet || matchedSource.title).slice(0, 400),
+            },
+          ],
+          strength: c.citedIdx !== undefined ? "strong" : "moderate",
+          rationale: `Extracted from AskScholar synthesis and bound to verified source "${matchedSource.title}".`,
+        },
+      };
+    });
+}

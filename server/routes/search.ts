@@ -61,9 +61,9 @@ export function registerSearchRoutes(app: express.Application) {
     });
   }));
 
-  // Live Web & Scholarly Search Route (OpenAlex, Crossref, Wikipedia, Proxy)
+  // Live Web & Scholarly Search Route (OpenAlex, Crossref, ERIC, Proxy)
   router.post("/live", asyncRoute(async (req, res) => {
-    const { query, limit = 5, mode = "all" } = req.body || {};
+    const { query, limit = 20, candidateBudget, discipline, mode = "all" } = req.body || {};
     const effectiveQuery = typeof query === "string" ? query.trim() : "";
     if (!effectiveQuery) {
       return res.status(400).json({ error: "Missing required query parameter" });
@@ -72,10 +72,12 @@ export function registerSearchRoutes(app: express.Application) {
     try {
       const { executeLiveSearch } = await import("../src/discovery/liveSearch.ts");
       const results = await executeLiveSearch(effectiveQuery, {
-        limit: Number(limit) || 5,
+        limit: Number(limit) || 20,
+        candidateBudget: Number(candidateBudget) || undefined,
+        discipline: typeof discipline === "string" ? discipline : undefined,
         mode: mode === "scholarly" || mode === "web" ? mode : "all",
       });
-      res.json({ success: true, count: results.length, results });
+      res.json({ success: true, count: results.length, searchedCount: results.length, results });
     } catch (err) {
       res.status(502).json({ error: `Live search failed: ${err instanceof Error ? err.message : String(err)}` });
     }
@@ -83,7 +85,7 @@ export function registerSearchRoutes(app: express.Application) {
 
   router.get("/live", asyncRoute(async (req, res) => {
     const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
-    const limit = Number(req.query.limit) || 5;
+    const limit = Number(req.query.limit) || 20;
     const mode = req.query.mode === "scholarly" || req.query.mode === "web" ? req.query.mode : "all";
 
     if (!query) {
@@ -93,7 +95,7 @@ export function registerSearchRoutes(app: express.Application) {
     try {
       const { executeLiveSearch } = await import("../src/discovery/liveSearch.ts");
       const results = await executeLiveSearch(query, { limit, mode });
-      res.json({ success: true, count: results.length, results });
+      res.json({ success: true, count: results.length, searchedCount: results.length, results });
     } catch (err) {
       res.status(502).json({ error: `Live search failed: ${err instanceof Error ? err.message : String(err)}` });
     }

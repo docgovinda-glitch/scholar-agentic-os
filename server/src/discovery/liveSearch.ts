@@ -165,13 +165,14 @@ export function reconstructOpenAlexAbstract(invertedIndex?: Record<string, numbe
 }
 
 /**
- * Queries OpenAlex public REST API.
+ * Queries OpenAlex public REST API with multi-page pagination support.
  */
-export async function searchOpenAlexLive(query: string, limit = 5): Promise<LiveSearchResult[]> {
+export async function searchOpenAlexLive(query: string, limit = 5, page = 1): Promise<LiveSearchResult[]> {
   const topic = cleanSearchTopic(query);
   const params = new URLSearchParams({
     search: topic,
-    "per-page": String(Math.max(limit, 8)),
+    "per-page": String(Math.min(50, Math.max(limit, 8))),
+    page: String(Math.max(1, page)),
   });
   const mailto = process.env.OPENALEX_MAILTO;
   if (mailto) params.set("mailto", mailto);
@@ -230,13 +231,16 @@ export async function searchOpenAlexLive(query: string, limit = 5): Promise<Live
 }
 
 /**
- * Queries Crossref public API.
+ * Queries Crossref public API with multi-page offset pagination support.
  */
-export async function searchCrossrefLive(query: string, limit = 5): Promise<LiveSearchResult[]> {
+export async function searchCrossrefLive(query: string, limit = 5, page = 1): Promise<LiveSearchResult[]> {
+  const effectiveRows = Math.min(50, Math.max(limit, 5));
+  const offset = Math.max(0, (page - 1) * effectiveRows);
   const params = new URLSearchParams({
     query,
-    rows: String(limit),
+    rows: String(effectiveRows),
     sort: "relevance",
+    ...(offset > 0 ? { offset: String(offset) } : {}),
   });
 
   try {
@@ -369,13 +373,65 @@ export async function searchProxyWebLive(query: string, limit = 5): Promise<Live
 }
 
 /**
+ * Queries ERIC (Education Resources Information Center) public REST API for Education & Social Science research.
+ */
+export async function searchEricLive(query: string, limit = 10): Promise<LiveSearchResult[]> {
+  const topic = cleanSearchTopic(query);
+  const params = new URLSearchParams({
+    search: topic,
+    format: "json",
+    rows: String(Math.min(50, Math.max(limit, 5))),
+  });
+  try {
+    const res = await fetch(`https://api.ies.ed.gov/eric/?${params.toString()}`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      response?: {
+        docs?: Array<{
+          id?: string;
+          title?: string;
+          author?: string[];
+          publicationdateyear?: number | string;
+          description?: string;
+          source?: string;
+          url?: string;
+        }>;
+      };
+    };
+    const docs = data.response?.docs ?? [];
+    return docs
+      .map((doc) => {
+        const ericId = doc.id || "";
+        const url = doc.url || (ericId ? `https://eric.ed.gov/?id=${encodeURIComponent(ericId)}` : "");
+        const authors = Array.isArray(doc.author) ? doc.author.filter(Boolean) : [];
+        return {
+          title: stripHtml(doc.title || "Untitled ERIC Document"),
+          url,
+          snippet: doc.description ? stripHtml(doc.description).slice(0, 1800) : `Education research published in ${doc.source || "ERIC"}.`,
+          publicationDate: doc.publicationdateyear ? String(doc.publicationdateyear) : undefined,
+          authors,
+          source: "openalex" as const,
+          score: 82,
+        };
+      })
+      .filter((d) => d.authors.length > 0 && d.url);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Orchestrates multi-source live web & scholarly search.
- * Merges and deduplicates records across OpenAlex, Crossref, and Web.
+ * Merges and deduplicates records across OpenAlex, Crossref, ERIC, and Web with multi-page pagination.
  */
 export async function executeLiveSearch(
   query: string,
   options: {
     limit?: number;
+    candidateBudget?: number;
+    discipline?: string;
     mode?: "all" | "scholarly" | "web";
   } = {}
 ): Promise<LiveSearchResult[]> {
@@ -383,6 +439,8 @@ export async function executeLiveSearch(
   if (!cleanQuery) return [];
 
   const limit = Math.max(1, Math.min(options.limit ?? 20, 120));
+  const candidateBudget = options.candidateBudget ?? limit * 2;
+  const maxPages = candidateBudget > 50 ? 2 : 1;
   const mode = options.mode ?? "all";
   const topicQuery = cleanSearchTopic(cleanQuery);
 
@@ -434,15 +492,20 @@ export async function executeLiveSearch(
 
   if (mode === "all" || mode === "scholarly") {
     const scholarlyCap = Math.max(15, limit);
-    scholarlyTasks.push(searchOpenAlexLive(topicQuery, scholarlyCap));
-    scholarlyTasks.push(
-      searchCrossrefLive(topicQuery, scholarlyCap).then((items) =>
-        items.filter((item) => {
-          const rel = computeLiveSearchRelevance(cleanQuery, item.title, item.snippet);
-          return rel.keywordCount <= 1 ? rel.totalMatches >= 1 : rel.titleMatches >= 1 && rel.ratio >= 0.4;
-        })
-      )
-    );
+    for (let page = 1; page <= maxPages; page++) {
+      scholarlyTasks.push(searchOpenAlexLive(topicQuery, scholarlyCap, page));
+      scholarlyTasks.push(
+        searchCrossrefLive(topicQuery, scholarlyCap, page).then((items) =>
+          items.filter((item) => {
+            const rel = computeLiveSearchRelevance(cleanQuery, item.title, item.snippet);
+            return rel.keywordCount <= 1 ? rel.totalMatches >= 1 : rel.titleMatches >= 1 && rel.ratio >= 0.4;
+          })
+        )
+      );
+    }
+    if (options.discipline === "education") {
+      scholarlyTasks.push(searchEricLive(topicQuery, Math.min(15, scholarlyCap)));
+    }
   }
 
   const [webSettled, scholarlySettled] = await Promise.all([

@@ -21,6 +21,7 @@ import {
 } from "../config/askScholarConfig";
 import {
   verifyAndDeduplicateSources,
+  verifyAndEnrichDOIMetadataBatch,
   type CSLItem,
   type ExcludedSourceRecord,
   type RawSourceInput,
@@ -311,18 +312,22 @@ async function searchOpenAlexClient(
 }
 
 /**
- * Provider 2: Crossref REST API (includes retraction `update-to` metadata).
+ * Provider 2: Crossref REST API (includes retraction `update-to` metadata and multi-page offset pagination).
  */
 async function searchCrossrefClient(
   query: string,
   rows = 15,
+  page = 1,
   signal?: AbortSignal
 ): Promise<RawSourceInput[]> {
   try {
     const topic = cleanClientTopic(query);
+    const effectiveRows = Math.min(50, Math.max(rows, 10));
+    const offset = Math.max(0, (page - 1) * effectiveRows);
     const params = new URLSearchParams({
       query: topic,
-      rows: String(Math.min(50, Math.max(rows, 10))),
+      rows: String(effectiveRows),
+      ...(offset > 0 ? { offset: String(offset) } : {}),
     });
     const res = await fetch(`https://api.crossref.org/works?${params.toString()}`, { signal });
     if (!res.ok) return [];
@@ -469,6 +474,137 @@ async function searchEuropePmcClient(
 }
 
 /**
+ * Provider 4: ERIC REST API (Education Resources Information Center — Education & Social Sciences).
+ */
+async function searchEricClient(
+  query: string,
+  rows = 12,
+  signal?: AbortSignal
+): Promise<RawSourceInput[]> {
+  try {
+    const topic = cleanClientTopic(query);
+    const params = new URLSearchParams({
+      search: topic,
+      format: "json",
+      rows: String(Math.min(50, Math.max(rows, 8))),
+    });
+    const res = await fetch(`https://api.ies.ed.gov/eric/?${params.toString()}`, { signal });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      response?: {
+        docs?: Array<{
+          id?: string;
+          title?: string;
+          author?: string[];
+          publicationdateyear?: number | string;
+          description?: string;
+          source?: string;
+          url?: string;
+          peerreviewed?: string | boolean;
+        }>;
+      };
+    };
+
+    return (data.response?.docs ?? []).map((doc) => {
+      const ericId = doc.id || "";
+      const url = doc.url || (ericId ? `https://eric.ed.gov/?id=${encodeURIComponent(ericId)}` : "");
+      return {
+        title: cleanHtmlTags(doc.title || ""),
+        url,
+        snippet: doc.description ? cleanHtmlTags(doc.description).slice(0, 1800) : "",
+        year: doc.publicationdateyear,
+        authors: Array.isArray(doc.author) ? doc.author.filter(Boolean) : [],
+        venue: doc.source || "ERIC (U.S. Department of Education)",
+        journal: doc.source,
+        publisher: "Institute of Education Sciences (ERIC)",
+        sourceType:
+          doc.peerreviewed === "T" || doc.peerreviewed === true
+            ? "peer-reviewed article"
+            : "institutional report",
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Provider 5: SSRN / RePEc / NBER Working Papers & Repository Index via OpenAlex filter
+ * (Management & Business, Economics, Social Sciences, and Law).
+ */
+async function searchWorkingPapersClient(
+  query: string,
+  perPage = 12,
+  signal?: AbortSignal
+): Promise<RawSourceInput[]> {
+  try {
+    const topic = cleanClientTopic(query);
+    const params = new URLSearchParams({
+      search: topic,
+      filter: "primary_location.source.type:repository",
+      "per-page": String(Math.min(50, Math.max(perPage, 8))),
+    });
+    const res = await fetch(`https://api.openalex.org/works?${params.toString()}`, { signal });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      results?: Array<{
+        id?: string;
+        doi?: string;
+        title?: string;
+        display_name?: string;
+        publication_year?: number;
+        publication_date?: string;
+        is_retracted?: boolean;
+        open_access?: { oa_url?: string };
+        authorships?: Array<{ author?: { display_name?: string } }>;
+        abstract_inverted_index?: Record<string, number[]>;
+        primary_location?: {
+          landing_page_url?: string;
+          pdf_url?: string;
+          source?: { display_name?: string };
+        };
+      }>;
+    };
+
+    return (data.results ?? []).map((w) => {
+      const doi = w.doi ? w.doi.replace(/^https?:\/\/doi\.org\//i, "") : undefined;
+      const url = w.doi ?? w.primary_location?.landing_page_url ?? w.id ?? "";
+      const authors = (w.authorships ?? [])
+        .map((a) => a.author?.display_name)
+        .filter((n): n is string => Boolean(n));
+      let snippet = "";
+      if (w.abstract_inverted_index) {
+        const words: Array<[number, string]> = [];
+        for (const [word, positions] of Object.entries(w.abstract_inverted_index)) {
+          if (Array.isArray(positions)) {
+            for (const pos of positions) words.push([pos, word]);
+          }
+        }
+        words.sort((a, b) => a[0] - b[0]);
+        snippet = words.map((p) => p[1]).join(" ").slice(0, 1800);
+      }
+      const venue = w.primary_location?.source?.display_name || "Working Paper Repository";
+      return {
+        title: w.title || w.display_name || "",
+        url,
+        doi,
+        snippet: snippet || `Working paper published in ${venue} (${w.publication_year || ""}).`,
+        year: w.publication_year,
+        publicationDate: w.publication_date,
+        authors,
+        venue,
+        journal: venue,
+        openAccessUrl: w.open_access?.oa_url || w.primary_location?.pdf_url,
+        isRetracted: w.is_retracted === true,
+        sourceType: "working paper",
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Executes a multi-provider search with dynamic source budgets, query variations,
  * deduplication (DOI -> title + first author), retraction checks, and strict CSL-JSON verification.
  */
@@ -547,6 +683,7 @@ export async function executeLiveSearchWithTelemetry(
         query: cleanQuery,
         limit: requestedLimit,
         candidateBudget: candidateTarget,
+        discipline: classification.discipline,
         mode: options.mode === "deep_research" ? "all" : options.mode ?? "all",
       }),
       signal: options.signal,
@@ -563,7 +700,11 @@ export async function executeLiveSearchWithTelemetry(
           detail: `Retrieved ${data.searchedCount ?? data.results.length} candidates · Deduplicating by DOI & verifying CSL metadata…`,
           candidatesFound: data.searchedCount ?? data.results.length,
         });
-        const { verified, verifiedRaw, excluded } = verifyAndDeduplicateSources(data.results);
+        const enrichedServerResults = await verifyAndEnrichDOIMetadataBatch(data.results, {
+          signal: options.signal,
+          maxLookups: 5,
+        });
+        const { verified, verifiedRaw, excluded } = verifyAndDeduplicateSources(enrichedServerResults);
         const allExcluded = [...(data.excludedSources ?? []), ...excluded];
         const finalResults: LiveSearchResult[] = verifiedRaw
           .slice(0, requestedLimit)
@@ -614,15 +755,29 @@ export async function executeLiveSearchWithTelemetry(
     // Server proxy unreachable; proceed to direct parallel browser queries
   }
 
-  // 2. Direct parallel multi-provider queries across query variations
+  // 2. Direct parallel multi-provider queries across query variations with multi-page pagination
   const perProviderLimit = Math.max(10, Math.ceil(candidateTarget / (queryVariations.length * 2)));
+  const maxPages = candidateTarget > 50 ? 2 : 1;
   const providerPromises: Array<Promise<RawSourceInput[]>> = [];
 
   for (const qVar of queryVariations.slice(0, 2)) {
-    providerPromises.push(searchOpenAlexClient(qVar, perProviderLimit, 1, options.signal));
-    providerPromises.push(searchCrossrefClient(qVar, perProviderLimit, options.signal));
+    for (let page = 1; page <= maxPages; page++) {
+      providerPromises.push(searchOpenAlexClient(qVar, perProviderLimit, page, options.signal));
+      providerPromises.push(searchCrossrefClient(qVar, perProviderLimit, page, options.signal));
+    }
   }
   providerPromises.push(searchEuropePmcClient(queryVariations[0], perProviderLimit, options.signal));
+
+  // Discipline-specific providers (Section 7)
+  if (classification.discipline === "education") {
+    providerPromises.push(searchEricClient(queryVariations[0], perProviderLimit, options.signal));
+  } else if (
+    classification.discipline === "management_business" ||
+    classification.discipline === "social_sciences" ||
+    classification.discipline === "law"
+  ) {
+    providerPromises.push(searchWorkingPapersClient(queryVariations[0], perProviderLimit, options.signal));
+  }
 
   const settled = await Promise.allSettled(providerPromises);
   const rawCandidates: RawSourceInput[] = [];
@@ -653,8 +808,14 @@ export async function executeLiveSearchWithTelemetry(
     .sort((a, b) => b.score - a.score)
     .map((x) => x.cand);
 
+  // Live Crossref DOI metadata verification & retraction check pass (Section 6)
+  const enrichedCandidates = await verifyAndEnrichDOIMetadataBatch(scoredCandidates, {
+    signal: options.signal,
+    maxLookups: 5,
+  });
+
   // Strict verification, retraction filtering, and deduplication (by DOI -> title + first author)
-  const { verified, verifiedRaw, excluded } = verifyAndDeduplicateSources(scoredCandidates);
+  const { verified, verifiedRaw, excluded } = verifyAndDeduplicateSources(enrichedCandidates);
 
   const finalResults: LiveSearchResult[] = verifiedRaw
     .slice(0, requestedLimit)

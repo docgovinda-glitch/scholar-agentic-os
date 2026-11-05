@@ -13,7 +13,15 @@ import {
   type AiOperationalStatus,
   type AgenticQueryResponse,
 } from "./api";
-import { addManualSource } from "./api/claimEvidenceApi";
+import { addManualSource, addClaim, bindEvidence } from "./api/claimEvidenceApi";
+import {
+  loadLocalAskScholarThreads,
+  saveLocalAskScholarThreads,
+  mergeAskScholarThreads,
+  fetchAskScholarThreadsFromServer,
+  syncAskScholarThreadsToServer,
+  type AskScholarConversationThread,
+} from "../services/askScholarThreadSync";
 import {
   isDuplicateProjectTitle,
   getNextUntitledProjectTitle,
@@ -157,6 +165,7 @@ import {
   answerWebsiteQuestion,
   FormatIcon,
   ChooseOutputType,
+  extractSeedClaimsFromSynthesis,
 } from "./dashboard";
 
 export {
@@ -761,18 +770,7 @@ export default function ProjectListScreen({
   const [isAskHistoryOpen, setIsAskHistoryOpen] = useState(false);
   const [askThreads, setAskThreads] = useState<
     Array<{ id: string; title: string; updatedAt: string; messages: WebsiteAssistantMessage[] }>
-  >(() => {
-    try {
-      const raw = localStorage.getItem("scholar_ask_threads_v1");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed.slice(0, 15);
-      }
-    } catch {
-      // ignore
-    }
-    return [];
-  });
+  >(() => loadLocalAskScholarThreads(userEmail));
   const [messageActiveTab, setMessageActiveTab] = useState<Record<string, "synthesis" | "matrix" | "graph" | "consensus">>({});
   const [selectedGraphNodeId, setSelectedGraphNodeId] = useState<string | null>(null);
   const [userVaultItems, setUserVaultItems] = useState<VaultItem[]>([]);
@@ -783,6 +781,25 @@ export default function ProjectListScreen({
       return false;
     }
   });
+
+  // Fetch remote Ask Scholar threads from server on sign-in
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!userEmail) return;
+      const remote = await fetchAskScholarThreadsFromServer(userEmail);
+      if (active && remote.length > 0) {
+        setAskThreads((prev) => {
+          const merged = mergeAskScholarThreads(prev, remote);
+          saveLocalAskScholarThreads(merged, userEmail);
+          return merged;
+        });
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [userEmail]);
 
   // Load user's knowledge vault items for AI co-pilot grounding
   useEffect(() => {
@@ -809,7 +826,7 @@ export default function ProjectListScreen({
   const guideInputRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Sync active Ask Scholar thread to multi-thread history in localStorage
+  // Sync active Ask Scholar thread to multi-thread history in localStorage and server
   useEffect(() => {
     const userMsgs = guideMessages.filter((m) => m.sender === "user");
     const assistantMsgs = guideMessages.filter(
@@ -819,17 +836,20 @@ export default function ProjectListScreen({
     const rawTitle = userMsgs[0].text.trim().replace(/\s+/g, " ");
     const title = rawTitle.length > 52 ? `${rawTitle.slice(0, 50)}…` : rawTitle;
     const updatedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const updatedAtIso = new Date().toISOString();
     setAskThreads((prev) => {
       const filtered = prev.filter((t) => t.id !== activeAskThreadId);
-      const next = [{ id: activeAskThreadId, title, updatedAt, messages: guideMessages }, ...filtered].slice(0, 15);
-      try {
-        localStorage.setItem("scholar_ask_threads_v1", JSON.stringify(next));
-      } catch {
-        // ignore
+      const next: AskScholarConversationThread[] = [
+        { id: activeAskThreadId, title, updatedAt, updatedAtIso, messages: guideMessages },
+        ...filtered,
+      ].slice(0, 15);
+      saveLocalAskScholarThreads(next, userEmail);
+      if (userEmail) {
+        void syncAskScholarThreadsToServer(next, userEmail);
       }
       return next;
     });
-  }, [guideMessages, activeAskThreadId]);
+  }, [guideMessages, activeAskThreadId, userEmail]);
 
   // Step through Deep Research stages while Deep Research is actively running
   useEffect(() => {
@@ -1600,6 +1620,11 @@ export default function ProjectListScreen({
               preRetrievedSources: liveRetrievedSources,
               history,
               vaultSources: selectedVaultSources,
+              onStageUpdate: (update) => {
+                if (!askAbortRef.current && update?.status) {
+                  setAskPhase({ step: "searching", detail: update.status });
+                }
+              },
               onChunk: (chunk) => {
                 if (!askAbortRef.current) {
                   setStreamingGuideText((prev) => prev + chunk);
@@ -1622,6 +1647,11 @@ export default function ProjectListScreen({
               images: currentAttachments.filter((a) => a.imageData).map((a) => a.imageData!),
               history,
               vaultSources: selectedVaultSources,
+              onStageUpdate: (update) => {
+                if (!askAbortRef.current && update?.status) {
+                  setAskPhase({ step: "searching", detail: update.status });
+                }
+              },
               onChunk: (chunk) => {
                 if (!askAbortRef.current) {
                   setStreamingGuideText((prev) => prev + chunk);
@@ -1911,6 +1941,24 @@ export default function ProjectListScreen({
               ).catch(() => {})
             )
           );
+        }
+
+        // Pre-seed verified claims and evidence bindings into Claim-Evidence Graph for Gate G2/G3
+        try {
+          const seedClaims = extractSeedClaimsFromSynthesis(
+            researchMessage.text,
+            structuredSources
+          );
+          if (typeof addClaim === "function" && seedClaims.length > 0) {
+            for (const sc of seedClaims) {
+              await Promise.resolve(addClaim(project.projectId, sc.claim as any)).catch(() => {});
+              if (sc.binding && typeof bindEvidence === "function") {
+                await Promise.resolve(bindEvidence(project.projectId, sc.binding as any)).catch(() => {});
+              }
+            }
+          }
+        } catch {
+          // non-blocking
         }
 
         onOpen(project.projectId);
@@ -3343,10 +3391,9 @@ export default function ProjectListScreen({
                                     e.stopPropagation();
                                     setAskThreads((prev) => {
                                       const next = prev.filter((item) => item.id !== t.id);
-                                      try {
-                                        localStorage.setItem("scholar_ask_threads_v1", JSON.stringify(next));
-                                      } catch {
-                                        // ignore
+                                      saveLocalAskScholarThreads(next, userEmail);
+                                      if (userEmail) {
+                                        void syncAskScholarThreadsToServer(next, userEmail);
                                       }
                                       return next;
                                     });

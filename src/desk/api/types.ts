@@ -96,6 +96,7 @@ export interface AgenticQueryRequest {
     notes?: string;
   }>;
   onChunk?: (chunk: string) => void;
+  onStageUpdate?: (update: { status: string; stage?: any }) => void;
 }
 
 export interface AgenticQueryResponse {

@@ -96,6 +96,8 @@ export interface RawSourceInput {
   credibilityLevel?: "high" | "moderate" | "preprint - not peer-reviewed";
   openAccessUrl?: string;
   isRetracted?: boolean;
+  retractionNotice?: string;
+  metadataMismatchWithDoi?: boolean;
   crossrefUpdateTo?: Array<{ type?: string; label?: string }>;
   snippet?: string;
   domain?: string;
@@ -411,7 +413,20 @@ export function verifyAndConvertToCSL(
     };
   }
 
-  // 1. Retraction Check
+  // 1. Retraction & DOI Metadata Mismatch Check
+  if (source.metadataMismatchWithDoi) {
+    return {
+      ok: false,
+      excluded: {
+        title: cleanTitle,
+        url: source.url,
+        doi,
+        reason: "metadata mismatch with DOI record",
+        detail: "Source title or metadata did not match the authoritative Crossref DOI record.",
+      },
+    };
+  }
+
   const retracted = isSourceRetracted(source);
   if (retracted && !options.allowRetractedForDiscussion) {
     return {
@@ -588,6 +603,170 @@ export function verifyAndDeduplicateSources(
   }
 
   return { verified, verifiedRaw, excluded };
+}
+
+const crossrefDoiRecordCache = new Map<string, Partial<RawSourceInput>>();
+
+function hasSignificantTitleOverlap(candidateTitle: string, crossrefTitle: string): boolean {
+  const tokenize = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length >= 4);
+  const aTokens = tokenize(candidateTitle);
+  const bTokens = new Set(tokenize(crossrefTitle));
+  if (aTokens.length < 3 || bTokens.size < 3) return true;
+  let overlap = 0;
+  for (const t of aTokens) {
+    if (bTokens.has(t)) overlap++;
+  }
+  return overlap >= 1;
+}
+
+/**
+ * Live Crossref DOI metadata verification & retraction check pass (Section 6).
+ * For candidates with a DOI that lack complete bibliographic fields or retraction verification,
+ * queries Crossref `/works/{doi}` (with caching) to enrich volume/issue/page/author/year,
+ * detect `update-to` retraction notices, and flag DOI-title mismatches.
+ */
+export async function verifyAndEnrichDOIMetadataBatch(
+  candidates: RawSourceInput[],
+  options: { signal?: AbortSignal; maxLookups?: number } = {}
+): Promise<RawSourceInput[]> {
+  if (!Array.isArray(candidates) || candidates.length === 0) return candidates;
+  if (
+    typeof import.meta !== "undefined" &&
+    import.meta.env?.MODE === "test" &&
+    !(globalThis.fetch as { mock?: unknown })?.mock
+  ) {
+    return candidates;
+  }
+
+  const maxLookups = options.maxLookups ?? 6;
+  const enriched = [...candidates];
+  const indicesToLookup: Array<{ idx: number; doi: string }> = [];
+
+  for (let i = 0; i < enriched.length; i++) {
+    const c = enriched[i];
+    const doi = normalizeDoi(c.doi) || normalizeDoi(c.url);
+    if (!doi) continue;
+    const cached = crossrefDoiRecordCache.get(doi.toLowerCase());
+    if (cached) {
+      enriched[i] = {
+        ...c,
+        ...cached,
+        title: c.title || cached.title,
+        authors: (Array.isArray(c.authors) && c.authors.length > 0 ? c.authors : cached.authors) || c.authors,
+        year: c.year || cached.year,
+        venue: c.venue || cached.venue,
+        journal: c.journal || cached.journal,
+        volume: c.volume || cached.volume,
+        issue: c.issue || cached.issue,
+        pages: c.pages || cached.pages,
+        publisher: c.publisher || cached.publisher,
+      };
+      continue;
+    }
+    const needsEnrichment =
+      !c.volume ||
+      !c.pages ||
+      !c.crossrefUpdateTo ||
+      !Array.isArray(c.authors) ||
+      c.authors.length === 0 ||
+      !c.year;
+    if (needsEnrichment && indicesToLookup.length < maxLookups) {
+      indicesToLookup.push({ idx: i, doi });
+    }
+  }
+
+  if (indicesToLookup.length === 0) return enriched;
+
+  await Promise.allSettled(
+    indicesToLookup.map(async ({ idx, doi }) => {
+      try {
+        const res = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`, {
+          signal: options.signal ?? AbortSignal.timeout(2500),
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          message?: {
+            title?: string[];
+            author?: Array<{ given?: string; family?: string; name?: string }>;
+            "container-title"?: string[];
+            volume?: string;
+            issue?: string;
+            page?: string;
+            publisher?: string;
+            "update-to"?: Array<{ type?: string; label?: string }>;
+            published?: { "date-parts"?: number[][] };
+            "published-print"?: { "date-parts"?: number[][] };
+            "published-online"?: { "date-parts"?: number[][] };
+          };
+        };
+        const msg = data?.message;
+        if (!msg || typeof msg !== "object") return;
+
+        const crTitle = Array.isArray(msg.title) ? (msg.title[0] || "").replace(/<[^>]+>/g, "").trim() : "";
+        const orig = enriched[idx];
+        const mismatch = Boolean(orig.title && crTitle && !hasSignificantTitleOverlap(orig.title, crTitle));
+
+        const crAuthors = (msg.author ?? [])
+          .map((a) => (a.family && a.given ? `${a.family}, ${a.given}` : a.name || a.family || ""))
+          .filter(Boolean);
+        const crVenue = Array.isArray(msg["container-title"]) ? msg["container-title"][0] : undefined;
+        const dateParts =
+          msg.published?.["date-parts"]?.[0] ||
+          msg["published-print"]?.["date-parts"]?.[0] ||
+          msg["published-online"]?.["date-parts"]?.[0];
+        const crYear = dateParts?.[0];
+        const updateTo = msg["update-to"];
+        const isRetracted = Array.isArray(updateTo)
+          ? updateTo.some((u) => /retract/i.test(`${u.type || ""} ${u.label || ""}`))
+          : false;
+
+        const patch: Partial<RawSourceInput> = {
+          title: crTitle || undefined,
+          authors: crAuthors.length > 0 ? crAuthors : undefined,
+          year: crYear,
+          venue: crVenue,
+          journal: crVenue,
+          volume: msg.volume,
+          issue: msg.issue,
+          pages: msg.page,
+          publisher: msg.publisher,
+          crossrefUpdateTo: updateTo,
+          isRetracted: Boolean(isRetracted || orig.isRetracted),
+          retractionNotice: isRetracted
+            ? "Crossref update-to retraction recorded"
+            : orig.retractionNotice,
+          metadataMismatchWithDoi: mismatch,
+        };
+        crossrefDoiRecordCache.set(doi.toLowerCase(), patch);
+
+        enriched[idx] = {
+          ...orig,
+          title: orig.title || patch.title,
+          authors: (Array.isArray(orig.authors) && orig.authors.length > 0 ? orig.authors : patch.authors) || orig.authors,
+          year: orig.year || patch.year,
+          venue: orig.venue || patch.venue,
+          journal: orig.journal || patch.journal,
+          volume: orig.volume || patch.volume,
+          issue: orig.issue || patch.issue,
+          pages: orig.pages || patch.pages,
+          publisher: orig.publisher || patch.publisher,
+          crossrefUpdateTo: patch.crossrefUpdateTo || orig.crossrefUpdateTo,
+          isRetracted: Boolean(patch.isRetracted),
+          retractionNotice: patch.retractionNotice || orig.retractionNotice,
+          metadataMismatchWithDoi: Boolean(patch.metadataMismatchWithDoi),
+        };
+      } catch {
+        // Ignore network timeout on optional Crossref DOI enrichment
+      }
+    })
+  );
+
+  return enriched;
 }
 
 // ============================================================================

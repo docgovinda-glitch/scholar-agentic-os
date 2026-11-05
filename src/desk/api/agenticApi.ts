@@ -23,7 +23,17 @@ export async function executeAgenticQuery(
     vaultSources: req.vaultSources,
   };
 
-  const res = await authedJsonFetch("/api/ai/agent", "POST", payload);
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (req.mode === "deep-research" && req.onStageUpdate) {
+    headers["Accept"] = "text/event-stream, application/json";
+  }
+
+  const res = await authedFetch("/api/ai/agent", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
   if (!res.ok) {
     const errorBody = await res.json().catch(() => ({}));
     if (res.status === 524 || res.status === 504) {
@@ -31,6 +41,45 @@ export async function executeAgenticQuery(
     }
     const errorMsg = (errorBody as { error?: string }).error || `AI Request failed with status ${res.status}`;
     throw new Error(errorMsg);
+  }
+
+  const isEventStream = Boolean(res.headers.get("content-type")?.includes("text/event-stream"));
+  if (isEventStream && res.body) {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let finalPayload: AgenticQueryResponse | null = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+
+      for (const ev of events) {
+        const trimmed = ev.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const jsonStr = trimmed.replace(/^data:\s*/, "");
+        try {
+          const parsed = JSON.parse(jsonStr);
+          if (parsed.type === "stage" && req.onStageUpdate) {
+            req.onStageUpdate({ status: parsed.status, stage: parsed.stage });
+          } else if (parsed.type === "complete" && parsed.payload) {
+            finalPayload = parsed.payload;
+          }
+        } catch {
+          // ignore stream parse errors
+        }
+      }
+    }
+
+    if (finalPayload) {
+      if (finalPayload.text && req.onChunk) {
+        req.onChunk(finalPayload.text);
+      }
+      return finalPayload;
+    }
   }
 
   const data = await res.json();
