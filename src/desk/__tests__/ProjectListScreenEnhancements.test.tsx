@@ -155,10 +155,12 @@ describe("UI/UX Enhancements: Command Palette, Boot Project, Related Inquiries, 
     fireEvent.change(input, { target: { value: "Synthesize CRISPR off-target cleavage mechanisms" } });
     fireEvent.click(screen.getByRole("button", { name: "Send question" }));
 
-    // Find and click the 'Boot Project' action button
-    const bootBtn = await screen.findByRole("button", { name: /Boot Project/i });
-    expect(bootBtn).toBeInTheDocument();
-    fireEvent.click(bootBtn);
+    // Find and click the 'Continue' post-response action button and choose 'Journal Article' (OT-10)
+    const continueBtn = await screen.findByTestId("action-continue");
+    expect(continueBtn).toBeInTheDocument();
+    fireEvent.click(continueBtn);
+    const journalBtn = await screen.findByTestId("continue-workspace-OT-10");
+    fireEvent.click(journalBtn);
 
     // Verify project initialization and intake saving
     await waitFor(() => {

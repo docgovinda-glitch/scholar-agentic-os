@@ -703,7 +703,7 @@ export async function searchCrossRef(query: string, maxResults = 4): Promise<Sea
       const year = item.created?.["date-parts"]?.[0]?.[0] || item.published?.["date-parts"]?.[0]?.[0];
       const url = item.URL || (item.DOI ? `https://doi.org/${item.DOI}` : "https://crossref.org");
       const venue = item["container-title"]?.[0] || "";
-      const snippet = `${author || "Unknown author"} (${year || "n.d."})${venue ? ` — ${venue}` : ""}. DOI: ${item.DOI || "N/A"}`;
+      const snippet = `${author ? `${author} ` : ""}${year ? `(${year})` : ""}${venue ? ` — ${venue}` : ""}. DOI: ${item.DOI || "N/A"}`.trim();
       const auth = evaluateSourceAuthority(url, title, snippet, year);
       const rel = computeWebQueryRelevance(effective, title, snippet);
 
@@ -749,7 +749,7 @@ export async function searchScholarlySources(query: string, maxResults = 4): Pro
     const results = await discoverOpenAlexSources(query, Math.max(maxResults * 2, 6)).catch(() => []);
     const mapped = results.map((r) => {
       const url = r.url || (r.doi ? `https://doi.org/${r.doi}` : `https://openalex.org`);
-      const snippet = `${r.authors?.slice(0, 3).join(", ") || "Unknown author"} (${r.year || "n.d."})${r.venue ? ` — ${r.venue}` : ""}`;
+      const snippet = `${r.authors?.slice(0, 3).join(", ") || r.venue || ""}${r.year ? ` (${r.year})` : ""}${r.venue ? ` — ${r.venue}` : ""}`.trim();
       const auth = evaluateSourceAuthority(url, r.title, snippet, r.year);
       const rel = computeWebQueryRelevance(query, r.title, snippet);
 
@@ -1030,22 +1030,22 @@ export function generateMultiVectorQueries(query: string): string[] {
  * Eliminates artificial universal caps while avoiding context overflow.
  */
 export function computeAdaptiveSourceTarget(query: string, mode?: "search" | "deep-research" | "chat"): number {
-  if (mode === "deep-research") return 30;
+  if (mode === "deep-research") return 60;
 
   const clean = query.trim().toLowerCase();
-  let target = 10; // Baseline: at least 10 verified sources
+  let target = 16; // Standard academic baseline (Section 3: 8-20 cited from 30-60 retrieved)
 
   const isComparative = /\b(?:compare|comparison|versus|vs|contrast|trade-off|diverge|divergence|competing)\b/i.test(clean);
   const isAcademic = /\b(?:meta-analysis|systematic review|empirical|literature|longitudinal|cohort|rct|p-value|causal|etiology|epidemiology)\b/i.test(clean);
   const isBroad = /\b(?:history of|impact of|overview|comprehensive|future of|evolution|geopolitical|framework)\b/i.test(clean);
   const isMultiFaceted = clean.split(/\s+/).length > 8;
 
-  if (isComparative) target += 4;
-  if (isAcademic) target += 6;
-  if (isBroad) target += 3;
-  if (isMultiFaceted) target += 3;
+  if (isComparative) target += 8;
+  if (isAcademic) target += 12;
+  if (isBroad) target += 6;
+  if (isMultiFaceted) target += 4;
 
-  return Math.min(Math.max(target, 8), 24);
+  return Math.min(Math.max(target, 15), 45);
 }
 
 /**

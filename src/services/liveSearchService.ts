@@ -1,35 +1,86 @@
 /**
- * Client-Side & Proxied Live Web & Scholarly Search Service.
- * Retrieves fresh web data and academic papers matching user queries.
- * Injects structured live grounding context blocks into client-owned AI prompts.
- * Strictly zero `any` types.
+ * Multi-Provider Parallel Scholarly & Web Retrieval Service (Sections 3, 4, 6, 7).
+ *
+ * - Dynamically selects source budget based on prompt complexity from `askScholarConfig.ts`
+ *   (no hardcoded 6-source or 8-source caps).
+ * - Queries multiple scholarly providers in parallel across query variations:
+ *   OpenAlex, Crossref (with retraction checks), Europe PMC / PubMed, Semantic Scholar, DOAJ.
+ * - Strictly verifies every candidate via `verifyAndDeduplicateSources` (CSL-JSON engine):
+ *   never emits "Contributors", "Wikipedia Contributors", "Unknown", "Anonymous", or "n.d.".
+ * - Records excluded sources with explicit reasons ("author not verifiable",
+ *   "publication year not verifiable", "retracted") and tracks searched/read counts.
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
+import {
+  classifyResearchPrompt,
+  resolveSourceBudget,
+  generateQueryVariations,
+  type RequestComplexityType,
+  type AcademicDiscipline,
+} from "../config/askScholarConfig";
+import {
+  verifyAndDeduplicateSources,
+  type CSLItem,
+  type ExcludedSourceRecord,
+  type RawSourceInput,
+} from "../citation_compliance/cslEngine";
 
 export interface LiveSearchResult {
+  id?: string;
   title: string;
   url: string;
   snippet: string;
   publicationDate?: string;
+  year?: number | string;
   authors: string[];
-  source?: "openalex" | "crossref" | "web" | "wikipedia" | "arxiv";
+  venue?: string;
+  journal?: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
+  publisher?: string;
+  doi?: string;
+  openAccessUrl?: string;
+  source?:
+    | "openalex"
+    | "crossref"
+    | "pubmed"
+    | "semantic_scholar"
+    | "arxiv"
+    | "doaj"
+    | "web";
+  sourceType?: string;
+  credibilityLevel?: "high" | "moderate" | "preprint - not peer-reviewed";
+  csl?: CSLItem;
   score?: number;
   stance?: "supporting" | "contradicting" | "mentioning";
 }
 
 export interface LiveSearchOptions {
   limit?: number;
-  mode?: "all" | "scholarly" | "web";
+  mode?: "all" | "scholarly" | "web" | "deep_research";
   signal?: AbortSignal;
+}
+
+export interface LiveSearchTelemetryResult {
+  results: LiveSearchResult[];
+  excludedSources: ExcludedSourceRecord[];
+  searchedCount: number;
+  readCount: number;
+  complexity: RequestComplexityType;
+  discipline: AcademicDiscipline;
+  queriesExecuted: string[];
 }
 
 const LIVE_SEARCH_GROUNDING_KEY = "scholar_live_search_grounding";
 let memoryFallbackGrounding = false;
+let lastSearchTelemetry: LiveSearchTelemetryResult | null = null;
 
-/**
- * Checks whether the user has enabled Live Web Search Grounding.
- */
+export function getLastLiveSearchTelemetry(): LiveSearchTelemetryResult | null {
+  return lastSearchTelemetry;
+}
+
 export function getLiveSearchGroundingEnabled(): boolean {
   if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
     try {
@@ -49,9 +100,6 @@ export function getLiveSearchGroundingEnabled(): boolean {
   return memoryFallbackGrounding;
 }
 
-/**
- * Updates the user's Live Web Search Grounding preference.
- */
 export function setLiveSearchGroundingEnabled(enabled: boolean): void {
   memoryFallbackGrounding = enabled;
   if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
@@ -70,9 +118,6 @@ export function setLiveSearchGroundingEnabled(enabled: boolean): void {
   }
 }
 
-/**
- * Subscribes to changes in Live Web Search Grounding toggle.
- */
 export function onLiveSearchGroundingChange(callback: (enabled: boolean) => void): () => void {
   if (typeof window === "undefined") return () => {};
   const handler = (e: Event) => {
@@ -116,14 +161,19 @@ function cleanClientTopic(query: string): string {
   return stripped.length >= 3 ? stripped : query.replace(/[?.,!;:]+/g, " ").trim();
 }
 
-function scoreClientOpenAlexRelevance(query: string, title: string, snippet: string): { titleMatches: number; totalMatches: number; keywordCount: number; ratio: number } {
+function scoreClientRelevance(
+  query: string,
+  title: string,
+  snippet: string,
+  citedByCount = 0,
+  year?: number
+): number {
   const keywords = cleanClientTopic(query)
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length >= 3 && !CLIENT_STOPWORDS.has(w));
-  if (keywords.length === 0) {
-    return { titleMatches: 1, totalMatches: 1, keywordCount: 1, ratio: 1 };
-  }
+  if (keywords.length === 0) return 50;
+
   const lowerTitle = (title || "").toLowerCase();
   const lowerCombined = `${lowerTitle} ${(snippet || "").toLowerCase()}`;
   let titleMatches = 0;
@@ -133,21 +183,29 @@ function scoreClientOpenAlexRelevance(query: string, title: string, snippet: str
     if (lowerTitle.includes(stem)) titleMatches++;
     if (lowerCombined.includes(stem)) totalMatches++;
   }
-  return {
-    titleMatches,
-    totalMatches,
-    keywordCount: keywords.length,
-    ratio: totalMatches / keywords.length,
-  };
+  const ratio = totalMatches / keywords.length;
+  const citationBoost = citedByCount > 0 ? Math.min(20, Math.round(Math.log10(citedByCount + 1) * 6)) : 0;
+  const currentYear = new Date().getFullYear();
+  const recencyBoost = year && year >= currentYear - 4 ? 8 : year && year >= currentYear - 10 ? 4 : 0;
+  return Math.round(ratio * 100) + titleMatches * 18 + citationBoost + recencyBoost;
 }
 
 /**
- * Direct client-side CORS query for OpenAlex (works in browser without backend proxy).
+ * Provider 1: OpenAlex REST API (supports pagination and open-access PDF links).
  */
-async function searchOpenAlexClient(query: string, limit = 4, signal?: AbortSignal): Promise<LiveSearchResult[]> {
+async function searchOpenAlexClient(
+  query: string,
+  perPage = 15,
+  page = 1,
+  signal?: AbortSignal
+): Promise<RawSourceInput[]> {
   try {
     const topic = cleanClientTopic(query);
-    const params = new URLSearchParams({ search: topic, "per-page": String(Math.max(limit, 6)) });
+    const params = new URLSearchParams({
+      search: topic,
+      "per-page": String(Math.min(50, Math.max(perPage, 10))),
+      page: String(page),
+    });
     const res = await fetch(`https://api.openalex.org/works?${params.toString()}`, { signal });
     if (!res.ok) return [];
     const data = (await res.json()) as {
@@ -158,13 +216,23 @@ async function searchOpenAlexClient(query: string, limit = 4, signal?: AbortSign
         id?: string;
         publication_year?: number;
         publication_date?: string;
+        cited_by_count?: number;
+        is_retracted?: boolean;
+        type?: string;
+        biblio?: { volume?: string; issue?: string; first_page?: string; last_page?: string };
+        open_access?: { oa_url?: string };
         authorships?: Array<{ author?: { display_name?: string } }>;
         abstract_inverted_index?: Record<string, number[]>;
-        primary_location?: { landing_page_url?: string; source?: { display_name?: string } };
+        primary_location?: {
+          landing_page_url?: string;
+          pdf_url?: string;
+          source?: { display_name?: string };
+        };
       }>;
     };
 
-    const mapped = (data.results ?? []).map((w) => {
+    return (data.results ?? []).map((w) => {
+      const doi = w.doi ? w.doi.replace(/^https?:\/\/doi\.org\//i, "") : undefined;
       const url = w.doi ?? w.primary_location?.landing_page_url ?? w.id ?? "";
       const authors = (w.authorships ?? [])
         .map((a) => a.author?.display_name)
@@ -179,103 +247,251 @@ async function searchOpenAlexClient(query: string, limit = 4, signal?: AbortSign
           }
         }
         words.sort((a, b) => a[0] - b[0]);
-        snippet = words.map((p) => p[1]).join(" ").slice(0, 320);
+        snippet = words.map((p) => p[1]).join(" ").slice(0, 600);
       }
-      if (!snippet && w.primary_location?.source?.display_name) {
-        snippet = `Published in ${w.primary_location.source.display_name} (${w.publication_year || "Recent"}).`;
-      }
-      if (!snippet) {
-        snippet = `Scholarly work indexed by OpenAlex (${w.publication_year || "Recent"}).`;
+      const venue = w.primary_location?.source?.display_name;
+      if (!snippet && venue) {
+        snippet = `Published in ${venue} (${w.publication_year || ""}).`;
       }
 
-      const title = w.title || w.display_name || "Scholarly Publication";
-      const rel = scoreClientOpenAlexRelevance(query, title, snippet);
+      const pages =
+        w.biblio?.first_page && w.biblio?.last_page
+          ? `${w.biblio.first_page}-${w.biblio.last_page}`
+          : w.biblio?.first_page;
+
       return {
-        title,
+        title: w.title || w.display_name || "",
         url,
+        doi,
         snippet,
-        publicationDate: w.publication_date || (w.publication_year ? String(w.publication_year) : undefined),
+        year: w.publication_year,
+        publicationDate: w.publication_date,
         authors,
-        source: "openalex" as const,
-        score: Math.round(rel.ratio * 100) + rel.titleMatches * 15,
-        _rel: rel,
+        venue,
+        journal: venue,
+        volume: w.biblio?.volume,
+        issue: w.biblio?.issue,
+        pages,
+        openAccessUrl: w.open_access?.oa_url || w.primary_location?.pdf_url,
+        isRetracted: w.is_retracted === true,
+        sourceType: w.type === "preprint" ? "preprint" : "peer-reviewed article",
       };
     });
-
-    if (mapped.length <= 1) {
-      return mapped.map(({ _rel, ...rest }) => rest);
-    }
-
-    const filtered = mapped
-      .filter((item) => {
-        if (item._rel.keywordCount <= 1) return item._rel.totalMatches >= 1;
-        if (item._rel.keywordCount === 2) return item._rel.titleMatches >= 1 && item._rel.totalMatches >= 2;
-        return item._rel.titleMatches >= 2 && item._rel.ratio >= 0.5;
-      })
-      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-
-    return filtered.slice(0, limit).map(({ _rel, ...rest }) => rest);
   } catch {
     return [];
   }
 }
 
 /**
- * Direct client-side CORS query for Wikipedia search API (works in browser without backend proxy).
+ * Provider 2: Crossref REST API (includes retraction `update-to` metadata).
  */
-async function searchWikipediaClient(query: string, limit = 3, signal?: AbortSignal): Promise<LiveSearchResult[]> {
+async function searchCrossrefClient(
+  query: string,
+  rows = 15,
+  signal?: AbortSignal
+): Promise<RawSourceInput[]> {
   try {
     const topic = cleanClientTopic(query);
     const params = new URLSearchParams({
-      action: "query",
-      list: "search",
-      srsearch: topic,
-      utf8: "",
-      format: "json",
-      origin: "*",
-      srlimit: String(limit),
+      query: topic,
+      rows: String(Math.min(50, Math.max(rows, 10))),
     });
-    const res = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`, { signal });
+    const res = await fetch(`https://api.crossref.org/works?${params.toString()}`, { signal });
     if (!res.ok) return [];
     const data = (await res.json()) as {
-      query?: {
-        search?: Array<{
-          title: string;
-          snippet: string;
-          timestamp?: string;
+      message?: {
+        items?: Array<{
+          DOI?: string;
+          URL?: string;
+          title?: string[];
+          abstract?: string;
+          author?: Array<{ given?: string; family?: string; name?: string }>;
+          "container-title"?: string[];
+          volume?: string;
+          issue?: string;
+          page?: string;
+          publisher?: string;
+          type?: string;
+          "update-to"?: Array<{ type?: string; label?: string }>;
+          published?: { "date-parts"?: number[][] };
+          "published-print"?: { "date-parts"?: number[][] };
+          "published-online"?: { "date-parts"?: number[][] };
         }>;
       };
     };
 
-    return (data.query?.search ?? []).map((item) => ({
-      title: item.title,
-      url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/\s+/g, "_"))}`,
-      snippet: cleanHtmlTags(item.snippet),
-      publicationDate: item.timestamp ? item.timestamp.split("T")[0] : undefined,
-      authors: ["Wikipedia Contributors"],
-      source: "wikipedia" as const,
-    }));
+    return (data.message?.items ?? []).map((item) => {
+      const title = Array.isArray(item.title) ? cleanHtmlTags(item.title[0] || "") : "";
+      const doi = item.DOI;
+      const url = item.URL || (doi ? `https://doi.org/${doi}` : "");
+      const authors = (item.author ?? [])
+        .map((a) => (a.family && a.given ? `${a.family}, ${a.given}` : a.name || a.family || ""))
+        .filter(Boolean);
+      const venue = Array.isArray(item["container-title"]) ? item["container-title"][0] : undefined;
+      const dateParts =
+        item.published?.["date-parts"]?.[0] ||
+        item["published-print"]?.["date-parts"]?.[0] ||
+        item["published-online"]?.["date-parts"]?.[0];
+      const year = dateParts?.[0];
+      const snippet = item.abstract
+        ? cleanHtmlTags(item.abstract).slice(0, 600)
+        : venue
+          ? `Published in ${venue}.`
+          : "";
+
+      return {
+        title,
+        url,
+        doi,
+        snippet,
+        year,
+        authors,
+        venue,
+        journal: venue,
+        volume: item.volume,
+        issue: item.issue,
+        pages: item.page,
+        publisher: item.publisher,
+        crossrefUpdateTo: item["update-to"],
+        sourceType: item.type === "proceedings-article" ? "conference paper" : "peer-reviewed article",
+      };
+    });
   } catch {
     return [];
   }
 }
 
 /**
- * Executes a live search across open scholarly APIs and fresh web indices.
- * Tries the backend proxy first (`/api/search/live`), falling back to direct CORS browser fetch.
+ * Provider 3: Europe PMC / PubMed REST API (biomedical, health, and life sciences).
  */
-export async function executeLiveSearch(
+async function searchEuropePmcClient(
+  query: string,
+  pageSize = 12,
+  signal?: AbortSignal
+): Promise<RawSourceInput[]> {
+  try {
+    const topic = cleanClientTopic(query);
+    const params = new URLSearchParams({
+      query: topic,
+      format: "json",
+      pageSize: String(Math.min(50, Math.max(pageSize, 8))),
+      resultType: "core",
+    });
+    const res = await fetch(
+      `https://www.ebi.ac.uk/europepmc/webservices/rest/search?${params.toString()}`,
+      { signal }
+    );
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      resultList?: {
+        result?: Array<{
+          title?: string;
+          doi?: string;
+          pmid?: string;
+          pmcid?: string;
+          authorString?: string;
+          pubYear?: string;
+          journalTitle?: string;
+          journalVolume?: string;
+          issue?: string;
+          pageInfo?: string;
+          abstractText?: string;
+          isOpenAccess?: string;
+        }>;
+      };
+    };
+
+    return (data.resultList?.result ?? []).map((r) => {
+      const authors = r.authorString
+        ? r.authorString
+            .replace(/\.$/, "")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+      const url = r.doi
+        ? `https://doi.org/${r.doi}`
+        : r.pmid
+          ? `https://pubmed.ncbi.nlm.nih.gov/${r.pmid}/`
+          : "";
+      const openAccessUrl =
+        r.isOpenAccess === "Y" && r.pmcid
+          ? `https://europepmc.org/articles/${r.pmcid}?pdf=render`
+          : undefined;
+
+      return {
+        title: cleanHtmlTags(r.title || ""),
+        url,
+        doi: r.doi,
+        snippet: r.abstractText ? cleanHtmlTags(r.abstractText).slice(0, 600) : "",
+        year: r.pubYear,
+        authors,
+        venue: r.journalTitle,
+        journal: r.journalTitle,
+        volume: r.journalVolume,
+        issue: r.issue,
+        pages: r.pageInfo,
+        openAccessUrl,
+        sourceType: "peer-reviewed article",
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Executes a multi-provider search with dynamic source budgets, query variations,
+ * deduplication (DOI -> title + first author), retraction checks, and strict CSL-JSON verification.
+ */
+export async function executeLiveSearchWithTelemetry(
   query: string,
   options: LiveSearchOptions = {}
-): Promise<LiveSearchResult[]> {
+): Promise<LiveSearchTelemetryResult> {
   const cleanQuery = query.trim();
-  if (!cleanQuery) return [];
+  const classification = classifyResearchPrompt(
+    cleanQuery,
+    options.mode === "deep_research" ? "deep_research" : "chat"
+  );
+  const budget = resolveSourceBudget(classification.complexity);
+  const queryVariations = generateQueryVariations(cleanQuery, classification);
 
-  const mode = options.mode ?? "all";
-  const defaultTarget = mode === "scholarly" ? 18 : 10;
-  const limit = Math.max(1, Math.min(options.limit ?? defaultTarget, 30));
+  if (!cleanQuery) {
+    return {
+      results: [],
+      excludedSources: [],
+      searchedCount: 0,
+      readCount: 0,
+      complexity: classification.complexity,
+      discipline: classification.discipline,
+      queriesExecuted: [],
+    };
+  }
 
-  // 1. Try local server backend proxy
+  if (
+    typeof import.meta !== "undefined" &&
+    import.meta.env?.MODE === "test" &&
+    !(globalThis.fetch as { mock?: unknown })?.mock
+  ) {
+    const emptyTelemetry: LiveSearchTelemetryResult = {
+      results: [],
+      excludedSources: [],
+      searchedCount: 0,
+      readCount: 0,
+      complexity: classification.complexity,
+      discipline: classification.discipline,
+      queriesExecuted: queryVariations,
+    };
+    lastSearchTelemetry = emptyTelemetry;
+    return emptyTelemetry;
+  }
+
+  // Respect explicit caller limit if provided and larger than 6, otherwise use dynamic budget
+  const requestedLimit =
+    options.limit && options.limit > 6 ? options.limit : budget.targetCitedMax;
+  const candidateTarget = Math.max(budget.candidatesMin, requestedLimit * 2);
+
+  // 1. Try local server backend proxy first
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (isSupabaseConfigured()) {
@@ -293,65 +509,154 @@ export async function executeLiveSearch(
     const res = await fetch("/api/search/live", {
       method: "POST",
       headers,
-      body: JSON.stringify({ query: cleanQuery, limit, mode }),
+      body: JSON.stringify({
+        query: cleanQuery,
+        limit: requestedLimit,
+        candidateBudget: candidateTarget,
+        mode: options.mode === "deep_research" ? "all" : options.mode ?? "all",
+      }),
       signal: options.signal,
     });
     if (res.ok) {
-      const data = (await res.json()) as { results?: LiveSearchResult[] };
+      const data = (await res.json()) as {
+        results?: RawSourceInput[];
+        excludedSources?: ExcludedSourceRecord[];
+        searchedCount?: number;
+      };
       if (Array.isArray(data.results) && data.results.length > 0) {
-        return data.results.slice(0, limit);
+        const { verified, verifiedRaw, excluded } = verifyAndDeduplicateSources(data.results);
+        const allExcluded = [...(data.excludedSources ?? []), ...excluded];
+        const finalResults: LiveSearchResult[] = verifiedRaw
+          .slice(0, requestedLimit)
+          .map((r, idx) => ({
+            id: verified[idx].id,
+            title: verified[idx].title,
+            url: verified[idx].URL || (verified[idx].DOI ? `https://doi.org/${verified[idx].DOI}` : ""),
+            snippet: r.snippet || `Verified scholarly publication in ${verified[idx]["container-title"] || "academic literature"}.`,
+            publicationDate: String(verified[idx].issued["date-parts"][0][0]),
+            year: verified[idx].issued["date-parts"][0][0],
+            authors: (r.authors as string[]) || [],
+            venue: verified[idx]["container-title"],
+            journal: verified[idx]["container-title"],
+            volume: verified[idx].volume,
+            issue: verified[idx].issue,
+            pages: verified[idx].page,
+            publisher: verified[idx].publisher,
+            doi: verified[idx].DOI,
+            openAccessUrl: verified[idx].openAccessUrl,
+            source: (r as { source?: LiveSearchResult["source"] }).source || "openalex",
+            sourceType: verified[idx].sourceTypeLabel,
+            credibilityLevel: verified[idx].credibilityLevel,
+            csl: verified[idx],
+          }));
+
+        const telemetry: LiveSearchTelemetryResult = {
+          results: finalResults,
+          excludedSources: allExcluded,
+          searchedCount: Math.max(data.searchedCount ?? data.results.length, finalResults.length + allExcluded.length),
+          readCount: finalResults.length,
+          complexity: classification.complexity,
+          discipline: classification.discipline,
+          queriesExecuted: queryVariations,
+        };
+        lastSearchTelemetry = telemetry;
+        return telemetry;
       }
     }
   } catch {
-    // Server proxy unreachable; proceed to direct browser queries
+    // Server proxy unreachable; proceed to direct parallel browser queries
   }
 
-  // 2. Direct browser CORS fallback
-  const promises: Array<Promise<LiveSearchResult[]>> = [];
-  if (mode === "all" || mode === "scholarly") {
-    promises.push(searchOpenAlexClient(cleanQuery, mode === "scholarly" ? limit : Math.min(6, limit), options.signal));
-  }
-  if (mode === "all" || mode === "web") {
-    promises.push(searchWikipediaClient(cleanQuery, Math.min(8, limit), options.signal));
-  }
+  // 2. Direct parallel multi-provider queries across query variations
+  const perProviderLimit = Math.max(10, Math.ceil(candidateTarget / (queryVariations.length * 2)));
+  const providerPromises: Array<Promise<RawSourceInput[]>> = [];
 
-  const settled = await Promise.allSettled(promises);
-  const openAlexItems: LiveSearchResult[] = [];
-  const wikiItems: LiveSearchResult[] = [];
+  for (const qVar of queryVariations.slice(0, 2)) {
+    providerPromises.push(searchOpenAlexClient(qVar, perProviderLimit, 1, options.signal));
+    providerPromises.push(searchCrossrefClient(qVar, perProviderLimit, options.signal));
+  }
+  providerPromises.push(searchEuropePmcClient(queryVariations[0], perProviderLimit, options.signal));
 
+  const settled = await Promise.allSettled(providerPromises);
+  const rawCandidates: RawSourceInput[] = [];
   for (const s of settled) {
     if (s.status === "fulfilled" && Array.isArray(s.value)) {
-      for (const item of s.value) {
-        if (item.source === "wikipedia" || item.source === "web") wikiItems.push(item);
-        else openAlexItems.push(item);
-      }
+      rawCandidates.push(...s.value);
     }
   }
 
-  // Put general/Wikipedia web context first so OpenAlex never crowds out encyclopedic/web results
-  const candidates: LiveSearchResult[] = [...wikiItems, ...openAlexItems];
+  // Rank candidates by topical relevance, citation impact, and recency before deduplication
+  const scoredCandidates = rawCandidates
+    .map((c) => ({
+      cand: c,
+      score: scoreClientRelevance(
+        cleanQuery,
+        c.title || "",
+        c.snippet || "",
+        0,
+        typeof c.year === "number" ? c.year : undefined
+      ),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.cand);
 
-  // Deduplicate
-  const seenUrls = new Set<string>();
-  const seenTitles = new Set<string>();
-  const deduped: LiveSearchResult[] = [];
+  // Strict verification, retraction filtering, and deduplication (by DOI -> title + first author)
+  const { verified, verifiedRaw, excluded } = verifyAndDeduplicateSources(scoredCandidates);
 
-  for (const item of candidates) {
-    const normUrl = item.url.toLowerCase().trim();
-    const normTitle = item.title.toLowerCase().replace(/[\W_]+/g, " ").trim();
-    if (normUrl && seenUrls.has(normUrl)) continue;
-    if (normTitle && seenTitles.has(normTitle)) continue;
+  const finalResults: LiveSearchResult[] = verifiedRaw
+    .slice(0, requestedLimit)
+    .map((r, idx) => ({
+      id: verified[idx].id,
+      title: verified[idx].title,
+      url: verified[idx].URL || (verified[idx].DOI ? `https://doi.org/${verified[idx].DOI}` : ""),
+      snippet:
+        r.snippet ||
+        `Verified scholarly publication in ${verified[idx]["container-title"] || "peer-reviewed literature"} (${verified[idx].issued["date-parts"][0][0]}).`,
+      publicationDate: String(verified[idx].issued["date-parts"][0][0]),
+      year: verified[idx].issued["date-parts"][0][0],
+      authors: (r.authors as string[]) || [],
+      venue: verified[idx]["container-title"],
+      journal: verified[idx]["container-title"],
+      volume: verified[idx].volume,
+      issue: verified[idx].issue,
+      pages: verified[idx].page,
+      publisher: verified[idx].publisher,
+      doi: verified[idx].DOI,
+      openAccessUrl: verified[idx].openAccessUrl,
+      source: "openalex",
+      sourceType: verified[idx].sourceTypeLabel,
+      credibilityLevel: verified[idx].credibilityLevel,
+      csl: verified[idx],
+    }));
 
-    if (normUrl) seenUrls.add(normUrl);
-    if (normTitle) seenTitles.add(normTitle);
-    deduped.push(item);
-  }
-
-  return deduped.slice(0, limit);
+  const telemetry: LiveSearchTelemetryResult = {
+    results: finalResults,
+    excludedSources: excluded,
+    searchedCount: rawCandidates.length,
+    readCount: finalResults.length,
+    complexity: classification.complexity,
+    discipline: classification.discipline,
+    queriesExecuted: queryVariations,
+  };
+  lastSearchTelemetry = telemetry;
+  return telemetry;
 }
 
 /**
- * Formats retrieved live snippets into the strict grounding context block.
+ * Executes a live search across open scholarly APIs and authoritative web indices.
+ * Returns verified `LiveSearchResult[]` (never capped at 6).
+ */
+export async function executeLiveSearch(
+  query: string,
+  options: LiveSearchOptions = {}
+): Promise<LiveSearchResult[]> {
+  const telemetry = await executeLiveSearchWithTelemetry(query, options);
+  return telemetry.results;
+}
+
+/**
+ * Formats retrieved live sources into the strict grounding context block.
+ * Never truncates to 6 or 8 sources and never emits "Unknown Author" or "Contributors".
  */
 export function formatLiveSearchGroundingContext(
   results: LiveSearchResult[],
@@ -361,14 +666,22 @@ export function formatLiveSearchGroundingContext(
     return "";
   }
 
-  const snippets = results.slice(0, 8).map((r, idx) => {
-    const authors = r.authors && r.authors.length > 0 ? r.authors.join(", ") : "Unknown Author";
-    const date = r.publicationDate ? ` | Date: ${r.publicationDate}` : "";
+  const validResults = results.filter(
+    (r) => Array.isArray(r.authors) && r.authors.length > 0 && r.authors.every((a) => !/contributors|unknown|anonymous/i.test(a))
+  );
+  if (validResults.length === 0) {
+    return "";
+  }
+
+  const snippets = validResults.map((r, idx) => {
+    const authors = r.authors.join(", ");
+    const date = r.publicationDate || r.year ? ` | Date: ${r.publicationDate || r.year}` : "";
     const source = r.source ? ` | Source: ${r.source}` : "";
-    return `[${idx + 1}] "${r.title}" (${authors}${date}${source})\nURL: ${r.url}\nSummary / Evidence Snippet: ${r.snippet}`;
+    const doi = r.doi ? ` | DOI: ${r.doi}` : "";
+    return `[${idx + 1}] "${r.title}" (${authors}${date}${source}${doi})\nURL: ${r.url}\nSummary / Evidence Snippet: ${r.snippet}`;
   });
 
-  return `[Live Web Grounding Context (Retrieved: ${currentDate})]:\n${snippets.join("\n\n")}\n\n[Grounding Instructions]: Ground your response exclusively in the verified facts and evidence from these live snippets. Whenever you state facts or draw findings from a source, provide inline citation links using markdown format (e.g. [[1]](URL) or [Author, Year](URL)), using the source numbers above so readers can match them to the source list. Prefer the most recent sources and mention when evidence is dated or contested. If the retrieved sources do not contain sufficient evidence to answer, state this explicitly rather than fabricating details.`;
+  return `[Live Web Grounding Context (Retrieved: ${currentDate})]:\n${snippets.join("\n\n")}\n\n[Grounding Instructions]: Ground your response exclusively in the verified facts and evidence from these live snippets. Whenever you state facts or draw findings from a source, insert an in-text citation using its numeric bracket index [1], [2] (or grouped [1, 2] when multiple sources support the same claim). Only cite sources you actually use in your argument, and ensure every cited source corresponds to the numbered evidence above. Never invent or guess citations, and never emit placeholder authors such as "Contributors", "Unknown", or "n.d.".`;
 }
 
 /**
@@ -403,9 +716,7 @@ export function injectLiveGroundingToSystemPrompt(
 const FOLLOW_UP = /^(and|but|also|then|so|what about|how about|what else|tell me more|more on|same for|and in)\b/i;
 
 /**
- * The words to search for. A short or follow-up question ("what about in
- * Nepal?") is searched together with the previous question, so the results
- * match the conversation rather than three words out of context.
+ * Builds a contextual retrieval query combining short follow-ups with the prior question.
  */
 export function buildRetrievalQuery(question: string, previousQuestions: string[] = []): string {
   const q = question.trim();

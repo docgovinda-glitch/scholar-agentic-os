@@ -65,7 +65,7 @@ export class ChicagoNotesFormatter implements CitationStyle {
 
   /** The shortened note used for every citation after the first (CMOS 17 §14.34): last name, short title, locator. */
   formatShortNote(reference: CanonicalReference, options?: NoteOptions): string {
-    const lastName = reference.authors?.[0]?.lastName ?? "Unknown";
+    const lastName = reference.authors?.[0]?.lastName ?? "";
     const short = this.shortTitle(reference.title);
     const page = options?.locator ?? reference.pages;
     const isArticle = reference.kind === "JournalArticle";

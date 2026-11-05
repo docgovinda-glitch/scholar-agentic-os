@@ -35,7 +35,7 @@ export class APA7Formatter implements CitationStyle {
    */
   private inTextAuthors(authors: CanonicalReference["authors"]): string {
     const names = (authors ?? []).map((a) => a.lastName).filter(Boolean);
-    if (names.length === 0) return "Anonymous";
+    if (names.length === 0) return "";
     if (names.length === 1) return names[0];
     if (names.length === 2) return `${names[0]} & ${names[1]}`;
     return `${names[0]} et al.`;

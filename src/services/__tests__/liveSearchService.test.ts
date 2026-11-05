@@ -10,6 +10,7 @@ import {
   setLiveSearchGroundingEnabled,
   onLiveSearchGroundingChange,
   executeLiveSearch,
+  executeLiveSearchWithTelemetry,
   type LiveSearchResult,
 } from "../liveSearchService";
 import {
@@ -17,7 +18,7 @@ import {
   reconstructOpenAlexAbstract,
 } from "../../../server/src/discovery/liveSearch";
 
-describe("Live Web & Scholarly Search Service", () => {
+describe("Live Web & Scholarly Search Service (Multi-Provider & CSL-JSON Verified)", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
@@ -34,6 +35,7 @@ describe("Live Web & Scholarly Search Service", () => {
       snippet:
         "Recent breakthroughs in diamond NV-centers enable real-time sub-cellular magnetic resonance imaging with nanometer spatial resolution.",
       publicationDate: "2024-03-15",
+      year: 2024,
       authors: ["Smith, Jane", "Kovacs, Laszlo", "Chen, Wei"],
       source: "openalex",
     },
@@ -43,17 +45,19 @@ describe("Live Web & Scholarly Search Service", () => {
       snippet:
         "Chain-of-thought verification reduces hallucination rates by 42% on complex multi-hop academic benchmark tasks.",
       publicationDate: "2024-01-20",
+      year: 2024,
       authors: ["Patel, Aarav", "Gupta, Sunita"],
       source: "crossref",
     },
     {
-      title: "Quantum Entanglement",
-      url: "https://en.wikipedia.org/wiki/Quantum_entanglement",
+      title: "World Health Organization Global Malaria Report",
+      url: "https://www.who.int/publications/malaria-report-2024",
       snippet:
-        "Quantum entanglement is a physical phenomenon that occurs when a group of particles interact in ways such that the quantum state of each particle cannot be described independently.",
+        "Annual assessment of global malaria incidence, vector control, and vaccine rollout across endemic regions.",
       publicationDate: "2024-02-01",
-      authors: ["Wikipedia Contributors"],
-      source: "wikipedia",
+      year: 2024,
+      authors: ["World Health Organization"],
+      source: "web",
     },
   ];
 
@@ -64,39 +68,33 @@ describe("Live Web & Scholarly Search Service", () => {
       expect(formatLiveSearchGroundingContext(undefined)).toBe("");
     });
 
-    it("formats strict system context block with current date and sources", () => {
+    it("formats strict system context block with current date and verified sources", () => {
       const fixedDate = "2026-10-23";
       const formatted = formatLiveSearchGroundingContext(mockResults, fixedDate);
 
-      // Verify header matches strict pattern
       expect(formatted).toContain("[Live Web Grounding Context (Retrieved: 2026-10-23)]:");
-
-      // Verify source 1 details
-      expect(formatted).toContain('[1] "Quantum Sensing Advances in Biological Systems" (Smith, Jane, Kovacs, Laszlo, Chen, Wei | Date: 2024-03-15 | Source: openalex)');
+      expect(formatted).toContain(
+        '[1] "Quantum Sensing Advances in Biological Systems" (Smith, Jane, Kovacs, Laszlo, Chen, Wei | Date: 2024-03-15 | Source: openalex)'
+      );
       expect(formatted).toContain("URL: https://doi.org/10.1038/s41586-024-00123-x");
       expect(formatted).toContain("Summary / Evidence Snippet: Recent breakthroughs in diamond NV-centers");
-
-      // Verify source 2 details
       expect(formatted).toContain('[2] "Empirical Analysis of Large Language Model Reasoning Bounds"');
-      expect(formatted).toContain("URL: https://doi.org/10.1145/3610000");
-
-      // Verify grounding instructions
-      expect(formatted).toContain("[Grounding Instructions]: Ground your response exclusively in the verified facts and evidence from these live snippets.");
-      expect(formatted).toContain("provide inline citation links using markdown format");
+      expect(formatted).toContain("[Grounding Instructions]: Ground your response exclusively in the verified facts and evidence");
     });
 
-    it("caps formatted sources to the top 8 snippets", () => {
-      const largeList: LiveSearchResult[] = Array.from({ length: 10 }, (_, i) => ({
-        title: `Paper ${i + 1}`,
-        url: `https://example.org/${i + 1}`,
-        snippet: `Snippet content for paper ${i + 1}`,
-        authors: [`Author ${i + 1}`],
+    it("does NOT cap formatted sources at 6 or 8 and excludes unverified placeholder authors", () => {
+      const largeList: LiveSearchResult[] = Array.from({ length: 18 }, (_, i) => ({
+        title: `Verified Paper ${i + 1}`,
+        url: `https://doi.org/10.1000/paper.${i + 1}`,
+        snippet: `Empirical findings for study ${i + 1}`,
+        publicationDate: "2024",
+        authors: [`Rostova, Elena`],
       }));
 
       const formatted = formatLiveSearchGroundingContext(largeList, "2026-10-23");
-      // Ask Scholar now searches for up to 6–8 sources per answer (was 5).
-      expect(formatted).toContain('[8] "Paper 8"');
-      expect(formatted).not.toContain('[9] "Paper 9"');
+      expect(formatted).toContain('[8] "Verified Paper 8"');
+      expect(formatted).toContain('[15] "Verified Paper 15"');
+      expect(formatted).toContain('[18] "Verified Paper 18"');
     });
   });
 
@@ -155,73 +153,82 @@ describe("Live Web & Scholarly Search Service", () => {
     });
   });
 
-  describe("executeLiveSearch", () => {
+  describe("executeLiveSearch & executeLiveSearchWithTelemetry", () => {
     it("returns empty array for whitespace query", async () => {
       const results = await executeLiveSearch("   ");
       expect(results).toEqual([]);
     });
 
-    it("queries server backend /api/search/live when available", async () => {
+    it("queries server backend /api/search/live and verifies CSL metadata, excluding placeholder authors", async () => {
+      const serverResults = [
+        ...mockResults,
+        {
+          title: "Unverified Wiki Article",
+          url: "https://en.wikipedia.org/wiki/Quantum",
+          snippet: "Some wiki text",
+          publicationDate: "2026-01-01",
+          authors: ["Wikipedia Contributors"],
+        },
+      ];
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ results: mockResults }),
+        json: async () => ({ results: serverResults, searchedCount: 42 }),
       } as Response);
 
-      const results = await executeLiveSearch("quantum sensing", { limit: 3 });
+      const telemetry = await executeLiveSearchWithTelemetry("quantum sensing in biology");
       expect(fetchSpy).toHaveBeenCalledWith(
         "/api/search/live",
         expect.objectContaining({
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: "quantum sensing", limit: 3, mode: "all" }),
         })
       );
-      expect(results).toHaveLength(3);
-      expect(results[0].title).toBe("Quantum Sensing Advances in Biological Systems");
+      // The 3 verified sources pass; the "Wikipedia Contributors" source is excluded!
+      expect(telemetry.results).toHaveLength(3);
+      expect(telemetry.excludedSources).toHaveLength(1);
+      expect(telemetry.excludedSources[0].reason).toBe("author not verifiable");
+      expect(telemetry.searchedCount).toBe(42);
     });
 
-    it("falls back to client-side CORS open APIs if backend server returns an error", async () => {
-      // First call (server) fails with 500
-      const fetchSpy = vi.spyOn(globalThis, "fetch")
+    it("falls back to parallel multi-provider scholarly APIs if backend server returns an error", async () => {
+      vi.spyOn(globalThis, "fetch")
+        // First call (server) fails with 500
         .mockResolvedValueOnce({
           ok: false,
           status: 500,
         } as Response)
-        // Second call: OpenAlex client
-        .mockResolvedValueOnce({
+        // Subsequent parallel provider calls (OpenAlex, Crossref, EuropePMC)
+        .mockResolvedValue({
           ok: true,
           json: async () => ({
             results: [
               {
                 id: "https://openalex.org/W12345",
-                title: "Fallback OpenAlex Paper",
+                doi: "https://doi.org/10.1038/s41586-024-09999-z",
+                title: "Fallback OpenAlex Quantum Paper",
                 publication_year: 2024,
-                authorships: [{ author: { display_name: "Dr. Fallback" } }],
+                authorships: [{ author: { display_name: "Elena Rostova" } }],
+                primary_location: { source: { display_name: "Nature" } },
               },
             ],
-          }),
-        } as Response)
-        // Third call: Wikipedia client
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            query: {
-              search: [
+            message: {
+              items: [
                 {
-                  title: "Fallback Wikipedia Page",
-                  snippet: "Fallback encyclopedia snippet.",
-                  timestamp: "2024-05-01T12:00:00Z",
+                  DOI: "10.1126/science.2024.111",
+                  title: ["Crossref Verified Quantum Study"],
+                  author: [{ given: "Alan", family: "Turing" }],
+                  published: { "date-parts": [[2024]] },
+                  "container-title": ["Science"],
                 },
               ],
             },
+            resultList: { result: [] },
           }),
         } as Response);
 
-      const results = await executeLiveSearch("test query", { limit: 5 });
-      expect(fetchSpy).toHaveBeenCalledTimes(3);
-      expect(results.length).toBeGreaterThan(0);
-      expect(results.some((r) => r.title === "Fallback OpenAlex Paper")).toBe(true);
-      expect(results.some((r) => r.title === "Fallback Wikipedia Page")).toBe(true);
+      const results = await executeLiveSearch("quantum computing error correction");
+      expect(results.length).toBeGreaterThanOrEqual(2);
+      expect(results.some((r) => r.title === "Fallback OpenAlex Quantum Paper")).toBe(true);
+      expect(results.some((r) => r.title === "Crossref Verified Quantum Study")).toBe(true);
     });
   });
 

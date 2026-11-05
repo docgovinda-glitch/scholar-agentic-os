@@ -124,17 +124,21 @@ describe("Ask Scholar 2.0 Multi-Layer Integration", () => {
     // 1. Verify assistant response renders
     expect(await screen.findByText(/Transformers/i)).toBeInTheDocument();
 
-    // 2. Verify Layer handoff action buttons appear
-    const discoveryBtn = await screen.findByRole("button", { name: /^Discovery$/i });
-    const synthesisBtn = await screen.findByRole("button", { name: /^Evidence Synthesis$/i });
+    // 2. Verify merged single-row primary tabs appear without duplicate row-2 buttons (Section 13)
+    const matrixTabBtn = await screen.findByRole("button", { name: /Evidence Matrix \(2\)/i });
+    const citationGraphTabBtn = await screen.findByRole("button", { name: /^Citation Graph$/i });
     const exportBtn = await screen.findByRole("button", { name: /LaTeX \/ Overleaf/i });
 
-    expect(discoveryBtn).toBeInTheDocument();
-    expect(synthesisBtn).toBeInTheDocument();
+    expect(matrixTabBtn).toBeInTheDocument();
+    expect(citationGraphTabBtn).toBeInTheDocument();
     expect(exportBtn).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Discovery$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Evidence Synthesis$/i })).toBeNull();
 
-    // 3. Click Discovery button -> Opens Literature Discovery Workspace (Layer B)
-    fireEvent.click(discoveryBtn);
+    // 3. Click Citation Graph tab -> Click Full Discovery Workspace -> Opens Literature Discovery Workspace (Layer B)
+    fireEvent.click(citationGraphTabBtn);
+    const fullDiscoveryBtn = await screen.findByRole("button", { name: /Full Discovery Workspace/i });
+    fireEvent.click(fullDiscoveryBtn);
 
     expect(await screen.findByText("Literature Discovery Workspace")).toBeInTheDocument();
     expect(screen.getByText(/Layer B · Citation Graph/i)).toBeInTheDocument();

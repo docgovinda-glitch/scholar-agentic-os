@@ -1,13 +1,50 @@
 /**
- * Scholar Citation Engine & Referencing Subsystem
+ * Scholar Citation Engine & Referencing Subsystem (CSL-JSON Deterministic Engine)
  *
- * Implements authoritative citation generation, anti-fabrication verification,
- * and dynamic multi-style formatting (APA, MLA, Chicago, Harvard, IEEE, Vancouver)
- * for Ask Scholar responses.
+ * Implements authoritative CSL-JSON citation generation, strict metadata verification,
+ * retraction filtering, 1-to-1 citation-reference bijection, and multi-style rendering
+ * (APA 7th, MLA 9th, Chicago 17th Author-Date, Chicago 17th Notes & Bibliography,
+ * Harvard, IEEE, Vancouver) for Ask Scholar responses.
+ *
+ * Strictly forbids placeholder authors or dates ("Contributors", "Unknown", "Anonymous", "n.d.").
  */
 
-import { CitationFormatterFactory, CitationStyleRegistry } from "../citation_compliance/formattingEngine";
 import type { CanonicalReference, ReferenceAuthor, ReferenceKind } from "../citation_compliance/model/reference";
+import {
+  verifyAndConvertToCSL,
+  verifyAndDeduplicateSources,
+  formatCSLInTextSingle,
+  formatCSLBibliographyEntry,
+  sortCSLItemsForStyle,
+  normalizeCSLStyle,
+  getReferenceListHeading,
+  enforceCitationReferenceBijection,
+  exportCSLToBibTeX,
+  exportCSLToRIS,
+  parseReferenceImportText,
+  normalizeDoi,
+  isBannedAuthorString,
+  type CSLItem,
+  type ExcludedSourceRecord,
+  type SupportedCSLStyle,
+} from "../citation_compliance/cslEngine";
+
+export {
+  verifyAndConvertToCSL,
+  verifyAndDeduplicateSources,
+  formatCSLInTextSingle,
+  formatCSLBibliographyEntry,
+  sortCSLItemsForStyle,
+  normalizeCSLStyle,
+  getReferenceListHeading,
+  enforceCitationReferenceBijection,
+  exportCSLToBibTeX,
+  exportCSLToRIS,
+  parseReferenceImportText,
+  type CSLItem,
+  type ExcludedSourceRecord,
+  type SupportedCSLStyle,
+};
 
 export interface WebsiteCitationItem {
   id?: string;
@@ -21,12 +58,22 @@ export interface WebsiteCitationItem {
   source?: string;
   venue?: string;
   journal?: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
   year?: number | string;
+  publishedDate?: string;
+  publicationDate?: string;
   author?: string;
   authors?: string[];
   doi?: string;
   isPrimary?: boolean;
   sourceType?: "official" | "scholarly" | "media" | "web" | string;
+  credibilityLevel?: "high" | "moderate" | "preprint - not peer-reviewed";
+  openAccessUrl?: string;
+  isRetracted?: boolean;
+  limitationNote?: string;
+  csl?: CSLItem;
   claim?: string;
   citation?: string;
   evidenceSnippet?: string;
@@ -34,7 +81,14 @@ export interface WebsiteCitationItem {
   suggestedUse?: string;
 }
 
-export type AskCitationStyleId = "apa" | "mla" | "chicago" | "harvard" | "ieee" | "vancouver";
+export type AskCitationStyleId =
+  | "apa"
+  | "mla"
+  | "chicago"
+  | "chicago-notes"
+  | "harvard"
+  | "ieee"
+  | "vancouver";
 
 export interface AskCitationStyleInfo {
   id: AskCitationStyleId;
@@ -54,16 +108,18 @@ export const ASK_SCHOLAR_CITATION_STYLES: AskCitationStyleInfo[] = [
     isNumbered: false,
     description: "Author-date format: (Author, Year). Alphabetical reference list.",
     exampleInText: "(Vaswani et al., 2017)",
-    exampleBib: "Vaswani, A., et al. (2017). Attention is all you need. arXiv. https://doi.org/10.48550/arXiv.1706.03762",
+    exampleBib:
+      "Vaswani, A., Shazeer, N., Parmar, N., & Uszkoreit, J. (2017). Attention is all you need. Advances in Neural Information Processing Systems, 30. https://doi.org/10.48550/arXiv.1706.03762",
   },
   {
     id: "mla",
     name: "MLA 9th Edition",
     shortLabel: "MLA 9th",
     isNumbered: false,
-    description: "Author format: (Author). Works Cited list with containers.",
-    exampleInText: "(Vaswani)",
-    exampleBib: 'Vaswani, Ashish, et al. "Attention Is All You Need." arXiv, 2017.',
+    description: "Author-page format: (Author). Alphabetical Works Cited list.",
+    exampleInText: "(Vaswani et al.)",
+    exampleBib:
+      'Vaswani, Ashish, et al. "Attention Is All You Need." Advances in Neural Information Processing Systems, vol. 30, 2017. https://doi.org/10.48550/arXiv.1706.03762.',
   },
   {
     id: "chicago",
@@ -71,41 +127,55 @@ export const ASK_SCHOLAR_CITATION_STYLES: AskCitationStyleInfo[] = [
     shortLabel: "Chicago",
     isNumbered: false,
     description: "Author-date format: (Author Year). Alphabetical bibliography.",
-    exampleInText: "(Vaswani 2017)",
-    exampleBib: 'Vaswani, Ashish, et al. 2017. "Attention Is All You Need." arXiv.',
+    exampleInText: "(Vaswani et al. 2017)",
+    exampleBib:
+      'Vaswani, Ashish, et al. 2017. "Attention Is All You Need." Advances in Neural Information Processing Systems 30. https://doi.org/10.48550/arXiv.1706.03762.',
+  },
+  {
+    id: "chicago-notes",
+    name: "Chicago 17th (Notes & Bibliography)",
+    shortLabel: "Chicago Notes",
+    isNumbered: true,
+    description: "Numbered note format: [1]. Alphabetical bibliography.",
+    exampleInText: "[1]",
+    exampleBib:
+      'Vaswani, Ashish, et al. "Attention Is All You Need." Advances in Neural Information Processing Systems 30 (2017). https://doi.org/10.48550/arXiv.1706.03762.',
   },
   {
     id: "harvard",
     name: "Harvard Referencing",
     shortLabel: "Harvard",
     isNumbered: false,
-    description: "Author-date format: (Author, Year). Harvard reference list.",
+    description: "Author-date format: (Author, Year). Alphabetical reference list.",
     exampleInText: "(Vaswani, 2017)",
-    exampleBib: "Vaswani, A. (2017) 'Attention is all you need', arXiv.",
+    exampleBib:
+      "Vaswani, A. et al. (2017) 'Attention Is All You Need', Advances in Neural Information Processing Systems, 30. doi:10.48550/arXiv.1706.03762.",
   },
   {
     id: "ieee",
     name: "IEEE",
     shortLabel: "IEEE",
     isNumbered: true,
-    description: "Numbered bracket format: [1]. Citation-ordered references list.",
+    description: "Numbered bracket format: [1]. Appearance-ordered reference list.",
     exampleInText: "[1]",
-    exampleBib: '[1] A. Vaswani et al., "Attention is all you need," arXiv, 2017.',
+    exampleBib:
+      '[1] A. Vaswani et al., "Attention Is All You Need," Advances in Neural Information Processing Systems, vol. 30, 2017, doi: 10.48550/arXiv.1706.03762.',
   },
   {
     id: "vancouver",
     name: "Vancouver",
     shortLabel: "Vancouver",
     isNumbered: true,
-    description: "Numbered format: [1]. Uniform requirements citation order.",
-    exampleInText: "[1]",
-    exampleBib: "1. Vaswani A, et al. Attention is all you need. arXiv; 2017.",
+    description: "Numbered format: (1). Appearance-ordered reference list.",
+    exampleInText: "(1)",
+    exampleBib:
+      "1. Vaswani A, Shazeer N, Parmar N, Uszkoreit J. Attention Is All You Need. Advances in Neural Information Processing Systems. 2017;30. doi:10.48550/arXiv.1706.03762",
   },
 ];
 
 export function getCitationStyleInfo(styleId: string): AskCitationStyleInfo {
-  const norm = (styleId || "apa").toLowerCase().replace(/[^a-z]/g, "");
-  const found = ASK_SCHOLAR_CITATION_STYLES.find((s) => s.id === norm || norm.includes(s.id));
+  const norm = normalizeCSLStyle(styleId);
+  const found = ASK_SCHOLAR_CITATION_STYLES.find((s) => s.id === norm);
   return found || ASK_SCHOLAR_CITATION_STYLES[0];
 }
 
@@ -113,28 +183,25 @@ export function getCitationStyleInfo(styleId: string): AskCitationStyleInfo {
  * Extracts a DOI (Digital Object Identifier) from a string, URL, or identifier.
  */
 export function extractDoi(str?: string): string | undefined {
-  if (!str) return undefined;
-  const doiRegex = /(10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+)/i;
-  const match = str.match(doiRegex);
-  if (match) {
-    return match[1].replace(/[.,;)]+$/, "");
-  }
-  return undefined;
+  return normalizeDoi(str);
 }
 
 /**
  * Splits a full name string into structured ReferenceAuthor parts.
+ * Returns empty lastName if the name is a banned placeholder.
  */
 export function splitAuthorName(fullName: string, order = 1): ReferenceAuthor {
-  const clean = fullName.trim().replace(/^by\s+/i, "");
-  if (!clean) {
-    return { firstName: "", lastName: "Unknown", order };
+  const clean = (fullName || "").trim().replace(/^by\s+/i, "");
+  if (!clean || isBannedAuthorString(clean)) {
+    return { firstName: "", lastName: "", order };
   }
 
-  // Handle "Lastname, Firstname"
   if (clean.includes(",")) {
     const [last, first] = clean.split(",").map((s) => s.trim());
-    return { firstName: first || "", lastName: last || "Unknown", order };
+    if (!last || isBannedAuthorString(last)) {
+      return { firstName: "", lastName: "", order };
+    }
+    return { firstName: first || "", lastName: last, order };
   }
 
   const parts = clean.split(/\s+/);
@@ -153,64 +220,86 @@ export function splitAuthorName(fullName: string, order = 1): ReferenceAuthor {
  * Infers ReferenceKind from citation metadata.
  */
 export function inferReferenceKind(item: WebsiteCitationItem): ReferenceKind {
-  const type = (item as any).sourceType || "";
+  const type = (item.sourceType || "").toLowerCase();
   const domain = (item.domain || item.url || "").toLowerCase();
 
-  if (type === "official" || domain.endsWith(".gov") || domain.includes("who.int") || domain.includes("un.org")) {
+  if (type.includes("government") || type === "official" || domain.endsWith(".gov") || domain.includes("who.int") || domain.includes("un.org")) {
     return "GovernmentPublication";
   }
-  if (type === "scholarly" || domain.includes("arxiv.org") || domain.includes("biorxiv.org")) {
+  if (type.includes("preprint") || domain.includes("arxiv.org") || domain.includes("biorxiv.org")) {
     return "Preprint";
   }
-  if (type === "scholarly" || extractDoi(item.url) || extractDoi((item as any).doi)) {
+  if (type.includes("conference")) {
+    return "ConferencePaper";
+  }
+  if (type.includes("book")) {
+    return "Book";
+  }
+  if (type === "scholarly" || type.includes("peer-reviewed") || extractDoi(item.url) || extractDoi(item.doi)) {
     return "JournalArticle";
   }
   return "Website";
 }
 
 /**
- * Converts a verified WebsiteCitationItem or SearchResultItem into a CanonicalReference.
+ * Converts a WebsiteCitationItem into a verified CSLItem, or returns null if verification fails.
+ */
+export function citationItemToCSL(item: WebsiteCitationItem, index = 0): CSLItem | null {
+  if (item.csl && item.csl.author?.length > 0 && item.csl.issued?.["date-parts"]?.[0]?.[0]) {
+    return item.csl;
+  }
+  const res = verifyAndConvertToCSL(
+    {
+      id: item.id,
+      title: item.title,
+      authors: item.authors,
+      author: item.author,
+      year: item.year,
+      publishedDate: item.publishedDate,
+      publicationDate: item.publicationDate,
+      venue: item.venue || item.source,
+      journal: item.journal,
+      volume: item.volume,
+      issue: item.issue,
+      pages: item.pages,
+      publisher: item.publisher,
+      doi: item.doi,
+      url: item.url,
+      sourceType: item.sourceType,
+      credibilityLevel: item.credibilityLevel,
+      openAccessUrl: item.openAccessUrl,
+      isRetracted: item.isRetracted,
+    },
+    index
+  );
+  return res.ok ? res.item : null;
+}
+
+/**
+ * Converts a verified WebsiteCitationItem into a CanonicalReference.
  */
 export function citationItemToCanonicalReference(
   item: WebsiteCitationItem,
   index = 0
 ): CanonicalReference {
-  const doi = extractDoi((item as any).doi) || extractDoi(item.url);
+  const csl = citationItemToCSL(item, index);
   const kind = inferReferenceKind(item);
+  const doi = csl?.DOI || extractDoi(item.doi) || extractDoi(item.url);
 
-  // Extract authors
-  let authors: ReferenceAuthor[] = [];
-  const rawAuthors: any = (item as any).authors || (item as any).author;
+  const authors: ReferenceAuthor[] = csl
+    ? csl.author.map((a, i) => ({
+        firstName: a.given || "",
+        lastName: a.family || a.literal || "",
+        order: i + 1,
+      }))
+    : (item.authors || [])
+        .map((a, i) => splitAuthorName(a, i + 1))
+        .filter((a) => Boolean(a.lastName));
 
-  if (Array.isArray(rawAuthors) && rawAuthors.length > 0) {
-    authors = rawAuthors.map((a, i) =>
-      typeof a === "string" ? splitAuthorName(a, i + 1) : a
-    );
-  } else if (typeof rawAuthors === "string" && rawAuthors.trim()) {
-    // Check for comma or semicolon delimited authors
-    const authorList = rawAuthors.split(/[;]|\band\b/i).map((s) => s.trim()).filter(Boolean);
-    authors = authorList.map((a, i) => splitAuthorName(a, i + 1));
-  } else if (item.publisher) {
-    // If no human author is named, institutional attribution serves as author
-    authors = [{ firstName: "", lastName: item.publisher.trim(), order: 1 }];
-  } else if (item.domain) {
-    authors = [{ firstName: "", lastName: item.domain.replace(/^www\./, ""), order: 1 }];
-  } else {
-    authors = [{ firstName: "", lastName: "Scholar Reference", order: 1 }];
-  }
-
-  // Publication year extraction
-  let yearStr = item.year !== undefined ? String(item.year) : undefined;
-  if (!yearStr) {
-    const textToScan = `${item.title || ""} ${item.snippet || ""}`;
-    const yearMatch = textToScan.match(/\b(201\d|202\d)\b/);
-    if (yearMatch) {
-      yearStr = yearMatch[1];
-    }
-  }
-
-  const cleanTitle = (item.title || "Scholarly Resource").trim();
-  const venue = item.venue || (item as any).publisher || item.domain || undefined;
+  const yearNum = csl?.issued?.["date-parts"]?.[0]?.[0];
+  const yearStr = yearNum ? String(yearNum) : item.year ? String(item.year) : undefined;
+  const cleanTitle = (csl?.title || item.title || "").trim();
+  const venue = csl?.["container-title"] || item.journal || item.venue || item.publisher || undefined;
 
   return {
     kind,
@@ -218,117 +307,104 @@ export function citationItemToCanonicalReference(
     authors,
     source: venue || cleanTitle,
     journal: kind === "JournalArticle" || kind === "Preprint" ? venue : undefined,
-    publisher: item.publisher || undefined,
+    volume: csl?.volume || item.volume,
+    issue: csl?.issue || item.issue,
+    pages: csl?.page || item.pages,
+    publisher: csl?.publisher || item.publisher || undefined,
     year: yearStr,
     publicationDate: yearStr ? `${yearStr}-01-01` : undefined,
     doi: doi ? (doi.startsWith("http") ? doi : `https://doi.org/${doi}`) : undefined,
-    url: item.url || undefined,
+    url: csl?.URL || item.url || undefined,
     _position: index + 1,
     _meta: { sourceRecordId: item.url || `source-${index + 1}` },
   };
 }
 
 /**
- * Formats an in-text citation marker using the Citation Engine according to the selected style.
+ * Formats an in-text citation marker using the CSL-JSON Engine according to the selected style.
+ * Returns empty string if the item lacks verifiable author or publication year.
  */
 export function formatAskScholarInText(
   item: WebsiteCitationItem,
   index: number,
   styleId: string
 ): string {
-  const ref = citationItemToCanonicalReference(item, index);
-  const styleInfo = getCitationStyleInfo(styleId);
-
-  if (styleInfo.id === "ieee") {
-    return `[${index + 1}]`;
-  }
-  if (styleInfo.id === "vancouver") {
-    return `(${index + 1})`;
-  }
-
-  try {
-    const formatted = CitationFormatterFactory.formatInText(styleId, ref);
-    if (formatted && formatted !== "[Citation: Unknown]") {
-      return formatted.trim();
-    }
-  } catch {
-    // fallback below
-  }
-
-  // Fallback for author-date styles if formatter returns bare string
-  const primaryAuthor = ref.authors[0]?.lastName || item.publisher || item.domain || "Source";
-  const year = ref.year || "n.d.";
-  if (styleInfo.id === "mla") {
-    return `(${primaryAuthor})`;
-  }
-  return `(${primaryAuthor}, ${year})`;
+  const style = normalizeCSLStyle(styleId);
+  const csl = citationItemToCSL(item, index);
+  if (!csl) return "";
+  return formatCSLInTextSingle(csl, style, index + 1);
 }
 
 export interface FormattedBibliographyEntry {
   originalIndex: number;
   displayIndex: number;
   formattedText: string;
+  markdownText?: string;
+  htmlText?: string;
   rawCitation: WebsiteCitationItem;
+  csl?: CSLItem;
   marker?: string;
   doi?: string;
   url?: string;
+  openAccessUrl?: string;
   year?: string;
   publisher?: string;
   authorityBadge?: string;
+  sourceTypeLabel?: string;
+  credibilityLevel?: string;
 }
 
 /**
- * Formats a single bibliography item using the Citation Engine.
+ * Formats a single bibliography item using the deterministic CSL-JSON Engine.
+ * Returns null if the item fails verification (no verifiable author/year or retracted).
  */
 export function formatAskScholarBibliographyEntry(
   item: WebsiteCitationItem,
   index: number,
   styleId: string
-): FormattedBibliographyEntry {
-  const ref = citationItemToCanonicalReference(item, index);
-  const styleInfo = getCitationStyleInfo(styleId);
+): FormattedBibliographyEntry | null {
+  const style = normalizeCSLStyle(styleId);
+  const csl = citationItemToCSL(item, index);
+  if (!csl) return null;
 
-  let formatted = "";
-  try {
-    formatted = CitationFormatterFactory.formatBibliography(styleId, ref);
-  } catch {
-    formatted = `${ref.title || item.title || "Scholarly Resource"}.`;
-  }
+  const formatted = formatCSLBibliographyEntry(csl, style, index + 1);
+  const yearStr = String(csl.issued["date-parts"][0][0]);
 
   let marker: string | undefined = undefined;
-  if (styleInfo.id === "ieee") {
+  if (style === "ieee" || style === "chicago-notes") {
     marker = `[${index + 1}]`;
-    if (!formatted.startsWith("[")) {
-      formatted = `[${index + 1}] ${formatted}`;
-    }
-  } else if (styleInfo.id === "vancouver") {
+  } else if (style === "vancouver") {
     marker = `(${index + 1})`;
-    if (!/^\d+\./.test(formatted) && !formatted.startsWith("(")) {
-      formatted = `${index + 1}. ${formatted}`;
-    }
   }
 
-  const doi = ref.doi || extractDoi(item.url);
-  const directUrl = doi ? (doi.startsWith("http") ? doi : `https://doi.org/${doi}`) : item.url;
+  const doi = csl.DOI;
+  const directUrl = doi ? (doi.startsWith("http") ? doi : `https://doi.org/${doi}`) : csl.URL;
 
   return {
     originalIndex: index + 1,
     displayIndex: index + 1,
-    formattedText: formatted.trim(),
-    rawCitation: item,
+    formattedText: formatted.plainText,
+    markdownText: formatted.markdownText,
+    htmlText: formatted.htmlText,
+    rawCitation: { ...item, csl },
+    csl,
     marker,
     doi: doi ? (doi.startsWith("http") ? doi : `https://doi.org/${doi}`) : undefined,
     url: directUrl,
-    year: ref.year,
-    publisher: item.publisher || item.venue || item.domain,
-    authorityBadge: item.authorityBadge || "Verified Source",
+    openAccessUrl: csl.openAccessUrl || item.openAccessUrl,
+    year: yearStr,
+    publisher: csl["container-title"] || csl.publisher || item.publisher || item.venue,
+    authorityBadge: csl.sourceTypeLabel || item.authorityBadge || "peer-reviewed article",
+    sourceTypeLabel: csl.sourceTypeLabel,
+    credibilityLevel: csl.credibilityLevel,
   };
 }
 
 /**
- * Formats all citations into a complete reference list / bibliography according to academic standards.
- * Author-date styles (APA, MLA, Chicago, Harvard) are sorted alphabetically by author.
- * Numbered styles (IEEE, Vancouver) maintain citation appearance order.
+ * Formats all verified citations into a complete reference list / bibliography according to academic standards.
+ * - Filters out any unverified source (missing author, missing year, placeholder author, or retracted).
+ * - Author-date styles (APA, MLA, Chicago, Harvard) are sorted alphabetically by primary author's surname.
+ * - Numbered styles (IEEE, Vancouver) maintain citation appearance order.
  */
 export function formatAskScholarBibliography(
   citations: WebsiteCitationItem[],
@@ -336,28 +412,69 @@ export function formatAskScholarBibliography(
 ): FormattedBibliographyEntry[] {
   if (!citations || citations.length === 0) return [];
 
-  const styleInfo = getCitationStyleInfo(styleId);
-  const entries = citations.map((c, i) => formatAskScholarBibliographyEntry(c, i, styleId));
+  const style = normalizeCSLStyle(styleId);
+  const styleInfo = getCitationStyleInfo(style);
+
+  // Convert and filter only verified CSL items
+  const validPairs: Array<{ item: WebsiteCitationItem; csl: CSLItem; origIdx: number }> = [];
+  citations.forEach((c, idx) => {
+    const csl = citationItemToCSL(c, idx);
+    if (csl) {
+      validPairs.push({ item: c, csl, origIdx: idx });
+    }
+  });
+
+  if (validPairs.length === 0) return [];
 
   if (!styleInfo.isNumbered) {
-    // Sort alphabetically by primary author's last name (or title if no author)
-    entries.sort((a, b) => {
-      const getSortKey = (entry: FormattedBibliographyEntry) => {
-        const auth = entry.rawCitation.authors?.[0] || entry.rawCitation.author;
-        if (auth) {
-          const parts = auth.trim().split(/\s+/);
-          return parts[parts.length - 1].toLowerCase();
-        }
-        return (entry.rawCitation.title || entry.formattedText).toLowerCase();
-      };
-      return getSortKey(a).localeCompare(getSortKey(b));
+    validPairs.sort((a, b) => {
+      const surA = (a.csl.author[0]?.family || a.csl.author[0]?.literal || "").toLowerCase();
+      const surB = (b.csl.author[0]?.family || b.csl.author[0]?.literal || "").toLowerCase();
+      const cmp = surA.localeCompare(surB);
+      if (cmp !== 0) return cmp;
+      const yrA = a.csl.issued["date-parts"][0][0];
+      const yrB = b.csl.issued["date-parts"][0][0];
+      if (yrA !== yrB) return yrA - yrB;
+      return a.csl.title.toLowerCase().localeCompare(b.csl.title.toLowerCase());
     });
-
-    // Re-index display positions
-    return entries.map((e, i) => ({ ...e, displayIndex: i + 1 }));
   }
 
-  return entries;
+  return validPairs.map((pair, displayIdx) => {
+    const formatted = formatCSLBibliographyEntry(pair.csl, style, displayIdx + 1);
+    const yearStr = String(pair.csl.issued["date-parts"][0][0]);
+    const doi = pair.csl.DOI;
+    const directUrl = doi
+      ? doi.startsWith("http")
+        ? doi
+        : `https://doi.org/${doi}`
+      : pair.csl.URL;
+
+    let marker: string | undefined = undefined;
+    if (style === "ieee" || style === "chicago-notes") {
+      marker = `[${displayIdx + 1}]`;
+    } else if (style === "vancouver") {
+      marker = `(${displayIdx + 1})`;
+    }
+
+    return {
+      originalIndex: pair.origIdx + 1,
+      displayIndex: displayIdx + 1,
+      formattedText: formatted.plainText,
+      markdownText: formatted.markdownText,
+      htmlText: formatted.htmlText,
+      rawCitation: { ...pair.item, csl: pair.csl },
+      csl: pair.csl,
+      marker,
+      doi: doi ? (doi.startsWith("http") ? doi : `https://doi.org/${doi}`) : undefined,
+      url: directUrl,
+      openAccessUrl: pair.csl.openAccessUrl || pair.item.openAccessUrl,
+      year: yearStr,
+      publisher: pair.csl["container-title"] || pair.csl.publisher || pair.item.publisher || pair.item.venue,
+      authorityBadge: pair.csl.sourceTypeLabel || pair.item.authorityBadge || "peer-reviewed article",
+      sourceTypeLabel: pair.csl.sourceTypeLabel,
+      credibilityLevel: pair.csl.credibilityLevel,
+    };
+  });
 }
 
 /**
@@ -366,13 +483,14 @@ export function formatAskScholarBibliography(
  */
 export function stripRawReferencesSection(markdown: string): string {
   if (!markdown) return "";
-  const refHeaderRegex = /(?:\n\s*---\s*\n)?\n\s*(?:##|###)\s*(?:References|References\s*&\s*Evidence\s*Base|Sources|Works\s*Cited|Bibliography)[\s\S]*$/i;
+  const refHeaderRegex =
+    /(?:\n\s*---\s*\n)?\n\s*(?:##|###)\s*(?:References|References\s*&\s*Evidence\s*Base|Sources|Works\s*Cited|Bibliography)[\s\S]*$/i;
   return markdown.replace(refHeaderRegex, "").trim();
 }
 
 /**
  * Deterministically replaces bracket reference tokens ([1], [2], [1, 2])
- * with authoritative in-text citations according to the selected citation style (APA, Harvard, IEEE, MLA, etc.).
+ * with authoritative in-text citations according to the selected citation style (APA, Harvard, IEEE, MLA, Chicago, Vancouver).
  * Strictly strips any raw hallucinated bibliography section.
  */
 export function replaceBracketTokensWithDeterministicCitations(
@@ -384,7 +502,7 @@ export function replaceBracketTokensWithDeterministicCitations(
   const cleaned = stripRawReferencesSection(prose);
   if (!sources || sources.length === 0) return cleaned;
 
-  const styleInfo = getCitationStyleInfo(styleId);
+  const style = normalizeCSLStyle(styleId);
 
   // Match bracket tokens not followed by '(' (which would indicate a Markdown link [text](url))
   const bracketRegex = /\[([^\[\]\(\)\r\n]+)\](?!\()/g;
@@ -398,24 +516,27 @@ export function replaceBracketTokensWithDeterministicCitations(
         .map((s: string) => parseInt(s.trim(), 10))
         .filter((n: number) => !isNaN(n));
 
-      const validNums = indices.filter((n: number) => n >= 1 && n <= sources.length);
-      if (validNums.length === 0) return match;
+      const validNums = indices.filter((n: number) => {
+        if (n < 1 || n > sources.length) return false;
+        return citationItemToCSL(sources[n - 1], n - 1) !== null;
+      });
+      if (validNums.length === 0) return "";
 
-      if (styleInfo.id === "ieee") {
+      if (style === "ieee" || style === "chicago-notes") {
         return `[${validNums.join(", ")}]`;
       }
-      if (styleInfo.id === "vancouver") {
+      if (style === "vancouver") {
         return `(${validNums.join(", ")})`;
       }
 
-      const formattedCites = validNums.map((n: number) => {
-        const cite = formatAskScholarInText(sources[n - 1], n - 1, styleId);
-        return cite.replace(/^\s*\(\s*(.+?)\s*\)\s*$/, "$1").trim();
-      });
+      const formattedCites = validNums
+        .map((n: number) => {
+          const cite = formatAskScholarInText(sources[n - 1], n - 1, style);
+          return cite.replace(/^\s*\(\s*(.+?)\s*\)\s*$/, "$1").trim();
+        })
+        .filter(Boolean);
 
-      if (styleInfo.id === "mla") {
-        return `(${formattedCites.join("; ")})`;
-      }
+      if (formattedCites.length === 0) return "";
       return `(${formattedCites.join("; ")})`;
     }
 
@@ -432,15 +553,17 @@ export function replaceBracketTokensWithDeterministicCitations(
     });
 
     if (matchedIdx !== -1) {
-      if (styleInfo.id === "ieee") {
+      const csl = citationItemToCSL(sources[matchedIdx], matchedIdx);
+      if (!csl) return "";
+      if (style === "ieee" || style === "chicago-notes") {
         return `[${matchedIdx + 1}]`;
       }
-      if (styleInfo.id === "vancouver") {
+      if (style === "vancouver") {
         return `(${matchedIdx + 1})`;
       }
-      const cite = formatAskScholarInText(sources[matchedIdx], matchedIdx, styleId);
+      const cite = formatAskScholarInText(sources[matchedIdx], matchedIdx, style);
       const trimmedCite = cite.replace(/^\s*\(\s*(.+?)\s*\)\s*$/, "$1").trim();
-      return `(${trimmedCite})`;
+      return trimmedCite ? `(${trimmedCite})` : "";
     }
 
     return match;
@@ -458,13 +581,17 @@ export function compileDeterministicBibliographyMarkdown(
   const entries = formatAskScholarBibliography(sources, styleId);
   if (entries.length === 0) return "";
 
-  const styleInfo = getCitationStyleInfo(styleId);
-  const heading = styleInfo.id === "mla" ? "Works Cited" : "References";
+  const heading = getReferenceListHeading(styleId);
+  const style = normalizeCSLStyle(styleId);
 
   let markdown = `\n\n## ${heading}\n\n`;
   entries.forEach((e) => {
-    markdown += `${e.displayIndex}. ${e.formattedText}\n`;
+    const text = e.markdownText || e.formattedText;
+    if (style === "ieee" || style === "vancouver") {
+      markdown += `${text}\n`;
+    } else {
+      markdown += `${text}\n\n`;
+    }
   });
   return markdown.trimEnd();
 }
-

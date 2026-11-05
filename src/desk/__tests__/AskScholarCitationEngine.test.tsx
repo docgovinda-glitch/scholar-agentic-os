@@ -222,7 +222,7 @@ describe("Ask Scholar Citation Engine & Referencing System", () => {
     it("formats MLA9 in-text citations without publication year", () => {
       const input = "The self-attention mechanism [1] fundamentally transformed NLP.";
       const result = replaceBracketTokensWithDeterministicCitations(input, testSources, "mla");
-      expect(result).toBe("The self-attention mechanism (Vaswani) fundamentally transformed NLP.");
+      expect(result).toBe("The self-attention mechanism (Vaswani and Shazeer) fundamentally transformed NLP.");
     });
 
     it("retains standard Markdown hyperlinks without corruption", () => {

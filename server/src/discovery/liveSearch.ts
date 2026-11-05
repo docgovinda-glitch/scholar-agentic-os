@@ -323,7 +323,7 @@ export async function searchWikipediaLive(query: string, limit = 3): Promise<Liv
         url,
         snippet,
         publicationDate,
-        authors: ["Wikipedia Contributors"],
+        authors: [],
         source: "wikipedia" as const,
       };
     });
@@ -382,7 +382,7 @@ export async function executeLiveSearch(
   const cleanQuery = query.trim();
   if (!cleanQuery) return [];
 
-  const limit = Math.max(1, Math.min(options.limit ?? 5, 20));
+  const limit = Math.max(1, Math.min(options.limit ?? 20, 120));
   const mode = options.mode ?? "all";
   const topicQuery = cleanSearchTopic(cleanQuery);
 
@@ -391,7 +391,7 @@ export async function executeLiveSearch(
 
   if (mode === "all" || mode === "web") {
     webTasks.push(
-      searchConfiguredWebApi(cleanQuery, Math.min(5, limit)).then((items) =>
+      searchConfiguredWebApi(cleanQuery, Math.min(15, limit)).then((items) =>
         items.map((item) => ({
           title: item.title,
           url: item.url,
@@ -404,7 +404,7 @@ export async function executeLiveSearch(
       )
     );
     webTasks.push(
-      searchGoogleNewsRss(topicQuery, Math.min(4, limit)).then((items) =>
+      searchGoogleNewsRss(topicQuery, Math.min(10, limit)).then((items) =>
         items.map((item) => ({
           title: item.title,
           url: item.url,
@@ -417,7 +417,7 @@ export async function executeLiveSearch(
       )
     );
     webTasks.push(
-      searchDuckDuckGo(topicQuery, Math.min(4, limit)).then((items) =>
+      searchDuckDuckGo(topicQuery, Math.min(10, limit)).then((items) =>
         items.map((item) => ({
           title: item.title,
           url: item.url,
@@ -429,18 +429,17 @@ export async function executeLiveSearch(
         }))
       )
     );
-    webTasks.push(searchWikipediaLive(topicQuery, Math.min(3, limit)));
-    webTasks.push(searchProxyWebLive(topicQuery, Math.min(3, limit)));
+    webTasks.push(searchProxyWebLive(topicQuery, Math.min(10, limit)));
   }
 
   if (mode === "all" || mode === "scholarly") {
-    const scholarlyCap = mode === "scholarly" ? Math.max(4, limit) : 2;
+    const scholarlyCap = Math.max(15, limit);
     scholarlyTasks.push(searchOpenAlexLive(topicQuery, scholarlyCap));
     scholarlyTasks.push(
       searchCrossrefLive(topicQuery, scholarlyCap).then((items) =>
         items.filter((item) => {
           const rel = computeLiveSearchRelevance(cleanQuery, item.title, item.snippet);
-          return rel.keywordCount <= 1 ? rel.totalMatches >= 1 : rel.titleMatches >= 1 && rel.ratio >= 0.45;
+          return rel.keywordCount <= 1 ? rel.totalMatches >= 1 : rel.titleMatches >= 1 && rel.ratio >= 0.4;
         })
       )
     );
@@ -465,9 +464,8 @@ export async function executeLiveSearch(
     }
   }
 
-  // Prioritize live web, news, and Wikipedia first; append up to 2 relevant scholarly works in "all" mode
-  const maxScholarlyInAll = mode === "all" && webPool.length >= 2 ? Math.min(2, Math.floor(limit / 3) || 1) : limit;
-  const combinedPool = [...webPool, ...scholarlyPool.slice(0, maxScholarlyInAll)];
+  // Combine scholarly and web sources without capping scholarly sources to 2
+  const combinedPool = [...scholarlyPool, ...webPool];
 
   // Deduplicate by URL or normalized Title
   const seenUrls = new Set<string>();

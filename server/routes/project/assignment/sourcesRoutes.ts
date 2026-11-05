@@ -217,7 +217,7 @@ router.post("/citations-ground", async (req: express.Request<{ id: string }>, re
           year: d.year ? String(d.year) : "2024",
           journalOrPublisher: d.venue || "Academic Press",
           doi: d.doi || "",
-          citationText: bib.formattedText,
+          citationText: bib?.formattedText || `${d.authors.join(", ")} (${d.year || ""}). ${d.title}.`,
           inTextCitation: inText,
           citationStyle,
           verifiedPeerReviewed: d.authorityTier === "A",

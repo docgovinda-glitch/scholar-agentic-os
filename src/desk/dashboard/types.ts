@@ -1,5 +1,6 @@
 import type { LiveSearchResult } from "../../services/liveSearchService";
 import type { ResearchStageTelemetry } from "../api/types";
+import type { CSLItem, ExcludedSourceRecord } from "../../citation_compliance/cslEngine";
 
 export interface Attachment {
   file: File;
@@ -37,7 +38,29 @@ export interface WebsiteAssistantMessage {
   plan?: string[];
   stages?: ResearchStageTelemetry[];
   citationStyle?: string;
+  originatingQuestion?: string;
+  discipline?: string;
+  searchedCount?: number;
+  readCount?: number;
+  citedCount?: number;
+  excludedSources?: ExcludedSourceRecord[];
+  cslItems?: CSLItem[];
+  deepResearchState?: {
+    phase:
+      | "plan_proposed"
+      | "plan_approved"
+      | "searching"
+      | "reading"
+      | "synthesizing"
+      | "report_ready";
+    subQuestions: string[];
+    searchedCount?: number;
+    readCount?: number;
+    citedCount?: number;
+  };
   citations?: Array<{
+    id?: string;
+    sourceId?: string;
     title?: string;
     url?: string;
     snippet?: string;
@@ -48,12 +71,22 @@ export interface WebsiteAssistantMessage {
     source?: string;
     venue?: string;
     journal?: string;
+    volume?: string;
+    issue?: string;
+    pages?: string;
     year?: number | string;
+    publishedDate?: string;
+    publicationDate?: string;
     author?: string;
     authors?: string[];
     doi?: string;
     isPrimary?: boolean;
-    sourceType?: "official" | "scholarly" | "media" | "web" | "vault";
+    sourceType?: "official" | "scholarly" | "media" | "web" | "vault" | string;
+    credibilityLevel?: "high" | "moderate" | "preprint - not peer-reviewed";
+    openAccessUrl?: string;
+    isRetracted?: boolean;
+    limitationNote?: string;
+    csl?: CSLItem;
     stance?: "supporting" | "contradicting" | "mentioning";
     claim?: string;
     evidenceSnippet?: string;

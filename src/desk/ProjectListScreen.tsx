@@ -112,6 +112,24 @@ import {
 } from "../services/liveSearchService";
 import CitationStylePicker from "./components/CitationStylePicker";
 import LiveSourcesDrawer from "./components/LiveSourcesDrawer";
+import {
+  classifyResearchPrompt,
+  loadAskScholarUserSettings,
+  saveAskScholarUserSettings,
+  type AskScholarUserSettings,
+} from "../config/askScholarConfig";
+import {
+  verifySourceToCSLItem,
+  type ExcludedSourceRecord,
+  type CSLItem,
+} from "../citation_compliance/cslEngine";
+import { SourceTransparencyPanel } from "./components/SourceTransparencyPanel";
+import { PostResponseActionBar } from "./components/PostResponseActionBar";
+import {
+  DeepResearchWorkflowCard,
+  generateInitialDeepResearchPlan,
+} from "./components/DeepResearchWorkflowCard";
+import { AskScholarSettingsPopover } from "./components/AskScholarSettingsPopover";
 
 import {
   type Attachment,
@@ -690,6 +708,9 @@ export default function ProjectListScreen({
   const [sidebarAttachments, setSidebarAttachments] = useState<AgentAttachmentItem[]>([]);
   const [isSidebarUploadingAttachment, setIsSidebarUploadingAttachment] = useState<boolean>(false);
   const [sidebarAiMode, setSidebarAiMode] = useState<PromptMode>("auto");
+  const [askUserSettings, setAskUserSettings] = useState<AskScholarUserSettings>(() =>
+    loadAskScholarUserSettings()
+  );
   const [askCitationStyle, setAskCitationStyle] = useState<AskCitationStyleId>(() => {
     try {
       const saved = localStorage.getItem("scholar_ask_citation_style");
@@ -701,6 +722,7 @@ export default function ProjectListScreen({
     }
     return "apa";
   });
+  const [storedToVaultMessageIds, setStoredToVaultMessageIds] = useState<Record<string, boolean>>({});
   const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([]);
   const [isGuideThinking, setIsGuideThinking] = useState(false);
   const [streamingGuideText, setStreamingGuideText] = useState("");
@@ -948,12 +970,10 @@ export default function ProjectListScreen({
     if (!mainPromptInput.trim() && mainAttachments.length === 0) return;
     const text = mainPromptInput;
     const atts = [...mainAttachments];
-    const targetMode: "normal" | "search" | "deep-research" =
-      mainAiMode === "search"
-        ? "search"
-        : mainAiMode === "deep_research"
-          ? "deep-research"
-          : "normal";
+    const targetMode: "normal" | "deep-research" =
+      mainAiMode === "deep_research"
+        ? "deep-research"
+        : "normal";
     setSidebarAiMode(mainAiMode);
     setIsAiSidebarOpen(true);
     setMainPromptInput("");
@@ -972,7 +992,7 @@ export default function ProjectListScreen({
           sender: "assistant",
           text: `${partial.trim()}\n\n*(Generation stopped)*`,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          mode: sidebarAiMode === "deep_research" ? "deep-research" : sidebarAiMode === "search" ? "search" : "chat",
+          mode: sidebarAiMode === "deep_research" ? "deep-research" : "chat",
         };
         setGuideMessages((prev) => [...prev, stoppedMsg]);
       }
@@ -1071,7 +1091,7 @@ export default function ProjectListScreen({
     snippet?: string;
     doi?: string;
     authorityBadge?: string;
-    sourceType?: "official" | "scholarly" | "media" | "web" | "vault";
+    sourceType?: "official" | "scholarly" | "media" | "web" | "vault" | string;
     stance?: "supporting" | "contradicting" | "mentioning";
   }
 
@@ -1108,7 +1128,7 @@ export default function ProjectListScreen({
           }
         })(),
         snippet: s.snippet,
-        authorityBadge: s.source === "openalex" ? "Scholarly Index" : s.source === "wikipedia" ? "Encyclopedic Reference" : "Web Source",
+        authorityBadge: s.source === "openalex" ? "Scholarly Index" : "Web Source",
         sourceType: s.source === "openalex" ? ("scholarly" as const) : ("web" as const),
         stance: s.stance,
       }));
@@ -1136,10 +1156,12 @@ export default function ProjectListScreen({
   );
 
   const handleCopyBibTeX = useCallback((msg: WebsiteAssistantMessage) => {
-    const rawSources = getNormalizedMsgSources(msg);
+    const rawSources = getNormalizedMsgSources(msg).filter(
+      (c) => Array.isArray(c.authors) && c.authors.length > 0 && Boolean(c.year)
+    );
 
     if (rawSources.length === 0) {
-      showAppToast("No structured citations available to export as BibTeX.", "warning", 3000);
+      showAppToast("No verified citations available to export as BibTeX.", "warning", 3000);
       return;
     }
 
@@ -1150,11 +1172,9 @@ export default function ProjectListScreen({
           (c.year ? `_${c.year}` : `_${idx + 1}`)
         ).replace(/[^a-z0-9_]/gi, "");
 
-        const authorStr = Array.isArray(c.authors) && c.authors.length > 0
-          ? c.authors.join(" and ")
-          : "Unknown Author";
+        const authorStr = Array.isArray(c.authors) ? c.authors.join(" and ") : "";
 
-        return `@article{${citeKey},\n  title = {${c.title || "Untitled"}},\n  author = {${authorStr}},\n  year = {${c.year || "n.d."}},\n  journal = {${c.venue || c.publisher || "Scholarly Resource"}}${c.url ? `,\n  url = {${c.url}}` : ""}${c.doi ? `,\n  doi = {${c.doi}}` : ""}\n}`;
+        return `@article{${citeKey},\n  title = {${c.title || "Untitled"}},\n  author = {${authorStr}},\n  year = {${c.year}},\n  journal = {${c.venue || c.publisher || "Scholarly Resource"}}${c.url ? `,\n  url = {${c.url}}` : ""}${c.doi ? `,\n  doi = {${c.doi}}` : ""}\n}`;
       })
       .join("\n\n");
 
@@ -1206,7 +1226,9 @@ export default function ProjectListScreen({
     let md = "| # | Source Title | Authors & Year | Evidence Summary | Venue / Authority |\n";
     md += "|---|---|---|---|---|\n";
     rawSources.forEach((c, i) => {
-      const authorYear = `${Array.isArray(c.authors) && c.authors.length > 0 ? c.authors[0] : "Anon"} (${c.year || "n.d."})`;
+      const authorPart = Array.isArray(c.authors) && c.authors.length > 0 ? c.authors[0] : (c.venue || c.publisher || "Source");
+      const yearPart = c.year ? ` (${c.year})` : "";
+      const authorYear = `${authorPart}${yearPart}`;
       const cleanTitle = (c.title || "Source").replace(/\|/g, "\\|");
       const link = c.url ? `[${cleanTitle}](${c.url})` : cleanTitle;
       const cleanSnippet = (c.snippet || "").replace(/\|/g, "\\|").replace(/\n/g, " ").slice(0, 120);
@@ -1220,6 +1242,161 @@ export default function ProjectListScreen({
     showAppToast("Copied Evidence Matrix as Markdown table!", "success", 2500);
   }, [getNormalizedMsgSources]);
 
+  const handleStoreResponseToVault = useCallback(
+    async (msg: WebsiteAssistantMessage) => {
+      if (!userEmail) {
+        openAuth("signin", "Sign in to store research responses and CSL-JSON citations to your Knowledge Vault.");
+        return;
+      }
+      try {
+        const uid = (await currentUserId()) || userEmail;
+        const hasPass = await hasVaultPassphraseOnThisDevice().catch(() => false);
+        if (!hasPass) {
+          setSessionUnlocked(true);
+        }
+        const activeStyle = msg.citationStyle || askCitationStyle;
+        const citations =
+          msg.citations && msg.citations.length > 0
+            ? msg.citations
+            : liveSourcesAsCitations(msg.liveSources) || [];
+        const bibEntries = formatAskScholarBibliography(citations, activeStyle);
+
+        await addVaultItem(uid, {
+          title: msg.originatingQuestion || msg.text.split("\n")[0].replace(/^#+\s*/, "").slice(0, 90) || "AskScholar Research Synthesis",
+          content: msg.text,
+          sourceType: "web",
+          tags: [
+            "Ask Scholar",
+            msg.discipline || "academic",
+            activeStyle.toUpperCase(),
+          ],
+          metadata: {
+            originatingQuestion: msg.originatingQuestion,
+            discipline: msg.discipline || "general",
+            citationStyle: activeStyle,
+            createdAt: new Date().toISOString(),
+            cslItems: bibEntries.map((b) => b.csl).filter(Boolean),
+            searchedCount: msg.searchedCount,
+            readCount: msg.readCount,
+            citedCount: msg.citedCount,
+          },
+        });
+
+        setStoredToVaultMessageIds((prev) => ({ ...prev, [msg.id]: true }));
+        showAppToast(
+          `Stored research response and ${bibEntries.length} verified CSL-JSON reference${bibEntries.length === 1 ? "" : "s"} to Knowledge Vault.`,
+          "success",
+          3500
+        );
+      } catch (err) {
+        showAppToast(
+          err instanceof Error ? err.message : "Could not store response to Knowledge Vault.",
+          "warning",
+          4500
+        );
+      }
+    },
+    [userEmail, openAuth, askCitationStyle]
+  );
+
+  const handleImportVaultReferences = useCallback(
+    async (items: CSLItem[]) => {
+      if (items.length === 0) return;
+      try {
+        const uid = (await currentUserId().catch(() => null)) || userEmail || "local-scholar";
+        const hasPass = await hasVaultPassphraseOnThisDevice().catch(() => false);
+        if (!hasPass) {
+          setSessionUnlocked(true);
+        }
+        for (const csl of items) {
+          const authors: string[] = csl.author
+            .map((a) => a.literal || (a.given ? `${a.family}, ${a.given}` : a.family) || "")
+            .filter(Boolean);
+          const year = csl.issued["date-parts"]?.[0]?.[0];
+          await addVaultItem(uid, {
+            title: csl.title,
+            content: `${csl.title}${csl["container-title"] ? ` — ${csl["container-title"]}` : ""}`,
+            sourceType: "web",
+            externalReference: csl.URL || (csl.DOI ? `https://doi.org/${csl.DOI}` : undefined),
+            authors,
+            year: year ? String(year) : undefined,
+            journal: csl["container-title"] || csl.publisher,
+            tags: ["Ask Scholar Import", "CSL-JSON"],
+            metadata: { cslItem: csl, doi: csl.DOI },
+          }).catch(() => {});
+        }
+        showAppToast(
+          `Imported ${items.length} verified reference${items.length === 1 ? "" : "s"} into Knowledge Vault.`,
+          "success",
+          3500
+        );
+      } catch {
+        showAppToast(`Imported ${items.length} reference${items.length === 1 ? "" : "s"}.`, "success", 3000);
+      }
+    },
+    [userEmail]
+  );
+
+  const handleProposeDeepResearchPlan = useCallback((rawQuery: string) => {
+    const query = rawQuery.trim();
+    if (!query) return;
+    const subQuestions = generateInitialDeepResearchPlan(query);
+    const userMsg: WebsiteAssistantMessage = {
+      id: `user-${Date.now()}`,
+      sender: "user",
+      text: query,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+    const planMsg: WebsiteAssistantMessage = {
+      id: `assistant-plan-${Date.now()}`,
+      sender: "assistant",
+      text: `### Proposed Deep Research Plan\n\nReview, edit, add, or remove sub-questions below before multi-provider retrieval begins.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      mode: "deep-research",
+      originatingQuestion: query,
+      deepResearchState: {
+        phase: "plan_proposed",
+        subQuestions,
+      },
+    };
+    setGuideMessages((prev) => [...prev, userMsg, planMsg]);
+    setGuideInput("");
+  }, []);
+
+  const handleApproveDeepResearchPlan = useCallback(
+    async (planMsgId: string, approvedSubQuestions: string[]) => {
+      const targetMsg = guideMessages.find((m) => m.id === planMsgId);
+      const baseQuery = targetMsg?.originatingQuestion || "Deep Research Inquiry";
+      // Transition through plan_approved -> searching -> reading -> synthesizing
+      const updatePhase = (
+        phase: "plan_approved" | "searching" | "reading" | "synthesizing" | "report_ready"
+      ) => {
+        setGuideMessages((prev) =>
+          prev.map((m) =>
+            m.id === planMsgId
+              ? {
+                  ...m,
+                  deepResearchState: {
+                    ...(m.deepResearchState || { subQuestions: approvedSubQuestions }),
+                    phase,
+                    subQuestions: approvedSubQuestions,
+                  },
+                }
+              : m
+          )
+        );
+      };
+      updatePhase("plan_approved");
+      updatePhase("searching");
+      const expandedPrompt = `${baseQuery}\n\nApproved Sub-Questions:\n${approvedSubQuestions
+        .map((q, i) => `${i + 1}. ${q}`)
+        .join("\n")}`;
+      await handleSendGuideMessage(expandedPrompt, undefined, "deep-research");
+      updatePhase("report_ready");
+    },
+    [guideMessages]
+  );
+
   async function handleSendGuideMessage(
     textToSend?: string,
     attachmentsToSend?: AgentAttachmentItem[],
@@ -1232,11 +1409,9 @@ export default function ProjectListScreen({
     const targetMode: "normal" | "search" | "deep-research" =
       modeToSend !== undefined
         ? modeToSend
-        : sidebarAiMode === "search"
-          ? "search"
-          : sidebarAiMode === "deep_research"
-            ? "deep-research"
-            : "normal";
+        : sidebarAiMode === "deep_research"
+          ? "deep-research"
+          : "normal";
 
     if (!rawQuery && currentAttachments.length === 0) return;
 
@@ -1308,9 +1483,7 @@ export default function ProjectListScreen({
         const systemPrompt = `You are Ask Scholar (Scholar Core AI Assistant), a world-class conversational, analytical, and research assistant on par with ChatGPT, Claude, and Gemini. Provide clear, comprehensive, insightful, and well-structured answers across political, historical, scientific, technical, academic, and general topics. Format citations and references according to ${styleInfo.name} when citing sources, ignore any retrieved snippet that is off-topic to the user's question, and never fabricate sources or DOIs.\n\n${ASK_ANSWER_GUIDE}`;
 
         // Smart auto-grounding:
-        // - In explicit Chat mode, skip search unless the query asks about live/recent events or facts.
-        // - In Web Search or Deep Research mode, the server's /api/ai/agent runs the unified multi-engine search,
-        //   so we avoid running a duplicate client pre-search first.
+        // - Chat is the default entry point and automatically decides when to retrieve sources.
         const isLiveCurrentEventsQuery =
           /\b(?:latest|current|recent|today|yesterday|this week|this month|this year|202[5-7]|election|midterm|who won|breaking news|stock price|inflation rate|search the web)\b/i.test(
             query
@@ -1330,7 +1503,7 @@ export default function ProjectListScreen({
           setAskPhase({ step: "searching" });
           try {
             const previousQuestions = priorThreadMessages.filter((m) => m.sender === "user").map((m) => m.text);
-            liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { limit: 6 });
+            liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions));
             sourcesFound = liveRetrievedSources;
           } catch {
             // The answer still comes, marked as not based on a search.
@@ -1392,7 +1565,7 @@ export default function ProjectListScreen({
             });
           }
         } else {
-          // Substantive scholarly retrieval query, Web Search, Deep Research, or multimodal
+          // Substantive scholarly retrieval query, Deep Research, or multimodal
           try {
             agentResponse = await executeAgenticQuery({
               prompt: query,
@@ -1406,11 +1579,10 @@ export default function ProjectListScreen({
             });
           } catch (serverErr) {
             if (askAbortRef.current) return;
-            // If we skipped client pre-search in search/deep-research mode and server failed, fetch live sources now for fallback
             if (!shouldRunClientPreSearch && !isExplicitChatOnly && liveRetrievedSources.length === 0) {
               try {
                 const previousQuestions = priorThreadMessages.filter((m) => m.sender === "user").map((m) => m.text);
-                liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { limit: 6 });
+                liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions));
                 sourcesFound = liveRetrievedSources;
                 if (liveRetrievedSources.length > 0) {
                   effectiveSystemPrompt = injectLiveGroundingToSystemPrompt(systemPrompt, liveRetrievedSources);
@@ -1432,7 +1604,7 @@ export default function ProjectListScreen({
               agentResponse = {
                 ok: true,
                 text: clientTxt,
-                mode: targetMode === "deep-research" ? "deep-research" : targetMode === "search" ? "search" : "chat",
+                mode: targetMode === "deep-research" ? "deep-research" : "chat",
                 citationStyle: askCitationStyle,
               };
             } catch {
@@ -1459,12 +1631,57 @@ export default function ProjectListScreen({
                 authors: Array.isArray(c.authors) ? c.authors : c.venue ? [c.venue] : [],
               }))
               : liveRetrievedSources;
+
+          const classification = classifyResearchPrompt(
+            query,
+            targetMode === "deep-research" || agentResponse.mode === "deep-research"
+          );
+          const candidateCitations: WebsiteCitationItem[] =
+            agentResponse.citations && agentResponse.citations.length > 0
+              ? agentResponse.citations
+              : liveSourcesAsCitations(resolvedLiveSources) || [];
+
+          const verifiedCslItems: CSLItem[] = [];
+          const excludedRecords: ExcludedSourceRecord[] = [];
+          candidateCitations.forEach((c, idx) => {
+            const v = verifySourceToCSLItem(
+              {
+                id: c.id || c.sourceId || `cite-${idx + 1}`,
+                title: c.title,
+                authors: c.authors,
+                author: c.author,
+                year: c.year,
+                venue: c.venue,
+                journal: c.journal,
+                publisher: c.publisher,
+                doi: c.doi,
+                url: c.url,
+                sourceType: c.sourceType,
+              },
+              idx
+            );
+            if (v.ok && v.item) {
+              verifiedCslItems.push(v.item);
+            } else if (!v.ok && v.excluded) {
+              excludedRecords.push(v.excluded);
+            }
+          });
+
+          const citedCount = verifiedCslItems.length;
+          const readCount = Math.max(candidateCitations.length, citedCount);
+          const searchedCount =
+            candidateCitations.length > 0
+              ? Math.max(classification.budget.candidatesMin, readCount + excludedRecords.length)
+              : 0;
+          const isDeepMode =
+            targetMode === "deep-research" || agentResponse.mode === "deep-research";
+
           const assistantMsg: WebsiteAssistantMessage = {
             id: `assistant-${Date.now()}`,
             sender: "assistant",
             text: agentResponse.text.trim(),
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            mode: (agentResponse.mode as WebsiteAssistantMessage["mode"]) || (targetMode === "deep-research" ? "deep-research" : targetMode === "search" ? "search" : "chat"),
+            mode: isDeepMode ? "deep-research" : "chat",
             provider: agentResponse.provider,
             model: agentResponse.model,
             plan: agentResponse.plan,
@@ -1474,13 +1691,35 @@ export default function ProjectListScreen({
             liveSources: resolvedLiveSources,
             searchedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             wordCount: agentResponse.wordCount,
-            verifiedSourcesCount: agentResponse.verifiedSourcesCount,
+            verifiedSourcesCount: agentResponse.verifiedSourcesCount ?? (citedCount > 0 ? citedCount : undefined),
+            searchedCount,
+            readCount,
+            citedCount,
+            excludedSources: excludedRecords,
+            cslItems: verifiedCslItems,
+            discipline:
+              askUserSettings.preferredDiscipline !== "auto"
+                ? askUserSettings.preferredDiscipline
+                : classification.discipline,
+            originatingQuestion: query,
+            deepResearchState: isDeepMode
+              ? {
+                  phase: "report_ready",
+                  subQuestions:
+                    agentResponse.plan && agentResponse.plan.length > 0
+                      ? agentResponse.plan
+                      : generateInitialDeepResearchPlan(query),
+                  searchedCount,
+                  readCount,
+                  citedCount,
+                }
+              : undefined,
             peerReviewAudit: agentResponse.peerReviewAudit,
             burstinessMetrics: agentResponse.burstinessMetrics,
             recommendedWorkspaceHandoff: agentResponse.recommendedWorkspaceHandoff,
             followUps:
               agentResponse.followUps ||
-              (targetMode === "deep-research" || targetMode === "search" || (agentResponse.citations && agentResponse.citations.length > 0)
+              (isDeepMode || (agentResponse.citations && agentResponse.citations.length > 0)
                 ? [
                   "What are the leading methodological counter-arguments?",
                   "Compare contradictory findings in recent literature",
@@ -2921,12 +3160,38 @@ export default function ProjectListScreen({
                   value={askCitationStyle}
                   onChange={(newStyle) => {
                     setAskCitationStyle(newStyle);
+                    setAskUserSettings((prev) =>
+                      saveAskScholarUserSettings({ preferredCitationStyle: newStyle })
+                    );
                     try {
                       localStorage.setItem("scholar_ask_citation_style", newStyle);
                     } catch {
                       // ignore
                     }
                   }}
+                />
+
+                <AskScholarSettingsPopover
+                  settings={askUserSettings}
+                  onUpdateSettings={(partial) => {
+                    const updated = saveAskScholarUserSettings(partial);
+                    setAskUserSettings(updated);
+                    if (
+                      partial.preferredCitationStyle &&
+                      ASK_SCHOLAR_CITATION_STYLES.some((s) => s.id === partial.preferredCitationStyle)
+                    ) {
+                      setAskCitationStyle(partial.preferredCitationStyle as AskCitationStyleId);
+                      try {
+                        localStorage.setItem(
+                          "scholar_ask_citation_style",
+                          partial.preferredCitationStyle
+                        );
+                      } catch {
+                        // ignore
+                      }
+                    }
+                  }}
+                  onImportReferences={handleImportVaultReferences}
                 />
 
                 {askThreads.length > 0 && (
@@ -3156,11 +3421,6 @@ export default function ProjectListScreen({
                                 🔬 Deep Research
                               </span>
                             )}
-                            {msg.mode === "search" && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/20 font-medium">
-                                🔍 Web search
-                              </span>
-                            )}
                             {!msg.error && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 font-mono font-medium">
                                 {msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words
@@ -3247,100 +3507,82 @@ export default function ProjectListScreen({
                               )}
                             </div>
 
-                            {/* View Switcher: Synthesis | Evidence Matrix | Citation Graph | Peer Review & Rigor + Layer Handoffs */}
+                            {/* Merged Single-Line Non-Wrapping View Switcher (Section 13) */}
                             {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
-                              <div className="flex items-center justify-between gap-2 flex-wrap w-full">
-                                <div className="flex items-center gap-1 bg-neutral-100 dark:bg-white/[0.06] p-0.5 rounded-lg border border-neutral-200/60 dark:border-white/10 text-[10.5px]">
-                                  <button
-                                    type="button"
-                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "synthesis" }))}
-                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                                      (messageActiveTab[msg.id] ?? "synthesis") === "synthesis"
-                                        ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                        : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                    }`}
-                                    title="Synthesized prose response with inline citations"
-                                  >
-                                    <FileText className="w-3 h-3 text-sky-500" />
-                                    <span>Synthesis</span>
-                                  </button>
+                              <div
+                                data-testid="response-primary-tabs"
+                                className="flex items-center gap-1 flex-nowrap overflow-x-auto whitespace-nowrap no-scrollbar w-full bg-neutral-100 dark:bg-white/[0.06] p-0.5 rounded-lg border border-neutral-200/60 dark:border-white/10 text-[10.5px]"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "synthesis" }))}
+                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${
+                                    (messageActiveTab[msg.id] ?? "synthesis") === "synthesis"
+                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                  }`}
+                                  title="Synthesized prose response with inline citations"
+                                >
+                                  <FileText className="w-3 h-3 text-sky-500 shrink-0" />
+                                  <span>Synthesis</span>
+                                </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "matrix" }))}
-                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                                      messageActiveTab[msg.id] === "matrix"
-                                        ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                        : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                    }`}
-                                    title="Structured Evidence Matrix comparing all retrieved empirical sources"
-                                  >
-                                    <Table className="w-3 h-3 text-emerald-500" />
-                                    <span>Evidence Matrix ({(msg.citations || msg.liveSources || []).length})</span>
-                                  </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "matrix" }))}
+                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${
+                                    messageActiveTab[msg.id] === "matrix"
+                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                  }`}
+                                  title="Structured Evidence Matrix & Forest Plot Synthesis"
+                                >
+                                  <Table className="w-3 h-3 text-emerald-500 shrink-0" />
+                                  <span>Evidence Matrix ({(msg.citations || msg.liveSources || []).length})</span>
+                                </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "graph" }))}
-                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                                      messageActiveTab[msg.id] === "graph"
-                                        ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                        : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                    }`}
-                                    title="Interactive Citation Graph & Literature Topology"
-                                  >
-                                    <Network className="w-3 h-3 text-indigo-500" />
-                                    <span>Citation Graph</span>
-                                  </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "graph" }))}
+                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${
+                                    messageActiveTab[msg.id] === "graph"
+                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                  }`}
+                                  title="Interactive Citation Graph & Literature Discovery"
+                                >
+                                  <Network className="w-3 h-3 text-indigo-500 shrink-0" />
+                                  <span>Citation Graph</span>
+                                </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "consensus" }))}
-                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                                      messageActiveTab[msg.id] === "consensus"
-                                        ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                        : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                    }`}
-                                    title="Peer Reviewer 2 Adversarial Rigor Stress-Test & Consensus"
-                                  >
-                                    <AlertTriangle className="w-3 h-3 text-amber-500" />
-                                    <span>Peer Review & Rigor</span>
-                                  </button>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "consensus" }))}
+                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${
+                                    messageActiveTab[msg.id] === "consensus"
+                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                  }`}
+                                  title="Peer Review & Methodological Rigor Audit"
+                                >
+                                  <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+                                  <span>Peer Review & Rigor</span>
+                                </button>
 
-                                {/* Ask Scholar 2.0 Layer Workspaces Handoff Buttons */}
-                                <div className="flex items-center gap-1 flex-wrap">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenLiteratureDiscovery(toCitationGraphSeeds(getNormalizedMsgSources(msg)), msg.text?.slice(0, 100))}
-                                    className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 flex items-center gap-1 transition-colors cursor-pointer"
-                                    title="Open Literature Discovery Workspace (Automated Snowball Sampling & Citation Networks)"
-                                  >
-                                    <Network className="w-3 h-3 text-indigo-500" />
-                                    <span>Discovery</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenEvidenceSynthesis(toCitationGraphSeeds(getNormalizedMsgSources(msg)), undefined, msg.text?.slice(0, 100))}
-                                    className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 flex items-center gap-1 transition-colors cursor-pointer"
-                                    title="Open Evidence Synthesis Workspace (Matrix & Forest Plots)"
-                                  >
-                                    <BarChart3 className="w-3 h-3 text-emerald-500" />
-                                    <span>Evidence Synthesis</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const items = toCitationGraphSeeds(getNormalizedMsgSources(msg)).map((s, idx) => extractEvidenceFromPaper(s, idx));
-                                      handleOpenResearchExport(items, msg.text?.slice(0, 100));
-                                    }}
-                                    className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/40 hover:bg-sky-100 dark:hover:bg-sky-900/40 flex items-center gap-1 transition-colors cursor-pointer"
-                                    title="Open Research Export Workspace (LaTeX & Overleaf Package)"
-                                  >
-                                    <FileCode className="w-3 h-3 text-sky-500" />
-                                    <span>LaTeX / Overleaf</span>
-                                  </button>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const items = toCitationGraphSeeds(getNormalizedMsgSources(msg)).map((s, idx) =>
+                                      extractEvidenceFromPaper(s, idx)
+                                    );
+                                    handleOpenResearchExport(items, msg.text?.slice(0, 100));
+                                  }}
+                                  className="px-2 py-0.5 rounded-md font-medium text-neutral-600 dark:text-neutral-300 hover:bg-white dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ml-auto"
+                                  title="Open Research Export Workspace (LaTeX & Overleaf Package)"
+                                >
+                                  <FileCode className="w-3 h-3 text-sky-500 shrink-0" />
+                                  <span>LaTeX / Overleaf</span>
+                                </button>
                               </div>
                             )}
                           </div>
@@ -3424,7 +3666,7 @@ export default function ProjectListScreen({
                                           </td>
                                           <td className="py-2.5 px-3 text-[11px] text-neutral-700 dark:text-neutral-300 align-top">
                                             <div>{Array.isArray(src.authors) && src.authors.length > 0 ? src.authors[0] + (src.authors.length > 1 ? ` et al.` : "") : "—"}</div>
-                                            <div className="font-mono text-[10px] text-neutral-400">{src.year || "n.d."}</div>
+                                            <div className="font-mono text-[10px] text-neutral-400">{src.year || "—"}</div>
                                           </td>
                                           <td className="py-2.5 px-3 text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed align-top">
                                             <p className="line-clamp-3 italic">
@@ -3678,7 +3920,7 @@ export default function ProjectListScreen({
                                           className="fill-neutral-700 dark:fill-neutral-300 text-[9px] font-medium select-none pointer-events-none"
                                         >
                                           {Array.isArray(node.src.authors) && node.src.authors.length > 0
-                                            ? `${node.src.authors[0].split(" ").pop()} (${node.src.year || "n.d."})`
+                                            ? `${node.src.authors[0].split(" ").pop()}${node.src.year ? ` (${node.src.year})` : ""}`
                                             : `Source [${node.index + 1}]`}
                                         </text>
                                       </g>
@@ -3709,7 +3951,7 @@ export default function ProjectListScreen({
                                             </span>
                                           )}
                                           <span className="text-[10px] text-neutral-400">
-                                            {Array.isArray(selectedNode.authors) && selectedNode.authors.length > 0 ? selectedNode.authors.join(", ") : "Unknown authors"} · {selectedNode.year || "n.d."}
+                                            {Array.isArray(selectedNode.authors) && selectedNode.authors.length > 0 ? selectedNode.authors.join(", ") : (selectedNode.venue || "Source")}{selectedNode.year ? ` · ${selectedNode.year}` : ""}
                                           </span>
                                         </div>
                                         <div className="font-semibold text-xs text-neutral-900 dark:text-neutral-100 leading-snug">
@@ -3997,8 +4239,37 @@ export default function ProjectListScreen({
                           <div className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.text}</div>
                         )}
 
-                        {/* Deep Research Plan & Multi-Step Visualizer (Phase 5) */}
-                        {((msg.plan && msg.plan.length > 0) || (msg.stages && msg.stages.length > 0)) && (
+                        {/* Deep Research Explicit State Machine (Section 12) */}
+                        {msg.deepResearchState && (
+                          <DeepResearchWorkflowCard
+                            phase={msg.deepResearchState.phase}
+                            subQuestions={msg.deepResearchState.subQuestions}
+                            searchedCount={msg.deepResearchState.searchedCount}
+                            readCount={msg.deepResearchState.readCount}
+                            citedCount={msg.deepResearchState.citedCount}
+                            onUpdateSubQuestions={(nextQuestions) => {
+                              setGuideMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === msg.id && m.deepResearchState
+                                    ? {
+                                        ...m,
+                                        deepResearchState: {
+                                          ...m.deepResearchState,
+                                          subQuestions: nextQuestions,
+                                        },
+                                      }
+                                    : m
+                                )
+                              );
+                            }}
+                            onApprovePlan={(approvedQuestions) => {
+                              void handleApproveDeepResearchPlan(msg.id, approvedQuestions);
+                            }}
+                          />
+                        )}
+
+                        {/* Deep Research Plan & Multi-Step Visualizer */}
+                        {((msg.plan && msg.plan.length > 0) || (msg.stages && msg.stages.length > 0)) && !msg.deepResearchState && (
                           <LiveResearchTrajectoryVisualizer
                             plan={msg.plan}
                             stages={msg.stages}
@@ -4007,7 +4278,7 @@ export default function ProjectListScreen({
                           />
                         )}
 
-                        {/* Retrieved Live Sources Drawer (Progressive Disclosure: Auto-collapsed for large literature collections) */}
+                        {/* Retrieved Live Sources Drawer */}
                         {msg.liveSources && msg.liveSources.length > 0 && (
                           <LiveSourcesDrawer
                             sources={msg.liveSources}
@@ -4023,452 +4294,65 @@ export default function ProjectListScreen({
                           </p>
                         )}
 
-                        {/* Citation Engine References & Bibliography — Collapsible so it doesn't duplicate the open LiveSourcesDrawer */}
-                        {msg.citations && msg.citations.length > 0 && (() => {
-                          const styleInfo = getCitationStyleInfo(askCitationStyle);
-                          const formattedBib = formatAskScholarBibliography(msg.citations, askCitationStyle);
-                          const isBibOpen = expandedBibIds[msg.id] ?? !(msg.liveSources && msg.liveSources.length > 0);
+                        {/* Separated Reference List & Source Transparency Panel (Sections 5, 6, 10, 14) */}
+                        {msg.sender === "assistant" &&
+                          !msg.error &&
+                          ((msg.citations && msg.citations.length > 0) ||
+                            (msg.liveSources && msg.liveSources.length > 0) ||
+                            (msg.excludedSources && msg.excludedSources.length > 0)) && (
+                            <SourceTransparencyPanel
+                              messageId={msg.id}
+                              citations={
+                                msg.citations && msg.citations.length > 0
+                                  ? msg.citations
+                                  : liveSourcesAsCitations(msg.liveSources) || []
+                              }
+                              excludedSources={msg.excludedSources}
+                              citationStyle={askCitationStyle}
+                              searchedCount={msg.searchedCount}
+                              readCount={msg.readCount}
+                              citedCount={msg.citedCount}
+                            />
+                          )}
 
-                          return (
-                            <div className="mt-3 pt-2.5 border-t border-neutral-200/80 dark:border-white/10">
-                              <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                                <button
-                                  type="button"
-                                  onClick={() => setExpandedBibIds((prev) => ({ ...prev, [msg.id]: !isBibOpen }))}
-                                  className="flex items-center gap-1.5 min-w-0 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors cursor-pointer text-left"
-                                >
-                                  <BookOpen className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-                                  <span className="truncate">
-                                    References & Bibliography ({styleInfo.shortLabel})
-                                  </span>
-                                  {isBibOpen ? (
-                                    <ChevronUp className="w-3.5 h-3.5 shrink-0" />
-                                  ) : (
-                                    <ChevronDown className="w-3.5 h-3.5 shrink-0" />
-                                  )}
-                                </button>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const allBibText = formattedBib
-                                        .map((b) => `${b.formattedText}${b.url ? ` ${b.url}` : ""}`)
-                                        .join("\n\n");
-                                      navigator.clipboard.writeText(allBibText);
-                                      setCopiedMessageId(`bib-${msg.id}`);
-                                      setTimeout(() => setCopiedMessageId(null), 2000);
-                                    }}
-                                    className="text-[10px] normal-case px-2 py-0.5 rounded-md hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-600 dark:text-neutral-300 border border-neutral-200/80 dark:border-white/10 flex items-center gap-1 cursor-pointer transition-colors"
-                                    title={`Copy all references in ${styleInfo.shortLabel} format`}
-                                  >
-                                    {copiedMessageId === `bib-${msg.id}` ? (
-                                      <>
-                                        <Check className="w-3 h-3 text-emerald-500" />
-                                        <span className="text-emerald-600 dark:text-emerald-400">Copied!</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Copy className="w-3 h-3" />
-                                        <span>Copy All ({formattedBib.length})</span>
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-
-                              {isBibOpen && (
-                                <div className="space-y-2 max-h-72 overflow-y-auto pr-1 mt-2.5 scholar-scrollbar">
-                                  {formattedBib.map((entry, bIdx) => {
-                                    const c = entry.rawCitation;
-                                    const domain =
-                                      c.domain ||
-                                      (entry.url
-                                        ? (() => {
-                                          try {
-                                            return new URL(entry.url).hostname.replace(/^www\./, "");
-                                          } catch {
-                                            return "source";
-                                          }
-                                        })()
-                                        : "source");
-                                    const badge = c.authorityBadge || (c.isPrimary ? "Primary Source" : c.venue || "Verified Source");
-                                    const isGovOrAcademic =
-                                      badge.toLowerCase().includes("gov") ||
-                                      badge.toLowerCase().includes("peer-reviewed") ||
-                                      badge.toLowerCase().includes("academic");
-                                    const isSaved = Boolean(entry.url && savedVaultSourceUrls[entry.url]);
-
-                                    return (
-                                      <div
-                                        key={bIdx}
-                                        className="flex flex-col p-2.5 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 hover:border-sky-400 dark:hover:border-sky-500/60 hover:shadow-xs transition text-left relative"
-                                      >
-                                        <div className="flex items-start justify-between gap-2 mb-1.5">
-                                          <div className="flex items-center gap-1.5 min-w-0">
-                                            {styleInfo.isNumbered && (
-                                              <span className="flex-shrink-0 text-[10px] font-mono font-semibold px-1 rounded bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300">
-                                                {entry.displayIndex}
-                                              </span>
-                                            )}
-                                            <img
-                                              src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
-                                              alt=""
-                                              className="w-3.5 h-3.5 rounded-xs flex-shrink-0 opacity-80"
-                                              onError={(e) => {
-                                                (e.target as HTMLElement).style.display = "none";
-                                              }}
-                                            />
-                                            <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400 truncate">
-                                              {c.publisher || domain}
-                                            </span>
-                                          </div>
-                                          <div className="flex items-center gap-1 shrink-0">
-                                            {entry.url && (
-                                              <button
-                                                type="button"
-                                                disabled={isSaved}
-                                                onClick={() =>
-                                                  handleSaveSourceToVault({
-                                                    title: c.title,
-                                                    url: entry.url!,
-                                                    snippet: c.snippet || entry.formattedText,
-                                                    authors: c.authors || [],
-                                                    year: c.year ? String(c.year) : undefined,
-                                                    venue: c.venue,
-                                                  })
-                                                }
-                                                className={`px-1.5 py-0.5 rounded text-[10px] font-medium inline-flex items-center gap-1 transition cursor-pointer ${
-                                                  isSaved
-                                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                                    : "hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                                }`}
-                                                title={isSaved ? "Saved in Knowledge Vault" : "Save source to Knowledge Vault"}
-                                              >
-                                                {isSaved ? <Check className="w-3 h-3" /> : <BookmarkPlus className="w-3 h-3" />}
-                                                <span>{isSaved ? "Saved" : "Save"}</span>
-                                              </button>
-                                            )}
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                navigator.clipboard.writeText(entry.formattedText);
-                                                setCopiedMessageId(`ref-${msg.id}-${bIdx}`);
-                                                setTimeout(() => setCopiedMessageId(null), 2000);
-                                              }}
-                                              className="p-1 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition cursor-pointer"
-                                              title="Copy formatted citation"
-                                            >
-                                              {copiedMessageId === `ref-${msg.id}-${bIdx}` ? (
-                                                <Check className="w-3 h-3 text-emerald-500" />
-                                              ) : (
-                                                <Copy className="w-3 h-3" />
-                                              )}
-                                            </button>
-                                            {entry.url && (
-                                              <a
-                                                href={entry.url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="p-1 rounded hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-400 hover:text-sky-500 transition cursor-pointer"
-                                                title="Open source link or DOI"
-                                              >
-                                                <ExternalLink className="w-3 h-3" />
-                                              </a>
-                                            )}
-                                          </div>
-                                        </div>
-
-                                        <div className="text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed font-serif pl-0.5">
-                                          {entry.formattedText}
-                                        </div>
-
-                                        <div className="flex items-center justify-between gap-1.5 mt-2 pt-1.5 border-t border-neutral-100 dark:border-white/5 text-[9px]">
-                                          <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span
-                                              className={`px-1.5 py-0.2 rounded-full font-medium ${c.sourceType === "vault" || badge.toLowerCase().includes("vault")
-                                                  ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40"
-                                                  : isGovOrAcademic
-                                                    ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
-                                                    : badge.toLowerCase().includes("policy") || badge.toLowerCase().includes("institute")
-                                                      ? "bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/40"
-                                                      : "bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300"
-                                                }`}
-                                            >
-                                              {badge}
-                                            </span>
-                                            {entry.doi && (
-                                              <span className="font-mono text-neutral-400 truncate max-w-[130px]">
-                                                DOI: {entry.doi.replace(/^https?:\/\/doi\.org\//, "")}
-                                              </span>
-                                            )}
-                                          </div>
-                                          {entry.url && (
-                                            <a
-                                              href={entry.url}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="text-sky-600 dark:text-sky-400 hover:underline inline-flex items-center gap-0.5 font-medium shrink-0"
-                                            >
-                                              <span>Visit Source</span>
-                                              <span className="text-[10px]">↗</span>
-                                            </a>
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-
-                        {/* 1-Click Workspace Handoff Banner */}
-                        {msg.sender === "assistant" && (msg.recommendedWorkspaceHandoff || (msg.citations && msg.citations.length > 0)) && (
-                          <div className="mt-3.5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 shadow-2xs">
-                            <div className="flex items-start gap-2.5 min-w-0">
-                              <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 shrink-0">
-                                <FolderPlus className="w-4 h-4" />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5 flex-wrap">
-                                  <span>
-                                    {msg.recommendedWorkspaceHandoff
-                                      ? `Launch in ${msg.recommendedWorkspaceHandoff.formatLabel}`
-                                      : "Scholarly Workspace Handoff"}
-                                  </span>
-                                  {(msg.verifiedSourcesCount || msg.citations?.length || 0) > 0 && (
-                                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 font-medium">
-                                      {msg.verifiedSourcesCount || msg.citations?.length || 0} Verified Sources Attached
-                                    </span>
-                                  )}
-                                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-500/10 text-sky-800 dark:text-sky-200 font-mono">
-                                    {msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words
-                                  </span>
-                                </div>
-                                <p className="text-[11px] text-neutral-600 dark:text-neutral-300 mt-0.5 line-clamp-2">
-                                  Transition this research synthesis into a structured coursework essay or formal journal manuscript with evidentiary matrices and quality gates.
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 w-full lg:w-auto flex-wrap lg:flex-nowrap shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => handleBootProjectFromResearch(msg, "OT-01")}
-                                className="flex-1 lg:flex-initial px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer whitespace-nowrap"
-                              >
-                                <span>Launch in 4-Phase Essay Engine (OT-01)</span>
-                                <ArrowRight className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleBootProjectFromResearch(msg, "OT-10")}
-                                className="flex-1 lg:flex-initial px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer whitespace-nowrap"
-                              >
-                                <span>Launch in Journal Studio (OT-10)</span>
-                                <ArrowRight className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Response Utility Action Bar */}
-                        {msg.sender === "assistant" && !msg.error && (
-                          <div className="flex items-center justify-between flex-wrap gap-2 pt-2.5 mt-2.5 border-t border-neutral-200/60 dark:border-white/10 text-[11px] text-neutral-500 dark:text-neutral-400">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <button
-                                type="button"
-                                onClick={() => handleCopyResponse(msg.id, msg.text)}
-                                className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                                title="Copy full response to markdown"
-                              >
-                                {copiedMessageId === msg.id ? (
-                                  <>
-                                    <Check className="w-3 h-3 text-emerald-500" />
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">Copied!</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="w-3 h-3" />
-                                    <span>Copy</span>
-                                  </>
-                                )}
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadMarkdown(msg)}
-                                className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                                title="Export response and bibliography as a Markdown (.md) file"
-                              >
-                                <Download className="w-3 h-3" />
-                                <span>Export .md</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleCopyBibTeX(msg)}
-                                className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                                title="Copy structured references as standard BibTeX (.bib) format"
-                              >
-                                {copiedMessageId === `bibtex-${msg.id}` ? (
-                                  <>
-                                    <Check className="w-3 h-3 text-emerald-500" />
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">Copied BibTeX!</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <BookOpen className="w-3 h-3 text-sky-500" />
-                                    <span>BibTeX</span>
-                                  </>
-                                )}
-                              </button>
-
-                              {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDownloadMatrixCsv(msg)}
-                                    className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                                    title="Export Evidence Matrix as CSV file"
-                                  >
-                                    <Table className="w-3 h-3 text-emerald-500" />
-                                    <span>Matrix CSV</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => setProvenanceInspectorMsg(msg)}
-                                    className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer text-emerald-700 dark:text-emerald-300 font-medium"
-                                    title="Inspect Sentence-Level Provenance & Grounding"
-                                  >
-                                    <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                                    <span>Grounding Trace</span>
-                                  </button>
-                                </>
-                              )}
-
-                              {msg.id !== "init" && msg.id !== "reset-assistant" && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const msgIdx = guideMessages.findIndex((m) => m.id === msg.id);
-                                      const precedingUser =
-                                        msgIdx > 0
-                                          ? guideMessages.slice(0, msgIdx).filter((m) => m.sender === "user").slice(-1)[0]
-                                          : guideMessages.filter((m) => m.sender === "user").slice(-1)[0];
-                                      if (precedingUser) {
-                                        handleSendGuideMessage(
-                                          precedingUser.text,
-                                          undefined,
-                                          msg.mode === "deep-research"
-                                            ? "deep-research"
-                                            : msg.mode === "search"
-                                              ? "search"
-                                              : "normal"
-                                        );
-                                      }
-                                    }}
-                                    className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                                    title="Regenerate response"
-                                  >
-                                    <RotateCcw className="w-3 h-3" />
-                                    <span>Regenerate</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      handleSendGuideMessage(
-                                        "Continue and expand on the preceding analysis with additional depth, concrete examples, and key implications.",
-                                        undefined,
-                                        msg.mode === "deep-research"
-                                          ? "deep-research"
-                                          : msg.mode === "search"
-                                            ? "search"
-                                            : "normal"
-                                      );
-                                    }}
-                                    className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                                    title="Continue and expand this conversation"
-                                  >
-                                    <ArrowRight className="w-3 h-3" />
-                                    <span>Continue</span>
-                                  </button>
-                                </>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (!userEmail) {
-                                    openAuth("signin", "Sign in to save research findings to your Knowledge Vault.");
-                                    return;
-                                  }
-                                  onOpenVault?.();
-                                }}
-                                className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                                title="Open Knowledge Vault to manage citations & evidence"
-                              >
-                                <Database className="w-3 h-3 text-amber-500" />
-                                <span>Vault</span>
-                              </button>
-
-                              {/* Boot Project from Research Button */}
-                              <button
-                                type="button"
-                                onClick={() => handleBootProjectFromResearch(msg)}
-                                className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 transition-colors cursor-pointer font-medium"
-                                title="Initialize a new academic project workspace populated with this research"
-                              >
-                                <FolderPlus className="w-3 h-3 text-emerald-500" />
-                                <span>Boot Project</span>
-                              </button>
-
-                              {msg.mode !== "search" && msg.id !== "init" && msg.id !== "reset-assistant" && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSidebarAiMode("search");
-                                    const lastUserMsg = guideMessages.filter((m) => m.sender === "user").slice(-1)[0];
-                                    if (lastUserMsg) {
-                                      handleSendGuideMessage(lastUserMsg.text, undefined, "search");
-                                    }
-                                  }}
-                                  className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-sky-50 dark:hover:bg-sky-950/30 text-sky-600 dark:text-sky-400 transition-colors cursor-pointer"
-                                  title="Re-run with Live Web Search grounding"
-                                >
-                                  <Globe className="w-3 h-3" />
-                                  <span>Web Search</span>
-                                </button>
-                              )}
-
-                              {msg.mode !== "deep-research" && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSidebarAiMode("deep_research");
-                                    const lastUserMsg = guideMessages.filter((m) => m.sender === "user").slice(-1)[0];
-                                    if (lastUserMsg) {
-                                      handleSendGuideMessage(lastUserMsg.text, undefined, "deep-research");
-                                    }
-                                  }}
-                                  className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-purple-50 dark:hover:bg-purple-950/30 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
-                                  title="Conduct comprehensive deep research on this topic"
-                                >
-                                  <Sparkles className="w-3 h-3" />
-                                  <span>Deep Research</span>
-                                </button>
-                              )}
-                            </div>
-
-                            {msg.model && (
-                              <span className="text-[10px] text-neutral-400 font-mono truncate max-w-[120px]">
-                                {msg.model}
-                              </span>
-                            )}
-                          </div>
+                        {/* Exact 6 Post-Response Actions in Single Non-Wrapping Row (Sections 8, 11, 13) */}
+                        {msg.sender === "assistant" && !msg.error && msg.id !== "init" && msg.id !== "reset-assistant" && (
+                          <PostResponseActionBar
+                            message={{
+                              ...msg,
+                              text:
+                                msg.citations && msg.citations.length > 0
+                                  ? stripRawReferencesSection(msg.text)
+                                  : msg.text,
+                              citations:
+                                msg.citations && msg.citations.length > 0
+                                  ? msg.citations
+                                  : liveSourcesAsCitations(msg.liveSources) || [],
+                            }}
+                            citationStyle={askCitationStyle}
+                            isSavedToVault={Boolean(storedToVaultMessageIds[msg.id])}
+                            onRegenerate={() => {
+                              const msgIdx = guideMessages.findIndex((m) => m.id === msg.id);
+                              const precedingUser =
+                                msgIdx > 0
+                                  ? guideMessages.slice(0, msgIdx).filter((m) => m.sender === "user").slice(-1)[0]
+                                  : guideMessages.filter((m) => m.sender === "user").slice(-1)[0];
+                              if (precedingUser) {
+                                void handleSendGuideMessage(
+                                  precedingUser.text,
+                                  undefined,
+                                  msg.mode === "deep-research" ? "deep-research" : "normal"
+                                );
+                              }
+                            }}
+                            onStoreToVault={() => {
+                              void handleStoreResponseToVault(msg);
+                            }}
+                            onContinueToWorkspace={(formatId) => {
+                              void handleBootProjectFromResearch(msg, formatId);
+                            }}
+                            onToast={(text, type) => showAppToast(text, type || "info", 2800)}
+                          />
                         )}
 
                         {/* Quick Action Deep-Links */}
@@ -4834,6 +4718,20 @@ export default function ProjectListScreen({
                           </span>
                         )}
                       </button>
+
+                      {sidebarAiMode === "deep_research" && (
+                        <button
+                          type="button"
+                          data-testid="propose-deep-research-plan-btn"
+                          disabled={!guideInput.trim()}
+                          onClick={() => handleProposeDeepResearchPlan(guideInput)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/20 disabled:opacity-40 transition-colors cursor-pointer whitespace-nowrap"
+                          title="Propose an editable Deep Research plan before searching begins"
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          <span>Propose Plan</span>
+                        </button>
+                      )}
                     </div>
 
                     <div className="relative group">
@@ -4960,8 +4858,8 @@ export default function ProjectListScreen({
           setIsAiSidebarOpen(true);
           if (mode === "deep-research") {
             setSidebarAiMode("deep_research");
-          } else if (mode === "search") {
-            setSidebarAiMode("search");
+          } else {
+            setSidebarAiMode("auto");
           }
           if (initialQuery) {
             handleSendGuideMessage(initialQuery, undefined, mode);

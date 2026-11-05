@@ -40,7 +40,7 @@ const { default: ProjectListScreen } = await import("../ProjectListScreen");
 
 const SOURCES = [
   { title: "Social media and polarization: a review", url: "https://doi.org/10.1/abc", snippet: "Mixed effects on polarization.", authors: ["Kubin, E."], source: "openalex", publicationDate: "2024-03-01" },
-  { title: "Echo chambers online?", url: "https://doi.org/10.2/def", snippet: "Echo chambers are smaller than assumed.", authors: ["Arguedas, A."], source: "crossref" },
+  { title: "Echo chambers online?", url: "https://doi.org/10.2/def", snippet: "Echo chambers are smaller than assumed.", authors: ["Arguedas, A."], source: "crossref", publicationDate: "2022-05-01" },
 ];
 
 function open() {
@@ -76,7 +76,7 @@ describe("Ask Scholar grounds every answer in a fresh search", () => {
 
     await ask("Does social media increase political polarisation among young voters?");
     await waitFor(() => expect(executeAgenticQuery).toHaveBeenCalled());
-    expect(executeLiveSearch).toHaveBeenCalledWith("Does social media increase political polarisation among young voters?", { limit: 6 });
+    expect(executeLiveSearch).toHaveBeenCalledWith("Does social media increase political polarisation among young voters?");
     // The search results go to the AI with the question.
     expect(executeAgenticQuery.mock.calls[0][0].systemPrompt).toContain('[1] "Social media and polarization: a review"');
 
@@ -95,8 +95,7 @@ describe("Ask Scholar grounds every answer in a fresh search", () => {
     await ask("What about in Nepal?");
     await waitFor(() => expect(executeAgenticQuery).toHaveBeenCalledTimes(2));
     expect(executeLiveSearch).toHaveBeenLastCalledWith(
-      "Does social media increase political polarisation among young voters? What about in Nepal?",
-      { limit: 6 }
+      "Does social media increase political polarisation among young voters? What about in Nepal?"
     );
     expect(await screen.findByTestId("no-live-sources")).toHaveTextContent("No recent sources were found");
   });

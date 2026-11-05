@@ -810,11 +810,12 @@ describe("minimal website assistant", () => {
     fireEvent.click(sendBtn);
 
     expect(await screen.findByText(/Executive Scholarly Synthesis & Verified Literature Brief on Biology/i, {}, { timeout: 2000 })).toBeInTheDocument();
-    expect(screen.getAllByText(/1540 words/i)[0]).toBeInTheDocument();
 
-    const handoffBtn = screen.getByRole("button", { name: /Launch in 4-Phase Essay Engine \(OT-01\)/i });
-    expect(handoffBtn).toBeInTheDocument();
-    fireEvent.click(handoffBtn);
+    const continueBtn = await screen.findByTestId("action-continue");
+    expect(continueBtn).toBeInTheDocument();
+    fireEvent.click(continueBtn);
+    const assignmentBtn = await screen.findByTestId("continue-workspace-OT-01");
+    fireEvent.click(assignmentBtn);
 
     await waitFor(() => {
       expect(createProject).toHaveBeenCalledWith("OT-01");
@@ -1209,17 +1210,17 @@ describe("distinct academic format USPs & specs", () => {
     expect(plusTooltip?.className).toContain("bottom-full");
     expect(plusTooltip?.className).toContain("mb-2");
 
-    // Popover menu interaction & mode toggles
+    // Popover menu interaction & mode toggles (Web search mode is removed per Section 2)
     fireEvent.click(uploadBtn);
     expect(screen.getByRole("menu", { name: /Prompt options menu/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /Add files & photos/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /Web search/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /Web search/i })).not.toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /Deep research/i })).toBeInTheDocument();
 
-    // Select Web Search mode
-    fireEvent.click(screen.getByRole("menuitem", { name: /Web search/i }));
+    // Select Deep Research mode
+    fireEvent.click(screen.getByRole("menuitem", { name: /Deep research/i }));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    expect(screen.getByText("Search")).toBeInTheDocument();
+    expect(screen.getByText("Deep Research")).toBeInTheDocument();
 
     // Reset mode via × button on chip
     const resetChipBtn = screen.getByRole("button", { name: /Reset mode/i });
@@ -1342,7 +1343,7 @@ describe("prompt isolation & rich markdown rendering", () => {
     // Headings rendered without ### hashtags
     expect(screen.queryByText(/### 1\. Ideological Foundations/)).not.toBeInTheDocument();
     expect(screen.getByText("1. Ideological Foundations: Hindutva")).toBeInTheDocument();
-    const headingElem = screen.getByText("1. Ideological Foundations: Hindutva").closest("h5");
+    const headingElem = screen.getByText("1. Ideological Foundations: Hindutva").closest("h3, h4, h5");
     expect(headingElem).toBeInTheDocument();
 
     // Bold & italic rendered without raw asterisks

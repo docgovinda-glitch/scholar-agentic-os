@@ -383,7 +383,7 @@ export async function executeDeepResearch(
   if (gapQueries.length > 0) {
     onProgress?.(`Stage 5/7: Conducting iterative follow-up searches for ${gapQueries.length} gap vector(s)...`);
     const followUpResults = await Promise.all(
-      gapQueries.slice(0, 3).map((q) => executeWebSearch(q, { maxResults: 6, fetchFullContent: true, mode: "deep-research" }))
+      gapQueries.slice(0, 4).map((q) => executeWebSearch(q, { maxResults: 18, fetchFullContent: true, mode: "deep-research" }))
     );
     followUpResults.forEach((res, idx) => {
       for (const src of res.results) {

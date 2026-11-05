@@ -1,8 +1,11 @@
 import React, { useState, Fragment } from "react";
-import { Copy, Check, Scale, Info, BarChart3, Network, ExternalLink } from "lucide-react";
+import { Copy, Check, Scale, Info, BarChart3, Network, ExternalLink, ListTree } from "lucide-react";
 import type { WebsiteAssistantMessage, WebsiteCitationItem, AssistantAction } from "./types";
 import { WEBSITE_ASSISTANT_FAQS } from "./constants";
-import { formatAskScholarInText } from "../scholarCitationEngine";
+import {
+  formatAskScholarInText,
+  stripRawReferencesSection,
+} from "../scholarCitationEngine";
 
 export function getAssistantActionAndFollowUps(query: string): {
   action?: AssistantAction;
@@ -58,7 +61,7 @@ export function CodeBlockWithCopy({ lang, code }: { lang: string; code: string }
   };
 
   return (
-    <div className="my-2 rounded-xl bg-neutral-900 dark:bg-black/80 border border-neutral-800 dark:border-white/10 overflow-hidden shadow-2xs">
+    <div className="my-2.5 rounded-xl bg-neutral-900 dark:bg-ink-900 border border-neutral-800 dark:border-white/10 overflow-hidden shadow-2xs">
       <div className="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5 text-[10px] font-mono text-neutral-400">
         <span className="uppercase tracking-wider font-semibold">{lang || "code"}</span>
         <button
@@ -78,11 +81,167 @@ export function CodeBlockWithCopy({ lang, code }: { lang: string; code: string }
   );
 }
 
+/**
+ * Converts LaTeX math expressions into clean typographic math nodes (KaTeX-compatible DOM).
+ */
+const LATEX_SYMBOL_MAP: Record<string, string> = {
+  "\\alpha": "α",
+  "\\beta": "β",
+  "\\gamma": "γ",
+  "\\Gamma": "Γ",
+  "\\delta": "δ",
+  "\\Delta": "Δ",
+  "\\epsilon": "ε",
+  "\\varepsilon": "ε",
+  "\\zeta": "ζ",
+  "\\eta": "η",
+  "\\theta": "θ",
+  "\\Theta": "Θ",
+  "\\kappa": "κ",
+  "\\lambda": "λ",
+  "\\Lambda": "Λ",
+  "\\mu": "μ",
+  "\\nu": "ν",
+  "\\xi": "ξ",
+  "\\pi": "π",
+  "\\Pi": "Π",
+  "\\rho": "ρ",
+  "\\sigma": "σ",
+  "\\Sigma": "Σ",
+  "\\tau": "τ",
+  "\\phi": "φ",
+  "\\Phi": "Φ",
+  "\\chi": "χ",
+  "\\psi": "ψ",
+  "\\Psi": "Ψ",
+  "\\omega": "ω",
+  "\\Omega": "Ω",
+  "\\pm": "±",
+  "\\mp": "∓",
+  "\\times": "×",
+  "\\div": "÷",
+  "\\cdot": "·",
+  "\\leq": "≤",
+  "\\le": "≤",
+  "\\geq": "≥",
+  "\\ge": "≥",
+  "\\neq": "≠",
+  "\\ne": "≠",
+  "\\approx": "≈",
+  "\\equiv": "≡",
+  "\\sim": "∼",
+  "\\propto": "∝",
+  "\\infty": "∞",
+  "\\partial": "∂",
+  "\\nabla": "∇",
+  "\\forall": "∀",
+  "\\exists": "∃",
+  "\\in": "∈",
+  "\\notin": "∉",
+  "\\subset": "⊂",
+  "\\subseteq": "⊆",
+  "\\cup": "∪",
+  "\\cap": "∩",
+  "\\sum": "∑",
+  "\\prod": "∏",
+  "\\int": "∫",
+  "\\rightarrow": "→",
+  "\\to": "→",
+  "\\leftarrow": "←",
+  "\\Rightarrow": "⇒",
+  "\\Leftarrow": "⇐",
+  "\\leftrightarrow": "↔",
+  "\\Leftrightarrow": "⇔",
+};
+
+export function formatLatexMathToText(latex: string): string {
+  let out = latex.trim();
+  // \text{...} -> ...
+  out = out.replace(/\\(?:text|mathrm|mathbf|mathit)\{([^}]*)\}/g, "$1");
+  // \frac{a}{b} -> (a)/(b)
+  out = out.replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, "($1)/($2)");
+  // \sqrt{a} -> √(a)
+  out = out.replace(/\\sqrt\{([^}]*)\}/g, "√($1)");
+  // \hat{x} -> x̂, \bar{x} -> x̄
+  out = out.replace(/\\hat\{([^}]*)\}/g, "$1\u0302");
+  out = out.replace(/\\bar\{([^}]*)\}/g, "$1\u0304");
+  for (const [cmd, sym] of Object.entries(LATEX_SYMBOL_MAP)) {
+    out = out.split(cmd).join(sym);
+  }
+  // Clean remaining braces around superscripts/subscripts: ^{2} -> ^2, _{i} -> _i
+  out = out.replace(/\^\{([^}]*)\}/g, "^$1");
+  out = out.replace(/_\{([^}]*)\}/g, "_$1");
+  return out;
+}
+
+export function LatexMathBlock({
+  latex,
+  displayMode = false,
+}: {
+  latex: string;
+  displayMode?: boolean;
+}) {
+  const rendered = formatLatexMathToText(latex);
+  if (displayMode) {
+    return (
+      <div
+        data-testid="katex-display-math"
+        className="katex-display my-2.5 py-2 px-3 rounded-xl bg-neutral-50 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 text-center font-serif text-sm text-neutral-900 dark:text-neutral-100 overflow-x-auto"
+      >
+        <span role="math" className="font-serif italic">{rendered}</span>
+      </div>
+    );
+  }
+  return (
+    <span
+      data-testid="katex-inline-math"
+      className="katex-inline font-serif italic px-1 py-0.5 rounded bg-neutral-100/70 dark:bg-white/5 text-neutral-900 dark:text-neutral-100"
+    >
+      {rendered}
+    </span>
+  );
+}
+
+/**
+ * Scrolls to and briefly highlights the matching Reference List entry when an in-text citation chip is clicked (Section 10).
+ */
+export function scrollToReferenceEntry(num: string | number, messageId?: string) {
+  if (typeof document === "undefined") return;
+  const candidateIds = [
+    messageId ? `ref-entry-${messageId}-${num}` : "",
+    `ref-entry-${num}`,
+  ].filter(Boolean);
+
+  let targetEl: HTMLElement | null = null;
+  for (const id of candidateIds) {
+    const el = document.getElementById(id);
+    if (el) {
+      targetEl = el;
+      break;
+    }
+  }
+  if (!targetEl) {
+    targetEl = document.querySelector(`[data-ref-num="${num}"]`) as HTMLElement | null;
+  }
+
+  if (targetEl) {
+    if (typeof targetEl.scrollIntoView === "function") {
+      targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    targetEl.classList.add("ring-2", "ring-blue-500", "bg-blue-50/60", "dark:bg-blue-950/40");
+    const elRef = targetEl;
+    setTimeout(() => {
+      elRef.classList.remove("ring-2", "ring-blue-500", "bg-blue-50/60", "dark:bg-blue-950/40");
+    }, 2200);
+  }
+}
+
 export function InlineCitationBadge({
   num,
   url,
   citation,
   label,
+  messageId,
   onAddToEvidence,
   onFocusInGraph,
 }: {
@@ -90,10 +249,15 @@ export function InlineCitationBadge({
   url?: string;
   citation?: WebsiteCitationItem;
   label?: string;
+  messageId?: string;
   onAddToEvidence?: (citation: WebsiteCitationItem) => void;
   onFocusInGraph?: (citation: WebsiteCitationItem) => void;
 }) {
-  const targetUrl = url || (citation as Record<string, unknown> | undefined)?.doi as string | undefined || citation?.url;
+  const doiStr = (citation as Record<string, unknown> | undefined)?.doi as string | undefined;
+  const targetUrl =
+    url ||
+    (doiStr ? (doiStr.startsWith("http") ? doiStr : `https://doi.org/${doiStr}`) : undefined) ||
+    citation?.url;
   const displayLabel = label || `[${num}]`;
   const domain =
     citation?.domain ||
@@ -108,46 +272,71 @@ export function InlineCitationBadge({
       : undefined);
 
   const venue = citation?.venue || citation?.journal || citation?.publisher || domain || "Academic Source";
-  const authorStr = citation?.authors && citation.authors.length > 0
-    ? citation.authors.length > 2
-      ? `${citation.authors[0]} et al.`
-      : citation.authors.join(", ")
-    : citation?.author;
+  const authorStr =
+    citation?.authors && citation.authors.length > 0
+      ? citation.authors.length > 2
+        ? `${citation.authors[0]} et al.`
+        : citation.authors.join(", ")
+      : citation?.author;
 
-  const isPeerReviewed =
-    citation?.sourceType === "scholarly" ||
-    /nature|science|ieee|acm|neurips|icml|lancet|cell|springer|elsevier|wiley|pnas|oxford|cambridge/i.test(venue);
+  const sourceTypeBadge =
+    citation?.csl?.sourceTypeLabel ||
+    (citation?.sourceType === "scholarly"
+      ? "peer-reviewed article"
+      : citation?.sourceType === "official"
+        ? "government / institutional report"
+        : citation?.sourceType || "verified source");
+
+  const isPreprint =
+    sourceTypeBadge.includes("preprint") ||
+    citation?.credibilityLevel === "preprint - not peer-reviewed" ||
+    Boolean(targetUrl && /arxiv\.org|biorxiv\.org|medrxiv\.org/i.test(targetUrl));
 
   const isOpenAccess =
-    Boolean(targetUrl && /arxiv\.org|biorxiv\.org|openalex|doi\.org\/10\.48550/i.test(targetUrl)) ||
-    citation?.authorityTier === "open_access" ||
-    citation?.sourceType === "scholarly";
+    Boolean(citation?.openAccessUrl) ||
+    Boolean(targetUrl && /arxiv\.org|biorxiv\.org|openalex|europepmc|doi\.org\/10\.48550/i.test(targetUrl)) ||
+    citation?.authorityTier === "open_access";
 
   const snippet = citation?.evidenceSnippet || citation?.snippet || citation?.mainFinding;
 
   return (
-    <span className="relative group/cite inline align-baseline">
+    <span className="relative group/cite inline align-baseline mx-0.5">
       <a
-        href={targetUrl || "#"}
+        href={targetUrl || `#ref-entry-${num}`}
         target={targetUrl ? "_blank" : undefined}
-        rel="noopener noreferrer"
+        rel={targetUrl ? "noopener noreferrer" : undefined}
+        data-testid={`citation-chip-${num}`}
         onClick={(e) => {
-          if (!targetUrl) e.preventDefault();
+          const refMounted =
+            typeof document !== "undefined" &&
+            Boolean(
+              (messageId && document.getElementById(`ref-entry-${messageId}-${num}`)) ||
+                document.getElementById(`ref-entry-${num}`) ||
+                document.querySelector(`[data-ref-num="${num}"]`)
+            );
+          if (refMounted) {
+            e.preventDefault();
+          }
           e.stopPropagation();
+          scrollToReferenceEntry(num, messageId);
         }}
-        className="font-medium text-[0.95em] text-blue-700 dark:text-blue-300 underline decoration-blue-300/60 dark:decoration-blue-500/50 underline-offset-2 hover:decoration-current cursor-pointer"
-        title={citation?.title ? `Source ${displayLabel}: ${citation.title}` : targetUrl ? `Source ${displayLabel}: ${targetUrl}` : `Source ${displayLabel}`}
+        className="inline-flex items-center px-1.5 py-0.2 rounded-md font-medium text-[0.92em] bg-blue-50/90 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors cursor-pointer no-underline"
+        title={
+          citation?.title
+            ? `Source ${displayLabel}: ${citation.title}`
+            : `Source ${displayLabel}`
+        }
       >
         {displayLabel}
       </a>
 
-      {/* Citation Engine Verified Micro-Card Hover Popover */}
+      {/* Citation Preview Card on Hover (Section 10) */}
       {citation && (
         <span
           data-testid="citation-micro-card"
           className="pointer-events-none opacity-0 group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-all duration-200 ease-out absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-80 p-3.5 rounded-2xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200 dark:border-white/15 shadow-2xl text-left z-50 transform group-hover/cite:translate-y-0 translate-y-1 block select-text font-sans"
         >
-          {/* Top Venue & Tags Row */}
+          {/* Top Venue & Source Type Row */}
           <span className="flex items-center justify-between gap-1.5 mb-2">
             <span className="flex items-center gap-1.5 min-w-0">
               {domain && (
@@ -170,14 +359,18 @@ export function InlineCitationBadge({
                   {citation.year}
                 </span>
               )}
-              {isPeerReviewed && (
-                <span className="px-1.5 py-0.5 rounded-full font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/40 text-[9px]">
-                  Peer Reviewed
-                </span>
-              )}
+              <span
+                className={`px-1.5 py-0.5 rounded-full font-semibold text-[9px] border ${
+                  isPreprint
+                    ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200/60 dark:border-amber-800/40"
+                    : "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200/50 dark:border-indigo-800/40"
+                }`}
+              >
+                {isPreprint ? "Preprint (Not Peer-Reviewed)" : sourceTypeBadge}
+              </span>
               {isOpenAccess && (
                 <span className="px-1.5 py-0.5 rounded-full font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/40 text-[9px]">
-                  Open Access
+                  OA
                 </span>
               )}
             </span>
@@ -185,7 +378,7 @@ export function InlineCitationBadge({
 
           {/* Paper Title */}
           <span className="block text-xs font-semibold text-neutral-900 dark:text-neutral-100 line-clamp-2 leading-snug mb-1">
-            {citation.title || "External Scholarly Resource"}
+            {citation.title}
           </span>
 
           {/* Authors */}
@@ -246,7 +439,7 @@ export function InlineCitationBadge({
                 onClick={(e) => e.stopPropagation()}
                 className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 font-medium ml-auto"
               >
-                <span>Read DOI</span>
+                <span>Open source</span>
                 <ExternalLink className="w-2.5 h-2.5" />
               </a>
             )}
@@ -257,33 +450,58 @@ export function InlineCitationBadge({
   );
 }
 
+/**
+ * Sanitizes trailing half-streamed Markdown tokens so raw `#`, `**`, or `|` never flash during streaming.
+ */
+export function sanitizeStreamingMarkdown(rawText: string): string {
+  if (!rawText) return "";
+  let cleaned = stripRawReferencesSection(rawText);
+  // Balance unclosed bold `**` at the very end of a streaming chunk
+  const boldCount = (cleaned.match(/\*\*/g) || []).length;
+  if (boldCount % 2 === 1) {
+    cleaned = cleaned.replace(/\*\*([^*\n]*)$/, "$1");
+  }
+  // Remove a lone trailing `#` heading prefix with no text yet
+  cleaned = cleaned.replace(/\n#{1,6}\s*$/, "");
+  return cleaned;
+}
+
 export function renderFormattedGuideText(
   text: string,
   citations?: WebsiteAssistantMessage["citations"],
   citationStyle: string = "apa",
   onAddToEvidence?: (citation: WebsiteCitationItem) => void,
-  onFocusInGraph?: (citation: WebsiteCitationItem) => void
+  onFocusInGraph?: (citation: WebsiteCitationItem) => void,
+  messageId?: string
 ) {
   if (!text) return null;
 
+  const sanitizedText = sanitizeStreamingMarkdown(text);
+
   const inlineRegex =
-    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\[(\d+(?:\s*,\s*\d+)*)\]|`([^`]+)`|\*\*\*([^*]+)\*\*\*|___([^_]+)___|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+?)\*|\b_([^_]+)_\b|~~([^~]+)~~/g;
+    /\\\(([\s\S]+?)\\\)|\$([^$\n]+?)\$|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\[(\d+(?:\s*,\s*\d+)*)\]|`([^`]+)`|\*\*\*([^*]+)\*\*\*|___([^_]+)___|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+?)\*|\b_([^_]+)_\b|~~([^~]+)~~/g;
 
   const parseInline = (str: string): React.ReactNode[] => {
+    // Strip any stray leftover `**` or `## ` prefixes that didn't close
+    const cleanStr = str.replace(/^#{1,6}\s+/, "");
     const nodes: React.ReactNode[] = [];
     let lastIdx = 0;
     let match: RegExpExecArray | null;
     inlineRegex.lastIndex = 0;
 
-    while ((match = inlineRegex.exec(str)) !== null) {
+    while ((match = inlineRegex.exec(cleanStr)) !== null) {
       if (match.index > lastIdx) {
-        nodes.push(str.slice(lastIdx, match.index));
+        nodes.push(cleanStr.slice(lastIdx, match.index).replace(/\*\*/g, ""));
       }
 
-      if (match[1] !== undefined) {
+      if (match[1] !== undefined || match[2] !== undefined) {
+        // Inline LaTeX math: \(...\) or $...$
+        const latexExpr = match[1] ?? match[2];
+        nodes.push(<LatexMathBlock key={`math-${match.index}`} latex={latexExpr} displayMode={false} />);
+      } else if (match[3] !== undefined) {
         // Link: [title](url)
-        const linkTitle = match[1];
-        const linkUrl = match[2];
+        const linkTitle = match[3];
+        const linkUrl = match[4];
         const isNumeric = /^\d+$/.test(linkTitle.trim());
 
         if (isNumeric) {
@@ -291,7 +509,7 @@ export function renderFormattedGuideText(
           const matchedCite =
             citations && num > 0 && num <= citations.length ? citations[num - 1] : undefined;
           const formattedLabel = matchedCite
-            ? formatAskScholarInText(matchedCite, num - 1, citationStyle)
+            ? formatAskScholarInText(matchedCite, num - 1, citationStyle) || `[${linkTitle}]`
             : `[${linkTitle}]`;
 
           nodes.push(
@@ -301,6 +519,7 @@ export function renderFormattedGuideText(
               label={formattedLabel}
               url={linkUrl}
               citation={matchedCite}
+              messageId={messageId}
               onAddToEvidence={onAddToEvidence}
               onFocusInGraph={onFocusInGraph}
             />
@@ -312,7 +531,7 @@ export function renderFormattedGuideText(
               href={linkUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline font-medium inline-flex items-center gap-0.5 mx-0.5 transition-colors"
+              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline font-medium inline-flex items-center gap-0.5 mx-0.5 transition-colors"
               onClick={(e) => e.stopPropagation()}
             >
               <span>{linkTitle}</span>
@@ -320,9 +539,9 @@ export function renderFormattedGuideText(
             </a>
           );
         }
-      } else if (match[3] !== undefined) {
+      } else if (match[5] !== undefined) {
         // Numeric Bracket Citation: [1], [2], [1, 2]
-        const citeNums = match[3];
+        const citeNums = match[5];
         const mIdx = match.index;
         const nums = citeNums.split(",").map((n) => n.trim());
 
@@ -333,7 +552,7 @@ export function renderFormattedGuideText(
               const matchedCite =
                 citations && num > 0 && num <= citations.length ? citations[num - 1] : undefined;
               const formattedLabel = matchedCite
-                ? formatAskScholarInText(matchedCite, num - 1, citationStyle)
+                ? formatAskScholarInText(matchedCite, num - 1, citationStyle) || `[${numStr}]`
                 : `[${numStr}]`;
               return (
                 <InlineCitationBadge
@@ -342,6 +561,7 @@ export function renderFormattedGuideText(
                   label={formattedLabel}
                   url={matchedCite?.url}
                   citation={matchedCite}
+                  messageId={messageId}
                   onAddToEvidence={onAddToEvidence}
                   onFocusInGraph={onFocusInGraph}
                 />
@@ -349,42 +569,42 @@ export function renderFormattedGuideText(
             })}
           </Fragment>
         );
-      } else if (match[4] !== undefined) {
+      } else if (match[6] !== undefined) {
         // Inline code: `code`
         nodes.push(
           <code
             key={`c-${match.index}`}
             className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-neutral-200/80 dark:bg-white/10 text-neutral-800 dark:text-neutral-200 font-medium"
           >
-            {match[4]}
+            {match[6]}
           </code>
         );
-      } else if (match[5] !== undefined || match[6] !== undefined) {
+      } else if (match[7] !== undefined || match[8] !== undefined) {
         // Bold-italic: ***text*** or ___text___
         nodes.push(
           <strong key={`bi-${match.index}`} className="font-semibold text-neutral-900 dark:text-white">
-            <em className="italic">{match[5] || match[6]}</em>
-          </strong>
-        );
-      } else if (match[7] !== undefined || match[8] !== undefined) {
-        // Bold: **text** or __text__
-        nodes.push(
-          <strong key={`b-${match.index}`} className="font-semibold text-neutral-900 dark:text-white">
-            {match[7] || match[8]}
+            <em className="italic">{match[7] || match[8]}</em>
           </strong>
         );
       } else if (match[9] !== undefined || match[10] !== undefined) {
+        // Bold: **text** or __text__
+        nodes.push(
+          <strong key={`b-${match.index}`} className="font-semibold text-neutral-900 dark:text-white">
+            {match[9] || match[10]}
+          </strong>
+        );
+      } else if (match[11] !== undefined || match[12] !== undefined) {
         // Italic: *text* or _text_
         nodes.push(
           <em key={`i-${match.index}`} className="italic text-neutral-800 dark:text-neutral-200">
-            {match[9] || match[10]}
+            {match[11] || match[12]}
           </em>
         );
-      } else if (match[11] !== undefined) {
+      } else if (match[13] !== undefined) {
         // Strikethrough: ~~text~~
         nodes.push(
           <del key={`d-${match.index}`} className="line-through opacity-70">
-            {match[11]}
+            {match[13]}
           </del>
         );
       }
@@ -392,23 +612,24 @@ export function renderFormattedGuideText(
       lastIdx = inlineRegex.lastIndex;
     }
 
-    if (lastIdx < str.length) {
-      nodes.push(str.slice(lastIdx));
+    if (lastIdx < cleanStr.length) {
+      nodes.push(cleanStr.slice(lastIdx).replace(/\*\*/g, ""));
     }
 
     return nodes;
   };
 
   // Block parser
-  const lines = text.split("\n");
+  const lines = sanitizedText.split("\n");
   type Block =
     | { type: "empty" }
     | { type: "hr" }
-    | { type: "heading"; level: number; content: string }
+    | { type: "heading"; level: number; content: string; id: string }
     | { type: "bullet"; content: string }
     | { type: "ordered"; num: string; content: string }
     | { type: "blockquote"; content: string }
     | { type: "code_block"; lang: string; code: string }
+    | { type: "math_block"; latex: string }
     | { type: "table"; header: string[]; rows: string[][] }
     | { type: "paragraph"; content: string };
 
@@ -416,6 +637,9 @@ export function renderFormattedGuideText(
   let inCodeBlock = false;
   let codeBlockLang = "";
   let codeBlockLines: string[] = [];
+  let inMathBlock = false;
+  let mathBlockLines: string[] = [];
+  let headingCounter = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];
@@ -440,15 +664,47 @@ export function renderFormattedGuideText(
       continue;
     }
 
+    // Display math block: $$...$$ or \[...\]
+    if (trimmed.startsWith("$$") || trimmed.startsWith("\\[")) {
+      const isSingleLineDollar = trimmed.startsWith("$$") && trimmed.endsWith("$$") && trimmed.length > 4;
+      const isSingleLineBracket = trimmed.startsWith("\\[") && trimmed.endsWith("\\]") && trimmed.length > 4;
+      if (isSingleLineDollar || isSingleLineBracket) {
+        blocks.push({ type: "math_block", latex: trimmed.slice(2, -2).trim() });
+        continue;
+      }
+      if (inMathBlock) {
+        blocks.push({ type: "math_block", latex: mathBlockLines.join("\n") });
+        inMathBlock = false;
+        mathBlockLines = [];
+      } else {
+        inMathBlock = true;
+        mathBlockLines = [];
+      }
+      continue;
+    }
+
+    if (inMathBlock) {
+      if (trimmed.endsWith("$$") || trimmed.endsWith("\\]")) {
+        const lastPart = trimmed.slice(0, -2).trim();
+        if (lastPart) mathBlockLines.push(lastPart);
+        blocks.push({ type: "math_block", latex: mathBlockLines.join("\n") });
+        inMathBlock = false;
+        mathBlockLines = [];
+      } else {
+        mathBlockLines.push(rawLine);
+      }
+      continue;
+    }
+
     if (!trimmed) {
       blocks.push({ type: "empty" });
       continue;
     }
 
     if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
-      const cells = trimmed.split("|").slice(1, -1).map(c => c.trim());
-      const isSeparator = cells.length > 0 && cells.every(c => /^[:\-]+$/.test(c.replace(/\s/g, '')));
-      
+      const cells = trimmed.split("|").slice(1, -1).map((c) => c.trim());
+      const isSeparator = cells.length > 0 && cells.every((c) => /^[:\-]+$/.test(c.replace(/\s/g, "")));
+
       const lastBlock = blocks[blocks.length - 1];
       if (lastBlock?.type === "table") {
         if (!isSeparator) {
@@ -467,14 +723,16 @@ export function renderFormattedGuideText(
       continue;
     }
 
-    const headingMatch = trimmed.match(/^(#{2,6})\s*(.*)$|^(#)\s+(.*)$/);
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
     if (headingMatch) {
-      const hashes = headingMatch[1] || headingMatch[3];
-      const headingContent = headingMatch[2] !== undefined ? headingMatch[2] : headingMatch[4];
+      const hashes = headingMatch[1];
+      const headingContent = headingMatch[2].replace(/\*\*/g, "").trim();
+      headingCounter++;
       blocks.push({
         type: "heading",
         level: hashes.length,
         content: headingContent,
+        id: `heading-${messageId || "msg"}-${headingCounter}`,
       });
       continue;
     }
@@ -484,7 +742,11 @@ export function renderFormattedGuideText(
       continue;
     }
 
-    if (trimmed.startsWith("• ") || trimmed.startsWith("- ") || (trimmed.startsWith("* ") && !trimmed.startsWith("***"))) {
+    if (
+      trimmed.startsWith("• ") ||
+      trimmed.startsWith("- ") ||
+      (trimmed.startsWith("* ") && !trimmed.startsWith("***"))
+    ) {
       blocks.push({ type: "bullet", content: trimmed.replace(/^(?:•|-|\*)\s+/, "") });
       continue;
     }
@@ -502,8 +764,49 @@ export function renderFormattedGuideText(
     blocks.push({ type: "code_block", lang: codeBlockLang, code: codeBlockLines.join("\n") });
   }
 
+  const headingBlocks = blocks.filter(
+    (b): b is Extract<Block, { type: "heading" }> => b.type === "heading"
+  );
+
   return (
-    <div className="space-y-1.5 text-[13px] leading-relaxed text-inherit">
+    <div className="max-w-[75ch] space-y-2 text-[13.5px] leading-[1.68] text-inherit">
+      {/* Automatic Table of Contents for answers with 3 or more headings (Section 10) */}
+      {headingBlocks.length >= 3 && (
+        <nav
+          aria-label="Table of contents"
+          data-testid="response-toc"
+          className="mb-3 p-3 rounded-xl bg-neutral-50/90 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10"
+        >
+          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1.5">
+            <ListTree className="w-3.5 h-3.5 text-indigo-500" />
+            <span>Contents</span>
+          </div>
+          <ol className="space-y-1 text-xs">
+            {headingBlocks.map((h, hIdx) => (
+              <li
+                key={h.id}
+                className={h.level >= 3 ? "pl-3" : ""}
+              >
+                <a
+                  href={`#${h.id}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const target = document.getElementById(h.id);
+                    if (target && typeof target.scrollIntoView === "function") {
+                      target.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
+                  }}
+                  className="text-neutral-700 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-flex items-center gap-1.5"
+                >
+                  <span className="font-mono text-[10px] text-neutral-400">{hIdx + 1}.</span>
+                  <span>{h.content}</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      )}
+
       {blocks.map((block, idx) => {
         if (block.type === "empty") {
           return <div key={idx} className="h-1.5" />;
@@ -511,6 +814,10 @@ export function renderFormattedGuideText(
 
         if (block.type === "hr") {
           return <hr key={idx} className="border-neutral-200 dark:border-white/10 my-2.5" />;
+        }
+
+        if (block.type === "math_block") {
+          return <LatexMathBlock key={idx} latex={block.latex} displayMode={true} />;
         }
 
         if (block.type === "heading") {
@@ -528,6 +835,7 @@ export function renderFormattedGuideText(
             return (
               <div
                 key={idx}
+                id={block.id}
                 className="mt-3 mb-1.5 p-2.5 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200"
               >
                 <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider mb-1">
@@ -542,6 +850,7 @@ export function renderFormattedGuideText(
             return (
               <div
                 key={idx}
+                id={block.id}
                 className="mt-3 mb-1.5 p-2.5 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/15 border border-indigo-500/30 text-indigo-900 dark:text-indigo-200"
               >
                 <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider mb-1">
@@ -552,31 +861,36 @@ export function renderFormattedGuideText(
             );
           }
 
-          if (block.level === 1) {
+          if (block.level === 1 || block.level === 2) {
             return (
-              <h3 key={idx} className="font-bold text-sm sm:text-base text-neutral-900 dark:text-neutral-100 pt-2.5 pb-0.5 border-b border-neutral-200/60 dark:border-white/10 tracking-tight">
+              <h2
+                key={idx}
+                id={block.id}
+                className="font-bold text-base sm:text-[16px] text-neutral-900 dark:text-neutral-100 pt-3 pb-1 border-b border-neutral-200/60 dark:border-white/10 tracking-tight"
+              >
                 {parseInline(block.content)}
-              </h3>
-            );
-          }
-          if (block.level === 2) {
-            return (
-              <h4 key={idx} className="font-bold text-sm text-neutral-900 dark:text-neutral-100 pt-2 pb-0.5 tracking-tight">
-                {parseInline(block.content)}
-              </h4>
+              </h2>
             );
           }
           if (block.level === 3) {
             return (
-              <h5 key={idx} className="font-semibold text-[13px] sm:text-sm text-neutral-900 dark:text-neutral-100 pt-1.5 pb-0.5 tracking-tight">
+              <h3
+                key={idx}
+                id={block.id}
+                className="font-semibold text-[14.5px] text-neutral-900 dark:text-neutral-100 pt-2 pb-0.5 tracking-tight"
+              >
                 {parseInline(block.content)}
-              </h5>
+              </h3>
             );
           }
           return (
-            <h6 key={idx} className="font-semibold text-xs text-neutral-800 dark:text-neutral-300 uppercase tracking-wider pt-1 pb-0.5">
+            <h4
+              key={idx}
+              id={block.id}
+              className="font-semibold text-xs text-neutral-800 dark:text-neutral-300 uppercase tracking-wider pt-1.5 pb-0.5"
+            >
               {parseInline(block.content)}
-            </h6>
+            </h4>
           );
         }
 
@@ -592,7 +906,9 @@ export function renderFormattedGuideText(
         if (block.type === "ordered") {
           return (
             <div key={idx} className="flex items-start gap-2 pl-1 my-0.5">
-              <span className="text-neutral-500 dark:text-neutral-400 font-medium shrink-0 text-xs leading-relaxed min-w-[16px]">{block.num}.</span>
+              <span className="text-neutral-500 dark:text-neutral-400 font-medium shrink-0 text-xs leading-relaxed min-w-[16px]">
+                {block.num}.
+              </span>
               <div className="flex-1 min-w-0 leading-relaxed">{parseInline(block.content)}</div>
             </div>
           );
@@ -600,7 +916,10 @@ export function renderFormattedGuideText(
 
         if (block.type === "blockquote") {
           return (
-            <blockquote key={idx} className="border-l-2 border-neutral-300 dark:border-neutral-600 pl-3 py-1 my-1.5 italic text-neutral-700 dark:text-neutral-300 text-xs sm:text-[13px]">
+            <blockquote
+              key={idx}
+              className="border-l-2 border-neutral-300 dark:border-neutral-600 pl-3 py-1 my-1.5 italic text-neutral-700 dark:text-neutral-300 text-xs sm:text-[13px]"
+            >
               {parseInline(block.content)}
             </blockquote>
           );
@@ -612,12 +931,18 @@ export function renderFormattedGuideText(
 
         if (block.type === "table") {
           return (
-            <div key={idx} className="overflow-x-auto my-2 rounded-md border border-neutral-200 dark:border-white/10 shadow-sm scrollbar-hide">
-              <table className="w-full text-left text-sm text-neutral-600 dark:text-neutral-300">
+            <div
+              key={idx}
+              className="overflow-x-auto my-2.5 rounded-lg border border-neutral-200 dark:border-white/10 shadow-xs"
+            >
+              <table className="w-full text-left text-xs sm:text-sm text-neutral-700 dark:text-neutral-300">
                 <thead className="bg-neutral-50 dark:bg-white/5 border-b border-neutral-200 dark:border-white/10">
                   <tr>
                     {block.header.map((h, i) => (
-                      <th key={i} className="px-3 py-2 font-semibold text-neutral-900 dark:text-neutral-100 uppercase text-xs tracking-wider">
+                      <th
+                        key={i}
+                        className="px-3 py-2 font-semibold text-neutral-900 dark:text-neutral-100 uppercase text-[11px] tracking-wider"
+                      >
                         {parseInline(h)}
                       </th>
                     ))}
@@ -625,7 +950,10 @@ export function renderFormattedGuideText(
                 </thead>
                 <tbody className="divide-y divide-neutral-200 dark:divide-white/5">
                   {block.rows.map((row, rIdx) => (
-                    <tr key={rIdx} className="hover:bg-neutral-50/50 dark:hover:bg-white/[0.02] transition-colors">
+                    <tr
+                      key={rIdx}
+                      className="hover:bg-neutral-50/50 dark:hover:bg-white/[0.02] transition-colors"
+                    >
                       {row.map((cell, cIdx) => (
                         <td key={cIdx} className="px-3 py-2 leading-relaxed">
                           {parseInline(cell)}
@@ -644,7 +972,11 @@ export function renderFormattedGuideText(
         return (
           <p
             key={idx}
-            className={isHeaderLike ? "font-medium text-neutral-900 dark:text-neutral-100 pt-0.5 leading-relaxed" : "leading-relaxed text-inherit"}
+            className={
+              isHeaderLike
+                ? "font-medium text-neutral-900 dark:text-neutral-100 pt-0.5 leading-[1.68]"
+                : "leading-[1.68] text-inherit"
+            }
           >
             {parseInline(block.content)}
           </p>
@@ -658,12 +990,10 @@ export function isPlatformQuery(query: string): boolean {
   const q = query.toLowerCase().trim();
   if (!q) return false;
 
-  // Exact matches for FAQ questions or short labels
   if (WEBSITE_ASSISTANT_FAQS.some((f) => f.question.toLowerCase() === q || f.shortLabel.toLowerCase() === q)) {
     return true;
   }
 
-  // Non-academic raw code generation requests in support chat
   if (
     q.includes("generate code") ||
     q.includes("write code") ||
@@ -672,7 +1002,6 @@ export function isPlatformQuery(query: string): boolean {
     return true;
   }
 
-  // Common platform feature keywords
   const keywords = [
     "how do i set up ai",
     "configure ai",
@@ -709,7 +1038,6 @@ export function isPlatformQuery(query: string): boolean {
 export function answerWebsiteQuestion(query: string): string {
   const q = query.toLowerCase();
 
-  // Guardrail: Decline non-academic raw code generation in navigation chat
   if (
     q.includes("generate code") ||
     q.includes("write code") ||

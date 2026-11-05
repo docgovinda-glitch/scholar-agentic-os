@@ -44,7 +44,7 @@ export function liveSourcesAsCitations(sources?: LiveSearchResult[]): Citation[]
     year: yearOf(s.publicationDate),
     doi: doiOf(s.url),
     source: s.source,
-    sourceType: s.source === "web" || s.source === "wikipedia" ? "web" : "scholarly",
+    sourceType: s.source === "web" ? "web" : "scholarly",
   }));
 }
 
