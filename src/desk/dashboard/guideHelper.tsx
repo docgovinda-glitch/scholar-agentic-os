@@ -1,5 +1,5 @@
 import React, { useState, Fragment } from "react";
-import { Copy, Check, Scale, Info } from "lucide-react";
+import { Copy, Check, Scale, Info, BarChart3, Network, ExternalLink } from "lucide-react";
 import type { WebsiteAssistantMessage, WebsiteCitationItem, AssistantAction } from "./types";
 import { WEBSITE_ASSISTANT_FAQS } from "./constants";
 import { formatAskScholarInText } from "../scholarCitationEngine";
@@ -83,11 +83,15 @@ export function InlineCitationBadge({
   url,
   citation,
   label,
+  onAddToEvidence,
+  onFocusInGraph,
 }: {
   num: string | number;
   url?: string;
   citation?: WebsiteCitationItem;
   label?: string;
+  onAddToEvidence?: (citation: WebsiteCitationItem) => void;
+  onFocusInGraph?: (citation: WebsiteCitationItem) => void;
 }) {
   const targetUrl = url || (citation as Record<string, unknown> | undefined)?.doi as string | undefined || citation?.url;
   const displayLabel = label || `[${num}]`;
@@ -102,6 +106,24 @@ export function InlineCitationBadge({
           }
         })()
       : undefined);
+
+  const venue = citation?.venue || citation?.journal || citation?.publisher || domain || "Academic Source";
+  const authorStr = citation?.authors && citation.authors.length > 0
+    ? citation.authors.length > 2
+      ? `${citation.authors[0]} et al.`
+      : citation.authors.join(", ")
+    : citation?.author;
+
+  const isPeerReviewed =
+    citation?.sourceType === "scholarly" ||
+    /nature|science|ieee|acm|neurips|icml|lancet|cell|springer|elsevier|wiley|pnas|oxford|cambridge/i.test(venue);
+
+  const isOpenAccess =
+    Boolean(targetUrl && /arxiv\.org|biorxiv\.org|openalex|doi\.org\/10\.48550/i.test(targetUrl)) ||
+    citation?.authorityTier === "open_access" ||
+    citation?.sourceType === "scholarly";
+
+  const snippet = citation?.evidenceSnippet || citation?.snippet || citation?.mainFinding;
 
   return (
     <span className="relative group/cite inline align-baseline">
@@ -119,10 +141,14 @@ export function InlineCitationBadge({
         {displayLabel}
       </a>
 
-      {/* Citation Engine Verified Hover Card Popover */}
+      {/* Citation Engine Verified Micro-Card Hover Popover */}
       {citation && (
-        <span className="pointer-events-none opacity-0 group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-all duration-200 ease-out absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 rounded-xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200 dark:border-white/15 shadow-xl text-left z-50 transform group-hover/cite:translate-y-0 translate-y-1 block">
-          <span className="flex items-center justify-between gap-1.5 mb-1.5">
+        <span
+          data-testid="citation-micro-card"
+          className="pointer-events-none opacity-0 group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-all duration-200 ease-out absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-80 p-3.5 rounded-2xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200 dark:border-white/15 shadow-2xl text-left z-50 transform group-hover/cite:translate-y-0 translate-y-1 block select-text font-sans"
+        >
+          {/* Top Venue & Tags Row */}
+          <span className="flex items-center justify-between gap-1.5 mb-2">
             <span className="flex items-center gap-1.5 min-w-0">
               {domain && (
                 <img
@@ -134,44 +160,94 @@ export function InlineCitationBadge({
                   }}
                 />
               )}
-              <span className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-200 truncate">
-                {citation.publisher || domain || "Verified Source"}
+              <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 truncate">
+                {venue}
               </span>
             </span>
-            {citation.year && (
-              <span className="text-[10px] text-neutral-400 font-mono shrink-0">
-                {citation.year}
-              </span>
-            )}
+            <span className="flex items-center gap-1 shrink-0 text-[10px]">
+              {citation.year && (
+                <span className="font-mono text-neutral-500 dark:text-neutral-400">
+                  {citation.year}
+                </span>
+              )}
+              {isPeerReviewed && (
+                <span className="px-1.5 py-0.5 rounded-full font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/40 text-[9px]">
+                  Peer Reviewed
+                </span>
+              )}
+              {isOpenAccess && (
+                <span className="px-1.5 py-0.5 rounded-full font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/40 text-[9px]">
+                  Open Access
+                </span>
+              )}
+            </span>
           </span>
 
-          <span className="block text-xs font-medium text-neutral-900 dark:text-neutral-100 line-clamp-2 leading-snug mb-1">
+          {/* Paper Title */}
+          <span className="block text-xs font-semibold text-neutral-900 dark:text-neutral-100 line-clamp-2 leading-snug mb-1">
             {citation.title || "External Scholarly Resource"}
           </span>
 
-          {citation.snippet && (
-            <span className="block text-[10px] text-neutral-500 dark:text-neutral-400 line-clamp-2 leading-relaxed mb-2 italic">
-              "{citation.snippet}"
+          {/* Authors */}
+          {authorStr && (
+            <span className="block text-[10.5px] text-neutral-600 dark:text-neutral-400 truncate mb-1.5">
+              {authorStr}
             </span>
           )}
 
-          <span className="flex items-center justify-between pt-1.5 border-t border-neutral-100 dark:border-white/10 text-[9px]">
-            <span className={`px-1.5 py-0.5 rounded-full font-medium border ${
-              citation.sourceType === "vault" || (citation.authorityBadge || "").toLowerCase().includes("vault")
-                ? "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/40"
-                : "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
-            }`}>
-              {citation.authorityBadge || (citation.sourceType === "vault" ? "Knowledge Vault Verified" : "Citation Engine Verified")}
+          {/* Empirical Snippet / Excerpt */}
+          {snippet && (
+            <span className="block text-[10px] text-neutral-600 dark:text-neutral-400 line-clamp-2 leading-relaxed mb-2.5 italic bg-neutral-50 dark:bg-neutral-800/60 p-1.5 rounded-lg border border-neutral-100 dark:border-white/5">
+              "{snippet}"
             </span>
+          )}
+
+          {/* Micro-Card Action Buttons Row */}
+          <span className="flex items-center justify-between pt-2 border-t border-neutral-100 dark:border-white/10 gap-1.5 text-[10px]">
+            <span className="flex items-center gap-1">
+              {onAddToEvidence && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onAddToEvidence(citation);
+                  }}
+                  className="px-2 py-0.5 rounded-md font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Extract & add empirical findings to Evidence Matrix"
+                >
+                  <BarChart3 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                  <span>+ Matrix</span>
+                </button>
+              )}
+
+              {onFocusInGraph && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onFocusInGraph(citation);
+                  }}
+                  className="px-2 py-0.5 rounded-md font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/20 border border-indigo-500/30 transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Explore paper in Literature Discovery citation graph"
+                >
+                  <Network className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                  <span>Graph ↗</span>
+                </button>
+              )}
+            </span>
+
             {targetUrl && (
               <a
                 href={targetUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-500 hover:underline flex items-center gap-0.5 font-medium"
+                onClick={(e) => e.stopPropagation()}
+                className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 font-medium ml-auto"
               >
-                <span>Visit Source</span>
-                <span className="text-[10px]">↗</span>
+                <span>Read DOI</span>
+                <ExternalLink className="w-2.5 h-2.5" />
               </a>
             )}
           </span>
@@ -184,7 +260,9 @@ export function InlineCitationBadge({
 export function renderFormattedGuideText(
   text: string,
   citations?: WebsiteAssistantMessage["citations"],
-  citationStyle: string = "apa"
+  citationStyle: string = "apa",
+  onAddToEvidence?: (citation: WebsiteCitationItem) => void,
+  onFocusInGraph?: (citation: WebsiteCitationItem) => void
 ) {
   if (!text) return null;
 
@@ -223,6 +301,8 @@ export function renderFormattedGuideText(
               label={formattedLabel}
               url={linkUrl}
               citation={matchedCite}
+              onAddToEvidence={onAddToEvidence}
+              onFocusInGraph={onFocusInGraph}
             />
           );
         } else {
@@ -262,6 +342,8 @@ export function renderFormattedGuideText(
                   label={formattedLabel}
                   url={matchedCite?.url}
                   citation={matchedCite}
+                  onAddToEvidence={onAddToEvidence}
+                  onFocusInGraph={onFocusInGraph}
                 />
               );
             })}

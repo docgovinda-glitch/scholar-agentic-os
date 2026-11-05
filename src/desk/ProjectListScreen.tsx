@@ -85,6 +85,10 @@ import {
 import LiteratureDiscoveryWorkspace from "./discovery/LiteratureDiscoveryWorkspace";
 import EvidenceSynthesisWorkspace from "./evidence/EvidenceSynthesisWorkspace";
 import ResearchExportWorkspace from "./export/ResearchExportWorkspace";
+import ResearchSplitCanvas from "./components/ResearchSplitCanvas";
+import ScientificConsensusGauge from "./components/ScientificConsensusGauge";
+import SentenceProvenanceInspector from "./components/SentenceProvenanceInspector";
+import LiveResearchTrajectoryVisualizer from "./components/LiveResearchTrajectoryVisualizer";
 import { type CitationGraphNode } from "../services/discovery/snowballSamplingService";
 import { type EvidenceMatrixItem, extractEvidenceFromPaper } from "../services/evidence/evidenceExtractionService";
 import { getCloudProvider } from "../config/providerCatalog";
@@ -350,13 +354,19 @@ export default function ProjectListScreen({
 
   // Ask Scholar 2.0 Layer Workspaces: Literature Discovery (Layer B), Evidence Synthesis (Layer C), Research Export (Layer D)
   const [activeLayerWorkspace, setActiveLayerWorkspace] = useState<"discovery" | "evidence" | "export" | null>(null);
+  const [workspaceLayoutMode, setWorkspaceLayoutMode] = useState<"split" | "modal">(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 1024) return "modal";
+    return "split";
+  });
   const [layerWorkspaceSeeds, setLayerWorkspaceSeeds] = useState<Array<Partial<CitationGraphNode> & { title: string }>>([]);
   const [layerWorkspaceEvidenceItems, setLayerWorkspaceEvidenceItems] = useState<EvidenceMatrixItem[]>([]);
   const [layerWorkspaceQuery, setLayerWorkspaceQuery] = useState<string>("");
+  const [provenanceInspectorMsg, setProvenanceInspectorMsg] = useState<WebsiteAssistantMessage | null>(null);
 
   const handleOpenLiteratureDiscovery = useCallback((seeds: Array<Partial<CitationGraphNode> & { title: string }>, query?: string) => {
     setLayerWorkspaceSeeds(seeds);
     setLayerWorkspaceQuery(query || "");
+    setIsAiSidebarOpen(true);
     setActiveLayerWorkspace("discovery");
   }, []);
 
@@ -367,6 +377,7 @@ export default function ProjectListScreen({
       setLayerWorkspaceEvidenceItems(seeds.map((s, idx) => extractEvidenceFromPaper(s, idx)));
     }
     setLayerWorkspaceQuery(query || "");
+    setIsAiSidebarOpen(true);
     setActiveLayerWorkspace("evidence");
   }, []);
 
@@ -375,12 +386,49 @@ export default function ProjectListScreen({
       setLayerWorkspaceEvidenceItems(items);
     }
     setLayerWorkspaceQuery(query || "");
+    setIsAiSidebarOpen(true);
     setActiveLayerWorkspace("export");
   }, []);
 
   const handleCloseLayerWorkspace = useCallback(() => {
     setActiveLayerWorkspace(null);
   }, []);
+
+  const handleAddCitationToEvidence = useCallback((cite: WebsiteCitationItem) => {
+    const item = extractEvidenceFromPaper({
+      title: cite.title || "External Source",
+      authors: cite.authors || (cite.author ? [cite.author] : []),
+      year: typeof cite.year === "number" ? cite.year : parseInt(String(cite.year || 2024), 10) || 2024,
+      journal: cite.journal || cite.venue,
+      doi: cite.doi,
+      url: cite.url,
+      abstract: cite.evidenceSnippet || cite.snippet || cite.mainFinding,
+    });
+    setLayerWorkspaceEvidenceItems((prev) => {
+      if (prev.some((p) => p.paperTitle.toLowerCase() === item.paperTitle.toLowerCase())) {
+        showAppToast(`"${item.paperTitle}" is already in the Evidence Matrix.`, "info", 2000);
+        return prev;
+      }
+      showAppToast(`Added "${item.paperTitle}" to Evidence Matrix.`, "success", 2500);
+      return [item, ...prev];
+    });
+    setIsAiSidebarOpen(true);
+    setActiveLayerWorkspace("evidence");
+  }, [showAppToast]);
+
+  const handleFocusCitationInGraph = useCallback((cite: WebsiteCitationItem) => {
+    const seed = {
+      title: cite.title || "External Source",
+      authors: cite.authors || (cite.author ? [cite.author] : []),
+      year: typeof cite.year === "number" ? cite.year : parseInt(String(cite.year || 2024), 10) || 2024,
+      journal: cite.journal || cite.venue,
+      doi: cite.doi,
+      url: cite.url,
+      abstract: cite.evidenceSnippet || cite.snippet || cite.mainFinding,
+    };
+    handleOpenLiteratureDiscovery([seed], cite.title);
+    showAppToast(`Focusing "${seed.title}" in Literature Discovery Graph.`, "info", 2000);
+  }, [handleOpenLiteratureDiscovery, showAppToast]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -2754,26 +2802,28 @@ export default function ProjectListScreen({
       <aside
         style={
           isAiSidebarOpen && !isLandingPage
-            ? { width: `min(${aiSidebarWidth}px, 100vw)` }
+            ? { width: activeLayerWorkspace && workspaceLayoutMode === "split" ? "100%" : `min(${aiSidebarWidth}px, 100vw)` }
             : undefined
         }
         className={`h-full max-h-[100dvh] bg-white dark:bg-ink-800 text-neutral-800 dark:text-neutral-200 flex flex-col relative transition-all duration-300 ease-in-out ${isAiSidebarOpen
             ? isLandingPage
               ? "flex-1 w-full min-w-0 border-none shadow-none z-20 translate-x-0"
-              : "shrink-0 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 z-30 w-full max-w-[calc(100vw-1rem)] translate-x-0"
+              : activeLayerWorkspace && workspaceLayoutMode === "split"
+                ? "flex-1 w-full min-w-0 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 z-30 translate-x-0"
+                : "shrink-0 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 z-30 w-full max-w-[calc(100vw-1rem)] translate-x-0"
             : "hidden w-0 max-w-0 translate-x-full overflow-hidden border-none pointer-events-none"
           } ${isResizingAiSidebar ? "transition-none select-none" : ""
           }`}
         aria-hidden={!isAiSidebarOpen}
       >
-        {/* Resizable Split-Pane Drag Divider on Left Edge (hidden on full-screen landing page) */}
+        {/* Resizable Split-Pane Drag Divider on Left Edge (hidden on full-screen landing page or split canvas) */}
         {isAiSidebarOpen && (
           <div
             onMouseDown={(e) => {
               e.preventDefault();
               setIsResizingAiSidebar(true);
             }}
-            className={`${isLandingPage ? "hidden" : "hidden sm:flex"} absolute left-0 top-0 bottom-0 w-2.5 -ml-1 cursor-col-resize hover:bg-sky-500/30 active:bg-sky-500/50 transition-colors z-40 items-center justify-center select-none group`}
+            className={`${isLandingPage || (activeLayerWorkspace && workspaceLayoutMode === "split") ? "hidden" : "hidden sm:flex"} absolute left-0 top-0 bottom-0 w-2.5 -ml-1 cursor-col-resize hover:bg-sky-500/30 active:bg-sky-500/50 transition-colors z-40 items-center justify-center select-none group`}
             title="Drag to resize panel (360px - 750px)"
           >
             <div className="w-0.5 h-8 bg-neutral-300 dark:bg-white/20 rounded-full group-hover:bg-sky-500 transition-colors" />
@@ -2781,6 +2831,41 @@ export default function ProjectListScreen({
         )}
 
         {isAiSidebarOpen && (
+          <ResearchSplitCanvas
+            activeLayer={activeLayerWorkspace}
+            onSelectLayer={(l) => setActiveLayerWorkspace(l)}
+            onClose={handleCloseLayerWorkspace}
+            layoutMode={workspaceLayoutMode}
+            onLayoutModeChange={setWorkspaceLayoutMode}
+            canvasContent={
+              activeLayerWorkspace === "discovery" ? (
+                <LiteratureDiscoveryWorkspace
+                  seedPapers={layerWorkspaceSeeds}
+                  initialQuery={layerWorkspaceQuery}
+                  onOpenEvidenceSynthesis={(papers) => handleOpenEvidenceSynthesis(papers, undefined, layerWorkspaceQuery)}
+                  onClose={handleCloseLayerWorkspace}
+                />
+              ) : activeLayerWorkspace === "evidence" ? (
+                <EvidenceSynthesisWorkspace
+                  seedPapers={layerWorkspaceSeeds}
+                  initialItems={layerWorkspaceEvidenceItems.length > 0 ? layerWorkspaceEvidenceItems : undefined}
+                  onOpenLiteratureDiscovery={() => setActiveLayerWorkspace("discovery")}
+                  onOpenPublishingExport={(items) => handleOpenResearchExport(items, layerWorkspaceQuery)}
+                  onClose={handleCloseLayerWorkspace}
+                />
+              ) : activeLayerWorkspace === "export" ? (
+                <ResearchExportWorkspace
+                  projectTitle={layerWorkspaceQuery || "Empirical Research Synthesis & Meta-Analysis"}
+                  inquiryQuery={layerWorkspaceQuery}
+                  evidenceItems={layerWorkspaceEvidenceItems}
+                  literaturePapers={layerWorkspaceSeeds as any}
+                  onOpenEvidenceSynthesis={() => setActiveLayerWorkspace("evidence")}
+                  onOpenLiteratureDiscovery={() => setActiveLayerWorkspace("discovery")}
+                  onClose={handleCloseLayerWorkspace}
+                />
+              ) : null
+            }
+          >
           <div className="h-full flex flex-col w-full">
             {/* Sidebar Header with glassmorphism & elevated badge */}
             <header className="px-4 sm:px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/95 dark:bg-ink-800/95 backdrop-blur-md sticky top-0 z-20">
@@ -2968,7 +3053,7 @@ export default function ProjectListScreen({
                         <span>{msg.timestamp}</span>
                       </div>
                       <div className="rounded-2xl px-4 py-3 bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 rounded-tl-xs shadow-2xs text-[13px] leading-relaxed">
-                        {renderFormattedGuideText(msg.text, msg.citations, askCitationStyle)}
+                        {renderFormattedGuideText(msg.text, msg.citations, askCitationStyle, handleAddCitationToEvidence, handleFocusCitationInGraph)}
                       </div>
                     </div>
                   ))}
@@ -3855,10 +3940,23 @@ export default function ProjectListScreen({
                               </div>
                             </div>
                           );
-                        })() : msg.sender === "assistant" ? renderFormattedGuideText(
-                          msg.citations && msg.citations.length > 0 ? stripRawReferencesSection(msg.text) : msg.text,
-                          msg.citations && msg.citations.length > 0 ? msg.citations : liveSourcesAsCitations(msg.liveSources),
-                          askCitationStyle
+                        })() : msg.sender === "assistant" ? (
+                          <div className="space-y-3">
+                            {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
+                              <ScientificConsensusGauge
+                                citations={msg.citations && msg.citations.length > 0 ? msg.citations : liveSourcesAsCitations(msg.liveSources)}
+                              />
+                            )}
+                            <div>
+                              {renderFormattedGuideText(
+                                msg.citations && msg.citations.length > 0 ? stripRawReferencesSection(msg.text) : msg.text,
+                                msg.citations && msg.citations.length > 0 ? msg.citations : liveSourcesAsCitations(msg.liveSources),
+                                askCitationStyle,
+                                handleAddCitationToEvidence,
+                                handleFocusCitationInGraph
+                              )}
+                            </div>
+                          </div>
                         ) : editingUserMsgId === msg.id ? (
                           <div className="flex flex-col gap-2 min-w-[240px] sm:min-w-[320px]">
                             <textarea
@@ -3899,67 +3997,14 @@ export default function ProjectListScreen({
                           <div className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.text}</div>
                         )}
 
-                        {/* Deep Research Plan & 7-Stage Agentic Workflow — Interactive Collapsible Trajectory Accordion */}
+                        {/* Deep Research Plan & Multi-Step Visualizer (Phase 5) */}
                         {((msg.plan && msg.plan.length > 0) || (msg.stages && msg.stages.length > 0)) && (
-                          <div className="mt-3 rounded-xl bg-purple-500/5 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/30 text-xs overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => setExpandedPlanIds((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }))}
-                              className="w-full flex items-center justify-between p-2.5 hover:bg-purple-500/10 dark:hover:bg-purple-900/20 transition-colors cursor-pointer text-left"
-                            >
-                              <div className="font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                                <Compass className="w-3.5 h-3.5 text-purple-500" />
-                                <span>
-                                  {msg.stages && msg.stages.length > 0
-                                    ? `Deep Research Workflow (${msg.stages.length} Stages · ${msg.plan?.length || 0} Sub-Questions)`
-                                    : `Research Trajectory (${msg.plan?.length || 0} Steps)`}
-                                </span>
-                              </div>
-                              <span className="text-neutral-400">
-                                {expandedPlanIds[msg.id] !== false ? (
-                                  <ChevronUp className="w-3.5 h-3.5" />
-                                ) : (
-                                  <ChevronDown className="w-3.5 h-3.5" />
-                                )}
-                              </span>
-                            </button>
-                            {expandedPlanIds[msg.id] !== false && (
-                              <div className="px-2.5 pb-2.5 pt-1 border-t border-purple-200/40 dark:border-purple-800/20 space-y-2.5">
-                                {msg.stages && msg.stages.length > 0 && (
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
-                                    {msg.stages.map((stage) => (
-                                      <div
-                                        key={stage.id}
-                                        className="p-2 rounded-lg bg-white/70 dark:bg-white/[0.03] border border-purple-200/50 dark:border-purple-800/30 flex flex-col gap-0.5"
-                                      >
-                                        <div className="flex items-center justify-between gap-1.5">
-                                          <span className="font-semibold text-[11px] text-neutral-800 dark:text-neutral-200">
-                                            {stage.label}
-                                          </span>
-                                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                                            ✓ {stage.status}
-                                          </span>
-                                        </div>
-                                        <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-snug">
-                                          {stage.summary}
-                                        </p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                {msg.plan && msg.plan.length > 0 && (
-                                  <ul className="space-y-1.5 text-neutral-600 dark:text-neutral-400 text-[11px] pt-1">
-                                    {msg.plan.map((step, sIdx) => (
-                                      <li key={sIdx} className="flex items-start gap-1.5">
-                                        <span className="text-purple-500 font-bold shrink-0">✓</span>
-                                        <span>{step}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                          <LiveResearchTrajectoryVisualizer
+                            plan={msg.plan}
+                            stages={msg.stages}
+                            mode={msg.mode}
+                            defaultExpanded={expandedPlanIds[msg.id] !== false}
+                          />
                         )}
 
                         {/* Retrieved Live Sources Drawer (Progressive Disclosure: Auto-collapsed for large literature collections) */}
@@ -4280,15 +4325,27 @@ export default function ProjectListScreen({
                               </button>
 
                               {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDownloadMatrixCsv(msg)}
-                                  className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                                  title="Export Evidence Matrix as CSV file"
-                                >
-                                  <Table className="w-3 h-3 text-emerald-500" />
-                                  <span>Matrix CSV</span>
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadMatrixCsv(msg)}
+                                    className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                                    title="Export Evidence Matrix as CSV file"
+                                  >
+                                    <Table className="w-3 h-3 text-emerald-500" />
+                                    <span>Matrix CSV</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setProvenanceInspectorMsg(msg)}
+                                    className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer text-emerald-700 dark:text-emerald-300 font-medium"
+                                    title="Inspect Sentence-Level Provenance & Grounding"
+                                  >
+                                    <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                                    <span>Grounding Trace</span>
+                                  </button>
+                                </>
                               )}
 
                               {msg.id !== "init" && msg.id !== "reset-assistant" && (
@@ -4461,6 +4518,13 @@ export default function ProjectListScreen({
 
                   {isGuideThinking && (
                     <div className="flex flex-col gap-2.5 animate-in fade-in">
+                      {/* Live Multi-Step Research Visualizer (Phase 5) */}
+                      <LiveResearchTrajectoryVisualizer
+                        isLive={true}
+                        currentStep={askPhase?.step}
+                        foundCount={askPhase?.found}
+                        mode={sidebarAiMode}
+                      />
                       {/* Live Token Streaming Bubble when tokens are arriving */}
                       {streamingGuideText && (
                         <div className="flex flex-col items-start">
@@ -4806,8 +4870,9 @@ export default function ProjectListScreen({
               </div>
             </div>
           </div>
-        )}
-      </aside>
+        </ResearchSplitCanvas>
+      )}
+    </aside>
 
       {/* Delete Confirmation Modal Pop-up */}
       {projectToDelete && (
@@ -4915,40 +4980,19 @@ export default function ProjectListScreen({
         selectedFormatId={pendingFormatId}
       />
 
-      {/* Ask Scholar 2.0 Multi-Layer Research Workspaces: Layer B, Layer C, Layer D */}
-      {activeLayerWorkspace && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex flex-col p-2 md:p-6 animate-in fade-in">
-          <div className="flex-1 rounded-2xl overflow-hidden shadow-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-900 flex flex-col">
-            {activeLayerWorkspace === "discovery" && (
-              <LiteratureDiscoveryWorkspace
-                seedPapers={layerWorkspaceSeeds}
-                initialQuery={layerWorkspaceQuery}
-                onOpenEvidenceSynthesis={(papers) => handleOpenEvidenceSynthesis(papers, undefined, layerWorkspaceQuery)}
-                onClose={handleCloseLayerWorkspace}
-              />
-            )}
-            {activeLayerWorkspace === "evidence" && (
-              <EvidenceSynthesisWorkspace
-                seedPapers={layerWorkspaceSeeds}
-                initialItems={layerWorkspaceEvidenceItems.length > 0 ? layerWorkspaceEvidenceItems : undefined}
-                onOpenLiteratureDiscovery={() => setActiveLayerWorkspace("discovery")}
-                onOpenPublishingExport={(items) => handleOpenResearchExport(items, layerWorkspaceQuery)}
-                onClose={handleCloseLayerWorkspace}
-              />
-            )}
-            {activeLayerWorkspace === "export" && (
-              <ResearchExportWorkspace
-                projectTitle={layerWorkspaceQuery || "Empirical Research Synthesis & Meta-Analysis"}
-                inquiryQuery={layerWorkspaceQuery}
-                evidenceItems={layerWorkspaceEvidenceItems}
-                literaturePapers={layerWorkspaceSeeds as any}
-                onOpenEvidenceSynthesis={() => setActiveLayerWorkspace("evidence")}
-                onOpenLiteratureDiscovery={() => setActiveLayerWorkspace("discovery")}
-                onClose={handleCloseLayerWorkspace}
-              />
-            )}
-          </div>
-        </div>
+      {/* Sentence-Level Provenance & Grounding Inspector (Phase 4) */}
+      {provenanceInspectorMsg && (
+        <SentenceProvenanceInspector
+          isOpen={true}
+          onClose={() => setProvenanceInspectorMsg(null)}
+          responseText={provenanceInspectorMsg.text}
+          citations={
+            provenanceInspectorMsg.citations && provenanceInspectorMsg.citations.length > 0
+              ? provenanceInspectorMsg.citations
+              : liveSourcesAsCitations(provenanceInspectorMsg.liveSources)
+          }
+          onAddToEvidence={handleAddCitationToEvidence}
+        />
       )}
     </div>
   );

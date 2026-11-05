@@ -47,6 +47,7 @@ export interface WebsiteAssistantMessage {
     authorityTier?: string;
     source?: string;
     venue?: string;
+    journal?: string;
     year?: number | string;
     author?: string;
     authors?: string[];
@@ -54,6 +55,9 @@ export interface WebsiteAssistantMessage {
     isPrimary?: boolean;
     sourceType?: "official" | "scholarly" | "media" | "web" | "vault";
     stance?: "supporting" | "contradicting" | "mentioning";
+    claim?: string;
+    evidenceSnippet?: string;
+    mainFinding?: string;
   }>;
   liveSources?: LiveSearchResult[];
   /** When the search behind this answer ran (shown with its sources). */

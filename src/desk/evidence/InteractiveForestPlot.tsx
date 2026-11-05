@@ -3,16 +3,77 @@ import {
   BarChart3,
   Download,
   AlertTriangle,
-  Info,
-  CheckCircle,
-  Layers,
   FileSpreadsheet,
+  ArrowUpDown,
+  Filter,
+  Palette,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   type EvidenceMatrixItem,
   type MetaAnalysisResult,
   calculateMetaAnalysis,
 } from "../../services/evidence/evidenceExtractionService";
+
+export type ForestPlotSortOption =
+  | "default"
+  | "effect-desc"
+  | "effect-asc"
+  | "year-desc"
+  | "year-asc"
+  | "sample-desc"
+  | "weight-desc";
+
+export type ForestPlotThemeOption = "scholar" | "nature" | "lancet" | "monochrome";
+
+export interface ForestPlotThemeConfig {
+  id: ForestPlotThemeOption;
+  label: string;
+  pointColor: string;
+  whiskerColor: string;
+  diamondFill: string;
+  diamondStroke: string;
+  nullLineColor: string;
+}
+
+export const FOREST_PLOT_THEMES: Record<ForestPlotThemeOption, ForestPlotThemeConfig> = {
+  scholar: {
+    id: "scholar",
+    label: "Scholar Classic (Indigo)",
+    pointColor: "#2563eb",
+    whiskerColor: "#3b82f6",
+    diamondFill: "#6366f1",
+    diamondStroke: "#4338ca",
+    nullLineColor: "#94a3b8",
+  },
+  nature: {
+    id: "nature",
+    label: "Nature Portfolio (Emerald)",
+    pointColor: "#059669",
+    whiskerColor: "#10b981",
+    diamondFill: "#10b981",
+    diamondStroke: "#047857",
+    nullLineColor: "#64748b",
+  },
+  lancet: {
+    id: "lancet",
+    label: "The Lancet (Crimson)",
+    pointColor: "#be123c",
+    whiskerColor: "#e11d48",
+    diamondFill: "#e11d48",
+    diamondStroke: "#881337",
+    nullLineColor: "#475569",
+  },
+  monochrome: {
+    id: "monochrome",
+    label: "Publication Monochrome (Print)",
+    pointColor: "#1e293b",
+    whiskerColor: "#475569",
+    diamondFill: "#334155",
+    diamondStroke: "#0f172a",
+    nullLineColor: "#64748b",
+  },
+};
 
 export interface InteractiveForestPlotProps {
   items: EvidenceMatrixItem[];
@@ -26,16 +87,57 @@ export default function InteractiveForestPlot({
   className = "",
 }: InteractiveForestPlotProps) {
   const [model, setModel] = useState<"fixed" | "random">("random");
+  const [sortBy, setSortBy] = useState<ForestPlotSortOption>("default");
+  const [subgroupFilter, setSubgroupFilter] = useState<string>("all");
+  const [theme, setTheme] = useState<ForestPlotThemeOption>("scholar");
 
-  // Filter to quantitative items only for forest plot
-  const quantitativeItems = useMemo(() => {
-    return items.filter((it) => typeof it.effectSize === "number" && it.effectMetric !== "Qualitative");
+  const activeTheme = FOREST_PLOT_THEMES[theme] || FOREST_PLOT_THEMES.scholar;
+
+  // Extract available subgroups (study designs)
+  const availableSubgroups = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of items) {
+      if (it.studyDesign && typeof it.effectSize === "number" && it.effectMetric !== "Qualitative") {
+        set.add(it.studyDesign);
+      }
+    }
+    return Array.from(set).sort();
   }, [items]);
 
-  // Compute meta-analysis
+  // Filter to quantitative items and apply subgroup filter
+  const baseQuantitative = useMemo(() => {
+    return items.filter((it) => {
+      if (typeof it.effectSize !== "number" || it.effectMetric === "Qualitative") return false;
+      if (subgroupFilter !== "all" && it.studyDesign !== subgroupFilter) return false;
+      return true;
+    });
+  }, [items, subgroupFilter]);
+
+  // Compute meta-analysis on the filtered subgroup
   const meta: MetaAnalysisResult = useMemo(() => {
-    return calculateMetaAnalysis(quantitativeItems, model);
-  }, [quantitativeItems, model]);
+    return calculateMetaAnalysis(baseQuantitative, model);
+  }, [baseQuantitative, model]);
+
+  // Sort quantitative items based on user selection
+  const quantitativeItems = useMemo(() => {
+    const list = [...baseQuantitative];
+    switch (sortBy) {
+      case "effect-desc":
+        return list.sort((a, b) => (b.effectSize ?? 0) - (a.effectSize ?? 0));
+      case "effect-asc":
+        return list.sort((a, b) => (a.effectSize ?? 0) - (b.effectSize ?? 0));
+      case "year-desc":
+        return list.sort((a, b) => (b.year || 0) - (a.year || 0));
+      case "year-asc":
+        return list.sort((a, b) => (a.year || 0) - (b.year || 0));
+      case "sample-desc":
+        return list.sort((a, b) => (b.sampleSizeTotal || 0) - (a.sampleSizeTotal || 0));
+      case "weight-desc":
+        return list.sort((a, b) => (meta.studyWeights[b.id] ?? 0) - (meta.studyWeights[a.id] ?? 0));
+      default:
+        return list;
+    }
+  }, [baseQuantitative, sortBy, meta.studyWeights]);
 
   const isRatio = meta.metricType === "Odds Ratio" || meta.metricType === "Relative Risk" || meta.metricType === "Hazard Ratio";
   const nullEffectValue = isRatio ? 1.0 : 0.0;
@@ -98,18 +200,59 @@ export default function InteractiveForestPlot({
 
   const nullEffectX = scaleX(nullEffectValue);
 
-  // Export SVG handler
+  // Export SVG handler (with strict XML header and styles)
   const handleExportSvg = () => {
     const svgEl = document.getElementById("scholar-forest-plot-svg");
     if (!svgEl) return;
     const svgData = new XMLSerializer().serializeToString(svgEl);
-    const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const fullSvg = `<?xml version="1.0" standalone="no"?>\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n${svgData}`;
+    const blob = new Blob([fullSvg], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `forest_plot_${Date.now()}.svg`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // Export High-Res PNG (300 DPI publication equivalent)
+  const handleExportPng = () => {
+    const svgEl = document.getElementById("scholar-forest-plot-svg");
+    if (!svgEl) return;
+    const svgData = new XMLSerializer().serializeToString(svgEl);
+    const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const URLObj = window.URL || window.webkitURL || window;
+    const url = URLObj.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        const scale = 3; // 3x multiplier provides 300 DPI publication quality
+        canvas.width = plotWidth * scale;
+        canvas.height = plotHeight * scale;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.scale(scale, scale);
+          ctx.drawImage(img, 0, 0);
+          const a = document.createElement("a");
+          a.download = `forest_plot_300dpi_${Date.now()}.png`;
+          a.href = canvas.toDataURL("image/png");
+          a.click();
+        }
+      } catch {
+        // Fallback to SVG if canvas rasterization blocked
+        handleExportSvg();
+      } finally {
+        URLObj.revokeObjectURL(url);
+      }
+    };
+    img.onerror = () => {
+      handleExportSvg();
+      URLObj.revokeObjectURL(url);
+    };
+    img.src = url;
   };
 
   // Export CSV handler
@@ -149,7 +292,10 @@ export default function InteractiveForestPlot({
   }
 
   return (
-    <div className={`flex flex-col bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-white/10 shadow-sm overflow-hidden ${className}`}>
+    <div
+      data-testid="interactive-forest-plot"
+      className={`flex flex-col bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-white/10 shadow-xs overflow-hidden ${className}`}
+    >
       {/* Top Toolbar */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-200 dark:border-white/10 bg-neutral-50/70 dark:bg-white/[0.02] gap-3 flex-wrap">
         <div className="flex items-center gap-2.5">
@@ -166,7 +312,7 @@ export default function InteractiveForestPlot({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Model Toggle: Fixed vs Random Effects */}
           <div className="flex items-center rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-800 p-0.5 text-[11px]">
             <button
@@ -205,6 +351,15 @@ export default function InteractiveForestPlot({
           </button>
           <button
             type="button"
+            onClick={handleExportPng}
+            className="px-2.5 py-1 rounded-lg text-xs font-medium border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Export 300 DPI high-resolution PNG for journal submission"
+          >
+            <ImageIcon className="w-3 h-3 text-indigo-500" />
+            <span>PNG (300 DPI)</span>
+          </button>
+          <button
+            type="button"
             onClick={handleExportCsv}
             className="px-2.5 py-1 rounded-lg text-xs font-medium border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 transition-colors cursor-pointer"
             title="Export statistical data table as CSV"
@@ -212,6 +367,72 @@ export default function InteractiveForestPlot({
             <FileSpreadsheet className="w-3 h-3 text-emerald-500" />
             <span>CSV</span>
           </button>
+        </div>
+      </div>
+
+      {/* Customizer Bar: Subgroup Filter, Sorting & Theme Selector */}
+      <div className="flex items-center justify-between px-5 py-2 border-b border-neutral-200/80 dark:border-white/5 bg-neutral-100/40 dark:bg-neutral-800/20 text-xs flex-wrap gap-2.5">
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* Subgroup Selector */}
+          {availableSubgroups.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-neutral-400" />
+              <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">Subgroup:</span>
+              <select
+                data-testid="forest-subgroup-select"
+                aria-label="Filter Forest Plot by Subgroup"
+                value={subgroupFilter}
+                onChange={(e) => setSubgroupFilter(e.target.value)}
+                className="px-2 py-0.5 rounded-md border border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-[11px] focus:outline-hidden"
+              >
+                <option value="all">All Designs ({baseQuantitative.length + (subgroupFilter !== "all" ? 0 : 0)})</option>
+                {availableSubgroups.map((sg) => (
+                  <option key={sg} value={sg}>
+                    {sg}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Sort Selector */}
+          <div className="flex items-center gap-1.5">
+            <ArrowUpDown className="w-3.5 h-3.5 text-neutral-400" />
+            <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">Sort:</span>
+            <select
+              data-testid="forest-sort-select"
+              aria-label="Sort Forest Plot Studies"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as ForestPlotSortOption)}
+              className="px-2 py-0.5 rounded-md border border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-[11px] focus:outline-hidden"
+            >
+              <option value="default">Default Order</option>
+              <option value="effect-desc">Effect Size (High → Low)</option>
+              <option value="effect-asc">Effect Size (Low → High)</option>
+              <option value="year-desc">Year (Newest First)</option>
+              <option value="year-asc">Year (Oldest First)</option>
+              <option value="sample-desc">Sample Size (N)</option>
+              <option value="weight-desc">Study Weight (%)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Publication Theme Selector */}
+        <div className="flex items-center gap-1.5">
+          <Palette className="w-3.5 h-3.5 text-neutral-400" />
+          <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">Theme:</span>
+          <select
+            data-testid="forest-theme-select"
+            aria-label="Select Publication Style Theme"
+            value={theme}
+            onChange={(e) => setTheme(e.target.value as ForestPlotThemeOption)}
+            className="px-2 py-0.5 rounded-md border border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-[11px] focus:outline-hidden"
+          >
+            <option value="scholar">Scholar Classic (Indigo)</option>
+            <option value="nature">Nature Portfolio (Emerald)</option>
+            <option value="lancet">The Lancet (Crimson)</option>
+            <option value="monochrome">Monochrome (Print)</option>
+          </select>
         </div>
       </div>
 
@@ -238,7 +459,7 @@ export default function InteractiveForestPlot({
         <svg
           id="scholar-forest-plot-svg"
           viewBox={`0 0 ${plotWidth} ${plotHeight}`}
-          className="w-full max-w-[760px] h-auto select-none"
+          className="w-full max-w-[760px] h-auto select-none font-sans"
         >
           {/* Header Row */}
           <text
@@ -296,7 +517,7 @@ export default function InteractiveForestPlot({
             y1={headerHeight}
             x2={nullEffectX}
             y2={headerHeight + quantitativeItems.length * rowHeight + diamondRowHeight + 10}
-            stroke="#94a3b8"
+            stroke={activeTheme.nullLineColor}
             strokeWidth={1.5}
             strokeDasharray="4 3"
           />
@@ -350,7 +571,7 @@ export default function InteractiveForestPlot({
                   y1={y}
                   x2={ciUpperX}
                   y2={y}
-                  stroke="#3b82f6"
+                  stroke={activeTheme.whiskerColor}
                   strokeWidth={2}
                 />
                 {/* CI Whisker Left Cap */}
@@ -359,7 +580,7 @@ export default function InteractiveForestPlot({
                   y1={y - 4}
                   x2={ciLowerX}
                   y2={y + 4}
-                  stroke="#3b82f6"
+                  stroke={activeTheme.whiskerColor}
                   strokeWidth={1.5}
                 />
                 {/* CI Whisker Right Cap */}
@@ -368,7 +589,7 @@ export default function InteractiveForestPlot({
                   y1={y - 4}
                   x2={ciUpperX}
                   y2={y + 4}
-                  stroke="#3b82f6"
+                  stroke={activeTheme.whiskerColor}
                   strokeWidth={1.5}
                 />
 
@@ -378,7 +599,7 @@ export default function InteractiveForestPlot({
                   y={y - boxSize / 2}
                   width={boxSize}
                   height={boxSize}
-                  fill="#2563eb"
+                  fill={activeTheme.pointColor}
                   className="stroke-white dark:stroke-neutral-900 shadow-xs"
                   strokeWidth={1}
                 />
@@ -439,10 +660,10 @@ export default function InteractiveForestPlot({
                     {/* Summary Diamond Polygon */}
                     <polygon
                       points={points}
-                      fill="#6366f1"
-                      stroke="#4338ca"
+                      fill={activeTheme.diamondFill}
+                      stroke={activeTheme.diamondStroke}
                       strokeWidth={1.5}
-                      className="shadow-sm"
+                      className="shadow-xs"
                     />
 
                     {/* Pooled Value Text on Right */}
@@ -558,4 +779,3 @@ export default function InteractiveForestPlot({
     </div>
   );
 }
-

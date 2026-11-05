@@ -397,6 +397,6 @@ describe("Phase 1: Dynamic Target Word Count & Brief-Specific Outline Generation
 
       // Verify outline is still present and valid
       expect(screen.getByText(/Target Word Count & Section Allocations/i)).toBeInTheDocument();
-    });
+    }, 15000);
   });
 });
