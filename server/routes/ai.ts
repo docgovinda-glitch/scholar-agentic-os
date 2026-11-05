@@ -43,11 +43,11 @@ const researchLlm = (req: Request): ResearchLlm => (systemPrompt, userPrompt, _f
  */
 const ASK_SEARCH_TTL_MS = 20 * 60 * 1000;
 const askSearchCache = new Map<string, { at: number; value: Promise<Awaited<ReturnType<typeof executeWebSearch>>> }>();
-function cachedAskScholarWebSearch(query: string): Promise<Awaited<ReturnType<typeof executeWebSearch>>> {
-  const key = query.trim().toLowerCase();
+function cachedAskScholarWebSearch(query: string, maxResults?: number): Promise<Awaited<ReturnType<typeof executeWebSearch>>> {
+  const key = `${query.trim().toLowerCase()}::${maxResults ?? "adaptive"}`;
   const hit = askSearchCache.get(key);
   if (hit && Date.now() - hit.at < ASK_SEARCH_TTL_MS) return hit.value;
-  const value = executeWebSearch(query, { maxResults: 6, fetchFullContent: true });
+  const value = executeWebSearch(query, { maxResults, fetchFullContent: true });
   value.catch(() => askSearchCache.delete(key));
   askSearchCache.set(key, { at: Date.now(), value });
   if (askSearchCache.size > 200) {
@@ -585,7 +585,7 @@ export function registerAIRoutes(
         citations = [...vaultMapped, ...(searchResponse.results || [])];
         contextBlocks.push(`=== LIVE VERIFIED WEB, INSTITUTIONAL & SCHOLARLY SEARCH RESULTS ===\n${formatSearchResultsForPrompt(citations)}\n=== END OF SEARCH RESULTS ===`);
       } else if (isExplicitNormalChat && vaultSources.length > 0) {
-        citations = vaultSources.slice(0, 6).map((v: any, idx: number) => ({
+        citations = vaultSources.map((v: any, idx: number) => ({
           title: v.title || `Vault Source ${idx + 1}`,
           url: v.url || (v.doi ? `https://doi.org/${v.doi}` : `#vault-${idx + 1}`),
           doi: v.doi,

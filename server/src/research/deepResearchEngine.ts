@@ -134,7 +134,7 @@ Provide 3 to 4 focused subQuestions that cover foundational history/theory, prim
     attachmentDetails +=
       "\nInternal Knowledge Vault Sources Available:\n" +
       vaultSources
-        .slice(0, 6)
+        .slice(0, 25)
         .map((v) => `- "${v.title}" (${v.year || "n.d."})`)
         .join("\n");
   }
@@ -303,7 +303,7 @@ export async function executeDeepResearch(
   const evidence: SubQuestionEvidence[] = [];
   const searchOutputs = await Promise.all(
     researchPlan.subQuestions.map(async (sq) => {
-      const searchRes = await executeWebSearch(sq.searchQuery, { maxResults: 5, fetchFullContent: true });
+      const searchRes = await executeWebSearch(sq.searchQuery, { maxResults: 10, fetchFullContent: true, mode: "deep-research" });
       return { sq, searchRes };
     })
   );
@@ -383,7 +383,7 @@ export async function executeDeepResearch(
   if (gapQueries.length > 0) {
     onProgress?.(`Stage 5/7: Conducting iterative follow-up searches for ${gapQueries.length} gap vector(s)...`);
     const followUpResults = await Promise.all(
-      gapQueries.slice(0, 2).map((q) => executeWebSearch(q, { maxResults: 4, fetchFullContent: true }))
+      gapQueries.slice(0, 3).map((q) => executeWebSearch(q, { maxResults: 6, fetchFullContent: true, mode: "deep-research" }))
     );
     followUpResults.forEach((res, idx) => {
       for (const src of res.results) {

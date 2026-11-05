@@ -271,8 +271,9 @@ export async function executeLiveSearch(
   const cleanQuery = query.trim();
   if (!cleanQuery) return [];
 
-  const limit = Math.max(1, Math.min(options.limit ?? 5, 15));
   const mode = options.mode ?? "all";
+  const defaultTarget = mode === "scholarly" ? 18 : 10;
+  const limit = Math.max(1, Math.min(options.limit ?? defaultTarget, 30));
 
   // 1. Try local server backend proxy
   try {
@@ -308,10 +309,10 @@ export async function executeLiveSearch(
   // 2. Direct browser CORS fallback
   const promises: Array<Promise<LiveSearchResult[]>> = [];
   if (mode === "all" || mode === "scholarly") {
-    promises.push(searchOpenAlexClient(cleanQuery, mode === "scholarly" ? limit : Math.min(2, limit), options.signal));
+    promises.push(searchOpenAlexClient(cleanQuery, mode === "scholarly" ? limit : Math.min(6, limit), options.signal));
   }
   if (mode === "all" || mode === "web") {
-    promises.push(searchWikipediaClient(cleanQuery, Math.min(4, limit), options.signal));
+    promises.push(searchWikipediaClient(cleanQuery, Math.min(8, limit), options.signal));
   }
 
   const settled = await Promise.allSettled(promises);

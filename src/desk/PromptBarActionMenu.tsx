@@ -57,16 +57,22 @@ export function PromptBarActionMenu({
         <div
           role="menu"
           aria-label="Prompt options menu"
-          className="absolute bottom-full mb-2 left-0 z-50 w-56 p-1.5 rounded-2xl bg-white dark:bg-ink-650 border border-neutral-200 dark:border-white/10 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+          className="absolute bottom-full mb-2 left-0 z-50 w-64 p-1.5 rounded-2xl bg-white dark:bg-ink-650 border border-neutral-200 dark:border-white/10 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
         >
           <button
             type="button"
             role="menuitem"
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
+            onClick={() => {
+              fileInputRef.current?.click();
+              setIsOpen(false);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer text-left"
           >
-            <Paperclip className="w-4 h-4 text-neutral-500" />
-            <span>Add files & photos</span>
+            <Paperclip className="w-4 h-4 text-neutral-500 shrink-0" />
+            <div className="min-w-0">
+              <div className="font-medium">Add files & photos</div>
+              <p className="text-[10px] text-neutral-400 leading-tight">PDFs, documents & images</p>
+            </div>
           </button>
 
           <div className="my-1 border-t border-neutral-100 dark:border-white/5" />
@@ -78,14 +84,17 @@ export function PromptBarActionMenu({
               onSelectMode(currentMode === 'chat' ? 'auto' : 'chat');
               setIsOpen(false);
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] transition-colors cursor-pointer text-left ${
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] transition-colors cursor-pointer text-left ${
               currentMode === 'chat'
                 ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-medium'
                 : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5'
             }`}
           >
-            <MessageSquare className="w-4 h-4 text-neutral-500" />
-            <span>Chat</span>
+            <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <div className="min-w-0">
+              <div className="font-medium">Chat</div>
+              <p className="text-[10px] text-neutral-400 leading-tight">Conversational reasoning & writing</p>
+            </div>
           </button>
 
           <button
@@ -95,14 +104,17 @@ export function PromptBarActionMenu({
               onSelectMode(currentMode === 'search' ? 'auto' : 'search');
               setIsOpen(false);
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] transition-colors cursor-pointer text-left ${
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] transition-colors cursor-pointer text-left ${
               currentMode === 'search'
-                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-medium'
+                ? 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 font-medium'
                 : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5'
             }`}
           >
-            <Globe className="w-4 h-4 text-neutral-500" />
-            <span>Web search</span>
+            <Globe className="w-4 h-4 text-sky-500 shrink-0" />
+            <div className="min-w-0">
+              <div className="font-medium">Web search</div>
+              <p className="text-[10px] text-neutral-400 leading-tight">Live multi-source retrieval & citations</p>
+            </div>
           </button>
 
           <button
@@ -112,14 +124,17 @@ export function PromptBarActionMenu({
               onSelectMode(currentMode === 'deep_research' ? 'auto' : 'deep_research');
               setIsOpen(false);
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] transition-colors cursor-pointer text-left ${
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] transition-colors cursor-pointer text-left ${
               currentMode === 'deep_research'
-                ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-medium'
+                ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-medium'
                 : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5'
             }`}
           >
-            <Compass className="w-4 h-4 text-neutral-500" />
-            <span>Deep research</span>
+            <Compass className="w-4 h-4 text-purple-500 shrink-0" />
+            <div className="min-w-0">
+              <div className="font-medium">Deep research</div>
+              <p className="text-[10px] text-neutral-400 leading-tight">Autonomous multi-pass research & analysis</p>
+            </div>
           </button>
         </div>
       )}

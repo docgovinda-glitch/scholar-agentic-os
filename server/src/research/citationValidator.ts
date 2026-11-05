@@ -170,7 +170,7 @@ export function validateAndRefineCitations(
   // 3. Ensure a clean, authentic "References & Evidence Base" section exists
   // If the LLM omitted it or hallucinated ungrounded links at the end, build an authenticated one
   const hasRefSection = /(?:##\s*(?:References|Sources|Evidence Base)|###\s*(?:References|Sources))/i.test(purifiedText);
-  const finalCitationsList = (actuallyCitedSources.size > 0 ? Array.from(actuallyCitedSources) : verifiedSources.slice(0, 6)).map((c) => {
+  const finalCitationsList = (actuallyCitedSources.size > 0 ? Array.from(actuallyCitedSources) : verifiedSources).map((c) => {
     if (!c.stance) c.stance = "supporting";
     return c;
   });

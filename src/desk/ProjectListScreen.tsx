@@ -79,7 +79,14 @@ import {
   Table,
   Network,
   AlertTriangle,
+  BarChart3,
+  FileCode,
 } from "lucide-react";
+import LiteratureDiscoveryWorkspace from "./discovery/LiteratureDiscoveryWorkspace";
+import EvidenceSynthesisWorkspace from "./evidence/EvidenceSynthesisWorkspace";
+import ResearchExportWorkspace from "./export/ResearchExportWorkspace";
+import { type CitationGraphNode } from "../services/discovery/snowballSamplingService";
+import { type EvidenceMatrixItem, extractEvidenceFromPaper } from "../services/evidence/evidenceExtractionService";
 import { getCloudProvider } from "../config/providerCatalog";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 import { ASK_ANSWER_GUIDE, askFailureMessage, liveSourcesAsCitations } from "./dashboard/askScholarAnswer";
@@ -340,6 +347,40 @@ export default function ProjectListScreen({
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [aiSidebarWidth, setAiSidebarWidth] = useState<number>(450);
   const [isResizingAiSidebar, setIsResizingAiSidebar] = useState<boolean>(false);
+
+  // Ask Scholar 2.0 Layer Workspaces: Literature Discovery (Layer B), Evidence Synthesis (Layer C), Research Export (Layer D)
+  const [activeLayerWorkspace, setActiveLayerWorkspace] = useState<"discovery" | "evidence" | "export" | null>(null);
+  const [layerWorkspaceSeeds, setLayerWorkspaceSeeds] = useState<Array<Partial<CitationGraphNode> & { title: string }>>([]);
+  const [layerWorkspaceEvidenceItems, setLayerWorkspaceEvidenceItems] = useState<EvidenceMatrixItem[]>([]);
+  const [layerWorkspaceQuery, setLayerWorkspaceQuery] = useState<string>("");
+
+  const handleOpenLiteratureDiscovery = useCallback((seeds: Array<Partial<CitationGraphNode> & { title: string }>, query?: string) => {
+    setLayerWorkspaceSeeds(seeds);
+    setLayerWorkspaceQuery(query || "");
+    setActiveLayerWorkspace("discovery");
+  }, []);
+
+  const handleOpenEvidenceSynthesis = useCallback((seeds?: Array<Partial<CitationGraphNode> & { title: string }>, items?: EvidenceMatrixItem[], query?: string) => {
+    if (items && items.length > 0) {
+      setLayerWorkspaceEvidenceItems(items);
+    } else if (seeds && seeds.length > 0) {
+      setLayerWorkspaceEvidenceItems(seeds.map((s, idx) => extractEvidenceFromPaper(s, idx)));
+    }
+    setLayerWorkspaceQuery(query || "");
+    setActiveLayerWorkspace("evidence");
+  }, []);
+
+  const handleOpenResearchExport = useCallback((items?: EvidenceMatrixItem[], query?: string) => {
+    if (items && items.length > 0) {
+      setLayerWorkspaceEvidenceItems(items);
+    }
+    setLayerWorkspaceQuery(query || "");
+    setActiveLayerWorkspace("export");
+  }, []);
+
+  const handleCloseLayerWorkspace = useCallback(() => {
+    setActiveLayerWorkspace(null);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -1026,6 +1067,25 @@ export default function ProjectListScreen({
     }
     return [];
   }, []);
+
+  const toCitationGraphSeeds = useCallback(
+    (sources: NormalizedCitationSource[]): Array<Partial<CitationGraphNode> & { title: string }> => {
+      return sources.map((s, idx) => ({
+        id: s.url || s.doi || `source-${idx}`,
+        title: s.title || `Source ${idx + 1}`,
+        authors: s.authors || [],
+        year: typeof s.year === "number" ? s.year : typeof s.year === "string" ? parseInt(s.year, 10) || undefined : undefined,
+        journal: s.venue || s.publisher || "Academic Publication",
+        venue: s.venue,
+        url: s.url,
+        snippet: s.snippet,
+        doi: s.doi,
+        stance: s.stance,
+        citationCount: 25,
+      }));
+    },
+    []
+  );
 
   const handleCopyBibTeX = useCallback((msg: WebsiteAssistantMessage) => {
     const rawSources = getNormalizedMsgSources(msg);
@@ -3102,64 +3162,100 @@ export default function ProjectListScreen({
                               )}
                             </div>
 
-                            {/* View Switcher: Synthesis | Evidence Matrix | Citation Graph | Peer Review & Rigor */}
+                            {/* View Switcher: Synthesis | Evidence Matrix | Citation Graph | Peer Review & Rigor + Layer Handoffs */}
                             {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
-                              <div className="flex items-center gap-1 bg-neutral-100 dark:bg-white/[0.06] p-0.5 rounded-lg border border-neutral-200/60 dark:border-white/10 text-[10.5px]">
-                                <button
-                                  type="button"
-                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "synthesis" }))}
-                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                                    (messageActiveTab[msg.id] ?? "synthesis") === "synthesis"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                  }`}
-                                  title="Synthesized prose response with inline citations"
-                                >
-                                  <FileText className="w-3 h-3 text-sky-500" />
-                                  <span>Synthesis</span>
-                                </button>
+                              <div className="flex items-center justify-between gap-2 flex-wrap w-full">
+                                <div className="flex items-center gap-1 bg-neutral-100 dark:bg-white/[0.06] p-0.5 rounded-lg border border-neutral-200/60 dark:border-white/10 text-[10.5px]">
+                                  <button
+                                    type="button"
+                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "synthesis" }))}
+                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                                      (messageActiveTab[msg.id] ?? "synthesis") === "synthesis"
+                                        ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                        : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                    }`}
+                                    title="Synthesized prose response with inline citations"
+                                  >
+                                    <FileText className="w-3 h-3 text-sky-500" />
+                                    <span>Synthesis</span>
+                                  </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "matrix" }))}
-                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                                    messageActiveTab[msg.id] === "matrix"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                  }`}
-                                  title="Structured Evidence Matrix comparing all retrieved empirical sources"
-                                >
-                                  <Table className="w-3 h-3 text-emerald-500" />
-                                  <span>Evidence Matrix ({(msg.citations || msg.liveSources || []).length})</span>
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "matrix" }))}
+                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                                      messageActiveTab[msg.id] === "matrix"
+                                        ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                        : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                    }`}
+                                    title="Structured Evidence Matrix comparing all retrieved empirical sources"
+                                  >
+                                    <Table className="w-3 h-3 text-emerald-500" />
+                                    <span>Evidence Matrix ({(msg.citations || msg.liveSources || []).length})</span>
+                                  </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "graph" }))}
-                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                                    messageActiveTab[msg.id] === "graph"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                  }`}
-                                  title="Interactive Citation Graph & Literature Topology"
-                                >
-                                  <Network className="w-3 h-3 text-indigo-500" />
-                                  <span>Citation Graph</span>
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "graph" }))}
+                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                                      messageActiveTab[msg.id] === "graph"
+                                        ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                        : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                    }`}
+                                    title="Interactive Citation Graph & Literature Topology"
+                                  >
+                                    <Network className="w-3 h-3 text-indigo-500" />
+                                    <span>Citation Graph</span>
+                                  </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "consensus" }))}
-                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                                    messageActiveTab[msg.id] === "consensus"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                  }`}
-                                  title="Peer Reviewer 2 Adversarial Rigor Stress-Test & Consensus"
-                                >
-                                  <AlertTriangle className="w-3 h-3 text-amber-500" />
-                                  <span>Peer Review & Rigor</span>
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "consensus" }))}
+                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                                      messageActiveTab[msg.id] === "consensus"
+                                        ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                        : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                    }`}
+                                    title="Peer Reviewer 2 Adversarial Rigor Stress-Test & Consensus"
+                                  >
+                                    <AlertTriangle className="w-3 h-3 text-amber-500" />
+                                    <span>Peer Review & Rigor</span>
+                                  </button>
+                                </div>
+
+                                {/* Ask Scholar 2.0 Layer Workspaces Handoff Buttons */}
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenLiteratureDiscovery(toCitationGraphSeeds(getNormalizedMsgSources(msg)), msg.text?.slice(0, 100))}
+                                    className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Open Literature Discovery Workspace (Automated Snowball Sampling & Citation Networks)"
+                                  >
+                                    <Network className="w-3 h-3 text-indigo-500" />
+                                    <span>Discovery</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEvidenceSynthesis(toCitationGraphSeeds(getNormalizedMsgSources(msg)), undefined, msg.text?.slice(0, 100))}
+                                    className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Open Evidence Synthesis Workspace (Matrix & Forest Plots)"
+                                  >
+                                    <BarChart3 className="w-3 h-3 text-emerald-500" />
+                                    <span>Evidence Synthesis</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const items = toCitationGraphSeeds(getNormalizedMsgSources(msg)).map((s, idx) => extractEvidenceFromPaper(s, idx));
+                                      handleOpenResearchExport(items, msg.text?.slice(0, 100));
+                                    }}
+                                    className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/40 hover:bg-sky-100 dark:hover:bg-sky-900/40 flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Open Research Export Workspace (LaTeX & Overleaf Package)"
+                                  >
+                                    <FileCode className="w-3 h-3 text-sky-500" />
+                                    <span>LaTeX / Overleaf</span>
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -3175,7 +3271,16 @@ export default function ProjectListScreen({
                                   <Table className="w-3.5 h-3.5 text-sky-500" />
                                   <span>Evidence Matrix ({matrixSources.length} Sources Catalogued)</span>
                                 </div>
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEvidenceSynthesis(toCitationGraphSeeds(matrixSources), undefined, msg.text?.slice(0, 100))}
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                    title="Open Full Evidence Synthesis Workspace with Forest Plots"
+                                  >
+                                    <BarChart3 className="w-2.5 h-2.5" />
+                                    <span>Full Synthesis & Forest Plot</span>
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={() => handleCopyMatrixMarkdown(msg)}
@@ -3333,9 +3438,20 @@ export default function ProjectListScreen({
                           return (
                             <div className="space-y-3 pt-1">
                               <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
-                                <div className="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-200">
-                                  <Network className="w-3.5 h-3.5 text-indigo-500" />
-                                  <span>Interactive Citation Network ({graphSources.length} Nodes)</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-200">
+                                    <Network className="w-3.5 h-3.5 text-indigo-500" />
+                                    <span>Interactive Citation Network ({graphSources.length} Nodes)</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenLiteratureDiscovery(toCitationGraphSeeds(graphSources), msg.text?.slice(0, 100))}
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                    title="Open Full Literature Discovery Workspace with Recursive Snowball Sampling"
+                                  >
+                                    <Network className="w-2.5 h-2.5" />
+                                    <span>Full Discovery Workspace</span>
+                                  </button>
                                 </div>
                                 <div className="flex items-center gap-2 text-[10.5px]">
                                   <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
@@ -3846,12 +3962,12 @@ export default function ProjectListScreen({
                           </div>
                         )}
 
-                        {/* Retrieved Live Sources Drawer */}
+                        {/* Retrieved Live Sources Drawer (Progressive Disclosure: Auto-collapsed for large literature collections) */}
                         {msg.liveSources && msg.liveSources.length > 0 && (
                           <LiveSourcesDrawer
                             sources={msg.liveSources}
                             searchedAt={msg.searchedAt}
-                            initialExpanded
+                            initialExpanded={msg.liveSources.length <= 3}
                             onSaveToVault={handleSaveSourceToVault}
                             savedUrls={savedVaultSourceUrls}
                           />
@@ -4798,6 +4914,42 @@ export default function ProjectListScreen({
         initialMessage={authModalMessage}
         selectedFormatId={pendingFormatId}
       />
+
+      {/* Ask Scholar 2.0 Multi-Layer Research Workspaces: Layer B, Layer C, Layer D */}
+      {activeLayerWorkspace && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex flex-col p-2 md:p-6 animate-in fade-in">
+          <div className="flex-1 rounded-2xl overflow-hidden shadow-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-900 flex flex-col">
+            {activeLayerWorkspace === "discovery" && (
+              <LiteratureDiscoveryWorkspace
+                seedPapers={layerWorkspaceSeeds}
+                initialQuery={layerWorkspaceQuery}
+                onOpenEvidenceSynthesis={(papers) => handleOpenEvidenceSynthesis(papers, undefined, layerWorkspaceQuery)}
+                onClose={handleCloseLayerWorkspace}
+              />
+            )}
+            {activeLayerWorkspace === "evidence" && (
+              <EvidenceSynthesisWorkspace
+                seedPapers={layerWorkspaceSeeds}
+                initialItems={layerWorkspaceEvidenceItems.length > 0 ? layerWorkspaceEvidenceItems : undefined}
+                onOpenLiteratureDiscovery={() => setActiveLayerWorkspace("discovery")}
+                onOpenPublishingExport={(items) => handleOpenResearchExport(items, layerWorkspaceQuery)}
+                onClose={handleCloseLayerWorkspace}
+              />
+            )}
+            {activeLayerWorkspace === "export" && (
+              <ResearchExportWorkspace
+                projectTitle={layerWorkspaceQuery || "Empirical Research Synthesis & Meta-Analysis"}
+                inquiryQuery={layerWorkspaceQuery}
+                evidenceItems={layerWorkspaceEvidenceItems}
+                literaturePapers={layerWorkspaceSeeds as any}
+                onOpenEvidenceSynthesis={() => setActiveLayerWorkspace("evidence")}
+                onOpenLiteratureDiscovery={() => setActiveLayerWorkspace("discovery")}
+                onClose={handleCloseLayerWorkspace}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

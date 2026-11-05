@@ -1025,25 +1025,52 @@ export function generateMultiVectorQueries(query: string): string[] {
 }
 
 /**
+ * Compute dynamic adaptive source target based on query complexity, academic intent,
+ * presence of multi-vector comparative keywords, and research depth.
+ * Eliminates artificial universal caps while avoiding context overflow.
+ */
+export function computeAdaptiveSourceTarget(query: string, mode?: "search" | "deep-research" | "chat"): number {
+  if (mode === "deep-research") return 30;
+
+  const clean = query.trim().toLowerCase();
+  let target = 10; // Baseline: at least 10 verified sources
+
+  const isComparative = /\b(?:compare|comparison|versus|vs|contrast|trade-off|diverge|divergence|competing)\b/i.test(clean);
+  const isAcademic = /\b(?:meta-analysis|systematic review|empirical|literature|longitudinal|cohort|rct|p-value|causal|etiology|epidemiology)\b/i.test(clean);
+  const isBroad = /\b(?:history of|impact of|overview|comprehensive|future of|evolution|geopolitical|framework)\b/i.test(clean);
+  const isMultiFaceted = clean.split(/\s+/).length > 8;
+
+  if (isComparative) target += 4;
+  if (isAcademic) target += 6;
+  if (isBroad) target += 3;
+  if (isMultiFaceted) target += 3;
+
+  return Math.min(Math.max(target, 8), 24);
+}
+
+/**
  * Primary Unified Web Search: executes multi-vector search across live web, news, official portals,
  * and scholarly indices; ranks by authority & recency; and fetches deep page content via safeFetchHtml.
  */
 export async function executeWebSearch(
   query: string,
-  options: { maxResults?: number; fetchFullContent?: boolean } = {}
+  options: { maxResults?: number; fetchFullContent?: boolean; mode?: "search" | "deep-research" | "chat" } = {}
 ): Promise<WebSearchResponse> {
-  const maxResults = options.maxResults ?? 8;
+  const maxResults = options.maxResults ?? computeAdaptiveSourceTarget(query, options.mode);
   const effectiveQuery = query.trim();
   const multiQueries = generateMultiVectorQueries(effectiveQuery);
+
+  const subQueryMax = Math.max(6, Math.floor(maxResults / 2));
+  const scholarlyMax = Math.max(5, Math.floor(maxResults / 3));
 
   // Run configured API + DuckDuckGo across multi-vector queries concurrently
   const searchPromises: Promise<SearchResultItem[]>[] = [
     searchConfiguredWebApi(effectiveQuery, maxResults),
-    ...multiQueries.map((q) => searchDuckDuckGo(q, 6)),
-    searchGoogleNewsRss(effectiveQuery, 5),
-    searchWikipedia(effectiveQuery, 3),
-    searchCrossRef(effectiveQuery, 3),
-    searchScholarlySources(effectiveQuery, 3),
+    ...multiQueries.map((q) => searchDuckDuckGo(q, subQueryMax)),
+    searchGoogleNewsRss(effectiveQuery, Math.max(6, Math.floor(maxResults / 3))),
+    searchWikipedia(effectiveQuery, Math.max(4, Math.floor(maxResults / 4))),
+    searchCrossRef(effectiveQuery, scholarlyMax),
+    searchScholarlySources(effectiveQuery, scholarlyMax),
   ];
 
   const allBatchResults = await Promise.all(searchPromises);
