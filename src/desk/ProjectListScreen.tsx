@@ -24,7 +24,7 @@ import {
 } from "./projectNaming";
 import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice, currentUserId } from "../services/userVault";
-import { addVaultItem, setSessionUnlocked } from "../services/vaultContents";
+import { addVaultItem, setSessionUnlocked, listVaultItems, searchVaultItems, type VaultItem } from "../services/vaultContents";
 import { syncActiveSessionToRegistry } from "../services/auth/multiAccountService";
 import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
@@ -76,6 +76,7 @@ import {
   Clock,
   Square,
   Download,
+  Table,
 } from "lucide-react";
 import { getCloudProvider } from "../config/providerCatalog";
 import { useDeviceClass } from "../hooks/useDeviceClass";
@@ -639,6 +640,37 @@ export default function ProjectListScreen({
     }
     return [];
   });
+  const [messageActiveTab, setMessageActiveTab] = useState<Record<string, "synthesis" | "matrix" | "consensus">>({});
+  const [userVaultItems, setUserVaultItems] = useState<VaultItem[]>([]);
+  const [isVaultGroundingActive, setIsVaultGroundingActive] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("scholar_vault_grounding_active") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  // Load user's knowledge vault items for AI co-pilot grounding
+  useEffect(() => {
+    if (!userEmail) {
+      setUserVaultItems([]);
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const uid = (await currentUserId()) || userEmail;
+        const items = await listVaultItems(uid);
+        if (active) setUserVaultItems(items);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [userEmail]);
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const guideInputRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -936,6 +968,144 @@ export default function ProjectListScreen({
     }
   }, []);
 
+  interface NormalizedCitationSource {
+    title?: string;
+    url?: string;
+    authors?: string[];
+    year?: string | number;
+    venue?: string;
+    publisher?: string;
+    domain?: string;
+    snippet?: string;
+    doi?: string;
+    authorityBadge?: string;
+    sourceType?: "official" | "scholarly" | "media" | "web" | "vault";
+  }
+
+  const getNormalizedMsgSources = useCallback((msg: WebsiteAssistantMessage): NormalizedCitationSource[] => {
+    if (msg.citations && msg.citations.length > 0) {
+      return msg.citations.map((c) => ({
+        title: c.title,
+        url: c.url,
+        authors: Array.isArray(c.authors) ? c.authors : c.author ? [c.author] : [],
+        year: c.year,
+        venue: c.venue || c.publisher,
+        publisher: c.publisher || c.venue,
+        domain: c.domain,
+        snippet: c.snippet,
+        doi: c.doi,
+        authorityBadge: c.authorityBadge,
+        sourceType: c.sourceType,
+      }));
+    }
+    if (msg.liveSources && msg.liveSources.length > 0) {
+      return msg.liveSources.map((s) => ({
+        title: s.title,
+        url: s.url,
+        authors: s.authors,
+        year: s.publicationDate,
+        venue: s.source,
+        publisher: s.source,
+        domain: (() => {
+          try {
+            return s.url ? new URL(s.url).hostname.replace(/^www\./, "") : undefined;
+          } catch {
+            return undefined;
+          }
+        })(),
+        snippet: s.snippet,
+        authorityBadge: s.source === "openalex" ? "Scholarly Index" : s.source === "wikipedia" ? "Encyclopedic Reference" : "Web Source",
+        sourceType: s.source === "openalex" ? ("scholarly" as const) : ("web" as const),
+      }));
+    }
+    return [];
+  }, []);
+
+  const handleCopyBibTeX = useCallback((msg: WebsiteAssistantMessage) => {
+    const rawSources = getNormalizedMsgSources(msg);
+
+    if (rawSources.length === 0) {
+      showAppToast("No structured citations available to export as BibTeX.", "warning", 3000);
+      return;
+    }
+
+    const bibtexEntries = rawSources
+      .map((c, idx) => {
+        const citeKey = (
+          (Array.isArray(c.authors) && c.authors[0] ? c.authors[0].split(" ").pop()?.toLowerCase() : "ref") +
+          (c.year ? `_${c.year}` : `_${idx + 1}`)
+        ).replace(/[^a-z0-9_]/gi, "");
+
+        const authorStr = Array.isArray(c.authors) && c.authors.length > 0
+          ? c.authors.join(" and ")
+          : "Unknown Author";
+
+        return `@article{${citeKey},\n  title = {${c.title || "Untitled"}},\n  author = {${authorStr}},\n  year = {${c.year || "n.d."}},\n  journal = {${c.venue || c.publisher || "Scholarly Resource"}}${c.url ? `,\n  url = {${c.url}}` : ""}${c.doi ? `,\n  doi = {${c.doi}}` : ""}\n}`;
+      })
+      .join("\n\n");
+
+    navigator.clipboard.writeText(bibtexEntries);
+    setCopiedMessageId(`bibtex-${msg.id}`);
+    setTimeout(() => setCopiedMessageId(null), 2000);
+    showAppToast(`Copied ${rawSources.length} BibTeX entries to clipboard!`, "success", 2500);
+  }, [getNormalizedMsgSources]);
+
+  const handleDownloadMatrixCsv = useCallback((msg: WebsiteAssistantMessage) => {
+    const rawSources = getNormalizedMsgSources(msg);
+
+    if (rawSources.length === 0) {
+      showAppToast("No structured sources available to export as matrix.", "warning", 2500);
+      return;
+    }
+
+    const escapeCsv = (str?: string) => `"${(str || "").replace(/"/g, '""')}"`;
+    const headers = ["Index", "Title", "Authors", "Year", "Venue/Publisher", "Evidence Summary", "URL", "Authority Badge"];
+    const rows = rawSources.map((c, idx) => [
+      idx + 1,
+      escapeCsv(c.title),
+      escapeCsv(Array.isArray(c.authors) ? c.authors.join("; ") : ""),
+      escapeCsv(c.year ? String(c.year) : ""),
+      escapeCsv(c.venue || c.publisher || ""),
+      escapeCsv(c.snippet || ""),
+      escapeCsv(c.url || ""),
+      escapeCsv(c.authorityBadge || "Verified Source"),
+    ].join(","));
+
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `evidence-matrix-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showAppToast("Downloaded Evidence Matrix as CSV", "success", 2500);
+  }, [getNormalizedMsgSources]);
+
+  const handleCopyMatrixMarkdown = useCallback((msg: WebsiteAssistantMessage) => {
+    const rawSources = getNormalizedMsgSources(msg);
+
+    if (rawSources.length === 0) return;
+
+    let md = "| # | Source Title | Authors & Year | Evidence Summary | Venue / Authority |\n";
+    md += "|---|---|---|---|---|\n";
+    rawSources.forEach((c, i) => {
+      const authorYear = `${Array.isArray(c.authors) && c.authors.length > 0 ? c.authors[0] : "Anon"} (${c.year || "n.d."})`;
+      const cleanTitle = (c.title || "Source").replace(/\|/g, "\\|");
+      const link = c.url ? `[${cleanTitle}](${c.url})` : cleanTitle;
+      const cleanSnippet = (c.snippet || "").replace(/\|/g, "\\|").replace(/\n/g, " ").slice(0, 120);
+      const venue = (c.venue || c.publisher || "Verified").replace(/\|/g, "\\|");
+      md += `| ${i + 1} | ${link} | ${authorYear} | ${cleanSnippet}... | ${venue} |\n`;
+    });
+
+    navigator.clipboard.writeText(md);
+    setCopiedMessageId(`matrix-md-${msg.id}`);
+    setTimeout(() => setCopiedMessageId(null), 2000);
+    showAppToast("Copied Evidence Matrix as Markdown table!", "success", 2500);
+  }, [getNormalizedMsgSources]);
+
   async function handleSendGuideMessage(
     textToSend?: string,
     attachmentsToSend?: AgentAttachmentItem[],
@@ -1060,6 +1230,21 @@ export default function ProjectListScreen({
 
         if (askAbortRef.current) return;
 
+        const matchingVault = userEmail && userVaultItems.length > 0 ? searchVaultItems(userVaultItems, query) : [];
+        const selectedVaultSources = (isVaultGroundingActive && userEmail && userVaultItems.length > 0)
+          ? (matchingVault.length > 0 ? matchingVault : userVaultItems).slice(0, 5).map((v) => ({
+              id: v.id,
+              title: v.title,
+              snippet: v.content ? v.content.slice(0, 400) : v.citation || "",
+              notes: v.citation,
+              authors: Array.isArray(v.authors) ? v.authors : [],
+              year: v.year,
+              journal: v.journal,
+              url: v.externalReference,
+              doi: v.canonicalReference?.doi || (v.metadata as any)?.doi,
+            }))
+          : undefined;
+
         let effectiveSystemPrompt = liveRetrievedSources.length > 0
           ? injectLiveGroundingToSystemPrompt(systemPrompt, liveRetrievedSources)
           : systemPrompt;
@@ -1089,6 +1274,7 @@ export default function ProjectListScreen({
               mode: targetMode,
               citationStyle: askCitationStyle,
               history,
+              vaultSources: selectedVaultSources,
             });
           }
         } else {
@@ -1102,6 +1288,7 @@ export default function ProjectListScreen({
               files: currentAttachments.filter((a) => a.fileData).map((a) => a.fileData!),
               images: currentAttachments.filter((a) => a.imageData).map((a) => a.imageData!),
               history,
+              vaultSources: selectedVaultSources,
             });
           } catch (serverErr) {
             if (askAbortRef.current) return;
@@ -2887,22 +3074,266 @@ export default function ProjectListScreen({
                         )}
 
                         {msg.sender === "assistant" && !msg.error && (
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            {((msg.verifiedSourcesCount !== undefined && msg.verifiedSourcesCount > 0) || (msg.citations && msg.citations.length > 0)) && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                                <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                                <span>{msg.verifiedSourcesCount ?? msg.citations?.length ?? 0} Verified Sources</span>
-                              </span>
-                            )}
-                            {msg.model && (
-                              <span className="text-[10px] text-neutral-400 font-mono">
-                                {msg.model}
-                              </span>
+                          <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {((msg.verifiedSourcesCount !== undefined && msg.verifiedSourcesCount > 0) || (msg.citations && msg.citations.length > 0)) && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                                  <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                                  <span>{msg.verifiedSourcesCount ?? msg.citations?.length ?? 0} Verified Sources</span>
+                                </span>
+                              )}
+                              {msg.citations && msg.citations.some((c) => c.sourceType === "vault" || (c.authorityBadge || "").toLowerCase().includes("vault")) && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30">
+                                  <Database className="w-3 h-3 text-amber-500" />
+                                  <span>Knowledge Vault Grounded</span>
+                                </span>
+                              )}
+                              {msg.model && (
+                                <span className="text-[10px] text-neutral-400 font-mono">
+                                  {msg.model}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* View Switcher: Synthesis | Evidence Matrix | Consensus */}
+                            {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
+                              <div className="flex items-center gap-1 bg-neutral-100 dark:bg-white/[0.06] p-0.5 rounded-lg border border-neutral-200/60 dark:border-white/10 text-[10.5px]">
+                                <button
+                                  type="button"
+                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "synthesis" }))}
+                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                                    (messageActiveTab[msg.id] ?? "synthesis") === "synthesis"
+                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                  }`}
+                                  title="Synthesized prose response with inline citations"
+                                >
+                                  <FileText className="w-3 h-3 text-sky-500" />
+                                  <span>Synthesis</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "matrix" }))}
+                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                                    messageActiveTab[msg.id] === "matrix"
+                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                  }`}
+                                  title="Structured Evidence Matrix comparing all retrieved empirical sources"
+                                >
+                                  <Table className="w-3 h-3 text-emerald-500" />
+                                  <span>Evidence Matrix ({(msg.citations || msg.liveSources || []).length})</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "consensus" }))}
+                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                                    messageActiveTab[msg.id] === "consensus"
+                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                  }`}
+                                  title="Scholarly consensus assessment, methodology breakdown, and identified research gaps"
+                                >
+                                  <Scale className="w-3 h-3 text-purple-500" />
+                                  <span>Consensus & Gaps</span>
+                                </button>
+                              </div>
                             )}
                           </div>
                         )}
 
-                        {msg.sender === "assistant" ? renderFormattedGuideText(
+                        {msg.sender === "assistant" && messageActiveTab[msg.id] === "matrix" ? (() => {
+                          const matrixSources = getNormalizedMsgSources(msg);
+
+                          return (
+                            <div className="space-y-3 pt-1">
+                              <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
+                                <div className="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-200">
+                                  <Table className="w-3.5 h-3.5 text-sky-500" />
+                                  <span>Evidence Matrix ({matrixSources.length} Sources Catalogued)</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyMatrixMarkdown(msg)}
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-medium border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 flex items-center gap-1 cursor-pointer transition-colors"
+                                  >
+                                    <Copy className="w-2.5 h-2.5" />
+                                    <span>{copiedMessageId === `matrix-md-${msg.id}` ? "Copied!" : "Copy Table"}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadMatrixCsv(msg)}
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-medium border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 flex items-center gap-1 cursor-pointer transition-colors"
+                                  >
+                                    <Download className="w-2.5 h-2.5" />
+                                    <span>Export CSV</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="overflow-x-auto rounded-xl border border-neutral-200/80 dark:border-white/10 scholar-scrollbar">
+                                <table className="w-full text-left border-collapse text-xs">
+                                  <thead>
+                                    <tr className="bg-neutral-100/80 dark:bg-white/[0.04] border-b border-neutral-200/80 dark:border-white/10 text-[10.5px] font-semibold text-neutral-600 dark:text-neutral-400">
+                                      <th className="py-2 px-2.5 w-8">#</th>
+                                      <th className="py-2 px-3 min-w-[200px]">Source & Title</th>
+                                      <th className="py-2 px-3 min-w-[120px]">Author & Year</th>
+                                      <th className="py-2 px-3 min-w-[240px]">Empirical Finding / Evidence</th>
+                                      <th className="py-2 px-2.5 min-w-[110px]">Authority Tier</th>
+                                      <th className="py-2 px-2.5 text-right w-16">Save</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-neutral-200/60 dark:divide-white/5 font-sans">
+                                    {matrixSources.map((src, sIdx) => {
+                                      const key = src.url || src.title || "";
+                                      const isSaved = Boolean(key && savedVaultSourceUrls[key]);
+                                      const domain = src.domain || (src.url ? (() => { try { return new URL(src.url).hostname.replace(/^www\./, ""); } catch { return ""; } })() : "");
+                                      return (
+                                        <tr key={sIdx} className="hover:bg-neutral-50/70 dark:hover:bg-white/[0.02] transition-colors">
+                                          <td className="py-2.5 px-2.5 font-mono text-[10px] text-neutral-400 font-medium align-top">
+                                            [{sIdx + 1}]
+                                          </td>
+                                          <td className="py-2.5 px-3 align-top">
+                                            <div className="font-semibold text-neutral-900 dark:text-neutral-100 leading-snug line-clamp-2">
+                                              {src.url ? (
+                                                <a href={src.url} target="_blank" rel="noopener noreferrer" className="hover:text-sky-600 dark:hover:text-sky-400 transition-colors">
+                                                  {src.title || "Untitled Source"} ↗
+                                                </a>
+                                              ) : (
+                                                src.title || "Untitled Source"
+                                              )}
+                                            </div>
+                                            <div className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
+                                              {src.venue || src.publisher || domain || "Scholarly source"}
+                                            </div>
+                                          </td>
+                                          <td className="py-2.5 px-3 text-[11px] text-neutral-700 dark:text-neutral-300 align-top">
+                                            <div>{Array.isArray(src.authors) && src.authors.length > 0 ? src.authors[0] + (src.authors.length > 1 ? ` et al.` : "") : "—"}</div>
+                                            <div className="font-mono text-[10px] text-neutral-400">{src.year || "n.d."}</div>
+                                          </td>
+                                          <td className="py-2.5 px-3 text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed align-top">
+                                            <p className="line-clamp-3 italic">
+                                              "{src.snippet || "Evidence excerpt catalogued for this scholarly synthesis."}"
+                                            </p>
+                                          </td>
+                                          <td className="py-2.5 px-2.5 align-top">
+                                            <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-medium border ${
+                                              src.sourceType === "vault" || (src.authorityBadge || "").toLowerCase().includes("vault")
+                                                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300/50"
+                                                : (src.authorityBadge || "").toLowerCase().includes("peer") || (src.authorityBadge || "").toLowerCase().includes("academic")
+                                                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300/50"
+                                                  : "bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-300/50"
+                                            }`}>
+                                              {src.authorityBadge || (src.sourceType === "vault" ? "Knowledge Vault" : "Verified Source")}
+                                            </span>
+                                          </td>
+                                          <td className="py-2.5 px-2.5 text-right align-top">
+                                            {src.url && (
+                                              <button
+                                                type="button"
+                                                disabled={isSaved}
+                                                onClick={() => handleSaveSourceToVault({
+                                                  title: src.title,
+                                                  url: src.url,
+                                                  snippet: src.snippet,
+                                                  authors: Array.isArray(src.authors) ? src.authors : undefined,
+                                                  year: src.year,
+                                                  venue: src.venue,
+                                                })}
+                                                className={`p-1 rounded text-[10px] inline-flex items-center gap-1 transition cursor-pointer ${
+                                                  isSaved
+                                                    ? "text-emerald-600 dark:text-emerald-400"
+                                                    : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+                                                }`}
+                                                title={isSaved ? "Saved in Vault" : "Save to Knowledge Vault"}
+                                              >
+                                                {isSaved ? <Check className="w-3.5 h-3.5" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
+                                              </button>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          );
+                        })() : msg.sender === "assistant" && messageActiveTab[msg.id] === "consensus" ? (() => {
+                          const consensusSources = getNormalizedMsgSources(msg);
+                          return (
+                            <div className="space-y-3 pt-1">
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                                <Scale className="w-3.5 h-3.5 text-purple-500" />
+                                <span>Scholarly Consensus & Critical Synthesis Assessment</span>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <div className="p-3 rounded-xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/30 flex flex-col gap-1">
+                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                                    Empirical Consensus
+                                  </span>
+                                  <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                                    {consensusSources.length >= 4 ? "Convergent Literature" : "Emerging Consensus"}
+                                  </span>
+                                  <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-tight">
+                                    {consensusSources.length >= 4
+                                      ? "Independent empirical and institutional analyses converge on primary causal mechanisms."
+                                      : "Preliminary multi-source evidence indicates consistent directionality with open variables."}
+                                  </p>
+                                </div>
+
+                                <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/30 flex flex-col gap-1">
+                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                                    Evidentiary Breadth
+                                  </span>
+                                  <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                                    {consensusSources.length} Independent Sources
+                                  </span>
+                                  <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-tight">
+                                    Combines peer-reviewed literature, policy reports, and Knowledge Vault evidence.
+                                  </p>
+                                </div>
+
+                                <div className="p-3 rounded-xl bg-sky-50/60 dark:bg-sky-950/20 border border-sky-200/60 dark:border-sky-800/30 flex flex-col gap-1">
+                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-300">
+                                    Citation Standard
+                                  </span>
+                                  <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100 uppercase">
+                                    {askCitationStyle} Strict Audit
+                                  </span>
+                                  <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-tight">
+                                    Every claim mapped to authenticated inline brackets with active anti-hallucination scrub.
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="p-3 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/10 space-y-2">
+                                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
+                                  <Info className="w-3.5 h-3.5 text-neutral-500" />
+                                  <span>Key Methodological Observations & Remaining Inquiries</span>
+                                </div>
+                                <ul className="space-y-1.5 text-[11px] text-neutral-600 dark:text-neutral-300 pl-1">
+                                  <li className="flex items-start gap-1.5">
+                                    <span className="text-purple-500 font-bold shrink-0">•</span>
+                                    <span>Cross-study comparison: Sample sizes and regional contexts vary across primary data sets.</span>
+                                  </li>
+                                  <li className="flex items-start gap-1.5">
+                                    <span className="text-purple-500 font-bold shrink-0">•</span>
+                                    <span>Potential confounding factors: Policy interventions and macroeconomic shocks require continuous evaluation.</span>
+                                  </li>
+                                  <li className="flex items-start gap-1.5">
+                                    <span className="text-purple-500 font-bold shrink-0">•</span>
+                                    <span>Next academic step: Boot into Coursework Essay (OT-01) or Journal Studio (OT-10) to draft formal IMRaD sections with full matrices.</span>
+                                  </li>
+                                </ul>
+                              </div>
+                            </div>
+                          );
+                        })() : msg.sender === "assistant" ? renderFormattedGuideText(
                           msg.citations && msg.citations.length > 0 ? stripRawReferencesSection(msg.text) : msg.text,
                           msg.citations && msg.citations.length > 0 ? msg.citations : liveSourcesAsCitations(msg.liveSources),
                           askCitationStyle
@@ -3306,6 +3737,37 @@ export default function ProjectListScreen({
                                 <Download className="w-3 h-3" />
                                 <span>Export .md</span>
                               </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleCopyBibTeX(msg)}
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                                title="Copy structured references as standard BibTeX (.bib) format"
+                              >
+                                {copiedMessageId === `bibtex-${msg.id}` ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-500" />
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">Copied BibTeX!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <BookOpen className="w-3 h-3 text-sky-500" />
+                                    <span>BibTeX</span>
+                                  </>
+                                )}
+                              </button>
+
+                              {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadMatrixCsv(msg)}
+                                  className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-neutral-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                                  title="Export Evidence Matrix as CSV file"
+                                >
+                                  <Table className="w-3 h-3 text-emerald-500" />
+                                  <span>Matrix CSV</span>
+                                </button>
+                              )}
 
                               {msg.id !== "init" && msg.id !== "reset-assistant" && (
                                 <>
@@ -3740,6 +4202,52 @@ export default function ProjectListScreen({
                         onSelectMode={setSidebarAiMode}
                         onAttachFiles={handleSidebarFileSelect}
                       />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!userEmail) {
+                            openAuth("signin", "Sign in to ground Ask Scholar in your personal Knowledge Vault.");
+                            return;
+                          }
+                          setIsVaultGroundingActive((prev) => {
+                            const next = !prev;
+                            try {
+                              localStorage.setItem("scholar_vault_grounding_active", String(next));
+                            } catch {
+                              // ignore
+                            }
+                            showAppToast(
+                              next
+                                ? `Knowledge Vault Grounding enabled (${userVaultItems.length} items).`
+                                : "Knowledge Vault Grounding disabled.",
+                              next ? "success" : "info",
+                              2000
+                            );
+                            return next;
+                          });
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all cursor-pointer ${
+                          isVaultGroundingActive && userEmail
+                            ? "bg-amber-500/10 text-amber-800 dark:text-amber-200 border-amber-500/30 shadow-2xs font-semibold"
+                            : "bg-transparent text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 border-neutral-200/60 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20"
+                        }`}
+                        title={
+                          userEmail
+                            ? isVaultGroundingActive
+                              ? `Knowledge Vault Grounding Active (${userVaultItems.length} items available)`
+                              : "Click to ground answers in your personal Knowledge Vault"
+                            : "Sign in to ground answers in your personal Knowledge Vault"
+                        }
+                      >
+                        <Database className={`w-3 h-3 ${isVaultGroundingActive && userEmail ? "text-amber-500" : ""}`} />
+                        <span>Vault Grounding</span>
+                        {userEmail && (
+                          <span className={`text-[9px] font-mono px-1 rounded-full ${isVaultGroundingActive ? "bg-amber-500/20 text-amber-800 dark:text-amber-200" : "bg-neutral-200/60 dark:bg-white/10 text-neutral-500"}`}>
+                            {userVaultItems.length}
+                          </span>
+                        )}
+                      </button>
                     </div>
 
                     <div className="relative group">

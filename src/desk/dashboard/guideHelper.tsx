@@ -156,8 +156,12 @@ export function InlineCitationBadge({
           )}
 
           <span className="flex items-center justify-between pt-1.5 border-t border-neutral-100 dark:border-white/10 text-[9px]">
-            <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 font-medium border border-emerald-200 dark:border-emerald-800/40">
-              {citation.authorityBadge || "Citation Engine Verified"}
+            <span className={`px-1.5 py-0.5 rounded-full font-medium border ${
+              citation.sourceType === "vault" || (citation.authorityBadge || "").toLowerCase().includes("vault")
+                ? "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/40"
+                : "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
+            }`}>
+              {citation.authorityBadge || (citation.sourceType === "vault" ? "Knowledge Vault Verified" : "Citation Engine Verified")}
             </span>
             {targetUrl && (
               <a
