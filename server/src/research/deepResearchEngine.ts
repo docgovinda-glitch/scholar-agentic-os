@@ -177,7 +177,10 @@ Provide 3 to 4 focused subQuestions that cover foundational history/theory, prim
     console.warn("Failed to generate research plan with LLM; using heuristic decomposition:", err);
   }
 
-  // Resilient heuristic decomposition fallback
+  return buildHeuristicResearchPlan(topic);
+}
+
+function buildHeuristicResearchPlan(topic: string): ResearchPlan {
   const cleanTopic = topic.replace(/[?.,!]/g, "").trim();
   return {
     topic,
@@ -207,6 +210,76 @@ Provide 3 to 4 focused subQuestions that cover foundational history/theory, prim
   };
 }
 
+export function buildApprovedResearchPlan(topic: string, approvedSubQuestions: string[]): ResearchPlan {
+  const cleanApproved = approvedSubQuestions.map((q) => String(q || "").trim()).filter(Boolean);
+  return {
+    topic,
+    scope: `User-approved multi-dimensional investigation of ${topic}`,
+    objectives: cleanApproved.map((sq) => `Investigate and synthesize empirical and theoretical evidence on: ${sq}`),
+    subQuestions: cleanApproved.map((sq, idx) => ({
+      question: sq,
+      rationale: `User-approved analytical dimension ${idx + 1}`,
+      searchQuery: sq.replace(/[?.,!]/g, "").trim(),
+    })),
+  };
+}
+
+const DEEP_SEARCH_CACHE_TTL_MS = 20 * 60 * 1000;
+const deepSearchCache = new Map<string, { at: number; value: Promise<Awaited<ReturnType<typeof executeWebSearch>>> }>();
+
+function cachedDeepWebSearch(query: string, maxResults: number): Promise<Awaited<ReturnType<typeof executeWebSearch>>> {
+  const key = `${query.trim().toLowerCase()}::${maxResults}`;
+  const hit = deepSearchCache.get(key);
+  if (hit && Date.now() - hit.at < DEEP_SEARCH_CACHE_TTL_MS) return hit.value;
+  const value = Promise.resolve(executeWebSearch(query, { maxResults, fetchFullContent: true, mode: "deep-research" })).then(
+    (res) => (res && Array.isArray(res.results) ? res : { query, results: Array.isArray(res) ? res : [], retrievedAt: new Date().toISOString(), totalEvaluated: 0 })
+  );
+  value.catch(() => deepSearchCache.delete(key));
+  deepSearchCache.set(key, { at: Date.now(), value });
+  if (deepSearchCache.size > 250) {
+    const oldest = deepSearchCache.keys().next().value;
+    if (oldest !== undefined) deepSearchCache.delete(oldest);
+  }
+  return value;
+}
+
+export interface DeepResearchExecutionOptions {
+  approvedSubQuestions?: string[];
+  preRetrievedSources?: SearchResultItem[];
+  forceBrowserHandOff?: boolean;
+  verifyAndReadBrowserResult?: (systemPrompt: string, userPrompt: string) => string | null;
+}
+
+export class DeepResearchBrowserHandOffError extends Error {
+  readonly systemPrompt: string;
+  readonly userPrompt: string;
+  readonly allCitations: SearchResultItem[];
+  readonly plan: string[];
+  readonly researchPlan: ResearchPlan;
+  readonly stages: ResearchStageTelemetry[];
+  readonly evidence: SubQuestionEvidence[];
+
+  constructor(payload: {
+    systemPrompt: string;
+    userPrompt: string;
+    allCitations: SearchResultItem[];
+    plan: string[];
+    researchPlan: ResearchPlan;
+    stages: ResearchStageTelemetry[];
+    evidence: SubQuestionEvidence[];
+  }) {
+    super("Deep research requires browser LLM synthesis after multi-stage server retrieval.");
+    this.name = "DeepResearchBrowserHandOffError";
+    this.systemPrompt = payload.systemPrompt;
+    this.userPrompt = payload.userPrompt;
+    this.allCitations = payload.allCitations;
+    this.plan = payload.plan;
+    this.researchPlan = payload.researchPlan;
+    this.stages = payload.stages;
+    this.evidence = payload.evidence;
+  }
+}
+
 /**
  * Converts user Knowledge Vault sources into standardized SearchResultItem records
  * so internal knowledge and external web/scholarly sources share a unified source registry.
@@ -222,7 +295,8 @@ function convertVaultSourcesToRegistryItems(vaultSources?: DeepResearchVaultSour
         ? [v.authors.trim()]
         : [];
       const url = v.url || (v.doi ? (v.doi.startsWith("http") ? v.doi : `https://doi.org/${v.doi}`) : `vault://source/${v.id || idx + 1}`);
-      const snippet = v.summary || v.keyFindings || `${authorsList.join(", ") || "Vault Author"} (${v.year || "n.d."}) — ${v.venue || v.journal || "Knowledge Vault"}`;
+      const yearPart = v.year ? ` (${v.year})` : "";
+      const snippet = v.summary || v.keyFindings || `${authorsList.join(", ") || v.venue || v.journal || "Knowledge Vault"}${yearPart} — ${v.venue || v.journal || "Knowledge Vault"}`;
       return {
         title: v.title,
         url,
@@ -254,7 +328,8 @@ export async function executeDeepResearch(
   files?: Array<{ name: string; text?: string; type?: string }>,
   images?: ResearchImage[],
   vaultSources?: DeepResearchVaultSource[],
-  citationStyle: string = "apa"
+  citationStyle: string = "apa",
+  options?: DeepResearchExecutionOptions
 ): Promise<DeepResearchResult> {
   const stages: ResearchStageTelemetry[] = [];
   const allCitations: SearchResultItem[] = [];
@@ -276,7 +351,15 @@ export async function executeDeepResearch(
   // ── STAGE 1: RESEARCH PLANNING ──
   const s1Start = Date.now();
   onProgress?.("Stage 1/7: Interpreting research question & formulating sub-question plan...");
-  const researchPlan = await formulateResearchPlan(topic, llm, files, images, vaultSources);
+  const cleanApproved = Array.isArray(options?.approvedSubQuestions)
+    ? options!.approvedSubQuestions.map((q) => String(q || "").trim()).filter(Boolean)
+    : [];
+  const researchPlan: ResearchPlan =
+    cleanApproved.length > 0
+      ? buildApprovedResearchPlan(topic, cleanApproved)
+      : options?.forceBrowserHandOff || options?.verifyAndReadBrowserResult
+      ? buildHeuristicResearchPlan(topic)
+      : await formulateResearchPlan(topic, llm, files, images, vaultSources);
   const s1Telemetry: ResearchStageTelemetry = {
     id: "planning",
     stageNumber: 1,
@@ -289,21 +372,28 @@ export async function executeDeepResearch(
   stages.push(s1Telemetry);
   onProgress?.(s1Telemetry.detail, s1Telemetry);
 
-  // ── STAGE 2: MULTI-SOURCE DISCOVERY (Internal Vault + Live Web + Scholarly + Official) ──
+  // ── STAGE 2: MULTI-SOURCE DISCOVERY (Internal Vault + Pre-Retrieved Scholarly + Live Web + Scholarly + Official) ──
   const s2Start = Date.now();
   onProgress?.(`Stage 2/7: Discovering sources across Knowledge Vault, scholarly indices, and live web...`);
 
-  // 2a. Register Internal Knowledge Vault sources first
+  // 2a. Register Internal Knowledge Vault sources and pre-retrieved scholarly sources first
   const vaultItems = convertVaultSourcesToRegistryItems(vaultSources);
   for (const vItem of vaultItems) {
     registerSource(vItem);
   }
+  if (Array.isArray(options?.preRetrievedSources)) {
+    for (const preSrc of options!.preRetrievedSources) {
+      if (preSrc && preSrc.title) {
+        registerSource(preSrc);
+      }
+    }
+  }
 
-  // 2b. Execute parallel multi-vector searches for each sub-question
+  // 2b. Execute parallel multi-vector searches for each sub-question (cached for 20 min)
   const evidence: SubQuestionEvidence[] = [];
   const searchOutputs = await Promise.all(
     researchPlan.subQuestions.map(async (sq) => {
-      const searchRes = await executeWebSearch(sq.searchQuery, { maxResults: 10, fetchFullContent: true, mode: "deep-research" });
+      const searchRes = await cachedDeepWebSearch(sq.searchQuery, 10);
       return { sq, searchRes };
     })
   );
@@ -383,7 +473,7 @@ export async function executeDeepResearch(
   if (gapQueries.length > 0) {
     onProgress?.(`Stage 5/7: Conducting iterative follow-up searches for ${gapQueries.length} gap vector(s)...`);
     const followUpResults = await Promise.all(
-      gapQueries.slice(0, 4).map((q) => executeWebSearch(q, { maxResults: 18, fetchFullContent: true, mode: "deep-research" }))
+      gapQueries.slice(0, 4).map((q) => cachedDeepWebSearch(q, 18))
     );
     followUpResults.forEach((res, idx) => {
       for (const src of res.results) {
@@ -432,7 +522,8 @@ export async function executeDeepResearch(
     evidenceDigest += `\n### Internal Knowledge Vault Sources\n`;
     for (const v of vaultItems) {
       const gIdx = urlToGlobalIndex.get(v.url) || 1;
-      evidenceDigest += `- [${gIdx}] "${v.title}" (${v.author || "Vault Author"}, ${v.publishedDate || "n.d."}) [${v.authorityBadge}]: ${v.snippet}\n`;
+      const yearLabel = v.publishedDate ? `, ${v.publishedDate}` : "";
+      evidenceDigest += `- [${gIdx}] "${v.title}" (${v.author || v.publisher || "Knowledge Vault"}${yearLabel}) [${v.authorityBadge}]: ${v.snippet}\n`;
     }
   }
 
@@ -541,7 +632,50 @@ ${evidenceDigest}
 
 Generate the complete, publication-grade Deep Research Report now.`;
 
-  const rawSynthesizedReport = await llm(synthesisSystemPrompt, synthesisUserPrompt, "text", images);
+  const previewPlanSteps: string[] = [
+    `Stage 1 (Planning): Decomposed topic into ${researchPlan.subQuestions.length} sub-questions (${researchPlan.subQuestions.map((s) => s.question).join(" · ")})`,
+    `Stage 2 (Discovery): Searched live web, news, OpenAlex, CrossRef${vaultItems.length > 0 ? `, and ${vaultItems.length} Knowledge Vault source(s)` : ""}`,
+    `Stage 3 (Retrieval): Extracted full-page evidence across ${allCitations.length} sources (${primaryCount} primary/scholarly, ${secondaryCount} policy/media)`,
+    `Stage 4 (Critical Analysis): Cross-checked consensus vs. competing interpretations across ${evidence.length} analytical dimensions`,
+    `Stage 5 (Iterative Verification): ${s5Telemetry.detail}`,
+    `Stage 6 (Report Synthesis): Synthesized structured research report grounded in ${allCitations.length} verified sources`,
+  ];
+
+  let rawSynthesizedReport: string;
+  const verifiedFromBrowser = options?.verifyAndReadBrowserResult
+    ? options.verifyAndReadBrowserResult(synthesisSystemPrompt, synthesisUserPrompt)
+    : null;
+
+  if (verifiedFromBrowser) {
+    rawSynthesizedReport = verifiedFromBrowser;
+  } else if (options?.forceBrowserHandOff) {
+    throw new DeepResearchBrowserHandOffError({
+      systemPrompt: synthesisSystemPrompt,
+      userPrompt: synthesisUserPrompt,
+      allCitations,
+      plan: previewPlanSteps,
+      researchPlan,
+      stages,
+      evidence,
+    });
+  } else {
+    try {
+      rawSynthesizedReport = await llm(synthesisSystemPrompt, synthesisUserPrompt, "text", images);
+    } catch (llmErr: any) {
+      if (llmErr?.name === "LocalModelUnreachableError" || llmErr?.name === "NoClientAiProviderError" || llmErr?.code === "local_model_unreachable" || llmErr?.code === "no_ai_configured") {
+        throw new DeepResearchBrowserHandOffError({
+          systemPrompt: synthesisSystemPrompt,
+          userPrompt: synthesisUserPrompt,
+          allCitations,
+          plan: previewPlanSteps,
+          researchPlan,
+          stages,
+          evidence,
+        });
+      }
+      throw llmErr;
+    }
+  }
   const validated = validateAndRefineCitations(rawSynthesizedReport, allCitations, { files, images });
 
   const s6Telemetry: ResearchStageTelemetry = {

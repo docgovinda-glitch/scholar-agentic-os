@@ -9,15 +9,46 @@ import type { WebsiteAssistantMessage } from "./types";
 
 type Citation = NonNullable<WebsiteAssistantMessage["citations"]>[number];
 
-/** How every research answer is laid out. Appended to the system prompt. */
+/** How every research answer is laid out (Section 5 & Section 6). Appended to the system prompt. */
 export const ASK_ANSWER_GUIDE = [
-  "Answer layout:",
-  "1. Start with a direct answer to the question in one or two sentences.",
-  "2. Then give the evidence, citing the numbered sources you were given as [1], [2]. Cite only those numbers; never invent a source, author, year, DOI or figure.",
-  "3. Where the sources disagree or are thin, say so plainly.",
-  "4. End with one short line on what remains uncertain or would need checking.",
-  "Use short paragraphs or bullet points and plain language; no preamble.",
+  "Answer layout and academic writing standard:",
+  "1. Start with a direct answer to the question in one or two clear sentences.",
+  "2. Follow with a synthesized supporting argument in a considered, human-sounding analytical voice (use headings where the answer is long; synthesize sources together rather than summarizing them one at a time or dumping bullet points).",
+  "3. Insert in-text citations ([1], [2] or grouped [1, 2] matching the numbered sources provided) only where they support a specific claim; never invent a source, author, year, DOI, or figure.",
+  "4. Paraphrase sources in original wording; quote only when exact wording matters. If evidence is limited, conflicting, or outdated against the current date, say so plainly and explain how it affects the conclusion.",
+  "5. Conclude with a brief limitations section and ensure every cited source corresponds 1-to-1 with the Reference List.",
 ].join("\n");
+
+/**
+ * Builds a style- and length-aware academic writing guide for the system prompt (Sections 5, 6, 15).
+ */
+export function buildStyleAwareAnswerGuide(
+  citationStyle: string = "apa",
+  answerLength: "concise" | "standard" | "detailed" = "standard"
+): string {
+  const s = citationStyle.toLowerCase();
+  const styleRule =
+    s.startsWith("ieee")
+      ? "Cite sources using IEEE bracketed numbers in order of first appearance (e.g., [1], [2, 3])."
+      : s.startsWith("vancouver")
+        ? "Cite sources using Vancouver numbers in order of first appearance (e.g., [1] or (1))."
+        : s.startsWith("mla")
+          ? "Cite sources using numbered markers [1], [2] mapped to MLA 9th Edition author-page citations (Author) and Works Cited."
+          : s.startsWith("chicago")
+            ? "Cite sources using numbered markers [1], [2] mapped to Chicago 17th Edition citations (Author Year) and Bibliography."
+            : s.startsWith("harvard")
+              ? "Cite sources using numbered markers [1], [2] mapped to Harvard author-date citations (Author, Year) and References."
+              : "Cite sources using numbered markers [1], [2] mapped to APA 7th Edition author-date citations (Author, Year) and References.";
+
+  const lengthRule =
+    answerLength === "concise"
+      ? "Target length: Concise (2–3 focused analytical paragraphs with direct synthesis and key limitations)."
+      : answerLength === "detailed"
+        ? "Target length: Detailed (comprehensive multi-section academic synthesis with headings, methodological comparison, and limitations)."
+        : "Target length: Standard (balanced academic structure: direct answer, synthesized supporting argument with headings where helpful, and limitations).";
+
+  return `${ASK_ANSWER_GUIDE}\n6. ${styleRule}\n7. ${lengthRule}`;
+}
 
 function yearOf(date?: string): number | undefined {
   const m = date?.match(/\b(1[89]\d{2}|20\d{2})\b/);

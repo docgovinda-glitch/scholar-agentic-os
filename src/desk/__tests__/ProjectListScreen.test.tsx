@@ -810,12 +810,11 @@ describe("minimal website assistant", () => {
     fireEvent.click(sendBtn);
 
     expect(await screen.findByText(/Executive Scholarly Synthesis & Verified Literature Brief on Biology/i, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(screen.getAllByText(/1540 words/i)[0]).toBeInTheDocument();
 
-    const continueBtn = await screen.findByTestId("action-continue");
-    expect(continueBtn).toBeInTheDocument();
-    fireEvent.click(continueBtn);
-    const assignmentBtn = await screen.findByTestId("continue-workspace-OT-01");
-    fireEvent.click(assignmentBtn);
+    const handoffBtn = screen.getByRole("button", { name: /Launch in 4-Phase Essay Engine \(OT-01\)/i });
+    expect(handoffBtn).toBeInTheDocument();
+    fireEvent.click(handoffBtn);
 
     await waitFor(() => {
       expect(createProject).toHaveBeenCalledWith("OT-01");
@@ -1343,7 +1342,7 @@ describe("prompt isolation & rich markdown rendering", () => {
     // Headings rendered without ### hashtags
     expect(screen.queryByText(/### 1\. Ideological Foundations/)).not.toBeInTheDocument();
     expect(screen.getByText("1. Ideological Foundations: Hindutva")).toBeInTheDocument();
-    const headingElem = screen.getByText("1. Ideological Foundations: Hindutva").closest("h3, h4, h5");
+    const headingElem = screen.getByText("1. Ideological Foundations: Hindutva").closest("h5");
     expect(headingElem).toBeInTheDocument();
 
     // Bold & italic rendered without raw asterisks

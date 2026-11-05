@@ -161,7 +161,7 @@ export function reconstructOpenAlexAbstract(invertedIndex?: Record<string, numbe
     }
   }
   words.sort((a, b) => a[0] - b[0]);
-  return words.map((w) => w[1]).join(" ").slice(0, 350);
+  return words.map((w) => w[1]).join(" ").slice(0, 1800);
 }
 
 /**
@@ -265,7 +265,7 @@ export async function searchCrossrefLive(query: string, limit = 5): Promise<Live
         ? item["container-title"][0]
         : item["container-title"];
       const rawSnippet = item.abstract
-        ? stripHtml(item.abstract).slice(0, 300)
+        ? stripHtml(item.abstract).slice(0, 1800)
         : venue
         ? `Peer-reviewed paper published in ${venue}.`
         : "Scholarly record registered with Crossref.";

@@ -73,9 +73,37 @@ export interface LiveSearchTelemetryResult {
   queriesExecuted: string[];
 }
 
+export interface LiveSearchProgressUpdate {
+  stage: "searching" | "ranking" | "verifying";
+  detail: string;
+  candidatesFound?: number;
+  verifiedCount?: number;
+  excludedCount?: number;
+}
+
 const LIVE_SEARCH_GROUNDING_KEY = "scholar_live_search_grounding";
 let memoryFallbackGrounding = false;
 let lastSearchTelemetry: LiveSearchTelemetryResult | null = null;
+const progressListeners = new Set<(update: LiveSearchProgressUpdate) => void>();
+
+export function onLiveSearchProgress(
+  listener: (update: LiveSearchProgressUpdate) => void
+): () => void {
+  progressListeners.add(listener);
+  return () => {
+    progressListeners.delete(listener);
+  };
+}
+
+function emitLiveSearchProgress(update: LiveSearchProgressUpdate): void {
+  for (const listener of progressListeners) {
+    try {
+      listener(update);
+    } catch {
+      // ignore listener errors
+    }
+  }
+}
 
 export function getLastLiveSearchTelemetry(): LiveSearchTelemetryResult | null {
   return lastSearchTelemetry;
@@ -247,7 +275,7 @@ async function searchOpenAlexClient(
           }
         }
         words.sort((a, b) => a[0] - b[0]);
-        snippet = words.map((p) => p[1]).join(" ").slice(0, 600);
+        snippet = words.map((p) => p[1]).join(" ").slice(0, 1800);
       }
       const venue = w.primary_location?.source?.display_name;
       if (!snippet && venue) {
@@ -334,7 +362,7 @@ async function searchCrossrefClient(
         item["published-online"]?.["date-parts"]?.[0];
       const year = dateParts?.[0];
       const snippet = item.abstract
-        ? cleanHtmlTags(item.abstract).slice(0, 600)
+        ? cleanHtmlTags(item.abstract).slice(0, 1800)
         : venue
           ? `Published in ${venue}.`
           : "";
@@ -423,7 +451,7 @@ async function searchEuropePmcClient(
         title: cleanHtmlTags(r.title || ""),
         url,
         doi: r.doi,
-        snippet: r.abstractText ? cleanHtmlTags(r.abstractText).slice(0, 600) : "",
+        snippet: r.abstractText ? cleanHtmlTags(r.abstractText).slice(0, 1800) : "",
         year: r.pubYear,
         authors,
         venue: r.journalTitle,
@@ -491,6 +519,12 @@ export async function executeLiveSearchWithTelemetry(
     options.limit && options.limit > 6 ? options.limit : budget.targetCitedMax;
   const candidateTarget = Math.max(budget.candidatesMin, requestedLimit * 2);
 
+  emitLiveSearchProgress({
+    stage: "searching",
+    detail: `Searching OpenAlex, Crossref, PubMed, Semantic Scholar, arXiv & DOAJ (${queryVariations.length} query variations)…`,
+    candidatesFound: 0,
+  });
+
   // 1. Try local server backend proxy first
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -524,6 +558,11 @@ export async function executeLiveSearchWithTelemetry(
         searchedCount?: number;
       };
       if (Array.isArray(data.results) && data.results.length > 0) {
+        emitLiveSearchProgress({
+          stage: "ranking",
+          detail: `Retrieved ${data.searchedCount ?? data.results.length} candidates · Deduplicating by DOI & verifying CSL metadata…`,
+          candidatesFound: data.searchedCount ?? data.results.length,
+        });
         const { verified, verifiedRaw, excluded } = verifyAndDeduplicateSources(data.results);
         const allExcluded = [...(data.excludedSources ?? []), ...excluded];
         const finalResults: LiveSearchResult[] = verifiedRaw
@@ -549,6 +588,14 @@ export async function executeLiveSearchWithTelemetry(
             credibilityLevel: verified[idx].credibilityLevel,
             csl: verified[idx],
           }));
+
+        emitLiveSearchProgress({
+          stage: "verifying",
+          detail: `Verified ${finalResults.length} sources · Checked retractions & full-text passages…`,
+          candidatesFound: Math.max(data.searchedCount ?? data.results.length, finalResults.length + allExcluded.length),
+          verifiedCount: finalResults.length,
+          excludedCount: allExcluded.length,
+        });
 
         const telemetry: LiveSearchTelemetryResult = {
           results: finalResults,
@@ -584,6 +631,12 @@ export async function executeLiveSearchWithTelemetry(
       rawCandidates.push(...s.value);
     }
   }
+
+  emitLiveSearchProgress({
+    stage: "ranking",
+    detail: `Retrieved ${rawCandidates.length} candidates · Deduplicating by DOI & ranking by relevance…`,
+    candidatesFound: rawCandidates.length,
+  });
 
   // Rank candidates by topical relevance, citation impact, and recency before deduplication
   const scoredCandidates = rawCandidates
@@ -628,6 +681,14 @@ export async function executeLiveSearchWithTelemetry(
       credibilityLevel: verified[idx].credibilityLevel,
       csl: verified[idx],
     }));
+
+  emitLiveSearchProgress({
+    stage: "verifying",
+    detail: `Verified ${finalResults.length} sources · Checked retractions & CSL metadata…`,
+    candidatesFound: rawCandidates.length,
+    verifiedCount: finalResults.length,
+    excludedCount: excluded.length,
+  });
 
   const telemetry: LiveSearchTelemetryResult = {
     results: finalResults,

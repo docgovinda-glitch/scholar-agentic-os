@@ -13,6 +13,7 @@ import {
   type AiOperationalStatus,
   type AgenticQueryResponse,
 } from "./api";
+import { addManualSource } from "./api/claimEvidenceApi";
 import {
   isDuplicateProjectTitle,
   getNextUntitledProjectTitle,
@@ -93,7 +94,12 @@ import { type CitationGraphNode } from "../services/discovery/snowballSamplingSe
 import { type EvidenceMatrixItem, extractEvidenceFromPaper } from "../services/evidence/evidenceExtractionService";
 import { getCloudProvider } from "../config/providerCatalog";
 import { useDeviceClass } from "../hooks/useDeviceClass";
-import { ASK_ANSWER_GUIDE, askFailureMessage, liveSourcesAsCitations } from "./dashboard/askScholarAnswer";
+import {
+  ASK_ANSWER_GUIDE,
+  buildStyleAwareAnswerGuide,
+  askFailureMessage,
+  liveSourcesAsCitations,
+} from "./dashboard/askScholarAnswer";
 import { loadUserAiSettings } from "../services/userAiSettings";
 import { PromptBarActionMenu, type PromptMode } from "./PromptBarActionMenu";
 import {
@@ -107,6 +113,7 @@ import {
 import {
   buildRetrievalQuery,
   executeLiveSearch,
+  onLiveSearchProgress,
   injectLiveGroundingToSystemPrompt,
   type LiveSearchResult,
 } from "../services/liveSearchService";
@@ -367,7 +374,7 @@ export default function ProjectListScreen({
 
   // Command Palette & Resizable Assistant Split-Pane States
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [aiSidebarWidth, setAiSidebarWidth] = useState<number>(450);
+  const [aiSidebarWidth, setAiSidebarWidth] = useState<number>(760);
   const [isResizingAiSidebar, setIsResizingAiSidebar] = useState<boolean>(false);
 
   // Ask Scholar 2.0 Layer Workspaces: Literature Discovery (Layer B), Evidence Synthesis (Layer C), Research Export (Layer D)
@@ -571,7 +578,7 @@ export default function ProjectListScreen({
     if (!isResizingAiSidebar) return;
     const handleMouseMove = (e: MouseEvent) => {
       const newWidth = window.innerWidth - e.clientX;
-      if (newWidth >= 360 && newWidth <= 750) {
+      if (newWidth >= 380 && newWidth <= 960) {
         setAiSidebarWidth(newWidth);
       }
     };
@@ -728,8 +735,21 @@ export default function ProjectListScreen({
   const [streamingGuideText, setStreamingGuideText] = useState("");
   const askAbortRef = useRef<boolean>(false);
   const [deepResearchActiveStage, setDeepResearchActiveStage] = useState(0);
-  // What Ask Scholar is doing for the current question: searching, then writing.
-  const [askPhase, setAskPhase] = useState<{ step: "searching" | "writing"; found?: number } | null>(null);
+  // What Ask Scholar is doing for the current question: searching (with live stage detail), then writing.
+  const [askPhase, setAskPhase] = useState<{ step: "searching" | "writing"; found?: number; detail?: string } | null>(null);
+
+  const handleUpdateCitationStyle = useCallback((newStyle: AskCitationStyleId) => {
+    setAskCitationStyle(newStyle);
+    setAskUserSettings(saveAskScholarUserSettings({ preferredCitationStyle: newStyle }));
+    try {
+      localStorage.setItem("scholar_ask_citation_style", newStyle);
+    } catch {
+      // ignore
+    }
+    setGuideMessages((prev) =>
+      prev.map((m) => (m.sender === "assistant" ? { ...m, citationStyle: newStyle } : m))
+    );
+  }, []);
   const isLandingPage = activeView === "projects" && !choosing;
   const hasStartedChatting = guideMessages.some((m) => m.sender === "user") || isGuideThinking;
   const [expandedPlanIds, setExpandedPlanIds] = useState<Record<string, boolean>>({});
@@ -970,7 +990,7 @@ export default function ProjectListScreen({
     if (!mainPromptInput.trim() && mainAttachments.length === 0) return;
     const text = mainPromptInput;
     const atts = [...mainAttachments];
-    const targetMode: "normal" | "deep-research" =
+    const targetMode: "normal" | "search" | "deep-research" =
       mainAiMode === "deep_research"
         ? "deep-research"
         : "normal";
@@ -1091,7 +1111,7 @@ export default function ProjectListScreen({
     snippet?: string;
     doi?: string;
     authorityBadge?: string;
-    sourceType?: "official" | "scholarly" | "media" | "web" | "vault" | string;
+    sourceType?: "official" | "scholarly" | "media" | "web" | "vault";
     stance?: "supporting" | "contradicting" | "mentioning";
   }
 
@@ -1108,7 +1128,7 @@ export default function ProjectListScreen({
         snippet: c.snippet,
         doi: c.doi,
         authorityBadge: c.authorityBadge,
-        sourceType: c.sourceType,
+        sourceType: (c.sourceType as NormalizedCitationSource["sourceType"]) || "scholarly",
         stance: c.stance,
       }));
     }
@@ -1264,7 +1284,7 @@ export default function ProjectListScreen({
         await addVaultItem(uid, {
           title: msg.originatingQuestion || msg.text.split("\n")[0].replace(/^#+\s*/, "").slice(0, 90) || "AskScholar Research Synthesis",
           content: msg.text,
-          sourceType: "web",
+          sourceType: "text",
           tags: [
             "Ask Scholar",
             msg.discipline || "academic",
@@ -1275,7 +1295,7 @@ export default function ProjectListScreen({
             discipline: msg.discipline || "general",
             citationStyle: activeStyle,
             createdAt: new Date().toISOString(),
-            cslItems: bibEntries.map((b) => b.csl).filter(Boolean),
+            cslItems: msg.cslItems || [],
             searchedCount: msg.searchedCount,
             readCount: msg.readCount,
             citedCount: msg.citedCount,
@@ -1309,21 +1329,21 @@ export default function ProjectListScreen({
           setSessionUnlocked(true);
         }
         for (const csl of items) {
-          const authors: string[] = csl.author
-            .map((a) => a.literal || (a.given ? `${a.family}, ${a.given}` : a.family) || "")
-            .filter(Boolean);
+          const authors = csl.author
+            .map((a) => a.literal || (a.given ? `${a.family}, ${a.given}` : a.family))
+            .filter((name): name is string => Boolean(name));
           const year = csl.issued["date-parts"]?.[0]?.[0];
           await addVaultItem(uid, {
             title: csl.title,
             content: `${csl.title}${csl["container-title"] ? ` — ${csl["container-title"]}` : ""}`,
-            sourceType: "web",
+            sourceType: "reference",
             externalReference: csl.URL || (csl.DOI ? `https://doi.org/${csl.DOI}` : undefined),
             authors,
             year: year ? String(year) : undefined,
             journal: csl["container-title"] || csl.publisher,
             tags: ["Ask Scholar Import", "CSL-JSON"],
             metadata: { cslItem: csl, doi: csl.DOI },
-          }).catch(() => {});
+          }).catch(() => { });
         }
         showAppToast(
           `Imported ${items.length} verified reference${items.length === 1 ? "" : "s"} into Knowledge Vault.`,
@@ -1375,23 +1395,20 @@ export default function ProjectListScreen({
           prev.map((m) =>
             m.id === planMsgId
               ? {
-                  ...m,
-                  deepResearchState: {
-                    ...(m.deepResearchState || { subQuestions: approvedSubQuestions }),
-                    phase,
-                    subQuestions: approvedSubQuestions,
-                  },
-                }
+                ...m,
+                deepResearchState: {
+                  ...(m.deepResearchState || { subQuestions: approvedSubQuestions }),
+                  phase,
+                  subQuestions: approvedSubQuestions,
+                },
+              }
               : m
           )
         );
       };
       updatePhase("plan_approved");
       updatePhase("searching");
-      const expandedPrompt = `${baseQuery}\n\nApproved Sub-Questions:\n${approvedSubQuestions
-        .map((q, i) => `${i + 1}. ${q}`)
-        .join("\n")}`;
-      await handleSendGuideMessage(expandedPrompt, undefined, "deep-research");
+      await handleSendGuideMessage(baseQuery, undefined, "deep-research", undefined, approvedSubQuestions);
       updatePhase("report_ready");
     },
     [guideMessages]
@@ -1401,7 +1418,8 @@ export default function ProjectListScreen({
     textToSend?: string,
     attachmentsToSend?: AgentAttachmentItem[],
     modeToSend?: "normal" | "search" | "deep-research",
-    baseMessagesOverride?: WebsiteAssistantMessage[]
+    baseMessagesOverride?: WebsiteAssistantMessage[],
+    approvedSubQuestionsOverride?: string[]
   ) {
     const isSidebarDirect = textToSend === undefined;
     const rawQuery = (textToSend !== undefined ? textToSend : guideInput).trim();
@@ -1480,7 +1498,8 @@ export default function ProjectListScreen({
 
         let agentResponse: (AgenticQueryResponse & { ok?: boolean }) | undefined;
         const styleInfo = getCitationStyleInfo(askCitationStyle);
-        const systemPrompt = `You are Ask Scholar (Scholar Core AI Assistant), a world-class conversational, analytical, and research assistant on par with ChatGPT, Claude, and Gemini. Provide clear, comprehensive, insightful, and well-structured answers across political, historical, scientific, technical, academic, and general topics. Format citations and references according to ${styleInfo.name} when citing sources, ignore any retrieved snippet that is off-topic to the user's question, and never fabricate sources or DOIs.\n\n${ASK_ANSWER_GUIDE}`;
+        const styleAwareGuide = buildStyleAwareAnswerGuide(askCitationStyle, askUserSettings.answerLength);
+        const systemPrompt = `You are AskScholar (Scholar Core AI Research Assistant), a scholarly research assistant for students, researchers, and professionals across STEM, management and business, social sciences, humanities, health, law, and education. Ground your answer in authentic scholarly and open-web sources, format every citation in ${styleInfo.name}, ignore any retrieved snippet that is off-topic to the user's question, and never fabricate sources, DOIs, or placeholder metadata ("Unknown Author", "n.d.").\n\n${styleAwareGuide}`;
 
         // Smart auto-grounding:
         // - Chat is the default entry point and automatically decides when to retrieve sources.
@@ -1500,17 +1519,34 @@ export default function ProjectListScreen({
         const shouldRunClientPreSearch = !isExplicitChatOnly && targetMode === "normal";
 
         if (shouldRunClientPreSearch) {
-          setAskPhase({ step: "searching" });
+          setAskPhase({ step: "searching", detail: "Searching OpenAlex, Crossref, PubMed, Europe PMC, and open web…" });
+          const unsubscribeProgress = onLiveSearchProgress((evt) => {
+            if (!askAbortRef.current) {
+              setAskPhase({
+                step: "searching",
+                found: evt.verifiedCount ?? evt.candidatesFound,
+                detail: evt.detail,
+              });
+            }
+          });
           try {
             const previousQuestions = priorThreadMessages.filter((m) => m.sender === "user").map((m) => m.text);
             liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions));
             sourcesFound = liveRetrievedSources;
           } catch {
             // The answer still comes, marked as not based on a search.
+          } finally {
+            unsubscribeProgress();
           }
           setAskPhase({ step: "writing", found: liveRetrievedSources.length });
         } else if (targetMode === "search" || targetMode === "deep-research") {
-          setAskPhase({ step: "searching" });
+          setAskPhase({
+            step: "searching",
+            detail:
+              targetMode === "deep-research"
+                ? "Executing multi-stage Deep Research discovery and source verification…"
+                : "Searching scholarly and open-web providers…",
+          });
         } else {
           setAskPhase({ step: "writing", found: 0 });
         }
@@ -1520,16 +1556,16 @@ export default function ProjectListScreen({
         const matchingVault = userEmail && userVaultItems.length > 0 ? searchVaultItems(userVaultItems, query) : [];
         const selectedVaultSources = (isVaultGroundingActive && userEmail && userVaultItems.length > 0)
           ? (matchingVault.length > 0 ? matchingVault : userVaultItems).slice(0, 5).map((v) => ({
-              id: v.id,
-              title: v.title,
-              snippet: v.content ? v.content.slice(0, 400) : v.citation || "",
-              notes: v.citation,
-              authors: Array.isArray(v.authors) ? v.authors : [],
-              year: v.year,
-              journal: v.journal,
-              url: v.externalReference,
-              doi: v.canonicalReference?.doi || (v.metadata as any)?.doi,
-            }))
+            id: v.id,
+            title: v.title,
+            snippet: v.content ? v.content.slice(0, 400) : v.citation || "",
+            notes: v.citation,
+            authors: Array.isArray(v.authors) ? v.authors : [],
+            year: v.year,
+            journal: v.journal,
+            url: v.externalReference,
+            doi: v.canonicalReference?.doi || (v.metadata as any)?.doi,
+          }))
           : undefined;
 
         let effectiveSystemPrompt = liveRetrievedSources.length > 0
@@ -1560,8 +1596,15 @@ export default function ProjectListScreen({
               systemPrompt: effectiveSystemPrompt,
               mode: targetMode,
               citationStyle: askCitationStyle,
+              answerLength: askUserSettings.answerLength,
+              preRetrievedSources: liveRetrievedSources,
               history,
               vaultSources: selectedVaultSources,
+              onChunk: (chunk) => {
+                if (!askAbortRef.current) {
+                  setStreamingGuideText((prev) => prev + chunk);
+                }
+              },
             });
           }
         } else {
@@ -1572,10 +1615,18 @@ export default function ProjectListScreen({
               systemPrompt: effectiveSystemPrompt,
               mode: targetMode,
               citationStyle: askCitationStyle,
+              answerLength: askUserSettings.answerLength,
+              approvedSubQuestions: approvedSubQuestionsOverride,
+              preRetrievedSources: liveRetrievedSources,
               files: currentAttachments.filter((a) => a.fileData).map((a) => a.fileData!),
               images: currentAttachments.filter((a) => a.imageData).map((a) => a.imageData!),
               history,
               vaultSources: selectedVaultSources,
+              onChunk: (chunk) => {
+                if (!askAbortRef.current) {
+                  setStreamingGuideText((prev) => prev + chunk);
+                }
+              },
             });
           } catch (serverErr) {
             if (askAbortRef.current) return;
@@ -1660,9 +1711,9 @@ export default function ProjectListScreen({
               },
               idx
             );
-            if (v.ok && v.item) {
+            if (v.ok) {
               verifiedCslItems.push(v.item);
-            } else if (!v.ok && v.excluded) {
+            } else {
               excludedRecords.push(v.excluded);
             }
           });
@@ -1704,15 +1755,15 @@ export default function ProjectListScreen({
             originatingQuestion: query,
             deepResearchState: isDeepMode
               ? {
-                  phase: "report_ready",
-                  subQuestions:
-                    agentResponse.plan && agentResponse.plan.length > 0
-                      ? agentResponse.plan
-                      : generateInitialDeepResearchPlan(query),
-                  searchedCount,
-                  readCount,
-                  citedCount,
-                }
+                phase: "report_ready",
+                subQuestions:
+                  agentResponse.plan && agentResponse.plan.length > 0
+                    ? agentResponse.plan
+                    : generateInitialDeepResearchPlan(query),
+                searchedCount,
+                readCount,
+                citedCount,
+              }
               : undefined,
             peerReviewAudit: agentResponse.peerReviewAudit,
             burstinessMetrics: agentResponse.burstinessMetrics,
@@ -1801,26 +1852,67 @@ export default function ProjectListScreen({
 
         const project = await createProject(targetFormatId);
 
-        const sourcesToAttach = handoff?.retrievedSources || researchMessage.citations || [];
+        const sourcesToAttach =
+          handoff?.retrievedSources ||
+          researchMessage.citations ||
+          liveSourcesAsCitations(researchMessage.liveSources) ||
+          [];
+        const structuredSources = sourcesToAttach.map((c: any, i: number) => ({
+          id: c.id || c.sourceId || `ask-src-${i + 1}`,
+          title: c.title || `Source ${i + 1}`,
+          authors: Array.isArray(c.authors) ? c.authors : c.author ? [String(c.author)] : [],
+          year: c.year,
+          venue: c.venue || c.journal || c.publisher || "",
+          doi: c.doi,
+          url: c.url,
+          snippet: c.snippet || c.evidenceSnippet || "",
+        }));
         const citationNotes =
-          sourcesToAttach.length > 0
-            ? sourcesToAttach
+          structuredSources.length > 0
+            ? structuredSources
               .map(
                 (c, i) =>
-                  `[${i + 1}] ${c.title || "Scholarly Source"}${c.venue ? ` (${c.venue})` : ""}\nAuthors: ${Array.isArray(c.authors) ? c.authors.join(", ") : ""}\nDOI: ${c.doi || "N/A"}\nURL: ${c.url || "N/A"}`
+                  `[${i + 1}] ${c.title}${c.venue ? ` (${c.venue})` : ""}\nAuthors: ${c.authors.join(", ")}\nDOI: ${c.doi || "N/A"}\nURL: ${c.url || "N/A"}`
               )
               .join("\n\n")
             : "";
 
         const intake = {
           title: cleanTitle,
+          working_title: cleanTitle,
           researchQuestion: topic,
+          research_question: topic,
+          assignment_question: topic,
+          research_topic: topic,
+          citation_style: askCitationStyle,
           targetWordCount: handoff?.wordCountTarget || 1500,
           backgroundNotes: `Executive Scholarly Synthesis & Verified Literature Brief:\n\n${researchMessage.text}`,
           preliminaryEvidence: citationNotes,
+          discovered_sources: JSON.stringify(structuredSources),
         };
 
         await Promise.resolve(saveIntakeAnswers(project.projectId, intake)).catch(() => { });
+
+        // Seed relational evidenceLedger / Gate G2 for every verified source
+        if (typeof addManualSource === "function" && structuredSources.length > 0) {
+          await Promise.allSettled(
+            structuredSources.slice(0, 15).map((src) =>
+              Promise.resolve(
+                addManualSource(project.projectId, {
+                  title: src.title,
+                  authors: src.authors,
+                  year: typeof src.year === "number" ? src.year : Number(src.year) || undefined,
+                  venue: src.venue || undefined,
+                  doi: src.doi || undefined,
+                  url: src.url || undefined,
+                  sourceType: src.doi ? "scholarly" : "web",
+                  authorityTier: src.doi ? "A" : "B",
+                })
+              ).catch(() => {})
+            )
+          );
+        }
+
         onOpen(project.projectId);
       } catch (err: any) {
         setError(err?.message || "Failed to initialize project from research findings.");
@@ -2076,8 +2168,8 @@ export default function ProjectListScreen({
         }
       }}
       className={`pointer-events-auto flex flex-col justify-between w-full rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 shadow-sm focus-within:border-neutral-400 dark:focus-within:border-white/20 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] p-3 transition-all duration-200 ${isDragging
-          ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10 dark:bg-blue-950/20"
-          : ""
+        ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10 dark:bg-blue-950/20"
+        : ""
         }`}
     >
       {/* Pending Attachments Chips */}
@@ -2162,13 +2254,37 @@ export default function ProjectListScreen({
         />
       </div>
 
-      {/* Bottom Action Row: Attachments & Mode Selector on left, Submit button on right */}
-      <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-neutral-200/50 dark:border-white/5 w-full">
-        <PromptBarActionMenu
-          currentMode={mainAiMode}
-          onSelectMode={setMainAiMode}
-          onAttachFiles={handleMainFileSelect}
-        />
+      {/* Bottom Action Row: Attachments, Mode Selector, Citation Style & Preferences on left, Submit button on right */}
+      <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-neutral-200/50 dark:border-white/5 w-full flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <PromptBarActionMenu
+            currentMode={mainAiMode}
+            onSelectMode={setMainAiMode}
+            onAttachFiles={handleMainFileSelect}
+          />
+          {!isAiSidebarOpen && (
+            <>
+              <CitationStylePicker
+                value={askCitationStyle}
+                onChange={handleUpdateCitationStyle}
+              />
+              <AskScholarSettingsPopover
+                settings={askUserSettings}
+                onUpdateSettings={(partial) => {
+                  const updated = saveAskScholarUserSettings(partial);
+                  setAskUserSettings(updated);
+                  if (
+                    partial.preferredCitationStyle &&
+                    ASK_SCHOLAR_CITATION_STYLES.some((s) => s.id === partial.preferredCitationStyle)
+                  ) {
+                    handleUpdateCitationStyle(partial.preferredCitationStyle as AskCitationStyleId);
+                  }
+                }}
+                onImportReferences={handleImportVaultReferences}
+              />
+            </>
+          )}
+        </div>
 
         <div className="relative group">
           <button
@@ -2207,8 +2323,8 @@ export default function ProjectListScreen({
       <aside
         aria-label="Workspace navigation"
         className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${mobileMenuOpen
-            ? "translate-x-0 w-[260px] shadow-2xl"
-            : "-translate-x-full md:translate-x-0 " + (isSidebarOpen ? "w-[260px]" : "w-0 border-r-0 overflow-hidden")
+          ? "translate-x-0 w-[260px] shadow-2xl"
+          : "-translate-x-full md:translate-x-0 " + (isSidebarOpen ? "w-[260px]" : "w-0 border-r-0 overflow-hidden")
           }`}
       >
         {/* Top Section */}
@@ -2304,8 +2420,8 @@ export default function ProjectListScreen({
               }}
               aria-label="Knowledge Vault"
               className={`flex items-center gap-3 px-3 py-2.5 md:py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${activeView === "vault"
-                  ? "bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold"
-                  : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                ? "bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold"
+                : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
                 }`}
             >
               <Database className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 flex-shrink-0" />
@@ -2325,8 +2441,8 @@ export default function ProjectListScreen({
               }}
               aria-label="Manage AI Access"
               className={`flex items-center gap-3 px-3 py-2.5 md:py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${activeView === "ai-access"
-                  ? "bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold"
-                  : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                ? "bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold"
+                : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
                 }`}
             >
               <Sliders className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 flex-shrink-0" />
@@ -2351,8 +2467,8 @@ export default function ProjectListScreen({
               aria-label="Ask Scholar"
               aria-expanded={isAiSidebarOpen}
               className={`flex items-center gap-3 px-3 py-2.5 md:py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${isAiSidebarOpen
-                  ? "bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold"
-                  : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                ? "bg-neutral-900/10 dark:bg-white/10 text-neutral-900 dark:text-neutral-100 font-semibold"
+                : "hover:bg-neutral-900/5 dark:hover:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
                 }`}
             >
               <Lightbulb className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200 flex-shrink-0" />
@@ -2574,8 +2690,8 @@ export default function ProjectListScreen({
 
       {/* Main Content Area (Center Pane) */}
       <main className={`${isLandingPage && isAiSidebarOpen
-          ? "hidden"
-          : "flex-1 flex flex-col h-screen h-[100dvh] w-full bg-paper-cool dark:bg-ink-850 overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out"
+        ? "hidden"
+        : "flex-1 flex flex-col h-screen h-[100dvh] w-full bg-paper-cool dark:bg-ink-850 overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out"
         }`}>
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
         <div className="apple-glass-header sticky top-0 z-20 px-4 sm:px-6 py-3 flex items-center justify-between bg-paper-cool/85 dark:bg-ink-850/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
@@ -2767,8 +2883,8 @@ export default function ProjectListScreen({
                               else setActiveView("ai-access");
                             }}
                             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer ${aiStatus?.connected
-                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                : "border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300"
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                              : "border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300"
                               }`}
                           >
                             <span className={`w-1.5 h-1.5 rounded-full ${aiStatus?.connected ? "bg-emerald-500" : "bg-neutral-400"}`} />
@@ -2872,10 +2988,10 @@ export default function ProjectListScreen({
                               }}
                               disabled={isOtherBooting}
                               className={`apple-card group bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${isOtherBooting
-                                  ? "opacity-50 cursor-not-allowed"
-                                  : isBootingThis
-                                    ? "ring-2 ring-neutral-400 dark:ring-white/20 cursor-wait"
-                                    : ""
+                                ? "opacity-50 cursor-not-allowed"
+                                : isBootingThis
+                                  ? "ring-2 ring-neutral-400 dark:ring-white/20 cursor-wait"
+                                  : ""
                                 }`}
                             >
                               {/* Top Row: Clean Category Icon Container & Hover Affordance */}
@@ -2952,25 +3068,17 @@ export default function ProjectListScreen({
               </div>
             </div>
 
-            {/* Main AI Prompt Bar — Parallel to the line above settings (on phones it sits in the Ask Scholar hero instead) */}
+            {/* Main AI Prompt Bar — Hidden when Ask Scholar drawer is open so two prompt bars never compete visually */}
             {!(isPhone && !isAiSidebarOpen && !hasStartedChatting) && (
-              <div className="sticky bottom-0 z-20 w-full relative pointer-events-none flex flex-col justify-start bg-gradient-to-t from-paper-cool dark:from-ink-850 via-paper-cool/95 dark:via-ink-850/95 to-transparent px-4 sm:px-6 pb-3.5">
+              <div
+                data-testid="main-prompt-bar-wrapper"
+                className={
+                  isAiSidebarOpen
+                    ? "hidden"
+                    : "sticky bottom-0 z-20 w-full relative pointer-events-none flex flex-col justify-start bg-gradient-to-t from-paper-cool dark:from-ink-850 via-paper-cool/95 dark:via-ink-850/95 to-transparent px-4 sm:px-6 pb-3.5"
+                }
+              >
                 <div className="w-full max-w-4xl mx-auto relative pointer-events-auto flex flex-col items-center">
-                  {/* Contextual Clarification when Ask Scholar is Open */}
-                  {isAiSidebarOpen && (
-                    <div className="w-full flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400 mb-1.5 px-2 select-none">
-                      <span className="font-medium text-neutral-600 dark:text-neutral-300">Draft Assignment Guidelines</span>
-                      <button
-                        type="button"
-                        onClick={() => guideInputRef.current?.focus()}
-                        className="text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
-                      >
-                        <span>Ask Scholar Copilot Active</span>
-                        <span className="text-[10px]">➔</span>
-                      </button>
-                    </div>
-                  )}
-
                   {mainPromptForm}
                 </div>
               </div>
@@ -3045,12 +3153,12 @@ export default function ProjectListScreen({
             : undefined
         }
         className={`h-full max-h-[100dvh] bg-white dark:bg-ink-800 text-neutral-800 dark:text-neutral-200 flex flex-col relative transition-all duration-300 ease-in-out ${isAiSidebarOpen
-            ? isLandingPage
-              ? "flex-1 w-full min-w-0 border-none shadow-none z-20 translate-x-0"
-              : activeLayerWorkspace && workspaceLayoutMode === "split"
-                ? "flex-1 w-full min-w-0 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 z-30 translate-x-0"
-                : "shrink-0 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 z-30 w-full max-w-[calc(100vw-1rem)] translate-x-0"
-            : "hidden w-0 max-w-0 translate-x-full overflow-hidden border-none pointer-events-none"
+          ? isLandingPage
+            ? "flex-1 w-full min-w-0 border-none shadow-none z-20 translate-x-0"
+            : activeLayerWorkspace && workspaceLayoutMode === "split"
+              ? "flex-1 w-full min-w-0 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 z-30 translate-x-0"
+              : "shrink-0 shadow-2xl border-l border-neutral-200/80 dark:border-white/10 z-30 w-full max-w-[calc(100vw-1rem)] translate-x-0"
+          : "hidden w-0 max-w-0 translate-x-full overflow-hidden border-none pointer-events-none"
           } ${isResizingAiSidebar ? "transition-none select-none" : ""
           }`}
         aria-hidden={!isAiSidebarOpen}
@@ -3105,1672 +3213,1664 @@ export default function ProjectListScreen({
               ) : null
             }
           >
-          <div className="h-full flex flex-col w-full">
-            {/* Sidebar Header with glassmorphism & elevated badge */}
-            <header className="px-4 sm:px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/95 dark:bg-ink-800/95 backdrop-blur-md sticky top-0 z-20">
-              <div className="flex items-center gap-3">
-                {isLandingPage && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setMobileMenuOpen(true)}
-                      className="md:hidden p-2 rounded-lg border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer"
-                      aria-label="Open navigation"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                      </svg>
-                    </button>
-                    {!isSidebarOpen && (
+            <div className="h-full flex flex-col w-full">
+              {/* Sidebar Header with glassmorphism & elevated badge */}
+              <header className="px-4 sm:px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/95 dark:bg-ink-800/95 backdrop-blur-md sticky top-0 z-20">
+                <div className="flex items-center gap-3">
+                  {isLandingPage && (
+                    <>
                       <button
                         type="button"
-                        onClick={() => setIsSidebarOpen(true)}
-                        className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 text-xs font-medium cursor-pointer transition-all"
-                        title="Expand sidebar"
-                        aria-label="Expand sidebar"
+                        onClick={() => setMobileMenuOpen(true)}
+                        className="md:hidden p-2 rounded-lg border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer"
+                        aria-label="Open navigation"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                          <rect x="3" y="3" width="18" height="18" rx="2" strokeWidth="1.5" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v18" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 15l3-3-3-3" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
-                        <span>Open Sidebar</span>
                       </button>
-                    )}
-                  </>
-                )}
-                <div className="relative flex items-center justify-center">
-                  <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-white/10 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-200 flex items-center justify-center">
-                    <Lightbulb className="w-4 h-4 stroke-[2]" />
+                      {!isSidebarOpen && (
+                        <button
+                          type="button"
+                          onClick={() => setIsSidebarOpen(true)}
+                          className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 text-xs font-medium cursor-pointer transition-all"
+                          title="Expand sidebar"
+                          aria-label="Expand sidebar"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2" strokeWidth="1.5" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v18" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 15l3-3-3-3" />
+                          </svg>
+                          <span>Open Sidebar</span>
+                        </button>
+                      )}
+                    </>
+                  )}
+                  <div className="relative flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-white/10 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-200 flex items-center justify-center">
+                      <Lightbulb className="w-4 h-4 stroke-[2]" />
+                    </div>
+                    <span
+                      className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-ink-800 ${aiStatus?.connected ? "bg-emerald-500" : "bg-neutral-400"}`}
+                      title={aiStatus?.connected ? "AI connected" : "No AI connected"}
+                    />
                   </div>
-                  <span
-                    className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-ink-800 ${aiStatus?.connected ? "bg-emerald-500" : "bg-neutral-400"}`}
-                    title={aiStatus?.connected ? "AI connected" : "No AI connected"}
+                  <div>
+                    <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 tracking-tight">
+                      Ask Scholar
+                    </h2>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 relative">
+                  <CitationStylePicker
+                    value={askCitationStyle}
+                    onChange={handleUpdateCitationStyle}
                   />
-                </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 tracking-tight">
-                    Ask Scholar
-                  </h2>
-                </div>
-              </div>
 
-              <div className="flex items-center gap-2 relative">
-                <CitationStylePicker
-                  value={askCitationStyle}
-                  onChange={(newStyle) => {
-                    setAskCitationStyle(newStyle);
-                    setAskUserSettings((prev) =>
-                      saveAskScholarUserSettings({ preferredCitationStyle: newStyle })
-                    );
-                    try {
-                      localStorage.setItem("scholar_ask_citation_style", newStyle);
-                    } catch {
-                      // ignore
-                    }
-                  }}
-                />
-
-                <AskScholarSettingsPopover
-                  settings={askUserSettings}
-                  onUpdateSettings={(partial) => {
-                    const updated = saveAskScholarUserSettings(partial);
-                    setAskUserSettings(updated);
-                    if (
-                      partial.preferredCitationStyle &&
-                      ASK_SCHOLAR_CITATION_STYLES.some((s) => s.id === partial.preferredCitationStyle)
-                    ) {
-                      setAskCitationStyle(partial.preferredCitationStyle as AskCitationStyleId);
-                      try {
-                        localStorage.setItem(
-                          "scholar_ask_citation_style",
-                          partial.preferredCitationStyle
-                        );
-                      } catch {
-                        // ignore
+                  <AskScholarSettingsPopover
+                    settings={askUserSettings}
+                    onUpdateSettings={(partial) => {
+                      const updated = saveAskScholarUserSettings(partial);
+                      setAskUserSettings(updated);
+                      if (
+                        partial.preferredCitationStyle &&
+                        ASK_SCHOLAR_CITATION_STYLES.some((s) => s.id === partial.preferredCitationStyle)
+                      ) {
+                        handleUpdateCitationStyle(partial.preferredCitationStyle as AskCitationStyleId);
                       }
-                    }
-                  }}
-                  onImportReferences={handleImportVaultReferences}
-                />
+                    }}
+                    onImportReferences={handleImportVaultReferences}
+                  />
 
-                {askThreads.length > 0 && (
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsAskHistoryOpen((prev) => !prev)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/[0.06] hover:bg-neutral-200 dark:hover:bg-white/10 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer"
-                      title="Recent Ask Scholar conversations"
-                      aria-label="Recent Chats"
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">History</span>
-                      <span className="text-[10px] font-mono px-1 rounded bg-neutral-200/80 dark:bg-white/10">
-                        {askThreads.length}
-                      </span>
-                    </button>
+                  {askThreads.length > 0 && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsAskHistoryOpen((prev) => !prev)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/[0.06] hover:bg-neutral-200 dark:hover:bg-white/10 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer"
+                        title="Recent Ask Scholar conversations"
+                        aria-label="Recent Chats"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">History</span>
+                        <span className="text-[10px] font-mono px-1 rounded bg-neutral-200/80 dark:bg-white/10">
+                          {askThreads.length}
+                        </span>
+                      </button>
 
-                    {isAskHistoryOpen && (
-                      <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl bg-white dark:bg-ink-800 border border-neutral-200 dark:border-white/10 shadow-xl z-40 p-2 space-y-1 text-left">
-                        <div className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 border-b border-neutral-100 dark:border-white/10">
-                          <span>Recent Conversations</span>
-                          <button
-                            type="button"
-                            onClick={() => setIsAskHistoryOpen(false)}
-                            className="p-0.5 rounded hover:bg-neutral-100 dark:hover:bg-white/10 cursor-pointer"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        <div className="max-h-64 overflow-y-auto scholar-scrollbar space-y-1 pt-1">
-                          {askThreads.map((t) => (
-                            <div
-                              key={t.id}
-                              className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-xs transition-colors ${
-                                t.id === activeAskThreadId && hasStartedChatting
+                      {isAskHistoryOpen && (
+                        <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl bg-white dark:bg-ink-800 border border-neutral-200 dark:border-white/10 shadow-xl z-40 p-2 space-y-1 text-left">
+                          <div className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 border-b border-neutral-100 dark:border-white/10">
+                            <span>Recent Conversations</span>
+                            <button
+                              type="button"
+                              onClick={() => setIsAskHistoryOpen(false)}
+                              className="p-0.5 rounded hover:bg-neutral-100 dark:hover:bg-white/10 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <div className="max-h-64 overflow-y-auto scholar-scrollbar space-y-1 pt-1">
+                            {askThreads.map((t) => (
+                              <div
+                                key={t.id}
+                                className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-xs transition-colors ${t.id === activeAskThreadId && hasStartedChatting
                                   ? "bg-neutral-100 dark:bg-white/10 font-semibold text-neutral-900 dark:text-white"
                                   : "hover:bg-neutral-100/80 dark:hover:bg-white/[0.06] text-neutral-700 dark:text-neutral-300"
-                              }`}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveAskThreadId(t.id);
-                                  setGuideMessages(t.messages);
-                                  setIsAskHistoryOpen(false);
-                                }}
-                                className="flex-1 min-w-0 text-left truncate cursor-pointer"
-                                title={t.title}
+                                  }`}
                               >
-                                <div className="truncate">{t.title}</div>
-                                <div className="text-[10px] text-neutral-400 font-normal">
-                                  {t.messages.filter((m) => m.sender === "user").length} prompt
-                                  {t.messages.filter((m) => m.sender === "user").length === 1 ? "" : "s"} · {t.updatedAt}
-                                </div>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setAskThreads((prev) => {
-                                    const next = prev.filter((item) => item.id !== t.id);
-                                    try {
-                                      localStorage.setItem("scholar_ask_threads_v1", JSON.stringify(next));
-                                    } catch {
-                                      // ignore
-                                    }
-                                    return next;
-                                  });
-                                }}
-                                className="p-1 rounded text-neutral-400 hover:text-red-500 hover:bg-neutral-200/60 dark:hover:bg-white/10 cursor-pointer shrink-0"
-                                title="Delete conversation"
-                                aria-label="Delete conversation"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveAskThreadId(t.id);
+                                    setGuideMessages(t.messages);
+                                    setIsAskHistoryOpen(false);
+                                  }}
+                                  className="flex-1 min-w-0 text-left truncate cursor-pointer"
+                                  title={t.title}
+                                >
+                                  <div className="truncate">{t.title}</div>
+                                  <div className="text-[10px] text-neutral-400 font-normal">
+                                    {t.messages.filter((m) => m.sender === "user").length} prompt
+                                    {t.messages.filter((m) => m.sender === "user").length === 1 ? "" : "s"} · {t.updatedAt}
+                                  </div>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setAskThreads((prev) => {
+                                      const next = prev.filter((item) => item.id !== t.id);
+                                      try {
+                                        localStorage.setItem("scholar_ask_threads_v1", JSON.stringify(next));
+                                      } catch {
+                                        // ignore
+                                      }
+                                      return next;
+                                    });
+                                  }}
+                                  className="p-1 rounded text-neutral-400 hover:text-red-500 hover:bg-neutral-200/60 dark:hover:bg-white/10 cursor-pointer shrink-0"
+                                  title="Delete conversation"
+                                  aria-label="Delete conversation"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  )}
 
-                {hasStartedChatting && (
+                  {hasStartedChatting && (
+                    <button
+                      type="button"
+                      onClick={handleStartNewAskThread}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/[0.06] hover:bg-neutral-200 dark:hover:bg-white/10 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer"
+                      title="Start a new chat and show deliverable workspaces"
+                      aria-label="New Chat"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">New Chat</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
-                    onClick={handleStartNewAskThread}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/[0.06] hover:bg-neutral-200 dark:hover:bg-white/10 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer"
-                    title="Start a new chat and show deliverable workspaces"
-                    aria-label="New Chat"
+                    onClick={() => setIsAiSidebarOpen(false)}
+                    className="p-1.5 text-neutral-400 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/10 transition cursor-pointer"
+                    title="Close Assistant"
+                    aria-label="Close Assistant"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">New Chat</span>
+                    <X className="w-4 h-4" />
                   </button>
-                )}
+                </div>
+              </header>
 
-                <button
-                  type="button"
-                  onClick={() => setIsAiSidebarOpen(false)}
-                  className="p-1.5 text-neutral-400 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/10 transition cursor-pointer"
-                  title="Close Assistant"
-                  aria-label="Close Assistant"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </header>
-
-            {/* Chat Canvas (flex-1 overflow-y-auto) */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-sm scholar-scrollbar">
-              {/* On Landing page before chatting begins: render the 4 deliverable cards in full glory */}
-              {isLandingPage && !hasStartedChatting && (
-                <div className="w-full max-w-5xl mx-auto my-auto py-4 flex flex-col items-center justify-center animate-in fade-in duration-200">
-                  {/* Any assistant greeting messages (e.g. from Reset Chat) */}
-                  {guideMessages.map((msg) => (
-                    <div key={msg.id} className="w-full max-w-2xl mx-auto mb-6">
-                      <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-neutral-500">
-                        <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
-                          <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
+              {/* Chat Canvas (flex-1 overflow-y-auto) */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-sm scholar-scrollbar">
+                {/* On Landing page before chatting begins: render the 4 deliverable cards in full glory */}
+                {isLandingPage && !hasStartedChatting && (
+                  <div className="w-full max-w-5xl mx-auto my-auto py-4 flex flex-col items-center justify-center animate-in fade-in duration-200">
+                    {/* Any assistant greeting messages (e.g. from Reset Chat) */}
+                    {guideMessages.map((msg) => (
+                      <div key={msg.id} className="w-full max-w-2xl mx-auto mb-6">
+                        <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-neutral-500">
+                          <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
+                            <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
+                          </div>
+                          <span className="font-semibold text-neutral-700 dark:text-neutral-300">Scholar Core</span>
+                          <span>•</span>
+                          <span>{msg.timestamp}</span>
                         </div>
-                        <span className="font-semibold text-neutral-700 dark:text-neutral-300">Scholar Core</span>
-                        <span>•</span>
-                        <span>{msg.timestamp}</span>
+                        <div className="rounded-2xl px-4 py-3 bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 rounded-tl-xs shadow-2xs text-[13px] leading-relaxed">
+                          {renderFormattedGuideText(msg.text, msg.citations, askCitationStyle, handleAddCitationToEvidence, handleFocusCitationInGraph)}
+                        </div>
                       </div>
-                      <div className="rounded-2xl px-4 py-3 bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 rounded-tl-xs shadow-2xs text-[13px] leading-relaxed">
-                        {renderFormattedGuideText(msg.text, msg.citations, askCitationStyle, handleAddCitationToEvidence, handleFocusCitationInGraph)}
-                      </div>
+                    ))}
+
+                    {/* Heading */}
+                    <div className="text-center mb-6 flex flex-col items-center">
+                      <h1 className="text-2xl sm:text-[28px] font-semibold text-neutral-900 dark:text-white tracking-tight leading-tight">
+                        Where will your research begin?
+                      </h1>
                     </div>
-                  ))}
 
-                  {/* Heading */}
-                  <div className="text-center mb-6 flex flex-col items-center">
-                    <h1 className="text-2xl sm:text-[28px] font-semibold text-neutral-900 dark:text-white tracking-tight leading-tight">
-                      Where will your research begin?
-                    </h1>
-                  </div>
-
-                  {/* 4 Cards Grid - Responsive full 4-column layout */}
-                  <div className="w-full">
-                    <div className="grid w-full gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-                      {FORMAT_TILES.map((tile) => {
-                        const isBootingThis = creatingFormatId === tile.id;
-                        const isOtherBooting = creating && !isBootingThis;
-                        const tileTheme = getFormatTileTheme(tile.id);
-                        return (
-                          <button
-                            key={tile.id}
-                            type="button"
-                            onClick={() => {
-                              if (creating) return;
-                              if (!userEmail) {
-                                openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
-                                return;
-                              }
-                              handleCreate(tile.id);
-                            }}
-                            disabled={isOtherBooting}
-                            className={`group bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${isOtherBooting
+                    {/* 4 Cards Grid - Responsive full 4-column layout */}
+                    <div className="w-full">
+                      <div className="grid w-full gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                        {FORMAT_TILES.map((tile) => {
+                          const isBootingThis = creatingFormatId === tile.id;
+                          const isOtherBooting = creating && !isBootingThis;
+                          const tileTheme = getFormatTileTheme(tile.id);
+                          return (
+                            <button
+                              key={tile.id}
+                              type="button"
+                              onClick={() => {
+                                if (creating) return;
+                                if (!userEmail) {
+                                  openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
+                                  return;
+                                }
+                                handleCreate(tile.id);
+                              }}
+                              disabled={isOtherBooting}
+                              className={`group bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md cursor-pointer flex flex-col justify-between min-h-[16.5rem] h-auto text-left relative ${isOtherBooting
                                 ? "opacity-50 cursor-not-allowed"
                                 : isBootingThis
                                   ? "ring-2 ring-neutral-400 dark:ring-white/20 cursor-wait"
                                   : ""
-                              }`}
-                          >
-                            {/* Top Row: Clean Category Icon Container & Hover Affordance */}
-                            <div className="flex items-center justify-between w-full">
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
-                                {isBootingThis ? (
-                                  <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                  <FormatIcon id={tile.id} className="w-4 h-4" />
-                                )}
+                                }`}
+                            >
+                              {/* Top Row: Clean Category Icon Container & Hover Affordance */}
+                              <div className="flex items-center justify-between w-full">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
+                                  {isBootingThis ? (
+                                    <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <FormatIcon id={tile.id} className="w-4 h-4" />
+                                  )}
+                                </div>
+                                <span
+                                  aria-hidden="true"
+                                  className="w-7 h-7 rounded-full flex items-center justify-center text-neutral-400 dark:text-neutral-500 group-hover:text-neutral-900 dark:group-hover:text-white group-hover:bg-neutral-100 dark:group-hover:bg-white/10 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200"
+                                >
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                </span>
                               </div>
-                              <span
-                                aria-hidden="true"
-                                className="w-7 h-7 rounded-full flex items-center justify-center text-neutral-400 dark:text-neutral-500 group-hover:text-neutral-900 dark:group-hover:text-white group-hover:bg-neutral-100 dark:group-hover:bg-white/10 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200"
-                              >
-                                <ArrowRight className="w-3.5 h-3.5" />
-                              </span>
-                            </div>
 
-                            {/* Middle Content: Title & Actionable Workflow Guidance */}
-                            <div className="mt-4 mb-2 flex-1 flex flex-col justify-start">
-                              <h2 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-white group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
-                                {tile.label}
-                              </h2>
-                              <p className="text-[12.5px] leading-relaxed font-normal text-neutral-600 dark:text-neutral-400 mt-2">
-                                {tile.guidance}
-                              </p>
-                            </div>
+                              {/* Middle Content: Title & Actionable Workflow Guidance */}
+                              <div className="mt-4 mb-2 flex-1 flex flex-col justify-start">
+                                <h2 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-white group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
+                                  {tile.label}
+                                </h2>
+                                <p className="text-[12.5px] leading-relaxed font-normal text-neutral-600 dark:text-neutral-400 mt-2">
+                                  {tile.guidance}
+                                </p>
+                              </div>
 
-                            {/* Bottom Row: Divider & Actionable Deliverables Spec */}
-                            <div className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
-                              {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
-                                <React.Fragment key={idx}>
-                                  {idx > 0 && <span className="text-neutral-400 dark:text-neutral-400 opacity-60 font-bold">·</span>}
-                                  <span className="font-medium whitespace-nowrap">{part}</span>
-                                </React.Fragment>
-                              ))}
-                            </div>
-                          </button>
-                        );
-                      })}
+                              {/* Bottom Row: Divider & Actionable Deliverables Spec */}
+                              <div className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
+                                {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
+                                  <React.Fragment key={idx}>
+                                    {idx > 0 && <span className="text-neutral-400 dark:text-neutral-400 opacity-60 font-bold">·</span>}
+                                    <span className="font-medium whitespace-nowrap">{part}</span>
+                                  </React.Fragment>
+                                ))}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Chat Canvas (when hasStartedChatting or in non-landing view): 4 cards are COMPLETELY HIDDEN! */}
-              {(!isLandingPage || hasStartedChatting) && (
-                <div className={isLandingPage ? "w-full max-w-4xl mx-auto space-y-4 py-2" : "space-y-4"}>
-                  {guideMessages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
-                    >
-                      <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-neutral-500">
-                        {msg.sender === "assistant" ? (
-                          <>
-                            <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
-                              <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
-                            </div>
-                            <span className="font-semibold text-neutral-700 dark:text-neutral-300">Scholar Core</span>
-                            {msg.mode === "deep-research" && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 font-medium">
-                                🔬 Deep Research
-                              </span>
-                            )}
-                            {!msg.error && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 font-mono font-medium">
-                                {msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words
-                              </span>
-                            )}
-                            {msg.provider && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] bg-neutral-500/10 text-neutral-700 dark:text-neutral-300 font-medium">
-                                ⚡ {msg.provider}
-                              </span>
-                            )}
-
-                          </>
-                        ) : (
-                          <span>You</span>
-                        )}
-                        <span>•</span>
-                        <span>{msg.timestamp}</span>
-                        {msg.sender === "user" && !isGuideThinking && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingUserMsgId(msg.id);
-                              setEditingUserMsgText(msg.text);
-                            }}
-                            className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
-                            title="Edit and resubmit message"
-                          >
-                            <Pencil className="w-2.5 h-2.5" />
-                            <span>Edit</span>
-                          </button>
-                        )}
-                      </div>
-
+                {/* Chat Canvas (when hasStartedChatting or in non-landing view): 4 cards are COMPLETELY HIDDEN! */}
+                {(!isLandingPage || hasStartedChatting) && (
+                  <div className={isLandingPage ? "w-full max-w-4xl mx-auto space-y-4 py-2" : "space-y-4"}>
+                    {guideMessages.map((msg) => (
                       <div
-                        className={`rounded-2xl px-4 py-3 max-w-[88%] leading-relaxed ${msg.sender === "user"
+                        key={msg.id}
+                        className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-neutral-500">
+                          {msg.sender === "assistant" ? (
+                            <>
+                              <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
+                                <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
+                              </div>
+                              <span className="font-semibold text-neutral-700 dark:text-neutral-300">Scholar Core</span>
+                              {msg.mode === "deep-research" && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 font-medium">
+                                  🔬 Deep Research
+                                </span>
+                              )}
+                              {!msg.error && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 font-mono font-medium">
+                                  {msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words
+                                </span>
+                              )}
+                              {msg.provider && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] bg-neutral-500/10 text-neutral-700 dark:text-neutral-300 font-medium">
+                                  ⚡ {msg.provider}
+                                </span>
+                              )}
+
+                            </>
+                          ) : (
+                            <span>You</span>
+                          )}
+                          <span>•</span>
+                          <span>{msg.timestamp}</span>
+                          {msg.sender === "user" && !isGuideThinking && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingUserMsgId(msg.id);
+                                setEditingUserMsgText(msg.text);
+                              }}
+                              className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+                              title="Edit and resubmit message"
+                            >
+                              <Pencil className="w-2.5 h-2.5" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <div
+                          className={`rounded-2xl px-4 py-3 max-w-[88%] leading-relaxed ${msg.sender === "user"
                             ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-sm rounded-tr-xs"
                             : msg.error
                               ? "bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 text-neutral-900 dark:text-neutral-200 rounded-tl-xs shadow-2xs"
                               : "bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 rounded-tl-xs shadow-2xs"
-                          }`}
-                      >
-                        {/* User Attachments Display */}
-                        {msg.attachments && msg.attachments.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-2">
-                            {msg.attachments.map((att, aIdx) => (
-                              <div
-                                key={aIdx}
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/20 dark:bg-white/20 text-xs text-white"
-                              >
-                                {att.isImage ? (
-                                  att.previewUrl ? (
-                                    <img src={att.previewUrl} alt={att.name} className="w-5 h-5 object-cover rounded" />
+                            }`}
+                        >
+                          {/* User Attachments Display */}
+                          {msg.attachments && msg.attachments.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-2">
+                              {msg.attachments.map((att, aIdx) => (
+                                <div
+                                  key={aIdx}
+                                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/20 dark:bg-white/20 text-xs text-white"
+                                >
+                                  {att.isImage ? (
+                                    att.previewUrl ? (
+                                      <img src={att.previewUrl} alt={att.name} className="w-5 h-5 object-cover rounded" />
+                                    ) : (
+                                      <Paperclip className="w-3.5 h-3.5" />
+                                    )
                                   ) : (
-                                    <Paperclip className="w-3.5 h-3.5" />
-                                  )
-                                ) : (
-                                  <FileText className="w-3.5 h-3.5" />
-                                )}
-                                <span className="truncate max-w-[150px] font-medium text-[11px]">{att.name}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                                    <FileText className="w-3.5 h-3.5" />
+                                  )}
+                                  <span className="truncate max-w-[150px] font-medium text-[11px]">{att.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
 
-                        {msg.sender === "assistant" && !msg.error && (
-                          <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {((msg.verifiedSourcesCount !== undefined && msg.verifiedSourcesCount > 0) || (msg.citations && msg.citations.length > 0)) && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                                  <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                                  <span>{msg.verifiedSourcesCount ?? msg.citations?.length ?? 0} Verified Sources</span>
-                                </span>
-                              )}
-                              {msg.citations && msg.citations.some((c) => c.sourceType === "vault" || (c.authorityBadge || "").toLowerCase().includes("vault")) && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30">
-                                  <Database className="w-3 h-3 text-amber-500" />
-                                  <span>Knowledge Vault Grounded</span>
-                                </span>
-                              )}
-                              {msg.model && (
-                                <span className="text-[10px] text-neutral-400 font-mono">
-                                  {msg.model}
-                                </span>
+                          {msg.sender === "assistant" && !msg.error && (
+                            <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {((msg.verifiedSourcesCount !== undefined && msg.verifiedSourcesCount > 0) || (msg.citations && msg.citations.length > 0)) && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                                    <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                                    <span>{msg.verifiedSourcesCount ?? msg.citations?.length ?? 0} Verified Sources</span>
+                                  </span>
+                                )}
+                                {msg.citations && msg.citations.some((c) => c.sourceType === "vault" || (c.authorityBadge || "").toLowerCase().includes("vault")) && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30">
+                                    <Database className="w-3 h-3 text-amber-500" />
+                                    <span>Knowledge Vault Grounded</span>
+                                  </span>
+                                )}
+                                {msg.model && (
+                                  <span className="text-[10px] text-neutral-400 font-mono">
+                                    {msg.model}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Merged Single-Line Non-Wrapping View Switcher (Section 13) */}
+                              {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
+                                <div
+                                  data-testid="response-primary-tabs"
+                                  className="flex items-center gap-1 flex-nowrap overflow-x-auto whitespace-nowrap no-scrollbar w-full bg-neutral-100 dark:bg-white/[0.06] p-0.5 rounded-lg border border-neutral-200/60 dark:border-white/10 text-[10.5px]"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "synthesis" }))}
+                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${(messageActiveTab[msg.id] ?? "synthesis") === "synthesis"
+                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                      }`}
+                                    title="Synthesized prose response with inline citations"
+                                  >
+                                    <FileText className="w-3 h-3 text-sky-500 shrink-0" />
+                                    <span>Synthesis</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "matrix" }))}
+                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${messageActiveTab[msg.id] === "matrix"
+                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                      }`}
+                                    title="Structured Evidence Matrix & Forest Plot Synthesis"
+                                  >
+                                    <Table className="w-3 h-3 text-emerald-500 shrink-0" />
+                                    <span>Evidence Matrix ({(msg.citations || msg.liveSources || []).length})</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "graph" }))}
+                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${messageActiveTab[msg.id] === "graph"
+                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                      }`}
+                                    title="Interactive Citation Graph & Literature Discovery"
+                                  >
+                                    <Network className="w-3 h-3 text-indigo-500 shrink-0" />
+                                    <span>Citation Graph</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "consensus" }))}
+                                    className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${messageActiveTab[msg.id] === "consensus"
+                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
+                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                      }`}
+                                    title="Peer Review & Methodological Rigor Audit"
+                                  >
+                                    <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+                                    <span>Peer Review & Rigor</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const items = toCitationGraphSeeds(getNormalizedMsgSources(msg)).map((s, idx) =>
+                                        extractEvidenceFromPaper(s, idx)
+                                      );
+                                      handleOpenResearchExport(items, msg.text?.slice(0, 100));
+                                    }}
+                                    className="px-2 py-0.5 rounded-md font-medium text-neutral-600 dark:text-neutral-300 hover:bg-white dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ml-auto"
+                                    title="Open Research Export Workspace (LaTeX & Overleaf Package)"
+                                  >
+                                    <FileCode className="w-3 h-3 text-sky-500 shrink-0" />
+                                    <span>LaTeX / Overleaf</span>
+                                  </button>
+                                </div>
                               )}
                             </div>
+                          )}
 
-                            {/* Merged Single-Line Non-Wrapping View Switcher (Section 13) */}
-                            {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
-                              <div
-                                data-testid="response-primary-tabs"
-                                className="flex items-center gap-1 flex-nowrap overflow-x-auto whitespace-nowrap no-scrollbar w-full bg-neutral-100 dark:bg-white/[0.06] p-0.5 rounded-lg border border-neutral-200/60 dark:border-white/10 text-[10.5px]"
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "synthesis" }))}
-                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${
-                                    (messageActiveTab[msg.id] ?? "synthesis") === "synthesis"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                  }`}
-                                  title="Synthesized prose response with inline citations"
-                                >
-                                  <FileText className="w-3 h-3 text-sky-500 shrink-0" />
-                                  <span>Synthesis</span>
-                                </button>
+                          {msg.sender === "assistant" && messageActiveTab[msg.id] === "matrix" ? (() => {
+                            const matrixSources = getNormalizedMsgSources(msg);
 
-                                <button
-                                  type="button"
-                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "matrix" }))}
-                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${
-                                    messageActiveTab[msg.id] === "matrix"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                  }`}
-                                  title="Structured Evidence Matrix & Forest Plot Synthesis"
-                                >
-                                  <Table className="w-3 h-3 text-emerald-500 shrink-0" />
-                                  <span>Evidence Matrix ({(msg.citations || msg.liveSources || []).length})</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "graph" }))}
-                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${
-                                    messageActiveTab[msg.id] === "graph"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                  }`}
-                                  title="Interactive Citation Graph & Literature Discovery"
-                                >
-                                  <Network className="w-3 h-3 text-indigo-500 shrink-0" />
-                                  <span>Citation Graph</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: "consensus" }))}
-                                  className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${
-                                    messageActiveTab[msg.id] === "consensus"
-                                      ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-                                  }`}
-                                  title="Peer Review & Methodological Rigor Audit"
-                                >
-                                  <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
-                                  <span>Peer Review & Rigor</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const items = toCitationGraphSeeds(getNormalizedMsgSources(msg)).map((s, idx) =>
-                                      extractEvidenceFromPaper(s, idx)
-                                    );
-                                    handleOpenResearchExport(items, msg.text?.slice(0, 100));
-                                  }}
-                                  className="px-2 py-0.5 rounded-md font-medium text-neutral-600 dark:text-neutral-300 hover:bg-white dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ml-auto"
-                                  title="Open Research Export Workspace (LaTeX & Overleaf Package)"
-                                >
-                                  <FileCode className="w-3 h-3 text-sky-500 shrink-0" />
-                                  <span>LaTeX / Overleaf</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {msg.sender === "assistant" && messageActiveTab[msg.id] === "matrix" ? (() => {
-                          const matrixSources = getNormalizedMsgSources(msg);
-
-                          return (
-                            <div className="space-y-3 pt-1">
-                              <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
-                                <div className="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-200">
-                                  <Table className="w-3.5 h-3.5 text-sky-500" />
-                                  <span>Evidence Matrix ({matrixSources.length} Sources Catalogued)</span>
+                            return (
+                              <div className="space-y-3 pt-1">
+                                <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
+                                  <div className="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-200">
+                                    <Table className="w-3.5 h-3.5 text-sky-500" />
+                                    <span>Evidence Matrix ({matrixSources.length} Sources Catalogued)</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEvidenceSynthesis(toCitationGraphSeeds(matrixSources), undefined, msg.text?.slice(0, 100))}
+                                      className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                      title="Open Full Evidence Synthesis Workspace with Forest Plots"
+                                    >
+                                      <BarChart3 className="w-2.5 h-2.5" />
+                                      <span>Full Synthesis & Forest Plot</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyMatrixMarkdown(msg)}
+                                      className="px-2 py-0.5 rounded-md text-[10px] font-medium border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 flex items-center gap-1 cursor-pointer transition-colors"
+                                    >
+                                      <Copy className="w-2.5 h-2.5" />
+                                      <span>{copiedMessageId === `matrix-md-${msg.id}` ? "Copied!" : "Copy Table"}</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDownloadMatrixCsv(msg)}
+                                      className="px-2 py-0.5 rounded-md text-[10px] font-medium border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 flex items-center gap-1 cursor-pointer transition-colors"
+                                    >
+                                      <Download className="w-2.5 h-2.5" />
+                                      <span>Export CSV</span>
+                                    </button>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenEvidenceSynthesis(toCitationGraphSeeds(matrixSources), undefined, msg.text?.slice(0, 100))}
-                                    className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                    title="Open Full Evidence Synthesis Workspace with Forest Plots"
-                                  >
-                                    <BarChart3 className="w-2.5 h-2.5" />
-                                    <span>Full Synthesis & Forest Plot</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyMatrixMarkdown(msg)}
-                                    className="px-2 py-0.5 rounded-md text-[10px] font-medium border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 flex items-center gap-1 cursor-pointer transition-colors"
-                                  >
-                                    <Copy className="w-2.5 h-2.5" />
-                                    <span>{copiedMessageId === `matrix-md-${msg.id}` ? "Copied!" : "Copy Table"}</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDownloadMatrixCsv(msg)}
-                                    className="px-2 py-0.5 rounded-md text-[10px] font-medium border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 flex items-center gap-1 cursor-pointer transition-colors"
-                                  >
-                                    <Download className="w-2.5 h-2.5" />
-                                    <span>Export CSV</span>
-                                  </button>
-                                </div>
-                              </div>
 
-                              <div className="overflow-x-auto rounded-xl border border-neutral-200/80 dark:border-white/10 scholar-scrollbar">
-                                <table className="w-full text-left border-collapse text-xs">
-                                  <thead>
-                                    <tr className="bg-neutral-100/80 dark:bg-white/[0.04] border-b border-neutral-200/80 dark:border-white/10 text-[10.5px] font-semibold text-neutral-600 dark:text-neutral-400">
-                                      <th className="py-2 px-2.5 w-8">#</th>
-                                      <th className="py-2 px-3 min-w-[190px]">Source & Title</th>
-                                      <th className="py-2 px-3 min-w-[110px]">Author & Year</th>
-                                      <th className="py-2 px-3 min-w-[220px]">Empirical Finding / Evidence</th>
-                                      <th className="py-2 px-2.5 min-w-[95px]">Stance (Scite)</th>
-                                      <th className="py-2 px-2.5 min-w-[105px]">Authority Tier</th>
-                                      <th className="py-2 px-2.5 text-right w-14">Save</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-neutral-200/60 dark:divide-white/5 font-sans">
-                                    {matrixSources.map((src, sIdx) => {
-                                      const key = src.url || src.title || "";
-                                      const isSaved = Boolean(key && savedVaultSourceUrls[key]);
-                                      const domain = src.domain || (src.url ? (() => { try { return new URL(src.url).hostname.replace(/^www\./, ""); } catch { return ""; } })() : "");
-                                      return (
-                                        <tr key={sIdx} className="hover:bg-neutral-50/70 dark:hover:bg-white/[0.02] transition-colors">
-                                          <td className="py-2.5 px-2.5 font-mono text-[10px] text-neutral-400 font-medium align-top">
-                                            [{sIdx + 1}]
-                                          </td>
-                                          <td className="py-2.5 px-3 align-top">
-                                            <div className="font-semibold text-neutral-900 dark:text-neutral-100 leading-snug line-clamp-2">
-                                              {src.url ? (
-                                                <a href={src.url} target="_blank" rel="noopener noreferrer" className="hover:text-sky-600 dark:hover:text-sky-400 transition-colors">
-                                                  {src.title || "Untitled Source"} ↗
-                                                </a>
+                                <div className="overflow-x-auto rounded-xl border border-neutral-200/80 dark:border-white/10 scholar-scrollbar">
+                                  <table className="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                      <tr className="bg-neutral-100/80 dark:bg-white/[0.04] border-b border-neutral-200/80 dark:border-white/10 text-[10.5px] font-semibold text-neutral-600 dark:text-neutral-400">
+                                        <th className="py-2 px-2.5 w-8">#</th>
+                                        <th className="py-2 px-3 min-w-[190px]">Source & Title</th>
+                                        <th className="py-2 px-3 min-w-[110px]">Author & Year</th>
+                                        <th className="py-2 px-3 min-w-[220px]">Empirical Finding / Evidence</th>
+                                        <th className="py-2 px-2.5 min-w-[95px]">Stance (Scite)</th>
+                                        <th className="py-2 px-2.5 min-w-[105px]">Authority Tier</th>
+                                        <th className="py-2 px-2.5 text-right w-14">Save</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-neutral-200/60 dark:divide-white/5 font-sans">
+                                      {matrixSources.map((src, sIdx) => {
+                                        const key = src.url || src.title || "";
+                                        const isSaved = Boolean(key && savedVaultSourceUrls[key]);
+                                        const domain = src.domain || (src.url ? (() => { try { return new URL(src.url).hostname.replace(/^www\./, ""); } catch { return ""; } })() : "");
+                                        return (
+                                          <tr key={sIdx} className="hover:bg-neutral-50/70 dark:hover:bg-white/[0.02] transition-colors">
+                                            <td className="py-2.5 px-2.5 font-mono text-[10px] text-neutral-400 font-medium align-top">
+                                              [{sIdx + 1}]
+                                            </td>
+                                            <td className="py-2.5 px-3 align-top">
+                                              <div className="font-semibold text-neutral-900 dark:text-neutral-100 leading-snug line-clamp-2">
+                                                {src.url ? (
+                                                  <a href={src.url} target="_blank" rel="noopener noreferrer" className="hover:text-sky-600 dark:hover:text-sky-400 transition-colors">
+                                                    {src.title || "Untitled Source"} ↗
+                                                  </a>
+                                                ) : (
+                                                  src.title || "Untitled Source"
+                                                )}
+                                              </div>
+                                              <div className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
+                                                {src.venue || src.publisher || domain || "Scholarly source"}
+                                              </div>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-[11px] text-neutral-700 dark:text-neutral-300 align-top">
+                                              <div>{Array.isArray(src.authors) && src.authors.length > 0 ? src.authors[0] + (src.authors.length > 1 ? ` et al.` : "") : "—"}</div>
+                                              <div className="font-mono text-[10px] text-neutral-400">{src.year || "—"}</div>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed align-top">
+                                              <p className="line-clamp-3 italic">
+                                                "{src.snippet || "Evidence excerpt catalogued for this scholarly synthesis."}"
+                                              </p>
+                                            </td>
+                                            <td className="py-2.5 px-2.5 align-top">
+                                              {src.stance === "contradicting" ? (
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300/50" title="Contradicts or challenges primary thesis">
+                                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                                  Refuting
+                                                </span>
+                                              ) : src.stance === "supporting" ? (
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300/50" title="Provides direct evidentiary support">
+                                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                  Supporting
+                                                </span>
                                               ) : (
-                                                src.title || "Untitled Source"
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-white/10" title="Mentions or provides contextual background">
+                                                  <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
+                                                  Mentioning
+                                                </span>
                                               )}
-                                            </div>
-                                            <div className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
-                                              {src.venue || src.publisher || domain || "Scholarly source"}
-                                            </div>
-                                          </td>
-                                          <td className="py-2.5 px-3 text-[11px] text-neutral-700 dark:text-neutral-300 align-top">
-                                            <div>{Array.isArray(src.authors) && src.authors.length > 0 ? src.authors[0] + (src.authors.length > 1 ? ` et al.` : "") : "—"}</div>
-                                            <div className="font-mono text-[10px] text-neutral-400">{src.year || "—"}</div>
-                                          </td>
-                                          <td className="py-2.5 px-3 text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed align-top">
-                                            <p className="line-clamp-3 italic">
-                                              "{src.snippet || "Evidence excerpt catalogued for this scholarly synthesis."}"
-                                            </p>
-                                          </td>
-                                          <td className="py-2.5 px-2.5 align-top">
-                                            {src.stance === "contradicting" ? (
-                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300/50" title="Contradicts or challenges primary thesis">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                                Refuting
-                                              </span>
-                                            ) : src.stance === "supporting" ? (
-                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300/50" title="Provides direct evidentiary support">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                                Supporting
-                                              </span>
-                                            ) : (
-                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-white/10" title="Mentions or provides contextual background">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
-                                                Mentioning
-                                              </span>
-                                            )}
-                                          </td>
-                                          <td className="py-2.5 px-2.5 align-top">
-                                            <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-medium border ${
-                                              src.sourceType === "vault" || (src.authorityBadge || "").toLowerCase().includes("vault")
+                                            </td>
+                                            <td className="py-2.5 px-2.5 align-top">
+                                              <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-medium border ${src.sourceType === "vault" || (src.authorityBadge || "").toLowerCase().includes("vault")
                                                 ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300/50"
                                                 : (src.authorityBadge || "").toLowerCase().includes("peer") || (src.authorityBadge || "").toLowerCase().includes("academic")
                                                   ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300/50"
                                                   : "bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-300/50"
-                                            }`}>
-                                              {src.authorityBadge || (src.sourceType === "vault" ? "Knowledge Vault" : "Verified Source")}
-                                            </span>
-                                          </td>
-                                          <td className="py-2.5 px-2.5 text-right align-top">
-                                            {src.url && (
-                                              <button
-                                                type="button"
-                                                disabled={isSaved}
-                                                onClick={() => handleSaveSourceToVault({
-                                                  title: src.title,
-                                                  url: src.url,
-                                                  snippet: src.snippet,
-                                                  authors: Array.isArray(src.authors) ? src.authors : undefined,
-                                                  year: src.year,
-                                                  venue: src.venue,
-                                                })}
-                                                className={`p-1 rounded text-[10px] inline-flex items-center gap-1 transition cursor-pointer ${
-                                                  isSaved
+                                                }`}>
+                                                {src.authorityBadge || (src.sourceType === "vault" ? "Knowledge Vault" : "Verified Source")}
+                                              </span>
+                                            </td>
+                                            <td className="py-2.5 px-2.5 text-right align-top">
+                                              {src.url && (
+                                                <button
+                                                  type="button"
+                                                  disabled={isSaved}
+                                                  onClick={() => handleSaveSourceToVault({
+                                                    title: src.title,
+                                                    url: src.url,
+                                                    snippet: src.snippet,
+                                                    authors: Array.isArray(src.authors) ? src.authors : undefined,
+                                                    year: src.year,
+                                                    venue: src.venue,
+                                                  })}
+                                                  className={`p-1 rounded text-[10px] inline-flex items-center gap-1 transition cursor-pointer ${isSaved
                                                     ? "text-emerald-600 dark:text-emerald-400"
                                                     : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                                                }`}
-                                                title={isSaved ? "Saved in Vault" : "Save to Knowledge Vault"}
-                                              >
-                                                {isSaved ? <Check className="w-3.5 h-3.5" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
-                                              </button>
-                                            )}
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          );
-                        })() : msg.sender === "assistant" && messageActiveTab[msg.id] === "graph" ? (() => {
-                          const graphSources = getNormalizedMsgSources(msg);
-                          if (graphSources.length === 0) {
-                            return (
-                              <div className="py-8 text-center text-xs text-neutral-500 dark:text-neutral-400">
-                                No cited empirical sources available to construct a citation network.
+                                                    }`}
+                                                  title={isSaved ? "Saved in Vault" : "Save to Knowledge Vault"}
+                                                >
+                                                  {isSaved ? <Check className="w-3.5 h-3.5" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
+                                                </button>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
                               </div>
                             );
-                          }
+                          })() : msg.sender === "assistant" && messageActiveTab[msg.id] === "graph" ? (() => {
+                            const graphSources = getNormalizedMsgSources(msg);
+                            if (graphSources.length === 0) {
+                              return (
+                                <div className="py-8 text-center text-xs text-neutral-500 dark:text-neutral-400">
+                                  No cited empirical sources available to construct a citation network.
+                                </div>
+                              );
+                            }
 
-                          const selectedNode = selectedGraphNodeId
-                            ? graphSources.find((s) => (s.url || s.title) === selectedGraphNodeId) || graphSources[0]
-                            : graphSources[0];
+                            const selectedNode = selectedGraphNodeId
+                              ? graphSources.find((s) => (s.url || s.title) === selectedGraphNodeId) || graphSources[0]
+                              : graphSources[0];
 
-                          const width = 640;
-                          const height = 360;
-                          const centerX = width / 2;
-                          const centerY = height / 2;
-                          const radius = Math.min(centerX - 80, centerY - 50);
+                            const width = 640;
+                            const height = 360;
+                            const centerX = width / 2;
+                            const centerY = height / 2;
+                            const radius = Math.min(centerX - 80, centerY - 50);
 
-                          const nodePositions = graphSources.map((src, i) => {
-                            const angle = -Math.PI / 2 + (2 * Math.PI * i) / graphSources.length;
-                            const x = centerX + radius * Math.cos(angle);
-                            const y = centerY + radius * Math.sin(angle);
-                            const key = src.url || src.title || `source-${i}`;
-                            return { src, index: i, x, y, key };
-                          });
+                            const nodePositions = graphSources.map((src, i) => {
+                              const angle = -Math.PI / 2 + (2 * Math.PI * i) / graphSources.length;
+                              const x = centerX + radius * Math.cos(angle);
+                              const y = centerY + radius * Math.sin(angle);
+                              const key = src.url || src.title || `source-${i}`;
+                              return { src, index: i, x, y, key };
+                            });
 
-                          return (
-                            <div className="space-y-3 pt-1">
-                              <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
-                                <div className="flex items-center gap-2">
-                                  <div className="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-200">
-                                    <Network className="w-3.5 h-3.5 text-indigo-500" />
-                                    <span>Interactive Citation Network ({graphSources.length} Nodes)</span>
+                            return (
+                              <div className="space-y-3 pt-1">
+                                <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-200">
+                                      <Network className="w-3.5 h-3.5 text-indigo-500" />
+                                      <span>Interactive Citation Network ({graphSources.length} Nodes)</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenLiteratureDiscovery(toCitationGraphSeeds(graphSources), msg.text?.slice(0, 100))}
+                                      className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                      title="Open Full Literature Discovery Workspace with Recursive Snowball Sampling"
+                                    >
+                                      <Network className="w-2.5 h-2.5" />
+                                      <span>Full Discovery Workspace</span>
+                                    </button>
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenLiteratureDiscovery(toCitationGraphSeeds(graphSources), msg.text?.slice(0, 100))}
-                                    className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                    title="Open Full Literature Discovery Workspace with Recursive Snowball Sampling"
+                                  <div className="flex items-center gap-2 text-[10.5px]">
+                                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                                      <span className="w-2 h-0.5 bg-emerald-500 inline-block rounded" /> Supporting
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium">
+                                      <span className="w-2 h-0.5 bg-rose-500 inline-block rounded" /> Refuting
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium">
+                                      <span className="w-2 h-0.5 bg-sky-400 inline-block rounded" /> Mentioning
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="relative rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/70 dark:bg-white/[0.02] p-2 overflow-hidden">
+                                  <svg
+                                    viewBox={`0 0 ${width} ${height}`}
+                                    className="w-full h-auto max-h-[380px] select-none"
                                   >
-                                    <Network className="w-2.5 h-2.5" />
-                                    <span>Full Discovery Workspace</span>
-                                  </button>
-                                </div>
-                                <div className="flex items-center gap-2 text-[10.5px]">
-                                  <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                                    <span className="w-2 h-0.5 bg-emerald-500 inline-block rounded" /> Supporting
-                                  </span>
-                                  <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium">
-                                    <span className="w-2 h-0.5 bg-rose-500 inline-block rounded" /> Refuting
-                                  </span>
-                                  <span className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium">
-                                    <span className="w-2 h-0.5 bg-sky-400 inline-block rounded" /> Mentioning
-                                  </span>
-                                </div>
-                              </div>
+                                    {/* Concentric guide rings */}
+                                    <circle cx={centerX} cy={centerY} r={radius * 0.55} className="stroke-neutral-200/60 dark:stroke-white/5 fill-none" strokeDasharray="3 3" />
+                                    <circle cx={centerX} cy={centerY} r={radius} className="stroke-neutral-200/60 dark:stroke-white/5 fill-none" strokeDasharray="3 3" />
 
-                              <div className="relative rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/70 dark:bg-white/[0.02] p-2 overflow-hidden">
-                                <svg
-                                  viewBox={`0 0 ${width} ${height}`}
-                                  className="w-full h-auto max-h-[380px] select-none"
-                                >
-                                  {/* Concentric guide rings */}
-                                  <circle cx={centerX} cy={centerY} r={radius * 0.55} className="stroke-neutral-200/60 dark:stroke-white/5 fill-none" strokeDasharray="3 3" />
-                                  <circle cx={centerX} cy={centerY} r={radius} className="stroke-neutral-200/60 dark:stroke-white/5 fill-none" strokeDasharray="3 3" />
+                                    {/* Cross edges between nearby sources */}
+                                    {nodePositions.map((node, i) => {
+                                      const nextNode = nodePositions[(i + 1) % nodePositions.length];
+                                      if (nodePositions.length <= 1) return null;
+                                      return (
+                                        <line
+                                          key={`cross-${i}`}
+                                          x1={node.x}
+                                          y1={node.y}
+                                          x2={nextNode.x}
+                                          y2={nextNode.y}
+                                          className="stroke-neutral-300/40 dark:stroke-white/10"
+                                          strokeWidth={1}
+                                          strokeDasharray="2 4"
+                                        />
+                                      );
+                                    })}
 
-                                  {/* Cross edges between nearby sources */}
-                                  {nodePositions.map((node, i) => {
-                                    const nextNode = nodePositions[(i + 1) % nodePositions.length];
-                                    if (nodePositions.length <= 1) return null;
-                                    return (
-                                      <line
-                                        key={`cross-${i}`}
-                                        x1={node.x}
-                                        y1={node.y}
-                                        x2={nextNode.x}
-                                        y2={nextNode.y}
-                                        className="stroke-neutral-300/40 dark:stroke-white/10"
-                                        strokeWidth={1}
-                                        strokeDasharray="2 4"
+                                    {/* Edges from center Hub to nodes */}
+                                    {nodePositions.map((node) => {
+                                      const isSelected = (selectedNode.url || selectedNode.title) === node.key;
+                                      const strokeColor =
+                                        node.src.stance === "contradicting"
+                                          ? "rgba(244, 63, 94, 0.75)"
+                                          : node.src.stance === "supporting"
+                                            ? "rgba(16, 185, 129, 0.75)"
+                                            : "rgba(56, 189, 248, 0.65)";
+                                      const strokeWidth = isSelected ? 2.5 : 1.5;
+
+                                      return (
+                                        <line
+                                          key={`edge-${node.key}`}
+                                          x1={centerX}
+                                          y1={centerY}
+                                          x2={node.x}
+                                          y2={node.y}
+                                          stroke={strokeColor}
+                                          strokeWidth={strokeWidth}
+                                          strokeDasharray={node.src.stance === "contradicting" ? "4 3" : undefined}
+                                          className="transition-all duration-300"
+                                        />
+                                      );
+                                    })}
+
+                                    {/* Center Hub Node */}
+                                    <g className="cursor-default">
+                                      <circle
+                                        cx={centerX}
+                                        cy={centerY}
+                                        r={32}
+                                        className="fill-sky-50 dark:fill-sky-950/80 stroke-sky-400 dark:stroke-sky-500"
+                                        strokeWidth={2}
                                       />
-                                    );
-                                  })}
-
-                                  {/* Edges from center Hub to nodes */}
-                                  {nodePositions.map((node) => {
-                                    const isSelected = (selectedNode.url || selectedNode.title) === node.key;
-                                    const strokeColor =
-                                      node.src.stance === "contradicting"
-                                        ? "rgba(244, 63, 94, 0.75)"
-                                        : node.src.stance === "supporting"
-                                        ? "rgba(16, 185, 129, 0.75)"
-                                        : "rgba(56, 189, 248, 0.65)";
-                                    const strokeWidth = isSelected ? 2.5 : 1.5;
-
-                                    return (
-                                      <line
-                                        key={`edge-${node.key}`}
-                                        x1={centerX}
-                                        y1={centerY}
-                                        x2={node.x}
-                                        y2={node.y}
-                                        stroke={strokeColor}
-                                        strokeWidth={strokeWidth}
-                                        strokeDasharray={node.src.stance === "contradicting" ? "4 3" : undefined}
-                                        className="transition-all duration-300"
-                                      />
-                                    );
-                                  })}
-
-                                  {/* Center Hub Node */}
-                                  <g className="cursor-default">
-                                    <circle
-                                      cx={centerX}
-                                      cy={centerY}
-                                      r={32}
-                                      className="fill-sky-50 dark:fill-sky-950/80 stroke-sky-400 dark:stroke-sky-500"
-                                      strokeWidth={2}
-                                    />
-                                    <text
-                                      x={centerX}
-                                      y={centerY - 4}
-                                      textAnchor="middle"
-                                      className="fill-sky-900 dark:fill-sky-200 text-[10px] font-bold select-none pointer-events-none"
-                                    >
-                                      Inquiry
-                                    </text>
-                                    <text
-                                      x={centerX}
-                                      y={centerY + 9}
-                                      textAnchor="middle"
-                                      className="fill-sky-600 dark:fill-sky-400 text-[8.5px] font-medium select-none pointer-events-none"
-                                    >
-                                      Core Thesis
-                                    </text>
-                                  </g>
-
-                                  {/* Peripheral Paper Nodes */}
-                                  {nodePositions.map((node) => {
-                                    const isSelected = (selectedNode.url || selectedNode.title) === node.key;
-                                    const fillColor =
-                                      node.src.stance === "contradicting"
-                                        ? "fill-rose-500/20 stroke-rose-500"
-                                        : node.src.stance === "supporting"
-                                        ? "fill-emerald-500/20 stroke-emerald-500"
-                                        : "fill-sky-500/20 stroke-sky-400";
-
-                                    return (
-                                      <g
-                                        key={`node-${node.key}`}
-                                        onClick={() => setSelectedGraphNodeId(node.key)}
-                                        className="cursor-pointer group"
+                                      <text
+                                        x={centerX}
+                                        y={centerY - 4}
+                                        textAnchor="middle"
+                                        className="fill-sky-900 dark:fill-sky-200 text-[10px] font-bold select-none pointer-events-none"
                                       >
-                                        {isSelected && (
+                                        Inquiry
+                                      </text>
+                                      <text
+                                        x={centerX}
+                                        y={centerY + 9}
+                                        textAnchor="middle"
+                                        className="fill-sky-600 dark:fill-sky-400 text-[8.5px] font-medium select-none pointer-events-none"
+                                      >
+                                        Core Thesis
+                                      </text>
+                                    </g>
+
+                                    {/* Peripheral Paper Nodes */}
+                                    {nodePositions.map((node) => {
+                                      const isSelected = (selectedNode.url || selectedNode.title) === node.key;
+                                      const fillColor =
+                                        node.src.stance === "contradicting"
+                                          ? "fill-rose-500/20 stroke-rose-500"
+                                          : node.src.stance === "supporting"
+                                            ? "fill-emerald-500/20 stroke-emerald-500"
+                                            : "fill-sky-500/20 stroke-sky-400";
+
+                                      return (
+                                        <g
+                                          key={`node-${node.key}`}
+                                          onClick={() => setSelectedGraphNodeId(node.key)}
+                                          className="cursor-pointer group"
+                                        >
+                                          {isSelected && (
+                                            <circle
+                                              cx={node.x}
+                                              cy={node.y}
+                                              r={24}
+                                              className="stroke-amber-400 fill-amber-400/10 animate-pulse"
+                                              strokeWidth={1.5}
+                                            />
+                                          )}
                                           <circle
                                             cx={node.x}
                                             cy={node.y}
-                                            r={24}
-                                            className="stroke-amber-400 fill-amber-400/10 animate-pulse"
-                                            strokeWidth={1.5}
+                                            r={18}
+                                            className={`${fillColor} transition-transform duration-200 group-hover:scale-110`}
+                                            strokeWidth={isSelected ? 2.5 : 1.5}
                                           />
-                                        )}
-                                        <circle
-                                          cx={node.x}
-                                          cy={node.y}
-                                          r={18}
-                                          className={`${fillColor} transition-transform duration-200 group-hover:scale-110`}
-                                          strokeWidth={isSelected ? 2.5 : 1.5}
-                                        />
-                                        <text
-                                          x={node.x}
-                                          y={node.y + 4}
-                                          textAnchor="middle"
-                                          className="fill-neutral-900 dark:fill-white text-[9.5px] font-bold select-none pointer-events-none font-mono"
-                                        >
-                                          [{node.index + 1}]
-                                        </text>
-                                        <text
-                                          x={node.x}
-                                          y={node.y + (node.y > centerY ? 28 : -22)}
-                                          textAnchor="middle"
-                                          className="fill-neutral-700 dark:fill-neutral-300 text-[9px] font-medium select-none pointer-events-none"
-                                        >
-                                          {Array.isArray(node.src.authors) && node.src.authors.length > 0
-                                            ? `${node.src.authors[0].split(" ").pop()}${node.src.year ? ` (${node.src.year})` : ""}`
-                                            : `Source [${node.index + 1}]`}
-                                        </text>
-                                      </g>
-                                    );
-                                  })}
-                                </svg>
+                                          <text
+                                            x={node.x}
+                                            y={node.y + 4}
+                                            textAnchor="middle"
+                                            className="fill-neutral-900 dark:fill-white text-[9.5px] font-bold select-none pointer-events-none font-mono"
+                                          >
+                                            [{node.index + 1}]
+                                          </text>
+                                          <text
+                                            x={node.x}
+                                            y={node.y + (node.y > centerY ? 28 : -22)}
+                                            textAnchor="middle"
+                                            className="fill-neutral-700 dark:fill-neutral-300 text-[9px] font-medium select-none pointer-events-none"
+                                          >
+                                            {Array.isArray(node.src.authors) && node.src.authors.length > 0
+                                              ? `${node.src.authors[0].split(" ").pop()}${node.src.year ? ` (${node.src.year})` : ""}`
+                                              : `Source [${node.index + 1}]`}
+                                          </text>
+                                        </g>
+                                      );
+                                    })}
+                                  </svg>
 
-                                {/* Selected Paper Details Card */}
-                                {selectedNode && (
-                                  <div className="mt-2 p-3 rounded-xl bg-white dark:bg-neutral-800/90 border border-neutral-200/80 dark:border-white/10 shadow-2xs space-y-2">
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="space-y-0.5">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <span className="text-[10px] font-mono font-bold text-neutral-400">
-                                            Source #{graphSources.findIndex((s) => (s.url || s.title) === (selectedNode.url || selectedNode.title)) + 1}
-                                          </span>
-                                          {selectedNode.stance === "contradicting" ? (
-                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300/50">
-                                              Refuting / Contradicting
+                                  {/* Selected Paper Details Card */}
+                                  {selectedNode && (
+                                    <div className="mt-2 p-3 rounded-xl bg-white dark:bg-neutral-800/90 border border-neutral-200/80 dark:border-white/10 shadow-2xs space-y-2">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="space-y-0.5">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-[10px] font-mono font-bold text-neutral-400">
+                                              Source #{graphSources.findIndex((s) => (s.url || s.title) === (selectedNode.url || selectedNode.title)) + 1}
                                             </span>
-                                          ) : selectedNode.stance === "supporting" ? (
-                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300/50">
-                                              Supporting Evidence
+                                            {selectedNode.stance === "contradicting" ? (
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300/50">
+                                                Refuting / Contradicting
+                                              </span>
+                                            ) : selectedNode.stance === "supporting" ? (
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300/50">
+                                                Supporting Evidence
+                                              </span>
+                                            ) : (
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-white/10">
+                                                Mentioning / Context
+                                              </span>
+                                            )}
+                                            <span className="text-[10px] text-neutral-400">
+                                              {Array.isArray(selectedNode.authors) && selectedNode.authors.length > 0 ? selectedNode.authors.join(", ") : (selectedNode.venue || "Source")}{selectedNode.year ? ` · ${selectedNode.year}` : ""}
                                             </span>
-                                          ) : (
-                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-white/10">
-                                              Mentioning / Context
-                                            </span>
-                                          )}
-                                          <span className="text-[10px] text-neutral-400">
-                                            {Array.isArray(selectedNode.authors) && selectedNode.authors.length > 0 ? selectedNode.authors.join(", ") : (selectedNode.venue || "Source")}{selectedNode.year ? ` · ${selectedNode.year}` : ""}
-                                          </span>
+                                          </div>
+                                          <div className="font-semibold text-xs text-neutral-900 dark:text-neutral-100 leading-snug">
+                                            {selectedNode.url ? (
+                                              <a href={selectedNode.url} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                                {selectedNode.title || "Untitled Paper"} ↗
+                                              </a>
+                                            ) : (
+                                              selectedNode.title || "Untitled Paper"
+                                            )}
+                                          </div>
                                         </div>
-                                        <div className="font-semibold text-xs text-neutral-900 dark:text-neutral-100 leading-snug">
-                                          {selectedNode.url ? (
-                                            <a href={selectedNode.url} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                                              {selectedNode.title || "Untitled Paper"} ↗
-                                            </a>
-                                          ) : (
-                                            selectedNode.title || "Untitled Paper"
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          {selectedNode.url && (
+                                            <button
+                                              type="button"
+                                              disabled={Boolean(savedVaultSourceUrls[selectedNode.url || selectedNode.title || ""])}
+                                              onClick={() => handleSaveSourceToVault({
+                                                title: selectedNode.title,
+                                                url: selectedNode.url,
+                                                snippet: selectedNode.snippet,
+                                                authors: Array.isArray(selectedNode.authors) ? selectedNode.authors : undefined,
+                                                year: selectedNode.year,
+                                                venue: selectedNode.venue,
+                                              })}
+                                              className="px-2 py-1 rounded-md text-[10.5px] border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 flex items-center gap-1 cursor-pointer transition-colors"
+                                            >
+                                              <BookmarkPlus className="w-3 h-3 text-sky-500" />
+                                              <span>Save</span>
+                                            </button>
                                           )}
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center gap-1.5 shrink-0">
-                                        {selectedNode.url && (
                                           <button
                                             type="button"
-                                            disabled={Boolean(savedVaultSourceUrls[selectedNode.url || selectedNode.title || ""])}
-                                            onClick={() => handleSaveSourceToVault({
-                                              title: selectedNode.title,
-                                              url: selectedNode.url,
-                                              snippet: selectedNode.snippet,
-                                              authors: Array.isArray(selectedNode.authors) ? selectedNode.authors : undefined,
-                                              year: selectedNode.year,
-                                              venue: selectedNode.venue,
-                                            })}
-                                            className="px-2 py-1 rounded-md text-[10.5px] border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 flex items-center gap-1 cursor-pointer transition-colors"
+                                            onClick={() => {
+                                              const promptText = `Inquire deeper into: "${selectedNode.title || "this source"}" (${selectedNode.year || "recent"}). What specific empirical methodologies, causal limitations, and findings did the authors report?`;
+                                              setGuideInput(promptText);
+                                              guideInputRef.current?.focus();
+                                            }}
+                                            className="px-2 py-1 rounded-md text-[10.5px] font-medium bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-300/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 flex items-center gap-1 cursor-pointer transition-colors"
+                                            title="Prompt AskScholar to conduct a deep critical inquiry into this specific source"
                                           >
-                                            <BookmarkPlus className="w-3 h-3 text-sky-500" />
-                                            <span>Save</span>
+                                            <Sparkles className="w-3 h-3 text-indigo-500" />
+                                            <span>Deep Inquiry</span>
                                           </button>
-                                        )}
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const promptText = `Inquire deeper into: "${selectedNode.title || "this source"}" (${selectedNode.year || "recent"}). What specific empirical methodologies, causal limitations, and findings did the authors report?`;
-                                            setGuideInput(promptText);
-                                            guideInputRef.current?.focus();
-                                          }}
-                                          className="px-2 py-1 rounded-md text-[10.5px] font-medium bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-300/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 flex items-center gap-1 cursor-pointer transition-colors"
-                                          title="Prompt AskScholar to conduct a deep critical inquiry into this specific source"
-                                        >
-                                          <Sparkles className="w-3 h-3 text-indigo-500" />
-                                          <span>Deep Inquiry</span>
-                                        </button>
+                                        </div>
                                       </div>
+                                      {selectedNode.snippet && (
+                                        <p className="text-[11px] text-neutral-600 dark:text-neutral-300 italic bg-neutral-50 dark:bg-neutral-900/40 p-2 rounded-lg border border-neutral-200/50 dark:border-white/5">
+                                          "{selectedNode.snippet}"
+                                        </p>
+                                      )}
                                     </div>
-                                    {selectedNode.snippet && (
-                                      <p className="text-[11px] text-neutral-600 dark:text-neutral-300 italic bg-neutral-50 dark:bg-neutral-900/40 p-2 rounded-lg border border-neutral-200/50 dark:border-white/5">
-                                        "{selectedNode.snippet}"
-                                      </p>
-                                    )}
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })() : msg.sender === "assistant" && messageActiveTab[msg.id] === "consensus" ? (() => {
+                            const consensusSources = getNormalizedMsgSources(msg);
+                            const audit = msg.peerReviewAudit || {
+                              overallVerdict: "Empirical Rigor: High — Methodological Framework Validated",
+                              rigorScore: consensusSources.length >= 4 ? 91 : 84,
+                              critiques: [
+                                {
+                                  type: "causal_inference" as const,
+                                  title: "Observational Directionality & Endogeneity",
+                                  explanation: "Cross-sectional empirical studies observe correlation; reverse causality requires longitudinal verification.",
+                                  severity: "medium" as const,
+                                },
+                                {
+                                  type: "sample_bias" as const,
+                                  title: "Demographic & Contextual Generalizability",
+                                  explanation: "Primary datasets index primarily on high-resource institutional environments.",
+                                  severity: "low" as const,
+                                },
+                                {
+                                  type: "confounding_variable" as const,
+                                  title: "Macroeconomic & Institutional Latent Variables",
+                                  explanation: "Unobserved macroeconomic shifts during the sample windows may moderate observed effect sizes.",
+                                  severity: "low" as const,
+                                },
+                              ],
+                              methodologicalStrengths: [
+                                "Multi-source convergence across verified academic and institutional publications",
+                                "Explicit citation attribution with bracketed anti-hallucination validation",
+                                "Direct empirical alignment between theoretical claims and retrieved evidence",
+                              ],
+                              counterTheories: [
+                                "Non-linear equilibrium models predicting diminishing marginal returns",
+                                "Heterogeneous institutional adaptation dynamics under localized constraints",
+                              ],
+                            };
+
+                            return (
+                              <div className="space-y-3 pt-1">
+                                <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
+                                  <div className="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-200">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                                    <span>Peer Reviewer 2 Adversarial Stress-Test & Scholarly Rigor Audit</span>
                                   </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10.5px] font-mono font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+                                      Empirical Rigor: {audit.rigorScore}/100
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Overall Verdict Banner */}
+                                <div className="p-3 rounded-xl bg-gradient-to-r from-purple-50/70 to-indigo-50/70 dark:from-purple-950/20 dark:to-indigo-950/20 border border-purple-200/60 dark:border-purple-800/30 flex items-start gap-2.5">
+                                  <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+                                  <div className="space-y-0.5">
+                                    <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                                      {audit.overallVerdict}
+                                    </div>
+                                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug">
+                                      Multi-model adversarial audit evaluates potential causal fallacies, confounding factors, and theoretical contradictions across {consensusSources.length} cited sources.
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* 3 Metrics: Empirical Consensus, Evidentiary Breadth, Citation Standard */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                  <div className="p-3 rounded-xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/30 flex flex-col gap-1">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                                      Empirical Consensus
+                                    </span>
+                                    <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                                      {consensusSources.length >= 4 ? "Convergent Literature" : "Emerging Consensus"}
+                                    </span>
+                                    <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-tight">
+                                      {consensusSources.length >= 4
+                                        ? "Independent empirical and institutional analyses converge on primary causal mechanisms."
+                                        : "Preliminary multi-source evidence indicates consistent directionality with open variables."}
+                                    </p>
+                                  </div>
+
+                                  <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/30 flex flex-col gap-1">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                                      Evidentiary Breadth
+                                    </span>
+                                    <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                                      {consensusSources.length} Independent Sources
+                                    </span>
+                                    <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-tight">
+                                      Combines peer-reviewed literature, policy reports, and Knowledge Vault evidence.
+                                    </p>
+                                  </div>
+
+                                  <div className="p-3 rounded-xl bg-sky-50/60 dark:bg-sky-950/20 border border-sky-200/60 dark:border-sky-800/30 flex flex-col gap-1">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-300">
+                                      Citation Standard
+                                    </span>
+                                    <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100 uppercase">
+                                      {askCitationStyle} Strict Audit
+                                    </span>
+                                    <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-tight">
+                                      Every claim mapped to authenticated inline brackets with active anti-hallucination scrub.
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Adversarial Methodological Critiques */}
+                                <div className="p-3 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/10 space-y-2.5">
+                                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                                    <span>Peer Reviewer 2: Methodological Inquiries & Stress-Tests</span>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {audit.critiques.map((critique, cIdx) => (
+                                      <div key={cIdx} className="p-2.5 rounded-lg bg-white dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-white/5 space-y-1">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-[11px] font-bold text-neutral-900 dark:text-neutral-100">
+                                            {critique.title}
+                                          </span>
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded font-mono bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
+                                              {critique.type.replace(/_/g, " ")}
+                                            </span>
+                                            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${critique.severity === "high"
+                                              ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300/40"
+                                              : critique.severity === "medium"
+                                                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-300/40"
+                                                : "bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-300/40"
+                                              }`}>
+                                              {critique.severity.toUpperCase()} RISK
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <p className="text-[10.5px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                                          {critique.explanation}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Competing Theoretical Paradigms & Strengths */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  <div className="p-3 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/10 space-y-1.5">
+                                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
+                                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                                      <span>Methodological Strengths</span>
+                                    </div>
+                                    <ul className="space-y-1 text-[10.5px] text-neutral-600 dark:text-neutral-300 pl-1">
+                                      {audit.methodologicalStrengths.map((str, sIdx) => (
+                                        <li key={sIdx} className="flex items-start gap-1.5">
+                                          <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                                          <span>{str}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+
+                                  <div className="p-3 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/10 space-y-1.5">
+                                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
+                                      <Scale className="w-3.5 h-3.5 text-purple-500" />
+                                      <span>Competing Theoretical Paradigms</span>
+                                    </div>
+                                    <ul className="space-y-1 text-[10.5px] text-neutral-600 dark:text-neutral-300 pl-1">
+                                      {audit.counterTheories.map((ct, ctIdx) => (
+                                        <li key={ctIdx} className="flex items-start gap-1.5">
+                                          <span className="text-purple-500 font-bold shrink-0">⚡</span>
+                                          <span>{ct}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })() : msg.sender === "assistant" ? (
+                            <div className="space-y-3">
+                              {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
+                                <ScientificConsensusGauge
+                                  citations={msg.citations && msg.citations.length > 0 ? msg.citations : liveSourcesAsCitations(msg.liveSources)}
+                                />
+                              )}
+                              <div>
+                                {renderFormattedGuideText(
+                                  msg.citations && msg.citations.length > 0 ? stripRawReferencesSection(msg.text) : msg.text,
+                                  msg.citations && msg.citations.length > 0 ? msg.citations : liveSourcesAsCitations(msg.liveSources),
+                                  askCitationStyle,
+                                  handleAddCitationToEvidence,
+                                  handleFocusCitationInGraph,
+                                  msg.id
                                 )}
                               </div>
                             </div>
-                          );
-                        })() : msg.sender === "assistant" && messageActiveTab[msg.id] === "consensus" ? (() => {
-                          const consensusSources = getNormalizedMsgSources(msg);
-                          const audit = msg.peerReviewAudit || {
-                            overallVerdict: "Empirical Rigor: High — Methodological Framework Validated",
-                            rigorScore: consensusSources.length >= 4 ? 91 : 84,
-                            critiques: [
-                              {
-                                type: "causal_inference" as const,
-                                title: "Observational Directionality & Endogeneity",
-                                explanation: "Cross-sectional empirical studies observe correlation; reverse causality requires longitudinal verification.",
-                                severity: "medium" as const,
-                              },
-                              {
-                                type: "sample_bias" as const,
-                                title: "Demographic & Contextual Generalizability",
-                                explanation: "Primary datasets index primarily on high-resource institutional environments.",
-                                severity: "low" as const,
-                              },
-                              {
-                                type: "confounding_variable" as const,
-                                title: "Macroeconomic & Institutional Latent Variables",
-                                explanation: "Unobserved macroeconomic shifts during the sample windows may moderate observed effect sizes.",
-                                severity: "low" as const,
-                              },
-                            ],
-                            methodologicalStrengths: [
-                              "Multi-source convergence across verified academic and institutional publications",
-                              "Explicit citation attribution with bracketed anti-hallucination validation",
-                              "Direct empirical alignment between theoretical claims and retrieved evidence",
-                            ],
-                            counterTheories: [
-                              "Non-linear equilibrium models predicting diminishing marginal returns",
-                              "Heterogeneous institutional adaptation dynamics under localized constraints",
-                            ],
-                          };
-
-                          return (
-                            <div className="space-y-3 pt-1">
-                              <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
-                                <div className="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-200">
-                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                                  <span>Peer Reviewer 2 Adversarial Stress-Test & Scholarly Rigor Audit</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[10.5px] font-mono font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
-                                    Empirical Rigor: {audit.rigorScore}/100
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Overall Verdict Banner */}
-                              <div className="p-3 rounded-xl bg-gradient-to-r from-purple-50/70 to-indigo-50/70 dark:from-purple-950/20 dark:to-indigo-950/20 border border-purple-200/60 dark:border-purple-800/30 flex items-start gap-2.5">
-                                <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
-                                <div className="space-y-0.5">
-                                  <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                                    {audit.overallVerdict}
-                                  </div>
-                                  <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-snug">
-                                    Multi-model adversarial audit evaluates potential causal fallacies, confounding factors, and theoretical contradictions across {consensusSources.length} cited sources.
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* 3 Metrics: Empirical Consensus, Evidentiary Breadth, Citation Standard */}
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                <div className="p-3 rounded-xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/30 flex flex-col gap-1">
-                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-700 dark:text-purple-300">
-                                    Empirical Consensus
-                                  </span>
-                                  <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                                    {consensusSources.length >= 4 ? "Convergent Literature" : "Emerging Consensus"}
-                                  </span>
-                                  <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-tight">
-                                    {consensusSources.length >= 4
-                                      ? "Independent empirical and institutional analyses converge on primary causal mechanisms."
-                                      : "Preliminary multi-source evidence indicates consistent directionality with open variables."}
-                                  </p>
-                                </div>
-
-                                <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/30 flex flex-col gap-1">
-                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                                    Evidentiary Breadth
-                                  </span>
-                                  <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                                    {consensusSources.length} Independent Sources
-                                  </span>
-                                  <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-tight">
-                                    Combines peer-reviewed literature, policy reports, and Knowledge Vault evidence.
-                                  </p>
-                                </div>
-
-                                <div className="p-3 rounded-xl bg-sky-50/60 dark:bg-sky-950/20 border border-sky-200/60 dark:border-sky-800/30 flex flex-col gap-1">
-                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-300">
-                                    Citation Standard
-                                  </span>
-                                  <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100 uppercase">
-                                    {askCitationStyle} Strict Audit
-                                  </span>
-                                  <p className="text-[10.5px] text-neutral-600 dark:text-neutral-400 leading-tight">
-                                    Every claim mapped to authenticated inline brackets with active anti-hallucination scrub.
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* Adversarial Methodological Critiques */}
-                              <div className="p-3 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/10 space-y-2.5">
-                                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
-                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                                  <span>Peer Reviewer 2: Methodological Inquiries & Stress-Tests</span>
-                                </div>
-                                <div className="space-y-2">
-                                  {audit.critiques.map((critique, cIdx) => (
-                                    <div key={cIdx} className="p-2.5 rounded-lg bg-white dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-white/5 space-y-1">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[11px] font-bold text-neutral-900 dark:text-neutral-100">
-                                          {critique.title}
-                                        </span>
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded font-mono bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
-                                            {critique.type.replace(/_/g, " ")}
-                                          </span>
-                                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
-                                            critique.severity === "high"
-                                              ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300/40"
-                                              : critique.severity === "medium"
-                                              ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-300/40"
-                                              : "bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-300/40"
-                                          }`}>
-                                            {critique.severity.toUpperCase()} RISK
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <p className="text-[10.5px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
-                                        {critique.explanation}
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Competing Theoretical Paradigms & Strengths */}
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <div className="p-3 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/10 space-y-1.5">
-                                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
-                                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                                    <span>Methodological Strengths</span>
-                                  </div>
-                                  <ul className="space-y-1 text-[10.5px] text-neutral-600 dark:text-neutral-300 pl-1">
-                                    {audit.methodologicalStrengths.map((str, sIdx) => (
-                                      <li key={sIdx} className="flex items-start gap-1.5">
-                                        <span className="text-emerald-500 font-bold shrink-0">✓</span>
-                                        <span>{str}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-
-                                <div className="p-3 rounded-xl bg-neutral-50/80 dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/10 space-y-1.5">
-                                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
-                                    <Scale className="w-3.5 h-3.5 text-purple-500" />
-                                    <span>Competing Theoretical Paradigms</span>
-                                  </div>
-                                  <ul className="space-y-1 text-[10.5px] text-neutral-600 dark:text-neutral-300 pl-1">
-                                    {audit.counterTheories.map((ct, ctIdx) => (
-                                      <li key={ctIdx} className="flex items-start gap-1.5">
-                                        <span className="text-purple-500 font-bold shrink-0">⚡</span>
-                                        <span>{ct}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })() : msg.sender === "assistant" ? (
-                          <div className="space-y-3">
-                            {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
-                              <ScientificConsensusGauge
-                                citations={msg.citations && msg.citations.length > 0 ? msg.citations : liveSourcesAsCitations(msg.liveSources)}
+                          ) : editingUserMsgId === msg.id ? (
+                            <div className="flex flex-col gap-2 min-w-[240px] sm:min-w-[320px]">
+                              <textarea
+                                rows={2}
+                                value={editingUserMsgText}
+                                onChange={(e) => setEditingUserMsgText(e.target.value)}
+                                className="w-full rounded-lg p-2 text-xs bg-white/10 dark:bg-neutral-900/10 text-white dark:text-neutral-900 border border-white/20 dark:border-neutral-900/20 focus:outline-none resize-none"
                               />
-                            )}
-                            <div>
-                              {renderFormattedGuideText(
-                                msg.citations && msg.citations.length > 0 ? stripRawReferencesSection(msg.text) : msg.text,
-                                msg.citations && msg.citations.length > 0 ? msg.citations : liveSourcesAsCitations(msg.liveSources),
-                                askCitationStyle,
-                                handleAddCitationToEvidence,
-                                handleFocusCitationInGraph
-                              )}
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingUserMsgId(null);
+                                    setEditingUserMsgText("");
+                                  }}
+                                  className="px-2.5 py-1 rounded-md text-[11px] bg-white/10 dark:bg-neutral-900/10 hover:bg-white/20 dark:hover:bg-neutral-900/20 transition-colors cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextText = editingUserMsgText.trim();
+                                    if (!nextText) return;
+                                    const msgIndex = guideMessages.findIndex((m) => m.id === msg.id);
+                                    const baseHistory = msgIndex >= 0 ? guideMessages.slice(0, msgIndex) : guideMessages;
+                                    setEditingUserMsgId(null);
+                                    setEditingUserMsgText("");
+                                    handleSendGuideMessage(nextText, undefined, undefined, baseHistory);
+                                  }}
+                                  className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white text-neutral-900 dark:bg-neutral-900 dark:text-white hover:opacity-90 transition-opacity cursor-pointer"
+                                >
+                                  Save & Submit
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        ) : editingUserMsgId === msg.id ? (
-                          <div className="flex flex-col gap-2 min-w-[240px] sm:min-w-[320px]">
-                            <textarea
-                              rows={2}
-                              value={editingUserMsgText}
-                              onChange={(e) => setEditingUserMsgText(e.target.value)}
-                              className="w-full rounded-lg p-2 text-xs bg-white/10 dark:bg-neutral-900/10 text-white dark:text-neutral-900 border border-white/20 dark:border-neutral-900/20 focus:outline-none resize-none"
-                            />
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingUserMsgId(null);
-                                  setEditingUserMsgText("");
-                                }}
-                                className="px-2.5 py-1 rounded-md text-[11px] bg-white/10 dark:bg-neutral-900/10 hover:bg-white/20 dark:hover:bg-neutral-900/20 transition-colors cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const nextText = editingUserMsgText.trim();
-                                  if (!nextText) return;
-                                  const msgIndex = guideMessages.findIndex((m) => m.id === msg.id);
-                                  const baseHistory = msgIndex >= 0 ? guideMessages.slice(0, msgIndex) : guideMessages;
-                                  setEditingUserMsgId(null);
-                                  setEditingUserMsgText("");
-                                  handleSendGuideMessage(nextText, undefined, undefined, baseHistory);
-                                }}
-                                className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white text-neutral-900 dark:bg-neutral-900 dark:text-white hover:opacity-90 transition-opacity cursor-pointer"
-                              >
-                                Save & Submit
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.text}</div>
-                        )}
+                          ) : (
+                            <div className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.text}</div>
+                          )}
 
-                        {/* Deep Research Explicit State Machine (Section 12) */}
-                        {msg.deepResearchState && (
-                          <DeepResearchWorkflowCard
-                            phase={msg.deepResearchState.phase}
-                            subQuestions={msg.deepResearchState.subQuestions}
-                            searchedCount={msg.deepResearchState.searchedCount}
-                            readCount={msg.deepResearchState.readCount}
-                            citedCount={msg.deepResearchState.citedCount}
-                            onUpdateSubQuestions={(nextQuestions) => {
-                              setGuideMessages((prev) =>
-                                prev.map((m) =>
-                                  m.id === msg.id && m.deepResearchState
-                                    ? {
+                          {/* Deep Research Explicit State Machine (Section 12) */}
+                          {msg.deepResearchState && (
+                            <DeepResearchWorkflowCard
+                              phase={msg.deepResearchState.phase}
+                              subQuestions={msg.deepResearchState.subQuestions}
+                              searchedCount={msg.deepResearchState.searchedCount}
+                              readCount={msg.deepResearchState.readCount}
+                              citedCount={msg.deepResearchState.citedCount}
+                              onUpdateSubQuestions={(nextQuestions) => {
+                                setGuideMessages((prev) =>
+                                  prev.map((m) =>
+                                    m.id === msg.id && m.deepResearchState
+                                      ? {
                                         ...m,
                                         deepResearchState: {
                                           ...m.deepResearchState,
                                           subQuestions: nextQuestions,
                                         },
                                       }
-                                    : m
-                                )
-                              );
-                            }}
-                            onApprovePlan={(approvedQuestions) => {
-                              void handleApproveDeepResearchPlan(msg.id, approvedQuestions);
-                            }}
-                          />
-                        )}
-
-                        {/* Deep Research Plan & Multi-Step Visualizer */}
-                        {((msg.plan && msg.plan.length > 0) || (msg.stages && msg.stages.length > 0)) && !msg.deepResearchState && (
-                          <LiveResearchTrajectoryVisualizer
-                            plan={msg.plan}
-                            stages={msg.stages}
-                            mode={msg.mode}
-                            defaultExpanded={expandedPlanIds[msg.id] !== false}
-                          />
-                        )}
-
-                        {/* Retrieved Live Sources Drawer */}
-                        {msg.liveSources && msg.liveSources.length > 0 && (
-                          <LiveSourcesDrawer
-                            sources={msg.liveSources}
-                            searchedAt={msg.searchedAt}
-                            initialExpanded={msg.liveSources.length <= 3}
-                            onSaveToVault={handleSaveSourceToVault}
-                            savedUrls={savedVaultSourceUrls}
-                          />
-                        )}
-                        {msg.liveSources && msg.liveSources.length === 0 && (
-                          <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400" data-testid="no-live-sources">
-                            No recent sources were found for this question, so this answer is from the AI's general knowledge. Check it before you rely on it.
-                          </p>
-                        )}
-
-                        {/* Separated Reference List & Source Transparency Panel (Sections 5, 6, 10, 14) */}
-                        {msg.sender === "assistant" &&
-                          !msg.error &&
-                          ((msg.citations && msg.citations.length > 0) ||
-                            (msg.liveSources && msg.liveSources.length > 0) ||
-                            (msg.excludedSources && msg.excludedSources.length > 0)) && (
-                            <SourceTransparencyPanel
-                              messageId={msg.id}
-                              citations={
-                                msg.citations && msg.citations.length > 0
-                                  ? msg.citations
-                                  : liveSourcesAsCitations(msg.liveSources) || []
-                              }
-                              excludedSources={msg.excludedSources}
-                              citationStyle={askCitationStyle}
-                              searchedCount={msg.searchedCount}
-                              readCount={msg.readCount}
-                              citedCount={msg.citedCount}
+                                      : m
+                                  )
+                                );
+                              }}
+                              onApprovePlan={(approvedQuestions) => {
+                                void handleApproveDeepResearchPlan(msg.id, approvedQuestions);
+                              }}
                             />
                           )}
 
-                        {/* Exact 6 Post-Response Actions in Single Non-Wrapping Row (Sections 8, 11, 13) */}
-                        {msg.sender === "assistant" && !msg.error && msg.id !== "init" && msg.id !== "reset-assistant" && (
-                          <PostResponseActionBar
-                            message={{
-                              ...msg,
-                              text:
-                                msg.citations && msg.citations.length > 0
-                                  ? stripRawReferencesSection(msg.text)
-                                  : msg.text,
-                              citations:
-                                msg.citations && msg.citations.length > 0
-                                  ? msg.citations
-                                  : liveSourcesAsCitations(msg.liveSources) || [],
-                            }}
-                            citationStyle={askCitationStyle}
-                            isSavedToVault={Boolean(storedToVaultMessageIds[msg.id])}
-                            onRegenerate={() => {
-                              const msgIdx = guideMessages.findIndex((m) => m.id === msg.id);
-                              const precedingUser =
-                                msgIdx > 0
-                                  ? guideMessages.slice(0, msgIdx).filter((m) => m.sender === "user").slice(-1)[0]
-                                  : guideMessages.filter((m) => m.sender === "user").slice(-1)[0];
-                              if (precedingUser) {
-                                void handleSendGuideMessage(
-                                  precedingUser.text,
-                                  undefined,
-                                  msg.mode === "deep-research" ? "deep-research" : "normal"
-                                );
-                              }
-                            }}
-                            onStoreToVault={() => {
-                              void handleStoreResponseToVault(msg);
-                            }}
-                            onContinueToWorkspace={(formatId) => {
-                              void handleBootProjectFromResearch(msg, formatId);
-                            }}
-                            onToast={(text, type) => showAppToast(text, type || "info", 2800)}
-                          />
-                        )}
+                          {/* Deep Research Plan & Multi-Step Visualizer */}
+                          {((msg.plan && msg.plan.length > 0) || (msg.stages && msg.stages.length > 0)) && !msg.deepResearchState && (
+                            <LiveResearchTrajectoryVisualizer
+                              plan={msg.plan}
+                              stages={msg.stages}
+                              mode={msg.mode}
+                              defaultExpanded={expandedPlanIds[msg.id] !== false}
+                            />
+                          )}
 
-                        {/* Quick Action Deep-Links */}
-                        {msg.action && (
-                          <div className="mt-3 pt-2.5 border-t border-neutral-200 dark:border-white/10">
-                            <button
-                              type="button"
-                              onClick={() => handleAssistantAction(msg.action!)}
-                              className="inline-flex items-center gap-1 text-[11px] bg-blue-50 dark:bg-white/10 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30 px-2.5 py-1 rounded-md hover:bg-blue-100 dark:hover:bg-white/15 transition font-medium cursor-pointer"
-                            >
-                              <span>{msg.action.label}</span>
-                            </button>
-                          </div>
-                        )}
+                          {/* Retrieved Live Sources Drawer */}
+                          {msg.liveSources && msg.liveSources.length > 0 && (
+                            <LiveSourcesDrawer
+                              sources={msg.liveSources}
+                              searchedAt={msg.searchedAt}
+                              initialExpanded={msg.liveSources.length <= 3}
+                              onSaveToVault={handleSaveSourceToVault}
+                              savedUrls={savedVaultSourceUrls}
+                            />
+                          )}
+                          {msg.liveSources && msg.liveSources.length === 0 && (
+                            <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400" data-testid="no-live-sources">
+                              No recent sources were found for this question, so this answer is from the AI's general knowledge. Check it before you rely on it.
+                            </p>
+                          )}
 
-                        {/* Dynamic Follow-Up Questions ("Related Inquiries") */}
-                        {msg.sender === "assistant" && !msg.error && msg.followUps && msg.followUps.length > 0 && (
-                          <div className="mt-3 pt-2.5 border-t border-neutral-200/60 dark:border-white/10 space-y-1.5">
-                            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                              <Lightbulb className="w-3 h-3 text-amber-500" />
-                              <span>Related Inquiries</span>
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {msg.followUps.map((fu, fuIdx) => (
+                          {/* Separated Reference List & Source Transparency Panel (Sections 5, 6, 10, 14) */}
+                          {msg.sender === "assistant" &&
+                            !msg.error &&
+                            ((msg.citations && msg.citations.length > 0) ||
+                              (msg.liveSources && msg.liveSources.length > 0) ||
+                              (msg.excludedSources && msg.excludedSources.length > 0)) && (
+                              <SourceTransparencyPanel
+                                messageId={msg.id}
+                                citations={
+                                  msg.citations && msg.citations.length > 0
+                                    ? msg.citations
+                                    : liveSourcesAsCitations(msg.liveSources) || []
+                                }
+                                excludedSources={msg.excludedSources}
+                                citationStyle={askCitationStyle}
+                                searchedCount={msg.searchedCount}
+                                readCount={msg.readCount}
+                                citedCount={msg.citedCount}
+                              />
+                            )}
+
+                          {/* Recommended Workspace Handoff Callout when explicitly recommended by server */}
+                          {msg.sender === "assistant" && msg.recommendedWorkspaceHandoff && (
+                            <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/40 flex items-center justify-between gap-2 flex-wrap">
+                              <span className="text-[11px] font-medium text-emerald-900 dark:text-emerald-200">
+                                Recommended Workspace: {msg.recommendedWorkspaceHandoff.formatLabel}
+                              </span>
+                              <div className="flex items-center gap-1.5">
                                 <button
-                                  key={fuIdx}
                                   type="button"
-                                  onClick={() =>
-                                    handleSendGuideMessage(
-                                      fu,
-                                      undefined,
-                                      msg.mode === "deep-research" ? "deep-research" : msg.mode === "search" ? "search" : "normal"
-                                    )
-                                  }
-                                  className="text-[11px] text-left px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/[0.06] hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:border-sky-300 dark:hover:border-sky-500/30 border border-neutral-200/60 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors cursor-pointer inline-flex items-center gap-1 group"
+                                  onClick={() => void handleBootProjectFromResearch(msg, "OT-01")}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                                 >
-                                  <span>{fu}</span>
-                                  <ArrowRight className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity text-sky-500 shrink-0" />
+                                  <span>Launch in 4-Phase Essay Engine (OT-01)</span>
+                                  <ArrowRight className="w-3 h-3" />
                                 </button>
-                              ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Exact 6 Post-Response Actions in Single Non-Wrapping Row (Sections 8, 11, 13) */}
+                          {msg.sender === "assistant" && !msg.error && msg.id !== "init" && msg.id !== "reset-assistant" && (
+                            <PostResponseActionBar
+                              message={{
+                                ...msg,
+                                text:
+                                  msg.citations && msg.citations.length > 0
+                                    ? stripRawReferencesSection(msg.text)
+                                    : msg.text,
+                                citations:
+                                  msg.citations && msg.citations.length > 0
+                                    ? msg.citations
+                                    : liveSourcesAsCitations(msg.liveSources) || [],
+                              }}
+                              citationStyle={askCitationStyle}
+                              isSavedToVault={Boolean(storedToVaultMessageIds[msg.id])}
+                              onRegenerate={() => {
+                                const msgIdx = guideMessages.findIndex((m) => m.id === msg.id);
+                                const precedingUser =
+                                  msgIdx > 0
+                                    ? guideMessages.slice(0, msgIdx).filter((m) => m.sender === "user").slice(-1)[0]
+                                    : guideMessages.filter((m) => m.sender === "user").slice(-1)[0];
+                                if (precedingUser) {
+                                  void handleSendGuideMessage(
+                                    precedingUser.text,
+                                    undefined,
+                                    msg.mode === "deep-research" ? "deep-research" : "normal"
+                                  );
+                                }
+                              }}
+                              onStoreToVault={() => {
+                                void handleStoreResponseToVault(msg);
+                              }}
+                              onContinueToWorkspace={(formatId) => {
+                                void handleBootProjectFromResearch(msg, formatId);
+                              }}
+                              onToast={(text, type) => showAppToast(text, type || "info", 2800)}
+                            />
+                          )}
+
+                          {/* Quick Action Deep-Links */}
+                          {msg.action && (
+                            <div className="mt-3 pt-2.5 border-t border-neutral-200 dark:border-white/10">
+                              <button
+                                type="button"
+                                onClick={() => handleAssistantAction(msg.action!)}
+                                className="inline-flex items-center gap-1 text-[11px] bg-blue-50 dark:bg-white/10 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30 px-2.5 py-1 rounded-md hover:bg-blue-100 dark:hover:bg-white/15 transition font-medium cursor-pointer"
+                              >
+                                <span>{msg.action.label}</span>
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Dynamic Follow-Up Questions ("Related Inquiries") */}
+                          {msg.sender === "assistant" && !msg.error && msg.followUps && msg.followUps.length > 0 && (
+                            <div className="mt-3 pt-2.5 border-t border-neutral-200/60 dark:border-white/10 space-y-1.5">
+                              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                                <Lightbulb className="w-3 h-3 text-amber-500" />
+                                <span>Related Inquiries</span>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {msg.followUps.map((fu, fuIdx) => (
+                                  <button
+                                    key={fuIdx}
+                                    type="button"
+                                    onClick={() =>
+                                      handleSendGuideMessage(
+                                        fu,
+                                        undefined,
+                                        msg.mode === "deep-research" ? "deep-research" : msg.mode === "search" ? "search" : "normal"
+                                      )
+                                    }
+                                    className="text-[11px] text-left px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/[0.06] hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:border-sky-300 dark:hover:border-sky-500/30 border border-neutral-200/60 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors cursor-pointer inline-flex items-center gap-1 group"
+                                  >
+                                    <span>{fu}</span>
+                                    <ArrowRight className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity text-sky-500 shrink-0" />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    {isGuideThinking && (
+                      <div className="flex flex-col gap-2.5 animate-in fade-in">
+                        {/* Live Multi-Step Research Visualizer (Phase 5) */}
+                        <LiveResearchTrajectoryVisualizer
+                          isLive={true}
+                          currentStep={askPhase?.step}
+                          foundCount={askPhase?.found}
+                          mode={sidebarAiMode}
+                        />
+                        {/* Live Token Streaming Bubble when tokens are arriving */}
+                        {streamingGuideText && (
+                          <div className="flex flex-col items-start">
+                            <div className="flex items-center gap-1.5 mb-1 px-1 text-[10px] font-medium text-neutral-400">
+                              <ScholarCoreLogo size="sm" withText={false} className="scale-75 -mx-1" />
+                              <span>Scholar Core</span>
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                                Streaming…
+                              </span>
+                            </div>
+                            <div className="rounded-2xl px-4 py-3 max-w-[88%] leading-relaxed bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 rounded-tl-xs shadow-2xs">
+                              {renderFormattedGuideText(streamingGuideText, undefined, askCitationStyle)}
                             </div>
                           </div>
                         )}
-                      </div>
-                    </div>
-                  ))}
 
-                  {isGuideThinking && (
-                    <div className="flex flex-col gap-2.5 animate-in fade-in">
-                      {/* Live Multi-Step Research Visualizer (Phase 5) */}
-                      <LiveResearchTrajectoryVisualizer
-                        isLive={true}
-                        currentStep={askPhase?.step}
-                        foundCount={askPhase?.found}
-                        mode={sidebarAiMode}
-                      />
-                      {/* Live Token Streaming Bubble when tokens are arriving */}
-                      {streamingGuideText && (
-                        <div className="flex flex-col items-start">
-                          <div className="flex items-center gap-1.5 mb-1 px-1 text-[10px] font-medium text-neutral-400">
-                            <ScholarCoreLogo size="sm" withText={false} className="scale-75 -mx-1" />
-                            <span>Scholar Core</span>
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-sky-500/10 text-sky-600 dark:text-sky-400">
-                              Streaming…
-                            </span>
-                          </div>
-                          <div className="rounded-2xl px-4 py-3 max-w-[88%] leading-relaxed bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 rounded-tl-xs shadow-2xs">
-                            {renderFormattedGuideText(streamingGuideText, undefined, askCitationStyle)}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-sky-500/5 via-purple-500/5 to-transparent dark:from-sky-500/10 dark:via-purple-500/10 dark:to-transparent border border-sky-200/60 dark:border-white/10 shadow-xs">
-                        <div className="relative flex items-center justify-center shrink-0 mt-0.5">
-                          <div className="w-6 h-6 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 flex items-center justify-center shadow-xs">
-                            <ScholarCoreLogo size="sm" withText={false} className="scale-75 animate-spin" />
-                          </div>
-                          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-sky-500 animate-ping" />
-                        </div>
-                        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-semibold text-xs text-neutral-900 dark:text-neutral-100" role="status">
-                                {askPhase?.step === "searching"
-                                  ? "Searching recent sources…"
-                                  : askPhase?.step === "writing"
-                                    ? askPhase.found
-                                      ? `Found ${askPhase.found} source${askPhase.found === 1 ? "" : "s"} · writing the answer…`
-                                      : "No recent sources found · answering from general knowledge…"
-                                    : "Thinking…"}
-                              </span>
-                              <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.2 rounded-full border border-purple-200 dark:border-purple-800/40 animate-pulse shrink-0">
-                                Active
-                              </span>
+                        <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-sky-500/5 via-purple-500/5 to-transparent dark:from-sky-500/10 dark:via-purple-500/10 dark:to-transparent border border-sky-200/60 dark:border-white/10 shadow-xs">
+                          <div className="relative flex items-center justify-center shrink-0 mt-0.5">
+                            <div className="w-6 h-6 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 flex items-center justify-center shadow-xs">
+                              <ScholarCoreLogo size="sm" withText={false} className="scale-75 animate-spin" />
                             </div>
-                            <button
-                              type="button"
-                              onClick={handleStopGuideGeneration}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer shrink-0"
-                              title="Stop generating response"
-                            >
-                              <Square className="w-2.5 h-2.5 fill-current" />
-                              <span>Stop</span>
-                            </button>
+                            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-sky-500 animate-ping" />
                           </div>
+                          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-semibold text-xs text-neutral-900 dark:text-neutral-100" role="status">
+                                  {askPhase?.step === "searching"
+                                    ? askPhase.detail || "Searching recent sources…"
+                                    : askPhase?.step === "writing"
+                                      ? askPhase.found
+                                        ? `Found ${askPhase.found} source${askPhase.found === 1 ? "" : "s"} · writing the answer…`
+                                        : "No recent sources found · answering from general knowledge…"
+                                      : "Thinking…"}
+                                </span>
+                                <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.2 rounded-full border border-purple-200 dark:border-purple-800/40 animate-pulse shrink-0">
+                                  Active
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleStopGuideGeneration}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer shrink-0"
+                                title="Stop generating response"
+                              >
+                                <Square className="w-2.5 h-2.5 fill-current" />
+                                <span>Stop</span>
+                              </button>
+                            </div>
 
-                          {sidebarAiMode === "deep_research" ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
-                              {[
-                                "1. Query Framing & Scope",
-                                "2. Multi-Angle Sub-Questions",
-                                "3. Parallel Source Discovery",
-                                "4. Source Credibility & Screening",
-                                "5. Cross-Source Evidence Matrix",
-                                "6. Structured Synthesis & Counter-Arguments",
-                                "7. Citation & Verification Pass",
-                              ].map((stageLabel, idx) => {
-                                const isDone = idx < deepResearchActiveStage;
-                                const isCurrent = idx === deepResearchActiveStage;
-                                return (
-                                  <div
-                                    key={stageLabel}
-                                    className={`flex items-center gap-1.5 text-[10.5px] px-2 py-1 rounded-md border ${
-                                      isCurrent
+                            {sidebarAiMode === "deep_research" ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
+                                {[
+                                  "1. Query Framing & Scope",
+                                  "2. Multi-Angle Sub-Questions",
+                                  "3. Parallel Source Discovery",
+                                  "4. Source Credibility & Screening",
+                                  "5. Cross-Source Evidence Matrix",
+                                  "6. Structured Synthesis & Counter-Arguments",
+                                  "7. Citation & Verification Pass",
+                                ].map((stageLabel, idx) => {
+                                  const isDone = idx < deepResearchActiveStage;
+                                  const isCurrent = idx === deepResearchActiveStage;
+                                  return (
+                                    <div
+                                      key={stageLabel}
+                                      className={`flex items-center gap-1.5 text-[10.5px] px-2 py-1 rounded-md border ${isCurrent
                                         ? "bg-purple-500/10 border-purple-400/40 text-purple-800 dark:text-purple-200 font-semibold"
                                         : isDone
                                           ? "bg-emerald-500/5 border-emerald-400/20 text-emerald-700 dark:text-emerald-300"
                                           : "bg-transparent border-transparent text-neutral-400 dark:text-neutral-500"
-                                    }`}
-                                  >
-                                    <span className="font-mono text-[10px]">
-                                      {isDone ? "✓" : isCurrent ? "●" : "○"}
-                                    </span>
-                                    <span className="truncate">{stageLabel}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                              {askPhase?.step === "searching"
-                                ? "Live web, news, official portals, and scholarly indexes are searched so the answer rests on verified evidence."
-                                : "Synthesizing a clear, structured response with inline numbered citations."}
-                            </p>
-                          )}
+                                        }`}
+                                    >
+                                      <span className="font-mono text-[10px]">
+                                        {isDone ? "✓" : isCurrent ? "●" : "○"}
+                                      </span>
+                                      <span className="truncate">{stageLabel}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                                {askPhase?.step === "searching"
+                                  ? "Live web, news, official portals, and scholarly indexes are searched so the answer rests on verified evidence."
+                                  : "Synthesizing a clear, structured response with inline numbered citations."}
+                              </p>
+                            )}
 
-                          <div className="w-full h-1 bg-neutral-200/60 dark:bg-white/10 rounded-full overflow-hidden mt-0.5">
-                            <div className="h-full bg-gradient-to-r from-sky-500 via-purple-500 to-indigo-500 w-1/2 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]" />
+                            <div className="w-full h-1 bg-neutral-200/60 dark:bg-white/10 rounded-full overflow-hidden mt-0.5">
+                              <div className="h-full bg-gradient-to-r from-sky-500 via-purple-500 to-indigo-500 w-1/2 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]" />
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
-            </div>
-
-            {/* Pinned Floating Input Component (Module 3.4) */}
-            <div className="p-3 sm:p-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] bg-white/95 dark:bg-ink-800/95 backdrop-blur-md border-t border-neutral-200/80 dark:border-white/10 shrink-0">
-              <div className={isLandingPage ? "w-full max-w-4xl mx-auto" : "w-full"}>
-                {/* Status & Reset Bar */}
-                <div className="flex items-center justify-between px-1 mb-2">
-                  <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
-                    <Lightbulb className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400 shrink-0" aria-hidden="true" />
-                    <span className="font-medium text-neutral-700 dark:text-neutral-300">Ask Scholar</span>
-                    {aiStatus ? (
-                      aiStatus.connected ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold" title={`Operational provider: ${aiStatus.provider || "Operational"}`}>
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          <span>{aiStatus.statusText}</span>
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={onOpenAiAccess}
-                          className="text-neutral-600 dark:text-neutral-400 font-medium hover:underline cursor-pointer flex items-center gap-1"
-                          title="No operational AI providers. Click to configure AI Access."
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
-                          <span>AI Disconnected</span>
-                          <span className="text-[9px] underline">Configure ↗</span>
-                        </button>
-                      )
-                    ) : (
-                      <span className="text-neutral-400 text-[10px] animate-pulse">• Checking AI...</span>
                     )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      aria-label="Reset Chat"
-                      onClick={() => {
-                        handleStartNewAskThread();
-                        setGuideMessages([
-                          {
-                            id: "reset-assistant",
-                            sender: "assistant",
-                            text: "Hello! I am your Scholar Core Website Assistant. Ask me anything about how to navigate the platform, configure AI, manage your Knowledge Vault, or create research projects.",
-                            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                          },
-                        ]);
-                      }}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                      title="Reset conversation"
-                    >
-                      <RotateCcw className="w-3 h-3" />
-                      <span>Reset</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Pending Attachments Chips in Sidebar */}
-                {sidebarAttachments.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5 mb-2 px-1">
-                    {sidebarAttachments.map((att) => (
-                      <div
-                        key={att.id}
-                        className="flex items-center gap-1.5 px-2 py-0.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs animate-in fade-in"
-                      >
-                        {att.isImage ? (
-                          att.previewUrl ? (
-                            <img src={att.previewUrl} alt={att.name} className="w-4 h-4 object-cover rounded" />
-                          ) : (
-                            <Paperclip className="w-3.5 h-3.5 text-blue-500" />
-                          )
-                        ) : (
-                          <FileText className="w-3.5 h-3.5 text-amber-500" />
-                        )}
-                        <span className="truncate max-w-[140px] font-medium text-[11px]">{att.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeSidebarAttachment(att.id)}
-                          className="text-neutral-400 hover:text-red-500 p-0.5 rounded-full hover:bg-neutral-200 dark:hover:bg-white/10 cursor-pointer transition-colors"
-                          title="Remove attachment"
-                          aria-label="Remove attachment"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                    {isSidebarUploadingAttachment && (
-                      <span className="text-[11px] text-neutral-400 flex items-center gap-1.5 animate-pulse">
-                        <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing attachment...
-                      </span>
-                    )}
+                    <div ref={messagesEndRef} />
                   </div>
                 )}
+              </div>
 
-                {/* Input Wrapper Pill */}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (guideInput.trim() || sidebarAttachments.length > 0) {
-                      handleSendGuideMessage();
-                    }
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    if (e.dataTransfer.files?.length) {
-                      handleSidebarFileSelect(Array.from(e.dataTransfer.files));
-                    }
-                  }}
-                  className="relative flex flex-col rounded-2xl bg-white dark:bg-ink-750 p-3 shadow-sm border border-neutral-200/90 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] focus-within:shadow-md transition-all duration-200"
-                >
-                  <div className="w-full px-1">
-                    <textarea
-                      ref={guideInputRef as any}
-                      rows={1}
-                      value={guideInput}
-                      onChange={(e) => {
-                        setGuideInput(e.target.value);
-                        e.target.style.height = "auto";
-                        e.target.style.height = `${Math.min(e.target.scrollHeight, 130)}px`;
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.nativeEvent.isComposing || (e as unknown as { keyCode?: number }).keyCode === 229) return;
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          if (guideInput.trim() || sidebarAttachments.length > 0) {
-                            handleSendGuideMessage();
-                          }
-                        } else if (e.key === "Backspace" && guideInput === "" && sidebarAttachments.length > 0) {
-                          removeSidebarAttachment(sidebarAttachments[sidebarAttachments.length - 1].id);
-                        }
-                      }}
-                      onPaste={(e) => {
-                        const items = e.clipboardData?.items;
-                        if (!items) return;
-                        const newFiles: File[] = [];
-                        for (let i = 0; i < items.length; i++) {
-                          if (items[i].kind === "file") {
-                            const file = items[i].getAsFile();
-                            if (file) newFiles.push(file);
-                          }
-                        }
-                        if (newFiles.length > 0) {
-                          e.preventDefault();
-                          handleSidebarFileSelect(newFiles);
-                        }
-                      }}
-                      aria-label="Ask Scholar question input"
-                      placeholder="Ask a research question…"
-                      style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent", fieldSizing: "content" } as React.CSSProperties}
-                      className="w-full bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none resize-none prompt-bare-input max-h-32 min-h-[36px] overflow-y-auto scholar-scrollbar leading-relaxed"
-                    />
-                  </div>
+              {/* Pinned Floating Input Component (Module 3.4) */}
+              <div className="p-3 sm:p-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] bg-white/95 dark:bg-ink-800/95 backdrop-blur-md border-t border-neutral-200/80 dark:border-white/10 shrink-0">
+                <div className={isLandingPage ? "w-full max-w-4xl mx-auto" : "w-full"}>
+                  {/* Status & Reset Bar */}
+                  <div className="flex items-center justify-between px-1 mb-2">
+                    <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+                      <Lightbulb className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400 shrink-0" aria-hidden="true" />
+                      <span className="font-medium text-neutral-700 dark:text-neutral-300">Ask Scholar</span>
+                      {aiStatus ? (
+                        aiStatus.connected ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold" title={`Operational provider: ${aiStatus.provider || "Operational"}`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>{aiStatus.statusText}</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={onOpenAiAccess}
+                            className="text-neutral-600 dark:text-neutral-400 font-medium hover:underline cursor-pointer flex items-center gap-1"
+                            title="No operational AI providers. Click to configure AI Access."
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
+                            <span>AI Disconnected</span>
+                            <span className="text-[9px] underline">Configure ↗</span>
+                          </button>
+                        )
+                      ) : (
+                        <span className="text-neutral-400 text-[10px] animate-pulse">• Checking AI...</span>
+                      )}
+                    </div>
 
-                  <div className="flex items-center justify-between gap-2 pt-1.5 mt-1 border-t border-neutral-200/50 dark:border-white/5 flex-wrap">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <PromptBarActionMenu
-                        currentMode={sidebarAiMode}
-                        onSelectMode={setSidebarAiMode}
-                        onAttachFiles={handleSidebarFileSelect}
-                      />
-
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
+                        aria-label="Reset Chat"
                         onClick={() => {
-                          if (!userEmail) {
-                            openAuth("signin", "Sign in to ground Ask Scholar in your personal Knowledge Vault.");
-                            return;
-                          }
-                          setIsVaultGroundingActive((prev) => {
-                            const next = !prev;
-                            try {
-                              localStorage.setItem("scholar_vault_grounding_active", String(next));
-                            } catch {
-                              // ignore
-                            }
-                            showAppToast(
-                              next
-                                ? `Knowledge Vault Grounding enabled (${userVaultItems.length} items).`
-                                : "Knowledge Vault Grounding disabled.",
-                              next ? "success" : "info",
-                              2000
-                            );
-                            return next;
-                          });
+                          handleStartNewAskThread();
+                          setGuideMessages([
+                            {
+                              id: "reset-assistant",
+                              sender: "assistant",
+                              text: "Hello! I am your Scholar Core Website Assistant. Ask me anything about how to navigate the platform, configure AI, manage your Knowledge Vault, or create research projects.",
+                              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                            },
+                          ]);
                         }}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all cursor-pointer ${
-                          isVaultGroundingActive && userEmail
-                            ? "bg-amber-500/10 text-amber-800 dark:text-amber-200 border-amber-500/30 shadow-2xs font-semibold"
-                            : "bg-transparent text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 border-neutral-200/60 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20"
-                        }`}
-                        title={
-                          userEmail
-                            ? isVaultGroundingActive
-                              ? `Knowledge Vault Grounding Active (${userVaultItems.length} items available)`
-                              : "Click to ground answers in your personal Knowledge Vault"
-                            : "Sign in to ground answers in your personal Knowledge Vault"
-                        }
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                        title="Reset conversation"
                       >
-                        <Database className={`w-3 h-3 ${isVaultGroundingActive && userEmail ? "text-amber-500" : ""}`} />
-                        <span>Vault Grounding</span>
-                        {userEmail && (
-                          <span className={`text-[9px] font-mono px-1 rounded-full ${isVaultGroundingActive ? "bg-amber-500/20 text-amber-800 dark:text-amber-200" : "bg-neutral-200/60 dark:bg-white/10 text-neutral-500"}`}>
-                            {userVaultItems.length}
-                          </span>
-                        )}
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Reset</span>
                       </button>
-
-                      {sidebarAiMode === "deep_research" && (
-                        <button
-                          type="button"
-                          data-testid="propose-deep-research-plan-btn"
-                          disabled={!guideInput.trim()}
-                          onClick={() => handleProposeDeepResearchPlan(guideInput)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/20 disabled:opacity-40 transition-colors cursor-pointer whitespace-nowrap"
-                          title="Propose an editable Deep Research plan before searching begins"
-                        >
-                          <Sparkles className="w-3 h-3" />
-                          <span>Propose Plan</span>
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="relative group">
-                      {isGuideThinking ? (
-                        <button
-                          type="button"
-                          onClick={handleStopGuideGeneration}
-                          className="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-90 shadow-xs active:scale-95"
-                          title="Stop generating"
-                          aria-label="Stop generating"
-                        >
-                          <Square className="w-3.5 h-3.5 fill-current" />
-                        </button>
-                      ) : (
-                        <button
-                          type="submit"
-                          disabled={!guideInput.trim() && sidebarAttachments.length === 0}
-                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${guideInput.trim() || sidebarAttachments.length > 0
-                              ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-xs active:scale-95"
-                              : "bg-neutral-200/80 dark:bg-white/10 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-                            }`}
-                          title="Send question (Enter)"
-                          aria-label="Send question"
-                        >
-                          <ArrowUp className="w-4 h-4 stroke-[2.25]" />
-                        </button>
-                      )}
-                      <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
-                        {isGuideThinking ? "Stop generating" : "Send question (Enter)"}
-                      </span>
                     </div>
                   </div>
-                </form>
+
+                  {/* Pending Attachments Chips in Sidebar */}
+                  {sidebarAttachments.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 mb-2 px-1">
+                      {sidebarAttachments.map((att) => (
+                        <div
+                          key={att.id}
+                          className="flex items-center gap-1.5 px-2 py-0.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 text-xs text-neutral-800 dark:text-neutral-200 shadow-2xs animate-in fade-in"
+                        >
+                          {att.isImage ? (
+                            att.previewUrl ? (
+                              <img src={att.previewUrl} alt={att.name} className="w-4 h-4 object-cover rounded" />
+                            ) : (
+                              <Paperclip className="w-3.5 h-3.5 text-blue-500" />
+                            )
+                          ) : (
+                            <FileText className="w-3.5 h-3.5 text-amber-500" />
+                          )}
+                          <span className="truncate max-w-[140px] font-medium text-[11px]">{att.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeSidebarAttachment(att.id)}
+                            className="text-neutral-400 hover:text-red-500 p-0.5 rounded-full hover:bg-neutral-200 dark:hover:bg-white/10 cursor-pointer transition-colors"
+                            title="Remove attachment"
+                            aria-label="Remove attachment"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      {isSidebarUploadingAttachment && (
+                        <span className="text-[11px] text-neutral-400 flex items-center gap-1.5 animate-pulse">
+                          <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> Parsing attachment...
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Input Wrapper Pill */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (guideInput.trim() || sidebarAttachments.length > 0) {
+                        handleSendGuideMessage();
+                      }
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (e.dataTransfer.files?.length) {
+                        handleSidebarFileSelect(Array.from(e.dataTransfer.files));
+                      }
+                    }}
+                    className="relative flex flex-col rounded-2xl bg-white dark:bg-ink-750 p-3 shadow-sm border border-neutral-200/90 dark:border-white/10 focus-within:border-neutral-400 dark:focus-within:border-white/25 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] focus-within:shadow-md transition-all duration-200"
+                  >
+                    <div className="w-full px-1">
+                      <textarea
+                        ref={guideInputRef as any}
+                        rows={1}
+                        value={guideInput}
+                        onChange={(e) => {
+                          setGuideInput(e.target.value);
+                          e.target.style.height = "auto";
+                          e.target.style.height = `${Math.min(e.target.scrollHeight, 130)}px`;
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.nativeEvent.isComposing || (e as unknown as { keyCode?: number }).keyCode === 229) return;
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            if (guideInput.trim() || sidebarAttachments.length > 0) {
+                              handleSendGuideMessage();
+                            }
+                          } else if (e.key === "Backspace" && guideInput === "" && sidebarAttachments.length > 0) {
+                            removeSidebarAttachment(sidebarAttachments[sidebarAttachments.length - 1].id);
+                          }
+                        }}
+                        onPaste={(e) => {
+                          const items = e.clipboardData?.items;
+                          if (!items) return;
+                          const newFiles: File[] = [];
+                          for (let i = 0; i < items.length; i++) {
+                            if (items[i].kind === "file") {
+                              const file = items[i].getAsFile();
+                              if (file) newFiles.push(file);
+                            }
+                          }
+                          if (newFiles.length > 0) {
+                            e.preventDefault();
+                            handleSidebarFileSelect(newFiles);
+                          }
+                        }}
+                        aria-label="Ask Scholar question input"
+                        placeholder="Ask a research question…"
+                        style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent", fieldSizing: "content" } as React.CSSProperties}
+                        className="w-full bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 shadow-none focus:shadow-none resize-none prompt-bare-input max-h-32 min-h-[36px] overflow-y-auto scholar-scrollbar leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1.5 mt-1 border-t border-neutral-200/50 dark:border-white/5 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <PromptBarActionMenu
+                          currentMode={sidebarAiMode}
+                          onSelectMode={setSidebarAiMode}
+                          onAttachFiles={handleSidebarFileSelect}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!userEmail) {
+                              openAuth("signin", "Sign in to ground Ask Scholar in your personal Knowledge Vault.");
+                              return;
+                            }
+                            setIsVaultGroundingActive((prev) => {
+                              const next = !prev;
+                              try {
+                                localStorage.setItem("scholar_vault_grounding_active", String(next));
+                              } catch {
+                                // ignore
+                              }
+                              showAppToast(
+                                next
+                                  ? `Knowledge Vault Grounding enabled (${userVaultItems.length} items).`
+                                  : "Knowledge Vault Grounding disabled.",
+                                next ? "success" : "info",
+                                2000
+                              );
+                              return next;
+                            });
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all cursor-pointer ${isVaultGroundingActive && userEmail
+                            ? "bg-amber-500/10 text-amber-800 dark:text-amber-200 border-amber-500/30 shadow-2xs font-semibold"
+                            : "bg-transparent text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 border-neutral-200/60 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20"
+                            }`}
+                          title={
+                            userEmail
+                              ? isVaultGroundingActive
+                                ? `Knowledge Vault Grounding Active (${userVaultItems.length} items available)`
+                                : "Click to ground answers in your personal Knowledge Vault"
+                              : "Sign in to ground answers in your personal Knowledge Vault"
+                          }
+                        >
+                          <Database className={`w-3 h-3 ${isVaultGroundingActive && userEmail ? "text-amber-500" : ""}`} />
+                          <span>Vault Grounding</span>
+                          {userEmail && (
+                            <span className={`text-[9px] font-mono px-1 rounded-full ${isVaultGroundingActive ? "bg-amber-500/20 text-amber-800 dark:text-amber-200" : "bg-neutral-200/60 dark:bg-white/10 text-neutral-500"}`}>
+                              {userVaultItems.length}
+                            </span>
+                          )}
+                        </button>
+
+                        {sidebarAiMode === "deep_research" && (
+                          <button
+                            type="button"
+                            data-testid="propose-deep-research-plan-btn"
+                            disabled={!guideInput.trim()}
+                            onClick={() => handleProposeDeepResearchPlan(guideInput)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/20 disabled:opacity-40 transition-colors cursor-pointer whitespace-nowrap"
+                            title="Propose an editable Deep Research plan before searching begins"
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            <span>Propose Plan</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="relative group">
+                        {isGuideThinking ? (
+                          <button
+                            type="button"
+                            onClick={handleStopGuideGeneration}
+                            className="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-90 shadow-xs active:scale-95"
+                            title="Stop generating"
+                            aria-label="Stop generating"
+                          >
+                            <Square className="w-3.5 h-3.5 fill-current" />
+                          </button>
+                        ) : (
+                          <button
+                            type="submit"
+                            disabled={!guideInput.trim() && sidebarAttachments.length === 0}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${guideInput.trim() || sidebarAttachments.length > 0
+                              ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-xs active:scale-95"
+                              : "bg-neutral-200/80 dark:bg-white/10 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
+                              }`}
+                            title="Send question (Enter)"
+                            aria-label="Send question"
+                          >
+                            <ArrowUp className="w-4 h-4 stroke-[2.25]" />
+                          </button>
+                        )}
+                        <span className="hidden group-hover:block absolute bottom-full mb-2 right-0 px-2 py-1 text-[11px] bg-neutral-900 text-white dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30">
+                          {isGuideThinking ? "Stop generating" : "Send question (Enter)"}
+                        </span>
+                      </div>
+                    </div>
+                  </form>
+                </div>
               </div>
             </div>
-          </div>
-        </ResearchSplitCanvas>
-      )}
-    </aside>
+          </ResearchSplitCanvas>
+        )}
+      </aside>
 
       {/* Delete Confirmation Modal Pop-up */}
       {projectToDelete && (

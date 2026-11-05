@@ -231,7 +231,7 @@ Both architectures scale effectively [1, 2].
 
       expect(res.status).toBe(200);
       const draft: string = res.body.draft;
-      expect(draft).toContain("(Vaswani)");
+      expect(draft).toMatch(/\(Vaswani(?: and Shazeer)?\)/);
       expect(draft.includes("2017")).toBe(false);
     });
   });

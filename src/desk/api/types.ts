@@ -65,6 +65,23 @@ export interface AgenticQueryRequest {
   systemPrompt?: string;
   mode?: "normal" | "search" | "deep-research";
   citationStyle?: string;
+  answerLength?: "concise" | "standard" | "detailed";
+  approvedSubQuestions?: string[];
+  preRetrievedSources?: Array<{
+    id?: string;
+    title: string;
+    url?: string;
+    doi?: string;
+    snippet?: string;
+    authors?: string[];
+    year?: number | string;
+    publicationDate?: string;
+    venue?: string;
+    journal?: string;
+    openAccessUrl?: string;
+    source?: string;
+    sourceType?: string;
+  }>;
   files?: Array<{ name: string; text?: string; content?: string; type?: string; size?: number }>;
   images?: Array<{ data?: string; dataUrl?: string; mimeType?: string; name?: string }>;
   history?: Array<{ role: "user" | "assistant"; content: string }>;

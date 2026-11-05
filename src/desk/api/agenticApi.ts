@@ -14,6 +14,9 @@ export async function executeAgenticQuery(
     systemPrompt: req.systemPrompt,
     mode: req.mode,
     citationStyle: req.citationStyle,
+    answerLength: req.answerLength,
+    approvedSubQuestions: req.approvedSubQuestions,
+    preRetrievedSources: req.preRetrievedSources,
     files: req.files,
     images: req.images,
     history: req.history,
@@ -31,8 +34,13 @@ export async function executeAgenticQuery(
   }
 
   const data = await res.json();
-  if (data.ok && data.text) {
-    req.onChunk?.(data.text);
+  if (data.ok && data.text && req.onChunk) {
+    // Deliver progressive chunks so the response streams smoothly into the reading canvas
+    const words = String(data.text).split(/(\s+)/);
+    const step = Math.max(8, Math.ceil(words.length / 18));
+    for (let i = 0; i < words.length; i += step) {
+      req.onChunk(words.slice(i, i + step).join(""));
+    }
   }
   return data;
 }

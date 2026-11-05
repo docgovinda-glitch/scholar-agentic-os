@@ -35,6 +35,7 @@ export default function CitationStylePicker({ value, onChange }: { value: AskCit
     <div ref={rootRef} className="relative">
       <button
         type="button"
+        data-testid="citation-style-trigger"
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -61,6 +62,7 @@ export default function CitationStylePicker({ value, onChange }: { value: AskCit
                   <button
                     key={s.id}
                     type="button"
+                    data-testid={`citation-style-option-${s.id}`}
                     role="option"
                     aria-selected={selected}
                     onClick={() => {

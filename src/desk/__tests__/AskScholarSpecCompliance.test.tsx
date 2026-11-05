@@ -7,6 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 
 const createProject = vi.fn();
 const saveIntakeAnswers = vi.fn();
+const addManualSource = vi.fn();
 const executeAgenticQuery = vi.fn();
 const getAiOperationalStatus = vi.fn();
 const executeLiveSearch = vi.fn();
@@ -21,6 +22,10 @@ vi.mock("../api", () => ({
   executeAgenticQuery: (...a: unknown[]) => executeAgenticQuery(...a),
   getAiOperationalStatus: (...a: unknown[]) => getAiOperationalStatus(...a),
   parseFileForAgent: vi.fn(),
+}));
+
+vi.mock("../api/claimEvidenceApi", () => ({
+  addManualSource: (...a: unknown[]) => addManualSource(...a),
 }));
 
 vi.mock("../../services/liveSearchService", async (orig) => ({
@@ -276,5 +281,88 @@ describe("AskScholar Authoritative Specification Compliance (Sections 2–16)", 
     await waitFor(() => {
       expect(executeAgenticQuery).toHaveBeenCalled();
     });
+    const lastCallArg = executeAgenticQuery.mock.calls[executeAgenticQuery.mock.calls.length - 1][0];
+    expect(lastCallArg.approvedSubQuestions).toBeDefined();
+    expect(lastCallArg.approvedSubQuestions[0]).toContain("Edited sub-question");
+  });
+
+  it("verifies pre-query citation controls, 760px reading canvas, preRetrievedSources deduplication, dynamic in-place citation style re-formatting, and relational evidenceLedger seeding on Continue", async () => {
+    executeLiveSearch.mockResolvedValueOnce([
+      {
+        title: "Attention Is All You Need",
+        url: "https://doi.org/10.48550/arXiv.1706.03762",
+        doi: "10.48550/arXiv.1706.03762",
+        snippet: "The Transformer architecture relies entirely on self-attention mechanisms.",
+        authors: ["Vaswani, Ashish", "Shazeer, Noam"],
+        year: 2017,
+        venue: "Advances in Neural Information Processing Systems",
+        sourceType: "conference paper",
+      },
+    ]);
+
+    const onOpen = vi.fn();
+    render(
+      <MemoryRouter>
+        <ProjectListScreen
+          onOpen={onOpen}
+          userEmail="researcher@university.edu"
+          onOpenAiAccess={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    // Fix 6.1: Pre-query CitationStylePicker and AskScholarSettingsPopover are rendered on the initial prompt bar before opening the sidebar
+    expect(await screen.findByTestId("citation-style-trigger")).toBeInTheDocument();
+    expect(await screen.findByTestId("ask-scholar-settings-btn")).toBeInTheDocument();
+
+    // Open AskScholar sidebar
+    const buttons = screen.getAllByRole("button", { name: /Ask Scholar/i });
+    fireEvent.click(buttons[0]);
+
+    // Fix 5.2: Central prompt bar container is hidden while AskScholar reading canvas is open
+    const centralBar = screen.getByTestId("main-prompt-bar-wrapper");
+    expect(centralBar.className).toContain("hidden");
+
+    // Send a research question -> triggers executeLiveSearch and passes preRetrievedSources + onChunk to executeAgenticQuery
+    await sendQuestion("Analyze Transformer self-attention mechanisms in sequence modeling research.");
+
+    await waitFor(() => {
+      expect(executeAgenticQuery).toHaveBeenCalled();
+    });
+    const queryReq = executeAgenticQuery.mock.calls[0][0];
+    expect(Array.isArray(queryReq.preRetrievedSources)).toBe(true);
+    expect(queryReq.preRetrievedSources.length).toBeGreaterThan(0);
+    expect(typeof queryReq.onChunk).toBe("function");
+
+    // Fix 6.2: Switch citation style from APA 7 to IEEE and verify in-place re-formatting without calling executeAgenticQuery again
+    const callCountBeforeStyleChange = executeAgenticQuery.mock.calls.length;
+    const styleTriggers = screen.getAllByTestId("citation-style-trigger");
+    fireEvent.click(styleTriggers[styleTriggers.length - 1]);
+    const ieeeOption = await screen.findByTestId("citation-style-option-ieee");
+    fireEvent.click(ieeeOption);
+    expect(executeAgenticQuery.mock.calls.length).toBe(callCountBeforeStyleChange);
+
+    // Fix 3.1: Continue seeds discovered_sources in saveIntakeAnswers AND seeds relational evidenceLedger via addManualSource
+    createProject.mockResolvedValueOnce({ projectId: "proj-seeded-ledger-1" });
+    saveIntakeAnswers.mockResolvedValueOnce({ success: true });
+    addManualSource.mockResolvedValue({ id: "src-row-1" });
+
+    const actionBar = await screen.findByTestId("post-response-action-bar");
+    fireEvent.click(within(actionBar).getByTestId("action-continue"));
+    const picker = await screen.findByTestId("continue-workspace-picker");
+    fireEvent.click(within(picker).getByTestId("continue-workspace-OT-10"));
+
+    await waitFor(() => {
+      expect(createProject).toHaveBeenCalledWith("OT-10");
+      expect(saveIntakeAnswers).toHaveBeenCalled();
+      expect(addManualSource).toHaveBeenCalled();
+      expect(onOpen).toHaveBeenCalledWith("proj-seeded-ledger-1");
+    });
+
+    const intakePayload = saveIntakeAnswers.mock.calls[0][1];
+    expect(typeof intakePayload.discovered_sources).toBe("string");
+    const parsedSources = JSON.parse(intakePayload.discovered_sources);
+    expect(parsedSources.length).toBeGreaterThan(0);
+    expect(parsedSources[0].title).toBe("Attention Is All You Need");
   });
 });

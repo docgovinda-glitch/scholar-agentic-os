@@ -188,7 +188,7 @@ export function LatexMathBlock({
         data-testid="katex-display-math"
         className="katex-display my-2.5 py-2 px-3 rounded-xl bg-neutral-50 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 text-center font-serif text-sm text-neutral-900 dark:text-neutral-100 overflow-x-auto"
       >
-        <span role="math" className="font-serif italic">{rendered}</span>
+        <span className="font-serif italic">{rendered}</span>
       </div>
     );
   }
@@ -263,12 +263,12 @@ export function InlineCitationBadge({
     citation?.domain ||
     (targetUrl
       ? (() => {
-          try {
-            return new URL(targetUrl).hostname.replace(/^www\./, "");
-          } catch {
-            return "source";
-          }
-        })()
+        try {
+          return new URL(targetUrl).hostname.replace(/^www\./, "");
+        } catch {
+          return "source";
+        }
+      })()
       : undefined);
 
   const venue = citation?.venue || citation?.journal || citation?.publisher || domain || "Academic Source";
@@ -311,8 +311,8 @@ export function InlineCitationBadge({
             typeof document !== "undefined" &&
             Boolean(
               (messageId && document.getElementById(`ref-entry-${messageId}-${num}`)) ||
-                document.getElementById(`ref-entry-${num}`) ||
-                document.querySelector(`[data-ref-num="${num}"]`)
+              document.getElementById(`ref-entry-${num}`) ||
+              document.querySelector(`[data-ref-num="${num}"]`)
             );
           if (refMounted) {
             e.preventDefault();
@@ -360,11 +360,10 @@ export function InlineCitationBadge({
                 </span>
               )}
               <span
-                className={`px-1.5 py-0.5 rounded-full font-semibold text-[9px] border ${
-                  isPreprint
+                className={`px-1.5 py-0.5 rounded-full font-semibold text-[9px] border ${isPreprint
                     ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200/60 dark:border-amber-800/40"
                     : "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200/50 dark:border-indigo-800/40"
-                }`}
+                  }`}
               >
                 {isPreprint ? "Preprint (Not Peer-Reviewed)" : sourceTypeBadge}
               </span>
@@ -466,6 +465,87 @@ export function sanitizeStreamingMarkdown(rawText: string): string {
   return cleaned;
 }
 
+/**
+ * Extracts the primary author surname from a citation item for matching in-text author-date citations.
+ */
+function extractPrimarySurname(cit: WebsiteCitationItem): string {
+  const cslFirst = cit.csl?.author?.[0];
+  if (cslFirst?.family) return cslFirst.family.trim();
+  if (cslFirst?.literal) return cslFirst.literal.trim();
+
+  const raw = (cit.authors && cit.authors[0]) || cit.author || "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (trimmed.includes(",")) {
+    return trimmed.split(",")[0].trim();
+  }
+  const parts = trimmed.split(/\s+/);
+  return parts[parts.length - 1].trim();
+}
+
+/**
+ * Dynamically normalizes inline author-date, MLA author-page, or Vancouver parenthetical citations
+ * back to canonical `[n]` markers so switching citation styles re-formats existing responses in-place (Fix 6.2).
+ */
+export function normalizeAuthorDateCitationsInProse(
+  text: string,
+  citations?: WebsiteAssistantMessage["citations"]
+): string {
+  if (!text || !citations || citations.length === 0) return text;
+
+  const sourceMatchers = citations.map((cit, idx) => ({
+    num: idx + 1,
+    surname: extractPrimarySurname(cit),
+    year: cit.year ? String(cit.year).match(/\b(1[89]\d{2}|20\d{2})\b/)?.[1] || "" : "",
+  }));
+
+  // Replace parenthetical author-date / MLA / grouped citations: e.g. (Vaswani et al., 2017) or (Smith & Lee, 2023; Zhang, 2022)
+  return text.replace(/\(([^()\n]{2,140})\)/g, (fullMatch, inner: string) => {
+    const trimmedInner = inner.trim();
+
+    // Check Vancouver numeric parenthetical: e.g. "(1)" or "(1, 2)"
+    if (/^\d+(?:\s*,\s*\d+)*$/.test(trimmedInner)) {
+      const nums = trimmedInner
+        .split(",")
+        .map((n) => parseInt(n.trim(), 10))
+        .filter((n) => !isNaN(n) && n >= 1 && n <= citations.length);
+      if (nums.length > 0) {
+        return `[${nums.join(", ")}]`;
+      }
+    }
+
+    const segments = trimmedInner.split(";").map((s) => s.trim()).filter(Boolean);
+    if (segments.length === 0) return fullMatch;
+
+    const matchedNums: number[] = [];
+    for (const seg of segments) {
+      const segYear = seg.match(/\b(1[89]\d{2}|20\d{2})\b/)?.[1];
+      const found = sourceMatchers.find((m) => {
+        if (!m.surname || m.surname.length < 2) return false;
+        const escapedSurname = m.surname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const hasSurname = new RegExp(`^${escapedSurname}\\b`, "i").test(seg);
+        if (!hasSurname) return false;
+        if (segYear && m.year) {
+          return segYear === m.year;
+        }
+        // MLA 9 author-only or author-page pattern: e.g. "Vaswani et al." or "Smith and Lee 42"
+        return new RegExp(
+          `^${escapedSurname}(?:\\s+(?:&|and)\\s+[A-Z][a-zA-Z'\\-]+|\\s+et\\s+al\\.?)?(?:[,\\s]+(?:pp?\\.?\\s*)?\\d+(?:[-–]\\d+)?)?$`,
+          "i"
+        ).test(seg);
+      });
+      if (!found) {
+        return fullMatch;
+      }
+      if (!matchedNums.includes(found.num)) {
+        matchedNums.push(found.num);
+      }
+    }
+
+    return matchedNums.length > 0 ? `[${matchedNums.join(", ")}]` : fullMatch;
+  });
+}
+
 export function renderFormattedGuideText(
   text: string,
   citations?: WebsiteAssistantMessage["citations"],
@@ -476,7 +556,10 @@ export function renderFormattedGuideText(
 ) {
   if (!text) return null;
 
-  const sanitizedText = sanitizeStreamingMarkdown(text);
+  const sanitizedText = normalizeAuthorDateCitationsInProse(
+    sanitizeStreamingMarkdown(text),
+    citations
+  );
 
   const inlineRegex =
     /\\\(([\s\S]+?)\\\)|\$([^$\n]+?)\$|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\[(\d+(?:\s*,\s*\d+)*)\]|`([^`]+)`|\*\*\*([^*]+)\*\*\*|___([^_]+)___|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+?)\*|\b_([^_]+)_\b|~~([^~]+)~~/g;
@@ -863,34 +946,34 @@ export function renderFormattedGuideText(
 
           if (block.level === 1 || block.level === 2) {
             return (
-              <h2
+              <h4
                 key={idx}
                 id={block.id}
                 className="font-bold text-base sm:text-[16px] text-neutral-900 dark:text-neutral-100 pt-3 pb-1 border-b border-neutral-200/60 dark:border-white/10 tracking-tight"
               >
                 {parseInline(block.content)}
-              </h2>
+              </h4>
             );
           }
           if (block.level === 3) {
             return (
-              <h3
+              <h5
                 key={idx}
                 id={block.id}
                 className="font-semibold text-[14.5px] text-neutral-900 dark:text-neutral-100 pt-2 pb-0.5 tracking-tight"
               >
                 {parseInline(block.content)}
-              </h3>
+              </h5>
             );
           }
           return (
-            <h4
+            <h6
               key={idx}
               id={block.id}
               className="font-semibold text-xs text-neutral-800 dark:text-neutral-300 uppercase tracking-wider pt-1.5 pb-0.5"
             >
               {parseInline(block.content)}
-            </h4>
+            </h6>
           );
         }
 
