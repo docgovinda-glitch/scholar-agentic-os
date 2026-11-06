@@ -12,6 +12,7 @@ import {
   parseFileForAgent,
   type AiOperationalStatus,
   type AgenticQueryResponse,
+  type ResearchStageTelemetry,
 } from "./api";
 import { addManualSource, addClaim, bindEvidence } from "./api/claimEvidenceApi";
 import {
@@ -744,6 +745,10 @@ export default function ProjectListScreen({
   const [streamingGuideText, setStreamingGuideText] = useState("");
   const askAbortRef = useRef<boolean>(false);
   const [deepResearchActiveStage, setDeepResearchActiveStage] = useState(0);
+  const [activeResearchStage, setActiveResearchStage] = useState<ResearchStageTelemetry | null>(null);
+  const [isMobileWorkspaceMenuOpen, setIsMobileWorkspaceMenuOpen] = useState(false);
+  const mobileWorkspaceMenuRef = useRef<HTMLDivElement>(null);
+  const chatCanvasRef = useRef<HTMLDivElement | null>(null);
   // What Ask Scholar is doing for the current question: searching (with live stage detail), then writing.
   const [askPhase, setAskPhase] = useState<{ step: "searching" | "writing"; found?: number; detail?: string } | null>(null);
 
@@ -825,6 +830,35 @@ export default function ProjectListScreen({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const guideInputRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Auto-scroll chat container to bottom as AskScholar streams tokens, thinks, or appends messages
+  useEffect(() => {
+    if (chatCanvasRef.current) {
+      if (typeof chatCanvasRef.current.scrollTo === "function") {
+        chatCanvasRef.current.scrollTo({
+          top: chatCanvasRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      } else {
+        chatCanvasRef.current.scrollTop = chatCanvasRef.current.scrollHeight;
+      }
+    }
+    if (messagesEndRef.current && typeof messagesEndRef.current.scrollIntoView === "function") {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [streamingGuideText, isGuideThinking, askPhase?.step, askPhase?.detail, guideMessages.length]);
+
+  // Handle outside clicks to close the mobile academic workspace dropdown
+  useEffect(() => {
+    if (!isMobileWorkspaceMenuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (mobileWorkspaceMenuRef.current && !mobileWorkspaceMenuRef.current.contains(e.target as Node)) {
+        setIsMobileWorkspaceMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [isMobileWorkspaceMenuOpen]);
 
   // Sync active Ask Scholar thread to multi-thread history in localStorage and server
   useEffect(() => {
@@ -1047,6 +1081,8 @@ export default function ProjectListScreen({
     setStreamingGuideText("");
     setIsGuideThinking(false);
     setAskPhase(null);
+    setActiveResearchStage(null);
+    setDeepResearchActiveStage(0);
     setEditingUserMsgId(null);
     setActiveAskThreadId(`thread-${Date.now()}`);
     setGuideMessages([]);
@@ -1478,6 +1514,8 @@ export default function ProjectListScreen({
     askAbortRef.current = false;
     setStreamingGuideText("");
     setIsGuideThinking(true);
+    setActiveResearchStage(null);
+    setDeepResearchActiveStage(0);
     // Sources found for this question, kept so a failed answer still shows them.
     let sourcesFound: LiveSearchResult[] = [];
 
@@ -1621,8 +1659,16 @@ export default function ProjectListScreen({
               history,
               vaultSources: selectedVaultSources,
               onStageUpdate: (update) => {
-                if (!askAbortRef.current && update?.status) {
-                  setAskPhase({ step: "searching", detail: update.status });
+                if (!askAbortRef.current) {
+                  if (update?.status) {
+                    setAskPhase({ step: "searching", detail: update.status });
+                  }
+                  if (update?.stage) {
+                    setActiveResearchStage(update.stage);
+                    if (typeof update.stage.stageNumber === "number") {
+                      setDeepResearchActiveStage(Math.max(0, update.stage.stageNumber - 1));
+                    }
+                  }
                 }
               },
               onChunk: (chunk) => {
@@ -1648,8 +1694,16 @@ export default function ProjectListScreen({
               history,
               vaultSources: selectedVaultSources,
               onStageUpdate: (update) => {
-                if (!askAbortRef.current && update?.status) {
-                  setAskPhase({ step: "searching", detail: update.status });
+                if (!askAbortRef.current) {
+                  if (update?.status) {
+                    setAskPhase({ step: "searching", detail: update.status });
+                  }
+                  if (update?.stage) {
+                    setActiveResearchStage(update.stage);
+                    if (typeof update.stage.stageNumber === "number") {
+                      setDeepResearchActiveStage(Math.max(0, update.stage.stageNumber - 1));
+                    }
+                  }
                 }
               },
               onChunk: (chunk) => {
@@ -2315,9 +2369,11 @@ export default function ProjectListScreen({
               <CitationStylePicker
                 value={askCitationStyle}
                 onChange={handleUpdateCitationStyle}
+                direction="up"
               />
               <AskScholarSettingsPopover
                 settings={askUserSettings}
+                direction="up"
                 onUpdateSettings={(partial) => {
                   const updated = saveAskScholarUserSettings(partial);
                   setAskUserSettings(updated);
@@ -2911,38 +2967,102 @@ export default function ProjectListScreen({
                   </div>
                 )}
 
-                {/* Subtle Welcome / Workspace Heading & 4-Card Template Grid (completely hidden once chatting begins) */}
+                {/* Mobile Landing View: Clean, focused AskScholar chat interface with Workspaces in dropdown */}
                 {isPhone && !isAiSidebarOpen && !hasStartedChatting ? (
                   <>
                     <section aria-label="Ask Scholar" className="w-full">
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                         <h1 className="text-xl font-semibold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
                           <span className="w-7 h-7 rounded-lg bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-200 flex items-center justify-center">
                             <Lightbulb className="w-4 h-4 stroke-[2.1]" aria-hidden="true" />
                           </span>
                           Ask Scholar
                         </h1>
-                        {userEmail && (
-                          <button
-                            type="button"
-                            data-testid="mobile-ai-status"
-                            onClick={() => {
-                              if (onOpenAiAccess) onOpenAiAccess();
-                              else setActiveView("ai-access");
-                            }}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer ${aiStatus?.connected
-                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                              : "border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300"
-                              }`}
-                          >
-                            <span className={`w-1.5 h-1.5 rounded-full ${aiStatus?.connected ? "bg-emerald-500" : "bg-neutral-400"}`} />
-                            {aiStatus?.connected
-                              ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
-                              : aiStatus
-                                ? "Connect an AI"
-                                : "Checking AI…"}
-                          </button>
-                        )}
+
+                        <div className="flex items-center gap-1.5">
+                          {/* Clean Mobile Workspaces Dropdown */}
+                          <div className="relative" ref={mobileWorkspaceMenuRef}>
+                            <button
+                              type="button"
+                              onClick={() => setIsMobileWorkspaceMenuOpen((prev) => !prev)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200 border border-neutral-200/80 dark:border-white/10 cursor-pointer shadow-2xs hover:bg-neutral-200/60 dark:hover:bg-white/15 transition-colors"
+                              aria-expanded={isMobileWorkspaceMenuOpen}
+                              aria-label="Academic Workspaces"
+                            >
+                              <FolderOpen className="w-3.5 h-3.5 text-sky-500" />
+                              <span>Workspaces</span>
+                              <ChevronDown className="w-3 h-3 opacity-60" />
+                            </button>
+                            {isMobileWorkspaceMenuOpen && (
+                              <div
+                                role="menu"
+                                aria-label="Workspaces"
+                                className="absolute right-0 top-full mt-1.5 w-64 max-w-[calc(100vw-2rem)] p-1.5 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/15 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 space-y-0.5"
+                              >
+                                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                                  Academic Workspaces
+                                </div>
+                                {FORMAT_TILES.map((tile) => {
+                                  const tileTheme = getFormatTileTheme(tile.id);
+                                  const length = (tile.specs || tile.footer).split(" · ").pop();
+                                  return (
+                                    <button
+                                      key={tile.id}
+                                      type="button"
+                                      role="menuitem"
+                                      onClick={() => {
+                                        setIsMobileWorkspaceMenuOpen(false);
+                                        if (creating) return;
+                                        if (!userEmail) {
+                                          openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
+                                          return;
+                                        }
+                                        handleCreate(tile.id);
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer group"
+                                    >
+                                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${tileTheme.badgeBg}`}>
+                                        <FormatIcon id={tile.id} className="w-3.5 h-3.5" />
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <span className="block text-xs font-semibold text-neutral-900 dark:text-neutral-100 truncate group-hover:text-sky-600 dark:group-hover:text-sky-400">
+                                          {tile.label}
+                                        </span>
+                                        {length && (
+                                          <span className="block text-[10.5px] text-neutral-400 dark:text-neutral-500">
+                                            {length}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          {userEmail && (
+                            <button
+                              type="button"
+                              data-testid="mobile-ai-status"
+                              onClick={() => {
+                                if (onOpenAiAccess) onOpenAiAccess();
+                                else setActiveView("ai-access");
+                              }}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer ${aiStatus?.connected
+                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                : "border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300"
+                                }`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${aiStatus?.connected ? "bg-emerald-500" : "bg-neutral-400"}`} />
+                              {aiStatus?.connected
+                                ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
+                                : aiStatus
+                                  ? "Connect an AI"
+                                  : "Checking AI…"}
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <p className="text-[13px] text-neutral-600 dark:text-neutral-400 mb-3 leading-relaxed">
                         Ask a research question or paste your assignment brief. Each answer starts from a fresh search of scholarly sources.
@@ -2963,48 +3083,6 @@ export default function ProjectListScreen({
                             {faq.shortLabel}
                           </button>
                         ))}
-                      </div>
-                    </section>
-
-                    <section aria-label="Start a workspace" className="w-full">
-                      <div className="flex items-center justify-between mb-2">
-                        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Start a workspace</h2>
-                        <span className="text-[11px] text-neutral-400 dark:text-neutral-500">4 Core Formats</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        {FORMAT_TILES.map((tile) => {
-                          const isBootingThis = creatingFormatId === tile.id;
-                          const tileTheme = getFormatTileTheme(tile.id);
-                          const length = (tile.specs || tile.footer).split(" · ").pop();
-                          return (
-                            <button
-                              key={tile.id}
-                              type="button"
-                              onClick={() => {
-                                if (creating) return;
-                                if (!userEmail) {
-                                  openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
-                                  return;
-                                }
-                                handleCreate(tile.id);
-                              }}
-                              disabled={creating && !isBootingThis}
-                              className="flex flex-col items-start justify-between gap-2 rounded-2xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-ink-750 p-3.5 text-left cursor-pointer active:scale-[0.98] transition-all shadow-2xs disabled:opacity-50 min-h-[7rem]"
-                            >
-                              <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${tileTheme.badgeBg}`}>
-                                {isBootingThis ? (
-                                  <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                  <FormatIcon id={tile.id} className="w-4 h-4" />
-                                )}
-                              </span>
-                              <div>
-                                <span className="block text-[13px] font-semibold leading-snug text-neutral-900 dark:text-white">{tile.label}</span>
-                                {length && <span className="block text-[11px] text-neutral-500 dark:text-neutral-400 leading-tight mt-0.5">{length}</span>}
-                              </div>
-                            </button>
-                          );
-                        })}
                       </div>
                     </section>
                   </>
@@ -3315,10 +3393,12 @@ export default function ProjectListScreen({
                   <CitationStylePicker
                     value={askCitationStyle}
                     onChange={handleUpdateCitationStyle}
+                    direction="down"
                   />
 
                   <AskScholarSettingsPopover
                     settings={askUserSettings}
+                    direction="down"
                     onUpdateSettings={(partial) => {
                       const updated = saveAskScholarUserSettings(partial);
                       setAskUserSettings(updated);
@@ -3438,27 +3518,10 @@ export default function ProjectListScreen({
               </header>
 
               {/* Chat Canvas (flex-1 overflow-y-auto) */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-sm scholar-scrollbar">
+              <div ref={chatCanvasRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-sm scholar-scrollbar">
                 {/* On Landing page before chatting begins: render the 4 deliverable cards in full glory */}
                 {isLandingPage && !hasStartedChatting && (
                   <div className="w-full max-w-5xl mx-auto my-auto py-4 flex flex-col items-center justify-center animate-in fade-in duration-200">
-                    {/* Any assistant greeting messages (e.g. from Reset Chat) */}
-                    {guideMessages.map((msg) => (
-                      <div key={msg.id} className="w-full max-w-2xl mx-auto mb-6">
-                        <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-neutral-500">
-                          <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
-                            <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
-                          </div>
-                          <span className="font-semibold text-neutral-700 dark:text-neutral-300">Scholar Core</span>
-                          <span>•</span>
-                          <span>{msg.timestamp}</span>
-                        </div>
-                        <div className="rounded-2xl px-4 py-3 bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 rounded-tl-xs shadow-2xs text-[13px] leading-relaxed">
-                          {renderFormattedGuideText(msg.text, msg.citations, askCitationStyle, handleAddCitationToEvidence, handleFocusCitationInGraph)}
-                        </div>
-                      </div>
-                    ))}
-
                     {/* Heading */}
                     <div className="text-center mb-6 flex flex-col items-center">
                       <h1 className="text-2xl sm:text-[28px] font-semibold text-neutral-900 dark:text-white tracking-tight leading-tight">
@@ -3466,8 +3529,8 @@ export default function ProjectListScreen({
                       </h1>
                     </div>
 
-                    {/* 4 Cards Grid - Responsive full 4-column layout */}
-                    <div className="w-full">
+                    {/* 4 Cards Grid - Responsive full 4-column layout on sm+ screens */}
+                    <div className="w-full hidden sm:block">
                       <div className="grid w-full gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                         {FORMAT_TILES.map((tile) => {
                           const isBootingThis = creatingFormatId === tile.id;
@@ -3533,6 +3596,21 @@ export default function ProjectListScreen({
                           );
                         })}
                       </div>
+                    </div>
+
+                    {/* Clean Mobile Landing View: Clean Workspace selector pill */}
+                    <div className="w-full sm:hidden flex flex-col items-center gap-3 py-2 px-2 text-center">
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 max-w-xs leading-relaxed">
+                        Ask any academic question or paste a topic. Every response is grounded in authentic scholarly sources.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setIsMobileWorkspaceMenuOpen(true)}
+                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 text-xs font-semibold text-neutral-800 dark:text-neutral-200 shadow-2xs active:scale-95 transition-all"
+                      >
+                        <FolderOpen className="w-4 h-4 text-sky-500" />
+                        <span>Academic Workspaces ▾</span>
+                      </button>
                     </div>
                   </div>
                 )}
@@ -4551,11 +4629,14 @@ export default function ProjectListScreen({
 
                     {isGuideThinking && (
                       <div className="flex flex-col gap-2.5 animate-in fade-in">
-                        {/* Live Multi-Step Research Visualizer (Phase 5) */}
+                        {/* Live Single-Step Research Visualizer */}
                         <LiveResearchTrajectoryVisualizer
                           isLive={true}
                           currentStep={askPhase?.step}
                           foundCount={askPhase?.found}
+                          liveDetail={askPhase?.detail}
+                          activeStage={activeResearchStage}
+                          onStop={handleStopGuideGeneration}
                           mode={sidebarAiMode}
                         />
                         {/* Live Token Streaming Bubble when tokens are arriving */}
@@ -4573,85 +4654,6 @@ export default function ProjectListScreen({
                             </div>
                           </div>
                         )}
-
-                        <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-sky-500/5 via-purple-500/5 to-transparent dark:from-sky-500/10 dark:via-purple-500/10 dark:to-transparent border border-sky-200/60 dark:border-white/10 shadow-xs">
-                          <div className="relative flex items-center justify-center shrink-0 mt-0.5">
-                            <div className="w-6 h-6 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-white/10 flex items-center justify-center shadow-xs">
-                              <ScholarCoreLogo size="sm" withText={false} className="scale-75 animate-spin" />
-                            </div>
-                            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-sky-500 animate-ping" />
-                          </div>
-                          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="font-semibold text-xs text-neutral-900 dark:text-neutral-100" role="status">
-                                  {askPhase?.step === "searching"
-                                    ? askPhase.detail || "Searching recent sources…"
-                                    : askPhase?.step === "writing"
-                                      ? askPhase.found
-                                        ? `Found ${askPhase.found} source${askPhase.found === 1 ? "" : "s"} · writing the answer…`
-                                        : "No recent sources found · answering from general knowledge…"
-                                      : "Thinking…"}
-                                </span>
-                                <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.2 rounded-full border border-purple-200 dark:border-purple-800/40 animate-pulse shrink-0">
-                                  Active
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={handleStopGuideGeneration}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer shrink-0"
-                                title="Stop generating response"
-                              >
-                                <Square className="w-2.5 h-2.5 fill-current" />
-                                <span>Stop</span>
-                              </button>
-                            </div>
-
-                            {sidebarAiMode === "deep_research" ? (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
-                                {[
-                                  "1. Query Framing & Scope",
-                                  "2. Multi-Angle Sub-Questions",
-                                  "3. Parallel Source Discovery",
-                                  "4. Source Credibility & Screening",
-                                  "5. Cross-Source Evidence Matrix",
-                                  "6. Structured Synthesis & Counter-Arguments",
-                                  "7. Citation & Verification Pass",
-                                ].map((stageLabel, idx) => {
-                                  const isDone = idx < deepResearchActiveStage;
-                                  const isCurrent = idx === deepResearchActiveStage;
-                                  return (
-                                    <div
-                                      key={stageLabel}
-                                      className={`flex items-center gap-1.5 text-[10.5px] px-2 py-1 rounded-md border ${isCurrent
-                                        ? "bg-purple-500/10 border-purple-400/40 text-purple-800 dark:text-purple-200 font-semibold"
-                                        : isDone
-                                          ? "bg-emerald-500/5 border-emerald-400/20 text-emerald-700 dark:text-emerald-300"
-                                          : "bg-transparent border-transparent text-neutral-400 dark:text-neutral-500"
-                                        }`}
-                                    >
-                                      <span className="font-mono text-[10px]">
-                                        {isDone ? "✓" : isCurrent ? "●" : "○"}
-                                      </span>
-                                      <span className="truncate">{stageLabel}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                                {askPhase?.step === "searching"
-                                  ? "Live web, news, official portals, and scholarly indexes are searched so the answer rests on verified evidence."
-                                  : "Synthesizing a clear, structured response with inline numbered citations."}
-                              </p>
-                            )}
-
-                            <div className="w-full h-1 bg-neutral-200/60 dark:bg-white/10 rounded-full overflow-hidden mt-0.5">
-                              <div className="h-full bg-gradient-to-r from-sky-500 via-purple-500 to-indigo-500 w-1/2 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]" />
-                            </div>
-                          </div>
-                        </div>
                       </div>
                     )}
                     <div ref={messagesEndRef} />
@@ -4696,14 +4698,6 @@ export default function ProjectListScreen({
                         aria-label="Reset Chat"
                         onClick={() => {
                           handleStartNewAskThread();
-                          setGuideMessages([
-                            {
-                              id: "reset-assistant",
-                              sender: "assistant",
-                              text: "Hello! I am your Scholar Core Website Assistant. Ask me anything about how to navigate the platform, configure AI, manage your Knowledge Vault, or create research projects.",
-                              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                            },
-                          ]);
                         }}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
                         title="Reset conversation"

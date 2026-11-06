@@ -848,7 +848,8 @@ describe("minimal website assistant", () => {
     const resetBtn = await screen.findByRole("button", { name: "Reset Chat" });
     fireEvent.click(resetBtn);
 
-    expect(screen.getByText(/Hello! I am your Scholar Core Website Assistant/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Hello! I am your Scholar Core Website Assistant/i)).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Ask a research question/i)).toBeInTheDocument();
   });
 
   it("renders slide-in AI assistant sidebar on toggle", async () => {

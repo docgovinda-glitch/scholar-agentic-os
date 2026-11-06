@@ -7,7 +7,15 @@ import { ASK_SCHOLAR_CITATION_STYLES, getCitationStyleInfo, type AskCitationStyl
  * in-text citation looks, so the choice is clear without knowing the names.
  * Author–date styles and numbered styles are grouped.
  */
-export default function CitationStylePicker({ value, onChange }: { value: AskCitationStyleId; onChange: (id: AskCitationStyleId) => void }) {
+export default function CitationStylePicker({
+  value,
+  onChange,
+  direction = "up",
+}: {
+  value: AskCitationStyleId;
+  onChange: (id: AskCitationStyleId) => void;
+  direction?: "up" | "down";
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const current = getCitationStyleInfo(value);
@@ -51,7 +59,11 @@ export default function CitationStylePicker({ value, onChange }: { value: AskCit
         <div
           role="listbox"
           aria-label="Referencing style"
-          className="absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-2rem)] rounded-xl bg-white dark:bg-ink-700 border border-neutral-200 dark:border-white/15 shadow-xl z-40 p-1.5"
+          className={`absolute ${
+            direction === "up" ? "left-0 bottom-full mb-2" : "right-0 top-full mt-1.5"
+          } w-72 max-w-[calc(100vw-2rem)] rounded-xl bg-white dark:bg-ink-700 border border-neutral-200 dark:border-white/15 shadow-2xl z-50 p-1.5 animate-in fade-in ${
+            direction === "up" ? "slide-in-from-bottom-2" : "slide-in-from-top-2"
+          } duration-150`}
         >
           {groups.map(([label, styles]) => (
             <div key={label} role="group" aria-label={label}>

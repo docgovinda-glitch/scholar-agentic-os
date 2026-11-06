@@ -23,6 +23,7 @@ export interface AskScholarSettingsPopoverProps {
   settings?: AskScholarUserSettings;
   onUpdateSettings?: (partial: Partial<AskScholarUserSettings>) => void;
   onImportReferences?: (items: CSLItem[], rawDois?: string[]) => void | Promise<unknown>;
+  direction?: "up" | "down";
 }
 
 export function AskScholarSettingsPopover({
@@ -33,6 +34,7 @@ export function AskScholarSettingsPopover({
   settings: externalSettings,
   onUpdateSettings,
   onImportReferences,
+  direction = "up",
 }: AskScholarSettingsPopoverProps) {
   const [open, setOpen] = useState(false);
   const [internalSettings, setInternalSettings] = useState<AskScholarUserSettings>(() =>
@@ -104,7 +106,11 @@ export function AskScholarSettingsPopover({
           role="dialog"
           aria-label="AskScholar Settings"
           data-testid="ask-scholar-settings-popover"
-          className="absolute right-0 top-full mt-2 z-50 w-80 p-3.5 rounded-2xl bg-white dark:bg-ink-800 border border-neutral-200 dark:border-white/15 shadow-2xl space-y-3 text-xs"
+          className={`absolute ${
+            direction === "up" ? "left-0 bottom-full mb-2" : "right-0 top-full mt-2"
+          } z-50 w-80 max-w-[calc(100vw-2rem)] max-h-[75vh] overflow-y-auto p-3.5 rounded-2xl bg-white dark:bg-ink-800 border border-neutral-200 dark:border-white/15 shadow-2xl space-y-3 text-xs scholar-scrollbar animate-in fade-in ${
+            direction === "up" ? "slide-in-from-bottom-2" : "slide-in-from-top-2"
+          } duration-150`}
         >
           <div className="flex items-center justify-between pb-2 border-b border-neutral-200/70 dark:border-white/10">
             <span className="font-bold text-neutral-900 dark:text-neutral-100">

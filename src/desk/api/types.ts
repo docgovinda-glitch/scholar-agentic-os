@@ -53,11 +53,13 @@ export interface AiOperationalStatus {
 }
 
 export interface ResearchStageTelemetry {
-  id: "planning" | "discovery" | "retrieval" | "analysis" | "iteration" | "synthesis" | "followup";
+  id: "planning" | "discovery" | "retrieval" | "analysis" | "iteration" | "synthesis" | "followup" | string;
   label: string;
-  status: "completed" | "skipped";
-  summary: string;
+  status: "completed" | "skipped" | string;
+  summary?: string;
   sourcesCount?: number;
+  stageNumber?: number;
+  detail?: string;
 }
 
 export interface AgenticQueryRequest {

@@ -19,7 +19,7 @@ interface ScholarCoreLogoProps {
   alt?: string;
 }
 
-export default function ScholarCoreLogo({
+export function ScholarCoreLogo({
   size = 'md',
   withText = false,
   className = '',
@@ -83,3 +83,5 @@ export default function ScholarCoreLogo({
     </div>
   );
 }
+
+export default ScholarCoreLogo;
