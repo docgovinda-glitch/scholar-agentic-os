@@ -48,17 +48,19 @@ describe("phone home: Ask Scholar first", () => {
     device.isMobile = true;
   });
 
-  it("puts Ask Scholar, with the AI in use and the question box, above compact workspace tiles", async () => {
+  it("puts Ask Scholar, with the AI in use and the question box, with accessible academic workspaces", async () => {
     renderHome();
     const ask = screen.getByRole("region", { name: "Ask Scholar" });
     expect(within(ask).getByRole("textbox", { name: /Research instructions/i })).toBeInTheDocument();
     expect(await within(ask).findByTestId("mobile-ai-status")).toHaveTextContent("AI: Google Gemini");
 
-    const tiles = screen.getByRole("region", { name: "Start a workspace" });
-    expect(within(tiles).getByRole("button", { name: /Coursework & Essays/ })).toBeInTheDocument();
-    expect(within(tiles).getByRole("button", { name: /Journal Article/ })).toBeInTheDocument();
-    // Ask Scholar comes first in the page.
-    expect(ask.compareDocumentPosition(tiles) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const workspacesBtn = screen.getByRole("button", { name: "Academic Workspaces" });
+    expect(workspacesBtn).toBeInTheDocument();
+    fireEvent.click(workspacesBtn);
+
+    const menu = screen.getByRole("menu", { name: "Workspaces" });
+    expect(within(menu).getByRole("menuitem", { name: /Coursework & Essays/ })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /Journal Article/ })).toBeInTheDocument();
   });
 
   it("has a bottom bar for Ask, Projects, Vault and AI", async () => {
