@@ -3342,7 +3342,7 @@ export default function ProjectListScreen({
             <div className="h-full flex flex-col w-full">
               {/* Sidebar Header with glassmorphism & elevated badge */}
               <header className="px-4 sm:px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/95 dark:bg-ink-800/95 backdrop-blur-md sticky top-0 z-20">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                   {isLandingPage && (
                     <>
                       <button
@@ -3373,7 +3373,7 @@ export default function ProjectListScreen({
                       )}
                     </>
                   )}
-                  <div className="relative flex items-center justify-center">
+                  <div className="relative hidden sm:flex items-center justify-center">
                     <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-white/10 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-200 flex items-center justify-center">
                       <Lightbulb className="w-4 h-4 stroke-[2]" />
                     </div>
@@ -3382,14 +3382,14 @@ export default function ProjectListScreen({
                       title={aiStatus?.connected ? "AI connected" : "No AI connected"}
                     />
                   </div>
-                  <div>
-                    <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 tracking-tight">
+                  <div className="hidden sm:block min-w-0">
+                    <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 tracking-tight whitespace-nowrap truncate">
                       Ask Scholar
                     </h2>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 relative">
+                <div className="flex items-center gap-1.5 sm:gap-2 relative shrink-0">
                   <CitationStylePicker
                     value={askCitationStyle}
                     onChange={handleUpdateCitationStyle}
