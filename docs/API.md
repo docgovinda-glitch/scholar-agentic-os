@@ -1,392 +1,156 @@
-# API Reference & Endpoints
+# HTTP API
 
-This document specifies all currently active server endpoints, authentication protocols, request payloads, response contracts, and error structures in **Scholar Core**.
+Every endpoint registered by `server.ts` (modules in `server/routes/`). All paths are under one origin. This file lists paths and behaviour; request and response bodies are defined by zod schemas and types next to each handler.
 
----
+## 1. Conventions
 
-## 1. Global Conventions
+- **Auth**: `Authorization: Bearer <Supabase access token>`. `requireAuth` answers 401 `{ "error": "Missing or invalid authorization header" }` or `{ "error": "Invalid or expired token" }`, 403 for a suspended account, 503 when the token cannot be verified right now, and 500 if auth is not configured. "Public" below means no `requireAuth`.
+- **Errors**: JSON `{ "error": string }`. Validation failures through `errorHandler` return 400 `{ "error": "Validation failed", "details": [...] }`; an oversized upload returns 413 with the limit in the message.
+- **Project ownership**: every `/api/projects/:id/*` route loads the project for the signed-in owner; another user's project returns 404 (never 403) so existence is not revealed.
+- **AI routes** also read transient headers `x-ai-provider`, `x-ai-model`, `x-ai-api-key`, `x-ai-base-url` (and `x-ai-keyring` for `/api/ai/run` and the router bridge). Request bodies must not carry provider credentials (`rejectClientCredentials` on the agentic, assignment, thesis, proposal and presentation routers). When the user's only AI is a local model, some routes answer 426 with prompts for the browser to run (see [`AI-CALL-MAP.md`](AI-CALL-MAP.md)). JSON responses on AI routes may include an `aiRoute` summary.
+- **Streaming**: AI streaming endpoints use Server-Sent Events.
+- **Limits**: see [`ARCHITECTURE.md`](ARCHITECTURE.md) §3.2. JSON body limit is derived from `MAX_UPLOAD_MB`; multipart uploads are capped at `MAX_UPLOAD_MB` (default and maximum 10).
 
-- **Base URL**: `/api`
-- **Content Type**: `application/json` (except multipart file uploads and SSE streams).
-- **Authentication**: Bearer token via `Authorization: Bearer <jwt>` or active Supabase session cookie.
-- **Error Format**: All endpoints return standard JSON error structures:
-  ```json
-  {
-    "ok": false,
-    "error": "Descriptive error message",
-    "code": "ERROR_CODE_STRING",
-    "details": {}
-  }
-  ```
+## 2. Health
 
----
+| Method | Path | Auth | Notes |
+| :--- | :--- | :--- | :--- |
+| GET | `/api/health` | Public | `{ status, timestamp, persistenceMode, persistenceDurable, commit }`. `?deep=1` adds `checks.database` (`ok`, `unreachable`, `not-configured`) and returns 503 with `status: "degraded"` when the database is unreachable |
 
-## 2. Health & Monitoring Endpoints
+## 3. Auth (`server/routes/auth.ts`)
 
-### 2.1 Liveness Probe
-- **Method**: `GET`
-- **Path**: `/health` (also `/healthz` and `/api/health`)
-- **Authentication**: None (Public)
-- **Response**:
-  ```json
-  {
-    "status": "ok",
-    "timestamp": "2026-09-29T12:00:00.000Z",
-    "uptime": 1245.5,
-    "service": "scholar-core"
-  }
-  ```
+| Method | Path | Auth | Notes |
+| :--- | :--- | :--- | :--- |
+| POST | `/api/auth/verify-signup` | Public | Verifies the Turnstile `captchaToken`; 20 per 15 min per IP |
+| POST | `/api/auth/login` | Public | Resolves email, username or phone to a sign-in; uniform failure message; 5 per 5 min per IP |
+| POST | `/api/auth/check-availability` | Public | Username, email and phone availability; 30 per 15 min per IP |
 
----
+## 4. Supabase proxy (`server/routes/supabaseProxy.ts`)
 
-## 3. Authentication & Verification Endpoints
+`ANY /api/supabase/*` (and a WebSocket upgrade) streams to the Supabase project. Only `/auth/v1`, `/rest/v1`, `/storage/v1`, `/functions/v1` and `/realtime/v1` are forwarded; anything else, or a missing upstream, is refused. 300 requests per minute per IP.
 
-### 3.1 Multi-Identifier Login
-- **Method**: `POST`
-- **Path**: `/api/auth/login`
-- **Purpose**: Authenticates a user using email, username, or E.164 phone number via backend service-role resolution and upstream Supabase GoTrue password grant.
-- **Authentication**: None (Public, protected by Cloudflare Turnstile & Express client-IP rate limiter).
-- **Rate Limit**: 5 attempts per 5 minutes per verified client IP (`AUTH_LOGIN_MAX_PER_WINDOW = 5`). Upstream GoTrue HTTP 429 returns uniform `UPSTREAM_AUTH_RATE_LIMIT`.
-- **Request**:
-  ```json
-  {
-    "identifier": "scholar_alice",
-    "password": "SecurePassword123!",
-    "captchaToken": "0.XXXXX..."
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "success": true,
-    "session": {
-      "access_token": "eyJhbGciOi...",
-      "refresh_token": "...",
-      "user": {
-        "id": "uuid",
-        "email": "alice@oxford.ac.uk"
-      }
-    }
-  }
-  ```
-- **Errors**: `400 Bad Request` (missing identifier/password), `401 Unauthorized` (invalid credentials), `429 Too Many Requests` (`UPSTREAM_AUTH_RATE_LIMIT`).
+## 5. Projects (`server/routes/project.ts`, all `requireAuth`)
 
-### 3.2 Identifier Availability Check
-- **Method**: `POST`
-- **Path**: `/api/auth/check-availability`
-- **Purpose**: Verifies whether an email, username, or phone number is available for registration without exposing raw account enumerations to the client.
-- **Authentication**: None (Public, IP-rate limited).
-- **Request**:
-  ```json
-  {
-    "type": "username",
-    "value": "alice_scholar"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "available": true
-  }
-  ```
+| Method | Path | Purpose |
+| :--- | :--- | :--- |
+| GET | `/api/atlas/output-types`, `/api/atlas/output-types/:id` | Output-type catalog |
+| POST | `/api/projects` | Create `{ outputTypeId }` |
+| GET | `/api/projects`, `/api/projects/:id` | List, read |
+| PATCH | `/api/projects/:id` | Update project |
+| PATCH | `/api/projects/:id/intake` | Merge `{ answers }` into the project's answers (also how coursework state is saved) |
+| DELETE | `/api/projects/:id` | Delete |
+| PUT | `/api/projects/:id/authors` | Replace authors |
+| GET, POST, DELETE | `/api/user/saved-authors[/:authorId]` | Saved author library |
+| GET, PUT | `/api/projects/:id/document` | Canonical document (PUT recomputes the rubric) |
+| GET | `/api/projects/:id/rubric` | Rubric report; POST `/rubric/waive` waives a rule |
+| GET, PUT | `/api/projects/:id/journal-requirements` | Target-journal requirements; POST `/journal-requirements/extract` extracts them with AI |
+| POST | `/api/projects/:id/sync` | Apply queued offline `mutations` (such as `approve_source`) plus optional `document` and `answers` |
+| POST | `/api/projects/:id/draft` | Save a draft `document` and merge `answers` |
+| POST | `/api/projects/:id/sources/approve`, `/sources/reject` | Approve or reject a source |
+| DELETE | `/api/projects/:id/sources/:sourceId` | Remove a source |
+| GET | `/api/projects/:id/sources/:sourceId/claims` | Claims for a source |
+| POST | `/api/projects/:id/gates/G2/accept-smaller-corpus` | Accept a smaller corpus at G2 |
+| PUT | `/api/projects/:id/editor/gaps/:gapId`, `/editor/evidence/:evidenceId`, `/editor/claims/:claimId` | Editor-side edits |
 
-### 3.3 CAPTCHA Signup Verification
-- **Method**: `POST`
-- **Path**: `/api/auth/verify-signup`
-- **Purpose**: Verifies Cloudflare Turnstile token prior to user creation to prevent bot spam.
-- **Authentication**: None (Public)
-- **Request**:
-  ```json
-  {
-    "captchaToken": "0.XXXXX...",
-    "email": "scholar@oxford.ac.uk"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "ok": true,
-    "verified": true
-  }
-  ```
-- **Errors**: `400 Bad Request` if token is missing or failed Cloudflare verification.
+### 5.1 Gates, manuscript and export (`server/routes/project/core/manuscriptAndGateRoutes.ts`)
 
-### 3.4 Request Profile Update (Deprecated Edge Function)
-- **Method**: `POST`
-- **Path**: `https://<project-ref>.supabase.co/functions/v1/request-profile-update`
-- **Status**: **HTTP 410 Gone (`F-04` Closed)**
-- **Response**:
-  ```json
-  {
-    "success": false,
-    "code": "PROFILE_UPDATE_DISABLED",
-    "error": "Email and username change requests requiring administrator verification are temporarily unavailable during a security upgrade (TICKET-SEC-01)..."
-  }
-  ```
+| Method | Path |
+| :--- | :--- |
+| POST | `/api/projects/:id/gates/:gate/signoff`, `/gates/:gate/invalidate` |
+| GET | `/api/projects/:id/manuscript/job` |
+| POST | `/api/projects/:id/manuscript/start`, `/next-section`, `/pause`, `/resume`, `/coherence-check`, `/resolve-citations` |
+| GET, POST | `/api/projects/:id/manuscript/peer-review` |
+| GET, POST | `/api/projects/:id/cover-letter` |
+| POST | `/api/projects/:id/anonymization/propose`, `/anonymization/apply`; GET `/anonymization` |
+| POST | `/api/projects/:id/export`, `/export/:format`; GET `/export/:format` |
 
----
+Export formats: `docx`, `odt`, `pdf`, `latex`, `typst`, `camera_ready_pdf`, `markdown` (`md`), `rebuttal_letter` (`rebuttal-letter`). 400 when the project has no document or the format is invalid.
 
-## 4. Projects Core Endpoints (`server/routes/project.ts`)
+### 5.2 Project sub-routers
 
-### 4.1 List Projects
-- **Method**: `GET`
-- **Path**: `/api/projects`
-- **Authentication**: Required
-- **Response**:
-  ```json
-  {
-    "projects": [
-      {
-        "id": "uuid",
-        "title": "Quantum Computing Ethics",
-        "outputTypeId": "OT-01",
-        "state": {},
-        "createdAt": "2026-09-28T10:00:00.000Z",
-        "updatedAt": "2026-09-29T08:00:00.000Z"
-      }
-    ]
-  }
-  ```
+| Mount (under `/api/projects/:id`) | Endpoints |
+| :--- | :--- |
+| `/claims` | POST `/`; POST `/:claimId/evidence`; POST `/:claimId/mark-unsupported`; GET `/`, `/unsupported`, `/conflicts` |
+| `/evidence`, `/evidence-ledger` | GET `/`; POST `/sources`, `/discover`, `/sources/:sourceId/extract`, `/items/:evidenceId/verify`, `/propose`, `/approve`, `/reject` |
+| `/activity` | GET `/` |
+| `/files` | GET `/`; POST `/`; GET `/:fileId/signed-url` |
+| `/parse-file` | POST `/` (multipart), `/url`, `/text` |
+| `/compliance` | GET `/`, `/journal-compliance-report` |
+| `/submissions` | GET, POST `/`; PATCH, DELETE `/:submissionId` |
+| `/mesh` | GET `/agents`; POST `/run` |
 
-### 4.2 Create Project
-- **Method**: `POST`
-- **Path**: `/api/projects`
-- **Authentication**: Required
-- **Request**:
-  ```json
-  {
-    "title": "Analysis of Microgrid Decentralization",
-    "outputTypeId": "OT-01",
-    "initialWordTarget": 2500,
-    "citationStyle": "apa7"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "project": {
-      "id": "new-project-uuid",
-      "title": "Analysis of Microgrid Decentralization",
-      "outputTypeId": "OT-01",
-      "state": {}
-    }
-  }
-  ```
+### 5.3 Journal pipeline (`/api/projects/:id/agentic/*`, also mounted at `/agent/*`)
 
-### 4.3 Get Project by ID
-- **Method**: `GET`
-- **Path**: `/api/projects/:id`
-- **Authentication**: Required
-- **Response**: Returns full project metadata, authors list, and state.
-- **Errors**: `404 Not Found` if project does not exist or user lacks access.
+`server/routes/project/agentic/`, all POST unless noted.
 
-### 4.4 Update Project Metadata
-- **Method**: `PATCH`
-- **Path**: `/api/projects/:id`
-- **Authentication**: Required
-- **Request**:
-  ```json
-  {
-    "title": "Updated Title",
-    "authors": []
-  }
-  ```
+- Evidence: `/gaps`, `/titles`, `/vault-sources`, `/evidence-extraction`, `/external-research`, `/evidence-analysis`, `/journal-discovery`, `/journal-requirements`, `/upload-user-data`; PUT `/user-data/:dataId`; PUT, GET `/evidence`.
+- Blueprint: `/blueprint/gaps`, `/blueprint/questions`, `/blueprint/journals`, `/blueprint/outline`.
+- Drafting: `/allocate-budget`, `/draft-subsection`, `/draft`, `/draft-preview`, `/copilot-chat`; PUT, GET `/manuscript`.
+- Review: `/peer-review`, `/revision`, `/rebuttal-matrix` (also GET), `/citation-audit`, `/originality-check`, `/final-editor`, `/publication-readiness`, `/export`; GET, POST `/export/rebuttal-letter`; PUT `/critiques/:critiqueId/waive`; GET `/critiques`.
+- Other: `/journal-profile/extract`, `/references/lookup`, `/references/check`, `/citations/support`.
 
-### 4.5 Delete Project
-- **Method**: `DELETE`
-- **Path**: `/api/projects/:id`
-- **Authentication**: Required
-- **Response**:
-  ```json
-  {
-    "ok": true,
-    "deleted": "uuid"
-  }
-  ```
+### 5.4 Coursework (`/api/projects/:id/assignment/*`)
 
----
+`server/routes/project/assignment/`, all POST unless noted.
 
-## 5. Coursework & Essay Workflow Endpoints (`server/routes/project/assignment.ts`)
+- Extract: `/analyze`, `/deconstruct`, `/outline`.
+- Understand: `/plan`, `/think`, `/structure` (also GET), `/generate-outline`, `/estimate-rubric`, `/thesis-budget`.
+- Sources: `/research`, `/citations-ground`.
+- Drafting: `/draft-section`, `/stream-section` (SSE; accepts `allocatedWords`), `/review`, `/tutor-chat`, `/peel-matrix`.
+- Submission: `/audit-export`, `/copilot-chat`.
+- Stage agents: `/agent/extract`, `/agent/understand`, `/agent/sources`, `/agent/review`.
 
-### 5.1 Get Assignment State
-- **Method**: `GET`
-- **Path**: `/api/projects/:id/assignment`
-- **Purpose**: Fetches the complete 4-phase canonical state (`brief`, `sources`, `drafting`, `submission`).
-- **Response**: Returns `AssignmentProjectState`.
+### 5.5 Thesis, proposal, presentation
 
-### 5.2 Persist Assignment State
-- **Method**: `PUT`
-- **Path**: `/api/projects/:id/assignment`
-- **Purpose**: Saves and synchronizes 4-phase state changes to `public.assignment_projects`.
-- **Request**: Full `AssignmentProjectState` JSON object.
-- **Response**: `{ "ok": true, "updatedAt": "timestamp" }`.
+| Mount | Endpoints |
+| :--- | :--- |
+| `/thesis` | POST `/viva-simulate`, `/chapter-audit`, `/draft-chapter`; GET `/gate-status` |
+| `/proposal` | POST `/study-section-simulate`, `/aims-audit`, `/draft-section` |
+| `/presentation` | POST `/generate-deck`, `/qa-simulate`; GET, PUT `/deck` |
 
-### 5.3 Generate Dynamic Analytical Outline
-- **Method**: `POST`
-- **Path**: `/api/projects/:id/assignment/generate-outline`
-- **Purpose**: Generates dynamic substantive outline with section word budgets based on the prompt.
-- **Request**:
-  ```json
-  {
-    "prompt": "Critically analyze the role of deterrence in modern cybersecurity...",
-    "academicLevel": "undergraduate",
-    "assignmentType": "analytical_essay",
-    "targetWordCount": 2000,
-    "citationStyle": "apa7"
-  }
-  ```
-- **Response**: Returns `AssignmentStructure` schema containing `mainHeadings` and `subheadings`.
+## 6. AI
 
-### 5.4 Scholarly Literature Discovery
-- **Method**: `POST`
-- **Path**: `/api/projects/:id/assignment/scholarly-discovery`
-- **Purpose**: Runs question deconstruction and multi-angle literature search against OpenAlex/Crossref.
-- **Request**:
-  ```json
-  {
-    "prompt": "Critically analyze...",
-    "academicLevel": "undergraduate",
-    "discipline": "International Relations"
-  }
-  ```
-- **Response**: Array of `CuratedSource` objects tagged with roles and relevance justifications.
+| Method | Path | Auth | Purpose |
+| :--- | :--- | :--- | :--- |
+| POST | `/api/ai/run` | Yes | Unified streaming (SSE) call through the router; see [`AI-SYSTEM.md`](AI-SYSTEM.md) §2.1 |
+| GET | `/api/ai/models` | Yes | Curated live model list for the keys in the request |
+| GET | `/api/ai/status` | Public | AI availability |
+| POST | `/api/ai/search` | Yes | Web search |
+| POST | `/api/ai/deep-research` | Yes | Multi-step research |
+| POST | `/api/ai/agent` | Yes | Ask Scholar |
+| GET, POST | `/api/ai/threads` | Yes | Ask Scholar threads (held in server memory per user, merged by thread id) |
+| POST | `/api/drafting/section` | Yes | Section drafting |
+| POST | `/api/studio/voice-profile`, `/refine`, `/consent`, `/restrict` | Yes | Studio voice and refine |
+| GET | `/api/studio/egress-audit` | Yes | Egress audit |
 
-### 5.5 Lecture Document Ingestion
-- **Method**: `POST`
-- **Path**: `/api/projects/:id/assignment/lecture-upload`
-- **Payload**: `multipart/form-data` with `file` field (`.pdf`, `.pptx`, `.docx`).
-- **Response**:
-  ```json
-  {
-    "ok": true,
-    "fileId": "uuid",
-    "title": "Lecture 4 Slides.pdf",
-    "extractedChunks": 14
-  }
-  ```
+### 6.1 AI Access (`/api/ai-access`, all `requireAuth`, user-scoped)
 
-### 5.6 Draft Section
-- **Method**: `POST`
-- **Path**: `/api/projects/:id/assignment/draft-section`
-- **Purpose**: Generates initial academic draft for a specific subheading.
-- **Request**:
-  ```json
-  {
-    "subheadingId": "sub-1",
-    "subheadingTitle": "Deterrence by Denial in Network Architecture",
-    "targetWordCount": 450,
-    "writingStyle": "analytical",
-    "customVoiceSample": "",
-    "authorNotes": "Emphasize zero-trust principles",
-    "approvedSources": []
-  }
-  ```
-- **Response**: `{ "ok": true, "content": "Drafted text...", "wordCount": 442 }`.
+GET `/status`; POST `/connections`; DELETE `/connections/:providerId`; POST `/models`; GET `/keys`, `/keys/sync`; PUT, DELETE `/keys/:providerId`; POST `/route`; GET `/premium-catalog`, `/premium-plans`; GET, POST, DELETE `/premium-request`.
 
-### 5.7 Rubric Compliance Evaluation
-- **Method**: `POST`
-- **Path**: `/api/projects/:id/assignment/evaluate-rubric`
-- **Request**: `{ "draftContent": "Full draft...", "rubricCriteria": [] }`.
-- **Response**: 10-point evaluation breakdown with numerical scores and qualitative feedback.
+## 7. Search and Vault
 
-### 5.8 Citation Audit Reconciliation
-- **Method**: `POST`
-- **Path**: `/api/projects/:id/assignment/citation-audit`
-- **Request**: `{ "draftContent": "Full draft...", "bibliography": [] }`.
-- **Response**: `{ "inTextCitations": [], "reconciled": true, "discrepancies": [] }`.
+| Method | Path | Notes |
+| :--- | :--- | :--- |
+| GET | `/api/search?q=` | Searches the user's projects and sources |
+| POST, GET | `/api/search/live` | Live scholarly search (every `/api/search/*` route is `requireAuth`) |
+| POST | `/api/search/multi-portal` | Multi-portal discovery |
+| | `/api/discovery/*` | Alias of `/api/search/*` |
 
-### 5.9 Stage Copilot Chat
-- **Method**: `POST`
-- **Path**: `/api/projects/:id/assignment/copilot-chat`
-- **Request**:
-  ```json
-  {
-    "phase": "phase_1",
-    "persona": "advisor",
-    "messages": [{ "role": "user", "content": "How should I structure the counter-argument?" }],
-    "context": { "prompt": "...", "wordCount": 2000 }
-  }
-  ```
-- **Response**: `{ "reply": "...", "suggestedActions": [] }`.
+`/api/vault/*` (`requireAuth`): POST `/parse-file` (multipart), `/parse-url` (SSRF-guarded), `/lookup-doi`, `/search-semantic`, `/zotero/sync`, `/mendeley/sync`, `/reset`; GET `/drive/files`, `/onedrive/files`; GET, POST `/cloud/connections`; DELETE `/cloud/connections/:provider`. `POST /api/lookup-doi` is an alias of `/api/vault/lookup-doi`.
 
-### 5.10 Export Formatted Documents
-- **Method**: `POST`
-- **Path**: `/api/projects/:id/assignment/export-docx` and `/export-pdf`
-- **Response**: Streams binary file attachment (`application/vnd.openxmlformats-officedocument.wordprocessingml.document` or `application/pdf`).
+## 8. Presentations library (`/api/presentations`, all `requireAuth`)
 
----
+GET `/`, `/:id`; POST `/`; PUT `/:id`; DELETE `/:id`; POST `/parse-document` (multipart); POST `/:id/copilot`.
 
-## 6. AI Gateway Endpoints (`server/routes/ai.ts`)
+## 9. Admin (`/api/admin/ai`, `requireAuth` then `requireAdmin`; scopes in [`PRODUCT.md`](PRODUCT.md) §1)
 
-### 6.1 List Models
-- **Method**: `GET`
-- **Path**: `/api/ai/models`
-- **Response**: Returns catalog of cloud models, local runner models, and latency metrics.
+- Read: GET `/whoami`, `/dashboard`, `/providers`, `/resources`, `/plans/:planId/resources`, `/models`, `/premium-plans`, `/premium-requests`, `/premium-subscribers`, `/quota-overrides/:userId`, `/usage`, `/budget`, `/platform-credentials`, `/opportunities`, `/admins`, `/users/search`, `/audit-log`.
+- Providers and resources: PATCH `/providers/:id`, `/models/:id`; POST `/resources`; PATCH, DELETE `/resources/:id`; PUT `/plans/:planId/resources`; POST `/premium-plans`.
+- Premium: POST `/premium-requests/:id/approve`, `/premium-requests/:id/decline`, `/entitlements/grant`, `/entitlements/revoke`, `/quota-overrides`, `/credits/grant`.
+- Budget and credentials: PATCH `/budget`; POST `/platform-credentials`; PATCH `/platform-credentials/:id/status`; DELETE `/platform-credentials/:id`.
+- Opportunities: POST `/opportunities/research`, `/opportunities/:id/review`.
+- People: POST `/admins`; DELETE `/admins/:userId`; PATCH `/admins/:userId/scopes`, `/users/:userId/status`; DELETE `/users/:userId`.
 
-### 6.2 Verify API Key
-- **Method**: `POST`
-- **Path**: `/api/ai/verify-key`
-- **Request**: `{ "provider": "anthropic", "apiKey": "sk-ant-..." }`.
-- **Response**: `{ "valid": true, "latencyMs": 142 }`.
+## 10. Static and SPA
 
-### 6.3 Standard Generation & Chat
-- **Method**: `POST`
-- **Path**: `/api/ai/generate` and `/api/ai/chat`
-- **Request**: Standard generation options (prompt, model, max_tokens, temperature).
-- **Response**: `{ "text": "...", "model": "...", "provider": "..." }`.
-
-### 6.4 Streaming Inference
-- **Method**: `POST`
-- **Path**: `/api/ai/stream`
-- **Response**: Server-Sent Events (`text/event-stream`) streaming partial tokens:
-  ```text
-  data: {"delta": "According "}
-  data: {"delta": "to recent empirical "}
-  data: [DONE]
-  ```
-
----
-
-## 7. Knowledge Vault Endpoints (`server/routes/vault.ts`)
-
-### 7.1 List Vault Items
-- **Method**: `GET`
-- **Path**: `/api/vault`
-- **Authentication**: Required (`requireAuth`)
-- **Response**: Array of `UniversalVaultItem` records.
-
-### 7.2 Ingest DOI Metadata
-- **Method**: `POST`
-- **Path**: `/api/vault/doi`
-- **Authentication**: Required (`requireAuth`)
-- **Request**: `{ "doi": "10.1038/s41586-024-00000-0" }`
-- **Response**: Standardized bibliographic item fetched from Crossref/OpenAlex.
-
-### 7.3 Parse File Upload
-- **Method**: `POST`
-- **Path**: `/api/vault/parse-file`
-- **Authentication**: Required (`requireAuth`)
-- **Upload Limit**: Hard-clamped to `10 MB` (`MAX_UPLOAD_MB`).
-- **Concurrency Guard**: Maximum 1 heavy parse per server instance. Extra requests return HTTP `503 Service Unavailable` with `Retry-After: 5`.
-
-### 7.4 Cloud Integration Connections
-- **Method**: `GET`
-- **Path**: `/api/vault/cloud/connections`
-- **Authentication**: Required (`requireAuth`)
-- **Response**:
-  ```json
-  {
-    "google": { "connected": true, "needsAuth": false, "email": "alice@gmail.com" },
-    "onedrive": { "connected": false, "needsAuth": false },
-    "zotero": { "connected": false, "needsAuth": false },
-    "mendeley": { "connected": false, "needsAuth": false }
-  }
-  ```
-
----
-
-## 8. Supabase Proxy Endpoints (`server/routes/supabaseProxy.ts`)
-
-- **Strict Route Allowlist**: Only `/rest/v1/*`, `/auth/v1/*`, `/realtime/v1/*`, and `/storage/v1/*` are proxied. Administrative paths (`/pg/*`, `/meta/*`, `/functions/*`, `/platform/*`) return HTTP `403 Forbidden`.
-- **TLS Verification**: Enforces `rejectUnauthorized: true` on all upstream proxy agent connections.
-- **WebSocket Realtime Proxy**: `/api/supabase/realtime/v1/*` proxies live WebSocket duplex streams with origin validation.
+In production `server.ts` serves `dist/`: files under `/assets/` are cached immutably for a year; `index.html`, `sw.js` and `registerSW.js` are never cached. A missing file with a static extension (`.js`, `.css`, `.png`, …) or a missing `/robots.txt`, `/llms.txt`, `/ai-catalog.json`, `/favicon.ico` returns 404 text instead of the SPA; every other GET returns `index.html`. In development Vite middleware serves the app.

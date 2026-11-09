@@ -1,5 +1,7 @@
 # Hotfix 2 — Database, Storage, RPC & Edge Function Lockdown (`HOTFIX2_DEPLOY.md`)
 
+> **Dated record.** This document captures a point in time (an incident, audit, plan or status ledger) and is not kept in sync with the code. For current behaviour read [`docs/README.md`](docs/README.md). Details here, such as `render.yaml` settings, file names, line numbers and counts, may no longer match `main`.
+
 > [!WARNING]
 > **Verification Status: `UNVERIFIED AGAINST SUPABASE`**  
 > Both [`supabase/migrations/20261028000000_hotfix2_db_storage_rpc_lockdown.sql`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/migrations/20261028000000_hotfix2_db_storage_rpc_lockdown.sql) and [`supabase/migrations/20261028010000_purge_plaintext_credentials.sql`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/supabase/migrations/20261028010000_purge_plaintext_credentials.sql) remain marked **`UNVERIFIED`** until all 4 local Docker/Supabase verification steps (migration replay, anon denial + user login/upload verification, `COMPROMISE_CHECKS.md`/`PROD_CHECKS.md` execution, and `pg_dump`/`pg_restore` round-trip) pass.

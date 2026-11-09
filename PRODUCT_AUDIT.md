@@ -1,5 +1,7 @@
 # Product Audit (B1)
 
+> **Dated record.** This document captures a point in time (an incident, audit, plan or status ledger) and is not kept in sync with the code. For current behaviour read [`docs/README.md`](docs/README.md). Details here, such as `render.yaml` settings, file names, line numbers and counts, may no longer match `main`.
+
 Status: **first pass, 2026-10-29.** Built from the code on `main` (`b4031a2`) and the production smoke suite (`scripts/smoke-prod.sh`, 35/35 on 2026-10-29).
 - Areas marked **UNVERIFIED** have not yet been walked through in a running app. They are listed so B2 can cover them and B5 can fix them.
 - Every finding cites `file:line`.

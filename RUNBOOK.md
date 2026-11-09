@@ -36,7 +36,7 @@ Expected:
 - `commit` is the short SHA of `main`;
 - with `deep=1`, `checks.database: "ok"`. If the database is unreachable, the response is a 503 with `"degraded"`.
 
-Full functional check (35 checks: auth, ownership, uploads, SSRF guard, RPC lockdown, decks). It needs two test accounts and the Supabase service key in the environment:
+Full functional check (auth, ownership, uploads, SSRF guard, RPC lockdown, decks). It needs two test accounts and the Supabase service key in the environment:
 
 ```bash
 set -a; . ~/.scholar-agent.env; set +a; bash scripts/smoke-prod.sh
@@ -118,7 +118,7 @@ To change a limit:
 | Build with chunk budget (< 500 kB per chunk) | `npm run build` | CI |
 | End-to-end (Playwright) on a local Supabase, with a stand-in AI | see `e2e/README.md` | CI (`e2e.yml`) on every PR |
 | Credit ledger checks on a real database | `psql "$DB_URL" -f scripts/db/test-credits.sql` (local only) | CI (`e2e.yml`) |
-| Production smoke suite (35 checks, uses two test accounts) | `scripts/smoke-prod.sh` | by hand after a deploy, or in `deploy.yml` when the `SMOKE_*` secrets exist |
+| Production smoke suite (uses two test accounts) | `scripts/smoke-prod.sh` | by hand after a deploy, or in `deploy.yml` when the `SMOKE_*` secrets exist |
 
 The end-to-end suite covers sign-in, project privacy, each workspace (open, save, reload, no demo data, AI drafting with and without the user's AI), Journal versions and export, the Presentation studio, accessibility (axe, WCAG 2.1 A/AA) at 375/768/1280 px and keyboard focus.
 

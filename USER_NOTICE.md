@@ -1,5 +1,7 @@
 # Draft Security Notice to Users (`USER_NOTICE.md`)
 
+> **Dated record.** This document captures a point in time (an incident, audit, plan or status ledger) and is not kept in sync with the code. For current behaviour read [`docs/README.md`](docs/README.md). Details here, such as `render.yaml` settings, file names, line numbers and counts, may no longer match `main`.
+
 > **Owner Editorial, Verification & Legal Checklist (Complete Before Sending)**:
 > - **Status**: DRAFT — prepared for owner review. Nothing has been sent to users (the agent never sends anything to users). Do **not** send until every item in the **Claims-to-PR Pre-Send Checklist** below is checked off in production and the `[PLACEHOLDER]` sections are filled in.
 > - **Legal Notification Obligations**: Statutory breach-notification timelines and content requirements depend on the jurisdictions where affected users reside (for example: GDPR Article 34 for EU/EEA/UK residents when there is a high risk to rights and freedoms; US state data-breach statutes; Nepal's Individual Privacy Act 2075 / Electronic Transactions Act; or institutional research data agreements). Verify applicable legal obligations based on your user base's jurisdictions before sending.

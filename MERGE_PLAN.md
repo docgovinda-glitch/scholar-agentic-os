@@ -1,5 +1,7 @@
 # Production Merge & Deployment Plan (`MERGE_PLAN.md`)
 
+> **Dated record.** This document captures a point in time (an incident, audit, plan or status ledger) and is not kept in sync with the code. For current behaviour read [`docs/README.md`](docs/README.md). Details here, such as `render.yaml` settings, file names, line numbers and counts, may no longer match `main`.
+
 > [!IMPORTANT]
 > **Current Live Production & `origin/main` Baseline (`cbf38da`, 2026-10-29)**:
 > - **PR #71** (`hotfix/containment-authz-memory-ssrf`) merged to `main` at `5a642a0` (`2026-10-28T10:02:52Z` by `docgovinda-glitch`).

@@ -1,5 +1,7 @@
 # HOTFIX_DEPLOY.md — Containment Hotfix Deployment, Verification & Rollback Runbook
 
+> **Dated record.** This document captures a point in time (an incident, audit, plan or status ledger) and is not kept in sync with the code. For current behaviour read [`docs/README.md`](docs/README.md). Details here, such as `render.yaml` settings, file names, line numbers and counts, may no longer match `main`.
+
 > [!WARNING]
 > **`autoDeploy: true` Warning (Immediate Production Trigger on Merge)**:
 > [`render.yaml`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/render.yaml#L27) has `autoDeploy: true`. The moment a PR is merged into `main`, Render **immediately** begins building and deploying the new container to `https://scholar.gkshah.com.np` **without** waiting for the GitHub Actions `Production` environment approval gate in [`.github/workflows/deploy.yml`](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/.github/workflows/deploy.yml#L47-L66). Approving the GitHub Actions `deploy` job later will trigger a **second** redundant rebuild (`{"clearCache": "clear"}`). Before merging, ensure Render environment variables are ready and monitor the Render Dashboard Events feed immediately upon merge.

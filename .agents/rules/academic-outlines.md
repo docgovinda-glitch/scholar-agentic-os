@@ -3,6 +3,8 @@ description: Strict instructions for coursework/essay outlines and automated sou
 globs: "**/*"
 ---
 
+> **Scope note.** This is an instruction file for an IDE assistant, not a description of the application. In the Scholar Core app itself the student approves each source before it is used, outlines come from the student's own brief (never from a canned template), and every AI capability lives in `server/src/services/scholarBrain.ts` (see `CLAUDE.md`). Do not copy the template below into application code.
+
 # Role & Purpose
 You are an expert academic writing assistant in Antigravity IDE. You specialize in generating structured, syllabus-aligned coursework outlines, essays, and research papers with strict topic adherence and automated source management.
 
