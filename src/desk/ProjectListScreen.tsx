@@ -106,6 +106,8 @@ import { type CitationGraphNode } from "../services/discovery/snowballSamplingSe
 import { type EvidenceMatrixItem, extractEvidenceFromPaper } from "../services/evidence/evidenceExtractionService";
 import { getCloudProvider } from "../config/providerCatalog";
 import { useVisualViewport } from "../hooks/useVisualViewport";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import { useBackToClose } from "../hooks/useBackToClose";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 import {
   ASK_ANSWER_GUIDE,
@@ -389,7 +391,8 @@ export default function ProjectListScreen({
   const [choosing, setChoosing] = useState(false);
   const [welcomeVisible, setWelcomeVisible] = useState(() => showWelcome ?? false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  // Below 1024px the permanent 260px sidebar leaves too little room for the page (tablet portrait), so start collapsed.
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window === "undefined" || window.innerWidth >= 1024);
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Phones get an Ask-first home: Ask Scholar at the top, compact workspace
@@ -397,6 +400,29 @@ export default function ProjectListScreen({
   const { isMobile: isPhone } = useDeviceClass();
   // Keyboard-aware sizing on phones (iOS keeps 100dvh when the keyboard opens).
   const { height: visualViewportHeight, keyboardOpen } = useVisualViewport(isPhone);
+  const drawerRef = useRef<HTMLElement | null>(null);
+
+  // Phone: Back closes the chat / drawer instead of leaving the app.
+  useBackToClose(isAiSidebarOpen && isPhone, () => setIsAiSidebarOpen(false), isPhone);
+  useBackToClose(mobileMenuOpen && isPhone, () => setMobileMenuOpen(false), isPhone);
+
+  // Phone drawer: Escape closes it, focus moves in on open and returns on close.
+  useEffect(() => {
+    if (!isPhone || !mobileMenuOpen) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const t = window.setTimeout(() => {
+      drawerRef.current?.querySelector<HTMLElement>('a[href], button:not([disabled])')?.focus();
+    }, 60);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(t);
+      document.removeEventListener("keydown", onKey);
+      if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();
+    };
+  }, [isPhone, mobileMenuOpen]);
 
   // Command Palette & Resizable Assistant Split-Pane States
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -853,6 +879,7 @@ export default function ProjectListScreen({
   // read, leave them there and offer a "Jump to latest" button instead.
   const stickToBottomRef = useRef(true);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const [showProgressDetails, setShowProgressDetails] = useState(false);
   const handleChatScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
@@ -912,10 +939,9 @@ export default function ProjectListScreen({
   // Sync active Ask Scholar thread to multi-thread history in localStorage and server
   useEffect(() => {
     const userMsgs = guideMessages.filter((m) => m.sender === "user");
-    const assistantMsgs = guideMessages.filter(
-      (m) => m.sender === "assistant" && m.id !== "init" && m.id !== "reset-assistant" && !m.error
-    );
-    if (userMsgs.length === 0 || assistantMsgs.length === 0) return;
+    // Saved from the first question on, not only after a good answer: a failed reply
+    // (offline, no AI) must not make the conversation vanish on reload.
+    if (userMsgs.length === 0) return;
     const rawTitle = userMsgs[0].text.trim().replace(/\s+/g, " ");
     const title = rawTitle.length > 52 ? `${rawTitle.slice(0, 50)}…` : rawTitle;
     const updatedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -947,6 +973,7 @@ export default function ProjectListScreen({
   }, [isGuideThinking]);
 
   const [aiStatus, setAiStatus] = useState<AiOperationalStatus | null>(null);
+  const isOnline = useOnlineStatus();
 
   // Sync AI operational status
   useEffect(() => {
@@ -989,7 +1016,9 @@ export default function ProjectListScreen({
     return () => window.clearTimeout(t);
   }, [aiStatus]);
   const aiStatusResolved = aiStatus !== null || aiCheckTimedOut;
-    const aiPillLabel = aiStatus?.connected
+    const aiPillLabel = !isOnline
+    ? "You're offline"
+    : aiStatus?.connected
     ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
     : aiStatusResolved
       ? "Connect an AI"
@@ -1154,7 +1183,12 @@ export default function ProjectListScreen({
     setActiveAskThreadId(`thread-${Date.now()}`);
     setGuideMessages([]);
     setIsAskHistoryOpen(false);
-  }, []);
+    // On a phone an empty full-screen chat is a second, different landing page. Go back to the real one.
+    if (isPhone) {
+      setIsAiSidebarOpen(false);
+      window.setTimeout(() => guideTextareaRef.current?.focus(), 150);
+    }
+  }, [isPhone]);
 
   const handleSaveSourceToVault = useCallback(
     async (src: {
@@ -1953,7 +1987,9 @@ export default function ProjectListScreen({
         action:
           failure.kind === "no-ai"
             ? { type: "ai-access", label: "Connect an AI" }
-            : { type: "retry", label: "Try again", query, mode: targetMode },
+            : failure.kind === "signed-out"
+              ? { type: "auth", label: "Sign in" }
+              : { type: "retry", label: "Try again", query, mode: targetMode },
         liveSources: sourcesFound.length ? sourcesFound : undefined,
         searchedAt: sourcesFound.length ? new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : undefined,
         error: true,
@@ -2313,6 +2349,38 @@ export default function ProjectListScreen({
     getSupabaseClient().auth.signOut();
   }
 
+  // "Resume chat": the conversation in progress, or after a reload the most recent saved one.
+  const resumeTarget = hasStartedChatting
+    ? {
+        title: [...guideMessages].reverse().find((m) => m.sender === "user")?.text || "Your conversation",
+        open: () => setIsAiSidebarOpen(true),
+      }
+    : askThreads[0]
+      ? {
+          title: askThreads[0].title,
+          open: () => {
+            setActiveAskThreadId(askThreads[0].id);
+            setGuideMessages(askThreads[0].messages);
+            setIsAiSidebarOpen(true);
+          },
+        }
+      : null;
+  const resumeChatRow = (extraClass = "") =>
+    resumeTarget ? (
+      <button
+        type="button"
+        data-testid="mobile-resume-chat"
+        onClick={resumeTarget.open}
+        className={`w-full min-h-14 flex items-center gap-3 px-3.5 py-2 rounded-2xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-left cursor-pointer active:scale-[0.99] transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${extraClass}`}
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-[11px] font-semibold uppercase tracking-wider opacity-70">Resume chat</span>
+          <span className="block text-[13px] font-medium truncate">{resumeTarget.title}</span>
+        </span>
+        <ArrowRight className="w-4 h-4 shrink-0" aria-hidden="true" />
+      </button>
+    ) : null;
+
   // Up to two most recent projects for the phone landing's "Continue" rows.
   const landingRecents = (projects ?? []).length === 0 || !userEmail
     ? []
@@ -2337,8 +2405,16 @@ export default function ProjectListScreen({
     handleCreate(tile.id);
   };
 
+  // A tap on the box's padding (not on a control) should focus the input, as people expect.
+  const focusInputOnBackgroundTap = (ref: React.MutableRefObject<HTMLTextAreaElement | HTMLInputElement | null>) =>
+    (e: React.MouseEvent) => {
+      if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [role="menu"], [role="listbox"], [role="dialog"]')) return;
+      ref.current?.focus();
+    };
+
   const mainPromptForm = (
     <form
+      onClick={focusInputOnBackgroundTap(guideTextareaRef)}
       onSubmit={(e) => {
         e.preventDefault();
         if (mainPromptInput.trim() || mainAttachments.length > 0) {
@@ -2442,7 +2518,7 @@ export default function ProjectListScreen({
           name="researchInstructions"
           aria-label="Research instructions or assignment guidelines"
           placeholder={isPhone ? "Ask a research question or paste your brief…" : "Paste text, drop files/images, or draft research instructions..."}
-          style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent", fieldSizing: "content" } as React.CSSProperties}
+          style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent", fieldSizing: "content", minHeight: isPhone ? 48 : undefined } as React.CSSProperties}
           className="w-full flex-1 bg-transparent text-base sm:text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input max-h-28 overflow-y-auto scholar-scrollbar"
         />
       </div>
@@ -2519,6 +2595,11 @@ export default function ProjectListScreen({
 
       {/* Left Sidebar (Navigation Pane) */}
       <aside
+        ref={drawerRef}
+        // Off-screen is not the same as unreachable: without this, Tab and screen readers
+        // walk through a closed drawer's links. Inert also keeps the page behind an open
+        // drawer from taking focus.
+        inert={isPhone ? !mobileMenuOpen : !isSidebarOpen}
         aria-label="Workspace navigation"
         className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${mobileMenuOpen
           ? "translate-x-0 w-[260px] shadow-2xl"
@@ -2887,7 +2968,7 @@ export default function ProjectListScreen({
       </aside>
 
       {/* Main Content Area (Center Pane) */}
-      <main className={`${isLandingPage && isAiSidebarOpen
+      <main inert={isPhone && mobileMenuOpen} className={`${isLandingPage && isAiSidebarOpen
         ? "hidden"
         : "flex-1 flex flex-col h-screen h-[100dvh] w-full bg-paper-cool dark:bg-ink-850 overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out"
         }`}>
@@ -3176,22 +3257,7 @@ export default function ProjectListScreen({
                         Research, write and cite: essays, papers, slides.
                       </p>
 
-                      {hasStartedChatting && (
-                        <button
-                          type="button"
-                          data-testid="mobile-resume-chat"
-                          onClick={() => setIsAiSidebarOpen(true)}
-                          className="mb-4 w-full min-h-14 flex items-center gap-3 px-3.5 py-2 rounded-2xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-left cursor-pointer active:scale-[0.99] transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
-                        >
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[11px] font-semibold uppercase tracking-wider opacity-70">Resume chat</span>
-                            <span className="block text-[13px] font-medium truncate">
-                              {[...guideMessages].reverse().find((m) => m.sender === "user")?.text || "Your conversation"}
-                            </span>
-                          </span>
-                          <ArrowRight className="w-4 h-4 shrink-0" aria-hidden="true" />
-                        </button>
-                      )}
+                      {resumeChatRow("mb-4")}
 
                       <div className="mt-4">
                         <div
@@ -3251,8 +3317,9 @@ export default function ProjectListScreen({
                       )}
                     </section>
                   </>
-                ) : !isAiSidebarOpen && !hasStartedChatting ? (
+                ) : !isAiSidebarOpen ? (
                   <>
+                    {resumeTarget && <div className="w-full max-w-xl mx-auto">{resumeChatRow("mb-2")}</div>}
                     <div className="text-center mb-2 flex flex-col items-center">
                       <h1 className="text-2xl sm:text-[28px] font-semibold text-neutral-900 dark:text-white tracking-tight leading-tight">
                         Where will your research begin?
@@ -4577,7 +4644,7 @@ export default function ProjectListScreen({
                             );
                           })() : msg.sender === "assistant" ? (
                             <div className="space-y-3">
-                              {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
+                              {!msg.error && ((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
                                 <ScientificConsensusGauge
                                   citations={msg.citations && msg.citations.length > 0 ? msg.citations : liveSourcesAsCitations(msg.liveSources)}
                                 />
@@ -4817,23 +4884,37 @@ export default function ProjectListScreen({
                       <div className="flex flex-col gap-2.5 animate-in fade-in">
                         {isPhone && (
                           <div
-                            role="status"
-                            aria-live="polite"
                             data-testid="mobile-ask-progress"
-                            className="flex items-center gap-2 px-1 text-[13px] font-medium text-neutral-700 dark:text-neutral-200"
+                            className="flex items-center gap-2 px-1 min-h-10 text-[13px] font-medium text-neutral-700 dark:text-neutral-200"
                           >
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-500" aria-hidden="true" />
-                            <span>
+                            <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-sky-500" aria-hidden="true" />
+                            <span role="status" aria-live="polite" className="min-w-0 flex-1 truncate">
                               {askPhase?.step === "writing"
                                 ? "Writing your answer…"
                                 : typeof askPhase?.found === "number" && askPhase.found > 0
                                   ? `Searching scholarly sources… ${askPhase.found} found`
                                   : "Searching scholarly sources…"}
                             </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowProgressDetails((v) => !v)}
+                              aria-expanded={showProgressDetails}
+                              className="shrink-0 min-h-9 px-2.5 rounded-full text-xs text-sky-700 dark:text-sky-300 cursor-pointer focus-visible:outline-2 focus-visible:outline-sky-500"
+                            >
+                              {showProgressDetails ? "Hide details" : "Details"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleStopGuideGeneration}
+                              className="shrink-0 min-h-9 px-3 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold cursor-pointer active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+                            >
+                              Stop
+                            </button>
                           </div>
                         )}
-                        {/* Live Single-Step Research Visualizer */}
-                        <LiveResearchTrajectoryVisualizer
+                        {/* Phones show the full stage-by-stage card only on request; it filled most of a small screen. */}
+                        {(!isPhone || showProgressDetails) && (
+                                                <LiveResearchTrajectoryVisualizer
                           isLive={true}
                           currentStep={askPhase?.step}
                           foundCount={askPhase?.found}
@@ -4842,6 +4923,7 @@ export default function ProjectListScreen({
                           onStop={handleStopGuideGeneration}
                           mode={sidebarAiMode}
                         />
+                        )}
                         {/* Live Token Streaming Bubble when tokens are arriving */}
                         {streamingGuideText && (
                           <div className="flex flex-col items-start">
@@ -4880,11 +4962,16 @@ export default function ProjectListScreen({
               <div className="p-3 sm:p-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] bg-white/95 dark:bg-ink-800/95 backdrop-blur-md border-t border-neutral-200/80 dark:border-white/10 shrink-0">
                 <div className={isLandingPage ? "w-full max-w-4xl mx-auto" : "w-full"}>
                   {/* Status & Reset Bar. On phones the header already shows the title and AI dot, and New Chat replaces Reset, so only a disconnected AI is worth the space. */}
-                  <div className={`${isPhone && (!aiStatus || aiStatus.connected) ? "hidden" : "flex"} items-center justify-between px-1 mb-2`}>
+                  <div className={`${isPhone && isOnline && (!aiStatus || aiStatus.connected) ? "hidden" : "flex"} [@media(max-height:500px)]:hidden items-center justify-between px-1 mb-2`}>
                     <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
                       <Lightbulb className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400 shrink-0" aria-hidden="true" />
                       <span className="font-medium text-neutral-700 dark:text-neutral-300">Ask Scholar</span>
-                      {aiStatus ? (
+                      {!isOnline ? (
+                        <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-medium" role="status">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+                          <span>You're offline</span>
+                        </span>
+                      ) : aiStatus ? (
                         aiStatus.connected ? (
                           <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold" title={`Operational provider: ${aiStatus.provider || "Operational"}`}>
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -4962,6 +5049,7 @@ export default function ProjectListScreen({
 
                   {/* Input Wrapper Pill */}
                   <form
+                    onClick={focusInputOnBackgroundTap(guideInputRef)}
                     onSubmit={(e) => {
                       e.preventDefault();
                       if (guideInput.trim() || sidebarAttachments.length > 0) {

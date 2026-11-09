@@ -37,6 +37,22 @@ export interface DeviceInfo {
 
 const MOBILE_MAX = 767;
 const TABLET_MAX = 1023;
+/** A touch device whose short side is this small or less is a phone, even turned sideways. */
+const PHONE_SHORT_SIDE_MAX = 500;
+
+/**
+ * Pure classifier (exported for tests). Width alone mislabels a phone in
+ * landscape (844x390) as a tablet, which then gets the desktop layout: a permanent
+ * 260px sidebar and a chat only ~150px tall. For touch devices the short side is
+ * what separates a phone from a tablet.
+ */
+export function classifyViewport(width: number, height: number, isTouchPrimary: boolean): DeviceClass {
+  if (width <= MOBILE_MAX) return "mobile";
+  if (isTouchPrimary && Math.min(width, height) <= PHONE_SHORT_SIDE_MAX) return "mobile";
+  // A wide touch device is a tablet, not a desktop, however many pixels it has.
+  if (width <= TABLET_MAX || isTouchPrimary) return "tablet";
+  return "desktop";
+}
 
 function classify(): DeviceInfo {
   // SSR / test environments without a window: assume desktop so nothing is
@@ -52,19 +68,9 @@ function classify(): DeviceInfo {
     };
   }
 
-  const width = window.innerWidth;
   const isTouchPrimary =
     typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
-
-  let deviceClass: DeviceClass;
-  if (width <= MOBILE_MAX) {
-    deviceClass = "mobile";
-  } else if (width <= TABLET_MAX || isTouchPrimary) {
-    // A wide touch device is a tablet, not a desktop, however many pixels it has.
-    deviceClass = "tablet";
-  } else {
-    deviceClass = "desktop";
-  }
+  const deviceClass = classifyViewport(window.innerWidth, window.innerHeight, isTouchPrimary);
 
   return {
     deviceClass,

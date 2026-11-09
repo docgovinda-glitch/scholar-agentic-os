@@ -66,6 +66,24 @@ describe("ScientificConsensusGauge & Consensus Meter (Phase 3)", () => {
     expect(screen.getByText("Hide Breakdown")).toBeInTheDocument();
   });
 
+  it("does not invent agreement for sources nobody has classified", () => {
+    const unclassified = [{ title: "A" }, { title: "B" }, { title: "C" }, { title: "D" }];
+    expect(computeConsensusFromCitations(unclassified)).toBeNull();
+    const { container } = render(<ScientificConsensusGauge citations={unclassified} />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("needs at least two classified sources, and ignores unclassified ones in the count", () => {
+    expect(computeConsensusFromCitations([{ title: "A", stance: "supporting" as const }, { title: "B" }, { title: "C" }])).toBeNull();
+    const m = computeConsensusFromCitations([
+      { title: "A", stance: "supporting" as const },
+      { title: "B", stance: "supporting" as const },
+      { title: "C" },
+    ]);
+    expect(m?.totalStudies).toBe(2);
+    expect(m?.level).toBe("insufficient");
+  });
+
   it("renders null when citations are empty", () => {
     const { container } = render(<ScientificConsensusGauge citations={[]} />);
     expect(container.firstChild).toBeNull();

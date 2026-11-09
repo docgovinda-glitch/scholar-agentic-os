@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import React from "react";
-import { render, screen, fireEvent, within, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, within, cleanup, act, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router-dom";
 
@@ -86,6 +86,19 @@ describe("phone home: Ask Scholar first", () => {
     expect(screen.getByText("Where will your research begin?")).toBeInTheDocument();
   });
 
+  describe("navigation drawer", () => {
+    it("is inert while closed, so keyboard and screen readers skip it", () => {
+      renderHome();
+      const drawer = screen.getByLabelText("Workspace navigation", { selector: "aside" });
+      expect(drawer).toHaveAttribute("inert");
+      fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+      expect(drawer).not.toHaveAttribute("inert");
+      expect(document.querySelector("main")).toHaveAttribute("inert");
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(drawer).toHaveAttribute("inert");
+    });
+  });
+
   describe("landing improvements", () => {
     afterEach(() => {
       try { sessionStorage.clear(); } catch { /* ignore */ }
@@ -150,6 +163,46 @@ describe("phone home: Ask Scholar first", () => {
       const form = box.closest("form")!;
       expect(within(form).getByTestId("citation-style-trigger")).toBeInTheDocument();
       expect(within(form).getByTestId("ask-scholar-settings-btn")).toBeInTheDocument();
+    });
+
+    it("closes the chat on the phone Back button instead of leaving the app", async () => {
+      startChat("What is a literature review?");
+      await screen.findByRole("button", { name: "Back" });
+      await act(async () => {
+        window.history.back();
+        await new Promise((r) => setTimeout(r, 40));
+      });
+      expect(await screen.findByTestId("mobile-resume-chat")).toHaveTextContent("What is a literature review?");
+    });
+
+    it("New Chat returns to the landing instead of a second, different empty state", async () => {
+      startChat("What is a literature review?");
+      fireEvent.click(await screen.findByRole("button", { name: "New Chat" }));
+      expect(await screen.findByRole("region", { name: "Ask Scholar" })).toBeInTheDocument();
+      expect(screen.queryByText("Where will your research begin?")).toBeNull();
+    });
+
+    it("keeps the conversation after a reload, even when the reply failed", async () => {
+      startChat("What is a literature review?");
+      await screen.findByRole("button", { name: "Back" });
+      await waitFor(() => expect(localStorage.length).toBeGreaterThan(0));
+      cleanup();
+      renderHome();
+      expect(await screen.findByTestId("mobile-resume-chat")).toHaveTextContent("What is a literature review?");
+      fireEvent.click(screen.getByTestId("mobile-resume-chat"));
+      expect(await screen.findByRole("button", { name: "Back" })).toBeInTheDocument();
+    });
+
+    it("on larger screens, closing the chat shows the normal landing with a Resume row", async () => {
+      device.isMobile = false;
+      renderHome();
+      const box = screen.getAllByRole("textbox", { name: /Research instructions/i })[0];
+      fireEvent.change(box, { target: { value: "What is a literature review?" } });
+      fireEvent.submit(box.closest("form")!);
+      fireEvent.click(await screen.findByRole("button", { name: "Close Assistant" }));
+      expect(await screen.findByTestId("mobile-resume-chat")).toHaveTextContent("What is a literature review?");
+      expect(screen.getByText("Where will your research begin?")).toBeInTheDocument();
+      expect(screen.queryByText("Ask Scholar Copilot Active")).toBeNull();
     });
 
     it("goes back to the landing, which offers to resume the chat", async () => {

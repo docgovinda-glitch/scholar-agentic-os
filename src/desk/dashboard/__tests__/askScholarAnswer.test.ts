@@ -28,6 +28,21 @@ describe("Ask Scholar answers", () => {
     expect(askFailureMessage(undefined, 0).text).toMatch(/^The AI didn't return an answer\. Try again/);
   });
 
+  it("says plainly when the person is signed out, never quoting the raw header error", () => {
+    const m = askFailureMessage(new Error("Missing or invalid authorization header"), 3, true);
+    expect(m.kind).toBe("signed-out");
+    expect(m.text).toBe("I found 3 sources for this question (below), but you're not signed in, so I can't write an answer. Sign in and ask again.");
+    expect(askFailureMessage(new Error("Missing or invalid authorization header"), 0, true).text).toMatch(/^You're not signed in/);
+  });
+
+  it("tells offline apart from a server that is unreachable, and from a missing AI", () => {
+    expect(askFailureMessage(new Error("Failed to fetch"), 0, false)).toMatchObject({ kind: "offline" });
+    expect(askFailureMessage(new Error("Failed to fetch"), 0, false).text).toMatch(/^You're offline/);
+    expect(askFailureMessage(new TypeError("Load failed"), 2, true).text).toMatch(/couldn't reach Scholar/);
+    expect(askFailureMessage(new Error("Request failed (502)"), 0, true).kind).toBe("failed");
+    expect(askFailureMessage(new Error("No AI providers are configured"), 0, true).kind).toBe("no-ai");
+  });
+
   it("asks for a direct answer first and only the given sources", () => {
     expect(ASK_ANSWER_GUIDE).toMatch(/direct answer/);
     expect(ASK_ANSWER_GUIDE).toMatch(/never invent a source/);
