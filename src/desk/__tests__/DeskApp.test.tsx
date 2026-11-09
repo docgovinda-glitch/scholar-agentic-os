@@ -166,7 +166,8 @@ describe("Desk — project list", () => {
 
     // The main canvas is purged of project lists; accessing Knowledge Vault from sidebar shows empty state
     fireEvent.click(await screen.findByRole("button", { name: /Knowledge Vault/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Projects/i }));
+    // The Vault screen is code-split, so wait for it to load.
+    fireEvent.click(await screen.findByRole("button", { name: /Projects/i }));
     expect(await screen.findByText("No projects yet")).toBeInTheDocument();
   });
 

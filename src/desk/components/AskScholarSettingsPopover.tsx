@@ -236,7 +236,7 @@ export function AskScholarSettingsPopover({
         data-testid="ask-scholar-settings-btn"
         aria-label="AskScholar preferences and reference import"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200/70 dark:hover:bg-white/10 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer shrink-0"
+        className="inline-flex items-center justify-center gap-1 px-2 py-1 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 rounded-lg text-[11px] font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200/70 dark:hover:bg-white/10 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer shrink-0"
         title="Research preferences (Citation style, Discipline, Answer length, Export format & Reference import)"
       >
         <Settings2 className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />

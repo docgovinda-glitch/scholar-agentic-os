@@ -12,21 +12,20 @@ export interface ConsensusMetrics {
   summary: string;
 }
 
+/** Stances a citation can carry when something has actually classified it. */
+const SUPPORTING_STANCES = new Set(["supporting", "supports", "convergent"]);
+const CONTRADICTING_STANCES = new Set(["contradicting", "divergent"]);
+const NEUTRAL_STANCES = new Set(["neutral", "mentioning"]);
+
+/**
+ * Agreement across sources, computed ONLY from sources that carry an explicit
+ * stance. A source with no stance is unclassified, not "supporting": counting
+ * every search hit as support made every answer read "Strong Consensus (100%)"
+ * regardless of what the papers said. With fewer than two classified sources
+ * there is nothing honest to show, so this returns null and no gauge renders.
+ */
 export function computeConsensusFromCitations(citations?: WebsiteCitationItem[]): ConsensusMetrics | null {
   if (!citations || citations.length === 0) return null;
-
-  const total = citations.length;
-  if (total < 2) {
-    return {
-      agreementScore: 60,
-      level: "insufficient",
-      supportingCount: 1,
-      contradictingCount: 0,
-      neutralCount: total - 1,
-      totalStudies: total,
-      summary: "Limited empirical sample (<2 studies) to establish broad scientific consensus.",
-    };
-  }
 
   let supporting = 0;
   let contradicting = 0;
@@ -34,15 +33,14 @@ export function computeConsensusFromCitations(citations?: WebsiteCitationItem[])
 
   for (const c of citations) {
     const stance = (c.stance || "").toLowerCase();
-    if (stance === "contradicting" || stance === "divergent") {
-      contradicting++;
-    } else if (stance === "neutral" || stance === "mentioning") {
-      neutral++;
-    } else {
-      // Default to supporting if scholarly
-      supporting++;
-    }
+    if (SUPPORTING_STANCES.has(stance)) supporting++;
+    else if (CONTRADICTING_STANCES.has(stance)) contradicting++;
+    else if (NEUTRAL_STANCES.has(stance)) neutral++;
+    // no (or unknown) stance: unclassified, not counted
   }
+
+  const total = supporting + contradicting + neutral;
+  if (total < 2) return null;
 
   const score = Math.round((supporting / (supporting + contradicting || 1)) * 100);
 

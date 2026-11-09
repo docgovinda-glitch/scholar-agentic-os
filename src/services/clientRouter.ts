@@ -20,6 +20,7 @@
 import { getCloudProvider, CLOUD_PROVIDERS } from "../config/providerCatalog";
 import { LOCAL_RUNNERS } from "../config/localRunnerCatalog";
 import { probeRunner, type ProbeResult } from "./localRunnerProbe";
+import { getDeviceClass } from "../hooks/useDeviceClass";
 import { providersWithStoredKey, readProviderKey, loadUserAiSettings } from "./userAiSettings";
 import {
   getCachedDiscoveredModels,
@@ -152,6 +153,40 @@ export function getTaskRequirements(taskType: RoutingTaskType): TaskRequirement 
   }
 }
 
+type LocalProbe = ProbeResult;
+
+/** How long a localhost probe result is reused. 0 under test so mocks are never stale. */
+const LOCAL_PROBE_TTL_MS = import.meta.env?.MODE === "test" ? 0 : 60_000;
+const localProbeCache = new Map<string, { at: number; probe: Promise<LocalProbe> }>();
+
+/** Forget cached localhost probes (after the user starts/stops a local runtime, or in tests). */
+export function resetLocalProbeCache(): void {
+  localProbeCache.clear();
+}
+
+function probeRunnerCached(runner: (typeof LOCAL_RUNNERS)[number]): Promise<LocalProbe> {
+  const hit = localProbeCache.get(runner.id);
+  if (hit && Date.now() - hit.at < LOCAL_PROBE_TTL_MS) return hit.probe;
+  const probe = probeRunner(runner);
+  localProbeCache.set(runner.id, { at: Date.now(), probe });
+  return probe;
+}
+
+/**
+ * Should this request look for local runtimes (Ollama, LM Studio...) on localhost?
+ *
+ * Phones and tablets cannot run those server programs, and each probe is a request to
+ * a loopback port: wasted time on every question, console errors, and on some
+ * browsers a "local network" permission prompt. Skip unless the person asked for
+ * local-only/privacy-first routing, in which case a runner may be reachable
+ * (e.g. through a tunnel) and they expect it to be tried.
+ */
+function shouldProbeLocalRunners(privacyMode: PrivacyMode): boolean {
+  if (privacyMode === "cloud-allowed") return false;
+  if (privacyMode === "local-only" || privacyMode === "privacy-first") return true;
+  return getDeviceClass().canRunLocalAI;
+}
+
 /**
  * Discovers and ranks all available candidates in the user's Client AI Resource Pool.
  */
@@ -167,11 +202,15 @@ export async function resolveClientCandidates(
   const candidates: ClientRoutingCandidate[] = [];
 
   // 1. Discover active Local Runtimes (localhost)
-  if (privacyMode !== "cloud-allowed") {
-    for (const runner of LOCAL_RUNNERS) {
-      if (disabled.has(runner.id)) continue;
+  if (shouldProbeLocalRunners(privacyMode)) {
+    const runners = LOCAL_RUNNERS.filter((r) => !disabled.has(r.id));
+    // All runners at once (and reused for a minute), not one after another before every question.
+    const probes = await Promise.all(runners.map((r) => probeRunnerCached(r).catch(() => null)));
+    for (let i = 0; i < runners.length; i++) {
+      const runner = runners[i];
       try {
-        const probe = await probeRunner(runner);
+        const probe = probes[i];
+        if (!probe) continue;
         if (probe.reachable && probe.models.length > 0) {
           const validModels = probe.models.filter((m) => {
             if (isModelBlacklisted(runner.id, m)) return false;

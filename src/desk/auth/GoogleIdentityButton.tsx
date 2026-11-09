@@ -166,9 +166,8 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
       {gsiLoaded && !busy && (
         <button
           type="button"
-          data-compact="true"
           onClick={handleOAuthFallback}
-          className="mt-2 text-[11px] font-medium text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+          className="mt-2 inline-flex items-center text-[11px] font-medium text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
         >
           Having trouble with popup? Use redirect sign-in →
         </button>

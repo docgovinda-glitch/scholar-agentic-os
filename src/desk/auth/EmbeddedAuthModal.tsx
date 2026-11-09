@@ -111,7 +111,6 @@ export default function EmbeddedAuthModal({
             <div className="flex flex-1 p-1 bg-neutral-100 dark:bg-ink-900 rounded-md border border-neutral-200/70 dark:border-white/10">
               <button
                 type="button"
-                data-compact="true"
                 onClick={() => setScreen("signin")}
                 className={`flex-1 py-1.5 px-3 text-xs rounded-sm transition-all duration-150 cursor-pointer ${
                   screen === "signin"
@@ -123,7 +122,6 @@ export default function EmbeddedAuthModal({
               </button>
               <button
                 type="button"
-                data-compact="true"
                 onClick={() => setScreen("signup")}
                 className={`flex-1 py-1.5 px-3 text-xs rounded-sm transition-all duration-150 cursor-pointer ${
                   screen === "signup"
@@ -138,7 +136,6 @@ export default function EmbeddedAuthModal({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                data-compact="true"
                 onClick={() => setScreen("signin")}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
               >
@@ -152,7 +149,6 @@ export default function EmbeddedAuthModal({
 
           <button
             type="button"
-            data-compact="true"
             onClick={onClose}
             className="w-8 h-8 rounded-md bg-neutral-100 hover:bg-neutral-200/80 dark:bg-ink-750 dark:hover:bg-ink-700 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
             aria-label="Close"
@@ -187,7 +183,6 @@ export default function EmbeddedAuthModal({
             </div>
             <button
               type="button"
-              data-compact="true"
               onClick={() => {
                 const draft = createEphemeralProject(selectedFormatId || "OT-22", "Academic Presentation Deck");
                 onClose();

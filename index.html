@@ -36,7 +36,8 @@
     <!-- Theme pre-paint hydration -->
     <script>
       try {
-        var t = localStorage.getItem('scholar-theme') || localStorage.getItem('theme') || 'dark';
+        var t = localStorage.getItem('scholar-theme') || localStorage.getItem('theme') ||
+          (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
         document.documentElement.setAttribute('data-theme', t);
         if (t === 'dark') {
           document.documentElement.classList.add('dark');
