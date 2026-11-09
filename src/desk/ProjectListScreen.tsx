@@ -2409,6 +2409,11 @@ export default function ProjectListScreen({
         }];
       });
 
+  // A returning user has something to pick up, so the newcomer content (tagline, FAQ chips) steps aside
+  // and the whole landing fits one phone screen without scrolling. One "continue" row is enough next to Resume.
+  const hasReturningContent = Boolean(resumeTarget) || landingRecents.length > 0;
+  const visibleRecents = landingRecents.slice(0, resumeTarget ? 1 : 2);
+
   // Shared by the phone Workspaces menu and the "Start a workspace" cards.
   const handleMobileTilePick = (tile: (typeof FORMAT_TILES)[number]) => {
     if (creating) return;
@@ -2596,7 +2601,7 @@ export default function ProjectListScreen({
   return (
     <div
       style={visualViewportHeight ? { height: visualViewportHeight } : undefined}
-      className="h-screen h-[100dvh] w-full flex overflow-hidden bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-white font-sans selection:bg-neutral-100 selection:text-ink-850"
+      className="h-dvh w-full flex overflow-hidden bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-white font-sans selection:bg-neutral-100 selection:text-ink-850"
     >
       {/* Mobile Backdrop Overlay */}
       {mobileMenuOpen && (
@@ -2986,7 +2991,7 @@ export default function ProjectListScreen({
       {/* Main Content Area (Center Pane) */}
       <main inert={isPhone && mobileMenuOpen} className={`${isLandingPage && isAiSidebarOpen
         ? "hidden"
-        : "flex-1 flex flex-col h-screen h-[100dvh] w-full bg-paper-cool dark:bg-ink-850 overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out"
+        : "flex-1 flex flex-col h-dvh w-full bg-paper-cool dark:bg-ink-850 overflow-hidden text-neutral-900 dark:text-white scholar-scrollbar relative transition-all duration-300 ease-in-out"
         }`}>
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
         <div className="apple-glass-header sticky top-0 z-20 px-4 sm:px-6 py-3 flex items-center justify-between bg-paper-cool/85 dark:bg-ink-850/85 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shrink-0">
@@ -3270,12 +3275,15 @@ export default function ProjectListScreen({
                           )}
                         </div>
                       </div>
-                      <p className="mb-3 text-sm text-neutral-600 dark:text-neutral-400 leading-snug">
-                        Research, write and cite: essays, papers, slides.
-                      </p>
+                      {!hasReturningContent && (
+                        <p className="mb-3 text-sm text-neutral-600 dark:text-neutral-400 leading-snug">
+                          Research, write and cite: essays, papers, slides.
+                        </p>
+                      )}
 
-                      {resumeChatRow("mb-4")}
+                      {resumeChatRow(hasReturningContent && visibleRecents.length > 0 ? "mb-3" : "mb-4")}
 
+                      {!hasReturningContent && (
                       <div className="mt-4">
                         <div
                           role="group"
@@ -3299,14 +3307,15 @@ export default function ProjectListScreen({
                           <span aria-hidden="true" className="shrink-0 w-4" />
                         </div>
                       </div>
+                      )}
 
-                      {landingRecents.length > 0 && (
-                        <div className="mt-6" data-testid="mobile-continue">
+                      {visibleRecents.length > 0 && (
+                        <div className={hasReturningContent ? "mt-1" : "mt-6"} data-testid="mobile-continue">
                           <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                             Continue where you left off
                           </h2>
                           <ul className="space-y-2">
-                            {landingRecents.map((item) => {
+                            {visibleRecents.map((item) => {
                               const tileTheme = getFormatTileTheme(item.outputTypeId);
                               return (
                                 <li key={item.projectId}>

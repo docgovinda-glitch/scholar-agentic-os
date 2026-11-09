@@ -222,6 +222,14 @@ describe("phone home: Ask Scholar first", () => {
       await waitFor(() => expect(screen.queryByTestId("mobile-ask-progress")).toBeNull());
     });
 
+    it("keeps the returning-user landing to one screen: Resume replaces the tagline and FAQ chips", async () => {
+      startChat("What is a literature review?");
+      fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+      await screen.findByTestId("mobile-resume-chat");
+      expect(screen.queryByRole("group", { name: "Suggested questions" })).toBeNull();
+      expect(screen.queryByText(/Research, write and cite/)).toBeNull();
+    });
+
     it("goes back to the landing, which offers to resume the chat", async () => {
       startChat("What is a literature review?");
       fireEvent.click(await screen.findByRole("button", { name: "Back" }));

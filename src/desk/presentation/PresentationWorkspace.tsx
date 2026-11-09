@@ -394,7 +394,7 @@ export default function PresentationWorkspace({
 
   return (
     <div
-      className="flex h-screen h-[100dvh] w-full overflow-hidden bg-paper-warm dark:bg-ink-850 text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200"
+      className="flex h-dvh w-full overflow-hidden bg-paper-warm dark:bg-ink-850 text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-200"
       data-testid="presentation-workspace"
     >
       {/* Left Sidebar Shell */}
