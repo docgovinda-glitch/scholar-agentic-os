@@ -129,4 +129,37 @@ describe("phone home: Ask Scholar first", () => {
     });
 
   });
+
+  describe("after the user starts chatting", () => {
+    function startChat(text = "What is a literature review?") {
+      renderHome();
+      const bar = screen.getByTestId("main-prompt-bar-wrapper");
+      fireEvent.change(within(bar).getByRole("textbox"), { target: { value: text } });
+      fireEvent.submit(within(bar).getByRole("textbox").closest("form")!);
+    }
+
+    it("opens a full-screen chat with a title, Back and no crowded header", async () => {
+      startChat();
+      const header = (await screen.findByRole("heading", { name: "Ask Scholar", level: 2 })).closest("header")!;
+      expect(within(header).getByRole("button", { name: "Back" })).toBeInTheDocument();
+      expect(within(header).queryByRole("button", { name: "Close Assistant" })).toBeNull();
+      // Style and preferences moved next to the box
+      expect(within(header).queryByTestId("citation-style-trigger")).toBeNull();
+      expect(within(header).queryByTestId("ask-scholar-settings-btn")).toBeNull();
+      const box = screen.getByRole("textbox", { name: "Ask Scholar question input" });
+      const form = box.closest("form")!;
+      expect(within(form).getByTestId("citation-style-trigger")).toBeInTheDocument();
+      expect(within(form).getByTestId("ask-scholar-settings-btn")).toBeInTheDocument();
+    });
+
+    it("goes back to the landing, which offers to resume the chat", async () => {
+      startChat("What is a literature review?");
+      fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+      const resume = await screen.findByTestId("mobile-resume-chat");
+      expect(resume).toHaveTextContent("What is a literature review?");
+      expect(screen.queryByText("Ask Scholar Copilot Active")).toBeNull();
+      fireEvent.click(resume);
+      expect(await screen.findByRole("button", { name: "Back" })).toBeInTheDocument();
+    });
+  });
 });
