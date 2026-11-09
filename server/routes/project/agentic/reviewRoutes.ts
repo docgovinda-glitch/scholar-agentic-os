@@ -4,7 +4,7 @@ import { getProjectStore } from "../../../../src/services/store/projectStore.ts"
 import { safeParseAnswerField } from "../../../../src/shared/projectStateSchema.ts";
 import {
   streamOpenRouterJSON,
-} from "../../../utils/llm.ts";
+} from "../../../src/services/scholarBrain.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
   sanitizeScholarlyText,

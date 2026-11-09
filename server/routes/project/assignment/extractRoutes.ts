@@ -11,7 +11,7 @@ import {
   normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText, resolveRequestAiConfig } from "../../../utils/llm.ts";
+import { callOpenRouterJSON, callOpenRouterText, resolveRequestAiConfig } from "../../../src/services/scholarBrain.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
   auditDocumentLineByLine,
@@ -37,7 +37,6 @@ import {
 } from "../../../../src/desk/assignment/types.ts";
 import {
   generateDynamicAssignmentStructure,
-  extractTargetFrameworks,
   sanitizeOutlineHeadings,
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,

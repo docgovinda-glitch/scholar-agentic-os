@@ -7,7 +7,7 @@ import {
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
 import { scopeBrief, structureLens } from "../../../../src/domain/assignment/briefScoping.ts";
-import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig } from "../../../utils/llm.ts";
+import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig } from "../../../src/services/scholarBrain.ts";
 import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import {
@@ -35,7 +35,6 @@ import {
 import {
   generateDynamicAssignmentStructure,
   generateAiEnhancedOutline,
-  extractTargetFrameworks,
   sanitizeOutlineHeadings,
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,
@@ -489,7 +488,7 @@ Return ONLY valid JSON matching:
         data.target_frameworks ||
         data.targetFrameworks ||
         finalStructure.targetFrameworks ||
-        extractTargetFrameworks(question, assignmentType, briefText);
+        [];
       finalStructure.thesisStatement =
         data.thesis_statement ||
         data.thesisStatement ||

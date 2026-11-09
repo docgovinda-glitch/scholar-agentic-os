@@ -714,137 +714,9 @@ export function extractBriefInquiriesAndConcepts(
   };
 }
 
-/** Helper to add a framework if not already in array */
-function addIfNotPresent(arr: string[], item: string): void {
-  if (!arr.includes(item)) {
-    arr.push(item);
-  }
-}
-
-/**
- * Extract target academic, theoretical, and analytical frameworks from the assignment question and brief.
- * Adheres to AskScholar academic domain patterns.
- */
-export function extractTargetFrameworks(
-  question: string = "",
-  assignmentType?: string,
-  briefText?: string
-): string[] {
-  const combined = `${question} ${briefText || ""}`.toLowerCase();
-  const frameworks: string[] = [];
-
-  const knownExplicit: [RegExp, string][] = [
-    [/\bporter(?:'s)?\s*(?:five\s*forces|value\s*chain)?\b/i, "Porter's Five Forces & Value Chain Analysis"],
-    [/\bvrio\b/i, "VRIO Framework"],
-    [/\brbv\b|\bresource[- ]based\s*view\b/i, "Resource-Based View (RBV)"],
-    [/\bpestle?\b/i, "PESTLE Environmental Scanning"],
-    [/\bswot\b/i, "SWOT Strategic Framework"],
-    [/\brawls(?:ian)?\b|\bveil\s*of\s*ignorance\b/i, "Rawlsian Distributive Justice & Fairness Parity"],
-    [/\bkant(?:ian)?\b|\bdeontolog/i, "Kantian Deontological Ethics"],
-    [/\butilitarian(?:ism)?\b/i, "Utilitarian Consequentialism"],
-    [/\bfoucault\b|\bbiopolitics\b|\bpanopticon\b/i, "Foucauldian Power-Knowledge & Biopolitics"],
-    [/\bbourdieu\b|\bhabitus\b|\bcultural\s*capital\b/i, "Bourdieu's Cultural Capital & Habitus"],
-    [/\bhabermas\b|\bcommunicative\s*action\b/i, "Habermasian Communicative Action"],
-    [/\b(structural\s*realism|neorealism|mearsheimer|waltz)\b/i, "Structural Realism (Waltz & Mearsheimer)"],
-    [/\b(liberal\s*institutionalism|keohane|neoliberalism)\b/i, "Liberal Institutionalism (Keohane)"],
-    [/\b(constructivism|wendt)\b/i, "Social Constructivism (Wendt)"],
-    [/\bweaponized\s*interdependence\b/i, "Weaponized Interdependence (Farrell & Newman)"],
-    [/\bcommercial\s*peace\b/i, "Bilateral Economic Interdependence Model"],
-    [/\bsecurity\s*dilemma\b/i, "Security Dilemma (Jervis)"],
-    [/\binterdependence\b/i, "Complex Interdependence (Keohane & Nye)"],
-    [/\bcar[- ]t\b|\bcellular\s*therapy\b|\badoptive\s*cell\b/i, "Adoptive Cellular Transfer (ACT) Mechanics"],
-    [/\btumor\s*microenvironment\b|\btme\b/i, "Tumor Microenvironment (TME) Immunosuppression"],
-    [/\bempirical\s*risk\s*minimization\b|\berm\b/i, "Empirical Risk Minimization (ERM)"],
-    [/\brepresentation\s*learning\b|\bmanifold\b/i, "Latent Manifold Representation Theory"],
-    [/\bscaling\s*law/i, "Compute-Optimal Neural Scaling Laws (Chinchilla)"],
-    [/\bmechanistic\s*interpretability\b/i, "Mechanistic Interpretability Circuit Analysis"],
-    [/\beu\s*ai\s*act\b|\brisk[- ]tiered\b/i, "EU AI Act Risk-Tiered Governance Architecture"],
-    [/\bdisparate\s*impact\b|\bequalized\s*odds\b/i, "Statistical Fairness & Equalized Odds Parity"],
-    [/\bipcc\b|\bshared\s*socioeconomic\b|\bssp\b/i, "IPCC Shared Socioeconomic Pathways (SSPs)"],
-    [/\bplanetary\s*boundaries\b/i, "Planetary Boundaries Framework (Rockström)"],
-    [/\bostrom\b|\bcommons\b|\bcollective\s*action\b/i, "Polycentric Governance & Commons Theory (Ostrom)"],
-  ];
-
-  for (const [pattern, label] of knownExplicit) {
-    if (pattern.test(combined)) {
-      addIfNotPresent(frameworks, label);
-    }
-  }
-
-  // Domain heuristics if fewer than 3 frameworks found
-  if (frameworks.length < 3) {
-    if (
-      (combined.includes("china") || combined.includes("geopolitic")) &&
-      (combined.includes("ai") || combined.includes("tech") || combined.includes("artificial intelligence") || combined.includes("semiconductor") || combined.includes("chips"))
-    ) {
-      addIfNotPresent(frameworks, "Techno-Nationalism & Sovereign Innovation Systems");
-      addIfNotPresent(frameworks, "Weaponized Interdependence (Farrell & Newman)");
-      addIfNotPresent(frameworks, "Developmental State Industrial Policy");
-      addIfNotPresent(frameworks, "Compute Governance & Semiconductor Value Chains");
-    } else if (
-      combined.includes("economic interdependence") ||
-      combined.includes("commercial peace") ||
-      (combined.includes("trade") && (combined.includes("conflict") || combined.includes("peace") || combined.includes("friction") || combined.includes("war") || combined.includes("interstate"))) ||
-      (combined.includes("interdependence") && (combined.includes("conflict") || combined.includes("trade") || combined.includes("peace")))
-    ) {
-      addIfNotPresent(frameworks, "Bilateral Economic Interdependence Model");
-      addIfNotPresent(frameworks, "Realist Strategic Vulnerability");
-      addIfNotPresent(frameworks, "Weaponized Interdependence (Farrell & Newman)");
-    } else if (combined.includes("nepal") || (combined.includes("foreign policy") && combined.includes("india"))) {
-      addIfNotPresent(frameworks, "Small-State Asymmetric Buffer Theory");
-      addIfNotPresent(frameworks, "Equi-Proximity & Strategic Hedging");
-      addIfNotPresent(frameworks, "Regional Security Complex Theory (Buzan & Wæver)");
-    } else if (
-      combined.includes("cancer") ||
-      combined.includes("cell therapy") ||
-      combined.includes("cellular therapy") ||
-      combined.includes("immunotherapy") ||
-      combined.includes("oncology") ||
-      combined.includes("lymphoma") ||
-      combined.includes("tumor") ||
-      combined.includes("car-t")
-    ) {
-      addIfNotPresent(frameworks, "Adoptive Cellular Transfer (ACT) Mechanics");
-      addIfNotPresent(frameworks, "Tumor Microenvironment (TME) Immunosuppression");
-      addIfNotPresent(frameworks, "On-Target Off-Tumor Cytotoxicity Profiling");
-    } else if (combined.includes("machine learning") || (combined.includes("ai") && combined.includes("model"))) {
-      addIfNotPresent(frameworks, "Empirical Risk Minimization (ERM)");
-      addIfNotPresent(frameworks, "Latent Manifold Representation Theory");
-      addIfNotPresent(frameworks, "Compute-Optimal Scaling Laws");
-    } else if (
-      combined.includes("ethic") ||
-      combined.includes("bias") ||
-      combined.includes("fairness") ||
-      combined.includes("regulat") ||
-      combined.includes("discriminat") ||
-      (combined.includes("algorithm") && (combined.includes("governance") || combined.includes("accountab") || combined.includes("justice")))
-    ) {
-      addIfNotPresent(frameworks, "Rawlsian Distributive Justice & Fairness Parity");
-      addIfNotPresent(frameworks, "EU AI Act Risk-Tiered Governance Architecture");
-      addIfNotPresent(frameworks, "Algorithmic Accountability & Disparate Impact");
-    } else if (combined.includes("climate") || combined.includes("food security") || combined.includes("environment")) {
-      addIfNotPresent(frameworks, "IPCC Shared Socioeconomic Pathways (SSPs)");
-      addIfNotPresent(frameworks, "Planetary Boundaries Framework (Rockström)");
-      addIfNotPresent(frameworks, "Socio-Ecological Systems Resilience (Ostrom)");
-    } else if (
-      assignmentType === "coursework" ||
-      combined.includes("coursework") ||
-      assignmentType === "case_study" ||
-      assignmentType === "business_assignment" ||
-      assignmentType === "report"
-    ) {
-      addIfNotPresent(frameworks, "Porter's Five Forces & Value Chain Analysis");
-      addIfNotPresent(frameworks, "Resource-Based View (RBV) & VRIO");
-      addIfNotPresent(frameworks, "Strategic Alignment & Stakeholder Salience Theory");
-    } else {
-      addIfNotPresent(frameworks, "Comparative Analysis & Evidence Synthesis");
-      addIfNotPresent(frameworks, "Critical Epistemic & Methodological Deconstruction");
-      addIfNotPresent(frameworks, "Empirical Causal Inference & Evidence Synthesis");
-    }
-  }
-
-  return frameworks.slice(0, 4);
-}
+// NOTE (Single-Brain Architecture): target theoretical frameworks are never
+// derived here from keyword tables. They come only from scholarBrain-driven AI
+// output (`target_frameworks`) or from the user's own edits.
 
 /** Check if a heading title is a generic banned placeholder */
 export function isGenericPlaceholderTitle(title: string): boolean {
@@ -2077,7 +1949,7 @@ export function generateDynamicAssignmentStructure(
   const targetFrameworks =
     inputFrameworks && inputFrameworks.length > 0
       ? inputFrameworks
-      : extractTargetFrameworks(question, assignmentType, briefText);
+      : [];
 
   const total = Math.max(300, Number(targetWordCount) || 2000);
   const qLower = question.toLowerCase();
@@ -3205,7 +3077,7 @@ Generate the tailored academic outline JSON now:`;
       parsed.targetFrameworks ||
       parsed.target_frameworks ||
       fallbackStructure.targetFrameworks ||
-      extractTargetFrameworks(question, options.assignmentType, options.briefText);
+      [];
 
     return {
       version: options.currentStructure ? (options.currentStructure.version || 1) + 1 : 1,

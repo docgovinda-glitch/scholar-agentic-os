@@ -2,6 +2,10 @@
 
 Project memory for Claude Code. Keep it short and accurate; update it when commands, layout, or deploy rules change.
 
+## SINGLE-BRAIN ARCHITECTURE INVARIANT
+
+`server/src/services/scholarBrain.ts` is the ONLY AI brain, powering every workspace (OT-01, OT-09, OT-10, OT-19, OT-22). Only it may import `server/utils/llm.ts`; routes and services import `callOpenRouterJSON` / `callOpenRouterText` / `streamOpenRouterJSON` from `scholarBrain.ts`. No workspace may add its own prompt engine, regex outline generator or subject-to-theory lookup table. New AI capability = new method on `scholarBrain`. Always follow `.claude/agents/single-brain-guardian.md` and `.claude/skills/single-brain-guardian/SKILL.md`; CI enforces it via `src/__tests__/singleBrainGuardian.test.ts`.
+
 ## What this is
 
 A full-stack academic research/writing platform ("Scholar Core"): thesis, journal manuscript, proposal, assignment/coursework, presentation and peer-review workflows driven by AI agents, with a citation engine and a "Universal Vault" of sources. One Node process serves both the API and the React SPA.
@@ -16,7 +20,7 @@ Node 22 (Dockerfile) / Node 20 (CI). Use `npm ci` for installs.
 npm ci                     # install (lockfile-exact)
 npm run dev                # tsx server.ts → Express + Vite middleware (HMR) on :3000
 npm run lint               # tsc --noEmit + contrast check + CSP-hash check  (== pre-commit hook & CI gate)
-npx tsc --noEmit           # typecheck only
+npm run typecheck          # typecheck only (tsc --noEmit)
 npm test                   # vitest run (whole suite, ~3 min)
 npx vitest run path/to/file.test.ts   # single file — prefer this while iterating
 npm run build              # vite build → dist/  +  esbuild server.ts → dist/server.cjs

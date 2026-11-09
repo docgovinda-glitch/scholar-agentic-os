@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import { requireAuth } from "../src/middleware/auth.ts";
-import { getPremiumAiPolicy, readVerifiedBrowserResult, resolveRequestAiConfig, signLlmChallenge, computePromptHash } from "../utils/llm.ts";
+import { getPremiumAiPolicy, readVerifiedBrowserResult, resolveRequestAiConfig, signLlmChallenge, computePromptHash } from "../src/services/scholarBrain.ts";
 import { InvalidLlmChallengeError, LocalModelUnreachableError, NoClientAiProviderError, sendAiFailure } from "../src/ai/aiRouteErrors.ts";
 import { aiAvailability, answeredByLabel, routedCompletion } from "../src/ai/routerBridge.ts";
 import type { ResearchLlm } from "../src/research/deepResearchEngine.ts";

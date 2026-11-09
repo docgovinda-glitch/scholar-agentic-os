@@ -36,7 +36,19 @@ import { ag25PrivacyGuard } from "../../../src/app/mesh/agents/ag25PrivacyGuard.
 import { ag26WorkflowCoordinator } from "../../../src/app/mesh/agents/ag26WorkflowCoordinator.ts";
 import { issue, revoke } from "../../../src/services/capabilities/capabilities.ts";
 import { initialProjectGateState } from "../../../src/app/conductor/conductor.ts";
-import { getCandidates } from "../../utils/llm.ts";
+import {
+  getCandidates,
+  callOpenRouterJSON,
+  callOpenRouterText,
+  streamOpenRouterJSON,
+  buildAuthorizedPolicy,
+  resolveRequestAiConfig,
+  getPremiumAiPolicy,
+  signLlmChallenge,
+  computePromptHash,
+  generateGeminiEmbedding,
+} from "../../utils/llm.ts";
+import { loadArchetypeModelWeights, type ArchetypeModelWeights } from "../../../src/shared/archetypeModelWeights.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
   sanitizeScholarlyText,
@@ -299,9 +311,45 @@ function cachedLiveDiscovery(query: string, maxResults: number): Promise<LiveDra
 }
 
 /**
+ * SINGLE LLM GATEWAY. scholarBrain.ts is the only module allowed to import
+ * server/utils/llm.ts; every route and workspace reaches AI execution through
+ * these exports (or the matching scholarBrain methods).
+ */
+export {
+  getCandidates,
+  callOpenRouterJSON,
+  callOpenRouterText,
+  streamOpenRouterJSON,
+  buildAuthorizedPolicy,
+  resolveRequestAiConfig,
+  getPremiumAiPolicy,
+  signLlmChallenge,
+  computePromptHash,
+  generateGeminiEmbedding,
+  readVerifiedBrowserResult,
+};
+
+/** Centrally managed quantitative style weights (trained archetype model). */
+export function getArchetypeModelWeights(): ArchetypeModelWeights {
+  return loadArchetypeModelWeights();
+}
+
+/**
  * Canonical scholarBrain Orchestrator Object
  */
 export const scholarBrain = {
+  callJSON: (...args: Parameters<typeof callOpenRouterJSON>) => callOpenRouterJSON(...args),
+  callText: (...args: Parameters<typeof callOpenRouterText>) => callOpenRouterText(...args),
+  streamJSON: (...args: Parameters<typeof streamOpenRouterJSON>) => streamOpenRouterJSON(...args),
+  getCandidates: (...args: Parameters<typeof getCandidates>) => getCandidates(...args),
+  buildAuthorizedPolicy: (...args: Parameters<typeof buildAuthorizedPolicy>) => buildAuthorizedPolicy(...args),
+  resolveRequestAiConfig: (...args: Parameters<typeof resolveRequestAiConfig>) => resolveRequestAiConfig(...args),
+  getPremiumAiPolicy: (...args: Parameters<typeof getPremiumAiPolicy>) => getPremiumAiPolicy(...args),
+  signLlmChallenge: (...args: Parameters<typeof signLlmChallenge>) => signLlmChallenge(...args),
+  computePromptHash: (...args: Parameters<typeof computePromptHash>) => computePromptHash(...args),
+  generateGeminiEmbedding: (...args: Parameters<typeof generateGeminiEmbedding>) => generateGeminiEmbedding(...args),
+  readVerifiedBrowserResult: (...args: Parameters<typeof readVerifiedBrowserResult>) => readVerifiedBrowserResult(...args),
+  getArchetypeModelWeights,
   /**
    * 1. Unified Client-Owned AI Execution
    * Strictly enforces client-owned BYOK/Local routing, zero hardcoded models,

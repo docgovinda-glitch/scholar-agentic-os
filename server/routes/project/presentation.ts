@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { asyncRoute, loadOwnedProject, getSharedStore } from "../project.ts";
-import { getCandidates } from "../../utils/llm.ts";
+import { getCandidates } from "../../src/services/scholarBrain.ts";
 import {
   sanitizeScholarlyText,
   normalizeUnicodeNFC,
