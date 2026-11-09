@@ -1,4 +1,5 @@
 import OutlineByAiPanel from "../components/OutlineByAiPanel";
+import { useToast } from "../../../components/ui/FeedbackSystem";
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { DraftingSectionIndex } from "../components/DraftingSectionIndex";
@@ -74,6 +75,8 @@ export function AssignmentDraftingStage({
 
   const [streamingChunk, setStreamingChunk] = useState<string>("");
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
+  const { showError } = useToast();
   const [activeStreamingSectionId, setActiveStreamingSectionId] = useState<string | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isTuning, setIsTuning] = useState(false);
@@ -189,6 +192,7 @@ export function AssignmentDraftingStage({
       setActiveStreamingSectionId(sec.id);
       setGeneratingSection(sec.id, true);
       setDraftError(null);
+      setOfflineNotice(null);
       setStreamingChunk(sec.draftContent || "");
 
       // ── Evidence Pack Construction (Production Spec §4.1–4.3) ──
@@ -252,13 +256,14 @@ export function AssignmentDraftingStage({
             setActiveStreamingSectionId(null);
             setGeneratingSection(sec.id, false);
           },
-          onError: (err) => {
-            console.error("Section streaming failed:", err);
+          onFallback: ({ reason }) => {
+            setOfflineNotice(`${reason} Showing a scaffold built from your outline; write the analysis yourself or try again later.`);
           },
         });
       } catch (err) {
         // Keep whatever the section had before; never fill it with stand-in text.
-        setDraftError(`"${sec.title}" was not drafted: ${err instanceof Error ? err.message : String(err)}`);
+        // One clean toast; no uncaught console stack traces.
+        showError(`"${sec.title}" was not drafted: ${err instanceof Error ? err.message : String(err)}`);
         setStreamingChunk("");
         setActiveStreamingSectionId(null);
         setGeneratingSection(sec.id, false);
@@ -440,6 +445,12 @@ export function AssignmentDraftingStage({
           </button>
         </div>
       </header>
+
+      {offlineNotice && (
+        <p role="status" className="text-xs text-neutral-600 dark:text-neutral-400 px-1" data-testid="offline-draft-notice">
+          {offlineNotice}
+        </p>
+      )}
 
       {draftError && (
         <div role="alert" className="flex items-start gap-2 text-xs text-[var(--text-primary)] bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl px-3 py-2">

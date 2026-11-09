@@ -1,4 +1,6 @@
 import express from "express";
+import { buildSectionScaffold, type ScaffoldSource } from "../../../src/utils/sectionScaffold.ts";
+import { BrowserAiRequiredError, InvalidLlmChallengeError, LocalModelUnreachableError, NoClientAiProviderError } from "../../../src/ai/aiRouteErrors.ts";
 import { sectionWordRange, trimToSentenceWithinWords } from "../../../src/utils/sectionBudget.ts";
 import { countExactWords } from "../../../src/utils/wordBudgetAllocator.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
@@ -296,6 +298,8 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     revisionPrompt,
     existingContent = "",
     evidencePackPrompt,
+    guidance: sectionGuidance = "",
+    keyPoints: sectionKeyPoints = [],
   } = req.body || {};
   // The section's exact budget from the outline; the draft must land within ±10% of it.
   const targetWordCount = Math.min(3000, Math.max(50, Math.round(Number(allocatedWords ?? requestedTarget) || 500)));
@@ -498,6 +502,34 @@ Output ONLY the section text in clean academic Markdown prose.`;
     res.end();
   } catch (err: any) {
     if (err?.message === "RequireFrontendLLMException") return;
+    // Hand-off and configuration errors keep their own status; any other AI failure
+    // (credit/quota exhausted on every provider, 5xx, empty answer) on a first draft
+    // gets a clearly labelled offline scaffold instead of a dropped request.
+    const keepsOwnStatus =
+      err instanceof BrowserAiRequiredError ||
+      err instanceof InvalidLlmChallengeError ||
+      err instanceof LocalModelUnreachableError ||
+      err instanceof NoClientAiProviderError;
+    if (!res.headersSent && !keepsOwnStatus && !revisionPrompt && !String(existingContent || "").trim()) {
+      const scaffold = buildSectionScaffold({
+        title: String(sectionTitle || ""),
+        prompt: String(sectionGuidance || ""),
+        assignmentQuestion: String(assignmentTopic || ""),
+        keyPoints: Array.isArray(sectionKeyPoints) ? sectionKeyPoints.map(String) : [],
+        sources: Array.isArray(boundSources) ? (boundSources as ScaffoldSource[]) : [],
+        targetWords: targetWordCount,
+      });
+      console.warn("[stream-section] AI unavailable, sending offline scaffold:", err instanceof Error ? err.message : err);
+      res.status(200);
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.flushHeaders?.();
+      res.write(`data: ${JSON.stringify({ fallback: { mode: "offline_scaffold", reason: "No AI provider could answer right now." } })}\n\n`);
+      res.write(`data: ${JSON.stringify({ fullText: scaffold })}\n\n`);
+      res.write("data: [DONE]\n\n");
+      res.end();
+      return;
+    }
     if (!res.headersSent) return sendAiFailure(res, err, "Section draft");
     console.error("Stream section error:", err);
     res.write(`data: ${JSON.stringify({ error: "The section draft stopped before it finished. Try again." })}\n\n`);
