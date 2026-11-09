@@ -596,6 +596,22 @@ export function formatAcademicTopicTitle(raw: string): string {
   return formatted.join(" ");
 }
 
+/** A short (about 8 word) heading from a question: drops the leading command verb. */
+export function shortHeading(text: string, maxWords = 8): string {
+  const stripped = text
+    .replace(/^(?:critically\s+)?(?:compare|contrast|evaluate|analy[sz]e|assess|discuss|explain|describe|examine|derive|justify|propose|recommend|explore|investigate|identify|outline|define|apply|develop|design|calculate|show)\s+(?:and\s+\w+\s+)?/i, "")
+    .replace(/[?.:]+$/, "")
+    .trim();
+  const words = stripped.split(/\s+/);
+  const cut = words.length > maxWords ? `${words.slice(0, maxWords).join(" ")}…` : stripped;
+  return cut.charAt(0).toUpperCase() + cut.slice(1);
+}
+
+/** How many parsed questions sit under this Part heading. */
+function groupsByPart(entries: Array<[string, Array<{ part?: string }>]>, part?: string): number {
+  return entries.reduce((n, [, rows]) => n + rows.filter((r) => r.part === part).length, 0);
+}
+
 /** Max top-level sections an outline may be expanded to (human-scale outlines). */
 const MAX_OUTLINE_SECTIONS = 8;
 
@@ -1286,18 +1302,31 @@ export function buildBriefSpecificSpecs(
     const totalWeight = weights.reduce((t, w) => t + w, 0) || 1;
     return entries.map(([key, rows], i) => {
       const n = i + 1;
-      const heading = rows[0].text.length > 90 ? `${rows[0].text.slice(0, 89).replace(/\s+\S*$/, "")}…` : rows[0].text;
+      const multi = rows.length > 1;
+      const partName = rows[0].part ? formatAcademicTopicTitle(rows[0].part.toLowerCase()) : "";
+      const heading = multi ? (partName && rows.every((r) => r.part === rows[0].part) && rows.length === groupsByPart(entries, rows[0].part) ? partName : `Question ${key.replace(/\D/g, "")}`) : shortHeading(rows[0].text);
+      const rowWeights = rows.map((r) => r.marks ?? avgMarks);
+      const rowTotal = rowWeights.reduce((t, w) => t + w, 0) || 1;
       return {
         title: `${n}.0 ${heading}`,
         notes: `Answers ${rows.map((r) => r.label).join(", ")} from the brief.`,
-        subheadings: [
-          {
-            title: `${n}.1 ${key}: ${heading}`,
-            ratio: weights[i] / totalWeight,
-            guidance: `Focus: ${rows.map((r) => r.text).join(" ")}`,
-            keyPoints: rows.map((r) => r.text).slice(0, 4),
-          },
-        ],
+        // Sub-parts get their own short titles; a single prompt gets one neutral
+        // sub-section, never a copy of the parent title.
+        subheadings: multi
+          ? rows.map((r, k) => ({
+              title: `${n}.${k + 1} ${shortHeading(r.text)}`,
+              ratio: (weights[i] / totalWeight) * (rowWeights[k] / rowTotal),
+              guidance: `Focus: ${r.text}`,
+              keyPoints: [] as string[],
+            }))
+          : [
+              {
+                title: `${n}.1 Key points and evidence`,
+                ratio: weights[i] / totalWeight,
+                guidance: `Focus: ${rows[0].text}`,
+                keyPoints: [] as string[],
+              },
+            ],
       };
     });
   }
@@ -1322,7 +1351,7 @@ export function buildBriefSpecificSpecs(
           notes: `Directly address: "${task}".`,
           subheadings: [
             {
-              title: `${tIdx + 1}.1 ${cleanTaskTitle}`,
+              title: `${tIdx + 1}.1 Key points and evidence`,
               ratio: perTaskRatio,
               guidance: `Focus: Provide a direct, evidence-based, conversational answer addressing: "${task}".`,
               keyPoints: [
@@ -1352,7 +1381,7 @@ export function buildBriefSpecificSpecs(
         notes: `Directly address and substantiate: "${task}".`,
         subheadings: [
           {
-            title: `${tIdx + 1}.1 ${cleanTaskTitle}`,
+            title: `${tIdx + 1}.1 Key points and evidence`,
             ratio: 1 / directTasks.length,
             guidance: `Focus: Analyze the conceptual mechanisms, theoretical grounding (${primaryFramework}) and empirical evidence needed to answer: "${task}".`,
             keyPoints: [

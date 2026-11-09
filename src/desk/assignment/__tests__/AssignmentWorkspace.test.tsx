@@ -259,7 +259,7 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(screen.queryByText(/Command Verb Decoded/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Visual Storyline Roadmap/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Clean Grading Checklist/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/Thesis & Stance Selector/i)).toBeInTheDocument();
+    expect(screen.getByText(/Core Topic & Working Angle/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Do not write about general history before 2000/i).length).toBeGreaterThanOrEqual(1);
 
     // 5. Confirm no visual regressions or unwanted stage tabs exist

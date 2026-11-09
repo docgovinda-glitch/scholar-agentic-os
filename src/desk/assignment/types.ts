@@ -1038,6 +1038,8 @@ export function structureToSectionBudgets(structure?: AssignmentStructure | null
 
 /** Upper bound on drafting sections so no outline fragments into tiny pieces. */
 export const MAX_DRAFTING_SECTIONS = 8;
+/** Below this a sub-part is not drafted on its own. */
+export const MIN_DRAFTING_SECTION_WORDS = 250;
 
 export function structureToInternalSections(structure?: AssignmentStructure | null): AssignmentDraftingSection[] {
   if (!structure?.headings || structure.headings.length === 0) return [];
@@ -1047,11 +1049,14 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
   const flatCount = structure.headings.reduce((n, h) => n + Math.max(1, h.subheadings?.length ?? 0), 0);
   const mergeSubheadings = flatCount > MAX_DRAFTING_SECTIONS;
   structure.headings.forEach((h, hIdx) => {
-    if (!mergeSubheadings && h.subheadings && h.subheadings.length > 0) {
+    // A heading whose sub-parts would each get a very small budget is drafted as one section.
+    const tooSmall = (h.subheadings ?? []).length > 1 && (h.subheadings ?? []).some((x) => x.targetWordCount > 0 && x.targetWordCount < MIN_DRAFTING_SECTION_WORDS);
+    if (!mergeSubheadings && !tooSmall && h.subheadings && h.subheadings.length > 0) {
       h.subheadings.forEach((s) => {
         sections.push({
           id: s.id,
-          title: `${s.numberStr} ${s.title}`,
+          // One sub-section means the heading IS the section: never "1.0 X" then "1.1 X".
+          title: h.subheadings.length === 1 ? `${h.number}.0 ${h.title}` : `${s.numberStr} ${s.title}`,
           targetWordCount: s.targetWordCount,
           currentWordCount: s.currentWordCount || 0,
           guidance: s.guidance || `Analytical depth for ${s.title}. Notes: ${s.notes || ""}`,
@@ -1081,10 +1086,12 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
         title: `${h.number}.0 ${h.title}`,
         targetWordCount: h.targetWordCount,
         currentWordCount: (h.subheadings ?? []).reduce((n, sub) => n + (sub.currentWordCount || 0), 0),
-        guidance: h.notes || `Analysis for ${h.title}`,
+        guidance: (h.subheadings ?? []).map((sub) => sub.guidance).filter(Boolean).join(" ") || h.notes || `Analysis for ${h.title}`,
         draftContent: mergedDraft,
         status: mergedDraft ? "completed" : "not_started",
-        keyPoints: (h.subheadings ?? []).flatMap((sub) => sub.keyPoints || []).slice(0, 6),
+        keyPoints: (h.subheadings ?? [])
+          .flatMap((sub) => (sub.keyPoints && sub.keyPoints.length ? sub.keyPoints : [sub.title.replace(/^\s*\d+(\.\d+)*\.?\s*/, "")]))
+          .slice(0, 6),
         linkedEvidenceIds: [],
         academicFunction: h.title,
         purpose: h.purpose,

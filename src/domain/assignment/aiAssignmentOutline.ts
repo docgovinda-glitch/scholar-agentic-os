@@ -128,7 +128,7 @@ export function structureFromAi(
   const total = requestedTotal(opts.instruction, ai.totalWords) ?? Math.max(150, Math.round(targetWords) || 1500);
 
   const flat = ai.sections.flatMap((s, h) =>
-    (s.subsections.length ? s.subsections : [{ title: s.title, words: undefined, guidance: undefined }]).map((sub) => ({ h, sub }))
+    (s.subsections.length ? s.subsections : [{ title: "Key points and evidence", words: undefined, guidance: undefined }]).map((sub) => ({ h, sub }))
   );
   const words = fitWords(flat.map((f) => f.sub.words), total);
 

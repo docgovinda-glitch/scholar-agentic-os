@@ -163,11 +163,11 @@ export function parseMarkingCriteria(briefText: string, questions: BriefQuestion
           criterion: m[1].replace(/[:–\-\s]+$/, ""),
           marks: m[3] === "%" ? undefined : value,
           weightPercent: m[3] === "%" ? value : undefined,
-          expectation: m[4]?.trim() || "",
+          expectation: m[4]?.trim() && m[4].trim().length <= 80 ? m[4].trim() : plainExpectation(questions.filter((q) => new RegExp(`\\b${q.label}\\b`, "i").test(m[1]))),
         });
       }
     }
-    if (rows.length >= 2) return finishCriteria(rows);
+    if (rows.length >= 2) return finishCriteria(rows, statedTotalMarks(briefText));
     rows.length = 0;
   }
 
@@ -175,13 +175,14 @@ export function parseMarkingCriteria(briefText: string, questions: BriefQuestion
   if (parts.length >= 2) {
     return finishCriteria(
       parts.map((p) => {
-        const labels = questions.filter((q) => q.part && p.name.toLowerCase().startsWith(q.part.toLowerCase().slice(0, 20))).map((q) => q.label);
+        const inPart = questions.filter((q) => q.part && p.name.toLowerCase().startsWith(q.part.toLowerCase().slice(0, 20)));
         return {
           criterion: p.name,
           marks: p.marks,
-          expectation: labels.length ? `Answer ${labels[0]}${labels.length > 1 ? `–${labels[labels.length - 1]}` : ""} accurately, with evidence.` : "Answer every question in this part accurately, with evidence.",
+          expectation: plainExpectation(inPart),
         };
-      })
+      }),
+      statedTotalMarks(briefText)
     );
   }
 
@@ -195,17 +196,70 @@ export function parseMarkingCriteria(briefText: string, questions: BriefQuestion
   const grouped = [...byMain.entries()].map(([key, v]) => ({
     criterion: `${key}: ${v.first.text.slice(0, 60)}`,
     marks: v.marks,
-    expectation: "Answer every part of this question, showing reasoning and evidence.",
+    expectation: plainExpectation(questions.filter((q) => q.label.replace(/[a-z]$/, "") === key)),
   }));
-  return grouped.length ? finishCriteria(grouped) : [];
+  return grouped.length ? finishCriteria(grouped, statedTotalMarks(briefText)) : [];
 }
 
-function finishCriteria(rows: MarkingCriterionRow[]): MarkingCriterionRow[] {
-  const total = rows.reduce((s, r) => s + (r.marks ?? 0), 0);
+const PART_LABEL = /^(?:part|section)\s*[\da-z]+/i;
+
+/**
+ * Percentages need ONE denominator. Never sum Part totals AND the questions
+ * inside them. Priority: a stated "Total: N marks", else the Part totals when
+ * the brief has Parts, else the sum of the rows.
+ */
+function finishCriteria(rows: MarkingCriterionRow[], statedTotal?: number): MarkingCriterionRow[] {
+  const partRows = rows.filter((r) => PART_LABEL.test(r.criterion) && r.marks);
+  const leafSum = rows.filter((r) => !PART_LABEL.test(r.criterion)).reduce((s, r) => s + (r.marks ?? 0), 0);
+  const partSum = partRows.reduce((s, r) => s + (r.marks ?? 0), 0);
+  const total = statedTotal ?? (partRows.length >= 2 ? partSum : partRows.length ? partSum + leafSum : leafSum);
   return rows.map((r) => ({
     ...r,
     weightPercent: r.weightPercent ?? (r.marks && total > 0 ? Math.round((r.marks / total) * 100) : undefined),
   }));
+}
+
+/** "Total: 100 marks" / "(100 marks in total)" if the brief states it. */
+export function statedTotalMarks(briefText: string): number | undefined {
+  const m =
+    briefText.match(/\btotal\s*(?:marks?|mark\s*available)?\s*[:=\-–]?\s*(\d{2,4})\s*(?:marks?)?\b/i) ||
+    briefText.match(/\b(\d{2,4})\s*marks?\s*(?:in\s*total|total)\b/i);
+  const n = m ? parseInt(m[1], 10) : NaN;
+  return n >= 10 && n <= 1000 ? n : undefined;
+}
+
+const VERB_PLAIN: Record<string, string> = {
+  compare: "compare them point by point",
+  contrast: "show how they differ",
+  explain: "explain how and why in your own words",
+  describe: "describe it clearly and accurately",
+  evaluate: "weigh strengths and weaknesses and reach a judgement",
+  assess: "weigh the evidence and reach a judgement",
+  discuss: "set out the main views, then give your conclusion",
+  analyse: "break it into parts and explain how they connect",
+  analyze: "break it into parts and explain how they connect",
+  derive: "show each step of the working",
+  justify: "give reasons and evidence for your choice",
+  propose: "suggest a clear solution and say why it works",
+  recommend: "make a clear recommendation and back it up",
+  examine: "look closely at the evidence and explain what it shows",
+  design: "set out your design and why it meets the need",
+  calculate: "show the working and the result",
+  define: "define the key terms precisely",
+  identify: "pick out the key points and explain them",
+  outline: "set out the main steps or points in order",
+};
+
+/** One short, plain-English sentence on how to earn the marks, from the question verbs only. */
+export function plainExpectation(questions: BriefQuestionRow[]): string {
+  const verbs: string[] = [];
+  for (const q of questions) {
+    const first = q.text.toLowerCase().match(/^(?:critically\s+)?([a-z]+)/)?.[1];
+    const plain = first ? VERB_PLAIN[first] : undefined;
+    if (plain && !verbs.includes(plain)) verbs.push(plain);
+  }
+  const tail = verbs.length ? `: ${verbs.slice(0, 2).join(", and ")}` : "";
+  return `Answer every part fully${tail}, with evidence.`;
 }
 
 export interface BriefSummaryInput {

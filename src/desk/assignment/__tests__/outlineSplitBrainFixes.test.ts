@@ -88,3 +88,34 @@ Q5. Discuss post-quantum cryptography migration risks. [20 Marks]`;
     expect(sections.every((s) => s.targetWordCount === 300)).toBe(true);
   });
 });
+
+describe("no repeated parent/child headings", () => {
+  const BRIEF2 = `Word Count: 2,000 words
+PART 1: HARDWARE 40 MARKS
+Q1a. Compare superconducting transmon and trapped-ion qubits in terms of coherence time. [10 Marks]
+Q1b. Explain how gate fidelity limits near-term devices. [15 Marks]
+Q1c. Evaluate error mitigation strategies for NISQ hardware. [15 Marks]
+Q2. Derive the quantum Fourier transform circuit and show its role in Shor's algorithm. [30 Marks]
+Q3. Discuss Grover's search algorithm and its speed-up. [30 Marks]`;
+
+  it("names sub-parts distinctly and never copies the parent title into an X.1 child", () => {
+    const structure = generateDynamicAssignmentStructure({ question: BRIEF2, assignmentType: "coursework", academicLevel: "postgraduate", targetWordCount: 2000, briefText: BRIEF2 });
+    const norm = (t: string) => t.replace(/^\s*\d+(\.\d+)*\.?\s*/, "").trim().toLowerCase();
+    for (const h of structure.headings) {
+      for (const s of h.subheadings) expect(norm(s.title)).not.toBe(norm(h.title));
+    }
+    const q1 = structure.headings[0];
+    expect(q1.subheadings).toHaveLength(3);
+    expect(q1.subheadings.map((s) => s.numberStr ?? "")).toBeDefined();
+    expect(structure.headings[1].subheadings).toHaveLength(1);
+    expect(q1.title.split(/\s+/).length).toBeLessThanOrEqual(10);
+  });
+
+  it("drafts a heading with small sub-parts as one readable section of 250+ words", () => {
+    const structure = generateDynamicAssignmentStructure({ question: BRIEF2, assignmentType: "coursework", academicLevel: "postgraduate", targetWordCount: 2000, briefText: BRIEF2 });
+    const sections = structureToInternalSections(structure);
+    expect(sections.length).toBeLessThanOrEqual(8);
+    expect(sections.every((s) => s.targetWordCount >= 250)).toBe(true);
+    expect(sections[0].keyPoints?.length).toBe(3);
+  });
+});
