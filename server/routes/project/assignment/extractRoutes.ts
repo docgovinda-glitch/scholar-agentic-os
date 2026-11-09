@@ -49,6 +49,7 @@ import {
   isTutorialOrShortQABrief,
   extractSubstantiveBriefQuestions,
   stripSlideArtifacts,
+  stripCourseCodes,
 } from "../../../../src/utils/briefExtractor.ts";
 import { discoverMultiPortalSources, type DiscoveredSourceDraft } from "../../../src/discovery/discovery.ts";
 import {
@@ -119,9 +120,11 @@ router.post(
     // Detect metadata within first 50,000 characters to eliminate regex backtracking on multi-MB documents
     const searchSlice = cleanedText.slice(0, 50000);
     let detectedWordCount: number | undefined;
+    // Strip hyphenated course/module codes (QNT-4020) so they are never read as a word count
+    const wordSlice = stripCourseCodes(searchSlice);
     const wordMatch =
-      searchSlice.match(/(?:word\s*count|target|limit|length)\s*(?:is|of|:)?\s*([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})/i) ||
-      searchSlice.match(/(?:^|[^\d,])([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})\s*words\b/i);
+      wordSlice.match(/(?:word\s*count|target|limit|length)\s*(?:is|of|:)?\s*([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})/i) ||
+      wordSlice.match(/(?:^|[^\d,])([1-9]\d{0,2}(?:,\d{3})+|[1-9]\d{2,4})\s*words\b/i);
     if (wordMatch) {
       const parsed = parseInt((wordMatch[1] || "").replace(/,/g, ""), 10);
       if (parsed >= 200 && parsed <= 50000) {

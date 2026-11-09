@@ -38,9 +38,9 @@ import { issue, revoke } from "../../../src/services/capabilities/capabilities.t
 import { initialProjectGateState } from "../../../src/app/conductor/conductor.ts";
 import {
   getCandidates,
-  callOpenRouterJSON,
-  callOpenRouterText,
-  streamOpenRouterJSON,
+  callOpenRouterJSON as rawCallOpenRouterJSON,
+  callOpenRouterText as rawCallOpenRouterText,
+  streamOpenRouterJSON as rawStreamOpenRouterJSON,
   buildAuthorizedPolicy,
   resolveRequestAiConfig,
   getPremiumAiPolicy,
@@ -312,14 +312,16 @@ function cachedLiveDiscovery(query: string, maxResults: number): Promise<LiveDra
 
 /**
  * SINGLE LLM GATEWAY. scholarBrain.ts is the only module allowed to import
- * server/utils/llm.ts; every route and workspace reaches AI execution through
- * these exports (or the matching scholarBrain methods).
+ * server/utils/llm.ts. The three execution functions below are real wrappers,
+ * not pass-throughs: every call is timed and logged (task type + outcome only,
+ * never prompt text or credentials), failures are logged once with context and
+ * rethrown unchanged so route-level handling (NoAiConnectedError,
+ * BrowserAiRequiredError, ...) keeps working, and text output is NFC-normalised.
+ * Orthography/cliché rewriting stays opt-in via scholarBrain.complete()/stream(),
+ * because generic text calls (JSON, code, citations) must not be rewritten.
  */
 export {
   getCandidates,
-  callOpenRouterJSON,
-  callOpenRouterText,
-  streamOpenRouterJSON,
   buildAuthorizedPolicy,
   resolveRequestAiConfig,
   getPremiumAiPolicy,
@@ -328,6 +330,34 @@ export {
   generateGeminiEmbedding,
   readVerifiedBrowserResult,
 };
+
+async function runGatewayCall<T>(kind: string, taskType: string | undefined, fn: () => Promise<T>): Promise<T> {
+  const started = Date.now();
+  try {
+    const result = await fn();
+    console.info(`[scholarBrain] ${kind} ok task=${taskType ?? "reasoning"} ms=${Date.now() - started}`);
+    return result;
+  } catch (err) {
+    const name = err instanceof Error ? err.constructor.name : typeof err;
+    console.warn(`[scholarBrain] ${kind} failed task=${taskType ?? "reasoning"} ms=${Date.now() - started} error=${name}`);
+    throw err;
+  }
+}
+
+export function callOpenRouterJSON<T = any>(...args: Parameters<typeof rawCallOpenRouterJSON>): Promise<T> {
+  return runGatewayCall("json", args[5], () => rawCallOpenRouterJSON<T>(...args));
+}
+
+export function callOpenRouterText(...args: Parameters<typeof rawCallOpenRouterText>): ReturnType<typeof rawCallOpenRouterText> {
+  return runGatewayCall("text", args[5], async () => {
+    const text = await rawCallOpenRouterText(...args);
+    return typeof text === "string" ? normalizeUnicodeNFC(text) : text;
+  });
+}
+
+export function streamOpenRouterJSON(...args: Parameters<typeof rawStreamOpenRouterJSON>): ReturnType<typeof rawStreamOpenRouterJSON> {
+  return runGatewayCall("stream", args[5], () => rawStreamOpenRouterJSON(...args));
+}
 
 /** Centrally managed quantitative style weights (trained archetype model). */
 export function getArchetypeModelWeights(): ArchetypeModelWeights {

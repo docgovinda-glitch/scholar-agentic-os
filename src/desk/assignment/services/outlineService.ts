@@ -595,6 +595,29 @@ export function formatAcademicTopicTitle(raw: string): string {
   return formatted.join(" ");
 }
 
+/** Max top-level sections an outline may be expanded to (human-scale outlines). */
+const MAX_OUTLINE_SECTIONS = 8;
+
+/**
+ * True for lines that are brief metadata or section banners, never questions:
+ * "Word Count: 2,000" or "PART 1: Some title - 25 MARKS".
+ */
+function isNonQuestionBriefLine(line: string): boolean {
+  const t = line.trim();
+  if (/^(?:total\s+)?(?:word\s*count|word\s*limit|words?|marks?|module\s*code|course\s*code)\b\s*[:\-–]/i.test(t)) return true;
+  if (/^(?:part|section)\s*[\da-z]+\s*[:\-–.]?.*\(?\b\d+\s*marks?\b\)?\.?$/i.test(t) && !t.endsWith("?")) return true;
+  // Prefix already stripped by upstream parsers: "Strategic Analysis - 25 MARKS" (short, no directive verb)
+  if (
+    !t.endsWith("?") &&
+    t.split(/\s+/).length <= 10 &&
+    /[-–:]\s*\(?\d+\s*marks?\)?\.?$/i.test(t) &&
+    !/^(?:critically\s+)?(?:evaluate|analy[sz]e|assess|discuss|explain|describe|examine|compare|recommend|propose|justify|explore|investigate|identify|outline|define|apply|develop|design)\b/i.test(t)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export interface ExtractedBriefInquiries {
   subQuestions: string[];
   keyConcepts: string[];
@@ -621,7 +644,7 @@ export function extractBriefInquiriesAndConcepts(
   // Extract substantive questions directly if available
   const substantiveQuestions = extractSubstantiveBriefQuestions(cleanCombined);
   for (const sq of substantiveQuestions) {
-    if (!seenItems.has(sq.toLowerCase())) {
+    if (!isNonQuestionBriefLine(sq) && !seenItems.has(sq.toLowerCase())) {
       seenItems.add(sq.toLowerCase());
       subQuestions.push(sq);
     }
@@ -634,7 +657,7 @@ export function extractBriefInquiriesAndConcepts(
   let inTaskBlock = false;
   for (const line of lines) {
     const cleanLine = line.trim();
-    if (!cleanLine || isClassroomLogisticsLine(cleanLine)) continue;
+    if (!cleanLine || isClassroomLogisticsLine(cleanLine) || isNonQuestionBriefLine(cleanLine)) continue;
 
     // Detect directive trigger headers
     if (/(?:in your answer|address the following|ensure you address|tasks?|questions?|sub-questions?|key requirements?|topics? to cover)[:]/i.test(cleanLine)) {
@@ -1252,7 +1275,9 @@ export function buildBriefSpecificSpecs(
   targetWordCount?: number
 ): HeadingSpec[] {
   const inquiries = extractBriefInquiriesAndConcepts(question, briefText);
-  const directTasks = [...inquiries.extractedTasks, ...inquiries.subQuestions];
+  const directTasks = [...inquiries.extractedTasks, ...inquiries.subQuestions]
+    .filter((t) => !isNonQuestionBriefLine(t))
+    .slice(0, MAX_OUTLINE_SECTIONS);
   const semantics = deconstructQuestionSemantics(question);
   const primaryTopic = semantics.topicA || inquiries.coreThemes[0] || "Primary Analytical Focus";
   const secondaryTopic = semantics.topicB || inquiries.coreThemes[1] || "";
@@ -1481,31 +1506,18 @@ export function buildBriefSpecificSpecs(
       const taskConcept = concepts[tIdx] || primaryTopic;
       const relatedConcept = concepts[(tIdx + 1) % (concepts.length || 1)] || secondaryTopic || "Operational Dynamics";
 
-      const sub1Title = `${tIdx + 1}.1 Conceptual Framing and Analysis of ${cleanTaskTitle}`;
-      const sub2Title = `${tIdx + 1}.2 Empirical Evidence and Strategic Evaluation of ${cleanTaskTitle}`;
-
       return {
         title: `${tIdx + 1}.0 ${cleanTaskTitle}`,
         notes: `Directly address and substantiate: "${task}".`,
         subheadings: [
           {
-            title: sub1Title,
-            ratio: tIdx === 0 ? 0.16 : 0.18,
-            guidance: `Focus: Analyze core conceptual mechanisms, theoretical grounding (${primaryFramework}), and analytical dimensions for: "${task}".`,
+            title: `${tIdx + 1}.1 ${cleanTaskTitle}`,
+            ratio: 1 / directTasks.length,
+            guidance: `Focus: Analyze the conceptual mechanisms, theoretical grounding (${primaryFramework}) and empirical evidence needed to answer: "${task}".`,
             keyPoints: [
               `Direct answer to directive: ${task.slice(0, 80)}`,
               `Analytical parameters and theoretical grounding (${primaryFramework})`,
-              `Core conceptual mechanisms concerning ${taskConcept}`,
-            ],
-          },
-          {
-            title: sub2Title,
-            ratio: tIdx === 0 ? 0.18 : 0.16,
-            guidance: `Focus: Examine empirical case evidence, diagnostic indicators, and critical evaluation regarding: "${task}".`,
-            keyPoints: [
-              `Empirical data and case evidence addressing ${relatedConcept}`,
-              `Critical friction points, vulnerabilities, and counterarguments`,
-              `Substantiated conclusions and analytical synthesis`,
+              `Empirical evidence addressing ${relatedConcept} and core mechanisms concerning ${taskConcept}`,
             ],
           },
         ],
