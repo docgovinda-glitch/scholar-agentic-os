@@ -93,42 +93,22 @@ describe("phone home: Ask Scholar first", () => {
       vi.mocked(api.listProjects).mockResolvedValue({ items: [] } as never);
     });
 
+    it("stays uncluttered: no banner, examples or hint, and one suggestions row", () => {
+      renderHome();
+      expect(screen.queryByTestId("mobile-ai-setup-banner")).toBeNull();
+      expect(screen.queryByTestId("mobile-examples")).toBeNull();
+      expect(screen.queryByText(/attach a brief/i)).toBeNull();
+      expect(screen.getAllByRole("group", { name: "Suggested questions" })).toHaveLength(1);
+    });
+
+    it("offers Sign in in the header when signed out", () => {
+      renderHome(vi.fn(), vi.fn(), "");
+      expect(screen.getAllByRole("button", { name: /Sign in/ }).length).toBeGreaterThan(0);
+    });
+
     it("says what the app does", () => {
       renderHome();
       expect(screen.getByText(/Research, write and cite/i)).toBeInTheDocument();
-    });
-
-    it("does not nag about AI setup while an AI is connected", async () => {
-      renderHome();
-      expect(await screen.findByTestId("mobile-ai-status")).toHaveTextContent("AI: Google Gemini");
-      expect(screen.queryByTestId("mobile-ai-setup-banner")).toBeNull();
-    });
-
-    it("offers a dismissible setup banner when no AI is connected", async () => {
-      vi.mocked(api.getAiOperationalStatus).mockResolvedValue({ connected: false, statusText: "AI Disconnected", providers: [] } as never);
-      const onOpenAiAccess = vi.fn();
-      renderHome(onOpenAiAccess);
-      const banner = await screen.findByTestId("mobile-ai-setup-banner");
-      fireEvent.click(within(banner).getByRole("button", { name: "Set up" }));
-      expect(onOpenAiAccess).toHaveBeenCalled();
-      fireEvent.click(within(banner).getByRole("button", { name: "Dismiss" }));
-      expect(screen.queryByTestId("mobile-ai-setup-banner")).toBeNull();
-    });
-
-    it("asks signed-out visitors to sign in, from the banner and the header", () => {
-      renderHome(vi.fn(), vi.fn(), ""); // signed out
-      const banner = screen.getByTestId("mobile-ai-setup-banner");
-      expect(within(banner).getByRole("button", { name: "Sign in" })).toBeInTheDocument();
-      expect(screen.getAllByRole("button", { name: /Sign in/ }).length).toBeGreaterThanOrEqual(2);
-    });
-
-    it("fills the question box from an example prompt", () => {
-      renderHome();
-      const examples = screen.getByTestId("mobile-examples");
-      const first = within(examples).getAllByRole("button")[0];
-      fireEvent.click(first);
-      const box = within(screen.getByTestId("main-prompt-bar-wrapper")).getByRole("textbox") as HTMLTextAreaElement;
-      expect(box.value).toBe(first.textContent);
     });
 
     it("shows recent projects instead of examples for returning users", async () => {
@@ -138,7 +118,6 @@ describe("phone home: Ask Scholar first", () => {
       const onOpen = vi.fn();
       renderHome(vi.fn(), vi.fn(), "researcher@university.edu", onOpen);
       const section = await screen.findByTestId("mobile-continue");
-      expect(screen.queryByTestId("mobile-examples")).toBeNull();
       fireEvent.click(within(section).getAllByRole("button")[0]);
       expect(onOpen).toHaveBeenCalledWith("p1");
     });
@@ -149,12 +128,5 @@ describe("phone home: Ask Scholar first", () => {
       expect(screen.queryByRole("button", { name: /Toggle Scholar Core AI Assistant/i })).toBeNull();
     });
 
-    it("hints how to attach a brief, and hides the hint once typing starts", () => {
-      renderHome();
-      const bar = screen.getByTestId("main-prompt-bar-wrapper");
-      expect(within(bar).getByText(/attach a brief/i)).toBeInTheDocument();
-      fireEvent.change(within(bar).getByRole("textbox"), { target: { value: "hello" } });
-      expect(within(bar).queryByText(/attach a brief/i)).toBeNull();
-    });
   });
 });

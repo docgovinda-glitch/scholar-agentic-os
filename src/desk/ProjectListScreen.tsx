@@ -206,12 +206,6 @@ function LazyScreenFallback() {
   );
 }
 
-/** Starter prompts for people with no projects yet; they fill the composer so they can be edited before sending. */
-const LANDING_EXAMPLE_PROMPTS = [
-  "Summarise the main debates on remote work and productivity, with sources",
-  "Help me plan a 2,000-word essay. I'll paste the brief next",
-] as const;
-
 export default function ProjectListScreen({
   onOpen,
   userEmail = null,
@@ -971,27 +965,11 @@ export default function ProjectListScreen({
     return () => window.clearTimeout(t);
   }, [aiStatus]);
   const aiStatusResolved = aiStatus !== null || aiCheckTimedOut;
-  const aiNeedsSetup = aiStatusResolved && !aiStatus?.connected;
-  const aiPillLabel = aiStatus?.connected
+    const aiPillLabel = aiStatus?.connected
     ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
     : aiStatusResolved
       ? "Connect an AI"
       : "Checking AI…";
-
-  // "Connect an AI" banner on the phone landing; dismissal lasts for the browser session.
-  const [aiBannerDismissed, setAiBannerDismissed] = useState(() => {
-    try {
-      return sessionStorage.getItem("scholar-ai-banner-dismissed") === "1";
-    } catch {
-      return false;
-    }
-  });
-  const dismissAiBanner = () => {
-    setAiBannerDismissed(true);
-    try {
-      sessionStorage.setItem("scholar-ai-banner-dismissed", "1");
-    } catch { /* storage unavailable: dismissal just lasts until reload */ }
-  };
 
   async function parseFilesToAttachments(
     files: FileList | File[] | null,
@@ -3170,49 +3148,11 @@ export default function ProjectListScreen({
                           )}
                         </div>
                       </div>
-                      <p className="text-[15px] font-medium text-neutral-800 dark:text-neutral-100 leading-snug">
-                        Research, write and cite: essays, papers, proposals and slides.
-                      </p>
-                      <p className="mt-1 mb-3 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                        Ask a question or paste your brief. Every answer starts from a fresh search of scholarly sources.
+                      <p className="mb-3 text-sm text-neutral-600 dark:text-neutral-400 leading-snug">
+                        Research, write and cite: essays, papers, slides.
                       </p>
 
-                      {/* First-step nudge: shown only once we know there is no usable AI (or the user is signed out). */}
-                      {(aiNeedsSetup || !userEmail) && !aiBannerDismissed && (
-                        <div
-                          role="region"
-                          aria-label="Get started"
-                          data-testid="mobile-ai-setup-banner"
-                          className="mb-3 flex items-center gap-3 rounded-2xl border border-sky-500/25 bg-sky-500/10 pl-3.5 pr-1.5 py-2"
-                        >
-                          <p className="flex-1 min-w-0 text-[13px] leading-snug text-neutral-800 dark:text-neutral-100">
-                            {userEmail ? "Connect an AI to start asking." : "Sign in to connect an AI and save your work."}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!userEmail) openAuth("signin", "Sign in to connect an AI and save your work.");
-                              else if (onOpenAiAccess) onOpenAiAccess();
-                              else setActiveView("ai-access");
-                            }}
-                            className="shrink-0 min-h-9 px-3.5 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold cursor-pointer active:scale-95 transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
-                          >
-                            {userEmail ? "Set up" : "Sign in"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={dismissAiBanner}
-                            aria-label="Dismiss"
-                            className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer focus-visible:outline-2 focus-visible:outline-sky-500"
-                          >
-                            <X className="w-4 h-4" aria-hidden="true" />
-                          </button>
-                        </div>
-                      )}
                       <div className="mt-4">
-                        <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                          Try asking
-                        </h2>
                         <div
                           role="group"
                           aria-label="Suggested questions"
@@ -3236,7 +3176,7 @@ export default function ProjectListScreen({
                         </div>
                       </div>
 
-                      {landingRecents.length > 0 ? (
+                      {landingRecents.length > 0 && (
                         <div className="mt-6" data-testid="mobile-continue">
                           <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                             Continue where you left off
@@ -3265,34 +3205,6 @@ export default function ProjectListScreen({
                                 </li>
                               );
                             })}
-                          </ul>
-                        </div>
-                      ) : (
-                        <div className="mt-6" data-testid="mobile-examples">
-                          <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                            Try an example
-                          </h2>
-                          <ul className="space-y-2">
-                            {LANDING_EXAMPLE_PROMPTS.map((example) => (
-                              <li key={example}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setMainPromptInput(example);
-                                    window.setTimeout(() => {
-                                      const el = guideTextareaRef.current;
-                                      if (!el) return;
-                                      el.focus();
-                                      el.setSelectionRange(example.length, example.length);
-                                    }, 0);
-                                  }}
-                                  className="w-full min-h-12 flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 text-left text-[13px] leading-snug text-neutral-700 dark:text-neutral-200 cursor-pointer active:scale-[0.99] transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
-                                >
-                                  <Sparkles className="w-3.5 h-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
-                                  <span>{example}</span>
-                                </button>
-                              </li>
-                            ))}
                           </ul>
                         </div>
                       )}
@@ -3416,11 +3328,6 @@ export default function ProjectListScreen({
                 }
               >
                 <div className="w-full max-w-4xl mx-auto relative pointer-events-auto flex flex-col items-center">
-                  {isPhone && !isAiSidebarOpen && !hasStartedChatting && !mainPromptInput && mainAttachments.length === 0 && (
-                    <p className="w-full px-1 pb-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
-                      Paste text or attach a brief (PDF, DOCX, TXT) with <span aria-hidden="true">+</span><span className="sr-only">the add button</span>
-                    </p>
-                  )}
                   {mainPromptForm}
                 </div>
               </div>
