@@ -37,6 +37,7 @@ import {
 } from "../../../../src/desk/assignment/types.ts";
 import {
   generateDynamicAssignmentStructure,
+  extractBriefInquiriesAndConcepts,
   sanitizeOutlineHeadings,
   assignmentStructureToOutlineTree,
   outlineTreeToAssignmentStructure,
@@ -51,6 +52,7 @@ import {
   stripSlideArtifacts,
   stripCourseCodes,
 } from "../../../../src/utils/briefExtractor.ts";
+import { buildBriefSummary, extractPrescribedReferences } from "../../../../src/utils/briefQuestions.ts";
 import { discoverMultiPortalSources, type DiscoveredSourceDraft } from "../../../src/discovery/discovery.ts";
 import {
   replaceBracketTokensWithDeterministicCitations,
@@ -351,24 +353,10 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
     }`;
 
     // 5. Concepts, Expected Response Type, Evidence Requirements, Summary
-    const isQuantum = /quantum|qubit|superconducting|trapped-ion|shor|grover|qec|surface code|nisq|post-quantum|qkd/i.test(combinedContent);
     const isExamOrQuestionnaire = /examination|questionnaire|question\s*1|part\s*1|marks\b/i.test(combinedContent);
 
-    const keyConcepts = isQuantum
-      ? [
-          "Superconducting Transmon vs Trapped-Ion Physical Realisations",
-          "NISQ Hardware Limits & Error Mitigation (ZNE/PEC/CDR)",
-          "Quantum Algorithmic Complexity (BQP, Shor & Grover)",
-          "Planar Surface Codes & Fault-Tolerant Threshold Theorem",
-          "Quantum Key Distribution (BB84) & Post-Quantum Cryptography (FIPS 203)",
-        ]
-      : [
-          "Theoretical Framework",
-          "Empirical Evidence",
-          "Critical Synthesis",
-          "Methodological Rigor",
-          "Counterargument Evaluation",
-        ];
+    // Concepts come from the brief's own wording, never from a subject lookup.
+    const keyConcepts = extractBriefInquiriesAndConcepts(question, briefText).keyConcepts.slice(0, 6);
 
     const expectedResponseType = isExamOrQuestionnaire
       ? "Rigorous, structured technical answers solving all examination questions systematically with theoretical frameworks, mathematical rigor, and standard Harvard referencing."
@@ -382,24 +370,27 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
       ? "Scientific laboratory report following IMRaD structure with empirical hypothesis testing and error analysis."
       : "Dialectical academic essay advancing a central argumentative thesis substantiated by peer-reviewed evidence.";
 
-    const evidenceRequirements = isQuantum
-      ? "Authoritative quantum computing literature (e.g. Preskill 2018, Nielsen & Chuang 2010, Fowler et al. 2012, Shor 1994, Arute et al. 2019, Gidney & Ekerå 2021) adhering to Harvard style."
-      : academicLevel === "postgraduate"
-      ? "High-impact peer-reviewed journal articles, foundational theoretical monographs, and authoritative empirical datasets."
-      : "Authoritative academic sources, scholarly peer-reviewed journals, and verified institutional benchmark data.";
+    const prescribed = extractPrescribedReferences(combinedContent).map((r) => r.label);
+    const evidenceRequirements =
+      prescribed.length > 0
+        ? `Authoritative peer-reviewed literature. The brief names: ${prescribed.slice(0, 6).join(", ")}.`
+        : academicLevel === "postgraduate"
+        ? "High-impact peer-reviewed journal articles, foundational theoretical monographs, and authoritative empirical datasets."
+        : "Authoritative academic sources, scholarly peer-reviewed journals, and verified institutional benchmark data.";
 
-    const academicLevelNotes = isQuantum
-      ? "Calibrated for Honours / Postgraduate Quantum Information Systems examination standards. Demands mathematical precision, physical circuit mechanics, and rigorous theoretical grounding."
-      : academicLevel === "postgraduate"
+    const academicLevelNotes = academicLevel === "postgraduate"
       ? "Calibrated for Postgraduate / Masters study: demands high theoretical synthesis, methodological reflexivity, nuanced hedging, and original critical insight."
       : "Calibrated for Undergraduate study: emphasizes conceptual clarity, structured logical flow, accurate evidence deployment, and clear thesis progression.";
 
     const penaltyNote = penaltyItems.length > 0 ? ` Note: ${penaltyItems.length} specific penalty clause(s) identified.` : "";
 
-    const summary = `The examiner requires a rigorous ${assignmentType.replace(/_/g, " ")} addressing "${question.slice(
-      0,
-      140
-    )}...". The submission must reflect ${academicLevel} standards, deploy ${citationStyle.toUpperCase()} referencing, and deliver disciplined analysis within the ${targetWords}-word budget.${penaltyNote}`;
+    const summary = buildBriefSummary({
+      briefText: combinedContent,
+      assignmentType: String(assignmentType),
+      level: String(academicLevel),
+      citationStyle: String(citationStyle),
+      targetWords,
+    }) + penaltyNote;
 
     const finalAnalysis: AssignmentAnalysis = {
       commandVerbs,

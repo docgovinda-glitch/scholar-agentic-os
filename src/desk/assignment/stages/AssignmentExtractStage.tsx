@@ -119,6 +119,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     setAnalysis,
     ensurePersisted,
     isLoading,
+    agent,
   } = useAssignmentWorkspace() as any;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -482,6 +483,19 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
     const safeUpdates = stripCircularReferences(updates);
     await saveAnswers(safeUpdates);
 
+    // Have the student's AI read the brief and plan the assignment so Phase 2
+    // opens with its full breakdown. A failure here must not block the student.
+    try {
+      if (agent?.runExtract && agent?.runUnderstand) {
+        setIsGeneratingStructure(true);
+        if (await agent.runExtract()) await agent.runUnderstand();
+      }
+    } catch (agentErr) {
+      console.warn("Brief reading by AI did not complete:", agentErr);
+    } finally {
+      setIsGeneratingStructure(false);
+    }
+
     // Smoothly advance to Part 2: Understand
     onProceed?.();
   };
@@ -659,9 +673,11 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Take the File itself, then reset the input so the same file can be chosen again.
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (file) {
-      processUploadedFile(file);
+      void processUploadedFile(file);
     }
   };
 
@@ -686,26 +702,11 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           </p>
         </div>
 
-        {/* Next step */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          {onProceed && (
-            <button
-              type="button"
-              onClick={onProceed}
-              disabled={!canGenerate}
-              title={canGenerate ? undefined : "Add the assignment question, word count and citation style first"}
-              className="disabled:opacity-40 disabled:cursor-not-allowed px-3.5 py-1.5 rounded-xl border border-neutral-200/80 dark:border-white/10 text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <span>Proceed to Phase 2: Understand</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-        </div>
       </div>
 
       {/* The agent: reads the brief and can work through the stages */}
       <ExtractAgentPanel
+        minimal
         brief={localQuestion}
         saveBrief={async () => {
           const clean = cleanAnswerString(localQuestion);
@@ -764,7 +765,7 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.docx,.doc,.txt"
+            accept=".pdf,.docx,.doc,.txt,.md"
             onChange={handleFileUpload}
             disabled={uploadingBrief}
             className="hidden"

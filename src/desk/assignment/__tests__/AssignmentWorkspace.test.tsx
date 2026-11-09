@@ -167,9 +167,13 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(within(header).queryByRole("button", { name: /vault/i })).not.toBeInTheDocument();
     expect(within(header).queryByRole("button", { name: /ai access/i })).not.toBeInTheDocument();
 
-    // 3. One tutor toggle: the studio header's inspector button.
+    // 3. No stage-count, tutor, Zen or Inspector pills in the header.
     expect(within(header).queryByRole("button", { name: /toggle ai tutor/i })).not.toBeInTheDocument();
-    expect(screen.getByTestId("inspector-toggle")).toBeInTheDocument();
+    expect(screen.queryByTestId("inspector-toggle")).not.toBeInTheDocument();
+    expect(screen.queryByText("Socratic Tutor AI")).not.toBeInTheDocument();
+    expect(screen.queryByText("5 stages")).not.toBeInTheDocument();
+    expect(screen.queryByText("Zen")).not.toBeInTheDocument();
+    expect(screen.queryByText("Inspector")).not.toBeInTheDocument();
     expect(within(header).queryByText("AI Tutor")).not.toBeInTheDocument();
 
     // 4. Duplicate counter removed from top header; lives exclusively in stage navigation
@@ -257,10 +261,11 @@ describe("Scholar Core Assignment Workspace", () => {
     });
 
     // 4. Verify 4 Human-Centered Cards and clean tags (stripped [L012-L015])
-    expect(screen.getByText(/Plain-English Assignment Deconstruction/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Plain-English Assignment Deconstruction/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Command Verb Decoded/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Visual Storyline Roadmap/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Clean Grading Checklist/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Thesis & Stance Selector/i)).toBeInTheDocument();
-    expect(screen.getByText(/Visual Storyline Roadmap/i)).toBeInTheDocument();
-    expect(screen.getByText(/Clean Grading Checklist/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Do not write about general history before 2000/i).length).toBeGreaterThanOrEqual(1);
 
     // 5. Confirm no visual regressions or unwanted stage tabs exist
@@ -290,15 +295,14 @@ describe("Scholar Core Assignment Workspace", () => {
     );
   });
 
-  it("the tutor starts closed on a phone-width screen", async () => {
+  it("the tutor starts closed on a phone-width screen and has no header toggle", async () => {
     const original = window.matchMedia;
     window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false })) as unknown as typeof window.matchMedia;
     try {
       render(<AssignmentWorkspace projectId="proj-123" initialStage="understand" onStageChange={vi.fn()} />);
-      await screen.findByTestId("inspector-toggle");
+      await screen.findByRole("navigation", { name: /Assignment Workflow Phases/i });
       expect(screen.queryByTestId("assignment-tutor-drawer")).not.toBeInTheDocument();
-      fireEvent.click(screen.getByTestId("inspector-toggle"));
-      expect(screen.getByTestId("assignment-tutor-drawer")).toBeInTheDocument();
+      expect(screen.queryByTestId("inspector-toggle")).not.toBeInTheDocument();
     } finally {
       window.matchMedia = original;
     }

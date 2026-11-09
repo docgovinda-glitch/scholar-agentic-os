@@ -24,12 +24,13 @@ export interface FileValidationResult {
   error?: string;
 }
 
-const SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".doc", ".txt"];
+const SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".doc", ".txt", ".md"];
 const SUPPORTED_MIME_TYPES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/msword",
   "text/plain",
+  "text/markdown",
 ];
 
 /**
@@ -50,7 +51,7 @@ export function validateBriefFile(
   if (!hasSupportedExt && !hasSupportedMime) {
     return {
       valid: false,
-      error: "Unsupported file type. Please upload a PDF, DOCX, DOC, or TXT document.",
+      error: "Unsupported file type. Please upload a PDF, DOCX, DOC, TXT or MD document.",
     };
   }
 

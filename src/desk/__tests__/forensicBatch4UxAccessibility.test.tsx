@@ -139,10 +139,8 @@ describe("Forensic Remediation Batch 4 - UX, Ergonomics & Accessibility Suite", 
     fireEvent.click(mobileCloseBtn);
     expect(screen.queryByTestId("assignment-tutor-drawer")).not.toBeInTheDocument();
 
-    // Re-opening via the studio header's inspector toggle (the only tutor toggle)
-    const toggleBtn = screen.getByTestId("inspector-toggle");
-    fireEvent.click(toggleBtn);
-    expect(screen.getByTestId("assignment-tutor-drawer")).toBeInTheDocument();
+    // The header no longer carries an Inspector toggle
+    expect(screen.queryByTestId("inspector-toggle")).not.toBeInTheDocument();
   });
 
   // 3. useUnsavedChangesGuard registers beforeunload

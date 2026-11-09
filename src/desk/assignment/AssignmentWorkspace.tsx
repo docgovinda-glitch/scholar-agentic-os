@@ -534,19 +534,11 @@ function AssignmentWorkspaceInner({
           if (onClose) onClose();
           else if (typeof window !== "undefined") window.location.href = "/";
         }}
-        metricLabel="5 stages"
-        aiModelLabel="Socratic Tutor AI"
+        metricLabel={`${(currentWordCount || 0).toLocaleString()} / ${(targetWordCount || 0).toLocaleString()} words`}
         onOpenAiAccess={onOpenAiAccess}
         autosaveStatus={saveStatus}
         hidePhaseTabs
         projectVersion={project?.version}
-        zenMode={isZenMode}
-        onToggleZenMode={() => setIsZenMode((z) => !z)}
-        inspectorOpen={!isZenMode && tutorPanelOpen}
-        onToggleInspector={() => {
-          setIsZenMode(false);
-          setTutorPanelOpen((o) => !o);
-        }}
       />
 
       {/* Assignment bar: the title (editable on phones where the studio header hides it) */}

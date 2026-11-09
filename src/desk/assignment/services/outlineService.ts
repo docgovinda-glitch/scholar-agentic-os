@@ -35,6 +35,7 @@ import {
   extractSubstantiveBriefQuestions,
 } from "../../../utils/briefExtractor";
 
+import { isNonQuestionBriefLine } from "../../../utils/briefQuestions";
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
   question: string,
@@ -597,26 +598,6 @@ export function formatAcademicTopicTitle(raw: string): string {
 
 /** Max top-level sections an outline may be expanded to (human-scale outlines). */
 const MAX_OUTLINE_SECTIONS = 8;
-
-/**
- * True for lines that are brief metadata or section banners, never questions:
- * "Word Count: 2,000" or "PART 1: Some title - 25 MARKS".
- */
-function isNonQuestionBriefLine(line: string): boolean {
-  const t = line.trim();
-  if (/^(?:total\s+)?(?:word\s*count|word\s*limit|words?|marks?|module\s*code|course\s*code)\b\s*[:\-–]/i.test(t)) return true;
-  if (/^(?:part|section)\s*[\da-z]+\s*[:\-–.]?.*\(?\b\d+\s*marks?\b\)?\.?$/i.test(t) && !t.endsWith("?")) return true;
-  // Prefix already stripped by upstream parsers: "Strategic Analysis - 25 MARKS" (short, no directive verb)
-  if (
-    !t.endsWith("?") &&
-    t.split(/\s+/).length <= 10 &&
-    /[-–:]\s*\(?\d+\s*marks?\)?\.?$/i.test(t) &&
-    !/^(?:critically\s+)?(?:evaluate|analy[sz]e|assess|discuss|explain|describe|examine|compare|recommend|propose|justify|explore|investigate|identify|outline|define|apply|develop|design)\b/i.test(t)
-  ) {
-    return true;
-  }
-  return false;
-}
 
 export interface ExtractedBriefInquiries {
   subQuestions: string[];

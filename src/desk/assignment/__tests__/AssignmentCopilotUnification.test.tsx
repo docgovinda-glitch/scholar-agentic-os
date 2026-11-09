@@ -342,7 +342,7 @@ describe("Round 5: Context Panel Copilot Unification", () => {
       });
     });
 
-    it("swaps to Scribe in Phase 3 Drafting and Examiner in Phase 4 Submission", async () => {
+    it("Drafting keeps the writing area clear: no Inspector toggle and no side drawer", async () => {
       render(
         <AssignmentWorkspace
           projectId="proj-copilot-test"
@@ -350,27 +350,10 @@ describe("Round 5: Context Panel Copilot Unification", () => {
           onStageChange={vi.fn()}
         />
       );
-
-      // Drafting closes the side panel to give the writing area the width;
-      // the header's Inspector button opens it again.
-      fireEvent.click(await screen.findByRole("button", { name: "Show Inspector Drawer" }));
-      const sidebar = await screen.findByRole("complementary");
-
-      // Verify Scribe in Phase 3
-      expect(await within(sidebar).findByText("Scribe")).toBeInTheDocument();
-      expect(within(sidebar).getByText(/Academic Drafting & Synthesis/i)).toBeInTheDocument();
-      expect(within(sidebar).getByRole("button", { name: /Deepen analytical critique/i })).toBeInTheDocument();
-
-      // Click Phase 4: Submission
-      const submissionNavBtn = screen.getByRole("button", { name: /Phase 4: Submission/i });
-      fireEvent.click(submissionNavBtn);
-
-      // Verify Examiner in Phase 4
-      await waitFor(() => {
-        expect(within(sidebar).getByText("Examiner")).toBeInTheDocument();
-        expect(within(sidebar).getByText(/Quality Audit & Final Review/i)).toBeInTheDocument();
-        expect(within(sidebar).getByRole("button", { name: /Explain predicted grade/i })).toBeInTheDocument();
-      });
+      await screen.findByRole("button", { name: /Phase 4: Submission/i });
+      expect(screen.queryByRole("button", { name: "Show Inspector Drawer" })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("assignment-tutor-drawer")).not.toBeInTheDocument();
     });
+
   });
 });
