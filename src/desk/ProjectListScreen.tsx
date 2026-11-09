@@ -851,13 +851,22 @@ export default function ProjectListScreen({
   // Handle outside clicks to close the mobile academic workspace dropdown
   useEffect(() => {
     if (!isMobileWorkspaceMenuOpen) return;
-    const handleClick = (e: MouseEvent) => {
+    const handleClick = (e: Event) => {
       if (mobileWorkspaceMenuRef.current && !mobileWorkspaceMenuRef.current.contains(e.target as Node)) {
         setIsMobileWorkspaceMenuOpen(false);
       }
     };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsMobileWorkspaceMenuOpen(false);
+    };
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("touchstart", handleClick, { passive: true });
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("touchstart", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
   }, [isMobileWorkspaceMenuOpen]);
 
   // Sync active Ask Scholar thread to multi-thread history in localStorage and server
@@ -2246,6 +2255,16 @@ export default function ProjectListScreen({
     getSupabaseClient().auth.signOut();
   }
 
+  // Shared by the phone Workspaces menu and the "Start a workspace" cards.
+  const handleMobileTilePick = (tile: (typeof FORMAT_TILES)[number]) => {
+    if (creating) return;
+    if (!userEmail) {
+      openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
+      return;
+    }
+    handleCreate(tile.id);
+  };
+
   const mainPromptForm = (
     <form
       onSubmit={(e) => {
@@ -2352,7 +2371,7 @@ export default function ProjectListScreen({
           aria-label="Research instructions or assignment guidelines"
           placeholder={isPhone ? "Ask a research question or paste your brief…" : "Paste text, drop files/images, or draft research instructions..."}
           style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent", fieldSizing: "content" } as React.CSSProperties}
-          className="w-full flex-1 bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input max-h-28 overflow-y-auto scholar-scrollbar"
+          className="w-full flex-1 bg-transparent text-base sm:text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none resize-none leading-relaxed prompt-bare-input max-h-28 overflow-y-auto scholar-scrollbar"
         />
       </div>
 
@@ -2396,7 +2415,7 @@ export default function ProjectListScreen({
             title="Send message (Enter)"
             aria-label="Send message"
             disabled={(!mainPromptInput.trim() && mainAttachments.length === 0) || isGuideThinking}
-            className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer bg-neutral-900 text-white hover:bg-neutral-800 active:scale-95 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-sm disabled:bg-neutral-200/80 dark:disabled:bg-white/10 disabled:text-neutral-400 dark:disabled:text-neutral-500 disabled:shadow-none disabled:cursor-not-allowed"
+            className="flex-shrink-0 w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer bg-neutral-900 text-white hover:bg-neutral-800 active:scale-95 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-sm disabled:bg-neutral-200/80 dark:disabled:bg-white/10 disabled:text-neutral-400 dark:disabled:text-neutral-500 disabled:shadow-none disabled:cursor-not-allowed"
           >
             {isGuideThinking ? (
               <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -2971,33 +2990,34 @@ export default function ProjectListScreen({
                 {isPhone && !isAiSidebarOpen && !hasStartedChatting ? (
                   <>
                     <section aria-label="Ask Scholar" className="w-full">
-                      <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                        <h1 className="text-xl font-semibold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
-                          <span className="w-7 h-7 rounded-lg bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-200 flex items-center justify-center">
+                      <div className="flex flex-col gap-3 mb-3">
+                        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2.5">
+                          <span className="w-8 h-8 rounded-xl bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-200 flex items-center justify-center">
                             <Lightbulb className="w-4 h-4 stroke-[2.1]" aria-hidden="true" />
                           </span>
                           Ask Scholar
                         </h1>
 
-                        <div className="flex items-center gap-1.5">
-                          {/* Clean Mobile Workspaces Dropdown */}
-                          <div className="relative" ref={mobileWorkspaceMenuRef}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          {/* Clean Mobile Workspaces Dropdown (anchored to the button's left edge so it never leaves the viewport) */}
+                          <div className="relative shrink-0" ref={mobileWorkspaceMenuRef}>
                             <button
                               type="button"
                               onClick={() => setIsMobileWorkspaceMenuOpen((prev) => !prev)}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200 border border-neutral-200/80 dark:border-white/10 cursor-pointer shadow-2xs hover:bg-neutral-200/60 dark:hover:bg-white/15 transition-colors"
+                              className="inline-flex items-center gap-1.5 min-h-9 px-3 rounded-full text-xs font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200 border border-neutral-200/80 dark:border-white/10 cursor-pointer shadow-2xs hover:bg-neutral-200/60 dark:hover:bg-white/15 active:scale-95 transition-all"
                               aria-expanded={isMobileWorkspaceMenuOpen}
+                              aria-haspopup="menu"
                               aria-label="Academic Workspaces"
                             >
                               <FolderOpen className="w-3.5 h-3.5 text-sky-500" />
                               <span>Workspaces</span>
-                              <ChevronDown className="w-3 h-3 opacity-60" />
+                              <ChevronDown className={`w-3 h-3 opacity-60 transition-transform duration-150 ${isMobileWorkspaceMenuOpen ? "rotate-180" : ""}`} />
                             </button>
                             {isMobileWorkspaceMenuOpen && (
                               <div
                                 role="menu"
                                 aria-label="Workspaces"
-                                className="absolute right-0 top-full mt-1.5 w-64 max-w-[calc(100vw-2rem)] p-1.5 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/15 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 space-y-0.5"
+                                className="absolute left-0 top-full mt-2 w-[min(18rem,calc(100vw-2rem))] p-1.5 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/15 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 space-y-0.5"
                               >
                                 <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                                   Academic Workspaces
@@ -3012,24 +3032,19 @@ export default function ProjectListScreen({
                                       role="menuitem"
                                       onClick={() => {
                                         setIsMobileWorkspaceMenuOpen(false);
-                                        if (creating) return;
-                                        if (!userEmail) {
-                                          openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
-                                          return;
-                                        }
-                                        handleCreate(tile.id);
+                                        handleMobileTilePick(tile);
                                       }}
-                                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer group"
+                                      className="w-full min-h-12 flex items-center gap-3 px-2.5 py-2 rounded-xl text-left hover:bg-neutral-100 dark:hover:bg-white/5 active:bg-neutral-100 dark:active:bg-white/10 transition-colors cursor-pointer group"
                                     >
-                                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${tileTheme.badgeBg}`}>
-                                        <FormatIcon id={tile.id} className="w-3.5 h-3.5" />
+                                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${tileTheme.badgeBg}`}>
+                                        <FormatIcon id={tile.id} className="w-4 h-4" />
                                       </div>
                                       <div className="min-w-0 flex-1">
-                                        <span className="block text-xs font-semibold text-neutral-900 dark:text-neutral-100 truncate group-hover:text-sky-600 dark:group-hover:text-sky-400">
+                                        <span className="block text-[13px] font-semibold text-neutral-900 dark:text-neutral-100 truncate group-hover:text-sky-600 dark:group-hover:text-sky-400">
                                           {tile.label}
                                         </span>
                                         {length && (
-                                          <span className="block text-[10.5px] text-neutral-400 dark:text-neutral-500">
+                                          <span className="block text-[11px] text-neutral-500 dark:text-neutral-400">
                                             {length}
                                           </span>
                                         )}
@@ -3049,40 +3064,98 @@ export default function ProjectListScreen({
                                 if (onOpenAiAccess) onOpenAiAccess();
                                 else setActiveView("ai-access");
                               }}
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer ${aiStatus?.connected
+                              className={`inline-flex items-center gap-1.5 min-h-9 min-w-0 max-w-full px-3 rounded-full text-xs font-medium border cursor-pointer active:scale-95 transition-colors ${aiStatus?.connected
                                 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                                 : "border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300"
                                 }`}
                             >
-                              <span className={`w-1.5 h-1.5 rounded-full ${aiStatus?.connected ? "bg-emerald-500" : "bg-neutral-400"}`} />
-                              {aiStatus?.connected
-                                ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
-                                : aiStatus
-                                  ? "Connect an AI"
-                                  : "Checking AI…"}
+                              <span
+                                aria-hidden="true"
+                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${aiStatus?.connected ? "bg-emerald-500" : aiStatus ? "bg-amber-500" : "bg-neutral-400 animate-pulse"}`}
+                              />
+                              <span className="truncate">
+                                {aiStatus?.connected
+                                  ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
+                                  : aiStatus
+                                    ? "Connect an AI"
+                                    : "Checking AI…"}
+                              </span>
                             </button>
                           )}
                         </div>
                       </div>
-                      <p className="text-[13px] text-neutral-600 dark:text-neutral-400 mb-3 leading-relaxed">
-                        Ask a research question or paste your assignment brief. Each answer starts from a fresh search of scholarly sources.
+                      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3 leading-relaxed">
+                        Ask a research question or paste your assignment brief. Every answer starts from a fresh search of scholarly sources.
                       </p>
                       {mainPromptForm}
-                      <div className="mt-3 -mx-4 px-4 flex gap-2 overflow-x-auto scrollbar-hide" aria-label="Suggested questions">
-                        {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              setIsAiSidebarOpen(true);
-                              handleSendGuideMessage(faq.question);
-                            }}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-300 px-3 py-1.5 text-xs font-medium whitespace-nowrap cursor-pointer shrink-0 active:scale-95"
-                          >
-                            <Sparkles className="w-3 h-3 text-neutral-400" aria-hidden="true" />
-                            {faq.shortLabel}
-                          </button>
-                        ))}
+
+                      <div className="mt-5">
+                        <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                          Try asking
+                        </h2>
+                        <div
+                          role="group"
+                          aria-label="Suggested questions"
+                          className="-mx-4 px-4 scroll-pl-4 flex gap-2 overflow-x-auto scrollbar-hide snap-x snap-proximity overscroll-x-contain [mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)]"
+                        >
+                          {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setIsAiSidebarOpen(true);
+                                handleSendGuideMessage(faq.question);
+                              }}
+                              className="snap-start inline-flex items-center gap-1.5 min-h-9 rounded-full bg-white dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-300 px-3.5 text-xs font-medium whitespace-nowrap cursor-pointer shrink-0 active:scale-95 transition-transform"
+                            >
+                              <Sparkles className="w-3 h-3 text-neutral-400" aria-hidden="true" />
+                              {faq.shortLabel}
+                            </button>
+                          ))}
+                          <span aria-hidden="true" className="shrink-0 w-4" />
+                        </div>
+                      </div>
+
+                      {/* Start a workspace: surfaces the same four entry points as the menu so the screen is never a blank chat */}
+                      <div className="mt-6">
+                        <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                          Start a workspace
+                        </h2>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {FORMAT_TILES.map((tile) => {
+                            const tileTheme = getFormatTileTheme(tile.id);
+                            const length = (tile.specs || tile.footer).split(" · ").pop();
+                            const isBootingThis = creatingFormatId === tile.id;
+                            return (
+                              <button
+                                key={tile.id}
+                                type="button"
+                                data-testid={`mobile-start-${tile.id}`}
+                                onClick={() => handleMobileTilePick(tile)}
+                                disabled={creating && !isBootingThis}
+                                className="min-h-[5.5rem] flex flex-col items-start justify-between gap-2 p-3 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] cursor-pointer active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${tileTheme.badgeBg}`}>
+                                  {isBootingThis ? (
+                                    <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <FormatIcon id={tile.id} className="w-4 h-4" />
+                                  )}
+                                </span>
+                                <span className="min-w-0 w-full">
+                                  <span className="block text-[13px] font-semibold leading-snug text-neutral-900 dark:text-white">
+                                    {tile.label}
+                                  </span>
+                                  {length && (
+                                    <span className="block mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+                                      {length}
+                                    </span>
+                                  )}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </section>
                   </>
