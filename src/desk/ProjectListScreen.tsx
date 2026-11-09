@@ -3087,9 +3087,7 @@ export default function ProjectListScreen({
                       <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3 leading-relaxed">
                         Ask a research question or paste your assignment brief. Every answer starts from a fresh search of scholarly sources.
                       </p>
-                      {mainPromptForm}
-
-                      <div className="mt-5">
+                      <div className="mt-4">
                         <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                           Try asking
                         </h2>
@@ -3113,48 +3111,6 @@ export default function ProjectListScreen({
                             </button>
                           ))}
                           <span aria-hidden="true" className="shrink-0 w-4" />
-                        </div>
-                      </div>
-
-                      {/* Start a workspace: surfaces the same four entry points as the menu so the screen is never a blank chat */}
-                      <div className="mt-6">
-                        <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                          Start a workspace
-                        </h2>
-                        <div className="grid grid-cols-2 gap-2.5">
-                          {FORMAT_TILES.map((tile) => {
-                            const tileTheme = getFormatTileTheme(tile.id);
-                            const length = (tile.specs || tile.footer).split(" · ").pop();
-                            const isBootingThis = creatingFormatId === tile.id;
-                            return (
-                              <button
-                                key={tile.id}
-                                type="button"
-                                data-testid={`mobile-start-${tile.id}`}
-                                onClick={() => handleMobileTilePick(tile)}
-                                disabled={creating && !isBootingThis}
-                                className="min-h-[5.5rem] flex flex-col items-start justify-between gap-2 p-3 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] cursor-pointer active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${tileTheme.badgeBg}`}>
-                                  {isBootingThis ? (
-                                    <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                  ) : (
-                                    <FormatIcon id={tile.id} className="w-4 h-4" />
-                                  )}
-                                </span>
-                                <span className="min-w-0 w-full">
-                                  <span className="block text-[13px] font-semibold leading-snug text-neutral-900 dark:text-white">
-                                    {tile.label}
-                                  </span>
-                                  {length && (
-                                    <span className="block mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">
-                                      {length}
-                                    </span>
-                                  )}
-                                </span>
-                              </button>
-                            );
-                          })}
                         </div>
                       </div>
                     </section>
@@ -3268,7 +3224,6 @@ export default function ProjectListScreen({
             </div>
 
             {/* Main AI Prompt Bar — Hidden when Ask Scholar drawer is open so two prompt bars never compete visually */}
-            {!(isPhone && !isAiSidebarOpen && !hasStartedChatting) && (
               <div
                 data-testid="main-prompt-bar-wrapper"
                 className={
@@ -3281,7 +3236,6 @@ export default function ProjectListScreen({
                   {mainPromptForm}
                 </div>
               </div>
-            )}
           </>
         )}
 
