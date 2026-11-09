@@ -2777,7 +2777,9 @@ export default function ProjectListScreen({
                 onClick={projectsLoadNeedsSignIn ? () => openAuth("signin", "Sign in again to see your projects.") : load}
                 className="self-start px-3 py-1 rounded-lg border border-[color:var(--border-control)] font-semibold hover:bg-[color:var(--surface-hover)] cursor-pointer"
               >
-                {projectsLoadNeedsSignIn ? "Sign in" : "Try again"}
+                {/* "Sign in again", not "Sign in": this banner can sit beside the real sign-in form,
+                    and two buttons with the same name are ambiguous (and broke the E2E sign-in step). */}
+                {projectsLoadNeedsSignIn ? "Sign in again" : "Try again"}
               </button>
             </div>
           )}

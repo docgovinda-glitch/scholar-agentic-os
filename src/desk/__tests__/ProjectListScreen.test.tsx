@@ -1374,4 +1374,16 @@ describe("project list load failure (B7)", () => {
     await waitFor(() => expect(screen.queryByText(/Couldn't load your projects/)).not.toBeInTheDocument());
     expect(listProjects).toHaveBeenCalledTimes(2);
   });
+
+  it("says the session ended on a 401, with a button that cannot be confused with the sign-in form's", async () => {
+    const unauthenticated = Object.assign(new Error("Unauthenticated"), { name: "UnauthenticatedError" });
+    listProjects.mockRejectedValue(unauthenticated);
+    listOutputTypes.mockResolvedValue({ items: TYPES });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    expect(await screen.findByText(/Your session has ended/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in again" })).toBeInTheDocument();
+    // The E2E sign-in step clicks getByRole("button", { name: /^Sign in$/ }); it must stay unique.
+    expect(screen.queryByRole("button", { name: /^Sign in$/ })).toBeNull();
+  });
 });
