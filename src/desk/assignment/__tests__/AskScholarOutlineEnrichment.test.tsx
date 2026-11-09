@@ -5,7 +5,6 @@ import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import {
   generateDynamicAssignmentStructure,
-  extractTargetFrameworks,
   isGenericPlaceholderTitle,
   sanitizeOutlineHeadings,
   assignmentStructureToOutlineTree,
@@ -19,40 +18,23 @@ import type { AssignmentStructure, AskScholarOutlineResponse } from "../types";
 
 describe("AskScholar Pattern Outline Enrichment", () => {
   describe("1. Target Framework Extraction & Domain Detection", () => {
-    it("extracts explicit frameworks mentioned in prompt or brief", () => {
-      const frameworks = extractTargetFrameworks(
-        "Evaluate strategic capabilities of Netflix",
-        "coursework",
-        "The submission must apply Porter's Five Forces and VRIO to evaluate competitive advantage."
-      );
-      expect(frameworks).toContain("Porter's Five Forces & Value Chain Analysis");
-      expect(frameworks).toContain("VRIO Framework");
-    });
-
-    it("infers domain theoretical models when not explicitly named", () => {
-      const econ = extractTargetFrameworks("Does bilateral trade mitigate interstate military friction?", "essay");
-      expect(econ).toContain("Bilateral Economic Interdependence Model");
-      expect(econ).toContain("Realist Strategic Vulnerability");
-
-      const oncology = extractTargetFrameworks("Cellular immunotherapy in refractory lymphoma", "essay");
-      expect(oncology).toContain("Adoptive Cellular Transfer (ACT) Mechanics");
-      expect(oncology).toContain("Tumor Microenvironment (TME) Immunosuppression");
-
-      const ethics = extractTargetFrameworks("Algorithmic discrimination and governance in credit scoring", "essay");
-      expect(ethics).toContain("Rawlsian Distributive Justice & Fairness Parity");
-      expect(ethics).toContain("EU AI Act Risk-Tiered Governance Architecture");
-    });
-
-    it("populates targetFrameworks on generated AssignmentStructure", () => {
+    it("never invents frameworks locally; only AI or user supplied ones are kept", () => {
       const structure = generateDynamicAssignmentStructure({
-        question: "Role of AI in machine learning",
+        question: "Does bilateral trade mitigate interstate military friction?",
         assignmentType: "essay",
         academicLevel: "undergraduate",
-        targetWordCount: 2000,
+        targetWordCount: 1500,
       });
-      expect(structure.targetFrameworks).toBeDefined();
-      expect(structure.targetFrameworks?.length).toBeGreaterThan(0);
-      expect(structure.targetFrameworks).toContain("Empirical Risk Minimization (ERM)");
+      expect(structure.targetFrameworks ?? []).toEqual([]);
+
+      const supplied = generateDynamicAssignmentStructure({
+        question: "Does bilateral trade mitigate interstate military friction?",
+        assignmentType: "essay",
+        academicLevel: "undergraduate",
+        targetWordCount: 1500,
+        targetFrameworks: ["Commercial Peace Theory"],
+      });
+      expect(supplied.targetFrameworks).toEqual(["Commercial Peace Theory"]);
     });
   });
 
@@ -169,9 +151,8 @@ describe("AskScholar Pattern Outline Enrichment", () => {
       expect(structure.headings[2].subheadings[0].title).toContain("Prioritized Evidence-Based Recommendations");
       expect(structure.headings[2].subheadings[1].title).toContain("Implementation Roadmap");
 
-      // Verifies target frameworks present for Coursework
-      expect(structure.targetFrameworks).toBeDefined();
-      expect(structure.targetFrameworks).toContain("Porter's Five Forces & Value Chain Analysis");
+      // Frameworks are never invented locally (Single-Brain Architecture)
+      expect(structure.targetFrameworks ?? []).toEqual([]);
     });
   });
 
