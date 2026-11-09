@@ -18,17 +18,18 @@ export type BaseUrlResult = { ok: true; url: string; host: string } | { ok: fals
 const ENDPOINT_TAILS = /\/(?:chat\/completions|completions|models|messages|embeddings|responses)\/?$/i;
 const LOOPBACK = /^(localhost|127\.\d+\.\d+\.\d+|\[::1\])$/i;
 
-export function normalizeBaseUrl(raw: string, opts: { allowLoopbackHttp?: boolean } = {}): BaseUrlResult {
+export function normalizeBaseUrl(raw: string, opts: { allowLoopbackHttp?: boolean; /** Tidy only: accept http too and leave the https/public-address decision to the server guard (self-hosted installs may allow private http endpoints). */ lenient?: boolean } = {}): BaseUrlResult {
   const text = raw.replace(/[^\x20-\x7E]/g, "").trim();
   if (!text) return { ok: false, reason: "Enter the address." };
   let url: URL;
   try { url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`); } catch { return { ok: false, reason: "That is not a valid web address." }; }
   const loopback = LOOPBACK.test(url.hostname);
-  if (url.protocol !== "https:" && !(opts.allowLoopbackHttp && url.protocol === "http:" && loopback)) {
+  if (opts.lenient && url.protocol !== "https:" && url.protocol !== "http:") return { ok: false, reason: "The address must be an http(s) web address." };
+  if (!opts.lenient && url.protocol !== "https:" && !(opts.allowLoopbackHttp && url.protocol === "http:" && loopback)) {
     return { ok: false, reason: url.protocol === "http:" ? "The address must start with https:// (your key would travel unencrypted otherwise)." : "The address must be an https:// web address." };
   }
   if (url.username || url.password) return { ok: false, reason: "Put the key in the key field, not in the address." };
-  if (url.search || url.hash) return { ok: false, reason: "Remove everything after ? or # from the address." };
+  if (!opts.lenient && (url.search || url.hash)) return { ok: false, reason: "Remove everything after ? or # from the address." };
   let path = url.pathname.replace(/\/+$/, "");
   for (let i = 0; i < 2 && ENDPOINT_TAILS.test(path); i++) path = path.replace(ENDPOINT_TAILS, "");
   return { ok: true, url: `${url.protocol}//${url.host.toLowerCase()}${path}`, host: url.hostname.toLowerCase() };

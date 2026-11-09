@@ -64,7 +64,7 @@ describe("app/coverLetter: generateCoverLetter", () => {
     mockModelResponse("   ");
     await expect(
       generateCoverLetter({ document: paperDocument(), journalRequirements: journalRequirements(), provider: "openai", apiKey: "sk-test", policy: CONSENTED_POLICY })
-    ).rejects.toThrow(/empty cover letter/i);
+    ).rejects.toThrow(/empty cover letter|without writing an answer/i);
   });
 
   it("propagates GatewayDenied for a restricted scope rather than swallowing it", async () => {

@@ -46,10 +46,10 @@ export type TargetResult = { ok: true; target: RouterTarget } | { ok: false; rea
 export function resolveRouterTarget(catalogId: string, baseUrlOverride?: string): TargetResult {
   const id = catalogId.toLowerCase();
   const spec = getCloudProvider(id);
-  // A typed address is tidied (full endpoint cut back to its base); one that cannot be used is ignored here
-  // and reported by the caller that saves it (see normalizeBaseUrl), never guessed at.
+  // A typed address is only tidied here (full endpoint cut back to its base). Whether it may be used (https,
+  // public address) is decided by the server guard; the strict check runs when the person saves it (ProviderDetail).
   const typed = baseUrlOverride?.trim();
-  const cleaned = typed ? normalizeBaseUrl(typed, { allowLoopbackHttp: false }) : undefined;
+  const cleaned = typed ? normalizeBaseUrl(typed, { lenient: true }) : undefined;
   if (typed && cleaned && !cleaned.ok) return { ok: false, reason: cleaned.reason };
   const override = cleaned && cleaned.ok ? cleaned.url : undefined;
   const native = NATIVE[id];

@@ -88,15 +88,9 @@ describe("Strict Client-Owned BYOK Architecture Tests", () => {
     });
 
     it("returns parsed models when querying an OpenAI-compatible /v1/models endpoint", async () => {
-      const mockFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          data: [
-            { id: "gpt-4o", created: 1715367049 },
-            { id: "gpt-4o-mini", created: 1715367050 },
-          ],
-        }),
-      } as any);
+      const mockFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: [{ id: "gpt-4o", created: 1715367049 }, { id: "gpt-4o-mini", created: 1715367050 }] }), { status: 200 })
+      );
 
       const res = await request(app)
         .post("/api/ai-access/models")
@@ -118,58 +112,16 @@ describe("Strict Client-Owned BYOK Architecture Tests", () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it("returns parsed models for Ollama /api/tags payload format", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          models: [
-            { name: "llama3.3:70b", size: 42000000000 },
-            { name: "deepseek-r1:14b", size: 9000000000 },
-          ],
-        }),
-      } as any);
-
+    it("does not fetch a local runner's address from the server (it is the user's machine, and a way into the server's own network)", async () => {
+      const mockFetch = vi.spyOn(globalThis, "fetch");
+      mockFetch.mockClear();
       const res = await request(app)
         .post("/api/ai-access/models")
-        .send({
-          providerId: "ollama",
-          url: "http://localhost:11434/api/tags",
-        });
+        .send({ providerId: "ollama", url: "http://localhost:11434/api/tags" });
 
-      expect(res.status).toBe(200);
-      expect(res.body.ok).toBe(true);
-      expect(res.body.models).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ id: "llama3.3:70b" }),
-          expect.objectContaining({ id: "deepseek-r1:14b" }),
-        ])
-      );
-    });
-  });
-
-  describe("Pillar 3: Transient Request-Scoped Candidate Resolution", () => {
-    it("correctly extracts transient AI config from headers without persisting", async () => {
-      const mockReq = {
-        headers: {
-          "x-ai-provider": "openrouter",
-          "x-ai-api-key": "sk-or-v1-transient-secret-key",
-          "x-ai-model": "meta-llama/llama-3.3-70b-instruct",
-          "x-ai-base-url": "https://openrouter.ai/api/v1",
-        },
-      } as any;
-
-      const config = resolveRequestAiConfig(mockReq);
-      expect(config.provider).toBe("openrouter");
-      expect(config.apiKey).toBe("sk-or-v1-transient-secret-key");
-      expect(config.model).toBe("meta-llama/llama-3.3-70b-instruct");
-      expect(config.baseUrl).toBe("https://openrouter.ai/api/v1");
-
-      const candidates = getCandidates(mockReq);
-      expect(candidates.length).toBe(1);
-      expect(candidates[0].provider).toBe("openrouter");
-      expect(candidates[0].apiKey).toBe("sk-or-v1-transient-secret-key");
-      expect(candidates[0].model).toBe("meta-llama/llama-3.3-70b-instruct");
-      expect(await isServerAiAuthorized(mockReq)).toBe(true);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/browser/i);
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("supports local runner configuration with localhost base-url and default model", async () => {

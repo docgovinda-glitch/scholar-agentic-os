@@ -98,7 +98,7 @@ interface MockDb {
   plans?: object[];
   overrides?: object[];
   deductResult?: string;
-  providerResponse?: () => Promise<Response> | Response;
+  providerResponse?: (url: string) => Promise<Response> | Response;
   capturedWrites: Record<string, any[]>;
 }
 
@@ -153,12 +153,21 @@ function mockDb(db: MockDb) {
     }
 
     // The actual provider HTTP call (OpenAI-compatible chat/completions, matching studio.test.ts's own convention).
-    if (db.providerResponse) return Promise.resolve(db.providerResponse());
+    if (db.providerResponse) return Promise.resolve(db.providerResponse(url));
     return respondJson({}, 500);
   }) as unknown as typeof fetch;
 }
 
-function successfulProviderResponse() {
+const REVISED = JSON.stringify({
+  revised: "The cohort comprised 240 participants.",
+  changes: [{ original: "sample", replacement: "cohort", reason: "Avoids repetition." }],
+});
+
+/** Each provider answers in its own wire format; a Gemini resource must not be handed an OpenAI-shaped body (it would read as an empty answer). */
+function successfulProviderResponse(url = "") {
+  if (url.includes("generativelanguage.googleapis.com")) {
+    return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: REVISED }] }, finishReason: "STOP" }] }) } as Response;
+  }
   return {
     ok: true,
     status: 200,
@@ -418,7 +427,7 @@ describe("POST /api/studio/refine — Premium path", () => {
       plans: PLAN,
       overrides: [],
       deductResult: "ok",
-      providerResponse: successfulProviderResponse,
+      providerResponse: (url) => successfulProviderResponse(url),
     });
     await grantConsent("prem-8", "openai");
     await grantConsent("prem-8", "gemini");

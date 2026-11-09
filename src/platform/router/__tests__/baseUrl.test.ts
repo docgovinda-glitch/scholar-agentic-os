@@ -26,3 +26,10 @@ describe("normalizeBaseUrl", () => {
     expect(normalizeBaseUrl("https://")).toMatchObject({ ok: false });
   });
 });
+
+describe("lenient mode (tidy only; the server guard decides what may be reached)", () => {
+  it("keeps an http endpoint for a self-hosted install, tidied, and still refuses other schemes", () => {
+    expect(normalizeBaseUrl("http://localhost:11434/v1/chat/completions", { lenient: true })).toMatchObject({ ok: true, url: "http://localhost:11434/v1" });
+    expect(normalizeBaseUrl("ftp://x.org", { lenient: true }).ok).toBe(false);
+  });
+});

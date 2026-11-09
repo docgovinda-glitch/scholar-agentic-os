@@ -155,6 +155,9 @@ describe("legacy single-provider headers for every catalog provider", () => {
     const ring = Buffer.from(JSON.stringify([{ provider: "custom", via: "openrouter", model: "m1", apiKey: "k", baseUrl: "https://openrouter.ai/api/v1" }])).toString("base64url");
     expect(ringOf({ "x-ai-keyring": ring, "x-ai-provider": "openrouter", "x-ai-api-key": "k" }).length).toBe(1);
   });
+  it("keeps a self-hosted http endpoint for the server guard to decide on, instead of dropping the connection", () => {
+    expect(ringOf({ "x-ai-provider": "my-llm", "x-ai-api-key": "k", "x-ai-model": "m", "x-ai-base-url": "http://10.0.0.5:8000/v1/chat/completions" })).toEqual([expect.objectContaining({ provider: "custom", model: "m", baseUrl: "http://10.0.0.5:8000/v1" })]);
+  });
   it("ignores a provider that needs an address it was not given", () => {
     expect(ringOf({ "x-ai-provider": "cloudflare", "x-ai-api-key": "k" })).toEqual([]);
   });
