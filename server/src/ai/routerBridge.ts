@@ -19,6 +19,8 @@ import { route } from "../../../src/platform/router/router.ts";
 import { CircuitBreaker, MemoryBreakerStore } from "../../../src/platform/router/circuitBreaker.ts";
 import type { Candidate, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, TaskClass } from "../../../src/platform/router/types.ts";
 import { keyringToCandidates, parseKeyring, type KeyringEntry, type PremiumPort } from "../../routes/aiRun.ts";
+import { resolveRouterTarget } from "../../../src/platform/router/providerMap.ts";
+import { expandKeyring, quarantineModel } from "./liveModels.ts";
 import { screenCandidates, serverAdapters } from "./aiEndpointGuard.ts";
 import { LocalModelUnreachableError, NoClientAiProviderError } from "./aiRouteErrors.ts";
 
@@ -50,19 +52,6 @@ interface BridgeDeps { adapters: Partial<Record<ProviderId, ProviderAdapter>>; b
 let deps: BridgeDeps = { adapters: serverAdapters(), breaker: new CircuitBreaker(new MemoryBreakerStore()) };
 export function configureRouterBridge(next: Partial<BridgeDeps>): void { deps = { ...deps, ...next }; }
 
-const PROVIDER_ALIAS: Record<string, ProviderId> = { custom: "custom", gemini: "google", google: "google", openai: "openai", anthropic: "anthropic", claude: "anthropic", groq: "groq", deepseek: "deepseek", mistral: "mistral", ollama: "ollama", lmstudio: "lmstudio" };
-
-const DEFAULT_MODEL_BY_PROVIDER: Partial<Record<ProviderId, string>> = {
-  google: "gemini-2.5-flash",
-  openai: "gpt-4o-mini",
-  anthropic: "claude-sonnet-4-20250514",
-  groq: "openai/gpt-oss-120b",
-  deepseek: "deepseek-chat",
-  mistral: "mistral-small-latest",
-  ollama: "auto",
-  lmstudio: "auto",
-};
-
 /**
  * The user's AI connections for this request: the keyring, with the legacy
  * single-provider headers (the user's primary choice) first when the keyring
@@ -73,7 +62,8 @@ export function keyringFromRequest(req: { headers?: Request["headers"] }): Keyri
   const ring = parseKeyring(headers["x-ai-keyring"]);
   const legacy = legacyEntry(headers);
   if (!legacy) return ring;
-  if (ring.some((e) => e.provider === legacy.provider && e.model === legacy.model)) return ring;
+  // "auto" stands for whatever model the provider lists live, so any entry for the same connection covers it.
+  if (ring.some((e) => (e.via ?? e.provider) === (legacy.via ?? legacy.provider) && (legacy.model === "auto" || e.model === legacy.model))) return ring;
   return [legacy, ...ring].slice(0, 8);
 }
 
@@ -84,14 +74,17 @@ function legacyEntry(headers: Request["headers"]): KeyringEntry | undefined {
     const clean = v.replace(/[^\x20-\x7E]/g, "").trim();
     return clean || undefined;
   };
-  const named = h("x-ai-provider");
-  // Any other provider name with an endpoint is read as an OpenAI-compatible endpoint.
-  const provider = PROVIDER_ALIAS[named ?? ""] ?? (named && h("x-ai-base-url") ? "custom" : undefined);
+  const named = h("x-ai-provider")?.toLowerCase();
+  if (!named) return undefined;
   // A local runner may arrive without a model: the browser picks one on hand-off.
   const rawModel = h("x-ai-model")?.split(/\s*(?:—|–|\u2014|\u2013)\s*/)[0]?.trim();
-  const model = (rawModel && !/\s/.test(rawModel) ? rawModel : undefined) ?? (provider ? DEFAULT_MODEL_BY_PROVIDER[provider] : undefined);
-  if (!provider || !model) return undefined;
-  return { provider, model, apiKey: h("x-ai-api-key"), baseUrl: h("x-ai-base-url") };
+  const model = rawModel && !/\s/.test(rawModel) ? rawModel : "auto";
+  if (named === "ollama" || named === "lmstudio") return { provider: named, model, baseUrl: h("x-ai-base-url") };
+  // Any catalog provider (all 37) resolves to its wire protocol and endpoint; no model name is assumed:
+  // a missing one is chosen from the provider's live list.
+  const target = resolveRouterTarget(named, h("x-ai-base-url"));
+  if (!target.ok) return undefined;
+  return { provider: target.target.provider, via: target.target.via, model, apiKey: h("x-ai-api-key"), baseUrl: target.target.baseUrl, label: undefined };
 }
 
 type Scoped = Request & { user?: { id: string }; aiRoute?: AiRouteSummary };
@@ -122,13 +115,19 @@ export interface RoutedCall {
 
 /** The chain for this request and task. Throws NoAiConnectedError when it is empty. */
 export async function chainFor(req: Scoped, task: TaskClass): Promise<Candidate[]> {
-  const offered = keyringToCandidates(keyringFromRequest(req));
+  // Each connection becomes its live model plus up to two live alternates; a retired or missing model is replaced here.
+  const expanded = await expandKeyring(keyringFromRequest(req), task);
+  for (const n of expanded.notices) (req.aiRoute ??= { notices: [] }).notices.push(n);
+  const offered = keyringToCandidates(expanded.entries);
   const { kept: own, blocked } = await screenCandidates(offered);
   for (const b of blocked) (req.aiRoute ??= { notices: [] }).notices.push({ kind: "skipped", text: `Skipped ${b.label}: ${b.reason}` });
   const premium = deps.premium && req.user?.id ? (await deps.premium.candidates(req.user.id, task).catch(() => ({ candidates: [] as Candidate[] }))).candidates : [];
   const chain = [...premium, ...own.filter((c) => c.lane === "byok"), ...own.filter((c) => c.lane === "local")];
   if (!chain.length && blocked.length) {
     throw new RouterExhaustedError(blocked.map((b) => `${b.label}: ${b.reason}`).join("; "), "non_retryable");
+  }
+  if (!chain.length && expanded.notices.length) {
+    throw new RouterExhaustedError(expanded.notices.map((n) => n.text).join(" "), "non_retryable");
   }
   if (!chain.length) throw new NoAiConnectedError();
   return chain;
@@ -148,13 +147,13 @@ export async function routedText(req: Request, call: RoutedCall): Promise<string
     requestId: crypto.randomUUID(),
     task,
     messages: [...(call.systemPrompt ? [{ role: "system" as const, content: call.systemPrompt }] : []), { role: "user" as const, content: userContent }],
-    desiredOutputTokens: call.maxOutputTokens ?? 8_192,
+    desiredOutputTokens: call.maxOutputTokens ?? 16_384,
     minOutputTokens: Math.min(512, call.maxOutputTokens ?? 512),
     temperature: call.temperature,
   };
   const byId = new Map(chain.map((c) => [c.id, c]));
   let text = "";
-  for await (const ev of route(request, chain, call.signal ?? new AbortController().signal, { site: "server", adapters: deps.adapters, breaker: deps.breaker })) {
+  for await (const ev of route(request, chain, call.signal ?? new AbortController().signal, { site: "server", adapters: deps.adapters, breaker: deps.breaker, onCandidateFailure: (c, f) => { if (f.kind === "model_unavailable") quarantineModel(c); } })) {
     summarise(scoped.aiRoute, ev);
     call.onEvent?.(ev);
     if (ev.type === "token") text += ev.text;
@@ -162,6 +161,8 @@ export async function routedText(req: Request, call: RoutedCall): Promise<string
     if (ev.type === "done") {
       const c = byId.get(ev.candidateId);
       if (c?.lane === "premium" && deps.premium && scoped.user?.id) await deps.premium.charge(scoped.user.id, c, ev.usage, request.requestId).catch(() => false);
+      // The router already treats an empty stream as a failure; this is the last line of defence.
+      if (!text.trim()) throw new RouterExhaustedError("The AI returned an empty answer.", "exhausted");
       return text;
     }
     if (ev.type === "handoff") throw new RouterHandoffError(ev.label);

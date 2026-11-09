@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../src/middleware/auth.ts", () => ({
   requireAuth: (req: any, _res: any, next: any) => { req.user = { id: "user-1" }; next(); },
@@ -10,6 +10,10 @@ import { registerAiRunRoutes, type PremiumPort } from "../aiRun";
 import { CircuitBreaker, MemoryBreakerStore } from "../../../src/platform/router/circuitBreaker";
 import { ProviderHttpError } from "../../../src/platform/router/errors";
 import type { AdapterChunk, Candidate, ProviderAdapter } from "../../../src/platform/router/types";
+import { clearLiveModelState, setLiveModelsFetch } from "../../src/ai/liveModels";
+
+// No test may reach a real provider: by default every model list fails, so named models are trusted as given.
+beforeEach(() => { clearLiveModelState(); setLiveModelsFetch((async () => { throw new Error("offline"); }) as unknown as typeof fetch); });
 
 const SECRET = "sk-test-SECRET-never-echo-1234567890";
 const keyring = (entries: unknown[]) => Buffer.from(JSON.stringify(entries)).toString("base64url");
@@ -153,5 +157,127 @@ describe("GET /api/ai/models", () => {
     expect(openai.models.map((m: any) => m.id)).toEqual(["acme-pro-6.1"]);
     expect(res.body.providers.find((p: any) => p.provider === "anthropic").error).toBe("The key was rejected");
     expect(JSON.stringify(res.body)).not.toContain(SECRET);
+  });
+});
+
+
+const sse = (r: any, cb: any) => { let d = ""; r.on("data", (c: Buffer) => (d += c)); r.on("end", () => cb(null, d)); };
+const liveList = (ids: string[]) => (async () => new Response(JSON.stringify({ data: ids.map((id) => ({ id, created: 1_790_000_000 })) }), { status: 200 })) as unknown as typeof fetch;
+function appWith(adapter: ProviderAdapter) {
+  const a = express();
+  a.use(express.json());
+  registerAiRunRoutes(a, { adapters: { custom: adapter, groq: adapter, openai: adapter }, breaker: new CircuitBreaker(new MemoryBreakerStore()), routerOptions: { sleep: async () => {} } });
+  return a;
+}
+/** Answers with its model id, except models listed as empty (no text) or gone (404). */
+const picky = (empty: string[] = [], gone: string[] = []): ProviderAdapter => ({
+  async *stream(c: Candidate): AsyncIterable<AdapterChunk> {
+    if (gone.includes(c.model)) throw new ProviderHttpError(404, `The model \`${c.model}\` does not exist`);
+    if (empty.includes(c.model)) { yield { type: "finish", reason: "length" }; return; }
+    yield { type: "text", text: `answer from ${c.model}` };
+    yield { type: "finish", reason: "stop" };
+  },
+});
+
+describe("POST /api/ai/run with live models", () => {
+  it("a connection with no saved model uses the best model the provider lists now", async () => {
+    setLiveModelsFetch(liveList(["acme-pro-5", "acme-chat-5", "acme-flash-5"]));
+    const res = await request(appWith(picky())).post("/api/ai/run")
+      .set("x-ai-keyring", keyring([{ provider: "custom", via: "openrouter", model: "auto", apiKey: SECRET, baseUrl: "https://openrouter.ai/api/v1" }]))
+      .send(body).buffer(true).parse(sse);
+    expect(res.body).toContain("answer from acme-chat-5");
+  });
+
+  it("a model that answers nothing falls back to the next live model of the same connection, without a failure", async () => {
+    setLiveModelsFetch(liveList(["acme-chat-5", "acme-flash-5"]));
+    const res = await request(appWith(picky(["acme-chat-5"]))).post("/api/ai/run")
+      .set("x-ai-keyring", keyring([{ provider: "groq", model: "auto", apiKey: SECRET }]))
+      .send(body).buffer(true).parse(sse);
+    const text = res.body as string;
+    expect(events(text)).toContain("fallback");
+    expect(text).toMatch(/"reason":"empty_output"/);
+    expect(text).toContain("answer from acme-flash-5");
+    expect(events(text).at(-1)).toBe("done");
+  });
+
+  it("a model the provider retired is replaced, and remembered so the next request skips it", async () => {
+    setLiveModelsFetch(liveList(["acme-chat-5", "acme-flash-5"]));
+    const a = appWith(picky([], ["acme-chat-5"]));
+    const ring = keyring([{ provider: "groq", model: "auto", apiKey: SECRET }]);
+    const first = await request(a).post("/api/ai/run").set("x-ai-keyring", ring).send(body).buffer(true).parse(sse);
+    expect(first.body).toContain("answer from acme-flash-5");
+    const second = await request(a).post("/api/ai/run").set("x-ai-keyring", ring).send(body).buffer(true).parse(sse);
+    expect(events(second.body as string)).not.toContain("fallback");
+    expect(second.body).toContain("answer from acme-flash-5");
+  });
+
+  it("a credit-exhausted connection moves to the next provider without trying its other models", async () => {
+    setLiveModelsFetch(liveList(["acme-chat-5", "acme-flash-5"]));
+    const seen: string[] = [];
+    const adapter: ProviderAdapter = { async *stream(c) { seen.push(`${c.group}:${c.model}`); if (c.group === "openrouter") throw new ProviderHttpError(402, "Insufficient credits"); yield { type: "text", text: `answer from ${c.group}` }; } };
+    const res = await request(appWith(adapter)).post("/api/ai/run")
+      .set("x-ai-keyring", keyring([
+        { provider: "custom", via: "openrouter", model: "auto", apiKey: SECRET, baseUrl: "https://openrouter.ai/api/v1" },
+        { provider: "groq", model: "auto", apiKey: SECRET },
+      ])).send(body).buffer(true).parse(sse);
+    expect(res.body).toContain("answer from groq");
+    expect(seen.filter((s) => s.startsWith("openrouter")).length).toBe(1);
+  });
+});
+
+describe("POST /api/ai/verify", () => {
+  const verify = (a: express.Express, b: unknown, key: string | undefined = SECRET) => {
+    const r = request(a).post("/api/ai/verify");
+    return (key ? r.set("x-ai-api-key", key) : r).send(b as object);
+  };
+
+  it("lists the live models, tests one with a real request and recommends the one that answered", async () => {
+    setLiveModelsFetch(liveList(["acme-pro-5", "acme-chat-5", "acme-flash-5"]));
+    const res = await verify(appWith(picky(["acme-chat-5"])), { providerId: "openrouter" });
+    expect(res.body.ok).toBe(true);
+    expect(res.body.tested.model).toBe("acme-pro-5");
+    expect(res.body.options.map((o: { id: string }) => o.id)).toEqual(expect.arrayContaining(["acme-chat-5", "acme-pro-5", "acme-flash-5"]));
+    expect(res.body.options[0].why).toBeTruthy();
+    expect(JSON.stringify(res.body)).not.toContain(SECRET);
+  });
+
+  it("works for providers outside the six native ones (all catalog providers)", async () => {
+    setLiveModelsFetch(liveList(["x-chat-1"]));
+    for (const providerId of ["cerebras", "xai", "together", "cohere", "huggingface", "nvidia"]) {
+      const res = await verify(appWith(picky()), { providerId });
+      expect(res.body, providerId).toMatchObject({ ok: true, tested: { model: "x-chat-1" } });
+    }
+  });
+
+  it("a rejected key is reported as such, not as 'no models'", async () => {
+    setLiveModelsFetch((async () => new Response("no", { status: 401 })) as unknown as typeof fetch);
+    const res = await verify(appWith(picky()), { providerId: "groq" });
+    expect(res.body.ok).toBe(false);
+    expect(res.body.error).toMatch(/rejected/i);
+    expect(res.body.needsModel).toBeFalsy();
+  });
+
+  it("a key with no credit is reported as valid-but-out-of-credit", async () => {
+    setLiveModelsFetch(liveList(["acme-chat-5"]));
+    const broke: ProviderAdapter = { async *stream() { throw new ProviderHttpError(402, "Insufficient credits"); } };
+    const res = await verify(appWith(broke), { providerId: "groq" });
+    expect(res.body).toMatchObject({ ok: false });
+    expect(res.body.error).toMatch(/no credit or quota/i);
+  });
+
+  it("a provider that publishes no model list asks for a model, and tests the one given", async () => {
+    setLiveModelsFetch(liveList([]));
+    const none = await verify(appWith(picky()), { providerId: "qwen" });
+    expect(none.body).toMatchObject({ ok: false, needsModel: true, unsupported: true });
+    const given = await verify(appWith(picky()), { providerId: "qwen", model: "my-model" });
+    expect(given.body).toMatchObject({ ok: true, tested: { model: "my-model" } });
+  });
+
+  it("rejects a missing key, an unknown provider and a private endpoint", async () => {
+    expect((await verify(appWith(picky()), { providerId: "groq" }, "")).status).toBe(400);
+    expect((await verify(appWith(picky()), { providerId: "no-such" })).status).toBe(400);
+    const blocked = await verify(appWith(picky()), { providerId: "cloudflare", baseUrl: "https://169.254.169.254/v1" });
+    expect(blocked.status).toBe(400);
+    expect(blocked.body.error).toMatch(/private|internal/i);
   });
 });

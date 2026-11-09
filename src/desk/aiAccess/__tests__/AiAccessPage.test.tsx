@@ -200,6 +200,9 @@ describe("Per-provider configuration", () => {
     // not an <input> a user has to already know a model id to fill in.
     const select = screen.getByRole("combobox");
     const optionValues = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
+    // Nothing is pre-selected on a model name: the first choice is "best available", picked live.
+    expect(optionValues[0]).toBe("");
+    expect((select as HTMLSelectElement).value).toBe("");
     expect(optionValues).toContain("openai/gpt-oss-120b");
     expect(screen.queryByPlaceholderText(/Exact model id/i)).not.toBeInTheDocument();
 
@@ -208,7 +211,7 @@ describe("Per-provider configuration", () => {
     fireEvent.click(advancedToggle);
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     const customInput = screen.getByPlaceholderText(/Exact model id/i) as HTMLInputElement;
-    expect(customInput.value).toBe("openai/gpt-oss-120b");
+    expect(customInput.value).toBe("");
   });
 
   it("labels a deprecated model in the dropdown rather than presenting it as current", async () => {

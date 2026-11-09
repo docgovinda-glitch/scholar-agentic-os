@@ -3,16 +3,33 @@ vi.mock("../../../services/userAiSettings", () => ({ loadUserAiSettings: vi.fn()
 import { buildKeyring, encodeKeyring } from "../keyring";
 
 describe("keyring", () => {
-  it("puts the primary provider first, maps catalog ids, skips entries without key or model, and adds an enabled local model last", async () => {
+  it("puts the primary provider first, maps catalog ids, skips entries without a key, uses auto when no model is saved, and adds an enabled local model last", async () => {
     const settings = { provider: "anthropic", preferences: {
       anthropicModel: "a-model", openaiModel: "o-model", geminiModel: "g-model", gemini_note: "x",
       ollamaModel: "llama-local", ollamaEnabled: "true", ollamaEndpoint: "http://localhost:11434",
     } };
     const keys: Record<string, string> = { anthropic: "ka", openai: "ko", gemini: "kg", groq: "kq" };
     const ring = await buildKeyring(settings, ["openai", "gemini", "groq", "anthropic"], async (id) => keys[id] ?? null);
-    expect(ring.map((e) => `${e.provider}:${e.model}`)).toEqual(["anthropic:a-model", "openai:o-model", "google:g-model", "ollama:llama-local"]);
+    expect(ring.map((e) => `${e.provider}:${e.model}`)).toEqual(["anthropic:a-model", "openai:o-model", "google:g-model", "groq:auto", "ollama:llama-local"]);
     expect(ring.at(-1)).toMatchObject({ baseUrl: "http://localhost:11434" });
     expect(ring.at(-1)).not.toHaveProperty("apiKey");
+  });
+
+  it("includes every catalog provider with a key, by its endpoint and catalog id, never naming a model", async () => {
+    const keys: Record<string, string> = { openrouter: "k1", cerebras: "k2", cohere: "k3", cloudflare: "k4", qwen: "k5" };
+    const ring = await buildKeyring({ provider: "openrouter", preferences: { cloudflareBaseUrl: "https://api.cloudflare.com/client/v4/accounts/abc/ai/v1" } }, Object.keys(keys), async (id) => keys[id] ?? null);
+    expect(ring.map((e) => e.via)).toEqual(["openrouter", "cerebras", "cohere", "cloudflare", "qwen"]);
+    expect(ring.every((e) => e.provider === "custom" && e.model === "auto")).toBe(true);
+    expect(ring.find((e) => e.via === "openrouter")?.baseUrl).toBe("https://openrouter.ai/api/v1");
+    expect(ring.find((e) => e.via === "cohere")?.baseUrl).toContain("compatibility");
+    expect(ring.find((e) => e.via === "cloudflare")?.baseUrl).toContain("accounts/abc");
+  });
+
+  it("leaves out a provider that needs an address it does not have, and never exceeds the server's limit", async () => {
+    const ring = await buildKeyring({ provider: "cloudflare", preferences: {} }, ["cloudflare"], async () => "k");
+    expect(ring).toEqual([]);
+    const many = ["openrouter", "cerebras", "together", "fireworks", "deepinfra", "novita", "hyperbolic", "nebius", "sambanova", "chutes"];
+    expect((await buildKeyring({ provider: "openrouter", preferences: {} }, many, async () => "k")).length).toBe(8);
   });
 
   it("encodes as base64url JSON the server can read", () => {

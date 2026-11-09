@@ -5,10 +5,14 @@
  * them for that request and keeps nothing.
  */
 import { loadUserAiSettings, providersWithStoredKey, readProviderKey, type UserAiSettings } from "../../services/userAiSettings";
+import { resolveRouterTarget } from "../../platform/router/providerMap";
 import type { ProviderId } from "../../platform/router/types";
 
 export interface KeyringEntry {
   provider: ProviderId;
+  /** The catalog provider this is (e.g. "openrouter"); `provider` is only its wire protocol. */
+  via?: string;
+  /** A model id, or "auto": the server then uses the best model the provider lists live. */
   model: string;
   apiKey?: string;
   baseUrl?: string;
@@ -17,18 +21,9 @@ export interface KeyringEntry {
   maxOutputTokens?: number;
 }
 
-/** Catalog ids (AI Access) → router provider ids. */
-const CLOUD: Record<string, ProviderId> = {
-  openai: "openai",
-  anthropic: "anthropic",
-  claude: "anthropic",
-  gemini: "google",
-  google: "google",
-  groq: "groq",
-  deepseek: "deepseek",
-  mistral: "mistral",
-};
 const LOCAL: Record<string, ProviderId> = { ollama: "ollama", lmstudio: "lmstudio" };
+/** The server accepts at most this many connections per request. */
+const MAX_ENTRIES = 8;
 
 function cleanModelChoice(rawModel: string): string {
   const stripped = rawModel
@@ -42,6 +37,11 @@ function cleanModelChoice(rawModel: string): string {
 /** Models the user picked in AI Access, plus their known limits when the catalog had them. */
 export interface ModelChoice { model: string; contextWindow?: number; maxOutputTokens?: number }
 
+/**
+ * Every AI connection on this device, primary first. A provider with a key but
+ * no saved model is still included, as "auto": the server picks the best model
+ * the provider lists live instead of this code naming one.
+ */
 export async function buildKeyring(
   settings?: UserAiSettings,
   storedProviders: string[] = providersWithStoredKey(),
@@ -58,31 +58,43 @@ export async function buildKeyring(
     const out = Number(prefs[`${id}MaxOutput`]);
     return { model, contextWindow: Number.isFinite(ctx) && ctx > 0 ? ctx : undefined, maxOutputTokens: Number.isFinite(out) && out > 0 ? out : undefined };
   };
+  const endpointOf = (id: string) => {
+    const endpoint = prefs[`${id}Endpoint`] || prefs[`${id}BaseUrl`];
+    return endpoint ? endpoint.replace(/[^\x20-\x7E]/g, "").trim() : "";
+  };
 
   // Primary provider first, then every other provider with a key on this device.
   const order = [s.provider, ...storedProviders.filter((p) => p !== s.provider)];
   const entries: KeyringEntry[] = [];
+  const seen = new Set<string>();
   for (const id of order) {
-    const provider = CLOUD[id];
-    if (!provider) continue;
+    if (!id || LOCAL[id]) continue;
     const rawKey = await readKey(id);
     const key = rawKey ? rawKey.replace(/^\s*bearer\s+/i, "").replace(/[^\x21-\x7E]/g, "").trim() : null;
+    if (!key) continue;
+    const target = resolveRouterTarget(id, endpointOf(id));
+    if (!target.ok || seen.has(target.target.via)) continue; // e.g. Cloudflare without its address
+    seen.add(target.target.via);
     const choice = pick(id);
-    if (!key || !choice) continue;
-    const endpoint = prefs[`${id}Endpoint`] || prefs[`${id}BaseUrl`];
-    const cleanBase = endpoint ? endpoint.replace(/[^\x20-\x7E]/g, "").trim() : "";
-    entries.push({ provider, apiKey: key, ...choice, ...(cleanBase ? { baseUrl: cleanBase } : {}) });
+    entries.push({
+      provider: target.target.provider,
+      via: target.target.via,
+      apiKey: key,
+      model: choice?.model ?? "auto",
+      ...(choice?.contextWindow ? { contextWindow: choice.contextWindow } : {}),
+      ...(choice?.maxOutputTokens ? { maxOutputTokens: choice.maxOutputTokens } : {}),
+      ...(target.target.baseUrl ? { baseUrl: target.target.baseUrl } : {}),
+    });
   }
   // A local model goes last: it is the fallback that works offline.
   for (const id of Object.keys(LOCAL)) {
     const choice = pick(id);
     if (!choice) continue;
     if (id !== s.provider && !prefs[`${id}Enabled`]) continue;
-    const endpoint = prefs[`${id}Endpoint`] || prefs[`${id}BaseUrl`];
-    const cleanBase = endpoint ? endpoint.replace(/[^\x20-\x7E]/g, "").trim() : "";
+    const cleanBase = endpointOf(id);
     entries.push({ provider: LOCAL[id], ...choice, ...(cleanBase ? { baseUrl: cleanBase } : {}) });
   }
-  return entries;
+  return entries.slice(0, MAX_ENTRIES);
 }
 
 export const encodeKeyring = (entries: KeyringEntry[]): string => {

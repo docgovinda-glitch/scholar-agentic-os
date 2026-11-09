@@ -7,6 +7,15 @@ export class ProviderHttpError extends Error {
   }
 }
 
+/** The stream ended cleanly but carried no text and no tool call. */
+export class EmptyOutputError extends Error {
+  constructor(public finishReason: string) {
+    super(finishReason === "length"
+      ? "The model used its whole output limit before writing an answer (reasoning models spend part of it thinking)."
+      : "The model returned an empty answer.");
+  }
+}
+
 export class TimeoutError extends Error {
   constructor(public phase: "first_token" | "idle", ms: number) {
     super(`No ${phase === "first_token" ? "first token" : "new tokens"} for ${Math.round(ms / 1000)}s`);
@@ -14,7 +23,7 @@ export class TimeoutError extends Error {
 }
 
 const CREDIT_EXHAUSTED = /quota|billing|insufficient|credit balance|out of credits?|no credits?|payment required|balance (is )?(too low|exhausted)|exceeded your current|resource.?exhausted|spend(ing)? limit|usage limit/i;
-const MODEL_UNAVAILABLE = /model.{0,40}(not found|does not exist|not available|deprecated|decommissioned|no longer)/i;
+const MODEL_UNAVAILABLE = /model.{0,60}(not found|does not exist|not available|not supported|deprecated|decommissioned|no longer|retired|invalid)|(unknown|invalid|unsupported) model/i;
 
 function retryAfterMs(h: Record<string, string>): number | undefined {
   const v = h["retry-after-ms"] ?? h["retry-after"];
@@ -31,6 +40,7 @@ const f = (kind: FailureKind, message: string, retryable: boolean, fallbackWorth
 export function classify(err: unknown, signal: AbortSignal): Failure {
   if (signal.aborted) return f("aborted", "Cancelled", false, false);
   if (err instanceof TimeoutError) return f(err.phase === "first_token" ? "timeout_first_token" : "timeout_idle", err.message, err.phase === "first_token", true);
+  if (err instanceof EmptyOutputError) return f("empty_output", err.message, false, true);
   if (err instanceof ProviderHttpError) {
     const s = err.status;
     const msg = err.message.slice(0, 300);
@@ -46,7 +56,7 @@ export function classify(err: unknown, signal: AbortSignal): Failure {
     if (s >= 500) return f("server", msg, true, true, { httpStatus: s });
     if (/content.?(filter|policy)|safety/i.test(msg + code)) return f("content_filter", msg, false, false, { httpStatus: s });
     // A retired or unavailable model on this key is that provider's problem, not the prompt's: try the next one.
-    if (s === 404 || (s === 400 && MODEL_UNAVAILABLE.test(`${msg} ${code}`))) return f("invalid_request", msg, false, true, { httpStatus: s });
+    if (s === 404 || ((s === 400 || s === 410) && MODEL_UNAVAILABLE.test(`${msg} ${code}`)) || s === 410) return f("model_unavailable", msg, false, true, { httpStatus: s });
     return f("invalid_request", msg, false, false, { httpStatus: s });
   }
   const msg = err instanceof Error ? err.message : String(err);

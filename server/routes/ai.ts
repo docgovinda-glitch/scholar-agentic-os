@@ -1000,6 +1000,10 @@ Formatting & Verification Rules:
         }
       }
 
+      if (!result.text || !result.text.trim()) {
+        return sendAiFailure(res, new Error("The AI returned an empty answer."), "The answer");
+      }
+
       // 7. Post-Generation Anti-Hallucination Lock & Quality-Control via scholarBrain (only for strict Vault/Canonical ledger mode)
       if (useStrictVaultLedger && (isSubstantive || canonicalSources.length > 0 || unifiedEvidence.length > 0)) {
         const verifiedItems: VerifiedSourceItem[] = [

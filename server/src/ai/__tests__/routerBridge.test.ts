@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { setLiveModelsFetch, clearLiveModelState } from "../liveModels";
 import express from "express";
 import request from "supertest";
 import { aiRouteDecorator, configureRouterBridge, keyringFromRequest } from "../routerBridge";
@@ -8,6 +9,8 @@ import { ProviderHttpError } from "../../../../src/platform/router/errors";
 import type { AdapterChunk, Candidate, ProviderAdapter } from "../../../../src/platform/router/types";
 
 process.env.LLM_CHALLENGE_SECRET = "test-challenge-secret";
+// No test reaches a real provider: model lists fail, so named models are trusted as given.
+beforeEach(() => { clearLiveModelState(); setLiveModelsFetch((async () => { throw new Error("offline"); }) as unknown as typeof fetch); });
 const SECRET = "sk-test-SECRET-1234567890";
 const calls: string[] = [];
 const fake: ProviderAdapter = {
@@ -137,5 +140,22 @@ describe("existing AI steps through the router", () => {
     } finally {
       if (saved === undefined) delete process.env.ALLOW_SERVER_LOCAL_AI; else process.env.ALLOW_SERVER_LOCAL_AI = saved;
     }
+  });
+});
+
+
+describe("legacy single-provider headers for every catalog provider", () => {
+  const ringOf = (headers: Record<string, string>) => keyringFromRequest({ headers });
+  it("maps a catalog provider to its endpoint and leaves the model to the live list", () => {
+    expect(ringOf({ "x-ai-provider": "openrouter", "x-ai-api-key": "k" })).toEqual([expect.objectContaining({ provider: "custom", via: "openrouter", model: "auto", baseUrl: "https://openrouter.ai/api/v1" })]);
+    expect(ringOf({ "x-ai-provider": "claude", "x-ai-api-key": "k" })).toEqual([expect.objectContaining({ provider: "anthropic", model: "auto" })]);
+    expect(ringOf({ "x-ai-provider": "gemini", "x-ai-api-key": "k", "x-ai-model": "gemini-x" })).toEqual([expect.objectContaining({ provider: "google", model: "gemini-x" })]);
+  });
+  it("does not duplicate a connection the keyring already holds", () => {
+    const ring = Buffer.from(JSON.stringify([{ provider: "custom", via: "openrouter", model: "m1", apiKey: "k", baseUrl: "https://openrouter.ai/api/v1" }])).toString("base64url");
+    expect(ringOf({ "x-ai-keyring": ring, "x-ai-provider": "openrouter", "x-ai-api-key": "k" }).length).toBe(1);
+  });
+  it("ignores a provider that needs an address it was not given", () => {
+    expect(ringOf({ "x-ai-provider": "cloudflare", "x-ai-api-key": "k" })).toEqual([]);
   });
 });

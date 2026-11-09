@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { providerAccessFacts, type CloudProviderSpec } from "../../config/providerCatalog";
-import { getDefaultModelId, getModelsForProvider, type ModelSpec } from "../../config/modelCatalog";
+import { getModelsForProvider, type ModelSpec } from "../../config/modelCatalog";
+import type { ConnectCloudResult } from "./useAiAccess";
 import ModelSelectField from "./ModelSelectField";
 import { bestDiscovered, curatedToSpec } from "./bestModels";
 import type { ConnectionTier, ProviderView } from "./useAiAccess";
@@ -39,7 +40,7 @@ export default function ProviderDetail({
   view: ProviderView;
   spec: CloudProviderSpec;
   tier?: ConnectionTier;
-  onConnect: (input: { apiKey: string; model: string; baseUrl?: string; makeDefault: boolean; tier?: ConnectionTier }) => Promise<{ ok: boolean; error?: string; modelsDetected?: number }>;
+  onConnect: (input: { apiKey: string; model: string; baseUrl?: string; makeDefault: boolean; tier?: ConnectionTier }) => Promise<ConnectCloudResult>;
   onDisconnect: () => Promise<void>;
   onSetModel: (model: string) => Promise<void>;
   onMakeDefault: () => Promise<void>;
@@ -49,7 +50,9 @@ export default function ProviderDetail({
   const [tier, setTier] = useState<ConnectionTier>(() => tierProp ?? view.tier ?? (facts.usableWithoutPaying ? "free" : "byok"));
   const models = getModelsForProvider(spec.id, tier === "free" ? "free" : "byok");
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState(view.selectedModel ?? getDefaultModelId(spec.id));
+  // No model name is assumed: empty until the person picks one or connecting finds the best live model.
+  const [model, setModel] = useState(view.selectedModel ?? "");
+  const [found, setFound] = useState<ConnectCloudResult | null>(null);
   const [baseUrl, setBaseUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +120,8 @@ export default function ProviderDetail({
   const showingBest = best.length > 0 && !showAllModels;
 
   // Combine catalog models with dynamically discovered models
-  const effectiveModels: ModelSpec[] = [...models];
+  // Once the provider has listed its models, only those are offered: the built-in catalog may name retired ones.
+  const effectiveModels: ModelSpec[] = discoveredModels.length > 0 ? [] : [...models];
   for (const dm of discoveredModels) {
     const mId = dm.modelId || dm.id;
     const existingIdx = effectiveModels.findIndex((m) => m.modelId === mId);
@@ -160,11 +164,12 @@ export default function ProviderDetail({
         return;
       }
       const discoResult = await discoverProviderModels(spec.id, key, baseUrl.trim() || undefined, true);
-      if (discoResult.ok && discoResult.models.length > 0) {
+      if (discoResult.ok && discoResult.source === "live_discovery" && discoResult.models.length > 0) {
         setDiscoveredModels(discoResult.models);
         setDiscoveryMsg(`Discovered ${discoResult.models.length} model(s) for your account.`);
       } else {
-        setDiscoveryMsg(discoResult.error || "No live models returned from /models. Using catalog fallbacks.");
+        // Never show a built-in list as if the provider had returned it.
+        setDiscoveryMsg(discoResult.error || "Could not list live models from here. Press \"Test and connect\": the server checks the key and finds the best model.");
       }
     } catch (e: any) {
       setDiscoveryMsg(`Discovery notice: ${e.message}`);
@@ -203,8 +208,12 @@ export default function ProviderDetail({
       }
       invalidateClientAiRuntimeConfig();
       setApiKey("");
+      setFound(outcome);
+      if (outcome.model) setModel(outcome.model);
       setResult(
-        outcome.modelsDetected != null
+        outcome.tested
+          ? `Connected. ${outcome.tested.model} answered a test request in ${(outcome.tested.latencyMs / 1000).toFixed(1)}s.`
+          : outcome.modelsDetected != null
           ? `Connected. ${outcome.modelsDetected} model${outcome.modelsDetected === 1 ? "" : "s"} available.`
           : "Connected."
       );
@@ -381,6 +390,17 @@ export default function ProviderDetail({
               {discoveryMsg}
             </p>
           )}
+          {found && (found.options?.length || found.needsModel) ? (
+            <RecommendationPanel
+              found={found}
+              selected={model}
+              onPick={(id) => {
+                setModel(id);
+                if (view.connected) void onSetModel(id).then(() => invalidateClientAiRuntimeConfig());
+              }}
+              providerName={spec.name}
+            />
+          ) : null}
           <ModelSelectField
             id={`model-${spec.id}`}
             models={showingBest ? withCurrent(bestSpecs, effectiveModels, model) : effectiveModels}
@@ -591,6 +611,49 @@ function withCurrent(best: ModelSpec[], all: ModelSpec[], current: string): Mode
 }
 
 /** Why the selected model carries its badges, in plain words. */
+const ROLE_LABEL: Record<string, string> = { recommended: "Recommended", most_capable: "Most capable", fastest: "Fastest", option: "Also good" };
+
+/** After connecting: the model that answered, and the best live alternatives, each with why. */
+function RecommendationPanel({ found, selected, onPick, providerName }: { found: ConnectCloudResult; selected: string; onPick: (id: string) => void; providerName: string }) {
+  const options = found.options ?? [];
+  return (
+    <div className="mb-3 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3" aria-live="polite">
+      {options.length > 0 ? (
+        <>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Best models on your {providerName} account (fetched live)</p>
+          <ul className="mt-2 space-y-1.5">
+            {options.map((o) => (
+              <li key={o.id} className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-[color:var(--text-primary)]">
+                    <span className="font-medium">{o.displayName || o.id}</span>{" "}
+                    <span className="rounded bg-[color:var(--surface-sunken)] px-1.5 py-0.5 text-[11px] font-semibold text-[color:var(--text-secondary)]">{ROLE_LABEL[o.role]}</span>
+                    {found.tested?.model === o.id && <span className="ml-1.5 text-[11px] text-[color:var(--state-success)]">answered a test request</span>}
+                  </p>
+                  <p className="text-xs text-[color:var(--text-muted)]">{o.why}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onPick(o.id)}
+                  disabled={selected === o.id}
+                  className="shrink-0 rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2.5 py-1 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-60"
+                >
+                  {selected === o.id ? "In use" : "Use this"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="text-sm text-[color:var(--text-secondary)]">
+          {providerName} does not publish a list of its models, so none can be recommended. Type the model name from its documentation below (Advanced), then press Save model.
+        </p>
+      )}
+      {found.note && <p className="mt-2 text-xs text-[color:var(--text-muted)]">{found.note}</p>}
+    </div>
+  );
+}
+
 function BadgeEvidence({ models, selected }: { models: ReturnType<typeof bestDiscovered>; selected: string }) {
   const m = models.find((x) => x.id === selected);
   if (!m || m.badges.length === 0) return null;

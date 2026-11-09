@@ -233,14 +233,15 @@ export function geminiAdapter(fetchImpl: FetchImpl = fetch): ProviderAdapter {
       let n = 0;
       for await (const { data } of sseEvents(res.body!)) {
         const j = JSON.parse(data) as {
-          candidates?: Array<{ content?: { parts?: Array<{ text?: string; functionCall?: { name: string; args?: unknown } }> }; finishReason?: string }>;
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean; functionCall?: { name: string; args?: unknown } }> }; finishReason?: string }>;
           usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
           promptFeedback?: { blockReason?: string };
         };
         if (j.promptFeedback?.blockReason) throw new ProviderHttpError(400, `Blocked by safety filter (${j.promptFeedback.blockReason})`, {}, "content_filter");
         const cand = j.candidates?.[0];
         for (const p of cand?.content?.parts ?? []) {
-          if (p.text) yield { type: "text", text: p.text };
+          // Thought summaries are the model thinking aloud, not the answer.
+          if (p.text && !p.thought) yield { type: "text", text: p.text };
           if (p.functionCall) yield { type: "tool_call", id: `call_${n++}`, name: p.functionCall.name, argumentsJson: JSON.stringify(p.functionCall.args ?? {}) };
         }
         if (j.usageMetadata) usage = { type: "usage", inputTokens: j.usageMetadata.promptTokenCount ?? 0, outputTokens: j.usageMetadata.candidatesTokenCount ?? 0 };

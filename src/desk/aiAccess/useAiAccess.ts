@@ -42,7 +42,7 @@ import {
   type UserAiSettings,
 } from "../../services/userAiSettings";
 import { removeKeyFromAccount, saveKeyToAccount, syncKeysWithAccount } from "./accountKeys";
-import { addConnection, getAiAccessStatus, removeConnection, verifyProviderKey, type AiAccessStatus, type VerifyKeyResult } from "./aiAccessApi";
+import { addConnection, getAiAccessStatus, removeConnection, verifyProviderKey, type AiAccessStatus, type LiveModelOption, type VerifyKeyResult } from "./aiAccessApi";
 
 export type ConnectionTier = "local" | "free" | "byok";
 
@@ -81,6 +81,21 @@ export interface AiAccessState {
   /** Everything currently connected, across tiers. */
   connected: ProviderView[];
   premiumActive: boolean;
+}
+
+/** What connecting a provider found out, for the screen to show. */
+export interface ConnectCloudResult {
+  ok: boolean;
+  error?: string;
+  modelsDetected?: number;
+  /** The model now saved for this provider (the one that answered the test, or the person's own pick). */
+  model?: string;
+  /** Live model suggestions, best first; empty when the provider publishes no list. */
+  options?: LiveModelOption[];
+  tested?: { model: string; latencyMs: number };
+  /** No model could be chosen automatically: the person must name one. */
+  needsModel?: boolean;
+  note?: string;
 }
 
 export interface ConnectCloudInput {
@@ -184,22 +199,22 @@ export function useAiAccess() {
 
   /** Verify a key with the provider, store it on this device, and record the connection. */
   const connectCloud = useCallback(
-    async (input: ConnectCloudInput): Promise<{ ok: boolean; error?: string; modelsDetected?: number }> => {
+    async (input: ConnectCloudInput): Promise<ConnectCloudResult> => {
       const spec = getCloudProvider(input.providerId);
       if (!spec) return { ok: false, error: `Unknown provider "${input.providerId}".` };
 
-      // The key goes to our server once, transiently, so the provider check
-      // happens server-side (no CORS surprises, and no key in a URL). It is
-      // never persisted there — see server/routes/aiAccess.ts.
+      // The key goes to our server once, transiently, in a header: the server lists the
+      // provider's live models and sends one real test request. It is never persisted there.
       const verification: VerifyKeyResult = await (
-        input.baseUrl
-          ? verifyProviderKey(input.providerId, input.apiKey, input.baseUrl)
+        input.baseUrl || input.model
+          ? verifyProviderKey(input.providerId, input.apiKey, input.baseUrl, input.model || undefined)
           : verifyProviderKey(input.providerId, input.apiKey)
       ).catch((e) => ({
         ok: false,
         error: (e as Error).message,
       }));
-      if (!verification.ok) {
+      // A provider that lists no model is not a failed key: the person names the model.
+      if (!verification.ok && !verification.needsModel) {
         return { ok: false, error: verification.error ?? "Could not verify this key with the provider." };
       }
 
@@ -209,11 +224,19 @@ export function useAiAccess() {
       await saveKeyToAccount(input.providerId, input.apiKey);
       await addConnection(input.providerId, input.tier, verification.modelsDetected);
 
+      // The model is the person's own pick, else the one that just answered a test request, else the
+      // live recommendation. No model name is ever assumed: with none, the server picks from the live
+      // list on each request, and the screen asks the person to name one.
+      const saved = settings.preferences[`${input.providerId}Model`];
+      const liveIds = new Set((verification.options ?? []).map((o) => o.id));
+      // A model the person typed that the provider does not list is not kept: the tested one replaces it.
+      const own = input.model && (liveIds.size === 0 || liveIds.has(input.model)) ? input.model : undefined;
+      const model = own || verification.tested?.model || (saved && (liveIds.size === 0 || liveIds.has(saved)) ? saved : verification.options?.[0]?.id) || "";
       const next: UserAiSettings = {
         provider: input.makeDefault ? input.providerId : settings.provider,
         preferences: {
           ...settings.preferences,
-          [`${input.providerId}Model`]: input.model || settings.preferences[`${input.providerId}Model`] || spec.defaultModel,
+          ...(model ? { [`${input.providerId}Model`]: model } : {}),
           ...(input.baseUrl ? { [`${input.providerId}BaseUrl`]: input.baseUrl } : {}),
         },
       };
@@ -221,7 +244,15 @@ export function useAiAccess() {
       setSettings(next);
       setKeyed(providersWithStoredKey());
       await refresh();
-      return { ok: true, modelsDetected: verification.modelsDetected };
+      return {
+        ok: true,
+        modelsDetected: verification.modelsDetected,
+        model: model || undefined,
+        options: verification.options,
+        tested: verification.tested,
+        needsModel: verification.needsModel || !model,
+        note: verification.note,
+      };
     },
     [settings, refresh]
   );

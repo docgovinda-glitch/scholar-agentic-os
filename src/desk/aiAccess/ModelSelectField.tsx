@@ -34,7 +34,8 @@ export default function ModelSelectField({
   // catalog entries (falls back to CloudProviderSpec.defaultModel, which
   // won't be in `models` either) — so the field a user's existing choice
   // lives in is the one shown on load, not silently swapped out from under them.
-  const [advanced, setAdvanced] = useState(() => models.length === 0 || !models.some((m) => m.modelId === value));
+  // An empty value means "best available": the dropdown stays the way in, with that as its first option.
+  const [advanced, setAdvanced] = useState(() => models.length === 0 || (value !== "" && !models.some((m) => m.modelId === value)));
 
   return (
     <div className="space-y-2">
@@ -45,6 +46,7 @@ export default function ModelSelectField({
           onChange={(e) => onChange(e.target.value)}
           className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
         >
+          <option value="">Best available (chosen from the provider's live list)</option>
           {models.map((m) => (
             <option key={m.modelId} value={m.modelId}>
               {optionLabel(m)}

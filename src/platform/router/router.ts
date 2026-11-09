@@ -1,6 +1,6 @@
 import type { AdapterChunk, AttemptTrace, Candidate, Failure, ProviderAdapter, ProviderId, RouteRequest, RouterEvent, Usage } from "./types";
 import { CircuitBreaker } from "./circuitBreaker";
-import { classify, countsAgainstProvider, TimeoutError } from "./errors";
+import { classify, countsAgainstProvider, EmptyOutputError, TimeoutError } from "./errors";
 import { estimateTokens, preflight, type TokenCounter } from "./tokenBudget";
 
 export interface RouterOptions {
@@ -15,12 +15,25 @@ export interface RouterOptions {
   limitWarnAt?: number;
   onFallbackTriggered?: (e: Extract<RouterEvent, { type: "fallback" }>) => void;
   onTokenApproachingLimit?: (e: Extract<RouterEvent, { type: "limit_warning" }>) => void;
+  /** Called for every failed attempt, e.g. to quarantine a model the provider retired. */
+  onCandidateFailure?: (c: Candidate, f: Failure) => void;
+  /** Stop trying new candidates after this long, so a long chain cannot hang a request. */
+  maxTotalMs?: number;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
   now?: () => number;
 }
 
 const DEFAULT_RETRY = { maxAttempts: 2, baseDelayMs: 800, maxDelayMs: 8_000, maxWaitMs: 20_000 };
 const DEFAULT_TIMEOUTS = { firstTokenMs: 25_000, idleMs: 20_000 };
+const DEFAULT_MAX_TOTAL_MS = 150_000;
+
+/**
+ * Failures that say the whole connection is unusable (same key, same account),
+ * so its other models are skipped. Per-model problems (rate limit, retired
+ * model, empty answer, context size, 5xx) move to the next model instead:
+ * providers meter and fail per model far more often than per account.
+ */
+const CONNECTION_WIDE = new Set<Failure["kind"]>(["quota", "auth", "network"]);
 
 export const abortableSleep = (ms: number, signal: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -74,6 +87,9 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
   const now = opts.now ?? Date.now;
   const metricsEvery = opts.metricsEveryMs ?? 500;
   const trace: AttemptTrace[] = [];
+  const startedAtAll = now();
+  const maxTotal = opts.maxTotalMs ?? DEFAULT_MAX_TOTAL_MS;
+  const deadGroups = new Set<string>();
 
   yield { type: "route_start", requestId: req.requestId, chain: chain.map(({ id, label, lane }) => ({ id, label, lane })) };
 
@@ -83,6 +99,15 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
 
   for (const c of chain) {
     if (signal.aborted) { yield { type: "cancelled", outputTokensSoFar: 0 }; return; }
+    if (now() - startedAtAll > maxTotal) {
+      yield { type: "error", code: "exhausted", message: `No model answered within ${Math.round(maxTotal / 1000)}s.${lastFailure ? ` Last error: ${lastFailure.message}` : ""}`, trace };
+      return;
+    }
+    // Same connection already failed account-wide (credit, key, network): its other models would fail the same way.
+    if (c.group && deadGroups.has(c.group)) {
+      trace.push({ candidateId: c.id, attempt: 0, startedAt: now(), durationMs: 0, outcome: "skipped" });
+      continue;
+    }
 
     if (c.runsIn !== opts.site) {
       // The server cannot reach the user's machine: the browser continues the chain from here.
@@ -158,6 +183,8 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
             yield { type: "metrics", candidateId: c.id, ttftMs: firstTokenAt - started, tokensPerSecond: outTok / Math.max(0.001, (t - firstTokenAt) / 1000), outputTokens: outTok };
           }
         }
+        // A clean stream with nothing in it is a failed attempt, not an answer.
+        if (!streamed) throw new EmptyOutputError(finishReason);
         await opts.breaker.success(c.id);
         trace.push({ candidateId: c.id, attempt, startedAt: started, durationMs: now() - started, outcome: "success" });
         yield { type: "done", candidateId: c.id, label: c.label, lane: c.lane, finishReason, trace,
@@ -167,6 +194,8 @@ export async function* route(req: RouteRequest, chain: Candidate[], signal: Abor
         failure = classify(ctl.signal.reason instanceof TimeoutError ? ctl.signal.reason : err, signal);
         trace.push({ candidateId: c.id, attempt, startedAt: started, durationMs: now() - started, outcome: failure.kind, httpStatus: failure.httpStatus });
         if (failure.kind === "aborted") { yield { type: "cancelled", candidateId: c.id, outputTokensSoFar: Math.round(outChars / 4) }; return; }
+        opts.onCandidateFailure?.(c, failure);
+        if (CONNECTION_WIDE.has(failure.kind) && c.group) deadGroups.add(c.group);
         if (countsAgainstProvider(failure.kind)) await opts.breaker.failure(c.id);
         if (!failure.fallbackWorthy) { yield { type: "error", code: "non_retryable", message: failure.message, trace }; return; }
         // Never retry silently after tokens reached the user: move on and say the partial output was dropped.

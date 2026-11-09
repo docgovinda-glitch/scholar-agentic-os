@@ -40,6 +40,8 @@ const REASON: Record<FailureKind, string> = {
   context_overflow: "input too long for this model",
   content_filter: "blocked by the provider's safety filter",
   aborted: "cancelled",
+  model_unavailable: "model no longer available",
+  empty_output: "model returned no answer",
 };
 export const reasonText = (k: FailureKind) => REASON[k];
 

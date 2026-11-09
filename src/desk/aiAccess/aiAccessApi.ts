@@ -107,17 +107,74 @@ export const addConnection = (providerId: string, tier: "local" | "free" | "byok
 export const removeConnection = (providerId: string) =>
   api<{ success: true }>(`/api/ai-access/connections/${encodeURIComponent(providerId)}`, { method: "DELETE" });
 
+/** One model the provider lists live for this key, with the reason it is suggested. */
+export interface LiveModelOption {
+  id: string;
+  displayName?: string;
+  role: "recommended" | "most_capable" | "fastest" | "option";
+  why: string;
+  contextWindow?: number;
+}
+
 export interface VerifyKeyResult {
   ok: boolean;
   modelsDetected?: number;
   error?: string;
   deferred?: boolean;
   note?: string;
+  /** The model that really answered a test request, and how long it took. */
+  tested?: { model: string; latencyMs: number };
+  /** Live, best-first model suggestions; the first is the recommendation. Empty when the provider publishes no list. */
+  options?: LiveModelOption[];
+  /** The provider lists no usable model, so the person has to name one. */
+  needsModel?: boolean;
+  /** Where the answer came from: the server's real test call, or the browser's list-only check. */
+  checkedBy?: "server-test" | "browser-list";
 }
 
-/** User BYOK keys are verified directly in the browser. They reach the Scholar server only as a per-request header on AI routes (see routeUsesClientAi in desk/api/client.ts). */
-export const verifyProviderKey = (providerId: string, apiKey: string, baseUrlOverride?: string): Promise<VerifyKeyResult> =>
-  clientVerifyProviderKey(providerId, apiKey, baseUrlOverride);
+interface ServerVerifyBody {
+  ok: boolean;
+  error?: string;
+  note?: string;
+  needsModel?: boolean;
+  totalListed?: number;
+  tested?: { model: string; latencyMs: number };
+  options?: Array<{ id: string; displayName?: string; role: LiveModelOption["role"]; why: string; contextWindow?: number }>;
+}
+
+/**
+ * Proves the key works the way Ask Scholar will use it: the server lists the
+ * provider's live models, tests one with a real one-line request (trying the
+ * next best model if it fails) and recommends what answered. The key travels
+ * only in the `x-ai-api-key` header of this one AI request and is never stored
+ * there. If the server cannot be reached the browser's list-only check is used
+ * instead, and the result says so.
+ */
+export const verifyProviderKey = async (providerId: string, apiKey: string, baseUrlOverride?: string, model?: string): Promise<VerifyKeyResult> => {
+  try {
+    const res = await fetch("/api/ai/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-ai-api-key": apiKey.replace(/[^\x21-\x7E]/g, ""), ...(await authHeaders()) },
+      body: JSON.stringify({ providerId, model: model || undefined, baseUrl: baseUrlOverride || undefined }),
+    });
+    const body = (await res.json().catch(() => null)) as ServerVerifyBody | null;
+    if (body && typeof body.ok === "boolean") {
+      return {
+        ok: body.ok,
+        error: body.error,
+        note: body.note,
+        needsModel: body.needsModel,
+        tested: body.tested,
+        modelsDetected: body.totalListed,
+        options: body.options?.map((o) => ({ id: o.id, displayName: o.displayName, role: o.role, why: o.why, contextWindow: o.contextWindow })),
+        checkedBy: "server-test",
+      };
+    }
+  } catch {
+    // Server unreachable: fall through to the browser check.
+  }
+  return { ...(await clientVerifyProviderKey(providerId, apiKey, baseUrlOverride)), checkedBy: "browser-list" };
+};
 
 export interface PublicResource {
   id: string;

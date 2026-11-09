@@ -12,6 +12,12 @@ export type Lane = "premium" | "byok" | "local";
 export interface Candidate {
   /** Stable id for the breaker and the trace, e.g. "byok:anthropic:claude-x". */
   id: string;
+  /**
+   * The connection this candidate belongs to (catalog provider id, e.g.
+   * "openrouter"). Candidates of one group share a key, a quota and an outage,
+   * so a provider-wide failure skips the rest of the group.
+   */
+  group?: string;
   lane: Lane;
   provider: ProviderId;
   model: string;
@@ -71,7 +77,11 @@ export interface ProviderAdapter {
 
 export type FailureKind =
   | "rate_limit" | "quota" | "server" | "overloaded" | "timeout_first_token" | "timeout_idle"
-  | "network" | "auth" | "invalid_request" | "context_overflow" | "content_filter" | "aborted";
+  | "network" | "auth" | "invalid_request" | "context_overflow" | "content_filter" | "aborted"
+  /** The provider no longer serves this model (retired, renamed, not on this key). */
+  | "model_unavailable"
+  /** The stream ended without any text (e.g. a reasoning model spent its whole output limit thinking). */
+  | "empty_output";
 
 export interface Failure {
   kind: FailureKind;

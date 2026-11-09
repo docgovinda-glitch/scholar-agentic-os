@@ -195,6 +195,19 @@ function toProviderCallError(providerId: string, err: unknown): ProviderCallErro
   return new ProviderCallError(providerId, classifyThrownError(err));
 }
 
+/** A model that finishes without writing anything has failed: move to the next candidate rather than return "". */
+function assertAnswered(providerId: string, text: string | undefined): void {
+  if (text && text.trim()) return;
+  throw new ProviderCallError(providerId, {
+    kind: "unknown",
+    label: "No answer",
+    message: "The model finished without writing an answer (a reasoning model can spend its whole output limit thinking).",
+    remedy: null,
+    retryable: false,
+    failoverWorthwhile: true,
+  });
+}
+
 function getCandidateKey(c: CandidateProvider, index: number): string {
   return `${c.provider}::${c.model || "default"}::${index}`;
 }
@@ -234,11 +247,14 @@ export async function completeWithFailover(
         throw new Error(`completeWithFailover: no candidate configured for key "${candidateKey}".`);
       }
       try {
-        return await complete(
+        const result = await complete(
           { ...req, provider: candidate.provider, apiKey: candidate.apiKey, model: candidate.model },
           policy
         );
+        assertAnswered(candidate.provider, result.text);
+        return result;
       } catch (err) {
+        if (err instanceof ProviderCallError) throw err;
         throw toProviderCallError(candidate.provider, err);
       }
     },
@@ -268,12 +284,15 @@ export async function streamWithFailover(
         throw new Error(`streamWithFailover: no candidate configured for key "${candidateKey}".`);
       }
       try {
-        return await stream(
+        const result = await stream(
           { ...req, provider: candidate.provider, apiKey: candidate.apiKey, model: candidate.model },
           onChunk,
           policy
         );
+        assertAnswered(candidate.provider, result.text);
+        return result;
       } catch (err) {
+        if (err instanceof ProviderCallError) throw err;
         throw toProviderCallError(candidate.provider, err);
       }
     },

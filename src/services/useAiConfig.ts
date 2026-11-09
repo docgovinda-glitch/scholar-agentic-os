@@ -136,8 +136,8 @@ export async function getClientAiRuntimeConfig(forceFresh = false): Promise<Clie
 
     if (key) {
       const discovered = getCachedDiscoveredModels(providerId, key) || [];
-      const fallbackModel = discovered[0]?.id || (cloudSpec ? getDefaultModelId(cloudSpec.id) : "");
-      const activeModel = sanitizeClientModelId(providerId, preferredModel, fallbackModel);
+      // No saved model and no live list yet: send none, and the server picks the best model the provider lists now.
+      const activeModel = preferredModel || discovered[0]?.id ? sanitizeClientModelId(providerId, preferredModel, discovered[0]?.id) : "";
       const config: ClientAiRuntimeConfig = {
         provider: sanitizeHeaderAscii(providerId),
         providerName: cloudSpec?.name || providerId,
@@ -161,8 +161,8 @@ export async function getClientAiRuntimeConfig(forceFresh = false): Promise<Clie
       if (altKey) {
         const spec = getCloudProvider(altProviderId);
         const altDiscovered = getCachedDiscoveredModels(altProviderId, altKey) || [];
-        const altFallback = altDiscovered[0]?.id || (spec ? getDefaultModelId(spec.id) : "");
-        const altModel = sanitizeClientModelId(altProviderId, prefs[`${altProviderId}Model`], altFallback);
+        const altSaved = prefs[`${altProviderId}Model`];
+        const altModel = altSaved || altDiscovered[0]?.id ? sanitizeClientModelId(altProviderId, altSaved, altDiscovered[0]?.id) : "";
         const altBaseUrl = sanitizeHeaderAscii(prefs[`${altProviderId}BaseUrl`] || prefs[`${altProviderId}Endpoint`]);
         const config: ClientAiRuntimeConfig = {
           provider: sanitizeHeaderAscii(altProviderId),

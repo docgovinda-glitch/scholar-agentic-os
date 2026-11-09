@@ -12,7 +12,8 @@ import type { DiscoveredModel } from "../../services/modelDiscovery";
 const ROUTER_PROVIDER: Record<string, string> = { gemini: "google" };
 
 export function bestDiscovered(providerId: string, discovered: DiscoveredModel[], now = Date.now()): CuratedModel[] {
-  const live = discovered.map((d) => ({
+  // Only models the provider itself listed: a built-in fallback list is never "best".
+  const live = discovered.filter((d) => d.source === "live_discovery").map((d) => ({
     id: d.modelId || d.id,
     displayName: d.displayName,
     contextWindow: d.contextWindow || undefined,
