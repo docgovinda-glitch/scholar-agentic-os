@@ -124,6 +124,8 @@ export async function fetchAskScholarThreadsFromServer(
 
   try {
     const headers = await buildAuthHeaders();
+    // No session token means the server would answer 401 (a console error and a wasted round trip).
+    if (!headers["Authorization"]) return [];
     const res = await fetch("/api/ai/threads", {
       method: "GET",
       headers,
@@ -153,6 +155,7 @@ export async function syncAskScholarThreadsToServer(
 
   try {
     const headers = await buildAuthHeaders();
+    if (!headers["Authorization"]) return false;
     const res = await fetch("/api/ai/threads", {
       method: "POST",
       headers,

@@ -287,6 +287,7 @@ export default function ProjectListScreen({
   const [projects, setProjects] = useState<ProjectView[] | null>(null);
   // A failed list load is shown as an error, never as "no projects" (B7).
   const [projectsLoadError, setProjectsLoadError] = useState<string | null>(null);
+  const [projectsLoadNeedsSignIn, setProjectsLoadNeedsSignIn] = useState(false);
   const deletedProjectIdsRef = useRef<Set<string>>(new Set());
 
   // Initialize from sessionStorage to prevent zombie project resurrection across fast reloads/nav
@@ -691,6 +692,7 @@ export default function ProjectListScreen({
   const load = useCallback(() => {
     setError(null);
     setProjectsLoadError(null);
+    setProjectsLoadNeedsSignIn(false);
     if (!userEmail) {
       setProjects([]);
       return;
@@ -706,9 +708,19 @@ export default function ProjectListScreen({
         });
         setProjects(uniqueItems);
       })
-      .catch(() => {
-        // Keep whatever is already listed; say the refresh failed.
-        setProjectsLoadError("Couldn't load your projects. Check your connection and try again.");
+      .catch((e: unknown) => {
+        // Keep whatever is already listed; say why the refresh failed. (Matched by name: the
+        // class is not importable from every mocked api module.)
+        const sessionEnded = (e as { name?: string } | null)?.name === "UnauthenticatedError";
+        const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+        setProjectsLoadNeedsSignIn(sessionEnded);
+        setProjectsLoadError(
+          sessionEnded
+            ? "Your session has ended. Sign in again to see your projects."
+            : offline
+              ? "You're offline. Reconnect to load your projects."
+              : "Couldn't load your projects. Check your connection and try again."
+        );
       });
   }, [userEmail]);
 
@@ -1632,6 +1644,7 @@ export default function ProjectListScreen({
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           action: meta.action,
           followUps: meta.followUps,
+          kind: "help",
         };
         setGuideMessages((prev) => [...prev, assistantMsg]);
       } else if (!userEmail && !aiStatus?.connected) {
@@ -1643,6 +1656,7 @@ export default function ProjectListScreen({
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           action: { type: "auth", label: "Sign In / Register to Use AI ↗" },
           followUps: ["How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?"],
+          kind: "help",
         };
         setGuideMessages((prev) => [...prev, assistantMsg]);
       } else {
@@ -2587,7 +2601,7 @@ export default function ProjectListScreen({
       {/* Mobile Backdrop Overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs md:hidden animate-in fade-in duration-150"
+          className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-xs ${isPhone ? "" : "md:hidden"} animate-in fade-in duration-150`}
           onClick={() => setMobileMenuOpen(false)}
           aria-hidden="true"
         />
@@ -2601,9 +2615,9 @@ export default function ProjectListScreen({
         // drawer from taking focus.
         inert={isPhone ? !mobileMenuOpen : !isSidebarOpen}
         aria-label="Workspace navigation"
-        className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${mobileMenuOpen
+        className={`fixed inset-y-0 left-0 z-50 ${isPhone ? "" : "md:relative md:z-30"} h-full flex flex-col justify-between border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-ink-750 text-neutral-700 dark:text-neutral-300 flex-shrink-0 select-none transition-all duration-300 ease-in-out ${mobileMenuOpen
           ? "translate-x-0 w-[260px] shadow-2xl"
-          : "-translate-x-full md:translate-x-0 " + (isSidebarOpen ? "w-[260px]" : "w-0 border-r-0 overflow-hidden")
+          : "-translate-x-full " + (isPhone ? "" : "md:translate-x-0 ") + (isSidebarOpen ? "w-[260px]" : "w-0 border-r-0 overflow-hidden")
           }`}
       >
         {/* Top Section */}
@@ -2638,7 +2652,7 @@ export default function ProjectListScreen({
             <button
               type="button"
               onClick={() => setIsSidebarOpen(false)}
-              className="hidden md:flex p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+              className={`${isPhone ? "hidden" : "hidden md:flex"} p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer`}
               title="Collapse sidebar"
               aria-label="Collapse sidebar"
             >
@@ -2651,7 +2665,7 @@ export default function ProjectListScreen({
             <button
               type="button"
               onClick={() => setMobileMenuOpen(false)}
-              className="md:hidden p-2 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+              className={`${isPhone ? "" : "md:hidden"} p-2 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer`}
               title="Close navigation"
               aria-label="Close navigation"
             >
@@ -2760,10 +2774,10 @@ export default function ProjectListScreen({
               <span>{projectsLoadError}</span>
               <button
                 type="button"
-                onClick={load}
+                onClick={projectsLoadNeedsSignIn ? () => openAuth("signin", "Sign in again to see your projects.") : load}
                 className="self-start px-3 py-1 rounded-lg border border-[color:var(--border-control)] font-semibold hover:bg-[color:var(--surface-hover)] cursor-pointer"
               >
-                Try again
+                {projectsLoadNeedsSignIn ? "Sign in" : "Try again"}
               </button>
             </div>
           )}
@@ -2979,7 +2993,7 @@ export default function ProjectListScreen({
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-2 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer"
+              className={`${isPhone ? "" : "md:hidden"} p-2 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer`}
               aria-label="Open navigation"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -2991,7 +3005,7 @@ export default function ProjectListScreen({
             <button
               type="button"
               onClick={() => setIsSidebarOpen((prev) => !prev)}
-              className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 text-xs font-medium cursor-pointer transition-all animate-in fade-in"
+              className={`${isPhone ? "hidden" : "hidden md:flex"} items-center gap-2 px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 text-xs font-medium cursor-pointer transition-all animate-in fade-in`}
               title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
               aria-label={isSidebarOpen ? "Toggle sidebar" : "Expand sidebar"}
             >
@@ -3072,10 +3086,11 @@ export default function ProjectListScreen({
                   setTimeout(() => guideInputRef.current?.focus(), 150);
                 }}
                 title="Ask Scholar"
-                className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 border-neutral-200/90 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white animate-in fade-in zoom-in-95 duration-150"
+                className="h-10 w-10 md:w-auto md:px-3.5 md:gap-2 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 border-neutral-200/90 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white animate-in fade-in zoom-in-95 duration-150"
                 aria-label="Toggle Scholar Core AI Assistant"
               >
                 <Lightbulb className="w-5 h-5 stroke-[1.9]" />
+                <span aria-hidden="true" className="hidden md:inline text-xs font-semibold">Ask Scholar</span>
               </button>
             )}
           </div>
@@ -3380,14 +3395,12 @@ export default function ProjectListScreen({
                               </div>
 
                               {/* Bottom Row: Divider & Actionable Deliverables Spec */}
-                              <div className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
+                              {/* One spec per line: wrapped "a · b · c" stranded dots at line ends and put the dividers at different heights. */}
+                              <ul className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-col gap-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
                                 {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
-                                  <React.Fragment key={idx}>
-                                    {idx > 0 && <span className="text-neutral-400 dark:text-neutral-400 opacity-60 font-bold">·</span>}
-                                    <span className="font-medium whitespace-nowrap">{part}</span>
-                                  </React.Fragment>
+                                  <li key={idx} className="font-medium">{part}</li>
                                 ))}
-                              </div>
+                              </ul>
                             </button>
                           );
                         })}
@@ -3448,6 +3461,7 @@ export default function ProjectListScreen({
             {[
               {
                 label: "Ask",
+                fullName: "Ask Scholar",
                 icon: Lightbulb,
                 active: activeView === "projects" && !choosing,
                 onClick: () => {
@@ -3457,9 +3471,10 @@ export default function ProjectListScreen({
                   else setTimeout(() => guideTextareaRef.current?.focus(), 300);
                 },
               },
-              { label: "Projects", icon: FolderOpen, active: false, onClick: () => setMobileMenuOpen(true) },
+              { label: "Projects", fullName: "Projects", icon: FolderOpen, active: false, onClick: () => setMobileMenuOpen(true) },
               {
                 label: "Vault",
+                fullName: "Knowledge Vault",
                 icon: Database,
                 active: activeView === "vault",
                 onClick: () => {
@@ -3473,6 +3488,7 @@ export default function ProjectListScreen({
               },
               {
                 label: "AI",
+                fullName: "AI Access",
                 icon: Sliders,
                 active: activeView === "ai-access",
                 onClick: () => {
@@ -3489,6 +3505,7 @@ export default function ProjectListScreen({
                 key={item.label}
                 type="button"
                 onClick={item.onClick}
+                aria-label={item.fullName}
                 aria-current={item.active ? "page" : undefined}
                 className={`flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium cursor-pointer ${item.active ? "text-neutral-900 dark:text-white" : "text-neutral-500 dark:text-neutral-400"
                   }`}
@@ -3837,14 +3854,12 @@ export default function ProjectListScreen({
                               </div>
 
                               {/* Bottom Row: Divider & Actionable Deliverables Spec */}
-                              <div className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
+                              {/* One spec per line: wrapped "a · b · c" stranded dots at line ends and put the dividers at different heights. */}
+                              <ul className="pt-3.5 mt-2 border-t border-neutral-100 dark:border-white/5 flex flex-col gap-0.5 text-[11px] sm:text-[11.5px] text-neutral-500 dark:text-neutral-400 font-sans leading-tight">
                                 {((tile.specs || tile.footer).split(" · ")).map((part, idx) => (
-                                  <React.Fragment key={idx}>
-                                    {idx > 0 && <span className="text-neutral-400 dark:text-neutral-400 opacity-60 font-bold">·</span>}
-                                    <span className="font-medium whitespace-nowrap">{part}</span>
-                                  </React.Fragment>
+                                  <li key={idx} className="font-medium">{part}</li>
                                 ))}
-                              </div>
+                              </ul>
                             </button>
                           );
                         })}
@@ -4796,7 +4811,20 @@ export default function ProjectListScreen({
                           )}
 
                           {/* Exact 6 Post-Response Actions in Single Non-Wrapping Row (Sections 8, 11, 13) */}
-                          {msg.sender === "assistant" && !msg.error && msg.id !== "init" && msg.id !== "reset-assistant" && (
+                          {msg.sender === "assistant" && !msg.error && msg.kind === "help" && (
+                            // Help answers are not research: Export to Word / BibTeX / Save to Vault make no sense on them.
+                            <div className="mt-2">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyMessage(msg.id, msg.text)}
+                                className="inline-flex items-center gap-1.5 min-h-9 px-3 rounded-lg text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/10 cursor-pointer focus-visible:outline-2 focus-visible:outline-sky-500"
+                              >
+                                <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+                                {copiedMessageId === msg.id ? "Copied" : "Copy"}
+                              </button>
+                            </div>
+                          )}
+                          {msg.sender === "assistant" && !msg.error && msg.kind !== "help" && msg.id !== "init" && msg.id !== "reset-assistant" && (
                             <PostResponseActionBar
                               message={{
                                 ...msg,

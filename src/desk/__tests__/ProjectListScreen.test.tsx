@@ -1145,15 +1145,15 @@ describe("distinct academic format USPs & specs", () => {
     expect(screen.getByText("10 – 35 slides")).toBeInTheDocument();
   });
 
-  it("renders centered middle-dot separator with subtle opacity styling", async () => {
+  it("lists each deliverable spec on its own line, with no stranded separator dots", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     const essayHeading = screen.getByRole("heading", { name: "Coursework & Essays" });
     const card = essayHeading.closest("button")!;
-    const dot = card.querySelector(".opacity-60");
-    expect(dot).toBeInTheDocument();
-    expect(dot?.textContent).toBe("·");
+    const specs = Array.from(card.querySelectorAll("ul li")).map((li) => li.textContent);
+    expect(specs).toEqual(["Structured Outline", "Rubric Matched", "800 – 4,000 words"]);
+    expect(card.textContent).not.toContain("·");
   });
 
   it("does not render pen, pencil, or edit icons on dashboard cards", async () => {

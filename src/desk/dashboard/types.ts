@@ -33,6 +33,8 @@ export interface WebsiteAssistantMessage {
   action?: AssistantAction;
   followUps?: string[];
   mode?: "chat" | "search" | "deep-research" | "deliverable";
+  /** A built-in help/platform answer rather than a research answer: no export, citation or vault actions. */
+  kind?: "help";
   provider?: string;
   model?: string;
   plan?: string[];

@@ -71,10 +71,12 @@ describe("phone home: Ask Scholar first", () => {
     const onOpenVault = vi.fn();
     renderHome(onOpenAiAccess, onOpenVault);
     const nav = screen.getByRole("navigation", { name: "Main" });
+    // Short visible labels; the accessible names are the same words used everywhere else for these places.
     expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual(["Ask", "Projects", "Vault", "AI"]);
-    fireEvent.click(within(nav).getByRole("button", { name: "AI" }));
+    expect(within(nav).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Ask Scholar", "Projects", "Knowledge Vault", "AI Access"]);
+    fireEvent.click(within(nav).getByRole("button", { name: "AI Access" }));
     expect(onOpenAiAccess).toHaveBeenCalled();
-    fireEvent.click(within(nav).getByRole("button", { name: "Vault" }));
+    fireEvent.click(within(nav).getByRole("button", { name: "Knowledge Vault" }));
     expect(onOpenVault).toHaveBeenCalled();
   });
 
@@ -203,6 +205,21 @@ describe("phone home: Ask Scholar first", () => {
       expect(await screen.findByTestId("mobile-resume-chat")).toHaveTextContent("What is a literature review?");
       expect(screen.getByText("Where will your research begin?")).toBeInTheDocument();
       expect(screen.queryByText("Ask Scholar Copilot Active")).toBeNull();
+    });
+
+    it("shows research progress as one line with Details and Stop while answering", async () => {
+      vi.mocked(api.executeAgenticLLM).mockImplementation(() => new Promise(() => {}) as never);
+      vi.mocked(api.executeAgenticQuery).mockImplementation(() => new Promise(() => {}) as never);
+      startChat("What is a literature review?");
+      const progress = await screen.findByTestId("mobile-ask-progress");
+      expect(within(progress).getByRole("status")).toHaveTextContent(/Searching scholarly sources|Writing your answer/);
+      const details = within(progress).getByRole("button", { name: "Details" });
+      expect(details).toHaveAttribute("aria-expanded", "false");
+      expect(within(progress).getByRole("button", { name: "Stop" })).toBeInTheDocument();
+      fireEvent.click(details);
+      expect(within(progress).getByRole("button", { name: "Hide details" })).toHaveAttribute("aria-expanded", "true");
+      fireEvent.click(within(progress).getByRole("button", { name: "Stop" }));
+      await waitFor(() => expect(screen.queryByTestId("mobile-ask-progress")).toBeNull());
     });
 
     it("goes back to the landing, which offers to resume the chat", async () => {

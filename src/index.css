@@ -795,6 +795,11 @@ button:disabled {
     min-width: 44px;
   }
 
+  /* Native selects get the same minimum height as buttons. */
+  select:not([data-compact="true"]) {
+    min-height: 44px;
+  }
+
   /* iOS zooms the viewport when a focused input's text is under 16px. */
   input, textarea, select {
     font-size: 16px;
