@@ -28,7 +28,7 @@ A user's own key reaches the server only on AI routes (`routeUsesClientAi` in `s
 | `server/routes/project/agentic/blueprintRoutes.ts`, `citationSupportRoutes.ts`, `journalProfileRoutes.ts` | `routedCompletion` |
 | `server/routes/project/assignment/*Routes.ts` and `helpers.ts` | scholarBrain wrappers, `scholarBrain.*`, gateway failover (`completeWithFailover`), `routedCompletion` |
 | `server/routes/project/thesis.ts`, `proposal.ts`, `presentation.ts` | `scholarBrain.*` (thesis and proposal use `browserFallback: true`) |
-| `server/routes/project/core/manuscriptAndGateRoutes.ts`, `core/projectHelpers.ts`, `server/routes/project.ts` | Premium (`runPremium*` wrappers over `runPremium`) or the user's key (manuscript sections, coherence, peer review, cover letter, anonymization, journal requirements) |
+| `server/routes/project/core/manuscriptAndGateRoutes.ts`, `core/projectHelpers.ts`, `server/routes/project.ts` | Premium (`runPremium*` wrappers over `runPremium`) or the user's connections via `server/src/ai/studioAi.ts` (`runWithUserAi`: live model, failover across connections; manuscript sections, coherence, peer review, cover letter, anonymization, journal requirements) |
 | `server/routes/studio.ts` | Premium (`/api/studio/refine`) |
 | `server/src/research/deepResearchEngine.ts`, `server/src/aiEngine/opportunityAgent.ts` | `routedCompletion` / router bridge |
 | `server/services/briefScannerGraph.ts` | LangGraph workflow |

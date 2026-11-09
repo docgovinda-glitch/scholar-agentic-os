@@ -1,3 +1,8 @@
+import { resolveRouterTarget } from "../../src/platform/router/providerMap.ts";
+import { listModelsFor, ModelListError } from "../../src/platform/router/modelListers.ts";
+import { normalizeCapabilities } from "../../src/services/modelDiscovery.ts";
+import { AiEndpointBlockedError, createAiFetch } from "../src/ai/aiEndpointGuard.ts";
+import { clearAccountKeyring } from "../src/ai/accountAi.ts";
 import express from "express";
 import { requireAuth, type AuthenticatedUser } from "../src/middleware/auth";
 import { asyncHandler } from "../src/middleware/asyncHandler";
@@ -139,7 +144,9 @@ export function registerAiAccessRoutes(app: express.Express): void {
     if (!vaultAvailable()) return vaultOff(res);
     try {
       const body = (req.body ?? {}) as { key?: unknown };
-      res.json(await saveUserKey(userId(req), req.params.providerId, body.key as string));
+      const saved = await saveUserKey(userId(req), req.params.providerId, body.key as string);
+      clearAccountKeyring(userId(req));
+      res.json(saved);
     } catch (err) {
       keyFail(res, err);
     }
@@ -149,6 +156,7 @@ export function registerAiAccessRoutes(app: express.Express): void {
     if (!vaultAvailable()) return vaultOff(res);
     try {
       await deleteUserKey(userId(req), req.params.providerId);
+      clearAccountKeyring(userId(req));
       res.json({ success: true });
     } catch (err) {
       keyFail(res, err);
@@ -177,14 +185,35 @@ export function registerAiAccessRoutes(app: express.Express): void {
       const effectiveKey = apiKey || (req.headers["x-ai-api-key"] as string) || "";
       const effectiveBaseUrl = baseUrl || url || (req.headers["x-ai-base-url"] as string) || undefined;
 
-      const spec = getCloudProvider(providerId);
-      if (!spec && providerId !== "ollama" && providerId !== "lmstudio" && providerId !== "vllm" && providerId !== "localai") {
+      // Local runners live on the person's own machine, which this server cannot reach.
+      if (providerId === "ollama" || providerId === "lmstudio" || providerId === "vllm" || providerId === "localai") {
+        return res.status(400).json({ ok: false, error: "Local runners are listed by your browser, not by this server." });
+      }
+      if (!getCloudProvider(providerId)) {
         return res.status(400).json({ error: `Unknown provider "${providerId}".` });
       }
-
-      const { discoverProviderModels } = await import("../../src/services/modelDiscovery.js");
-      const result = await discoverProviderModels(providerId, effectiveKey, effectiveBaseUrl, true);
-      res.json(result);
+      // A typed address is tidied and validated, then fetched only through the guarded client:
+      // https only, public addresses only, connection pinned to the checked address, no redirects.
+      const target = resolveRouterTarget(providerId, effectiveBaseUrl);
+      if (!target.ok) return res.status(400).json({ ok: false, error: target.reason });
+      try {
+        const live = await listModelsFor({ provider: target.target.provider, via: target.target.via, baseUrl: target.target.baseUrl }, { apiKey: effectiveKey, fetchImpl: createAiFetch(), signal: AbortSignal.timeout(8000) });
+        const verifiedAt = new Date().toISOString();
+        const models = live.filter((m) => m.generatesText !== false && !m.deprecated).map((m) => ({
+          id: m.id,
+          providerId,
+          displayName: m.displayName || m.id,
+          capabilities: normalizeCapabilities(providerId, m.id).capabilities,
+          contextWindow: m.contextWindow ?? null,
+          source: "live_discovery" as const,
+          verifiedAt,
+        }));
+        return res.json({ ok: true, models, source: "live_discovery" });
+      } catch (err) {
+        if (err instanceof AiEndpointBlockedError) return res.status(400).json({ ok: false, error: err.message });
+        if (err instanceof ModelListError) return res.status(err.unsupported ? 200 : err.status === 401 || err.status === 403 ? 401 : 502).json({ ok: false, models: [], source: "compatibility_fallback", error: err.message });
+        return res.status(502).json({ ok: false, error: "Could not reach the provider." });
+      }
     })
   );
 

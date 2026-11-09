@@ -120,6 +120,8 @@ export async function complete(
     systemPrompt: effectiveSystemPrompt,
   });
   const latencyMs = Date.now() - start;
+  // One place for every caller (Studio, Mesh, journal extraction): a model that wrote nothing has failed.
+  assertAnswered(req.provider, text);
 
   return {
     text,
@@ -159,6 +161,7 @@ export async function stream(
         return result;
       });
   const latencyMs = Date.now() - start;
+  assertAnswered(req.provider, text);
 
   return {
     text,

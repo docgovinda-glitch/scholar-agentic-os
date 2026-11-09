@@ -152,6 +152,9 @@ export function openAiCompatibleAdapter(fetchImpl: FetchImpl = fetch): ProviderA
 }
 
 // ── Anthropic Messages ───────────────────────────────────────────────────────
+/** About 1,000 tokens: below this the provider does not cache. */
+const CACHEABLE_SYSTEM_CHARS = 4_000;
+
 function anthropicBody(req: RouteRequest, c: Candidate, maxOutputTokens: number) {
   const system = req.messages.filter((m) => m.role === "system").map((m) => textOf(m.content)).join("\n\n");
   const messages = req.messages.filter((m) => m.role !== "system").map((m) => ({
@@ -167,7 +170,9 @@ function anthropicBody(req: RouteRequest, c: Candidate, maxOutputTokens: number)
     max_tokens: maxOutputTokens,
     stream: true,
     messages,
-    ...(system ? { system } : {}),
+    // A long system prompt (grounding sources, house rules) repeats across a workspace's calls: marking it
+    // cacheable makes repeats cost a fraction of the input price. Short prompts are below the provider's minimum.
+    ...(system ? { system: system.length >= CACHEABLE_SYSTEM_CHARS ? [{ type: "text", text: system, cache_control: { type: "ephemeral" } }] : system } : {}),
     ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
     ...(req.tools?.length ? { tools: req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })) } : {}),
   };

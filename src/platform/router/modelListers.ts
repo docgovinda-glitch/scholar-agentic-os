@@ -32,9 +32,13 @@ async function getJson(provider: ProviderId, url: string, headers: Record<string
     const text = await res.text().catch(() => "");
     throw new ModelListError(provider, res.status, res.status === 401 || res.status === 403 ? "The key was rejected" : `Model list failed (${res.status}): ${text.slice(0, 160)}`);
   }
-  return res.json();
+  // A model list is small; a huge body is not one (and must not be read into memory).
+  const text = await res.text();
+  if (text.length > MAX_LIST_BYTES) throw new ModelListError(provider, res.status, "The provider's model list was too large to read.");
+  try { return JSON.parse(text); } catch { throw new ModelListError(provider, res.status, "The provider's model list was not valid JSON."); }
 }
 
+const MAX_LIST_BYTES = 4_000_000;
 const need = (provider: ProviderId, ctx: ListerContext) => {
   if (!ctx.apiKey) throw new ModelListError(provider, undefined, "No key provided");
   return ctx.apiKey;

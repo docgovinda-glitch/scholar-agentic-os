@@ -38,3 +38,16 @@ describe("keyring", () => {
     expect(JSON.parse(Buffer.from(enc, "base64url").toString("utf8"))).toEqual([{ provider: "openai", model: "m", apiKey: "k/+?" }]);
   });
 });
+
+import { assembleKeyring } from "../../../platform/router/keyringAssemble";
+
+describe("assembleKeyring (shared by browser and server)", () => {
+  it("builds the same keyring from the same settings and keys on any device", () => {
+    const settings = { provider: "groq", preferences: { groqModel: "g-1", openrouterModel: "or-1" } };
+    const keys: Record<string, string> = { groq: "k1", openrouter: "k2", cohere: "k3" };
+    const a = assembleKeyring(settings, Object.keys(keys), (id) => keys[id]);
+    const b = assembleKeyring(settings, Object.keys(keys).reverse(), (id) => keys[id]);
+    expect(a.map((e) => [e.via, e.model])).toEqual([["groq", "g-1"], ["openrouter", "or-1"], ["cohere", "auto"]]);
+    expect(b[0].via).toBe("groq");
+  });
+});

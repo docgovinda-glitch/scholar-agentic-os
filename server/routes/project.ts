@@ -1,3 +1,4 @@
+import { runWithUserAi } from "../src/ai/studioAi.ts";
 import crypto from "crypto";
 import express from "express";
 import { catalog } from "../../src/app/atlas/atlas.ts";
@@ -649,12 +650,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
 
     try {
-      const result = await extractJournalRequirements({
-        ...baseInput,
-        provider: typeof provider === "string" ? provider : undefined,
-        apiKey: typeof apiKey === "string" ? apiKey : undefined,
-        model: typeof model === "string" ? model : undefined,
-      });
+      const result = await runWithUserAi(req, { task: "reasoning", explicit: { provider, apiKey, model } }, (ai) => extractJournalRequirements({ ...baseInput, ...ai }));
       return res.json({ proposal: result.proposal });
     } catch (err) {
       if (err instanceof GatewayDenied) {

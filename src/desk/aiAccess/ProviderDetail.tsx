@@ -2,6 +2,7 @@ import { useState } from "react";
 import { providerAccessFacts, type CloudProviderSpec } from "../../config/providerCatalog";
 import { getModelsForProvider, type ModelSpec } from "../../config/modelCatalog";
 import type { ConnectCloudResult } from "./useAiAccess";
+import { normalizeBaseUrl } from "../../platform/router/baseUrl";
 import ModelSelectField from "./ModelSelectField";
 import { bestDiscovered, curatedToSpec } from "./bestModels";
 import type { ConnectionTier, ProviderView } from "./useAiAccess";
@@ -201,7 +202,18 @@ export default function ProviderDetail({
         setError("This provider needs a custom address — see the note under the field.");
         return;
       }
-      const outcome = await onConnect({ apiKey: apiKey.trim(), model: model.trim(), baseUrl: baseUrl.trim() || undefined, makeDefault, tier });
+      // A typed address is cleaned (a pasted full endpoint is cut back to its base) and checked before anything is sent.
+      let address: string | undefined;
+      if (baseUrl.trim()) {
+        const checked = normalizeBaseUrl(baseUrl);
+        if (!checked.ok) {
+          setError(checked.reason);
+          return;
+        }
+        address = checked.url;
+        setBaseUrl(checked.url);
+      }
+      const outcome = await onConnect({ apiKey: apiKey.trim(), model: model.trim(), baseUrl: address, makeDefault, tier });
       if (!outcome.ok) {
         setError(outcome.error ?? "Could not connect.");
         return;
@@ -357,6 +369,10 @@ export default function ProviderDetail({
                 className="mt-1 w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <p className="mt-1 text-xs text-[color:var(--text-muted)]">{spec.customBaseUrlHint}</p>
+              {(() => {
+                const c = baseUrl.trim() ? normalizeBaseUrl(baseUrl) : null;
+                return c && c.ok ? <p className="mt-1 text-xs text-[color:var(--text-secondary)]">Your key will be sent only to <span className="font-mono">{c.host}</span>.</p> : null;
+              })()}
             </div>
           )}
         </Step>

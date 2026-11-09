@@ -129,6 +129,8 @@ export const AI_ROUTE_PATTERNS: RegExp[] = [
   /^\/api\/ai(\/|$)/,
   /^\/api\/drafting(\/|$)/,
   /^\/api\/projects\/[^/]+\/(agent|agentic|assignment|thesis|proposal|presentation)(\/|$)/,
+  // Journal Writer: manuscript sections, coherence, peer review, requirements, cover letter, anonymisation.
+  /^\/api\/projects\/[^/]+\/(manuscript|journal-requirements|cover-letter|anonymization)(\/|$)/,
 ];
 
 export function routeUsesClientAi(input: string): boolean {

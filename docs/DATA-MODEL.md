@@ -19,7 +19,7 @@ Tables, storage and state shapes. The authority is the SQL in `supabase/` (`sche
 | :--- | :--- | :--- |
 | `profiles` | `id`, `username`, `full_name`, `phone`, `phone_country_code`, `phone_e164` (generated), `affiliation`, `user_type`, `education_level`, `account_status`, `model_preferences`, `created_at`, `updated_at` | Yes |
 | `api_credentials` | `user_id`, `provider`, `encrypted_api_key`, `api_key_hash`, `updated_at` | Yes |
-| `user_ai_settings` | `user_id`, `provider`, `preferences`, `updated_at` | Yes |
+| `user_ai_settings` | `user_id`, `provider`, `preferences`, `updated_at` (default provider and chosen models; no secrets; written by the browser, read by the server so any device uses the person's choices; migration `20261109120000_user_ai_settings.sql`) | Yes |
 | `security_credential_reset_notices` | `user_id`, `had_api_credentials`, `had_cloud_integrations`, `created_at`, `dismissed_at` | Yes |
 | `admin_users` | `user_id`, `granted_by`, `granted_at`, `note`, `scopes` | Yes |
 

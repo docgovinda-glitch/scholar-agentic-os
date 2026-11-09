@@ -114,6 +114,7 @@ Export formats: `docx`, `odt`, `pdf`, `latex`, `typst`, `camera_ready_pdf`, `mar
 | :--- | :--- | :--- | :--- |
 | POST | `/api/ai/run` | Yes | Unified streaming (SSE) call through the router; see [`AI-SYSTEM.md`](AI-SYSTEM.md) §2.1 |
 | GET | `/api/ai/models` | Yes | Curated live model list for the keys in the request, with `recommended` and `options` per connection |
+| POST | `/api/ai-access/models` | Yes | Live model list for a catalog provider with the key in the request; a typed address is normalised and fetched only through the guarded client (https, public addresses, pinned, no redirects) |
 | POST | `/api/ai/verify` | Yes | Tests a key end to end (live model list + one real request) and recommends a model; key in `x-ai-api-key`; see [`AI-SYSTEM.md`](AI-SYSTEM.md) §2.0 |
 | GET | `/api/ai/status` | Public | AI availability |
 | POST | `/api/ai/search` | Yes | Web search |

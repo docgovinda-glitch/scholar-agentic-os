@@ -29,6 +29,7 @@ import {
   GenerationJobError,
 } from "../../../../src/domain/manuscript/stateMachine.ts";
 import { generateSection, GatewayDenied } from "../../../../src/app/manuscript/generate.ts";
+import { runWithUserAi } from "../../../src/ai/studioAi.ts";
 import { checkCoherence } from "../../../../src/app/coherence/checkCoherence.ts";
 import type { CoherenceDimension } from "../../../../src/domain/coherence/types.ts";
 import { COHERENCE_DIMENSIONS } from "../../../../src/domain/coherence/types.ts";
@@ -189,13 +190,11 @@ export function registerManuscriptAndGateRoutes(
       }
 
       try {
-        const result = await generateSection({
+        const result = await runWithUserAi(req, { task: "drafting", explicit: { provider, apiKey, model } }, (ai) => generateSection({
           packet,
-          provider: typeof provider === "string" ? provider : undefined,
-          apiKey: typeof apiKey === "string" ? apiKey : undefined,
-          model: typeof model === "string" ? model : undefined,
+          ...ai,
           policy,
-        });
+        }));
         const updated = await checkpoint(result.section);
         return res.json({ generationJob: updated.generationJob });
       } catch (err) {
@@ -299,14 +298,12 @@ export function registerManuscriptAndGateRoutes(
       }
 
       try {
-        const coherenceReport = await checkCoherence({
+        const coherenceReport = await runWithUserAi(req, { task: "reasoning", explicit: { provider, apiKey, model } }, (ai) => checkCoherence({
           sections,
-          provider: typeof provider === "string" ? provider : undefined,
-          apiKey: typeof apiKey === "string" ? apiKey : undefined,
-          model: typeof model === "string" ? model : undefined,
+          ...ai,
           policy,
           dimensions,
-        });
+        }));
         const updated = await saveReport(coherenceReport);
         return res.json({ generationJob: updated.generationJob });
       } catch (err) {
@@ -380,16 +377,14 @@ export function registerManuscriptAndGateRoutes(
       }
 
       try {
-        const round = await runPeerReview({
+        const round = await runWithUserAi(req, { task: "reasoning", explicit: { provider, apiKey, model } }, (ai) => runPeerReview({
           sections,
           roundNumber,
           journalRequirements,
-          provider: typeof provider === "string" ? provider : undefined,
-          apiKey: typeof apiKey === "string" ? apiKey : undefined,
-          model: typeof model === "string" ? model : undefined,
+          ...ai,
           policy,
           lenses,
-        });
+        }));
         const updated = await saveRound(round);
         return res.json({ peerReviewHistory: updated.peerReviewHistory, gates: summarize(updated.gates) });
       } catch (err) {
@@ -506,14 +501,12 @@ export function registerManuscriptAndGateRoutes(
       }
 
       try {
-        const { coverLetter } = await generateCoverLetter({
+        const { coverLetter } = await runWithUserAi(req, { task: "drafting", explicit: { provider, apiKey, model } }, (ai) => generateCoverLetter({
           document,
           journalRequirements,
-          provider: typeof provider === "string" ? provider : undefined,
-          apiKey: typeof apiKey === "string" ? apiKey : undefined,
-          model: typeof model === "string" ? model : undefined,
+          ...ai,
           policy,
-        });
+        }));
         const updated = await store.save({ ...record, coverLetter });
         return res.json({ coverLetter: updated.coverLetter });
       } catch (err) {
@@ -578,13 +571,11 @@ export function registerManuscriptAndGateRoutes(
     }
 
     try {
-      const anonymizationReport = await proposeAnonymization({
+      const anonymizationReport = await runWithUserAi(req, { task: "reasoning", explicit: { provider, apiKey, model } }, (ai) => proposeAnonymization({
         document,
-        provider: typeof provider === "string" ? provider : undefined,
-        apiKey: typeof apiKey === "string" ? apiKey : undefined,
-        model: typeof model === "string" ? model : undefined,
+          ...ai,
         policy,
-      });
+      }));
       const updated = await store.save({ ...record, anonymizationReport });
       return res.json({ anonymizationReport: updated.anonymizationReport });
     } catch (err) {

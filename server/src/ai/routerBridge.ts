@@ -21,6 +21,7 @@ import type { Candidate, ProviderAdapter, ProviderId, RouteRequest, RouterEvent,
 import { keyringToCandidates, parseKeyring, type KeyringEntry, type PremiumPort } from "../../routes/aiRun.ts";
 import { resolveRouterTarget } from "../../../src/platform/router/providerMap.ts";
 import { expandKeyring, quarantineModel } from "./liveModels.ts";
+import { accountKeyring } from "./accountAi.ts";
 import { screenCandidates, serverAdapters } from "./aiEndpointGuard.ts";
 import { LocalModelUnreachableError, NoClientAiProviderError } from "./aiRouteErrors.ts";
 
@@ -89,6 +90,18 @@ function legacyEntry(headers: Request["headers"]): KeyringEntry | undefined {
 
 type Scoped = Request & { user?: { id: string }; aiRoute?: AiRouteSummary };
 
+/**
+ * Every connection this request can use: the ones this device sent (headers),
+ * then the person's account connections they do not already cover. A device
+ * that has not synced its keys yet therefore still works on its first request.
+ */
+export async function requestKeyring(req: Scoped): Promise<KeyringEntry[]> {
+  const sent = keyringFromRequest(req);
+  const fromAccount = await accountKeyring(req.user?.id);
+  const have = new Set(sent.map((e) => e.via ?? e.provider));
+  return [...sent, ...fromAccount.filter((e) => !have.has(e.via ?? e.provider))].slice(0, 8);
+}
+
 function summarise(target: AiRouteSummary, ev: RouterEvent) {
   if (ev.type === "fallback") target.notices.push({ kind: "fallback", text: `Switched from ${ev.fromLabel} to ${ev.toLabel}: ${ev.message}${ev.httpStatus ? ` (HTTP ${ev.httpStatus})` : ""}` });
   if (ev.type === "retry") target.notices.push({ kind: "retry", text: `Retried after ${Math.round(ev.waitMs / 100) / 10}s: ${ev.message}` });
@@ -105,6 +118,8 @@ export interface RoutedCall {
   systemPrompt?: string;
   userPrompt: string;
   maxOutputTokens?: number;
+  /** Ask the model to continue when cut off at its output limit. Default: yes when no `maxOutputTokens` was given. */
+  continueOnLength?: boolean;
   temperature?: number;
   /** Images sent with the user prompt (base64, no data: prefix). */
   images?: Array<{ mediaType: string; data: string }>;
@@ -116,7 +131,7 @@ export interface RoutedCall {
 /** The chain for this request and task. Throws NoAiConnectedError when it is empty. */
 export async function chainFor(req: Scoped, task: TaskClass): Promise<Candidate[]> {
   // Each connection becomes its live model plus up to two live alternates; a retired or missing model is replaced here.
-  const expanded = await expandKeyring(keyringFromRequest(req), task);
+  const expanded = await expandKeyring(await requestKeyring(req), task);
   for (const n of expanded.notices) (req.aiRoute ??= { notices: [] }).notices.push(n);
   const offered = keyringToCandidates(expanded.entries);
   const { kept: own, blocked } = await screenCandidates(offered);
@@ -133,7 +148,22 @@ export async function chainFor(req: Scoped, task: TaskClass): Promise<Candidate[
   return chain;
 }
 
-/** Runs one prompt through the router and returns the text. */
+/**
+ * Output allowance when the caller states none. Providers bill what is generated, not what is allowed,
+ * so a roomy limit costs nothing for a short answer, while a too-small one cuts a long draft (or a
+ * reasoning model's thinking) off. Quick tasks get a small limit so a runaway answer stays cheap.
+ */
+export const DEFAULT_OUTPUT_BY_TASK: Record<TaskClass, number> = {
+  fast: 4_096, vision: 8_192, coding: 32_768, drafting: 32_768, reasoning: 32_768, "long-context": 32_768,
+};
+const MAX_CONTINUATIONS = 2;
+const CONTINUE_PROMPT = "Your last answer was cut off at the length limit. Continue exactly where it stopped: no preamble, no repetition of what you already wrote.";
+
+/**
+ * Runs one prompt through the router and returns the text. When the answer is cut off at the model's
+ * output limit (and the caller did not ask for a short one), the model is asked to continue, up to twice,
+ * so a long section or report arrives whole instead of ending mid-sentence.
+ */
 export async function routedText(req: Request, call: RoutedCall): Promise<string> {
   const scoped = req as Scoped;
   scoped.aiRoute ??= { notices: [] };
@@ -143,33 +173,48 @@ export async function routedText(req: Request, call: RoutedCall): Promise<string
   const userContent: RouteRequest["messages"][number]["content"] = images.length
     ? [{ type: "text", text: call.userPrompt }, ...images.map((i) => ({ type: "image" as const, mediaType: i.mediaType, data: i.data }))]
     : call.userPrompt;
-  const request: RouteRequest = {
-    requestId: crypto.randomUUID(),
-    task,
-    messages: [...(call.systemPrompt ? [{ role: "system" as const, content: call.systemPrompt }] : []), { role: "user" as const, content: userContent }],
-    desiredOutputTokens: call.maxOutputTokens ?? 16_384,
-    minOutputTokens: Math.min(512, call.maxOutputTokens ?? 512),
-    temperature: call.temperature,
-  };
+  const desired = call.maxOutputTokens ?? DEFAULT_OUTPUT_BY_TASK[task];
+  const mayContinue = call.continueOnLength ?? call.maxOutputTokens === undefined;
   const byId = new Map(chain.map((c) => [c.id, c]));
-  let text = "";
-  for await (const ev of route(request, chain, call.signal ?? new AbortController().signal, { site: "server", adapters: deps.adapters, breaker: deps.breaker, onCandidateFailure: (c, f) => { if (f.kind === "model_unavailable") quarantineModel(c); } })) {
-    summarise(scoped.aiRoute, ev);
-    call.onEvent?.(ev);
-    if (ev.type === "token") text += ev.text;
-    if (ev.type === "fallback" && ev.partialOutputDiscarded) text = "";
-    if (ev.type === "done") {
-      const c = byId.get(ev.candidateId);
-      if (c?.lane === "premium" && deps.premium && scoped.user?.id) await deps.premium.charge(scoped.user.id, c, ev.usage, request.requestId).catch(() => false);
-      // The router already treats an empty stream as a failure; this is the last line of defence.
-      if (!text.trim()) throw new RouterExhaustedError("The AI returned an empty answer.", "exhausted");
-      return text;
+  const base: RouteRequest["messages"] = [...(call.systemPrompt ? [{ role: "system" as const, content: call.systemPrompt }] : []), { role: "user" as const, content: userContent }];
+
+  const once = async (messages: RouteRequest["messages"]): Promise<{ text: string; finishReason: string }> => {
+    const request: RouteRequest = {
+      requestId: crypto.randomUUID(),
+      task,
+      messages,
+      desiredOutputTokens: desired,
+      minOutputTokens: Math.min(512, desired),
+      temperature: call.temperature,
+    };
+    let text = "";
+    for await (const ev of route(request, chain, call.signal ?? new AbortController().signal, { site: "server", adapters: deps.adapters, breaker: deps.breaker, onCandidateFailure: (c, f) => { if (f.kind === "model_unavailable") quarantineModel(c); } })) {
+      summarise(scoped.aiRoute!, ev);
+      call.onEvent?.(ev);
+      if (ev.type === "token") text += ev.text;
+      if (ev.type === "fallback" && ev.partialOutputDiscarded) text = "";
+      if (ev.type === "done") {
+        const c = byId.get(ev.candidateId);
+        if (c?.lane === "premium" && deps.premium && scoped.user?.id) await deps.premium.charge(scoped.user.id, c, ev.usage, request.requestId).catch(() => false);
+        // The router already treats an empty stream as a failure; this is the last line of defence.
+        if (!text.trim()) throw new RouterExhaustedError("The AI returned an empty answer.", "exhausted");
+        return { text, finishReason: ev.finishReason };
+      }
+      if (ev.type === "handoff") throw new RouterHandoffError(ev.label);
+      if (ev.type === "error") throw new RouterExhaustedError(ev.message, ev.code);
+      if (ev.type === "cancelled") throw new RouterExhaustedError("Cancelled", "non_retryable");
     }
-    if (ev.type === "handoff") throw new RouterHandoffError(ev.label);
-    if (ev.type === "error") throw new RouterExhaustedError(ev.message, ev.code);
-    if (ev.type === "cancelled") throw new RouterExhaustedError("Cancelled", "non_retryable");
+    throw new RouterExhaustedError("The AI stream ended without an answer.", "exhausted");
+  };
+
+  let { text, finishReason } = await once(base);
+  for (let i = 0; mayContinue && i < MAX_CONTINUATIONS && finishReason === "length"; i++) {
+    const next = await once([...base, { role: "assistant", content: text }, { role: "user", content: CONTINUE_PROMPT }]).catch(() => undefined);
+    if (!next) break; // keep what was written rather than lose it
+    text += next.text;
+    finishReason = next.finishReason;
   }
-  throw new RouterExhaustedError("The AI stream ended without an answer.", "exhausted");
+  return text;
 }
 
 /** Adds `aiRoute` to JSON responses of AI routes that ran through the router. */

@@ -159,3 +159,56 @@ describe("legacy single-provider headers for every catalog provider", () => {
     expect(ringOf({ "x-ai-provider": "cloudflare", "x-ai-api-key": "k" })).toEqual([]);
   });
 });
+
+import { routedText, DEFAULT_OUTPUT_BY_TASK } from "../routerBridge";
+import type { Request } from "express";
+
+describe("using the provider's allowance efficiently", () => {
+  const reqWith = (entry: Record<string, unknown>) => ({ headers: { "x-ai-keyring": ring([{ provider: "openai", model: "m", apiKey: SECRET, ...entry }]) }, user: undefined }) as unknown as Request;
+  const seen: Array<{ max: number; messages: unknown[] }> = [];
+  function install(script: Array<{ text: string; finish: "stop" | "length" }>) {
+    seen.length = 0;
+    let n = 0;
+    configureRouterBridge({
+      adapters: { openai: { async *stream(_c, r, max): AsyncIterable<AdapterChunk> {
+        seen.push({ max, messages: r.messages });
+        const step = script[Math.min(n++, script.length - 1)];
+        yield { type: "text", text: step.text };
+        yield { type: "finish", reason: step.finish };
+      } } },
+      breaker: new CircuitBreaker(new MemoryBreakerStore()),
+    });
+  }
+
+  it("asks for a roomy output limit on long tasks and a small one on quick tasks, bounded by the model's own limit", async () => {
+    install([{ text: "ok", finish: "stop" }]);
+    await routedText(reqWith({ maxOutputTokens: 100_000, contextWindow: 200_000 }), { task: "drafting", userPrompt: "write" });
+    expect(seen[0].max).toBe(DEFAULT_OUTPUT_BY_TASK.drafting);
+    await routedText(reqWith({ maxOutputTokens: 100_000, contextWindow: 200_000 }), { task: "fast", userPrompt: "label" });
+    expect(seen[1].max).toBe(DEFAULT_OUTPUT_BY_TASK.fast);
+    await routedText(reqWith({ maxOutputTokens: 6_000 }), { task: "drafting", userPrompt: "write" });
+    expect(seen[2].max).toBe(6_000);
+  });
+
+  it("continues an answer cut off at the output limit, so a long draft arrives whole", async () => {
+    install([{ text: "First half, ", finish: "length" }, { text: "second half.", finish: "stop" }]);
+    const text = await routedText(reqWith({}), { task: "drafting", userPrompt: "write" });
+    expect(text).toBe("First half, second half.");
+    expect(seen.length).toBe(2);
+    const second = seen[1].messages as Array<{ role: string; content: string }>;
+    expect(second.at(-2)).toMatchObject({ role: "assistant", content: "First half, " });
+    expect(second.at(-1)?.content).toMatch(/Continue exactly where it stopped/);
+  });
+
+  it("stops after two continuations, and keeps what was written if a continuation fails", async () => {
+    install([{ text: "a", finish: "length" }, { text: "b", finish: "length" }, { text: "c", finish: "length" }, { text: "d", finish: "stop" }]);
+    expect(await routedText(reqWith({}), { task: "drafting", userPrompt: "write" })).toBe("abc");
+    expect(seen.length).toBe(3);
+  });
+
+  it("does not continue when the caller asked for a short answer", async () => {
+    install([{ text: "short", finish: "length" }, { text: "more", finish: "stop" }]);
+    expect(await routedText(reqWith({}), { task: "drafting", userPrompt: "write", maxOutputTokens: 300 })).toBe("short");
+    expect(seen.length).toBe(1);
+  });
+});
