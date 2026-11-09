@@ -15,7 +15,9 @@ import { warmServer } from './services/serverWarmup';
 
 // Hydrate saved theme across all environments
 if (typeof document !== 'undefined') {
-  const savedTheme = localStorage.getItem('scholar-theme') || localStorage.getItem('theme') || 'dark';
+  // No saved choice yet: follow the device's light/dark setting (dark if it can't be read).
+  const systemTheme = window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  const savedTheme = localStorage.getItem('scholar-theme') || localStorage.getItem('theme') || systemTheme;
   document.documentElement.setAttribute('data-theme', savedTheme);
   if (savedTheme === 'dark') {
     document.documentElement.classList.add('dark');

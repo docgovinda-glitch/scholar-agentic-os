@@ -1,4 +1,4 @@
-import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   createProject,
@@ -41,9 +41,10 @@ import ScholarCoreLogo from "../components/ScholarCoreLogo";
 import { showAppToast, requestAppConfirm } from "../components/ui/FeedbackSystem";
 import UserAccountMenu from "./components/UserAccountMenu";
 import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
-import VaultScreen from "./vault/VaultScreen";
-import KnowledgeVault from "./vault/KnowledgeVault";
-import AiAccessPage, { type SectionId } from "./aiAccess/AiAccessPage";
+// Heavy screens that are not part of the first paint of the landing page.
+const KnowledgeVault = lazy(() => import("./vault/KnowledgeVault"));
+const AiAccessPage = lazy(() => import("./aiAccess/AiAccessPage"));
+import type { SectionId } from "./aiAccess/AiAccessPage";
 import { CommandPalette } from "./components/CommandPalette";
 import {
   Plus,
@@ -102,6 +103,7 @@ import LiveResearchTrajectoryVisualizer from "./components/LiveResearchTrajector
 import { type CitationGraphNode } from "../services/discovery/snowballSamplingService";
 import { type EvidenceMatrixItem, extractEvidenceFromPaper } from "../services/evidence/evidenceExtractionService";
 import { getCloudProvider } from "../config/providerCatalog";
+import { useVisualViewport } from "../hooks/useVisualViewport";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 import {
   ASK_ANSWER_GUIDE,
@@ -194,6 +196,22 @@ export {
  * Desk's entry surface: the signed-in user's own projects — transformed into
  * the SCHOLAR CORE Research Command Center.
  */
+/** Shown while a lazily loaded full-page screen (Vault, AI Access) downloads. */
+function LazyScreenFallback() {
+  return (
+    <div role="status" aria-live="polite" className="flex-1 flex items-center justify-center py-16 text-sm text-neutral-500 dark:text-neutral-400">
+      <span className="w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+      Loading…
+    </div>
+  );
+}
+
+/** Starter prompts for people with no projects yet; they fill the composer so they can be edited before sending. */
+const LANDING_EXAMPLE_PROMPTS = [
+  "Summarise the main debates on remote work and productivity, with sources",
+  "Help me plan a 2,000-word essay. I'll paste the brief next",
+] as const;
+
 export default function ProjectListScreen({
   onOpen,
   userEmail = null,
@@ -381,6 +399,8 @@ export default function ProjectListScreen({
   // Phones get an Ask-first home: Ask Scholar at the top, compact workspace
   // tiles below, and a bottom bar for the main places.
   const { isMobile: isPhone } = useDeviceClass();
+  // Keyboard-aware sizing on phones (iOS keeps 100dvh when the keyboard opens).
+  const { height: visualViewportHeight, keyboardOpen } = useVisualViewport(isPhone);
 
   // Command Palette & Resizable Assistant Split-Pane States
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -486,6 +506,8 @@ export default function ProjectListScreen({
       if (document.documentElement.classList.contains("dark") || document.documentElement.getAttribute("data-theme") === "dark") {
         return "dark";
       }
+      // First visit with no saved choice: follow the device setting.
+      if (window.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
     }
     return "dark";
   });
@@ -936,6 +958,40 @@ export default function ProjectListScreen({
       window.removeEventListener("scholar:ai-config-changed", refreshStatus);
     };
   }, []);
+
+  // The status check can be slow on a cold start. After a few seconds stop saying
+  // "Checking…" and offer the next step instead of leaving the user waiting.
+  const [aiCheckTimedOut, setAiCheckTimedOut] = useState(false);
+  useEffect(() => {
+    if (aiStatus) {
+      setAiCheckTimedOut(false);
+      return;
+    }
+    const t = window.setTimeout(() => setAiCheckTimedOut(true), 6000);
+    return () => window.clearTimeout(t);
+  }, [aiStatus]);
+  const aiStatusResolved = aiStatus !== null || aiCheckTimedOut;
+  const aiNeedsSetup = aiStatusResolved && !aiStatus?.connected;
+  const aiPillLabel = aiStatus?.connected
+    ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
+    : aiStatusResolved
+      ? "Connect an AI"
+      : "Checking AI…";
+
+  // "Connect an AI" banner on the phone landing; dismissal lasts for the browser session.
+  const [aiBannerDismissed, setAiBannerDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem("scholar-ai-banner-dismissed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const dismissAiBanner = () => {
+    setAiBannerDismissed(true);
+    try {
+      sessionStorage.setItem("scholar-ai-banner-dismissed", "1");
+    } catch { /* storage unavailable: dismissal just lasts until reload */ }
+  };
 
   async function parseFilesToAttachments(
     files: FileList | File[] | null,
@@ -2255,6 +2311,20 @@ export default function ProjectListScreen({
     getSupabaseClient().auth.signOut();
   }
 
+  // Up to two most recent projects for the phone landing's "Continue" rows.
+  const landingRecents = (projects ?? []).length === 0 || !userEmail
+    ? []
+    : recentProjectsList.slice(0, 2).flatMap((item) => {
+        const project = (projects ?? []).find((p) => p.projectId === item.projectId);
+        if (!project) return [];
+        return [{
+          projectId: item.projectId,
+          title: item.title,
+          outputTypeId: project.outputTypeId,
+          typeLabel: FORMAT_TILES.find((t) => t.id === project.outputTypeId)?.label ?? "",
+        }];
+      });
+
   // Shared by the phone Workspaces menu and the "Start a workspace" cards.
   const handleMobileTilePick = (tile: (typeof FORMAT_TILES)[number]) => {
     if (creating) return;
@@ -2415,7 +2485,7 @@ export default function ProjectListScreen({
             title="Send message (Enter)"
             aria-label="Send message"
             disabled={(!mainPromptInput.trim() && mainAttachments.length === 0) || isGuideThinking}
-            className="flex-shrink-0 w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer bg-neutral-900 text-white hover:bg-neutral-800 active:scale-95 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-sm disabled:bg-neutral-200/80 dark:disabled:bg-white/10 disabled:text-neutral-400 dark:disabled:text-neutral-500 disabled:shadow-none disabled:cursor-not-allowed"
+            className="flex-shrink-0 w-11 h-11 sm:w-8 sm:h-8 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer bg-neutral-900 text-white hover:bg-neutral-800 active:scale-95 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-sm disabled:bg-neutral-200/80 dark:disabled:bg-white/10 disabled:text-neutral-400 dark:disabled:text-neutral-500 disabled:shadow-none disabled:cursor-not-allowed"
           >
             {isGuideThinking ? (
               <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -2432,7 +2502,10 @@ export default function ProjectListScreen({
   );
 
   return (
-    <div className="h-screen h-[100dvh] w-full flex overflow-hidden bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-white font-sans selection:bg-neutral-100 selection:text-ink-850">
+    <div
+      style={visualViewportHeight ? { height: visualViewportHeight } : undefined}
+      className="h-screen h-[100dvh] w-full flex overflow-hidden bg-paper-cool dark:bg-ink-850 text-neutral-900 dark:text-white font-sans selection:bg-neutral-100 selection:text-ink-850"
+    >
       {/* Mobile Backdrop Overlay */}
       {mobileMenuOpen && (
         <div
@@ -2886,16 +2959,29 @@ export default function ProjectListScreen({
               <button
                 type="button"
                 onClick={() => openAuth("signin", "Sign in to configure your personal AI provider.")}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1.5 min-h-9 sm:min-h-0 px-3.5 sm:px-3 py-1 rounded-full text-xs sm:text-[11px] font-medium transition-colors border border-neutral-200 dark:border-white/10 bg-neutral-900/5 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-900/10 dark:hover:bg-white/10 cursor-pointer shadow-2xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
                 title="Sign in to access AI"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                <span>Guest Mode (AI Off)</span>
+                <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-slate-400" />
+                <span className="sm:hidden font-semibold">Sign in</span>
+                <span className="hidden sm:inline">Guest Mode (AI Off)</span>
               </button>
             )}
 
-            {/* AI Assistant Toggle Button (Clean minimalist Lightbulb icon, hidden when sidebar is open) */}
-            {!isAiSidebarOpen && (
+            {/* Phones: theme switch lives in the header (the sidebar one is a swipe away) */}
+            {isPhone && (
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                className="w-11 h-11 rounded-full flex items-center justify-center cursor-pointer border bg-white dark:bg-white/5 border-neutral-200/90 dark:border-white/10 text-neutral-600 dark:text-neutral-300 active:scale-95 transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+              >
+                {theme === "dark" ? <Sun className="w-5 h-5 text-amber-400" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
+              </button>
+            )}
+
+            {/* AI Assistant Toggle Button. On a phone it only appears once a chat exists: before that the whole screen is Ask Scholar, so the button had nothing to open. */}
+            {!isAiSidebarOpen && !(isPhone && !hasStartedChatting) && (
               <button
                 type="button"
                 onClick={() => {
@@ -2915,21 +3001,25 @@ export default function ProjectListScreen({
         {/* Dynamic Central Content (Knowledge Vault, AI Access, or Projects reading column) */}
         {activeView === "vault" ? (
           <div className="flex-1 overflow-y-auto w-full relative">
-            <KnowledgeVault
-              userId={userId || "local-user"}
-              initialTab="sources"
-              onClose={handleCloseCentralView}
-              onOpenProject={(pId) => onOpen(pId)}
-              onProjectRenamed={handleProjectRenamed}
-            />
+            <Suspense fallback={<LazyScreenFallback />}>
+              <KnowledgeVault
+                userId={userId || "local-user"}
+                initialTab="sources"
+                onClose={handleCloseCentralView}
+                onOpenProject={(pId) => onOpen(pId)}
+                onProjectRenamed={handleProjectRenamed}
+              />
+            </Suspense>
           </div>
         ) : activeView === "ai-access" ? (
           <div className="flex-1 overflow-y-auto w-full relative">
-            <AiAccessPage
-              onClose={handleCloseCentralView}
-              section={aiAccessSection}
-              onSectionChange={onAiAccessSectionChange}
-            />
+            <Suspense fallback={<LazyScreenFallback />}>
+              <AiAccessPage
+                onClose={handleCloseCentralView}
+                section={aiAccessSection}
+                onSectionChange={onAiAccessSectionChange}
+              />
+            </Suspense>
           </div>
         ) : choosing ? (
           <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-y-auto scholar-scrollbar">
@@ -3064,29 +3154,61 @@ export default function ProjectListScreen({
                                 if (onOpenAiAccess) onOpenAiAccess();
                                 else setActiveView("ai-access");
                               }}
-                              className={`inline-flex items-center gap-1.5 min-h-9 min-w-0 max-w-full px-3 rounded-full text-xs font-medium border cursor-pointer active:scale-95 transition-colors ${aiStatus?.connected
+                              className={`inline-flex items-center gap-1.5 min-h-9 min-w-[8.5rem] max-w-full px-3 rounded-full text-xs font-medium border cursor-pointer active:scale-95 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 ${aiStatus?.connected
                                 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                                 : "border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-300"
                                 }`}
                             >
                               <span
                                 aria-hidden="true"
-                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${aiStatus?.connected ? "bg-emerald-500" : aiStatus ? "bg-amber-500" : "bg-neutral-400 animate-pulse"}`}
+                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${aiStatus?.connected ? "bg-emerald-500" : aiStatusResolved ? "bg-amber-500" : "bg-neutral-400 animate-pulse"}`}
                               />
-                              <span className="truncate">
-                                {aiStatus?.connected
-                                  ? `AI: ${aiStatus.providers?.[0]?.name || aiStatus.provider || activeProviderLabel}`
-                                  : aiStatus
-                                    ? "Connect an AI"
-                                    : "Checking AI…"}
+                              <span className="truncate" role="status" aria-live="polite">
+                                {aiPillLabel}
                               </span>
                             </button>
                           )}
                         </div>
                       </div>
-                      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3 leading-relaxed">
-                        Ask a research question or paste your assignment brief. Every answer starts from a fresh search of scholarly sources.
+                      <p className="text-[15px] font-medium text-neutral-800 dark:text-neutral-100 leading-snug">
+                        Research, write and cite: essays, papers, proposals and slides.
                       </p>
+                      <p className="mt-1 mb-3 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                        Ask a question or paste your brief. Every answer starts from a fresh search of scholarly sources.
+                      </p>
+
+                      {/* First-step nudge: shown only once we know there is no usable AI (or the user is signed out). */}
+                      {(aiNeedsSetup || !userEmail) && !aiBannerDismissed && (
+                        <div
+                          role="region"
+                          aria-label="Get started"
+                          data-testid="mobile-ai-setup-banner"
+                          className="mb-3 flex items-center gap-3 rounded-2xl border border-sky-500/25 bg-sky-500/10 pl-3.5 pr-1.5 py-2"
+                        >
+                          <p className="flex-1 min-w-0 text-[13px] leading-snug text-neutral-800 dark:text-neutral-100">
+                            {userEmail ? "Connect an AI to start asking." : "Sign in to connect an AI and save your work."}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!userEmail) openAuth("signin", "Sign in to connect an AI and save your work.");
+                              else if (onOpenAiAccess) onOpenAiAccess();
+                              else setActiveView("ai-access");
+                            }}
+                            className="shrink-0 min-h-9 px-3.5 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold cursor-pointer active:scale-95 transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+                          >
+                            {userEmail ? "Set up" : "Sign in"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={dismissAiBanner}
+                            aria-label="Dismiss"
+                            className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer focus-visible:outline-2 focus-visible:outline-sky-500"
+                          >
+                            <X className="w-4 h-4" aria-hidden="true" />
+                          </button>
+                        </div>
+                      )}
                       <div className="mt-4">
                         <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                           Try asking
@@ -3113,6 +3235,67 @@ export default function ProjectListScreen({
                           <span aria-hidden="true" className="shrink-0 w-4" />
                         </div>
                       </div>
+
+                      {landingRecents.length > 0 ? (
+                        <div className="mt-6" data-testid="mobile-continue">
+                          <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                            Continue where you left off
+                          </h2>
+                          <ul className="space-y-2">
+                            {landingRecents.map((item) => {
+                              const tileTheme = getFormatTileTheme(item.outputTypeId);
+                              return (
+                                <li key={item.projectId}>
+                                  <button
+                                    type="button"
+                                    onClick={() => onOpen(item.projectId)}
+                                    className="w-full min-h-14 flex items-center gap-3 px-3 py-2 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 text-left cursor-pointer active:scale-[0.99] transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+                                  >
+                                    <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${tileTheme.badgeBg}`}>
+                                      <FormatIcon id={item.outputTypeId} className="w-4 h-4" />
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block text-[13px] font-semibold text-neutral-900 dark:text-white truncate">{item.title}</span>
+                                      {item.typeLabel && (
+                                        <span className="block text-[11px] text-neutral-500 dark:text-neutral-400">{item.typeLabel}</span>
+                                      )}
+                                    </span>
+                                    <ArrowRight className="w-4 h-4 shrink-0 text-neutral-400" aria-hidden="true" />
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      ) : (
+                        <div className="mt-6" data-testid="mobile-examples">
+                          <h2 className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                            Try an example
+                          </h2>
+                          <ul className="space-y-2">
+                            {LANDING_EXAMPLE_PROMPTS.map((example) => (
+                              <li key={example}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setMainPromptInput(example);
+                                    window.setTimeout(() => {
+                                      const el = guideTextareaRef.current;
+                                      if (!el) return;
+                                      el.focus();
+                                      el.setSelectionRange(example.length, example.length);
+                                    }, 0);
+                                  }}
+                                  className="w-full min-h-12 flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/90 dark:border-white/10 text-left text-[13px] leading-snug text-neutral-700 dark:text-neutral-200 cursor-pointer active:scale-[0.99] transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+                                >
+                                  <Sparkles className="w-3.5 h-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
+                                  <span>{example}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </section>
                   </>
                 ) : !isAiSidebarOpen && !hasStartedChatting ? (
@@ -3233,6 +3416,11 @@ export default function ProjectListScreen({
                 }
               >
                 <div className="w-full max-w-4xl mx-auto relative pointer-events-auto flex flex-col items-center">
+                  {isPhone && !isAiSidebarOpen && !hasStartedChatting && !mainPromptInput && mainAttachments.length === 0 && (
+                    <p className="w-full px-1 pb-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+                      Paste text or attach a brief (PDF, DOCX, TXT) with <span aria-hidden="true">+</span><span className="sr-only">the add button</span>
+                    </p>
+                  )}
                   {mainPromptForm}
                 </div>
               </div>
@@ -3240,7 +3428,7 @@ export default function ProjectListScreen({
         )}
 
         {/* Phone bottom bar: the main places, one tap each */}
-        {isPhone && (
+        {isPhone && !keyboardOpen && (
           <nav aria-label="Main" className="shrink-0 grid grid-cols-4 border-t border-neutral-200 dark:border-white/10 bg-paper-cool/95 dark:bg-ink-850/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
             {[
               {
@@ -4656,6 +4844,23 @@ export default function ProjectListScreen({
 
                     {isGuideThinking && (
                       <div className="flex flex-col gap-2.5 animate-in fade-in">
+                        {isPhone && (
+                          <div
+                            role="status"
+                            aria-live="polite"
+                            data-testid="mobile-ask-progress"
+                            className="flex items-center gap-2 px-1 text-[13px] font-medium text-neutral-700 dark:text-neutral-200"
+                          >
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-500" aria-hidden="true" />
+                            <span>
+                              {askPhase?.step === "writing"
+                                ? "Writing your answer…"
+                                : typeof askPhase?.found === "number" && askPhase.found > 0
+                                  ? `Searching scholarly sources… ${askPhase.found} found`
+                                  : "Searching scholarly sources…"}
+                            </span>
+                          </div>
+                        )}
                         {/* Live Single-Step Research Visualizer */}
                         <LiveResearchTrajectoryVisualizer
                           isLive={true}

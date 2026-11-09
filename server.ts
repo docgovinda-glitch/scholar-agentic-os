@@ -83,7 +83,7 @@ const localRunnerSources = Array.from(
 // recomputes the hash from index.html on every check and fails loudly if
 // this constant is stale, so an edit to the script without updating the
 // hash here cannot pass CI silently.
-const INLINE_THEME_SCRIPT_CSP_HASH = "'sha256-5V5R0fGRHFWdp0DZAppTOANJPlyUyQLWp0eGom1+k2c='";
+const INLINE_THEME_SCRIPT_CSP_HASH = "'sha256-2cbDWWj8VdkmPxU7zcMwu+BT/Fc1QAJFambUGGJ38xU='";
 
 const rawSupabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseOrigin = rawSupabaseUrl && rawSupabaseUrl.startsWith("http")
