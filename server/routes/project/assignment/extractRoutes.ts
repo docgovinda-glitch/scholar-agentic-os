@@ -102,7 +102,25 @@ router.post(
       filename: file.originalname,
       mimeType: file.mimetype,
     });
+    if (!parsed.ok) {
+      // Binary formats must never be decoded as text: that would put garbage in the brief box.
+      const lowerName = (file.originalname || "").toLowerCase();
+      const isBinaryDoc = /\.(pdf|docx?|pptx?)$/.test(lowerName) || /pdf|word|officedocument/i.test(file.mimetype || "");
+      if (isBinaryDoc) {
+        const why = (parsed as { error?: { type?: string; message?: string } }).error;
+        console.warn("[parse-brief] could not read", file.originalname, why?.type, why?.message);
+        return res.status(422).json({
+          error:
+            why?.type === "ENCRYPTED"
+              ? "This file is password-protected. Remove the password and upload it again, or paste the brief text."
+              : "We could not read text from this file. If it is a scanned image, paste the brief text instead.",
+          code: "brief_unreadable",
+        });
+      }
+    }
     text = parsed.ok ? parsed.data.text : file.buffer.toString("utf-8");
+    // Drop page-marker lines such as "-- 1 of 3 --" that PDF extraction inserts.
+    text = text.replace(/^\s*--\s*\d+\s+of\s+\d+\s*--\s*$/gim, "");
 
     // Clean whitespace, normalize line breaks and apply NFC
     text = normalizeUnicodeNFC(text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim());

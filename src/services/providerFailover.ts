@@ -273,7 +273,7 @@ export async function executeWithFailover<T>(
 ): Promise<FailoverResult<T>> {
   const {
     maxRetriesPerProvider = 2,
-    maxCandidatesToTry = 6,
+    maxCandidatesToTry = 12,
     maxBackoffMs = 8000,
     onEvent,
     signal,

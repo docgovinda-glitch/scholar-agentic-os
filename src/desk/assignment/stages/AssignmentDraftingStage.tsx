@@ -1,4 +1,5 @@
 import OutlineByAiPanel from "../components/OutlineByAiPanel";
+import { useToast } from "../../../components/ui/FeedbackSystem";
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { DraftingSectionIndex } from "../components/DraftingSectionIndex";
@@ -26,6 +27,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { SlideCanvas, extractSlidesFromAcademicText, type SlideDeck } from "../../../features/slides";
+import { ReferencesCard } from "../components/ReferencesCard";
 import { buildFormattedBibliography } from "../services/assignmentExportService";
 import { formatReferenceHtml } from "../services/referenceListGenerator";
 import { validateSectionUniqueness } from "../../../features/drafting/services/sectionDraftingEngine";
@@ -47,6 +49,7 @@ export function AssignmentDraftingStage({
   const {
     projectId,
     project,
+    saveAnswers,
     setPhase,
     targetWordCount,
     currentWordCount,
@@ -74,6 +77,8 @@ export function AssignmentDraftingStage({
 
   const [streamingChunk, setStreamingChunk] = useState<string>("");
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
+  const { showError } = useToast();
   const [activeStreamingSectionId, setActiveStreamingSectionId] = useState<string | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isTuning, setIsTuning] = useState(false);
@@ -88,10 +93,10 @@ export function AssignmentDraftingStage({
   );
 
   const draftMarkdown = useMemo(() => {
-    return internalSections
-      .map((sec) => `## ${sec.title}\n\n${sec.draftContent || ""}`)
-      .join("\n\n");
-  }, [internalSections]);
+    const body = internalSections.map((sec) => `## ${sec.title}\n\n${sec.draftContent || ""}`).join("\n\n");
+    const refs = buildFormattedBibliography(sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id))), citationStyle || "harvard");
+    return refs.length ? `${body}\n\n## References\n\n${refs.join("\n\n")}` : body;
+  }, [internalSections, sources, approvedSourceIds, citationStyle]);
 
   // Context continuity state — tracks claims, cited sources, and themes across sections
   const contextContinuityRef = useRef<ContextContinuityState | null>(null);
@@ -189,6 +194,7 @@ export function AssignmentDraftingStage({
       setActiveStreamingSectionId(sec.id);
       setGeneratingSection(sec.id, true);
       setDraftError(null);
+      setOfflineNotice(null);
       setStreamingChunk(sec.draftContent || "");
 
       // ── Evidence Pack Construction (Production Spec §4.1–4.3) ──
@@ -252,13 +258,14 @@ export function AssignmentDraftingStage({
             setActiveStreamingSectionId(null);
             setGeneratingSection(sec.id, false);
           },
-          onError: (err) => {
-            console.error("Section streaming failed:", err);
+          onFallback: ({ reason }) => {
+            setOfflineNotice(`${reason} Showing a scaffold built from your outline; write the analysis yourself or try again later.`);
           },
         });
       } catch (err) {
         // Keep whatever the section had before; never fill it with stand-in text.
-        setDraftError(`"${sec.title}" was not drafted: ${err instanceof Error ? err.message : String(err)}`);
+        // One clean toast; no uncaught console stack traces.
+        showError(`"${sec.title}" was not drafted: ${err instanceof Error ? err.message : String(err)}`);
         setStreamingChunk("");
         setActiveStreamingSectionId(null);
         setGeneratingSection(sec.id, false);
@@ -441,6 +448,12 @@ export function AssignmentDraftingStage({
         </div>
       </header>
 
+      {offlineNotice && (
+        <p role="status" className="text-xs text-neutral-600 dark:text-neutral-400 px-1" data-testid="offline-draft-notice">
+          {offlineNotice}
+        </p>
+      )}
+
       {draftError && (
         <div role="alert" className="flex items-start gap-2 text-xs text-[var(--text-primary)] bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl px-3 py-2">
           <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
@@ -505,38 +518,16 @@ export function AssignmentDraftingStage({
             }}
           />
 
-          {/* Live Bibliography Section */}
+          {/* Live compiled References */}
           {approvedSources.length > 0 && (
-            <details className="mt-5 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs overflow-hidden">
-              <summary className="px-5 py-3 flex items-center gap-2 bg-neutral-50/50 dark:bg-white/[0.02] cursor-pointer">
-                <Book className="w-4 h-4 text-emerald-500" />
-                <span className="text-sm font-semibold text-neutral-900 dark:text-white">Bibliography ({approvedSources.length})</span>
-              </summary>
-              <div className="p-5 text-[13px] text-neutral-700 dark:text-neutral-300 leading-relaxed space-y-4">
-                {buildFormattedBibliography(approvedSources, citationStyle || "harvard").map((bib, i) => {
-                  const safeHtml = formatReferenceHtml(bib);
-                  return (
-                    <p
-                      key={i}
-                      className="pl-6 -indent-6"
-                      ref={(el) => {
-                        if (!el) return;
-                        const anyEl = el as unknown as {
-                          setHTML?: (html: string, opts?: { sanitizer?: { elements?: string[]; attributes?: string[] } }) => void;
-                        };
-                        if (typeof anyEl.setHTML === "function") {
-                          anyEl.setHTML(safeHtml, {
-                            sanitizer: { elements: ["i", "em", "b", "strong"], attributes: [] },
-                          });
-                        } else {
-                          el.innerHTML = safeHtml;
-                        }
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </details>
+            <ReferencesCard
+              sources={approvedSources}
+              style={citationStyle || "harvard"}
+              savedEdit={typeof project?.answers?.["assignment_reference_list_edit"] === "string" ? (project?.answers?.["assignment_reference_list_edit"] as string) : ""}
+              onSaveEdit={(text) => {
+                void saveAnswers?.({ assignment_reference_list_edit: text });
+              }}
+            />
           )}
         </div>
       </div>

@@ -540,7 +540,8 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
       });
 
       if (!res.ok) {
-        throw new Error("Brief upload endpoint failed");
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw Object.assign(new Error(body?.error || "Brief upload endpoint failed"), { userFacing: res.status === 422 && Boolean(body?.error) });
       }
 
       const data = await res.json();
@@ -571,6 +572,29 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
         setLocalCitation(nextCitation);
       }
 
+      // Persist what was read right away, so a later failure never loses the extracted brief.
+      try {
+        await saveAnswers({
+          instructions: cleanPrompt,
+          assignment_prompt: cleanPrompt,
+          assignment_question: cleanPrompt,
+          assignment_brief_text: cleanPrompt,
+          assignment_brief_file: file.name,
+          targetWordCount: newWordCount,
+          target_word_count: newWordCount,
+          word_count: newWordCount,
+          word_limit: newWordCount,
+          academic_level: nextLevel,
+          academicLevel: nextLevel,
+          citation_style: nextCitation,
+          citationStyle: nextCitation,
+        });
+      } catch (persistErr) {
+        console.warn("Could not save the extracted brief yet:", persistErr);
+      }
+
+      // Building the outline is a second step: if it fails, the extracted brief stays.
+      try {
       let dynamicStruct = generateDynamicAssignmentStructure({
         question: cleanPrompt,
         assignmentType: localType,
@@ -659,11 +683,19 @@ export default function AssignmentExtractStage({ onProceed }: AssignmentExtractS
 
       const safeUpdates = stripCircularReferences(updates);
       await saveAnswers(safeUpdates);
+      } catch (outlineErr) {
+        console.warn("Outline build after brief upload did not finish:", outlineErr);
+        setParseNotice("Your brief was read. Click Save & Build to create the outline.");
+      }
 
       // Save answers without auto-advancing so user can review extracted brief parameters
     } catch (err: any) {
       console.warn("Brief parsing error caught safely:", err);
-      setParseNotice("Could not parse this document. Please verify the file format or paste the brief text manually.");
+      setParseNotice(
+        err && (err as { userFacing?: boolean }).userFacing
+          ? (err as Error).message
+          : "Could not parse this document. Please verify the file format or paste the brief text manually."
+      );
     } finally {
       setUploadingBrief(false);
       if (fileInputRef.current) {

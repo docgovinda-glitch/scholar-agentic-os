@@ -50,7 +50,7 @@ function overlap(a: Set<string>, b: Set<string>): number {
   return n / Math.min(a.size, b.size);
 }
 
-interface QuestionGroup {
+export interface QuestionGroup {
   key: string;
   marks: number;
   words: Set<string>;
@@ -75,6 +75,71 @@ const headingText = (h: AssignmentMainHeading) =>
     .filter(Boolean)
     .join(" ");
 
+/** Which heading answers which main question of the brief (by Q-label or wording overlap). */
+export function matchHeadingsToQuestions(
+  structure: AssignmentStructure,
+  headingIndexes: number[],
+  briefText?: string
+): Map<number, QuestionGroup> {
+  const groups = briefText ? questionGroups(briefText) : [];
+  const matched = new Map<number, QuestionGroup>();
+  const usedGroups = new Set<string>();
+  if (groups.length === 0) return matched;
+  const candidates: Array<{ i: number; g: QuestionGroup; score: number }> = [];
+  for (const i of headingIndexes) {
+    const text = headingText(structure.headings[i]);
+    const ht = tokens(text);
+    for (const g of groups) {
+      const labelHit = new RegExp(`\\bq(?:uestion)?\\s*${g.key.replace(/\D/g, "")}(?![\\da-z])`, "i").test(text);
+      const ov = overlap(ht, g.words);
+      if (labelHit || ov >= 0.4) candidates.push({ i, g, score: (labelHit ? 1 : 0) + ov });
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  for (const c of candidates) {
+    if (matched.has(c.i) || usedGroups.has(c.g.key)) continue;
+    matched.set(c.i, c.g);
+    usedGroups.add(c.g.key);
+  }
+  return matched;
+}
+
+/**
+ * The student set word counts per question: those numbers stay exactly as
+ * typed on the matching sections; any other section shares what is left.
+ */
+export function applyQuestionWordTargets(
+  structure: AssignmentStructure,
+  targets: Array<{ label: string; words: number }>,
+  briefText?: string
+): AssignmentStructure {
+  const byKey = new Map<string, number>();
+  for (const t of targets) {
+    const key = t.label.replace(/[a-z]$/, "");
+    byKey.set(key, (byKey.get(key) ?? 0) + Math.max(0, Math.round(t.words)));
+  }
+  const all = structure.headings.map((_, i) => i);
+  const matched = matchHeadingsToQuestions(structure, all, briefText);
+  if (matched.size === 0) return structure;
+  const total = Math.round(structure.targetWordCount);
+  const fixedSum = [...matched.values()].reduce((n, g) => n + (byKey.get(g.key) ?? 0), 0);
+  const free = all.filter((i) => !matched.has(i) && (structure.headings[i].targetWordCount ?? 0) > 0);
+  const freeWords = free.length
+    ? allocateCleanWords(free.map((i) => structure.headings[i].targetWordCount || 1), Math.max(free.length * 5, total - fixedSum), undefined, cleanWordStep(total))
+    : [];
+  const headings = structure.headings.map((h, i) => {
+    const g = matched.get(i);
+    const hw = g ? byKey.get(g.key) ?? h.targetWordCount : freeWords[free.indexOf(i)];
+    if (hw === undefined) return h;
+    const subs = h.subheadings ?? [];
+    if (subs.length === 0) return { ...h, targetWordCount: hw };
+    const subWords = allocateCleanWords(subs.map((x) => x.targetWordCount || 1), hw, undefined, 5);
+    return { ...h, targetWordCount: hw, subheadings: subs.map((x, k) => ({ ...x, targetWordCount: subWords[k] })) };
+  });
+  const allocated = headings.reduce((n, h) => n + (h.targetWordCount || 0), 0);
+  return { ...structure, headings, totalAllocated: allocated };
+}
+
 /**
  * Re-budget an outline (typically AI-written) so section words follow the
  * brief's marks and sum to `structure.targetWordCount` exactly. Without usable
@@ -86,28 +151,7 @@ export function applyMarksBudget(structure: AssignmentStructure, briefText?: str
   const live = structure.headings.map((h, i) => ({ h, i })).filter(({ h }) => (h.subheadings ?? []).some((s) => (s.targetWordCount ?? 0) > 0) || (h.targetWordCount ?? 0) > 0);
   if (live.length === 0 || !(total > 0)) return structure;
 
-  const groups = briefText ? questionGroups(briefText) : [];
-  const matched = new Map<number, QuestionGroup>();
-  const usedGroups = new Set<string>();
-  if (groups.length > 0) {
-    const candidates: Array<{ i: number; g: QuestionGroup; score: number }> = [];
-    for (const { h, i } of live) {
-      const label = new RegExp(`\\bq(?:uestion)?\\s*${"$KEY"}\\b`, "i");
-      const ht = tokens(headingText(h));
-      for (const g of groups) {
-        const labelHit = new RegExp(`\\bq(?:uestion)?\\s*${g.key.replace(/\D/g, "")}(?![\\da-z])`, "i").test(headingText(h));
-        const score = (labelHit ? 1 : 0) + overlap(ht, g.words);
-        if (labelHit || overlap(ht, g.words) >= 0.4) candidates.push({ i, g, score });
-      }
-      void label;
-    }
-    candidates.sort((a, b) => b.score - a.score);
-    for (const c of candidates) {
-      if (matched.has(c.i) || usedGroups.has(c.g.key)) continue;
-      matched.set(c.i, c.g);
-      usedGroups.add(c.g.key);
-    }
-  }
+  const matched = matchHeadingsToQuestions(structure, live.map(({ i }) => i), briefText);
 
   let headingWeights: number[];
   let remainderPos: number | undefined;

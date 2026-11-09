@@ -307,6 +307,9 @@ export function classifyHttpError(
     lower.includes("insufficient_quota") ||
     lower.includes("insufficient credit") ||
     lower.includes("exceeded your current quota") ||
+    lower.includes("remaining credit") ||
+    lower.includes("out of credit") ||
+    lower.includes("quota exhausted") ||
     lower.includes("billing")
   ) {
     return {

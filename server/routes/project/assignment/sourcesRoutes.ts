@@ -1,5 +1,7 @@
 import express from "express";
 import { buildSourceSearchQueries } from "../../../../src/utils/briefSourceQueries.ts";
+import { parseBriefQuestions } from "../../../../src/utils/briefQuestions.ts";
+import { explainSourceFit } from "../../../../src/utils/sourceFit.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
@@ -98,6 +100,7 @@ router.post("/research", async (req: express.Request<{ id: string }>, res) => {
 
     // Query multi-portal discovery (OpenAlex, Crossref, DOAJ, DataCite, arXiv)
     // Never send the raw brief to an index: build clean keyword phrases from it.
+    const briefQuestionRows = parseBriefQuestions(effectiveQuery);
     const phrases = buildSourceSearchQueries(effectiveQuery, 4);
     const toRun = phrases.length > 0 ? phrases : [effectiveQuery.slice(0, 200)];
     const settled = await Promise.allSettled(toRun.map((q) => discoverMultiPortalSources(q, 15)));
@@ -143,10 +146,8 @@ router.post("/research", async (req: express.Request<{ id: string }>, res) => {
           url: draft.url,
           // Only what the index returned; no summary of findings is invented.
           mainFinding: draft.venue ? `Published in ${draft.venue}.` : "",
-          suggestedUse:
-            draft.authorityTier === "A"
-              ? "Primary theoretical framework & empirical evidence grounding"
-              : "Supporting literature and contextual evidence",
+          suggestedUse: explainSourceFit({ title: draft.title, venue: draft.venue }, briefQuestionRows, toRun[0]) ?? "",
+          whyThisSource: explainSourceFit({ title: draft.title, venue: draft.venue }, briefQuestionRows, toRun[0]) ?? undefined,
           citation: citationStr,
           status: "unreviewed",
           retrievalSource: draft.discoveredVia,

@@ -192,8 +192,7 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
       expect(screen.getByText(titleRe(secondSource.title))).toBeInTheDocument();
 
       // Exit Gate Counter (visible when sources are present) & unblocked Proceed to Drafting & Skip to Drafting buttons
-      const counter = screen.getByTestId("evidence-counter");
-      expect(counter).toHaveTextContent("0 / 4 recommended");
+      expect(screen.queryByTestId("evidence-counter")).not.toBeInTheDocument();
 
       const proceedDraftingBtn = screen.getByTestId("proceed-to-drafting-btn");
       expect(proceedDraftingBtn).not.toBeDisabled();
@@ -274,8 +273,7 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
       await screen.findByText(/Sources & Course Materials/i);
 
       // Check current count: 3 / 4 recommended
-      const counter = screen.getByTestId("evidence-counter");
-      expect(counter).toHaveTextContent("3 / 4 recommended");
+      expect(screen.queryByTestId("evidence-counter")).not.toBeInTheDocument();
       const proceedDraftingBtn = screen.getByTestId("proceed-to-drafting-btn");
       expect(proceedDraftingBtn).not.toBeDisabled();
 

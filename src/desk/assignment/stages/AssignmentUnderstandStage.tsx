@@ -1,6 +1,7 @@
 import { UnderstandAgentPanel } from "../components/AgentPanels";
 import { SubQuestionsCard, GradingCriteriaCard } from "../components/BriefBreakdownCards";
 import { buildBriefSummary, parseBriefQuestions } from "../../../utils/briefQuestions";
+import { applyQuestionWordTargets } from "../../../domain/assignment/outlineBudget";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import BriefScopePanel from "../components/BriefScopePanel";
 import { useAssignmentWorkspace } from "../AssignmentContext";
@@ -282,6 +283,15 @@ function generateThesisStances(question: string, briefText?: string): {
     },
   ];
 }
+
+const WRITING_VOICE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "formal_academic", label: "Formal Academic" },
+  { value: "analytical", label: "Analytical" },
+  { value: "critical", label: "Critical" },
+  { value: "persuasive", label: "Persuasive" },
+  { value: "objective", label: "Objective" },
+  { value: "custom", label: "Custom Style" },
+];
 
 function generateSubQuestions(question: string, briefText?: string): string[] {
   const extracted = extractBriefInquiriesAndConcepts(question || "", briefText || "");
@@ -901,8 +911,9 @@ export default function AssignmentUnderstandStage({
     handleTargetWordCountChange(newCount);
   };
 
-  const handleStructureChange = (newStructure: AssignmentStructure) => {
-    const balanced = autoBalanceStructure(newStructure, localWordCount);
+  const handleStructureChange = (newStructure: AssignmentStructure, opts: { balance?: boolean } = {}) => {
+    // A student's own per-question word counts are kept exactly as typed.
+    const balanced = opts.balance === false ? newStructure : autoBalanceStructure(newStructure, localWordCount);
     setLocalStructure(balanced);
     if (setStructure) {
       setStructure(balanced);
@@ -1047,6 +1058,13 @@ export default function AssignmentUnderstandStage({
       aiApproach: agent?.understanding?.approach,
     });
   }, [localBrief, localQuestion, localType, localLevel, localCitation, localWordCount, agent?.understanding]);
+
+  const coreTopic = useMemo(() => {
+    const text = cleanAnswerString(localBrief) || cleanAnswerString(localQuestion);
+    const qs = parseBriefQuestions(text);
+    const first = qs[0]?.text || subQuestions[0] || cleanAnswerString(localQuestion);
+    return first.length > 200 ? `${first.slice(0, 199)}…` : first;
+  }, [localBrief, localQuestion, subQuestions]);
 
   const thesisStances = useMemo(() => {
     return generateThesisStances(localQuestion, localBrief);
@@ -1883,127 +1901,115 @@ export default function AssignmentUnderstandStage({
             briefText={cleanAnswerString(localBrief) || cleanAnswerString(localQuestion)}
             fallbackQuestions={subQuestions}
             totalWords={localWordCount}
+            onWordsChange={(targets, hasOverrides) => {
+              // Only the student's own numbers change the outline; the marks split is already in it.
+              if (!hasOverrides) return;
+              const next = applyQuestionWordTargets(localStructure, targets, cleanAnswerString(localBrief) || cleanAnswerString(localQuestion));
+              if (next !== localStructure) handleStructureChange(next, { balance: false });
+            }}
             onRowsChange={(rows) => {
               void saveAnswers({ assignment_question_rows: JSON.stringify(rows) });
             }}
           />
           <GradingCriteriaCard briefText={cleanAnswerString(localBrief) || cleanAnswerString(localQuestion)} rubricText={rubricText || markingRubricText} />
 
-          {/* ========================================================
-              CARD 2: Thesis & Stance Selector (Pick Your Angle)
-             ======================================================== */}
-          <div className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-5 sm:p-7 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/5 pb-3">
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-purple-600 dark:text-purple-400">
-                  Card 02
-                </span>
-                <h3 className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-white">
-                  Thesis &amp; Stance Selector (Pick Your Angle)
-                </h3>
-              </div>
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                Argumentative Direction
-              </span>
-            </div>
-
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-              Select one of the 3 synthesized stances below to anchor your argument, or tweak the wording to formulate your own working thesis statement.
+          {/* Core topic, working angle and writing voice */}
+          <section className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-4 sm:p-5 shadow-xs space-y-3" aria-label="Core topic and working angle">
+            <h3 className="text-xs font-semibold text-neutral-900 dark:text-white uppercase tracking-wider">
+              Core Topic &amp; Working Angle
+            </h3>
+            <p className="text-sm text-neutral-800 dark:text-neutral-200" data-testid="core-topic">
+              {coreTopic}
             </p>
 
-            {/* 3 Selectable Thesis Stance Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Pick an angle">
               {thesisStances.map((st) => {
                 const isSelected = activeThesis === st.statement;
                 return (
                   <button
                     key={st.id}
                     type="button"
+                    aria-pressed={isSelected}
+                    title={st.statement}
                     onClick={() => {
                       setActiveThesis(st.statement);
-                      saveAnswers({
-                        assignment_thesis: st.statement,
-                        thesis_statement: st.statement,
-                      });
+                      saveAnswers({ assignment_thesis: st.statement, thesis_statement: st.statement });
                     }}
-                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
+                    className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors cursor-pointer ${
                       isSelected
-                        ? "border-purple-500 bg-purple-50/40 dark:bg-purple-950/20 ring-1 ring-purple-500 shadow-2xs"
-                        : "border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 hover:border-neutral-300 dark:hover:border-white/20"
+                        ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
+                        : "border-neutral-200 dark:border-white/15 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5"
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center justify-between gap-1 mb-1.5">
-                        <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                          st.isRecommended
-                            ? "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-bold"
-                            : "bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300"
-                        }`}>
-                          {st.badge}
-                        </span>
-                        {isSelected && (
-                          <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 flex items-center gap-0.5">
-                            ✓ Active
-                          </span>
-                        )}
-                      </div>
-                      <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
-                        {st.title}
-                      </h4>
-                      <p className="text-[11px] text-neutral-600 dark:text-neutral-300 mt-1 leading-relaxed line-clamp-4">
-                        "{st.statement}"
-                      </p>
-                    </div>
-                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold pt-1">
-                      {isSelected ? "Active thesis selected" : "Click to select angle →"}
-                    </span>
+                    {st.title}
                   </button>
                 );
               })}
             </div>
 
-            {/* Editable Active Working Thesis Textarea */}
-            <div className="space-y-1.5 pt-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="assignment_thesis_input" className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                  Introduction &amp; Core Working Thesis
-                </label>
-                <span className="text-[10px] text-neutral-400">
-                  Editable · Fine-tune your argument below
-                </span>
-              </div>
+            <div className="space-y-1.5">
+              <label htmlFor="assignment_thesis_input" className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                Working thesis
+              </label>
               <textarea
                 id="assignment_thesis_input"
                 value={activeThesis}
                 onChange={(e) => {
                   setActiveThesis(e.target.value);
-                  saveAnswers({
-                    assignment_thesis: e.target.value,
-                    thesis_statement: e.target.value,
-                  });
+                  saveAnswers({ assignment_thesis: e.target.value, thesis_statement: e.target.value });
                 }}
-                rows={3}
-                placeholder="Formulate or tweak your central working thesis statement..."
-                className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-3 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all leading-relaxed resize-y font-medium"
+                rows={2}
+                placeholder="Pick an angle above or write your own working thesis…"
+                className="w-full bg-transparent border border-neutral-200/80 dark:border-white/10 rounded-xl p-3 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400 resize-y"
               />
             </div>
 
-            {/* Writing Tone Indicator Badge */}
             <div
               ref={toneSectionRef}
               data-testid="tone-section-wrapper"
               onFocusCapture={dispatchToneAssistantSuggestions}
               onClickCapture={dispatchToneAssistantSuggestions}
-              className="flex items-center gap-2 pt-1 text-xs text-neutral-500 dark:text-neutral-400"
+              className="space-y-1.5"
             >
-              <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 capitalize">
-                Calibrated in {safeFormatLabel(localTone)} tone
-              </span>
-              <span className="text-[11px] text-neutral-400 hidden sm:inline">
-                Thesis and outline vocabulary calibrated to your selected academic style.
-              </span>
+              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Writing style &amp; tone</span>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Writing style and tone">
+                {WRITING_VOICE_OPTIONS.map((opt) => {
+                  const active = localTone === opt.value || (opt.value === "custom" && localTone === "custom");
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => handleToneChange(opt.value)}
+                      className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors cursor-pointer ${
+                        active
+                          ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
+                          : "border-neutral-200 dark:border-white/15 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {localTone === "custom" && (
+                <textarea
+                  aria-label="Describe or paste your own writing style"
+                  value={localStyle.customSampleText ?? ""}
+                  onChange={(e) => {
+                    const updated: WritingStyleConfig = { ...localStyle, preset: "custom", customSampleText: e.target.value };
+                    setLocalStyle(updated);
+                    setWritingStyle?.(updated);
+                    saveAnswers({ writingStyle: updated, writing_style: updated }).catch(console.warn);
+                  }}
+                  rows={2}
+                  placeholder="Paste a short sample of your writing, or describe the voice you want…"
+                  className="w-full bg-transparent border border-neutral-200/80 dark:border-white/10 rounded-xl p-3 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400 resize-y"
+                />
+              )}
             </div>
-          </div>
+          </section>
 
             {/* Collapsed-by-default Fine-Tune Accordion */}
             <details className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] group">

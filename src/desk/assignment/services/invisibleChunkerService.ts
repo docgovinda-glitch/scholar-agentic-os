@@ -825,6 +825,8 @@ export interface StreamSectionOptions {
   onChunk: (chunk: string, aggregatedText: string) => void;
   onComplete: (fullText: string) => void;
   onError?: (err: Error) => void;
+  /** Called when the server could not use an AI and sent an offline scaffold instead. */
+  onFallback?: (info: { reason: string }) => void;
 }
 
 /**
@@ -847,6 +849,7 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
     onChunk,
     onComplete,
     onError,
+    onFallback,
   } = options;
 
   const relevantSources = approvedSources.filter(
@@ -858,6 +861,8 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
     const response = await authedJsonFetch(`/api/projects/${projectId}/assignment/stream-section`, "POST", {
       sectionId: section.id,
       sectionTitle: section.title,
+      guidance: section.guidance,
+      keyPoints: section.keyPoints,
       academicFunction: section.academicFunction,
       targetWordCount: section.targetWordCount,
       allocatedWords: section.targetWordCount,
@@ -899,8 +904,9 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
         const rawData = line.slice(6).trim();
         if (!rawData || rawData === "[DONE]") continue;
         try {
-          const parsed = JSON.parse(rawData) as { chunk?: string; fullText?: string; error?: string };
+          const parsed = JSON.parse(rawData) as { chunk?: string; fullText?: string; error?: string; fallback?: { reason?: string } };
           if (parsed.error) streamError = parsed.error;
+          if (parsed.fallback) onFallback?.({ reason: parsed.fallback.reason || "No AI provider could answer right now." });
           if (parsed.chunk) {
             aggregatedText += parsed.chunk;
             onChunk(parsed.chunk, aggregatedText);
@@ -919,7 +925,13 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
     onComplete(finalText);
     return finalText;
   } catch (err) {
-    const error = err instanceof Error ? err : new Error(String(err));
+    // A dropped connection surfaces as TypeError: Failed to fetch; say what it means.
+    const error =
+      err instanceof TypeError
+        ? new Error("Could not reach the server. Check your connection and try again.")
+        : err instanceof Error
+        ? err
+        : new Error(String(err));
     onError?.(error);
     throw error;
   }

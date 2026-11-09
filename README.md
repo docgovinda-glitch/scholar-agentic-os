@@ -102,7 +102,7 @@ Access the application at `http://localhost:3000`.
 # Type checking
 npm run typecheck
 
-# Run tests (438 files, 4,070 tests)
+# Run tests (442 files, 4,089 tests)
 npm test
 
 # Linting & design checks

@@ -72,6 +72,30 @@ describe("Coursework stream-section", () => {
     expect(res.text).toContain("Group work shapes how teams decide.");
   });
 
+  it("when every provider is out of credit, streams a labelled offline scaffold instead of dropping the request", async () => {
+    const id = await createProject();
+    vi.mocked(callOpenRouterText).mockRejectedValue(new Error("This account has no remaining credit or quota with the provider."));
+    const res = await request(app)
+      .post(`/api/projects/${id}/assignment/stream-section`)
+      .send({ sectionTitle: "2.0 Group decisions", guidance: "Explain how groups decide.", keyPoints: ["Consensus versus majority"], allocatedWords: 300 });
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/event-stream");
+    expect(res.text).toContain("offline_scaffold");
+    expect(res.text).toContain("Offline scaffold");
+    expect(res.text).toContain("Consensus versus majority");
+    for (const marker of TEMPLATE_MARKERS) expect(res.text).not.toMatch(marker);
+  });
+
+  it("never replaces existing text with a scaffold when a revision fails", async () => {
+    const id = await createProject();
+    vi.mocked(callOpenRouterText).mockRejectedValue(new Error("quota exhausted"));
+    const res = await request(app)
+      .post(`/api/projects/${id}/assignment/stream-section`)
+      .send({ sectionTitle: "Intro", revisionPrompt: "expand", existingContent: "My own words." });
+    expect(res.status).toBe(502);
+    expect(res.text).not.toContain("Offline scaffold");
+  });
+
   it("without the user's AI, hands off with a 426 instead of streaming template text", async () => {
     const id = await createProject();
     handOffToBrowser();

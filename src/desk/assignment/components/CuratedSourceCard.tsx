@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { sourceVenueLabel } from "../services/sourceDisplay";
 import type { DiscoveredSource } from "../types";
 import {
   Check,
@@ -75,18 +76,7 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
       ? "Course Materials / Uploaded Source"
       : "Unknown author";
 
-  const venueDisplay =
-    source.journal ||
-    source.publisher ||
-    (source.type === "journal"
-      ? "Academic Journal"
-      : source.type === "book"
-      ? "University Press"
-      : source.type === "conference"
-      ? "Conference Proceedings"
-      : source.type === "institutional"
-      ? "Institutional Research"
-      : "Scholarly Publication");
+  const venueDisplay = sourceVenueLabel(source);
 
   const effectiveBookmarked = source.isBookmarked ?? isBookmarked;
 
