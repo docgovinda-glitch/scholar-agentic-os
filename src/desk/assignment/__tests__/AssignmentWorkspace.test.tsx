@@ -63,7 +63,7 @@ describe("Scholar Core Assignment Workspace", () => {
     });
   });
 
-  it("renders the 4-phase horizontal navigation, active workspace, and AI tutor panel", async () => {
+  it("renders the 4-phase horizontal navigation, active workspace, with the AI tutor panel closed", async () => {
     render(
       <AssignmentWorkspace
         projectId="proj-123"
@@ -89,16 +89,10 @@ describe("Scholar Core Assignment Workspace", () => {
     expect(await screen.findByText(/Phase 1: Understand the Assignment/i)).toBeInTheDocument();
     expect(screen.getByText(/Target Word Count/i)).toBeInTheDocument();
 
-    // Right Sidebar Copilot: unified ContextPanel mounting active persona (Advisor for Phase 1 Understand)
-    const tutorPanel = await screen.findByRole("complementary");
-    expect(within(tutorPanel).getByText("Advisor")).toBeInTheDocument();
-    expect(within(tutorPanel).getByText(/Assignment Brief & Rubric Guidance/i)).toBeInTheDocument();
-    expect(within(tutorPanel).getByRole("button", { name: /Analyze prompt & key command verbs/i })).toBeInTheDocument();
-    expect(within(tutorPanel).getByRole("button", { name: /Recommend writing tone for this brief/i })).toBeInTheDocument();
-    expect(within(tutorPanel).getByRole("button", { name: /Auto-detect rubric grading criteria/i })).toBeInTheDocument();
-    expect(within(tutorPanel).getByPlaceholderText(/Ask Advisor a question\.\.\./i)).toBeInTheDocument();
-
-    // Verify right sidebar purged header and duplicate word count are not present
+    // The right-hand Architect / tutor drawer stays closed so it takes no screen space
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/Ask Advisor a question\.\.\./i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("assignment-tutor-drawer")).not.toBeInTheDocument();
     expect(screen.queryByText(/Academic Thinking & Writing Tutor/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Word Count Budget Planner/i)).not.toBeInTheDocument();
   });

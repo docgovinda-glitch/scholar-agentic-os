@@ -98,7 +98,7 @@ describe("Forensic Remediation Batch 4 - UX, Ergonomics & Accessibility Suite", 
   });
 
   // 2. Mobile AI Tutor Drawer on AssignmentWorkspace
-  it("renders AssignmentWorkspace mobile AI Tutor drawer and backdrop when toggled", async () => {
+  it("keeps the AssignmentWorkspace AI Tutor drawer closed by default", async () => {
     getProject.mockResolvedValue({
       projectId: "proj-123",
       outputTypeId: "OT-01",
@@ -125,21 +125,10 @@ describe("Forensic Remediation Batch 4 - UX, Ergonomics & Accessibility Suite", 
       </FeedbackProvider>
     );
 
-    // AI copilot is open by default (tutorPanelOpen = true)
-    const drawer = await screen.findByTestId("assignment-tutor-drawer");
-    expect(drawer).toBeInTheDocument();
-
-    const mobileBackdrop = screen.getByTestId("mobile-tutor-backdrop");
-    expect(mobileBackdrop).toBeInTheDocument();
-
-    const mobileCloseBtn = screen.getByTestId("mobile-tutor-close");
-    expect(mobileCloseBtn).toBeInTheDocument();
-
-    // Clicking close hides drawer
-    fireEvent.click(mobileCloseBtn);
+    // The tutor drawer is closed by default in every phase and has no header toggle
+    await screen.findByRole("navigation", { name: /Assignment Workflow Phases/i });
     expect(screen.queryByTestId("assignment-tutor-drawer")).not.toBeInTheDocument();
-
-    // The header no longer carries an Inspector toggle
+    expect(screen.queryByTestId("mobile-tutor-backdrop")).not.toBeInTheDocument();
     expect(screen.queryByTestId("inspector-toggle")).not.toBeInTheDocument();
   });
 
