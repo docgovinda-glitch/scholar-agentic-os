@@ -276,8 +276,8 @@ describe("Phase I Dynamic Structure & Cross-Phase Workflow", () => {
       expect(screen.getByText("2.1 Geopolitical Dynamics in South Asia")).toBeInTheDocument();
 
       // Target vs drafted word counts
-      expect(screen.getByText("295 / 300 w")).toBeInTheDocument();
-      expect(screen.getByText("0 / 500 w")).toBeInTheDocument();
+      expect(screen.getByText("295 / 300 words")).toBeInTheDocument();
+      expect(screen.getByText("0 / 500 words")).toBeInTheDocument();
 
       // Click to select
       fireEvent.click(screen.getByText("2.1 Geopolitical Dynamics in South Asia"));

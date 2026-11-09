@@ -1,4 +1,6 @@
 import express from "express";
+import { sectionWordRange, trimToSentenceWithinWords } from "../../../src/utils/sectionBudget.ts";
+import { countExactWords } from "../../../src/utils/wordBudgetAllocator.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
@@ -284,7 +286,8 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     sectionId,
     sectionTitle,
     academicFunction,
-    targetWordCount = 500,
+    targetWordCount: requestedTarget = 500,
+    allocatedWords,
     academicLevel = project.answers["academic_level"] || "undergraduate",
     citationStyle = project.answers["citation_style"] || "apa7",
     assignmentTopic = project.answers["assignment_question"] || "",
@@ -294,6 +297,9 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     existingContent = "",
     evidencePackPrompt,
   } = req.body || {};
+  // The section's exact budget from the outline; the draft must land within ±10% of it.
+  const targetWordCount = Math.min(3000, Math.max(50, Math.round(Number(allocatedWords ?? requestedTarget) || 500)));
+  const budgetRange = sectionWordRange(targetWordCount);
 
   // The event stream starts only once the AI has answered, so a missing AI
   // can still be reported as a 426 hand-off or an error status (P0-20).
@@ -348,6 +354,8 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
       ? "REVISION FOCUS: Condense prose. Tighten argumentation and eliminate redundancies to fit the exact target word count."
       : revisionPrompt === "citations"
       ? "REVISION FOCUS: Reinforce citation grounding. Seamlessly integrate in-text citations from the bound sources to substantiate claims and strengthen academic credibility."
+      : revisionPrompt === "tone"
+      ? "REVISION FOCUS: Refine the academic tone and register. Keep every claim, citation and the word count; improve precision, formality and flow."
       : revisionPrompt === "smooth"
       ? "REVISION FOCUS: Enhance academic transitions and cohesion. Craft seamless transitional linkages between paragraphs and ensure strong analytical flow."
       : revisionPrompt
@@ -402,7 +410,7 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     const prompt = `You are the Scholar Core Grounded Academic Drafting Agent.
 Write the section prose for: "${sectionTitle}".
 Academic Function: ${academicFunction}
-Target Word Count: ~${targetWordCount} words
+WORD BUDGET: ${targetWordCount} words (acceptable range ${budgetRange.min}-${budgetRange.max}). Write a complete, cohesive, well-cited section that lands inside that range and ends on a finished sentence; never stop mid-sentence and never pad.
 Academic Level: ${academicLevel}
 Citation Style: ${citationStyle}
 Central Thesis: "${thesis || String(project.answers["assignment_thesis"] || project.answers["thesis_statement"] || "")}"
@@ -436,6 +444,24 @@ Output ONLY the section text in clean academic Markdown prose.`;
     if (!effectiveDraft) {
       return sendAiFailure(res, new UnusableAiResponseError("section draft"), "Section draft");
     }
+
+    // Enforce the budget: ask once for a rewrite when far under, trim to a whole sentence when over.
+    if (!revisionPrompt && countExactWords(effectiveDraft) < budgetRange.min) {
+      try {
+        const longer = await callOpenRouterText(
+          req,
+          res,
+          `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`,
+          `${prompt}\n\nYOUR PREVIOUS ATTEMPT WAS ${countExactWords(effectiveDraft)} WORDS, BELOW THE BUDGET. Rewrite it fully at ${targetWordCount} words (${budgetRange.min}-${budgetRange.max}), keeping every citation token.\nPREVIOUS ATTEMPT:\n${effectiveDraft}`,
+          undefined,
+          "drafting"
+        );
+        if (longer && countExactWords(longer) > countExactWords(effectiveDraft)) effectiveDraft = longer.trim();
+      } catch {
+        // Keep the first draft rather than fail the whole section.
+      }
+    }
+    effectiveDraft = trimToSentenceWithinWords(effectiveDraft, budgetRange.max);
 
     // Pipe streamed draft through deterministic citation interceptor
     effectiveDraft = replaceBracketTokensWithDeterministicCitations(

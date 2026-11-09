@@ -1036,11 +1036,18 @@ export function structureToSectionBudgets(structure?: AssignmentStructure | null
   }));
 }
 
+/** Upper bound on drafting sections so no outline fragments into tiny pieces. */
+export const MAX_DRAFTING_SECTIONS = 8;
+
 export function structureToInternalSections(structure?: AssignmentStructure | null): AssignmentDraftingSection[] {
   if (!structure?.headings || structure.headings.length === 0) return [];
   const sections: AssignmentDraftingSection[] = [];
+  // Human-scale outlines: when per-subheading expansion would exceed
+  // MAX_DRAFTING_SECTIONS, draft one section per heading instead.
+  const flatCount = structure.headings.reduce((n, h) => n + Math.max(1, h.subheadings?.length ?? 0), 0);
+  const mergeSubheadings = flatCount > MAX_DRAFTING_SECTIONS;
   structure.headings.forEach((h, hIdx) => {
-    if (h.subheadings && h.subheadings.length > 0) {
+    if (!mergeSubheadings && h.subheadings && h.subheadings.length > 0) {
       h.subheadings.forEach((s) => {
         sections.push({
           id: s.id,
@@ -1067,15 +1074,17 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
         });
       });
     } else {
+      // Keep any text already drafted under merged subheadings.
+      const mergedDraft = (h.subheadings ?? []).map((sub) => sub.draftContent || "").filter((t) => t.trim()).join("\n\n");
       sections.push({
         id: h.id,
         title: `${h.number}.0 ${h.title}`,
         targetWordCount: h.targetWordCount,
-        currentWordCount: 0,
+        currentWordCount: (h.subheadings ?? []).reduce((n, sub) => n + (sub.currentWordCount || 0), 0),
         guidance: h.notes || `Analysis for ${h.title}`,
-        draftContent: "",
-        status: "not_started",
-        keyPoints: [],
+        draftContent: mergedDraft,
+        status: mergedDraft ? "completed" : "not_started",
+        keyPoints: (h.subheadings ?? []).flatMap((sub) => sub.keyPoints || []).slice(0, 6),
         linkedEvidenceIds: [],
         academicFunction: h.title,
         purpose: h.purpose,
@@ -1090,7 +1099,17 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
       });
     }
   });
-  return sections;
+  return capSections(sections);
+}
+
+function capSections(sections: AssignmentDraftingSection[]): AssignmentDraftingSection[] {
+  if (sections.length <= MAX_DRAFTING_SECTIONS) return sections;
+  const head = sections.slice(0, MAX_DRAFTING_SECTIONS - 1);
+  const tail = sections.slice(MAX_DRAFTING_SECTIONS - 1);
+  const last = { ...tail[0] };
+  last.targetWordCount = tail.reduce((n, t) => n + (t.targetWordCount || 0), 0);
+  last.keyPoints = tail.flatMap((t) => t.keyPoints || []).slice(0, 6);
+  return [...head, last];
 }
 
 export type WritingTonePreset =

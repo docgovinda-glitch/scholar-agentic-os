@@ -39,6 +39,9 @@ export default function OutlineByAiPanel({
     }
   };
 
+  // The outline always comes from the brief; no "starter outline" notice is shown.
+  if (!fromAi) return null;
+
   return (
     <section aria-label="Outline" className="mb-3 rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-ink-750 p-3 space-y-2" data-testid="outline-by-ai">
       {fromAi ? (
@@ -46,22 +49,7 @@ export default function OutlineByAiPanel({
           <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" aria-hidden="true" />
           {structure?.rationale || "Written by your AI from your brief."}
         </p>
-      ) : (
-        <div className="rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200/80 dark:border-amber-500/30 p-2.5 space-y-2">
-          <p className="text-xs text-amber-900 dark:text-amber-200">
-            <span className="font-semibold">Starter outline.</span> It was not written from your brief. Let your AI write one that fits your assignment; anything you have written is kept.
-          </p>
-          <button
-            type="button"
-            onClick={() => run()}
-            disabled={busy}
-            className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 px-3 py-1.5 text-xs font-semibold cursor-pointer disabled:opacity-60"
-          >
-            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Wand2 className="w-3.5 h-3.5" aria-hidden="true" />}
-            {busy ? "Writing the outline…" : "Write the outline from my brief"}
-          </button>
-        </div>
-      )}
+      ) : null}
 
       {fromAi && (
         <form

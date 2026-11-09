@@ -40,3 +40,51 @@ describe("outlineService split-brain fixes (OT-01)", () => {
     expect(JSON.stringify(structure)).not.toMatch(/Conceptual Framing and Analysis of/);
   });
 });
+
+import { structureToInternalSections } from "../types";
+
+describe("brief-grounded outline (Phase 4)", () => {
+  const BRIEF = `Module Code: QNT-4020 Word Count: 2,000 words
+PART 1: HARDWARE 25 MARKS
+Q1a. Compare superconducting transmon and trapped-ion qubits in terms of coherence time. [5 Marks]
+Q1b. Explain how gate fidelity limits near-term devices. [10 Marks]
+Q1c. Evaluate error mitigation strategies for NISQ hardware. [10 Marks]
+Q2. Derive the quantum Fourier transform circuit and show its role in Shor's algorithm. [15 Marks]
+Q3. Discuss Grover's search algorithm and its speed-up. [20 Marks]
+Q4. Explain surface code quantum error correction thresholds. [20 Marks]
+Q5. Discuss post-quantum cryptography migration risks. [20 Marks]`;
+
+  it("maps one section per main question with budgets proportional to marks summing to the target", () => {
+    const structure = generateDynamicAssignmentStructure({
+      question: BRIEF,
+      assignmentType: "coursework",
+      academicLevel: "postgraduate",
+      targetWordCount: 2000,
+      briefText: BRIEF,
+    });
+    const sections = structureToInternalSections(structure);
+    expect(sections.length).toBeGreaterThanOrEqual(5);
+    expect(sections.length).toBeLessThanOrEqual(8);
+    expect(sections.every((s) => s.targetWordCount >= 250)).toBe(true);
+    const total = sections.reduce((n, s) => n + s.targetWordCount, 0);
+    expect(Math.abs(total - 2000)).toBeLessThanOrEqual(5);
+    // Q1 (25 of 90 marks) gets the largest-ratio budget among its peers proportional to marks
+    const q1 = sections[0].targetWordCount;
+    const q2 = sections[1].targetWordCount;
+    expect(q1).toBeGreaterThan(q2);
+    expect(JSON.stringify(structure)).not.toMatch(/Bilateral Economic|Conceptual Framing and Analysis/);
+    expect(sections[0].guidance).toContain("Compare superconducting transmon");
+  });
+
+  it("never returns more than 8 drafting sections however many subheadings exist", () => {
+    const headings = Array.from({ length: 6 }, (_, h) => ({
+      id: `h${h}`, number: h + 1, title: `Heading ${h + 1}`, targetWordCount: 300,
+      subheadings: Array.from({ length: 4 }, (_, s) => ({
+        id: `s${h}-${s}`, headingId: `h${h}`, numberStr: `${h + 1}.${s + 1}`, title: `Sub ${s}`, targetWordCount: 75, currentWordCount: 0,
+      })),
+    }));
+    const sections = structureToInternalSections({ version: 1, isConfirmed: false, targetWordCount: 1800, totalAllocated: 1800, headings } as never);
+    expect(sections).toHaveLength(6);
+    expect(sections.every((s) => s.targetWordCount === 300)).toBe(true);
+  });
+});

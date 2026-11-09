@@ -138,7 +138,6 @@ export function DraftingActiveEditor({
   const [manualText, setManualText] = useState(section?.draftContent || "");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(section?.title || "");
-  const [customDirective, setCustomDirective] = useState("");
 
   // Zen Mode & Writer's Block Nudge State
   const [isZenMode, setIsZenMode] = useState(false);
@@ -184,7 +183,6 @@ export function DraftingActiveEditor({
     setIsEditingTitle(false);
     setInspectedCitation(null);
     setShowCitationDropdown(false);
-    setCustomDirective("");
     setIsZenMode(false);
     setShowWriterBlockNudge(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the section changes
@@ -769,79 +767,29 @@ export function DraftingActiveEditor({
         </div>
       )}
 
-      {/* Inline Section Action Controls Toolbar */}
+      {/* Toolbar: refinement actions appear only once the section has text */}
       <div className="px-5 py-2.5 border-b border-neutral-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-ink-750">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Deepen Analysis */}
-          <button
-            type="button"
-            onClick={() => onStreamSection?.("deepen")}
-            disabled={isStreaming}
-            title="Amplify critical evaluation, evaluate trade-offs, and reduce passive description (70/30 PEEL ratio)"
-            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200/70 dark:hover:bg-white/10 disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <TrendingUp className="w-3.5 h-3.5 text-indigo-500" />
-            <span>Deepen Analysis</span>
-          </button>
-
-          {/* Expand */}
-          <button
-            type="button"
-            onClick={() => onStreamSection?.("expand")}
-            disabled={isStreaming}
-            title="Expand analytical elaboration while maintaining citation grounding"
-            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200/70 dark:hover:bg-white/10 disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <PlusCircle className="w-3.5 h-3.5 text-blue-500" />
-            <span>Expand</span>
-          </button>
-
-          {/* Condense */}
-          <button
-            type="button"
-            onClick={() => onStreamSection?.("condense")}
-            disabled={isStreaming}
-            title="Tighten prose to eliminate wordiness and fit exact budget"
-            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200/70 dark:hover:bg-white/10 disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <Scissors className="w-3.5 h-3.5 text-amber-500" />
-            <span>Condense</span>
-          </button>
-
-          {/* Reinforce Citations */}
-          <button
-            type="button"
-            onClick={() => onStreamSection?.("citations")}
-            disabled={isStreaming}
-            title="Anchor assertions with in-text citations from bound literature"
-            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200/70 dark:hover:bg-white/10 disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="hidden sm:inline">Ground Citations</span>
-          </button>
-
-          {/* Devil's Advocate */}
-          <button
-            type="button"
-            onClick={() => onStreamSection?.("challenge")}
-            disabled={isStreaming}
-            title="Devil's Advocate: Identify weak spots and suggest counter-arguments"
-            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200/70 dark:hover:bg-white/10 disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-rose-500" />
-            <span className="hidden sm:inline">Challenge Me</span>
-          </button>
-
-          {/* Full Regenerate */}
-          <button
-            type="button"
-            onClick={() => onStreamSection?.()}
-            disabled={isStreaming}
-            title="Regenerate this section from scratch using PEEL framework"
-            className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 disabled:opacity-40 transition-colors cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
+          {liveContent.trim().length > 0 && (<>
+          {[
+            { key: "expand", label: "Expand", title: "Elaborate while keeping citations grounded", Icon: PlusCircle },
+            { key: "condense", label: "Condense", title: "Tighten the prose to fit the word budget", Icon: Scissors },
+            { key: "tone", label: "Refine Tone", title: "Polish the academic register", Icon: TrendingUp },
+            { key: "citations", label: "Insert Citation", title: "Anchor assertions with citations from your approved sources", Icon: BookOpen },
+          ].map(({ key, label, title, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onStreamSection?.(key)}
+              disabled={isStreaming}
+              title={title}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200/70 dark:hover:bg-white/10 disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span>{label}</span>
+            </button>
+          ))}
+          </>)}
         </div>
 
         {/* Manual Edit Mode Toggle */}
@@ -866,68 +814,6 @@ export function DraftingActiveEditor({
               <span>Edit text</span>
             </button>
           )}
-        </div>
-      </div>
-
-      {/* Custom AI Section Directives Bar */}
-      <div className="px-5 py-2.5 bg-neutral-50/70 dark:bg-white/[0.02] border-b border-neutral-100 dark:border-white/5 space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-purple-500">
-              <Sparkles className="w-3.5 h-3.5" />
-            </div>
-            <input
-              type="text"
-              value={customDirective}
-              onChange={(e) => setCustomDirective(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && customDirective.trim() && !isStreaming) {
-                  onStreamSection?.(customDirective.trim());
-                }
-              }}
-              placeholder="Guide AI for this section... (e.g. 'Contrast with empirical studies from 2023', 'Emphasize policy implications', 'Add critical counter-argument')"
-              className="w-full pl-8 pr-20 py-1.5 text-xs bg-white dark:bg-ink-600 border border-neutral-200/80 dark:border-white/10 rounded-xl text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all shadow-2xs font-sans"
-            />
-            <button
-              type="button"
-              disabled={!customDirective.trim() || isStreaming}
-              onClick={() => {
-                if (customDirective.trim()) {
-                  onStreamSection?.(customDirective.trim());
-                }
-              }}
-              className="absolute right-1 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-[11px] font-semibold hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-            >
-              <span>Draft</span>
-              <ArrowRight className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-
-        {/* Quick Directive Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px] pt-0.5">
-          <span className="text-[10px] uppercase font-semibold text-neutral-400 dark:text-neutral-500 tracking-wider shrink-0">
-            Suggested Directives:
-          </span>
-          {[
-            { label: "Synthesize Counterargument", prompt: "Synthesize strong counterarguments and theoretical critiques challenging the primary hypothesis" },
-            { label: "Deepen Dialectical Rigor", prompt: "Deepen dialectical rigor by evaluating methodological trade-offs and structural assumptions" },
-            { label: "Strengthen Academic Register", prompt: "Elevate formal academic register and sophisticated transitional phrasing" },
-            { label: "Focus on Policy Implications", prompt: "Expand pragmatic policy implications and actionable future recommendations" },
-          ].map((chip) => (
-            <button
-              key={chip.label}
-              type="button"
-              disabled={isStreaming}
-              onClick={() => {
-                setCustomDirective(chip.prompt);
-                onStreamSection?.(chip.prompt);
-              }}
-              className="px-2 py-0.5 rounded-md bg-white dark:bg-ink-600 border border-neutral-200/70 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-300 dark:border-white/20 transition-all shrink-0 cursor-pointer disabled:opacity-40"
-            >
-              + {chip.label}
-            </button>
-          ))}
         </div>
       </div>
 

@@ -861,6 +861,7 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
       sectionTitle: section.title,
       academicFunction: section.academicFunction,
       targetWordCount: section.targetWordCount,
+      allocatedWords: section.targetWordCount,
       academicLevel,
       citationStyle,
       assignmentTopic,

@@ -11,12 +11,10 @@ const base = { version: 1, isConfirmed: false, targetWordCount: 2000, totalAlloc
 describe("outline panel", () => {
   afterEach(() => cleanup());
 
-  it("labels a starter outline and writes one from the brief", async () => {
-    const onRewrite = vi.fn().mockResolvedValue({ ok: true, structure: { ...base, source: "ai" } });
-    render(<OutlineByAiPanel structure={{ ...base, source: "starter" }} onRewrite={onRewrite} onRestore={vi.fn()} />);
-    expect(screen.getByText(/Starter outline\./)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Write the outline from my brief/ }));
-    await waitFor(() => expect(onRewrite).toHaveBeenCalledWith(undefined));
+  it("shows no starter-outline notice for a non-AI outline", () => {
+    const { container } = render(<OutlineByAiPanel structure={{ ...base, source: "starter" }} onRewrite={vi.fn()} onRestore={vi.fn()} />);
+    expect(screen.queryByText(/Starter outline/)).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("revises an AI outline on request, can undo, and shows errors", async () => {

@@ -35,7 +35,7 @@ import {
   extractSubstantiveBriefQuestions,
 } from "../../../utils/briefExtractor";
 
-import { isNonQuestionBriefLine } from "../../../utils/briefQuestions";
+import { isNonQuestionBriefLine, parseBriefQuestions } from "../../../utils/briefQuestions";
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
   question: string,
@@ -1270,6 +1270,37 @@ export function buildBriefSpecificSpecs(
     assignmentType === "case_study";
 
   const primaryFramework = targetFrameworks[0] || (isCoursework ? "Applied Analytical Model" : "Theoretical Explanatory Framework");
+
+  // The brief states its own questions and marks: one section per main question,
+  // budgets proportional to the marks, Focus lines quoting the brief itself.
+  const markedRows = parseBriefQuestions(briefText || question || "");
+  if (markedRows.length >= 2 && markedRows.some((r) => r.marks)) {
+    const groups = new Map<string, typeof markedRows>();
+    for (const r of markedRows) {
+      const key = r.label.replace(/[a-z]$/, "");
+      groups.set(key, [...(groups.get(key) ?? []), r]);
+    }
+    const entries = [...groups.entries()].slice(0, MAX_OUTLINE_SECTIONS);
+    const avgMarks = markedRows.reduce((t, r) => t + (r.marks ?? 0), 0) / Math.max(1, markedRows.filter((r) => r.marks).length);
+    const weights = entries.map(([, rows]) => rows.reduce((t, r) => t + (r.marks ?? avgMarks), 0));
+    const totalWeight = weights.reduce((t, w) => t + w, 0) || 1;
+    return entries.map(([key, rows], i) => {
+      const n = i + 1;
+      const heading = rows[0].text.length > 90 ? `${rows[0].text.slice(0, 89).replace(/\s+\S*$/, "")}…` : rows[0].text;
+      return {
+        title: `${n}.0 ${heading}`,
+        notes: `Answers ${rows.map((r) => r.label).join(", ")} from the brief.`,
+        subheadings: [
+          {
+            title: `${n}.1 ${key}: ${heading}`,
+            ratio: weights[i] / totalWeight,
+            guidance: `Focus: ${rows.map((r) => r.text).join(" ")}`,
+            keyPoints: rows.map((r) => r.text).slice(0, 4),
+          },
+        ],
+      };
+    });
+  }
 
   const isTutorialOrShort =
     (targetWordCount !== undefined && targetWordCount <= 600) ||
