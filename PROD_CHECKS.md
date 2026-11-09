@@ -1,5 +1,7 @@
 # Read-Only Production Verification Runbook (`PROD_CHECKS.md`)
 
+> **Dated record.** This document captures a point in time (an incident, audit, plan or status ledger) and is not kept in sync with the code. For current behaviour read [`docs/README.md`](docs/README.md). Details here, such as `render.yaml` settings, file names, line numbers and counts, may no longer match `main`.
+
 **Target Production Project**: `gfjhsijrwodjvkisouzw` (Supabase) & `srv-d9lgbn710e5c73dl8sk0` (Render)  
 **Safety Guarantee**: Every SQL query in this document is strictly **`SELECT`-only** against `pg_catalog` / `information_schema` / `supabase_migrations` / `storage`, and every CLI command is **read-only**. Column names have been checked statically against repo SQL migrations (`sqlRunbooksVerification.test.ts`); live Postgres execution status is tracked in `STATUS.md`. Do **not** run any `ALTER`, `DROP`, `INSERT`, `UPDATE`, or `DELETE` until the results below are reviewed.
 

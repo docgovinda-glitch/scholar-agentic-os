@@ -72,5 +72,4 @@ Decks never contain figures, quotations or citations that are not in the user's 
 ## 7. Known limitations
 
 - Exported decks use Arial and Georgia so they render the same on Windows and macOS; text is slightly narrower in PowerPoint than in the app's web font.
-- The audience Q&A simulator's offline fallback (`generateFallbackQAScenarios`) still contains example figures and has not yet been reworked.
-- Coursework (`CourseworkWorkspace.tsx`) still previews slides with the older `SlideCanvas` component.
+- The legacy `SlideCanvas` component (`src/features/slides/components/SlideCanvas.tsx`) is still used by `src/desk/assignment/stages/AssignmentDraftingStage.tsx` and `src/features/coursework/components/CourseworkWorkspace.tsx` to preview slides; those surfaces do not use the Gamma card engine.

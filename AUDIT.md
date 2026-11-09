@@ -1,5 +1,7 @@
 # Phase 2 — Production Health & Security Audit (`AUDIT.md`)
 
+> **Dated record.** This document captures a point in time (an incident, audit, plan or status ledger) and is not kept in sync with the code. For current behaviour read [`docs/README.md`](docs/README.md). Details here, such as `render.yaml` settings, file names, line numbers and counts, may no longer match `main`.
+
 **Repository**: `https://github.com/docgovinda-glitch/scholar-agentic-os.git`  
 **Audit Date**: 2026-10-28  
 **Baseline Commit (`main`)**: `bb6d482` (`main`) + Hotfix PR [#71](https://github.com/docgovinda-glitch/scholar-agentic-os/pull/71) (`d7d0746` on `hotfix/containment-authz-memory-ssrf`)  

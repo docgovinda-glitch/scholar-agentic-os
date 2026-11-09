@@ -1,5 +1,7 @@
 # Post-Exposure Compromise & Persistence Audit (`COMPROMISE_CHECKS.md`)
 
+> **Dated record.** This document captures a point in time (an incident, audit, plan or status ledger) and is not kept in sync with the code. For current behaviour read [`docs/README.md`](docs/README.md). Details here, such as `render.yaml` settings, file names, line numbers and counts, may no longer match `main`.
+
 **Purpose**: Read-only forensic checks to detect any unauthorized access, backdoor persistence, privilege escalation, or quota abuse since **2026-08-04** (when commits `01f851f` and `28cfaa5` committed live credentials to the repository).  
 **Safety & Privacy Guarantee**:
 - Every SQL query below is strictly `SELECT`-only. Column names have been checked statically against repo SQL migrations (`sqlRunbooksVerification.test.ts`); live Postgres execution status is tracked in `STATUS.md`.

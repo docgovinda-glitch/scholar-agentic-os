@@ -24,24 +24,22 @@ Production: https://scholar.gkshah.com.np (Render, Docker, free plan).
 
 ## Commands
 
-Node 22 (Dockerfile) / Node 20 (CI). Use `npm ci` for installs.
+Node 22 (Dockerfile and every GitHub workflow; Node 20 has no global `WebSocket`). Use `npm ci` for installs.
 
 ```bash
 npm ci                     # install (lockfile-exact)
 npm run dev                # tsx server.ts → Express + Vite middleware (HMR) on :3000
-npm run lint               # tsc --noEmit + contrast check + CSP-hash check  (== pre-commit hook & CI gate)
+npm run lint               # tsc --noEmit + contrast, CSP-hash, no-pure-black, no-raw-hex-class checks (== .husky/pre-commit & CI gate)
 npm run typecheck          # typecheck only (tsc --noEmit)
 npm test                   # vitest run (whole suite, ~3 min)
 npx vitest run path/to/file.test.ts   # single file — prefer this while iterating
-npm run build              # vite build → dist/  +  esbuild server.ts → dist/server.cjs
+npm run build              # vite build → dist/, chunk-budget check (<500 kB), esbuild server.ts → dist/server.cjs
 npm start                  # node dist/server.cjs (after build)
 npm run verify:contrast    # WCAG checks over tokens in src/index.css
 npm run verify:csp-hash    # inline theme script in index.html must match hash in server.ts
 ```
 
 Known baseline: ~18 tests in 5 files fail without real credentials/network (`authIntegration`, `liveNetworkDiagnostics`, `productionFinalAcceptance`, `AddSourceModal`, `selfServiceAuthConflict6`). Don't "fix" them by mocking away their purpose; just confirm your change doesn't add new failures.
-
-`generate:knowledge` / `validate:knowledge` / `check:knowledge` point at `.claude/scripts/*.js`, which do not exist in the repo — those scripts are currently dead.
 
 ## Architecture
 
@@ -72,8 +70,8 @@ supabase/                 schema*.sql, migrations/ (timestamped), functions/ (De
 - Path alias `@/*` → repo root (not `src/`).
 - Server code imports shared modules from `src/` (citation formatters, document_intelligence, mesh agents) — keep those modules free of browser-only APIs.
 - **Supabase**: Auth (GoTrue), Postgres with RLS, private storage buckets, Edge Functions (Resend email, search proxies). The server persists through Supabase's HTTPS Data API (`server/src/supabaseRest.ts`) using `VITE_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`; `DATABASE_URL` direct Postgres is an optional fallback only.
-- **AI**: Gemini (`@google/genai`) by default, plus BYOK and admin-managed provider pools; LangChain/LangGraph for graph workflows. Request bodies must never carry provider credentials (`rejectClientCredentials`); a user's own key reaches the server only as transient `x-ai-*` headers on AI routes (`routeUsesClientAi` in `src/desk/api/client.ts`).
-- Deeper docs: `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DATA-MODEL.md`, `docs/WORKFLOWS.md`, `docs/AI-SYSTEM.md`, `docs/UI-UX.md`, `SYSTEM_MAP.md`, `SETUP.md`. Security context: `AUDIT.md`, `ROTATION_RUNBOOK.md`, `HOTFIX*_DEPLOY.md`.
+- **AI**: every call goes through one router chain (`server/src/ai/routerBridge.ts`): Premium resources (admin-managed pool, credits) → the user's own keys → their local model (browser hand-off). The server never serves a normal request from a server-held env key. 37 cloud providers (`src/config/providerCatalog.ts`) and 9 local runners; LangGraph for the brief scanner. Request bodies must never carry provider credentials (`rejectClientCredentials`); a user's own key reaches the server only as transient `x-ai-*` / `x-ai-keyring` headers on AI routes (`routeUsesClientAi` in `src/desk/api/client.ts`). Details: `docs/AI-SYSTEM.md`.
+- Deeper docs (kept in step with the code; update them in the same PR as the change): `docs/README.md` (index), `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DATA-MODEL.md`, `docs/WORKFLOWS.md`, `docs/AI-SYSTEM.md`, `docs/AI-CALL-MAP.md`, `docs/UI-UX.md`, `docs/DEVELOPMENT.md`, `docs/DEPLOYMENT.md`, `SYSTEM_MAP.md`, `SETUP.md`, `RUNBOOK.md`. Security history (dated records, not current behaviour): `AUDIT.md`, `ROTATION_RUNBOOK.md`, `HOTFIX*_DEPLOY.md`.
 
 ## Slides & Keynotes (Presentation Studio, OT-22)
 
@@ -88,21 +86,21 @@ supabase/                 schema*.sql, migrations/ (timestamped), functions/ (De
 ## UI conventions
 
 - React 19 + TypeScript, Tailwind CSS v4 via `@tailwindcss/vite` (no tailwind.config; tokens live in `src/index.css` `@theme` / `:root`).
-- Use semantic CSS tokens (`--bg-*`, `--text-*`, `--border-*`, `--theme-*`), not raw hex colors. Dark mode = `data-theme="dark"` / `.dark` (custom variant). Changing a token must still pass `verify:contrast`.
+- Use semantic CSS tokens (`--bg-*`, `--surface-*`, `--text-*`, `--border-*`, `--accent*`, `--state-*`, `--theme-*`), not raw hex colors; lint rejects `#000000` and raw hex Tailwind classes (`bg-[#…]`) in app code. Dark mode = `data-theme="dark"` / `.dark` (custom variant). Changing a token must still pass `verify:contrast`.
 - Icons: `lucide-react`; animation: `motion`; editor: TipTap.
 - If you edit the inline theme script in `index.html`, update `INLINE_THEME_SCRIPT_CSP_HASH` in `server.ts` (lint will fail otherwise).
 - Heavy libs are split via `manualChunks` in `vite.config.ts`; lazy-load large features.
 
 ## Deployment
 
-- `main` is production. `.github/workflows/deploy.yml` on push to `main`: `npm ci` → `npm run lint` → `npm test` → `npm run build`, then triggers the Render deploy hook and pings `/api/health`.
-- `render.yaml`: single Docker web service (`Dockerfile`, two-stage node:22-alpine), `plan: free` (cold starts, 512 MB RAM — keep `MAX_UPLOAD_MB` small), `autoDeploy: true`, `healthCheckPath: /api/health`. Secrets are `sync: false` (set in the Render dashboard).
+- `main` is production. `.github/workflows/ci.yml` and `e2e.yml` run on every PR. `.github/workflows/deploy.yml` on push to `main`: `npm ci` → `npm run lint` → `npm audit --omit=dev --audit-level=high` → `npm test` → `npm run build`, then triggers the Render deploy hook (`RENDER_DEPLOY_KEY`), waits until `/api/health` reports the commit, runs `/api/health?deep=1` and the production smoke suite (if its secrets exist). `uptime.yml` checks `/api/health?deep=1` every 15 minutes.
+- `render.yaml`: single Docker web service (`Dockerfile`, two-stage node:22-alpine), `plan: free` (cold starts, 512 MB RAM — keep `MAX_UPLOAD_MB` small), `autoDeploy: false` (deploys are triggered by `deploy.yml`), `healthCheckPath: /api/health`. Secrets are `sync: false` (set in the Render dashboard).
 - `VITE_*` vars are baked in at build time (Docker build args). Anything secret must never be prefixed `VITE_`.
 - Supabase migrations / Edge Functions are deployed separately (Supabase CLI), not by Render.
 
 ## Environment
 
-Template: `.env.example` (all real `.env*` files are gitignored). Keys: Supabase (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`), AI (`GEMINI_API_KEY`, `GEMINI_API_KEY_BACKUP`, `AI_GATEWAY_*`, `TAVILY_API_KEY`, `VITE_OPENALEX_API_KEY`), crypto (`MASTER_KEY`, `ENCRYPTION_KEY`), captcha (`VITE_CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY`), email (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`), app (`APP_URL`, `VITE_APP_NAME`, `VITE_API_BASE_URL`, `MAIN_ADMIN_EMAIL`).
+Template: `.env.example` (all real `.env*` files are gitignored). Full inventory and what each variable does: `SETUP.md` §4. Keys the code reads: Supabase (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`), crypto and security (`MASTER_KEY`, `LLM_CHALLENGE_SECRET`, `MAIN_ADMIN_EMAIL`, `VITE_CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY`), AI and search (`TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_SEARCH_API_KEY`, `OPENALEX_API_KEY`, `ALLOW_SERVER_LOCAL_AI`, `ENABLE_SERVER_AI`), runtime (`PORT`, `NODE_ENV`, `MAX_UPLOAD_MB`). `GEMINI_API_KEY*`, `AI_GATEWAY_*`, `APP_URL`, `VITE_APP_NAME`, `VITE_API_BASE_URL` and `VITE_OPENALEX_API_KEY` are in `.env.example` but not read by current code. Email keys (`RESEND_*`, `ADMIN_EMAIL`) are Supabase Edge Function secrets.
 
 ## Rules
 

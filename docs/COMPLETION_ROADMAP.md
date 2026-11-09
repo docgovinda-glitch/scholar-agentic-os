@@ -1,5 +1,7 @@
 # Scholar Core OS — Completion Baseline & Roadmap
 
+> **Dated record.** This document captures a point in time (an incident, audit, plan or status ledger) and is not kept in sync with the code. For current behaviour read [`docs/README.md`](README.md). Details here, such as `render.yaml` settings, file names, line numbers and counts, may no longer match `main`.
+
 This document establishes the authoritative completion baseline for **Scholar Core**, based on a comprehensive read-only audit of the codebase, type system, test suite, backend endpoints, core engines, and user workspaces.
 
 ---

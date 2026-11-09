@@ -1,24 +1,16 @@
-# Scholar Agentic OS Deployment Configuration
-# Primary hosting stack (Task 9 decision, 2026-08-02):
-# - Render: Full-stack hosting (frontend + backend, Docker deployment)
-# - Supabase: User authentication and database (profiles, admin approvals)
-# - Resend: Transactional emails (approval/reset notifications)
-# - Cloudflare: DNS management
+# Scholar Agentic OS deployment configuration (see docs/DEPLOYMENT.md).
 #
-# Serves:
-# - AI generation routes (/api/generate*, /api/stream-generate)
-# - Parse/parsing routes (/api/parse-file, /api/parse-external-link, /api/lookup-doi)
-# - Agent execution routes (/api/agents, /api/agents/execute)
-# - Admin approval UI (/admin/approve-scholar)
-# - Health check endpoint (/api/health)
+# One Docker web service runs the Express API, the Supabase proxy and the built
+# React app (dist/). Around it:
+# - Supabase: Auth, Postgres, Storage and Edge Functions.
+# - Resend: transactional email, sent from Supabase Edge Functions (not server.ts).
+# - Cloudflare: DNS and Turnstile CAPTCHA.
+# - GitHub Actions: .github/workflows/deploy.yml triggers the Render deploy hook
+#   after lint, tests and build pass on main (autoDeploy is off).
 #
-# Auth/user/admin data: Supabase (not local Postgres)
-# Email delivery: Resend Edge Functions (not server.ts)
-#
-# VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, and VITE_CAPTCHA_SITE_KEY are consumed
-# as Docker build ARGs by the Dockerfile (Render automatically forwards matching env
-# vars as build args), not just runtime env — required for Vite to bake them into the
-# built frontend bundle.
+# VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY and VITE_CAPTCHA_SITE_KEY are consumed
+# as Docker build ARGs by the Dockerfile (Render forwards matching env vars as
+# build args), not just runtime env: Vite bakes them into the frontend bundle.
 services:
   - type: web
     name: scholar-agentic-os

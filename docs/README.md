@@ -1,66 +1,33 @@
 # Scholar Core Documentation
 
-Welcome to the **Scholar Core** technical documentation. This documentation describes the application as it **currently exists and functions today**.
+This folder describes the application as it exists on `main`. Where a document and the code disagree, the code is right and the document should be fixed in the same pull request that changes the code.
 
----
+## Living documents
 
-## What is Scholar Core?
-
-**Scholar Core** is an enterprise-grade academic research, structured writing, evidence-grounded verification, and multi-agent peer review operating system. Designed for undergraduate students, postgraduates, doctoral researchers, and academic faculty, it replaces generic text generation with deterministic evidence ledgers, citation reconciliation, rubric alignment, and dedicated academic workspaces.
-
----
-
-## Authoritative Documentation Directory
-
-The documentation is organized into focused, authoritative specifications:
-
-| Document | Description |
+| Document | Describes |
 | :--- | :--- |
-| [**`PRODUCT.md`**](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/docs/PRODUCT.md) | Current product capabilities, user personas, active academic deliverable types, and core features. |
-| [**`UI-UX.md`**](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/docs/UI-UX.md) | Current UI/UX design system, component layouts, user interaction patterns, Day/Night theme, and view states. |
-| [**`ARCHITECTURE.md`**](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/docs/ARCHITECTURE.md) | Current technical architecture, fullstack topology (Vite, React 19, Express, Supabase), and security model. |
-| [**`WORKFLOWS.md`**](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/docs/WORKFLOWS.md) | Step-by-step current user journeys: Auth, Onboarding, Coursework 4-Phase flow, Journal Article pipeline, Vault. |
-| [**`AI-SYSTEM.md`**](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/docs/AI-SYSTEM.md) | Current AI architecture: Client-side routing, multi-provider failover, BYOK, local LLM runners, and prompt system. |
-| [**`DATA-MODEL.md`**](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/docs/DATA-MODEL.md) | Active domain entities, TypeScript schemas, PostgreSQL relational tables, JSONB schemas, and persistence. |
-| [**`API.md`**](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/docs/API.md) | Active server endpoints, parameters, request/response contracts, SSE streaming, and Supabase proxy routes. |
-| [**`DEVELOPMENT.md`**](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/docs/DEVELOPMENT.md) | Developer guide, prerequisites, local setup, build pipeline, testing standards, and verification commands. |
-| [**`DEPLOYMENT.md`**](file:///Users/pobpkf/Documents/Scholar%20Core/scholar-agentic-os/docs/DEPLOYMENT.md) | Production deployment specifications, Docker containerization, Render configuration, and Supabase setup. |
+| [`PRODUCT.md`](PRODUCT.md) | Capabilities, user roles, the output-type catalog and which workspaces exist |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Runtime topology, server and client layers, security model, ML style engine |
+| [`WORKFLOWS.md`](WORKFLOWS.md) | Sign-in and onboarding, then each workspace step by step |
+| [`AI-SYSTEM.md`](AI-SYSTEM.md) | Single brain (`scholarBrain`), the two routers, providers, credentials, local models |
+| [`AI-CALL-MAP.md`](AI-CALL-MAP.md) | Entry layers that reach the AI gateway and where each gets its credentials |
+| [`DATA-MODEL.md`](DATA-MODEL.md) | Postgres tables (from `supabase/`), storage buckets, project state shapes |
+| [`API.md`](API.md) | Every HTTP endpoint registered by `server.ts`, with auth and rate-limit notes |
+| [`UI-UX.md`](UI-UX.md) | Design tokens, themes, shell and navigation, accessibility rules |
+| [`DEVELOPMENT.md`](DEVELOPMENT.md) | Local setup, commands, tests, conventions |
+| [`DEPLOYMENT.md`](DEPLOYMENT.md) | Dockerfile, `render.yaml`, GitHub workflows, Supabase |
+| [`presentation-studio.md`](presentation-studio.md) | Slides engine (OT-22) |
 
----
+Related files at the repository root: [`README.md`](../README.md), [`CLAUDE.md`](../CLAUDE.md) (agent and contributor rules), [`SETUP.md`](../SETUP.md), [`RUNBOOK.md`](../RUNBOOK.md) (operations), [`SYSTEM_MAP.md`](../SYSTEM_MAP.md) (file map), [`e2e/README.md`](../e2e/README.md), [`CHANGELOG.md`](../CHANGELOG.md).
 
-## Major Application Modules
+## Dated records (not kept in sync)
 
-1. **Coursework & Essay Engine (`OT-01` & `OT-02`)**
-   - 9-milestone structured workflow:
-     - **Phase 1 · Understand & Structure**: Dual-tab brief intake, dynamic analytical outline generator & editor (`DynamicStructurePlanner`), word count allocation controls, and authentic academic voice selection (`WritingStyleSelector`).
-     - **Phase 2 · Sources & Discovery**: Question deconstruction, multi-angle literature discovery (30+ authentic scholarly sources), lecture upload dropzone, relevance categorization, and approved evidence shelf.
-     - **Phase 3 · Drafting**: Subheading-by-subheading drafting alignment, live word count targets, invisible academic chunker, citation insertion shortcuts, and evidence binding.
-     - **Phase 4 · Submission & Verification**: 10-point rubric evaluator, citation audit reconciliation (100% in-text to bibliography match), automated reference list generation, and one-click `.docx` / PDF export.
-     - **Copilot Personas**: Phase-specific copilots (Advisor, Librarian, Scribe, Examiner).
+These capture a point in time (incidents, audits, plans, status ledgers). Each starts with a banner saying so. Do not treat them as a description of current behaviour.
 
-2. **Journal Article Workspace (`OT-10`)**
-   - 25-stage empirical research pipeline across 5 logical phases: Foundation, Evidence, Drafting, Review, Publication.
-   - Includes adversarial multi-agent peer review simulation with 5 specialized referee lenses.
+`AUDIT.md`, `COMPROMISE_CHECKS.md`, `HOTFIX_DEPLOY.md`, `HOTFIX2_DEPLOY.md`, `MERGE_PLAN.md`, `POST_DEPLOY_80.md`, `PROD_CHECKS.md`, `PRODUCT_AUDIT.md`, `ROTATION_RUNBOOK.md`, `STATUS.md`, `USER_NOTICE.md`, `docs/COMPLETION_ROADMAP.md`.
 
-3. **Thesis / Dissertation Workspace (`OT-09` / `OT-07`)**
-   - Multi-chapter milestone tracker, literature synthesis matrix, and 15-question Viva Voce defense simulator.
+## Keeping docs correct
 
-4. **Research Proposal Workspace (`OT-19`)**
-   - Grant development pipeline: Funding agency alignment, Specific Aims, Significance & Innovation, Work Packages, and NIH/NSF Study Section scoring simulator.
-
-5. **Academic Presentation Workspace (`OT-22`)**
-   - Visual narrative and defense studio: 10m/20m/45m timing profiler, slide deck architecture, speaker notes, and 16:9 canvas.
-
-6. **Knowledge Vault (`/vault`)**
-   - Cross-project source repository operating under a strict **Zero-Document Retention Policy** (metadata and canonical citations only).
-   - Cloud drive integrations (Google Drive, Microsoft OneDrive/SharePoint), DOI lookup, and BibTeX/RIS import.
-
-7. **AI Access Control (`/ai-access`)**
-   - 5 operational AI modes: Smart Gateway, Bring Your Own Key (BYOK), Free Tier, Local AI (Ollama, LM Studio, etc.), and Offline.
-   - Dynamic model discovery, local hardware profiling, and resilient provider failover engine.
-
-8. **Account Settings (`/settings`)**
-   - Multi-account registry, active profile switching, institutional credentials, and Day/Night theme toggling.
-
-9. **Admin Infrastructure Panel (`/admin`)**
-   - Dedicated dashboard for monitoring provider health, testing API keys, tracking latency, and auditing error rates.
+- Name files, routes and commands exactly as they exist; do not quote test counts, bundle sizes or timings.
+- Change a route, table, environment variable, command or workflow file: update the matching document in the same pull request.
+- `CLAUDE.md` holds the short, authoritative project memory; these documents hold the detail.
