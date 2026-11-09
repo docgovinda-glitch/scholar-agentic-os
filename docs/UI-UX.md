@@ -45,7 +45,7 @@ Defined in `src/index.css`:
 | Account, Vault, AI Access | `src/desk/account/AccountSettingsScreen.tsx`, `src/desk/vault/`, `src/desk/aiAccess/` |
 | Admin | `src/admin/AdminApp.tsx` (lazy, `/admin/*`) |
 
-`src/hooks/useDeviceClass.ts` classifies `mobile` (< 768 px), `tablet` (768-1023 px) and `desktop` (>= 1024 px, demoted when the pointer is coarse) so components that cannot work on a phone (for example local-server AI options) are not mounted there. `src/pocket/` and `src/desk/pocket/` contain a compact mobile shell (`PocketShell`, `DeskPocketMount`) that no route currently mounts.
+`src/hooks/useDeviceClass.ts` classifies `mobile` (< 768 px), `tablet` (768-1023 px) and `desktop` (>= 1024 px, demoted when the pointer is coarse) so components that cannot work on a phone (for example local-server AI options) are not mounted there.
 
 Other hooks: `useBackToClose`, `useOnlineStatus`, `useVisualViewport`, `useUnsavedChangesGuard`, `useSubscriptionLimits`.
 

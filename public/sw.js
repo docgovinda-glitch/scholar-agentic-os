@@ -11,7 +11,6 @@ const CACHE_DYNAMIC = `${CACHE_VERSION}-dynamic`;
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/pocket',
 ];
 
 const STATIC_EXTENSIONS = ['.js', '.css', '.woff2', '.png', '.svg'];
@@ -128,7 +127,7 @@ function networkFirstStrategy(request, cacheName) {
     });
 }
 
-// Push notifications for Scholar OS Pocket
+// Push notifications for Scholar Core
 self.addEventListener('push', (event) => {
   if (!event.data) {
     return;
@@ -154,12 +153,12 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const data = event.notification.data || {};
-  let url = '/pocket';
+  let url = '/projects';
 
   if (data.url) {
     url = data.url;
   } else if (data.tab) {
-    url = `/pocket?tab=${data.tab}`;
+    url = `/projects?tab=${data.tab}`;
   }
 
   event.waitUntil(

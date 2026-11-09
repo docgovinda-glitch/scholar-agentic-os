@@ -44,10 +44,6 @@ services:
       # alongside the 1-at-a-time heavy-parse concurrency guard.
       - key: MAX_UPLOAD_MB
         value: 10
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: GEMINI_API_KEY_BACKUP
-        sync: false
       - key: MAIN_ADMIN_EMAIL
         sync: false
       - key: ADMIN_EMAIL

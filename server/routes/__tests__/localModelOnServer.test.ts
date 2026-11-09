@@ -117,7 +117,7 @@ describe("local models are never called from a deployed server", () => {
 
   it("Thesis viva runs on a browser-local model: 426 with the prompt, then 200 with the browser's answer", async () => {
     process.env.ALLOW_SERVER_LOCAL_AI = "false";
-    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-09" });
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-07" });
     const url = `/api/projects/${created.body.projectId}/thesis/viva-simulate`;
     const body = { title: "Rural clinic wait times", researchQuestions: ["What drives wait times?"] };
 

@@ -83,7 +83,7 @@ Project sub-routers (`server/routes/project/`): `agentic/` (journal pipeline, sp
 | `uploadGuard.ts` | Multer memory storage, `MAX_UPLOAD_MB` (default and hard ceiling 10), heavy-parser detection |
 | `errorHandler.ts`, `asyncHandler.ts` | Uniform error responses |
 
-Rate limits actually applied (fixed window, per client IP): AI abuse limit 20/min on `/api/ai/run`, `/api/ai/models` and the `/api/ai/*` router; studio routes 200/min; project routes 600/min; Supabase proxy 300/min; saved AI keys 120 per 15 min (`/api/ai-access/keys`); auth routes use their own limiters (login 5 per 5 min, availability 30 per 15 min, signup verification 20 per 15 min). `server.ts` also defines `parseFileLimit`, `parseExternalLinkLimit` and `lookupDoiLimit`, which are not attached to any route today; `server/src/middleware/rateLimit.ts` additionally exports `authRateLimit`, `aiRateLimit` and `defaultRateLimit` presets.
+Rate limits actually applied (fixed window, per client IP): AI abuse limit 20/min on `/api/ai/run`, `/api/ai/models` and the `/api/ai/*` router; studio routes 200/min; project routes 600/min; Supabase proxy 300/min; saved AI keys 120 per 15 min (`/api/ai-access/keys`); auth routes use their own limiters (login 5 per 5 min, availability 30 per 15 min, signup verification 20 per 15 min).
 
 ### 3.3 Persistence (`src/services/store/projectStore.ts`)
 
@@ -123,7 +123,7 @@ The server imports from `src/` (citation formatters, `document_intelligence`, me
 
 | Path | Contents |
 | :--- | :--- |
-| `src/desk/` | UI by feature: assignment, thesis, journal, workspace (journal studio), proposal, presentation, vault, aiAccess, ai, auth, account, admin, dashboard, intake, setup, pocket, claims, evidence, gates, discovery, export, manuscript, editor |
+| `src/desk/` | UI by feature: assignment, thesis, journal, workspace (journal studio), proposal, presentation, vault, aiAccess, ai, auth, account, admin, dashboard, intake, setup, claims, evidence, gates, discovery, export, manuscript, editor |
 | `src/desk/api/` | Typed client: `client.ts` (authenticated fetch, transient `x-ai-*` headers on AI routes via `routeUsesClientAi`, offline queue), `projectsApi.ts`, `agenticApi.ts`, `claimEvidenceApi.ts`, `studioGenerationApi.ts` |
 | `src/app/` | Client engines: `atlas` (output-type catalog), `conductor` (gates), `mesh` (agent registry and executor), `citation`, `manuscript`, `review`, `coherence`, `rubric`, `studio`, `journal`, `anonymization`, `coverLetter`, `export` |
 | `src/domain/` | Pure models and zod schemas; no React and no I/O |

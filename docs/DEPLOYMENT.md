@@ -27,7 +27,7 @@ Local image: `docker build --build-arg VITE_SUPABASE_URL=... --build-arg VITE_SU
 
 - One `web` service `scholar-agentic-os`, `env: docker`, `plan: free`, `autoDeploy: false`, `healthCheckPath: /api/health`.
 - Fixed values: `PORT=3000`, `NODE_ENV=production`, `MAX_UPLOAD_MB=10`.
-- Secrets set in the Render dashboard (`sync: false`): `GEMINI_API_KEY`, `GEMINI_API_KEY_BACKUP`, `MAIN_ADMIN_EMAIL`, `ADMIN_EMAIL`, `ENCRYPTION_KEY`, `MASTER_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`.
+- Secrets set in the Render dashboard (`sync: false`): `MAIN_ADMIN_EMAIL`, `ADMIN_EMAIL`, `ENCRYPTION_KEY`, `MASTER_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`.
 - Variables the code reads that are not in the blueprint can be added in the dashboard when needed, notably `LLM_CHALLENGE_SECRET` (required in production for browser-run AI challenges), `SUPABASE_JWT_SECRET`, `ALLOW_SERVER_LOCAL_AI`, `ENABLE_SERVER_AI`, `OPENALEX_MAILTO`, `OPENALEX_API_KEY` and search keys. Full list: [`../SETUP.md`](../SETUP.md) §4.
 - `VITE_*` variables are baked in at build time; a change needs a rebuild. Never put a secret in a `VITE_` variable.
 - The free plan sleeps after about 15 minutes idle; the client wakes it early with `src/services/serverWarmup.ts`.

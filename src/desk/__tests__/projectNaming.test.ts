@@ -238,7 +238,7 @@ describe("projectNaming utilities", () => {
     it("returns correct labels for standard output type IDs", () => {
       expect(getFormatLabel("OT-01")).toBe("Assignment");
       expect(getFormatLabel("OT-10")).toBe("Journal Article");
-      expect(getFormatLabel("OT-19")).toBe("Research Proposal");
+      expect(getFormatLabel("OT-15")).toBe("Research Proposal");
       expect(getFormatLabel("OT-22")).toBe("Presentation");
       expect(getFormatLabel("OT-06")).toBe("Thesis / Dissertation");
     });
@@ -281,7 +281,7 @@ describe("projectNaming utilities", () => {
       expect(
         getProjectDisplayName({
           projectId: "p1",
-          outputTypeId: "OT-19",
+          outputTypeId: "OT-15",
           answers: { topic: "CRISPR-Cas9 Gene Editing Efficiency" },
         })
       ).toBe("CRISPR-Cas9 Gene Editing Efficiency");

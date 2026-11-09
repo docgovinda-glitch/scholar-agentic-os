@@ -7,7 +7,7 @@ import ProposalWorkspace from "../ProposalWorkspace";
 
 const draftBodies: Array<Record<string, unknown>> = [];
 
-describe("ProposalWorkspace (OT-19 Grant & Research Proposal Engine)", () => {
+describe("ProposalWorkspace (OT-15 Grant & Research Proposal Engine)", () => {
   let failNext = false;
   beforeEach(() => {
     failNext = false;

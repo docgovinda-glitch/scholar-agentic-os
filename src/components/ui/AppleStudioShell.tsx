@@ -33,7 +33,7 @@ export const APPLE_STUDIO_STAGES: readonly AppleStudioStageItem[] = [
 ];
 
 export interface AppleStudioHeaderProps {
-  /** Deliverable code e.g. OT-01, OT-10, OT-19, OT-09, OT-22 */
+  /** Deliverable code e.g. OT-01, OT-10, OT-15, OT-07, OT-22 */
   deliverableCode: string;
   /** Deliverable human-readable badge label */
   deliverableLabel: string;

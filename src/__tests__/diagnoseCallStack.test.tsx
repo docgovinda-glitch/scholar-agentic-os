@@ -9,7 +9,7 @@ import { MemoryRouter } from "react-router-dom";
 vi.mock("../desk/api", () => ({
   getProject: vi.fn().mockImplementation((id: string) => Promise.resolve({
     projectId: id,
-    outputTypeId: id.includes("thesis") ? "OT-09" : id.includes("research") ? "OT-10" : id.includes("proposal") ? "OT-19" : id.includes("presentation") ? "OT-22" : "OT-01",
+    outputTypeId: id.includes("thesis") ? "OT-07" : id.includes("research") ? "OT-10" : id.includes("proposal") ? "OT-15" : id.includes("presentation") ? "OT-22" : "OT-01",
     title: "Test Project",
     hasDocument: false,
     answers: {},

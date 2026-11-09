@@ -21,7 +21,7 @@ import { CitationFormatterFactory } from "../../../src/citation_compliance/forma
 import type { CanonicalReference, ReferenceAuthor } from "../../../src/citation_compliance/model/reference.ts";
 
 export interface DeliverableHandoff {
-  targetFormatId: "OT-01" | "OT-10" | "OT-19" | "OT-09" | "OT-22";
+  targetFormatId: "OT-01" | "OT-10" | "OT-15" | "OT-07" | "OT-22";
   formatLabel: string;
   topic: string;
   suggestedTitle: string;
@@ -97,7 +97,7 @@ export function detectDeliverableIntent(prompt: string): DeliverableHandoff | nu
     return raw.slice(0, 120).trim();
   };
 
-  // 1. Research Proposal (OT-19)
+  // 1. Research Proposal (OT-15)
   if (
     lower.includes("research proposal") ||
     lower.includes("grant proposal") ||
@@ -106,7 +106,7 @@ export function detectDeliverableIntent(prompt: string): DeliverableHandoff | nu
   ) {
     const topic = extractTopic(p, /(?:research proposal|grant proposal|funding proposal|specific aims)(?:\s+(?:on|about|for))?\s+([^.?!]+)/i) || p;
     return {
-      targetFormatId: "OT-19",
+      targetFormatId: "OT-15",
       formatLabel: "Research Proposal Workspace",
       topic: topic || "Investigative Research Proposal",
       suggestedTitle: `Research Proposal: ${capitalizeTitle(topic || "Scholarly Inquiry")}`,
@@ -116,14 +116,14 @@ export function detectDeliverableIntent(prompt: string): DeliverableHandoff | nu
     };
   }
 
-  // 2. Thesis & Dissertation (OT-09)
+  // 2. Thesis & Dissertation (OT-07)
   if (
     /\b(?:thesis|theses|dissertation|viva voce)\b/i.test(lower) ||
     /\bchapter\s+\d+\b/i.test(lower)
   ) {
     const topic = extractTopic(p, /(?:thesis|dissertation|chapter\s+\d+)(?:\s+(?:on|about|for))?\s+([^.?!]+)/i) || p;
     return {
-      targetFormatId: "OT-09",
+      targetFormatId: "OT-07",
       formatLabel: "Thesis & Dissertation Workspace",
       topic: topic || "Doctoral Dissertation",
       suggestedTitle: `Doctoral Thesis: ${capitalizeTitle(topic || "Scholarly Investigation")}`,

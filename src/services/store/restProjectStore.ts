@@ -36,6 +36,7 @@
  */
 
 import { initialProjectGateState } from "../../domain/project/gates";
+import { normalizeOutputTypeId } from "../../app/atlas/legacyIds.ts";
 import { emptyGraph } from "../../domain/claim/graph";
 import { emptyLedger } from "../../domain/evidence/types";
 import { emptyPeerReviewHistory } from "../../domain/review/types";
@@ -77,7 +78,7 @@ function rowToRecord(row: ProjectRow): ProjectRecord {
     projectId: row.project_id,
     version: row.version ?? 1,
     ownerId: row.owner_id,
-    outputTypeId: row.output_type_id as string,
+    outputTypeId: normalizeOutputTypeId(row.output_type_id) as string,
     answers: row.answers as ProjectRecord["answers"],
     authors: (row.authors as ProjectRecord["authors"] | null) ?? [],
     gates: row.gates as ProjectRecord["gates"],
@@ -182,7 +183,7 @@ export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
         projectId,
         version: 1,
         ownerId,
-        outputTypeId,
+        outputTypeId: normalizeOutputTypeId(outputTypeId) as string,
         answers: {},
         authors: [],
         gates: initialProjectGateState(projectId),

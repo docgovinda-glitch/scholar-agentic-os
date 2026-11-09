@@ -29,7 +29,7 @@ describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () =>
       return new Response(
         JSON.stringify({
           projectId: "proj-empty-1",
-          outputTypeId: "OT-19",
+          outputTypeId: "OT-15",
           version: 1,
           title: "",
           answers: {},
@@ -122,8 +122,8 @@ describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () =>
     });
   });
 
-  describe("2. Zero-Ghost Overhaul for ProposalWorkspace (OT-19) & ThesisWorkspace (OT-09)", () => {
-    it("renders ProposalWorkspace (OT-19) with an empty project and zero occurrences of 'Autonomous Verification' or 'Quantum Cognitive', offering 3 empty aims", () => {
+  describe("2. Zero-Ghost Overhaul for ProposalWorkspace (OT-15) & ThesisWorkspace (OT-07)", () => {
+    it("renders ProposalWorkspace (OT-15) with an empty project and zero occurrences of 'Autonomous Verification' or 'Quantum Cognitive', offering 3 empty aims", () => {
       const { container } = render(<ProposalWorkspace projectId="proj-empty-proposal" />);
 
       const htmlText = container.textContent || "";
@@ -138,7 +138,7 @@ describe("Apple-Grade Studio UX Unification & Sprint 1 Production Polish", () =>
       expect(screen.getByText(/0 of 3 aims written/i)).toBeInTheDocument();
     });
 
-    it("renders ThesisWorkspace (OT-09) with an empty project and zero occurrences of 'Quantum Cognitive' or 'Autonomous Verification', offering a 5-chapter structure", () => {
+    it("renders ThesisWorkspace (OT-07) with an empty project and zero occurrences of 'Quantum Cognitive' or 'Autonomous Verification', offering a 5-chapter structure", () => {
       const { container } = render(<ThesisWorkspace projectId="proj-empty-thesis" />);
 
       const htmlText = container.textContent || "";

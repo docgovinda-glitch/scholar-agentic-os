@@ -15,7 +15,7 @@ Components: `src/desk/auth/AuthFlow.tsx`, `src/desk/DeskAuthGate.tsx`, `src/desk
 
 ## 2. Creating a project
 
-1. On `/projects` (or the landing page) the user picks a format tile: Coursework & Essays (`OT-01`), Journal Article (`OT-10`), Research Proposal (`OT-19`) or Slides & Keynotes (`OT-22`); the picker also lists other catalog types. A signed-out visitor is asked to sign in first. An existing empty project of the same type is reused instead of creating another.
+1. On `/projects` (or the landing page) the user picks a format tile: Coursework & Essays (`OT-01`), Journal Article (`OT-10`), Research Proposal (`OT-15`) or Slides & Keynotes (`OT-22`); the picker also lists other catalog types. A signed-out visitor is asked to sign in first. An existing empty project of the same type is reused instead of creating another.
 2. `createProject` (`src/desk/api/projectsApi.ts`) makes a **local draft** (`draft-…` id kept in browser storage by `src/desk/ephemeralProjectStore.ts`) for every type except `OT-06`, which is created on the server immediately (`POST /api/projects` with `{ outputTypeId }`).
 3. The first authenticated project request for a draft (`authedFetch` in `src/desk/api/client.ts`) commits it to the database and rewrites the id; later requests use the real id.
 4. `/projects/:projectId` opens the workspace chosen by `outputTypeId` ([`PRODUCT.md`](PRODUCT.md) §2). Deep links use `/projects/:projectId/:view` (a journal stage id, or a shell view).
@@ -58,11 +58,11 @@ The same workspace also exposes a five-mode studio (Protocol Blueprint, Evidence
 - **Extras**: cover letter, anonymization (propose then apply), journal compliance report (`/compliance`), submission tracking (`/submissions`).
 - **Export** (`POST/GET /api/projects/:id/export[/:format]`): `docx`, `odt`, `pdf`, `latex`, `typst`, `camera_ready_pdf`, `markdown`/`md`, `rebuttal_letter`. A project with no document returns 400.
 
-## 5. Thesis (`OT-07`, `OT-09`)
+## 5. Thesis (`OT-07`)
 
 `ThesisWorkspace` has six steps: 1 Proposal & Framing, 2 Literature Matrix, 3 Methodology & Ethics, 4 Write Chapters, 5 Discussion & Audit, 6 Viva Voce Simulator. Server routes (`server/routes/project/thesis.ts`): `POST /viva-simulate` (examiner questions from the thesis title and research questions), `/chapter-audit`, `GET /gate-status`, `/draft-chapter`. Export: `thesisExport.ts`, `thesisLatex.ts`; references: `thesisReferences.ts`. Thesis and proposal routes answer with a browser hand-off when the user's only AI is a local model.
 
-## 6. Proposal (`OT-19` in the UI)
+## 6. Proposal (`OT-15`)
 
 `ProposalWorkspace` has eight steps: 1 Agency & Rubric, 2 Specific Aims (1-Page), 3 Preliminary Studies, 4 Significance & Innovation, 5 Research Strategy & Risk, 6 Budget & Resources, 7 Broader Impacts & Data Plan, 8 Study Section Scorer. Server routes (`server/routes/project/proposal.ts`): `POST /study-section-simulate`, `/aims-audit`, `/draft-section`. Export in `proposalExport.ts`.
 

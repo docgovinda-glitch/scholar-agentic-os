@@ -40,7 +40,7 @@ describe("Thesis Endpoints (/api/projects/:id/thesis)", () => {
   async function createThesisProject(): Promise<string> {
     const res = await request(app)
       .post("/api/projects")
-      .send({ outputTypeId: "OT-09" });
+      .send({ outputTypeId: "OT-07" });
     return res.body.projectId;
   }
 

@@ -4,7 +4,7 @@ Project memory for Claude Code. Keep it short and accurate; update it when comma
 
 ## SINGLE-BRAIN ARCHITECTURE INVARIANT
 
-`server/src/services/scholarBrain.ts` is the ONLY AI brain, powering every workspace (OT-01, OT-09, OT-10, OT-19, OT-22). Only it may import `server/utils/llm.ts`; routes and services import `callOpenRouterJSON` / `callOpenRouterText` / `streamOpenRouterJSON` from `scholarBrain.ts` (logged wrappers, not bare re-exports). No workspace may add its own prompt engine, regex outline generator or subject-to-theory lookup table. New AI capability = new method on `scholarBrain`. Always follow `.claude/agents/single-brain-guardian.md` and `.claude/skills/single-brain-guardian/SKILL.md`.
+`server/src/services/scholarBrain.ts` is the ONLY AI brain, powering every workspace (OT-01, OT-07, OT-10, OT-15, OT-22). Only it may import `server/utils/llm.ts`; routes and services import `callOpenRouterJSON` / `callOpenRouterText` / `streamOpenRouterJSON` from `scholarBrain.ts` (logged wrappers, not bare re-exports). No workspace may add its own prompt engine, regex outline generator or subject-to-theory lookup table. New AI capability = new method on `scholarBrain`. Always follow `.claude/agents/single-brain-guardian.md` and `.claude/skills/single-brain-guardian/SKILL.md`.
 
 **Permanently banned** (enforced by `src/__tests__/singleBrainGuardian.test.ts`, which fails `npm test`): the Quantum literature catalog (`quantumComputingCatalog` / `QUANTUM_COMPUTING_CATALOG`), the Zappos/Schein canned outline (any `Zappos` string in `src/desk/**` or `server/routes/project/assignment/**`), keyword-to-framework tables (e.g. "Bilateral Economic Interdependence Model"), and any direct `utils/llm` import outside `scholarBrain.ts`. Target frameworks come only from AI output or the student's own edits.
 
@@ -100,7 +100,7 @@ supabase/                 schema*.sql, migrations/ (timestamped), functions/ (De
 
 ## Environment
 
-Template: `.env.example` (all real `.env*` files are gitignored). Full inventory and what each variable does: `SETUP.md` §4. Keys the code reads: Supabase (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`), crypto and security (`MASTER_KEY`, `LLM_CHALLENGE_SECRET`, `MAIN_ADMIN_EMAIL`, `VITE_CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY`), AI and search (`TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_SEARCH_API_KEY`, `OPENALEX_API_KEY`, `ALLOW_SERVER_LOCAL_AI`, `ENABLE_SERVER_AI`), runtime (`PORT`, `NODE_ENV`, `MAX_UPLOAD_MB`). `GEMINI_API_KEY*`, `AI_GATEWAY_*`, `APP_URL`, `VITE_APP_NAME`, `VITE_API_BASE_URL` and `VITE_OPENALEX_API_KEY` are in `.env.example` but not read by current code. Email keys (`RESEND_*`, `ADMIN_EMAIL`) are Supabase Edge Function secrets.
+Template: `.env.example` (all real `.env*` files are gitignored). Full inventory and what each variable does: `SETUP.md` §4. Keys the code reads: Supabase (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`), crypto and security (`MASTER_KEY`, `LLM_CHALLENGE_SECRET`, `MAIN_ADMIN_EMAIL`, `VITE_CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY`), AI and search (`TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_SEARCH_API_KEY`, `OPENALEX_API_KEY`, `ALLOW_SERVER_LOCAL_AI`, `ENABLE_SERVER_AI`), runtime (`PORT`, `NODE_ENV`, `MAX_UPLOAD_MB`). Email keys (`RESEND_*`, `ADMIN_EMAIL`) are Supabase Edge Function secrets.
 
 ## Rules
 

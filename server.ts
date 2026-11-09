@@ -275,25 +275,6 @@ const aiAbuseLimit = rateLimit({
   limitBy: "ip",
 });
 
-// Parsing expensive endpoints: smaller bounds by IP
-const parseFileLimit = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  limitBy: "ip",
-});
-
-const parseExternalLinkLimit = rateLimit({
-  windowMs: 60 * 1000,
-  max: 100,
-  limitBy: "ip",
-});
-
-const lookupDoiLimit = rateLimit({
-  windowMs: 60 * 1000,
-  max: 100,
-  limitBy: "ip",
-});
-
 const studioLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 200,
