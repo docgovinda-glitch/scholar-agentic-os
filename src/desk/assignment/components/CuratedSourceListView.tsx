@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { sourceVenueLabel } from "../services/sourceDisplay";
 import type { DiscoveredSource } from "../types";
 import {
   Check,
@@ -65,16 +66,7 @@ export const CuratedSourceListView: React.FC<CuratedSourceListViewProps> = ({
             ? "Course Materials / Uploaded Source"
             : "Unknown author";
 
-        const venueDisplay =
-          source.journal ||
-          source.publisher ||
-          (source.type === "journal"
-            ? "Academic Journal"
-            : source.type === "book"
-            ? "University Press"
-            : source.type === "conference"
-            ? "Conference Proceedings"
-            : "Institutional Report");
+        const venueDisplay = sourceVenueLabel(source);
 
         return (
           <article

@@ -164,7 +164,7 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
     // AssignmentBriefScopePanel was removed per UX refactor directive (task 6).
     // Phase 1 parameters (Academic Level, Assignment Type etc.) are defined in Phase 1 only.
     // Phase 2 shows an unobtrusive single-line topic breadcrumb and the h1 heading.
-    it("renders the Sources stage heading and topic breadcrumb from Phase 1", async () => {
+    it("renders the Sources stage heading without a raw topic line", async () => {
       render(
         <AssignmentWorkspace
           projectId="proj-un-test"
@@ -176,8 +176,8 @@ describe("Phase 2 — Strengthened Literature Discovery, Phase 1 Integration & U
       // New Phase 2 h1 heading
       expect(await screen.findByText(/Sources & Course Materials/i, undefined, { timeout: 5000 })).toBeInTheDocument();
 
-      // Topic breadcrumb shows the assignment question from Phase 1 context
-      expect(screen.getByText(unQuestion)).toBeInTheDocument();
+      // The raw topic line is no longer echoed under the heading
+      expect(screen.queryByText(unQuestion)).not.toBeInTheDocument();
 
       // Proceed to Drafting is always available (unblocked)
       expect(screen.getByTestId("proceed-to-drafting-btn")).not.toBeDisabled();

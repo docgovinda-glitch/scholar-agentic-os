@@ -901,12 +901,6 @@ export default function AssignmentSourcesStage({
           <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-2xl leading-relaxed">
             Upload course slides, syllabus, or readings to ground your citations.
           </p>
-          {question && (
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 font-medium truncate max-w-2xl pt-1">
-              <span className="text-neutral-400 dark:text-neutral-500 font-normal">Topic: </span>
-              <span className="text-neutral-700 dark:text-neutral-300">{question}</span>
-            </p>
-          )}
         </div>
 
         {/* View Switcher & Evidence Base Counter (Top Header View) */}
@@ -942,14 +936,6 @@ export default function AssignmentSourcesStage({
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span
-                data-testid="evidence-counter"
-                className="px-3 py-1 rounded-full text-xs font-bold font-mono bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
-              >
-                {approvedSourceIds.length} / 4 recommended · {allMasterSources.length} in Vault
-              </span>
-            </div>
           </div>
         )}
       </div>
@@ -1080,25 +1066,6 @@ export default function AssignmentSourcesStage({
 
           {/* Section 2: Curated Academic Literature & Source Collection */}
           <section className="space-y-4 pt-4 border-t border-neutral-200/60 dark:border-white/5">
-            {/* Detailed Mode Evidence Grounding Matrix Banner */}
-            <>
-              <div className="rounded-2xl p-4 bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 text-xs space-y-2 font-sans animate-in fade-in duration-200">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider text-[11px]">
-                      Detailed Mode · OpenAlex & CrossRef Evidence Grounding Matrix
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
-                    {allMasterSources.length} Sources Active · Citation Token Interceptor Ready
-                  </span>
-                </div>
-                <p className="text-zinc-600 dark:text-zinc-400 text-[11px] leading-relaxed">
-                  Every approved source excerpt is assigned a deterministic token (e.g. <code>[1]</code> or <code>[ev-uuid]</code>) to ground factual statements before section drafting.
-                </p>
-              </div>
-            </>
             {/* Workspace Toolbar Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
@@ -1149,23 +1116,18 @@ export default function AssignmentSourcesStage({
 
             {/* Topic Mismatch Notice Banner if user changed prompt but has previously approved sources */}
             {isMismatched && approvedSourceIds.length > 0 && (
-              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
-                <div className="flex items-center gap-2.5">
-                  <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                  <span>
-                    Your assignment question has changed. Would you like to curate fresh literature tailored to your research question?
-                  </span>
-                </div>
+              <p className="flex items-center justify-between gap-3 text-xs text-neutral-600 dark:text-neutral-400" data-testid="question-changed-notice">
+                <span>Your assignment question has changed.</span>
                 <button
                   type="button"
                   onClick={handleReCurateForPrompt}
                   disabled={isFindingMore}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs shrink-0 cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs dark:shadow-none"
+                  className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-white/15 text-xs font-medium text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isFindingMore ? "animate-spin" : ""}`} />
-                  <span>Curate for Question</span>
+                  <RefreshCw className={`w-3 h-3 ${isFindingMore ? "animate-spin" : ""}`} />
+                  Refresh Sources
                 </button>
-              </div>
+              </p>
             )}
 
             {/* AI Literature Discovery & Query Bar */}

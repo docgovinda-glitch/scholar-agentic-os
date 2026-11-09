@@ -359,3 +359,13 @@ export function extractPrescribedReferences(briefText: string): PrescribedRefere
   while ((m = parenthetical.exec(text))) add(m[1], m[2]);
   return out.slice(0, 20);
 }
+
+/** A short (about 8 word) label for a question: drops the leading command verb. */
+export function shortQuestionLabel(text: string, maxWords = 8): string {
+  const stripped = text
+    .replace(/^(?:critically\s+)?(?:compare|contrast|evaluate|analy[sz]e|assess|discuss|explain|describe|examine|derive|justify|propose|recommend|explore|investigate|identify|outline|define|apply|develop|design|calculate|show)\s+/i, "")
+    .replace(/[?.:]+$/, "")
+    .trim();
+  const w = stripped.split(/\s+/);
+  return w.length > maxWords ? `${w.slice(0, maxWords).join(" ")}…` : stripped;
+}

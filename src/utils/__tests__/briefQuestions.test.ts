@@ -117,3 +117,25 @@ Q4. Discuss post-quantum migration. [30 Marks]`;
     expect(rows[0].expectation).toMatch(/compare them point by point/);
   });
 });
+
+import { explainSourceFit } from "../sourceFit";
+import { sourceVenueLabel } from "../../desk/assignment/services/sourceDisplay";
+
+describe("source cards", () => {
+  it("says which question a discovered paper serves, on which terms", () => {
+    const qs = parseBriefQuestions(BRIEF);
+    const why = explainSourceFit({ title: "Surface code error correction thresholds for fault tolerance" }, parseBriefQuestions(BRIEF.replace("Q3.", "Q3.")), "surface code");
+    expect(why ?? "").toMatch(/^Gives evidence for Q\d|Found for the search/);
+    const fit = explainSourceFit({ title: "Coherence time of superconducting transmon qubits" }, qs);
+    expect(fit).toMatch(/Q1a/);
+    expect(fit).toMatch(/coherence|superconducting|transmon/);
+  });
+
+  it("shows the real venue or a clean type badge, never a generic fallback", () => {
+    expect(sourceVenueLabel({ journal: "Physical Review A", type: "journal" })).toBe("Physical Review A");
+    expect(sourceVenueLabel({ type: "journal", retrievalSource: "arxiv" })).toBe("arXiv Preprint");
+    expect(sourceVenueLabel({ type: "conference" })).toBe("Conference Paper");
+    expect(sourceVenueLabel({ type: "book" })).toBe("Book");
+    expect(sourceVenueLabel({ type: "journal" })).toBe("Journal Article");
+  });
+});

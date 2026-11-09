@@ -11,7 +11,8 @@
 import type { DiscoveredSource, SourceVerificationStatus } from "../types";
 import { authedJsonFetch } from "../../api";
 import { buildSourceSearchQueries } from "../../../utils/briefSourceQueries";
-import { extractPrescribedReferences } from "../../../utils/briefQuestions";
+import { extractPrescribedReferences, parseBriefQuestions } from "../../../utils/briefQuestions";
+import { explainSourceFit } from "../../../utils/sourceFit";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types for server response
@@ -320,7 +321,12 @@ export async function discoverRealScholarlySourcesFromServer(
     console.warn("[RealDiscovery] All live APIs returned nothing.");
     return [];
   }
-  const mapped = drafts.map((draft, idx) => mapDraftToDiscoveredSource(draft, idx, queries.join(" ")));
+  const questionRows = parseBriefQuestions(question);
+  const mapped = drafts.map((draft, idx) => {
+    const src = mapDraftToDiscoveredSource(draft, idx, queries.join(" "));
+    const why = explainSourceFit({ title: draft.title, venue: draft.venue }, questionRows, queries[0]);
+    return why ? { ...src, whyThisSource: why } : src;
+  });
   return deduplicateSources(mapped).slice(0, maxResults);
 }
 

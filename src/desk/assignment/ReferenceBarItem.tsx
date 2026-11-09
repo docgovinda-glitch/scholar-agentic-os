@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { sourceVenueLabel } from "./services/sourceDisplay";
 import type { DiscoveredSource } from "./types";
 import {
   Check,
@@ -115,18 +116,7 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
       ? "Course Materials"
       : "Unknown author";
 
-  const venueDisplay =
-    source.journal ||
-    source.publisher ||
-    (source.type === "journal"
-      ? "Academic Journal"
-      : source.type === "book"
-      ? "University Press"
-      : source.type === "conference"
-      ? "Conference Proceedings"
-      : source.type === "institutional"
-      ? "Institutional Research"
-      : "Scholarly Publication");
+  const venueDisplay = sourceVenueLabel(source);
 
   const effectiveBookmarked = source.isBookmarked ?? isBookmarked;
 
