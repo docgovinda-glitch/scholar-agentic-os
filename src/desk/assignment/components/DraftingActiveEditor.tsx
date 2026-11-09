@@ -137,6 +137,7 @@ export function DraftingActiveEditor({
   const [isEditingManually, setIsEditingManually] = useState(false);
   const [manualText, setManualText] = useState(section?.draftContent || "");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const headingWords = (section?.title || "").trim().split(/\s+/);
   const [titleInput, setTitleInput] = useState(section?.title || "");
 
   // Zen Mode & Writer's Block Nudge State
@@ -570,9 +571,16 @@ export function DraftingActiveEditor({
             </form>
           ) : (
             <div className="flex items-center gap-2 group/title">
-              <h2 className="text-base sm:text-lg font-semibold tracking-tight text-neutral-900 dark:text-white truncate">
-                {section.title}
-              </h2>
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-semibold tracking-tight text-neutral-900 dark:text-white truncate" title={section.title}>
+                  {headingWords.length > 10 ? `${headingWords.slice(0, 10).join(" ")}…` : section.title}
+                </h2>
+                {headingWords.length > 10 && (
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2" data-testid="section-full-prompt">
+                    {section.title}
+                  </p>
+                )}
+              </div>
               {onUpdateTitle && (
                 <button
                   type="button"

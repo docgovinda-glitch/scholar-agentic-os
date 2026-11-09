@@ -27,6 +27,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { SlideCanvas, extractSlidesFromAcademicText, type SlideDeck } from "../../../features/slides";
+import { ReferencesCard } from "../components/ReferencesCard";
 import { buildFormattedBibliography } from "../services/assignmentExportService";
 import { formatReferenceHtml } from "../services/referenceListGenerator";
 import { validateSectionUniqueness } from "../../../features/drafting/services/sectionDraftingEngine";
@@ -48,6 +49,7 @@ export function AssignmentDraftingStage({
   const {
     projectId,
     project,
+    saveAnswers,
     setPhase,
     targetWordCount,
     currentWordCount,
@@ -91,10 +93,10 @@ export function AssignmentDraftingStage({
   );
 
   const draftMarkdown = useMemo(() => {
-    return internalSections
-      .map((sec) => `## ${sec.title}\n\n${sec.draftContent || ""}`)
-      .join("\n\n");
-  }, [internalSections]);
+    const body = internalSections.map((sec) => `## ${sec.title}\n\n${sec.draftContent || ""}`).join("\n\n");
+    const refs = buildFormattedBibliography(sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id))), citationStyle || "harvard");
+    return refs.length ? `${body}\n\n## References\n\n${refs.join("\n\n")}` : body;
+  }, [internalSections, sources, approvedSourceIds, citationStyle]);
 
   // Context continuity state — tracks claims, cited sources, and themes across sections
   const contextContinuityRef = useRef<ContextContinuityState | null>(null);
@@ -516,38 +518,16 @@ export function AssignmentDraftingStage({
             }}
           />
 
-          {/* Live Bibliography Section */}
+          {/* Live compiled References */}
           {approvedSources.length > 0 && (
-            <details className="mt-5 rounded-2xl bg-white dark:bg-ink-750 border border-neutral-200/80 dark:border-white/10 shadow-xs overflow-hidden">
-              <summary className="px-5 py-3 flex items-center gap-2 bg-neutral-50/50 dark:bg-white/[0.02] cursor-pointer">
-                <Book className="w-4 h-4 text-emerald-500" />
-                <span className="text-sm font-semibold text-neutral-900 dark:text-white">Bibliography ({approvedSources.length})</span>
-              </summary>
-              <div className="p-5 text-[13px] text-neutral-700 dark:text-neutral-300 leading-relaxed space-y-4">
-                {buildFormattedBibliography(approvedSources, citationStyle || "harvard").map((bib, i) => {
-                  const safeHtml = formatReferenceHtml(bib);
-                  return (
-                    <p
-                      key={i}
-                      className="pl-6 -indent-6"
-                      ref={(el) => {
-                        if (!el) return;
-                        const anyEl = el as unknown as {
-                          setHTML?: (html: string, opts?: { sanitizer?: { elements?: string[]; attributes?: string[] } }) => void;
-                        };
-                        if (typeof anyEl.setHTML === "function") {
-                          anyEl.setHTML(safeHtml, {
-                            sanitizer: { elements: ["i", "em", "b", "strong"], attributes: [] },
-                          });
-                        } else {
-                          el.innerHTML = safeHtml;
-                        }
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </details>
+            <ReferencesCard
+              sources={approvedSources}
+              style={citationStyle || "harvard"}
+              savedEdit={typeof project?.answers?.["assignment_reference_list_edit"] === "string" ? (project?.answers?.["assignment_reference_list_edit"] as string) : ""}
+              onSaveEdit={(text) => {
+                void saveAnswers?.({ assignment_reference_list_edit: text });
+              }}
+            />
           )}
         </div>
       </div>
