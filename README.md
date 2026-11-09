@@ -12,13 +12,12 @@ Rather than generic forms, each academic format in Scholar Core operates through
    - **Dual Execution Modes (`Minimal | Detailed`)**:
      - **Minimal Mode**: Streamlined setup (Topic, Assignment Type, Word Count Target, Citation Style) with a clean distraction-free writing canvas; defers intermediate telemetry and drawers.
      - **Detailed Mode**: Full architectural controls (Academic Tone selector with auto-binding, custom rubric, database filters) + live 4-phase atomic lifecycle stepper, OpenAlex/Crossref citation badges, `<20%` inter-section overlap indicator, and expanded ML Style Compliance Audit panel.
-   - **4-Phase Atomic Lifecycle**:
-     - **Phase 1 · Extract & Understand** (`current_phase = 'understand'` in Supabase DB):
-       - **Part 1 (Extract)**: Assignment brief intake (paste prompt or upload `.pdf`, `.docx`), target word count stepper, level, citation style, and grading criteria extraction.
-       - **Part 2 (Understand)**: Core working thesis calibration, target theoretical frameworks, tailored dynamic outline generator (`outlineService.ts`), dynamic word count editor (`DynamicStructurePlanner.tsx`), and collegiate writing style selection across 6 tones.
-     - **Phase 2 · Sources & Discovery**: Literature discovery engine (`scholarlyDiscoveryService.ts`), connecting directly to Phase 1 subheadings with research status indicators, explicit assignment roles (*Empirical evidence*, *Theoretical framework*, *Core theory*), and lecture/slide upload dropzone (`LectureUploadDropzone.tsx`).
-     - **Phase 3 · Drafting & Learned Prompt Injection**: Section drafting prompt generator (`drafting.ts`) injecting explicit quantitative writing constraints (mean sentence length 18–32 words, burstiness standard deviation 6.5–9.5 words, active voice `>= 80%`, citation density `>= 2.2%`, and archetype transition n-grams).
-     - **Phase 4 · Submission**: 10-point rubric compliance evaluator, citation reconciliation auditor (100% in-text citations verified against references), and one-click `.docx` and PDF export.
+   - **4-Phase Lifecycle (+ Submission)**, all derived from the student's own brief:
+     - **Phase 01 · Extract**: paste or upload (`.pdf`, `.docx`, `.txt`, `.md`). **Save & Build** extracts, plans and opens Phase 02 populated. Word count ignores course codes (`QNT-4020` never reads as `4,020 words`).
+     - **Phase 02 · Understand**: plain-English brief summary, one-line sub-question rows with the exact marks from the file and proportional word targets, grading criteria, and thesis selector.
+     - **Phase 03 · Sources**: clean keyword queries built from the sub-questions across OpenAlex, Crossref and Semantic Scholar (plus DOAJ, DataCite, arXiv) with per-provider timeouts; references named in the brief are pinned first with a `Prescribed in Brief` badge.
+     - **Phase 04 · Drafting**: 5–8 sections with marks-weighted budgets in clean multiples that sum exactly to the target; each section is drafted within ±10% of its budget and never ends mid-sentence; refinement tools appear only after text exists.
+     - **Submission**: 10-point rubric compliance evaluator, citation reconciliation, and one-click `.docx` / PDF export.
    - **Stage-Scoped Copilot Personas** (`ContextPanel.tsx`): Advisor (Understand), Librarian (Sources), Scribe (Drafting), Examiner (Submission).
 
 2. **📄 Journal Article Workspace (`OT-10`)**:
@@ -101,9 +100,9 @@ Access the application at `http://localhost:3000`.
 ### Run Verification & Tests
 ```bash
 # Type checking
-npx tsc --noEmit
+npm run typecheck
 
-# Run tests
+# Run tests (438 files, 4,070 tests)
 npm test
 
 # Linting & design checks
@@ -129,3 +128,7 @@ Complete authoritative documentation is available in the [`/docs`](docs/README.m
 - [**`docs/API.md`**](docs/API.md): Server endpoints, authentication, and request/response specifications.
 - [**`docs/DEVELOPMENT.md`**](docs/DEVELOPMENT.md): Local development environment, commands, and standards.
 - [**`docs/DEPLOYMENT.md`**](docs/DEPLOYMENT.md): Docker, Render, environment configuration, and Supabase setup.
+
+## Single-Brain Architecture
+
+`server/src/services/scholarBrain.ts` is the only AI brain for every workspace (`OT-01`, `OT-09`, `OT-10`, `OT-19`, `OT-22`). It is the only module allowed to import `server/utils/llm.ts`; all routes call its logged wrappers (`callOpenRouterJSON`, `callOpenRouterText`, `streamOpenRouterJSON`). No workspace may ship its own prompt engine, regex outline generator or subject-to-theory table, and the Quantum literature catalog and Zappos/Schein template are permanently banned. `src/__tests__/singleBrainGuardian.test.ts` enforces this in CI; see `CLAUDE.md` and `.claude/agents/single-brain-guardian.md`.

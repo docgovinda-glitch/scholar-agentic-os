@@ -1,8 +1,8 @@
 /**
- * Single loader for the trained archetype/style model weights.
- * scholarBrain (server/src/services/scholarBrain.ts) owns this data; the
- * browser-side styleEngineService reads it only through this module so there is
- * exactly one source of quantitative style rules. Pure data: no browser APIs.
+ * Server-side loader for the trained archetype/style model weights (about 2 MB).
+ * Imported ONLY by scholarBrain (server bundle). Do not import it from client
+ * code: Vite would bundle the 2 MB JSON and break the 500 kB chunk budget
+ * (scripts/verify-chunk-budget.mjs).
  */
 import weights from "../features/coursework/data/archetype_model_weights.json";
 

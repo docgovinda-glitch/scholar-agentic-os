@@ -1,4 +1,5 @@
 import express from "express";
+import { applyMarksBudget } from "../../../../src/domain/assignment/outlineBudget.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
@@ -484,6 +485,8 @@ Return ONLY valid JSON matching:
 
     if (finalStructure) {
       finalStructure.headings = sanitizeOutlineHeadings(finalStructure.headings, question, assignmentType);
+      // AI-invented word counts are replaced by the marks pipeline (clean multiples, exact sum).
+      finalStructure = applyMarksBudget(finalStructure, briefText || question);
       finalStructure.targetFrameworks =
         data.target_frameworks ||
         data.targetFrameworks ||

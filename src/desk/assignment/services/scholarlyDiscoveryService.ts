@@ -18,7 +18,6 @@ import type {
   ResearchBlueprintOverview,
 } from "../types";
 import { UN_PEACE_SECURITY_CATALOG } from "./catalogs/unPeaceSecurityCatalog";
-import { QUANTUM_COMPUTING_CATALOG } from "./catalogs/quantumComputingCatalog";
 import {
   APPROVED_ORGANIZATIONAL_CULTURE_LITERATURE,
   validateCitationRelevance,
@@ -80,7 +79,7 @@ export const ORGANIZATIONAL_CULTURE_CATALOG: ScholarlyCatalogItem[] = APPROVED_O
   citationCount: 1540,
   citationImpact: "High Impact (Field Benchmark)" as CitationImpactLevel,
   methodology: "Theoretical / Conceptual Framework" as ResearchMethodology,
-  keyConcepts: ["Organizational Culture", "Leadership", "Schein's 3 Levels", "Artifacts vs Assumptions", "Person-Organization Fit", "Zappos"],
+  keyConcepts: ["Organizational Culture", "Leadership", "Schein's 3 Levels", "Artifacts vs Assumptions", "Person-Organization Fit"],
   domain: "Organizational Behavior & Leadership",
   isOpenAccess: true,
   isVerifiedAcademic: true,
@@ -2132,17 +2131,11 @@ export function generateCuratedLiteratureSources(
   let candidatePool: ScholarlyCatalogItem[] = [];
 
   const isOBCulture =
-    /organization(?:al)?\s+culture|schein|zappos|leadership|breakthrough\s+leadership|human\s+resource/i.test(topic || "") ||
+    /organization(?:al)?\s+culture|schein|leadership|breakthrough\s+leadership|human\s+resource/i.test(topic || "") ||
     ((topic || "").toLowerCase().includes("culture") && (topic || "").toLowerCase().includes("organization"));
 
   if (isOBCulture) {
     candidatePool = [...ORGANIZATIONAL_CULTURE_CATALOG];
-  } else if (
-    intent.subTopic === "quantum_computing" ||
-    intent.academicDomain === "Quantum Information & Computational Physics" ||
-    /quantum|qubit|superconducting|trapped-ion|shor|grover/i.test(topic || "")
-  ) {
-    candidatePool = [...QUANTUM_COMPUTING_CATALOG];
   } else if (intent.subTopic === "un_peace_security") {
     candidatePool = [...UN_PEACE_SECURITY_CATALOG];
   } else if (intent.subTopic === "china_power_transition") {
@@ -2292,17 +2285,11 @@ export function fetchMoreLiteratureSources(
   let masterPool: ScholarlyCatalogItem[] = [];
 
   const isOBCulture =
-    /organization|culture|schein|zappos|leadership|breakthrough leadership|human resource/i.test(topic || "") ||
+    /organization|culture|schein|leadership|breakthrough leadership|human resource/i.test(topic || "") ||
     intent.academicDomain === "Sociology & Critical Theory";
 
   if (isOBCulture) {
     masterPool = [...ORGANIZATIONAL_CULTURE_CATALOG, ...EXPANSION_SCHOLARLY_POOL];
-  } else if (
-    intent.subTopic === "quantum_computing" ||
-    intent.academicDomain === "Quantum Information & Computational Physics" ||
-    /quantum|qubit|superconducting|trapped-ion|shor|grover/i.test(topic || "")
-  ) {
-    masterPool = [...QUANTUM_COMPUTING_CATALOG, ...EXPANSION_SCHOLARLY_POOL];
   } else if (intent.subTopic === "un_peace_security") {
     masterPool = [...UN_PEACE_SECURITY_CATALOG, ...EXPANSION_IR_POOL];
   } else if (intent.subTopic === "china_power_transition") {

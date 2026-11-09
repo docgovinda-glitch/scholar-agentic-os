@@ -80,13 +80,15 @@ Redirect to Dedicated Workspace (/projects/:projectId)
 The Coursework & Essay module guides students through 4 interconnected phases:
 
 ```text
-Phase 1: Extract & Understand (Database: understand)
+Phase 01 Extract  (Save & Build also runs the AI extract + understand steps)
              ↓
-Phase 2: Sources & Literature Discovery
+Phase 02 Understand  (summary, sub-questions with marks, grading criteria, thesis)
              ↓
-Phase 3: Drafting & Section Planner
+Phase 03 Sources  (brief-derived queries; prescribed references pinned first)
              ↓
-Phase 4: Submission & Verification Audit
+Phase 04 Drafting  (≤ 8 marks-weighted sections, ±10% sentence-safe budgets)
+             ↓
+Submission & Verification Audit
 ```
 
 ---

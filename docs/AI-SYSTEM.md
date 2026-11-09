@@ -267,6 +267,9 @@ graph TD
 ### 11.1 Central `scholarBrain` Engine (`server/src/services/scholarBrain.ts`)
 - Unified intelligence orchestrator governing AskScholar, Coursework (`OT-01`), Journal Article (`OT-10`), Thesis (`OT-09`), Research Proposal (`OT-19`), and Presentation Studio (`OT-22`).
 - Decomposes multi-part assignment briefs without question truncation and computes mark-weighted section word allocations.
+- **Single LLM gateway**: it is the only module that imports `server/utils/llm.ts`. `callOpenRouterJSON`, `callOpenRouterText` and `streamOpenRouterJSON` are wrappers that time and log each call (task type and outcome only, never prompts or keys) and rethrow errors unchanged; text output is NFC-normalised. Orthography/cliché rewriting stays opt-in via `complete()` / `stream()`.
+- **Central style weights**: `archetype_model_weights.json` is loaded through `src/shared/archetypeModelWeights.ts` and exposed as `scholarBrain.getArchetypeModelWeights()`.
+- **Guard**: `src/__tests__/singleBrainGuardian.test.ts` fails CI on any other `utils/llm` import, any keyword-to-framework table in `src/desk`, and the banned Quantum catalog / Zappos template.
 
 ### 11.2 Hybrid Semantic RAG Engine (`server/src/services/semanticRagEngine.ts`)
 - Combines dense vector similarity with BM25 lexical keyword scoring via Reciprocal Rank Fusion (RRF) to retrieve the highest-entailment evidence chunks for each sub-section prior to synthesis.

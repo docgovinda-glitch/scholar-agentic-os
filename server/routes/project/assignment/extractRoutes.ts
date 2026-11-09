@@ -462,7 +462,7 @@ const handleDeconstruct = async (req: express.Request<{ id: string }>, res: expr
           criteria: criteriaLines,
         }),
       });
-      structure = structureFromAi(aiText ?? "", targetWords);
+      structure = structureFromAi(aiText ?? "", targetWords, { briefText });
       if (!structure) outlineNote = "Your AI's answer had no usable outline, so a starter outline is shown.";
     } catch (llmErr) {
       console.warn("AI outline call failed:", llmErr instanceof Error ? llmErr.message : llmErr);
@@ -556,7 +556,7 @@ export async function writeOutlineForProject(
       written: Array.isArray(previous) ? previous.filter((p) => (p.draftContent ?? "").trim()).map((p) => p.id) : [],
     }),
   });
-  const structure = structureFromAi(aiText ?? "", targetWords, { instruction: opts.instruction, previous: Array.isArray(previous) ? previous : [] });
+  const structure = structureFromAi(aiText ?? "", targetWords, { instruction: opts.instruction, previous: Array.isArray(previous) ? previous : [], briefText });
   if (!structure) throw new UnusableAiResponseError("outline");
   structure.version = (Number(current?.version) || 0) + 1;
   project.answers.assignment_structure = JSON.stringify(structure);

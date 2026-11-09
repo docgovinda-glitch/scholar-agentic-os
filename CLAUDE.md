@@ -4,7 +4,17 @@ Project memory for Claude Code. Keep it short and accurate; update it when comma
 
 ## SINGLE-BRAIN ARCHITECTURE INVARIANT
 
-`server/src/services/scholarBrain.ts` is the ONLY AI brain, powering every workspace (OT-01, OT-09, OT-10, OT-19, OT-22). Only it may import `server/utils/llm.ts`; routes and services import `callOpenRouterJSON` / `callOpenRouterText` / `streamOpenRouterJSON` from `scholarBrain.ts`. No workspace may add its own prompt engine, regex outline generator or subject-to-theory lookup table. New AI capability = new method on `scholarBrain`. Always follow `.claude/agents/single-brain-guardian.md` and `.claude/skills/single-brain-guardian/SKILL.md`; CI enforces it via `src/__tests__/singleBrainGuardian.test.ts`.
+`server/src/services/scholarBrain.ts` is the ONLY AI brain, powering every workspace (OT-01, OT-09, OT-10, OT-19, OT-22). Only it may import `server/utils/llm.ts`; routes and services import `callOpenRouterJSON` / `callOpenRouterText` / `streamOpenRouterJSON` from `scholarBrain.ts` (logged wrappers, not bare re-exports). No workspace may add its own prompt engine, regex outline generator or subject-to-theory lookup table. New AI capability = new method on `scholarBrain`. Always follow `.claude/agents/single-brain-guardian.md` and `.claude/skills/single-brain-guardian/SKILL.md`.
+
+**Permanently banned** (enforced by `src/__tests__/singleBrainGuardian.test.ts`, which fails `npm test`): the Quantum literature catalog (`quantumComputingCatalog` / `QUANTUM_COMPUTING_CATALOG`), the Zappos/Schein canned outline (any `Zappos` string in `src/desk/**` or `server/routes/project/assignment/**`), keyword-to-framework tables (e.g. "Bilateral Economic Interdependence Model"), and any direct `utils/llm` import outside `scholarBrain.ts`. Target frameworks come only from AI output or the student's own edits.
+
+## Coursework (OT-01) pipeline
+
+Four phases plus submission; everything is derived from the student's brief, never from a subject template.
+1. **Phase 01 Extract** (`AssignmentExtractStage.tsx`, `extractRoutes.ts`): paste or upload (`.pdf/.docx/.txt/.md`; the `File` goes straight to the handler and the input is reset). **Save & Build** saves, then runs the AI extract and understand steps so Phase 02 opens populated. Word count ignores course codes (`stripCourseCodes`: `QNT-4020` is never `4020`).
+2. **Phase 02 Understand** (`AssignmentUnderstandStage.tsx`): brief-derived summary (`buildBriefSummary`), sub-question rows with the brief's own marks and proportional word targets (`parseBriefQuestions` + `allocateWordsByMarks`), grading criteria (`parseMarkingCriteria`), thesis selector. Parsers live in `src/utils/briefQuestions.ts`.
+3. **Phase 03 Sources** (`AssignmentSourcesStage.tsx`, `realScholarlyDiscoveryService.ts`, `sourcesRoutes.ts`): 3-5 keyword phrases from the brief (`buildSourceSearchQueries`, never the raw prompt); OpenAlex + Crossref + Semantic Scholar + DOAJ/DataCite/arXiv via `Promise.allSettled` with timeouts; references named in the brief are listed first with a `Prescribed in Brief` badge.
+4. **Phase 04 Drafting** (`AssignmentDraftingStage.tsx`, `draftingRoutes.ts`): at most 8 sections (`MAX_DRAFTING_SECTIONS`). Budgets come from `applyMarksBudget` (`src/domain/assignment/outlineBudget.ts`): marks-weighted, clean multiples of 5 (10 from 1,000 words), remainder on the largest body section, exact sum to `targetWordCount`; applied to every AI-written outline too. `/stream-section` takes `allocatedWords`, asks for ±10%, requests one rewrite if short and trims long drafts at a sentence boundary (`server/src/utils/sectionBudget.ts`). Refinement actions show only once a section has text.
 
 ## What this is
 

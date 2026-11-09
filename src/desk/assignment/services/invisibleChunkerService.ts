@@ -282,7 +282,6 @@ export function getThematicDecompositionForTopic(
   // 2b. Organizational Culture, Leadership & Organizational Behavior
   const isOBOrLeadership =
     lower.includes("schein") ||
-    lower.includes("zappos") ||
     lower.includes("organizational culture") ||
     lower.includes("leadership") ||
     lower.includes("breakthrough leadership") ||
@@ -330,7 +329,7 @@ export function getThematicDecompositionForTopic(
         title: "Introduction: Organizational Culture & Theoretical Framing",
         academicFunction: "Introduction & Theoretical Framing",
         guidance:
-          "Contextualize organizational culture as a strategic asset, setting up Schein's theoretical framework and the Zappos case study.",
+          "Contextualize organizational culture as a strategic asset, setting up the theoretical framework used in the brief.",
         keyPoints: [
           "Significance of organizational culture",
           "Schein's 3-level model as analytical scaffold",

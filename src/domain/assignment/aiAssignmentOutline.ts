@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { fitWords, requestedTotal } from "../journal/aiOutline";
 import { structureLens } from "./briefScoping";
+import { applyMarksBudget } from "./outlineBudget";
 import type { AssignmentDraftingSection, AssignmentMainHeading, AssignmentStructure, AssignmentSubheading } from "../../desk/assignment/types";
 
 export interface AssignmentOutlineContext {
@@ -119,7 +120,7 @@ const norm = (t: string) =>
 export function structureFromAi(
   text: string,
   targetWords: number,
-  opts: { instruction?: string; previous?: AssignmentDraftingSection[] } = {}
+  opts: { instruction?: string; previous?: AssignmentDraftingSection[]; briefText?: string } = {}
 ): AssignmentStructure | undefined {
   const parsed = aiOutlineSchema.safeParse(jsonIn(text ?? ""));
   if (!parsed.success) return undefined;
@@ -175,6 +176,13 @@ export function structureFromAi(
       subheadings,
     };
   });
+
+  // The AI's own word counts are suggestions: re-budget by the brief's marks, clean multiples, exact sum.
+  const budgeted = applyMarksBudget(
+    { version: 1, isConfirmed: false, targetWordCount: total, totalAllocated: total, headings } as AssignmentStructure,
+    opts.briefText
+  );
+  headings.splice(0, headings.length, ...budgeted.headings);
 
   const dropped = written.filter((p) => !used.has(p.id));
   if (dropped.length) {

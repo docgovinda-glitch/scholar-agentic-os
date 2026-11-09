@@ -64,4 +64,15 @@ describe("Single-Brain Architecture lock", () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  it("permanently bans the Quantum catalog and the Zappos/Schein template in Coursework code", () => {
+    const FORBIDDEN = [/quantumComputingCatalog/, /QUANTUM_COMPUTING_CATALOG/, /zappos/i];
+    expect(fs.existsSync(path.join(ROOT, "src/desk/assignment/services/catalogs/quantumComputingCatalog.ts"))).toBe(false);
+    const offenders: string[] = [];
+    for (const rel of productionFiles(["src/desk", "server/routes/project/assignment"])) {
+      const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
+      if (FORBIDDEN.some((re) => re.test(text))) offenders.push(rel);
+    }
+    expect(offenders).toEqual([]);
+  });
 });

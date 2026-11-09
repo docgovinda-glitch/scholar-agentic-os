@@ -27,7 +27,6 @@ import type {
 
 import { structureToInternalSections } from "../types";
 import { conductAskScholarResearchForOutline } from "./scholarlyDiscoveryService";
-import { isZapposScheinAssignment } from "../../../features/drafting/services/outlineGenerator";
 import {
   isClassroomLogisticsLine,
   stripSlideArtifacts,
@@ -35,6 +34,7 @@ import {
   extractSubstantiveBriefQuestions,
 } from "../../../utils/briefExtractor";
 
+import { applyMarksBudget, allocateCleanWords } from "../../../domain/assignment/outlineBudget";
 import { isNonQuestionBriefLine, parseBriefQuestions } from "../../../utils/briefQuestions";
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
@@ -1108,7 +1108,7 @@ export function generateThesisStatement(
   const toneLower = String(rawTone || "formal_academic").toLowerCase();
 
   const hasOBOrLeadership =
-    /\b(leadership|culture|schein|zappos|human resource|organizational behaviour|organizational behavior|management|employee|workplace|onboarding)\b/i.test(
+    /\b(leadership|culture|schein|human resource|organizational behaviour|organizational behavior|management|employee|workplace|onboarding)\b/i.test(
       qLower
     );
 
@@ -1305,177 +1305,6 @@ export function buildBriefSpecificSpecs(
   const isTutorialOrShort =
     (targetWordCount !== undefined && targetWordCount <= 600) ||
     isTutorialOrShortQABrief(briefText || question, targetWordCount);
-
-  // If the brief is the Breakthrough Leadership (Zappos & Schein) tutorial, return exact canonical sequence
-  if (isZapposScheinAssignment(question, briefText, directTasks)) {
-    if (isTutorialOrShort) {
-      return [
-        {
-          title: "1.0 Evaluating Culture Change: Why Changing Artifacts Alone Is Insufficient",
-          notes: "Directly address: Can organizational culture be changed by changing artifacts alone?",
-          subheadings: [
-            {
-              title: "1.1 Evaluating Culture Change: Why Changing Artifacts Alone Is Insufficient",
-              ratio: 0.35,
-              guidance: "Focus: Provide a direct, grounded answer evaluating whether organizational culture can be altered simply by changing surface artifacts alone.",
-              keyPoints: [
-                "Surface compliance versus internalized behavioral alignment",
-                "Why modifying artifacts (dress codes, office layouts) without shifting core assumptions fails",
-                "Aligning core principles and foundational beliefs",
-              ],
-            },
-          ],
-        },
-        {
-          title: "2.0 Leadership Interventions: Selecting the Most Effective Cultural Level to Target",
-          notes: "Directly address: As a leader, which level of Schein's model would you start with to change culture?",
-          subheadings: [
-            {
-              title: "2.1 Leadership Interventions: Selecting the Most Effective Cultural Level to Target",
-              ratio: 0.35,
-              guidance: "Focus: Explain which level of Schein's model leaders should start with (espoused values, norms, philosophies) and why.",
-              keyPoints: [
-                "Beginning at espoused values, norms, and philosophies",
-                "Defining expected behaviors and creating a shared direction",
-                "Reinforcing practices until they sink into underlying assumptions",
-              ],
-            },
-          ],
-        },
-        {
-          title: "3.0 Assessing Organizational Culture During the Job Interview Process",
-          notes: "Directly address: How would you assess a company's culture during a job interview using Schein's model?",
-          subheadings: [
-            {
-              title: "3.1 Assessing Organizational Culture During the Job Interview Process",
-              ratio: 0.30,
-              guidance: "Focus: Explain practical inquiries candidates can make during an interview to evaluate true corporate culture.",
-              keyPoints: [
-                "Inquiring about daily practices, ethics, and leadership styles",
-                "Probing artifacts, operational limits, and non-negotiables",
-                "Evaluating alignment between candidate boundaries and company culture",
-              ],
-            },
-          ],
-        },
-      ];
-    }
-
-    return [
-      {
-        title: "1.0 Introduction: Organizational Culture and the Zappos Case Study",
-        notes: "Directly address: Organizational Culture and the Zappos Case Study",
-        subheadings: [
-          {
-            title: "1.1 Introduction: Organizational Culture and the Zappos Case Study",
-            ratio: 0.12,
-            guidance: "Focus: Introduce organizational culture as a strategic asset, setting up the Zappos onboarding model and Schein's theoretical framework.",
-            keyPoints: [
-              "Significance of organizational culture in modern enterprise strategy",
-              "Introduction to Zappos' customer-centric and culture-first business architecture",
-              "Schein's 3-level model as the analytical scaffold for evaluating cultural coherence",
-            ],
-          },
-        ],
-      },
-      {
-        title: "2.0 Strategic Purpose of Zappos' $2,000 Resignation Offer",
-        notes: "Directly address: Why Zappos offers new employees $2,000 to quit after their first week",
-        subheadings: [
-          {
-            title: "2.1 Strategic Purpose of Zappos' $2,000 Resignation Offer",
-            ratio: 0.16,
-            guidance: "Focus: Evaluate the rationale behind Zappos' $2,000 resignation offer and its impact on employee alignment.",
-            keyPoints: [
-              "Self-selection screening mechanism during onboarding",
-              "Filtering for intrinsic cultural commitment over transactional compensation",
-              "Long-term economic advantages: lowering turnover and bad-hire costs",
-            ],
-          },
-        ],
-      },
-      {
-        title: "3.0 Schein’s Culture Model: Artifacts, Espoused Values, and Underlying Assumptions",
-        notes: "Directly address: Deconstruct Schein's 3 levels of organizational culture",
-        subheadings: [
-          {
-            title: "3.1 Schein’s Culture Model: Artifacts, Espoused Values, and Underlying Assumptions",
-            ratio: 0.16,
-            guidance: "Focus: Deconstruct Schein's three levels of culture (artifacts, espoused values, underlying assumptions) and their operational interplay.",
-            keyPoints: [
-              "Artifacts: visible organizational structures, physical layouts, and rituals",
-              "Espoused Values: stated norms, philosophies, and official codes of conduct",
-              "Basic Underlying Assumptions: unconscious, taken-for-granted beliefs shaping worldview",
-            ],
-          },
-        ],
-      },
-      {
-        title: "4.0 Evaluating Culture Change: Why Changing Artifacts Alone Is Insufficient",
-        notes: "Directly address: Can organizational culture be changed by changing artifacts alone?",
-        subheadings: [
-          {
-            title: "4.1 Evaluating Culture Change: Why Changing Artifacts Alone Is Insufficient",
-            ratio: 0.16,
-            guidance: "Focus: Analyze why modifying physical artifacts alone fails to create durable cultural transformation without shifting underlying assumptions.",
-            keyPoints: [
-              "Surface compliance versus internalized behavioral alignment",
-              "Limits of cosmetic alterations (open-plan offices, casual dress codes, game rooms)",
-              "Why underlying assumptions resist superficial visual redesigns",
-            ],
-          },
-        ],
-      },
-      {
-        title: "5.0 Leadership Interventions: Selecting the Most Effective Cultural Level to Target",
-        notes: "Directly address: As a leader, which level of Schein's model would you start with to change culture?",
-        subheadings: [
-          {
-            title: "5.1 Leadership Interventions: Selecting the Most Effective Cultural Level to Target",
-            ratio: 0.16,
-            guidance: "Focus: Evaluate which level of Schein's model leaders should target first to successfully lead and sustain culture change.",
-            keyPoints: [
-              "Weighing intervention points: direct targeting of values versus behavioral habits",
-              "Role of executive role-modeling and resource allocation in unfreezing assumptions",
-              "Aligning reward systems to bridge espoused values and everyday practices",
-            ],
-          },
-        ],
-      },
-      {
-        title: "6.0 Assessing Organizational Culture During the Job Interview Process",
-        notes: "Directly address: How would you assess a company's culture during a job interview using Schein's model?",
-        subheadings: [
-          {
-            title: "6.1 Assessing Organizational Culture During the Job Interview Process",
-            ratio: 0.14,
-            guidance: "Focus: Formulate practical methods for candidates and evaluators to assess genuine organizational culture during job interviews using Schein's levels.",
-            keyPoints: [
-              "Observing physical artifacts and interaction patterns during on-site visits",
-              "Asking probing behavioral questions that test stated values against real dilemmas",
-              "Identifying discrepancies between public marketing and internal unspoken assumptions",
-            ],
-          },
-        ],
-      },
-      {
-        title: "7.0 Conclusion & Strategic Takeaways",
-        notes: "Directly address: Synthesis of leadership insights and cultural alignment",
-        subheadings: [
-          {
-            title: "7.1 Conclusion & Strategic Takeaways",
-            ratio: 0.10,
-            guidance: "Focus: Synthesize findings on leadership, cultural alignment, and strategic hiring practices into actionable takeaways.",
-            keyPoints: [
-              "Synthesis of cultural coherence as a sustained competitive advantage",
-              "Summary of Schein's framework applied to modern organizational leadership",
-              "Key recommendations for leaders driving cultural evolution",
-            ],
-          },
-        ],
-      },
-    ];
-  }
 
   // If the brief provided 2 or more explicit tasks or questions, mirror them directly!
   if (directTasks.length >= 2) {
@@ -2060,17 +1889,14 @@ export function generateDynamicAssignmentStructure(
       qLower.includes("drug discovery"));
 
   const hasOBOrLeadership =
-    /\b(leadership|culture|schein|zappos|human resource|organizational behaviour|organizational behavior|management|employee|workplace|onboarding)\b/i.test(
+    /\b(leadership|culture|schein|human resource|organizational behaviour|organizational behavior|management|employee|workplace|onboarding)\b/i.test(
       qLower
     );
-
-  const isZapposSchein = isZapposScheinAssignment(question, briefText);
 
   const isAIMachineLearning =
     !isAIEthicsOrLaw &&
     !isAIInHealthcare &&
     !hasOBOrLeadership &&
-    !isZapposSchein &&
     (qLower.includes("machine learning") ||
       qLower.includes("deep learning") ||
       qLower.includes("neural network") ||
@@ -2111,7 +1937,7 @@ export function generateDynamicAssignmentStructure(
     assignmentType === "annotated_bibliography" ||
     qLower.includes("literature review");
 
-  if (hasExplicitBriefDirectives || isZapposSchein || hasOBOrLeadership) {
+  if (hasExplicitBriefDirectives || hasOBOrLeadership) {
     specs = buildBriefSpecificSpecs(question, briefText, assignmentType, targetFrameworks, targetWordCount);
   } else if (isEconomicInterdependence) {
     specs = [
@@ -3103,17 +2929,21 @@ Generate the tailored academic outline JSON now:`;
       fallbackStructure.targetFrameworks ||
       [];
 
-    return {
-      version: options.currentStructure ? (options.currentStructure.version || 1) + 1 : 1,
-      isConfirmed: false,
-      targetWordCount: total,
-      totalAllocated,
-      headings,
-      thesisStatement: parsed.thesisStatement || parsed.thesis_statement || fallbackStructure.thesisStatement,
-      targetFrameworks,
-      writingTone: typeof writingTone === "string" ? writingTone : (writingTone as any)?.preset || "formal_academic",
-      rationale: `AI-synthesized bespoke outline tailored specifically for: "${question}" (${academicLevel} level).`,
-    };
+    // AI-invented word counts are replaced by the marks pipeline (clean multiples, exact sum).
+    return applyMarksBudget(
+      {
+        version: options.currentStructure ? (options.currentStructure.version || 1) + 1 : 1,
+        isConfirmed: false,
+        targetWordCount: total,
+        totalAllocated,
+        headings,
+        thesisStatement: parsed.thesisStatement || parsed.thesis_statement || fallbackStructure.thesisStatement,
+        targetFrameworks,
+        writingTone: typeof writingTone === "string" ? writingTone : (writingTone as any)?.preset || "formal_academic",
+        rationale: `AI-synthesized bespoke outline tailored specifically for: "${question}" (${academicLevel} level).`,
+      },
+      options.briefText || question
+    );
   } catch (err) {
     console.warn("generateAiEnhancedOutline: LLM failed or timed out, returning high-precision local outline", err);
     return fallbackStructure;
@@ -3236,23 +3066,11 @@ export function autoBalanceStructure(
   const allSubs = structure.headings.flatMap((h) => h.subheadings);
   if (allSubs.length === 0) return structure;
 
-  const currentSum = allSubs.reduce((sum, s) => sum + (Number(s.targetWordCount) || 0), 0) || 1;
-  let distributed = 0;
-
-  const updatedHeadings = structure.headings.map((h, hIdx) => {
-    const updatedSubs = h.subheadings.map((s, sIdx) => {
-      const isLastGlobal =
-        hIdx === structure.headings.length - 1 && sIdx === h.subheadings.length - 1;
-      let words: number;
-      if (isLastGlobal) {
-        words = Math.max(50, total - distributed);
-      } else {
-        words = Math.max(50, Math.round((s.targetWordCount / currentSum) * total));
-        distributed += words;
-      }
-      return { ...s, targetWordCount: words };
-    });
-
+  // Same proportions as before, in clean multiples that sum to the target exactly.
+  const words = allocateCleanWords(allSubs.map((s) => Number(s.targetWordCount) || 1), total);
+  let k = 0;
+  const updatedHeadings = structure.headings.map((h) => {
+    const updatedSubs = h.subheadings.map((s) => ({ ...s, targetWordCount: words[k++] }));
     const hTotal = updatedSubs.reduce((sum, s) => sum + s.targetWordCount, 0);
     return { ...h, targetWordCount: hTotal, subheadings: updatedSubs };
   });
