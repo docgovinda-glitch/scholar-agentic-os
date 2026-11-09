@@ -8,7 +8,7 @@ import ThesisWorkspace from "../ThesisWorkspace";
 const draftCalls: string[] = [];
 let lastBody: unknown;
 
-describe("ThesisWorkspace (OT-09 Thesis & Dissertation Studio)", () => {
+describe("ThesisWorkspace (OT-07 Thesis & Dissertation Studio)", () => {
   let failNext = false;
   beforeEach(() => {
     failNext = false;

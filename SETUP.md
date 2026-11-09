@@ -72,7 +72,7 @@ Names the code reads, grouped by purpose. "Server" variables are read by `server
 | `TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_SEARCH_API_KEY` | Web-search backends for `/api/ai/search` and deep research (Tavily is also a secret of the `search-proxy` Edge Function) |
 | `OPENALEX_API_KEY`, `OPENALEX_MAILTO` | OpenAlex polite-pool identification for server-side discovery |
 
-The server never uses a server-held env key to serve a normal user request. `GEMINI_API_KEY`, `GEMINI_API_KEY_BACKUP`, `AI_GATEWAY_GENERAL_PROXY`, `AI_GATEWAY_PHASE_ENDPOINTS`, `VITE_OPENALEX_API_KEY`, `APP_URL`, `VITE_APP_NAME` and `VITE_API_BASE_URL` appear in `.env.example` (some also in `render.yaml`) but no current runtime code reads them. User keys arrive per request; Premium keys are stored encrypted in the database through the admin panel.
+The server never uses a server-held env key to serve a normal user request. User keys arrive per request; Premium keys are stored encrypted in the database through the admin panel.
 
 ### 4.4 Runtime and build
 

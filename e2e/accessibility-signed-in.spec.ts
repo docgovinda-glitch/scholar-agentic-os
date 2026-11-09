@@ -12,9 +12,9 @@ const WIDTHS = [375, 1280];
 const PAGES = ["/projects", "/vault", "/ai-access", "/settings"];
 const WORKSPACES = [
   { name: "coursework", outputTypeId: "OT-01" },
-  { name: "thesis", outputTypeId: "OT-09" },
+  { name: "thesis", outputTypeId: "OT-07" },
   { name: "journal", outputTypeId: "OT-10" },
-  { name: "proposal", outputTypeId: "OT-19" },
+  { name: "proposal", outputTypeId: "OT-15" },
 ];
 
 async function api(page: Page, method: string, path: string, body?: unknown) {

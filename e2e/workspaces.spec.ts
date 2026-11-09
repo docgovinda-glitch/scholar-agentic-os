@@ -10,9 +10,9 @@ test.skip(!A.email || !A.password || !B.email || !B.password, "E2E_A_*/E2E_B_* t
 
 const WORKSPACES = [
   { name: "Coursework", outputTypeId: "OT-01" },
-  { name: "Thesis", outputTypeId: "OT-09" },
+  { name: "Thesis", outputTypeId: "OT-07" },
   { name: "Journal", outputTypeId: "OT-10" },
-  { name: "Proposal", outputTypeId: "OT-19" },
+  { name: "Proposal", outputTypeId: "OT-15" },
 ] as const;
 
 // Text that only ever came from demo content, removed in P0-1…P0-19.

@@ -13,9 +13,9 @@ A project's `outputTypeId` decides which workspace opens (`src/desk/DeskApp.tsx`
 | Output type | Workspace | Entry component |
 | :--- | :--- | :--- |
 | `OT-01` Assignment, `OT-02` Essay | Coursework (5 stages) | `src/desk/assignment/AssignmentWorkspace.tsx` |
-| `OT-07` Master's Thesis, `OT-09` Book / Monograph | Thesis | `src/desk/thesis/ThesisWorkspace.tsx` |
+| `OT-07` Master's Thesis | Thesis | `src/desk/thesis/ThesisWorkspace.tsx` |
 | `OT-10` Journal Article | Journal research studio (25 stages in 5 phases) | `src/desk/workspace/ResearchWorkspace.tsx` |
-| `OT-19` | Research proposal | `src/desk/proposal/ProposalWorkspace.tsx` |
+| `OT-15` Research Proposal | Research proposal | `src/desk/proposal/ProposalWorkspace.tsx` |
 | `OT-22` | Presentation Studio | `src/desk/presentation/PresentationWorkspace.tsx` |
 | any other type | Generic project shell | `src/desk/DeskShell.tsx` |
 

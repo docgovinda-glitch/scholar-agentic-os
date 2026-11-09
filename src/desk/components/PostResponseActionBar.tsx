@@ -22,7 +22,7 @@ import {
   downloadAndCopyReferenceFile,
 } from "../services/askScholarExportService";
 
-export type ContinueWorkspaceId = "OT-01" | "OT-10" | "OT-19" | "OT-22";
+export type ContinueWorkspaceId = "OT-01" | "OT-10" | "OT-15" | "OT-22";
 
 export interface ContinueWorkspaceOption {
   id: ContinueWorkspaceId;
@@ -45,7 +45,7 @@ export const CONTINUE_WORKSPACE_OPTIONS: ContinueWorkspaceOption[] = [
     icon: BookOpen,
   },
   {
-    id: "OT-19",
+    id: "OT-15",
     label: "Research Proposal",
     description: "Grant proposals, thesis proposals & methodology protocols",
     icon: FileSearch,

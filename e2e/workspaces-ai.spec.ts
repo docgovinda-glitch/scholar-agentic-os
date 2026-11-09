@@ -92,16 +92,16 @@ test("Coursework (OT-01): the Drafting stage's streamed section comes from the u
   });
 });
 
-test("Thesis (OT-09): a chapter is drafted by the user's AI", async ({ page }) => {
-  await withProject(page, "OT-09", { title: "E2E thesis" }, async (id) => {
+test("Thesis (OT-07): a chapter is drafted by the user's AI", async ({ page }) => {
+  await withProject(page, "OT-07", { title: "E2E thesis" }, async (id) => {
     const res = await api(page, "POST", `/api/projects/${id}/thesis/draft-chapter`, { chapterTitle: "Introduction", targetWords: 150 }, AI_HEADERS);
     expect(res.status, res.text.slice(0, 300)).toBe(200);
     expect(res.json?.content).toContain(MARKER);
   });
 });
 
-test("Proposal (OT-19): a section is drafted by the user's AI", async ({ page }) => {
-  await withProject(page, "OT-19", { title: "E2E proposal" }, async (id) => {
+test("Proposal (OT-15): a section is drafted by the user's AI", async ({ page }) => {
+  await withProject(page, "OT-15", { title: "E2E proposal" }, async (id) => {
     const res = await api(page, "POST", `/api/projects/${id}/proposal/draft-section`, { sectionTitle: "Specific Aims", targetWords: 150 }, AI_HEADERS);
     expect(res.status, res.text.slice(0, 300)).toBe(200);
     expect(res.json?.content).toContain(MARKER);

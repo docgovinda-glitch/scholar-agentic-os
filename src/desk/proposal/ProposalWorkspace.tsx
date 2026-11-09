@@ -390,7 +390,7 @@ export default function ProposalWorkspace({
     <div className="min-h-screen bg-background text-primary font-sans flex flex-col selection:bg-accent/15">
       {/* Unified Apple-Grade Top Workspace Bar */}
       <AppleStudioHeader
-        deliverableCode="OT-19"
+        deliverableCode="OT-15"
         deliverableLabel="Grant Proposal"
         projectTitle={proposalData.title}
         onProjectTitleChange={(nextTitle) => updateProposalField("title", nextTitle)}

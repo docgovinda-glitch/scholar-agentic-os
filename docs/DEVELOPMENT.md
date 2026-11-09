@@ -10,7 +10,7 @@ Local setup, commands, tests and conventions. First-time environment details are
 
 ## 2. Environment
 
-`cp .env.example .env`. `.env*` files are git-ignored except `.env.example`; never commit or print secret values. `.env.example` lists these keys: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `GEMINI_API_KEY`, `GEMINI_API_KEY_BACKUP`, `AI_GATEWAY_GENERAL_PROXY`, `AI_GATEWAY_PHASE_ENDPOINTS`, `TAVILY_API_KEY`, `VITE_OPENALEX_API_KEY`, `MASTER_KEY`, `ENCRYPTION_KEY`, `VITE_CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `APP_URL`, `VITE_APP_NAME`, `VITE_API_BASE_URL`, `MAIN_ADMIN_EMAIL`. The code also reads others; the full inventory with defaults is in [`../SETUP.md`](../SETUP.md) §4.
+`cp .env.example .env`. `.env*` files are git-ignored except `.env.example`; never commit or print secret values. `.env.example` lists these keys: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `TAVILY_API_KEY`, `MASTER_KEY`, `ENCRYPTION_KEY`, `VITE_CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `MAIN_ADMIN_EMAIL`. The code also reads others; the full inventory with defaults is in [`../SETUP.md`](../SETUP.md) §4.
 
 For local work leave `VITE_CAPTCHA_SITE_KEY` empty: the placeholder value in `.env.example` turns Turnstile on and breaks the sign-up tests.
 

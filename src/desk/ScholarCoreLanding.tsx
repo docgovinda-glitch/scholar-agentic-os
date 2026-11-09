@@ -118,13 +118,13 @@ function FormatIcon({ id, className = "w-4 h-4" }: { id: string; className?: str
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
         </svg>
       );
-    case "OT-09":
+    case "OT-07":
       return (
         <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5" />
         </svg>
       );
-    case "OT-19":
+    case "OT-15":
       return (
         <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -136,7 +136,6 @@ function FormatIcon({ id, className = "w-4 h-4" }: { id: string; className?: str
           <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
         </svg>
       );
-    case "OT-07":
     default:
       return (
         <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75">
@@ -180,11 +179,11 @@ const FORMAT_FAMILIES = [
   {
     id: "long_form",
     label: "Thesis / Dissertation",
-    icon: "OT-09",
+    icon: "OT-07",
     desc: "Comprehensive multi-chapter milestone framework with defense preparation.",
     formats: [
       {
-        id: "OT-09",
+        id: "OT-07",
         label: "Thesis / Dissertation",
         words: "10,000 – 80,000 words",
         sections: "Proposal & Theory → Literature Review → Methodology → Findings → Discussion → Defense Preparation",
@@ -195,11 +194,11 @@ const FORMAT_FAMILIES = [
   {
     id: "proposal_funding",
     label: "Research Proposal",
-    icon: "OT-19",
+    icon: "OT-15",
     desc: "Competitive grant applications and research plans with strict agency rubric alignment.",
     formats: [
       {
-        id: "OT-19",
+        id: "OT-15",
         label: "Research Proposal",
         words: "3,000 – 15,000 words",
         sections: "Specific Aims → Research Significance → Methodological Design → Ethics & Timeline Budgeting",
