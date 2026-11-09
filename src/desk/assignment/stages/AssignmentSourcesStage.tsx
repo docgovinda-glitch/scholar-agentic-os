@@ -5,12 +5,12 @@ import { ReferenceBarItem } from "../ReferenceBarItem";
 import { ApprovedReferencesShelf } from "../ApprovedReferencesShelf";
 import { CuratedSourceCard } from "../components/CuratedSourceCard";
 import { LectureUploadDropzone } from "../components/LectureUploadDropzone";
-import { ScholarlyResearchPipeline } from "../components/ScholarlyResearchPipeline";
 import {
   areSourcesRelevantToQuestion,
 } from "../services/scholarlyDiscoveryService";
 import {
   discoverRealScholarlySourcesFromServer,
+  discoverSourcesForAssignment,
   fetchMoreRealSources,
 } from "../services/realScholarlyDiscoveryService";
 import { SectionAnalysisWorkspace } from "../components/SectionAnalysisWorkspace";
@@ -86,6 +86,7 @@ export default function AssignmentSourcesStage({
     project,
     saveAnswers,
     question,
+    assignmentBriefText,
     citationStyle,
     structure,
     sources,
@@ -368,7 +369,7 @@ export default function AssignmentSourcesStage({
     // Falls back to mock catalog if server is unavailable
     let cancelled = false;
     setIsDiscoveringInitial(true);
-    discoverRealScholarlySourcesFromServer(question, citationStyle)
+    discoverSourcesForAssignment({ question, briefText: assignmentBriefText, citationStyle })
       .then((discovered) => {
         if (!cancelled) {
           setSources(discovered);
@@ -407,7 +408,7 @@ export default function AssignmentSourcesStage({
   const handleReCurateForPrompt = async () => {
     setIsFindingMore(true);
     try {
-      const discovered = await discoverRealScholarlySourcesFromServer(question, citationStyle);
+      const discovered = await discoverSourcesForAssignment({ question, briefText: assignmentBriefText, citationStyle });
       await setSources(discovered);
       if (setApprovedSourceIds && approvedSourceIds.length > 0) {
         await setApprovedSourceIds(discovered.map((s) => s.id));
@@ -802,6 +803,8 @@ export default function AssignmentSourcesStage({
       // Keep uploaded sources near the top if on "all"
       if (a.isUserUploaded && !b.isUserUploaded) return -1;
       if (!a.isUserUploaded && b.isUserUploaded) return 1;
+      if (a.prescribedInBrief && !b.prescribedInBrief) return -1;
+      if (!a.prescribedInBrief && b.prescribedInBrief) return 1;
 
       if (sortBy === "citations") {
         return (b.citationCount || 0) - (a.citationCount || 0);
@@ -886,12 +889,11 @@ export default function AssignmentSourcesStage({
         <div className="space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wider uppercase bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
-              Phase 02
+              Phase 03
             </span>
             <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
               Evidence Discovery & Course Grounding
             </span>
-            <ScholarlyResearchPipeline question={question} />
           </div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
             Sources & Course Materials
@@ -953,22 +955,7 @@ export default function AssignmentSourcesStage({
       </div>
 
       {/* The agent: real search, AI reading of abstracts, links to the outline */}
-      <div className="mb-5"><SourcesAgentPanel /></div>
-
-      {/* Minimal Step Guidance Banner */}
-      <div className="p-3.5 sm:p-4 rounded-xl bg-neutral-100/60 dark:bg-white/[0.02] border border-neutral-200/60 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center font-mono font-bold text-[10px] shrink-0">
-            2
-          </div>
-          <p className="text-neutral-600 dark:text-neutral-400 text-xs leading-relaxed">
-            Curate peer-reviewed literature and course materials. Kept and approved sources are automatically linked to your outline sections for grounded drafting with verified in-text citations.
-          </p>
-        </div>
-        <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 shrink-0 self-start sm:self-auto">
-          Sources ground your citations
-        </span>
-      </div>
+      <SourcesAgentPanel minimal />
 
       {isDiscoveringInitial && allMasterSources.length === 0 ? (
         <div
@@ -1011,20 +998,11 @@ export default function AssignmentSourcesStage({
             projectId={projectId}
           />
 
-          {/* Quick Skip to Drafting option */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-neutral-200/60 dark:border-white/10">
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
               Citing sources is optional. You can draft freely and add citations at any time.
             </p>
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleContinue}
-                data-testid="skip-to-drafting-btn"
-                className="px-5 py-2.5 rounded-full text-xs font-semibold border border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-              >
-                Skip to Drafting
-              </button>
               <button
                 type="button"
                 onClick={handleContinue}
@@ -1896,7 +1874,7 @@ export default function AssignmentSourcesStage({
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
-              Phase 2: Evidence Grounding
+              Evidence Grounding
             </h3>
             {approvedCount > 0 ? (
               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 flex items-center gap-1 border border-emerald-500/20">
@@ -1926,25 +1904,7 @@ export default function AssignmentSourcesStage({
             className="px-4 py-2.5 rounded-full text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-center gap-1.5"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Phase 1: Understand</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleContinue}
-            data-testid="skip-to-drafting-btn"
-            className="px-5 py-2.5 rounded-full text-xs font-semibold border border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-          >
-            Skip to Drafting
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveMainView("analysis")}
-            className="px-5 py-2.5 rounded-full text-xs font-semibold border border-neutral-200 dark:border-white/10 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-center gap-1.5"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Move to AI Analysis</span>
+            <span>Back to Understand</span>
           </button>
 
           <button

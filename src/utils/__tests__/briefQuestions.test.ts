@@ -63,3 +63,25 @@ describe("brief parsing grounded in the file", () => {
     expect(labels).toEqual(expect.arrayContaining(["Preskill (2018)", "Arute et al. (2019)", "Nielsen & Chuang (2010)", "Shor (1994)"]));
   });
 });
+
+import { buildSourceSearchQueries } from "../briefSourceQueries";
+
+describe("source search queries from a brief", () => {
+  it("produces clean keyword phrases, never the department banner or module code", () => {
+    const qs = buildSourceSearchQueries(BRIEF);
+    expect(qs.length).toBeGreaterThanOrEqual(3);
+    expect(qs.length).toBeLessThanOrEqual(5);
+    for (const q of qs) {
+      expect(q).not.toMatch(/DEPARTMENT|QNT|4020|marks|word count/i);
+      expect(q.split(" ").length).toBeLessThanOrEqual(6);
+    }
+    expect(qs[0].toLowerCase()).toContain("superconducting");
+    expect(qs[0].toLowerCase()).toContain("trapped-ion");
+  });
+
+  it("falls back to the topic sentence when the brief has no numbered questions", () => {
+    const qs = buildSourceSearchQueries("UNIVERSITY OF EXAMPLE SCHOOL OF BUSINESS\nCritically evaluate how remote work affects employee productivity in technology firms.");
+    expect(qs[0].toLowerCase()).toContain("remote work");
+    expect(qs[0]).not.toMatch(/UNIVERSITY/);
+  });
+});

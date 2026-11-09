@@ -212,6 +212,14 @@ export const CuratedSourceCard: React.FC<CuratedSourceCardProps> = ({
 
         {/* Title & Metadata */}
         <div>
+          {source.prescribedInBrief && (
+            <span
+              data-testid="prescribed-in-brief-badge"
+              className="mb-1 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20"
+            >
+              Prescribed in Brief
+            </span>
+          )}
           <h3 className="text-sm font-semibold text-neutral-900 dark:text-white leading-snug">
             {source.title}
           </h3>

@@ -1,4 +1,5 @@
 import express from "express";
+import { buildSourceSearchQueries } from "../../../../src/utils/briefSourceQueries.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
 import {
   buildScholarlyVoiceSystemPrompt,
@@ -96,11 +97,24 @@ router.post("/research", async (req: express.Request<{ id: string }>, res) => {
     let discoveredDrafts: DiscoveredSourceDraft[] = [];
 
     // Query multi-portal discovery (OpenAlex, Crossref, DOAJ, DataCite, arXiv)
-    try {
-      discoveredDrafts = await discoverMultiPortalSources(effectiveQuery, 25);
-    } catch (discErr) {
-      console.warn("Multi-portal discovery network call failed, attempting fallback:", discErr);
+    // Never send the raw brief to an index: build clean keyword phrases from it.
+    const phrases = buildSourceSearchQueries(effectiveQuery, 4);
+    const toRun = phrases.length > 0 ? phrases : [effectiveQuery.slice(0, 200)];
+    const settled = await Promise.allSettled(toRun.map((q) => discoverMultiPortalSources(q, 15)));
+    const seenKeys = new Set<string>();
+    for (const r of settled) {
+      if (r.status !== "fulfilled") {
+        console.warn("Multi-portal discovery phrase failed:", r.reason);
+        continue;
+      }
+      for (const d of r.value) {
+        const key = (d.doi || d.title).toLowerCase();
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        discoveredDrafts.push(d);
+      }
     }
+    discoveredDrafts = discoveredDrafts.slice(0, 25);
 
     let sources: DiscoveredSource[] = [];
 

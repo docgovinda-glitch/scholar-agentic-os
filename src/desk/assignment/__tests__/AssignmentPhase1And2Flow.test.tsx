@@ -198,8 +198,10 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
       const proceedDraftingBtn = screen.getByTestId("proceed-to-drafting-btn");
       expect(proceedDraftingBtn).not.toBeDisabled();
 
-      const skipDraftingBtn = screen.getByTestId("skip-to-drafting-btn");
-      expect(skipDraftingBtn).toBeInTheDocument();
+      // Clean bottom bar: no Skip / AI Analysis shortcuts, just Back and Proceed
+      expect(screen.queryByTestId("skip-to-drafting-btn")).not.toBeInTheDocument();
+      expect(screen.queryByText("Move to AI Analysis")).not.toBeInTheDocument();
+      expect(screen.getByText("Back to Understand")).toBeInTheDocument();
     });
 
     it("allows one-click approve and remove actions on curated cards", async () => {
@@ -341,9 +343,9 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
       // Verify 0 literature cards are displayed
       expect(screen.queryByTestId("curated-sources-grid")).not.toBeInTheDocument();
 
-      // Verify Skip to Drafting button is available
-      const skipBtns = screen.getAllByTestId("skip-to-drafting-btn");
-      expect(skipBtns.length).toBeGreaterThan(0);
+      // Proceed stays available; there is no separate Skip button
+      expect(screen.queryByTestId("skip-to-drafting-btn")).not.toBeInTheDocument();
+      expect(screen.getAllByTestId("proceed-to-drafting-btn").length).toBeGreaterThan(0);
     });
   });
 });

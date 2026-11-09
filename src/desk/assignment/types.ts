@@ -348,6 +348,8 @@ export interface DiscoveredSource {
   canonicalReference?: CanonicalReference;
   status: "unreviewed" | "kept" | "removed";
   fromVault?: boolean;
+  /** Named in the assignment brief itself (listed first, with a badge). */
+  prescribedInBrief?: boolean;
 
   // Canonical Source Registry Fields (Production Spec §3.3)
   verificationStatus?: SourceVerificationStatus;
