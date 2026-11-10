@@ -30,7 +30,10 @@ jobs:
         run: |
           set -euo pipefail
           cd supabase/migrations
-          bad=$(ls | grep -vE '^[0-9]{14}_[a-z0-9_]+\.sql$' || true)
+          # Two early migrations predate the 14-digit convention and are already applied: they are
+          # grandfathered by name and must never be renamed. Every other file must be <14-digit timestamp>_<name>.sql.
+          legacy='^(20260824_drop_user_vault_items|20260825_universal_vault_v2)\.sql$'
+          bad=$(ls | grep -vE '^[0-9]{14}_[a-z0-9_]+\.sql$' | grep -vE "$legacy" || true)
           if [ -n "$bad" ]; then echo "::error::Migration files must be named <14-digit timestamp>_<name>.sql:"; echo "$bad"; exit 1; fi
           dupes=$(ls | cut -d_ -f1 | sort | uniq -d || true)
           if [ -n "$dupes" ]; then echo "::error::Duplicate migration timestamps: $dupes"; exit 1; fi
