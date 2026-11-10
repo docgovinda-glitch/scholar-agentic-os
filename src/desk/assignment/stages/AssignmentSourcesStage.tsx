@@ -77,6 +77,12 @@ export interface AssignmentSourcesStageProps {
   onBack?: () => void;
 }
 
+/** Relevance as a 0-100 integer whatever the source scale (0-1 fractions included). */
+function normalizeRelevance(score: number | undefined): number {
+  if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) return 0;
+  return Math.min(100, Math.round(score <= 1 ? score * 100 : score));
+}
+
 export default function AssignmentSourcesStage({
   onProceed,
   onBack,
@@ -647,7 +653,17 @@ export default function AssignmentSourcesStage({
 
     return raw.map((s, idx) => ({
       ...s,
-      sourceOrigin: s.sourceOrigin || (idx < 15 ? "ask_scholar" : "ai_research"),
+      // Brief-driven discovery (incl. prescribed references) counts under Ask Scholar;
+      // AI-search results under AI Research. Unknown origins never fall out of every tab.
+      sourceOrigin:
+        s.sourceOrigin === "ai_research" || s.sourceOrigin === "user"
+          ? s.sourceOrigin
+          : s.sourceOrigin === "ask_scholar"
+          ? "ask_scholar"
+          : s.originTag === "ai-research"
+          ? "ai_research"
+          : "ask_scholar",
+      relevanceScore: normalizeRelevance(s.relevanceScore),
       status: s.status || "kept",
     }));
   }, [sources, question, citationStyle, hasTopic, hasUploadedDocs]);
@@ -790,7 +806,7 @@ export default function AssignmentSourcesStage({
 
     // 7. Minimum Relevance filter
     if (minRelevance > 0) {
-      list = list.filter((s) => (s.relevanceScore || 0) >= minRelevance);
+      list = list.filter((s) => normalizeRelevance(s.relevanceScore) >= minRelevance);
     }
 
     // 8. Open Access Only filter

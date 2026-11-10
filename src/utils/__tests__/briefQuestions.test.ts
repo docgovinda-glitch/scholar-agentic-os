@@ -139,3 +139,45 @@ describe("source cards", () => {
     expect(sourceVenueLabel({ type: "journal" })).toBe("Journal Article");
   });
 });
+
+import fs from "node:fs";
+import path from "node:path";
+import { parsePrescribedBibliography, groupBriefQuestions } from "../briefQuestions";
+
+const QNT = fs.readFileSync(path.join(__dirname, "fixtures", "qnt4020-brief.txt"), "utf8");
+
+describe("QNT-4020 brief (7 questions, rubric part, prescribed bibliography, page footers)", () => {
+  it("finds all 7 questions, keeps sub-parts with their stem, and never reads 15 mK as marks", () => {
+    const groups = groupBriefQuestions(parseBriefQuestions(QNT));
+    expect(groups.map((g) => g.key)).toEqual(["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"]);
+    expect(groups.map((g) => g.marks)).toEqual([15, 10, 12, 13, 20, 10, 10]);
+    expect(groups[0].parts.map((p) => p.label)).toEqual(["Q1a", "Q1b", "Q1c"]);
+    expect(groups[3].title).toBe("Quantum Speedup Mechanisms: Shor vs. Grover");
+    const all = parseBriefQuestions(QNT).map((q) => q.text).join(" ");
+    expect(all).not.toMatch(/Page \d of \d|Rigour|Bennett, C\.H\./);
+  });
+
+  it("parses the full prescribed bibliography entries, never 'al., A. e.'", () => {
+    const bib = parsePrescribedBibliography(QNT);
+    expect(bib).toHaveLength(8);
+    const arute = bib.find((b) => b.label === "Arute et al. (2019)")!;
+    expect(arute.title).toBe("Quantum supremacy using a programmable superconducting processor");
+    expect(arute.venue).toBe("Nature");
+    expect(arute.volume).toBe("574");
+    expect(arute.issue).toBe("7779");
+    expect(arute.doi).toBe("10.1038/s41586-019-1666-5");
+    expect(arute.authors[0]).toBe("Arute, F.");
+    expect(arute.etAl).toBe(true);
+    const bb = bib.find((b) => b.label.startsWith("Bennett"))!;
+    expect(bb.authors).toEqual(["Bennett, C.H.", "Brassard, G."]);
+    const nc = bib.find((b) => b.label.startsWith("Nielsen"))!;
+    expect(nc.isBook).toBe(true);
+    expect(nc.title).toBe("Quantum Computation and Quantum Information");
+    expect(nc.publisher).toBe("Cambridge University Press");
+    expect(JSON.stringify(bib)).not.toMatch(/al\., A\. e\./);
+  });
+
+  it("reads the rubric part as the grading criteria (30/30/20/20)", () => {
+    expect(parseMarkingCriteria(QNT).map((r) => r.weightPercent)).toEqual([30, 30, 20, 20]);
+  });
+});

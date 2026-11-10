@@ -35,7 +35,7 @@ import {
 } from "../../../utils/briefExtractor";
 
 import { applyMarksBudget, allocateCleanWords } from "../../../domain/assignment/outlineBudget";
-import { isNonQuestionBriefLine, parseBriefQuestions } from "../../../utils/briefQuestions";
+import { isNonQuestionBriefLine, parseBriefQuestions, groupBriefQuestions } from "../../../utils/briefQuestions";
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
   question: string,
@@ -607,9 +607,11 @@ export function shortHeading(text: string, maxWords = 8): string {
   return cut.charAt(0).toUpperCase() + cut.slice(1);
 }
 
-/** How many parsed questions sit under this Part heading. */
-function groupsByPart(entries: Array<[string, Array<{ part?: string }>]>, part?: string): number {
-  return entries.reduce((n, [, rows]) => n + rows.filter((r) => r.part === part).length, 0);
+/** Keep a title as written (no case changes) but at most `maxWords` words. */
+function clipWords(text: string, maxWords: number): string {
+  const t = text.replace(/[:.\s]+$/, "").trim();
+  const w = t.split(/\s+/);
+  return w.length > maxWords ? `${w.slice(0, maxWords).join(" ")}…` : t;
 }
 
 /** Max top-level sections an outline may be expanded to (human-scale outlines). */
@@ -1291,39 +1293,36 @@ export function buildBriefSpecificSpecs(
   // budgets proportional to the marks, Focus lines quoting the brief itself.
   const markedRows = parseBriefQuestions(briefText || question || "");
   if (markedRows.length >= 2 && markedRows.some((r) => r.marks)) {
-    const groups = new Map<string, typeof markedRows>();
-    for (const r of markedRows) {
-      const key = r.label.replace(/[a-z]$/, "");
-      groups.set(key, [...(groups.get(key) ?? []), r]);
-    }
-    const entries = [...groups.entries()].slice(0, MAX_OUTLINE_SECTIONS);
-    const avgMarks = markedRows.reduce((t, r) => t + (r.marks ?? 0), 0) / Math.max(1, markedRows.filter((r) => r.marks).length);
-    const weights = entries.map(([, rows]) => rows.reduce((t, r) => t + (r.marks ?? avgMarks), 0));
+    // One section per main question: the stem and its sub-parts stay together and
+    // no question is ever dropped, however many there are.
+    const groups = groupBriefQuestions(markedRows);
+    const known = groups.filter((g) => g.marks);
+    const avgMarks = known.reduce((t, g) => t + (g.marks ?? 0), 0) / Math.max(1, known.length);
+    const weights = groups.map((g) => g.marks ?? avgMarks);
     const totalWeight = weights.reduce((t, w) => t + w, 0) || 1;
-    return entries.map(([key, rows], i) => {
+    return groups.map((g, i) => {
       const n = i + 1;
-      const multi = rows.length > 1;
-      const partName = rows[0].part ? formatAcademicTopicTitle(rows[0].part.toLowerCase()) : "";
-      const heading = multi ? (partName && rows.every((r) => r.part === rows[0].part) && rows.length === groupsByPart(entries, rows[0].part) ? partName : `Question ${key.replace(/\D/g, "")}`) : shortHeading(rows[0].text);
-      const rowWeights = rows.map((r) => r.marks ?? avgMarks);
-      const rowTotal = rowWeights.reduce((t, w) => t + w, 0) || 1;
+      const heading = g.stem ? clipWords(g.stem.text, 12) : shortHeading(g.title, 10);
+      const focus = [g.stem?.text, ...g.parts.map((p) => `(${p.label.slice(-1)}) ${p.text}`)].filter(Boolean).join(" ");
+      const partWeights = g.parts.map((p) => p.marks ?? 1);
+      const partTotal = partWeights.reduce((t, w) => t + w, 0) || 1;
       return {
         title: `${n}.0 ${heading}`,
-        notes: `Answers ${rows.map((r) => r.label).join(", ")} from the brief.`,
+        notes: `Answers ${g.key}${g.parts.length ? ` (${g.parts.map((p) => p.label.slice(-1)).join(", ")})` : ""} from the brief.`,
         // Sub-parts get their own short titles; a single prompt gets one neutral
         // sub-section, never a copy of the parent title.
-        subheadings: multi
-          ? rows.map((r, k) => ({
-              title: `${n}.${k + 1} ${shortHeading(r.text)}`,
-              ratio: (weights[i] / totalWeight) * (rowWeights[k] / rowTotal),
-              guidance: `Focus: ${r.text}`,
+        subheadings: g.parts.length > 0
+          ? g.parts.map((p, k) => ({
+              title: `${n}.${k + 1} ${shortHeading(p.text)}`,
+              ratio: (weights[i] / totalWeight) * (partWeights[k] / partTotal),
+              guidance: `Focus: ${p.text}`,
               keyPoints: [] as string[],
             }))
           : [
               {
                 title: `${n}.1 Key points and evidence`,
                 ratio: weights[i] / totalWeight,
-                guidance: `Focus: ${rows[0].text}`,
+                guidance: `Focus: ${focus}`,
                 keyPoints: [] as string[],
               },
             ],
@@ -2744,7 +2743,8 @@ export function generateDynamicAssignmentStructure(
   const totalAllocated = headings.reduce((sum, h) => sum + h.targetWordCount, 0);
   const thesisStatement = generateThesisStatement(question, options.writingTone, academicLevel);
 
-  return {
+  // Marks-weighted, clean multiples, exact sum to the target (never 40w + 960w).
+  return applyMarksBudget({
     version: currentStructure ? (currentStructure.version || 1) + 1 : 1,
     isConfirmed: false,
     targetWordCount: total,
@@ -2763,7 +2763,7 @@ export function generateDynamicAssignmentStructure(
       qualityControlChecklist: askScholarResearch.qualityControlChecklist,
     },
     questionMappingMatrix: askScholarResearch.questionMappingMatrix,
-  };
+  }, briefText || question);
 }
 
 /**

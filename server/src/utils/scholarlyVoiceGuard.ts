@@ -5,7 +5,7 @@
  * 1. Lexical Fingerprint Suppression: Bans LLM cliché tokens ("delve", "tapestry", "testament", etc.)
  * 2. Syntactic Burstiness & Epistemic Hedging: Alternates concise declaratives with analytical clauses
  * 3. Term-Locking, Dialect & Unicode/IAST Fidelity: Enforces British English by default, preserves NFC diacritics
- * 4. Claim-to-Evidence Provenance: Flags unbacked assertions with [Unverified Claim — Vault Citation Required]
+ * 4. Claim-to-Evidence Provenance: unsourced claims are stated cautiously, never tagged
  */
 
 export type ScholarlyDialect = "en-GB" | "en-US";
@@ -115,7 +115,7 @@ You are an elite academic peer reviewer, principal investigator, and scholarly e
 
 4. CLAIM-TO-EVIDENCE PROVENANCE:
 - Every factual, statistical, or empirical assertion must be grounded in verified literature or explicit data.
-- If proposing or synthesizing an empirical claim that lacks direct backing in the provided context or Knowledge Vault, append: "[Unverified Claim — Vault Citation Required]".
+- If a claim has no source in the provided context, state it cautiously without a citation. Never invent a citation and never write placeholder tags such as "[Unverified Claim]".
 `.trim();
 }
 

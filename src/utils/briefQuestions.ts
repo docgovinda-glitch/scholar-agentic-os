@@ -12,7 +12,8 @@ export function removeCourseCodes(text: string): string {
   return text.replace(COURSE_CODE, " ");
 }
 
-const MARKS_RE = /\[?\(?\s*(\d{1,3})\s*(?:marks?|mks?|pts?|points?)\s*\)?\]?/i;
+// "mK" (millikelvin) is not "marks": only full words count.
+const MARKS_RE = /\[?\(?\s*(\d{1,3})\s*(?:marks?|pts|points?)\b\s*\)?\]?/i;
 const MARKS_RE_G = new RegExp(MARKS_RE.source, "gi");
 const COMMAND_START =
   /^(?:critically\s+)?(?:evaluate|analy[sz]e|assess|discuss|explain|describe|examine|compare|contrast|recommend|propose|justify|explore|investigate|identify|outline|define|apply|develop|design|derive|show|prove|calculate|state|summari[sz]e|distinguish|illustrate)\b/i;
@@ -59,7 +60,10 @@ const SUB_RE = /^\(?([a-z])[\)\.]\s+(.+)$/i;
 
 function firstSentence(text: string, max = 150): string {
   const clean = text.replace(/\s+/g, " ").trim();
-  const m = clean.match(/^(.+?[.?!])(?:\s|$)/);
+  // A full stop in "vs.", "e.g.", "et al." or "Fig." does not end the sentence.
+  const masked = clean.replace(/\b(vs|e\.g|i\.e|et al|etc|cf|fig|eq|no|dr|prof)\./gi, (m) => m.replace(/\./g, "\u0000"));
+  const mm = masked.match(/^(.+?[.?!])(?:\s|$)/);
+  const m = mm ? [mm[0], mm[1].replace(/\u0000/g, ".")] : null;
   let s = m && m[1].length >= 20 ? m[1] : clean;
   if (s.length > max) s = `${s.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
   return s.replace(/[.\s]+$/, "");
@@ -71,6 +75,26 @@ function pullMarks(text: string): { text: string; marks?: number } {
   const marks = parseInt(m[1], 10);
   return { text: text.replace(MARKS_RE_G, " ").replace(/\s{2,}/g, " ").trim(), marks: marks > 0 ? marks : undefined };
 }
+
+/** Running page headers/footers that PDF extraction repeats on every page. */
+export function isPageFurnitureLine(line: string): boolean {
+  const t = line.trim();
+  return /\bpage\s+\d+\s+(?:of|\/)\s+\d+\b/i.test(t) || /^--\s*\d+\s+of\s+\d+\s*--$/i.test(t);
+}
+
+/** Remove page furniture and any line repeated 3+ times (running headers/footers). */
+export function stripPageFurniture(text: string): string {
+  const lines = text.split(/\r?\n/);
+  const counts = new Map<string, number>();
+  for (const l of lines) {
+    const k = l.trim();
+    if (k.length >= 12) counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return lines.filter((l) => !isPageFurnitureLine(l) && (counts.get(l.trim()) ?? 0) < 3).join("\n");
+}
+
+/** Part headings after which the brief lists rubric rows or references, not questions. */
+const NON_QUESTION_PART = /\b(rubric|marking|grading|assessment\s+criteria|bibliography|references?|reading\s+list|prescribed\s+(?:texts?|reading))\b/i;
 
 /** Parts (e.g. "PART 1: QUANTUM HARDWARE ARCHITECTURES 25 MARKS") found in the brief. */
 export function parseBriefParts(briefText: string): BriefPart[] {
@@ -94,7 +118,7 @@ export function parseBriefQuestions(briefText: string): BriefQuestionRow[] {
   const rows: BriefQuestionRow[] = [];
   let currentMain: string | undefined;
   let currentPart: string | undefined;
-  const lines = removeCourseCodes(briefText.slice(0, 60000)).split(/\r?\n/);
+  const lines = removeCourseCodes(stripPageFurniture(briefText.slice(0, 60000))).split(/\r?\n/);
 
   const push = (label: string, body: string) => {
     const { text, marks } = pullMarks(body);
@@ -103,13 +127,19 @@ export function parseBriefQuestions(briefText: string): BriefQuestionRow[] {
     rows.push({ id: label.toLowerCase(), label, text: clean, marks, part: currentPart });
   };
 
+  let inNonQuestionPart = false;
   for (const raw of lines) {
     const line = raw.trim();
-    if (!line) continue;
+    if (!line || isPageFurnitureLine(line)) continue;
     const part = line.match(PART_RE);
     if (part && part[2]) {
       currentPart = pullMarks(part[2]).text.replace(/[:\-–\s]+$/, "");
       currentMain = undefined;
+      inNonQuestionPart = NON_QUESTION_PART.test(currentPart);
+      continue;
+    }
+    if (inNonQuestionPart || /^(?:references|bibliography|reference\s+list)\s*:?$/i.test(line)) {
+      inNonQuestionPart = true;
       continue;
     }
     if (isNonQuestionBriefLine(line)) continue;
@@ -368,4 +398,121 @@ export function shortQuestionLabel(text: string, maxWords = 8): string {
     .trim();
   const w = stripped.split(/\s+/);
   return w.length > maxWords ? `${w.slice(0, maxWords).join(" ")}…` : stripped;
+}
+
+export interface BriefQuestionGroup {
+  /** "Q1" */
+  key: string;
+  /** Question heading: the stem's own title when the brief gives one. */
+  title: string;
+  stem?: BriefQuestionRow;
+  /** Sub-parts (a), (b), (c) ... answered inside the same section. */
+  parts: BriefQuestionRow[];
+  /** The question's marks: the stem's marks, else the sum of its parts' marks. */
+  marks?: number;
+  part?: string;
+}
+
+/**
+ * One group per main question. A stem and its sub-parts are never split, and
+ * marks are never double-counted (a stem's "[15 Marks]" covers its parts).
+ */
+export function groupBriefQuestions(rows: BriefQuestionRow[]): BriefQuestionGroup[] {
+  const map = new Map<string, BriefQuestionGroup>();
+  for (const r of rows) {
+    const key = r.label.replace(/[a-z]$/, "");
+    const g = map.get(key) ?? { key, title: "", parts: [], part: r.part };
+    if (r.label === key) g.stem = r;
+    else g.parts.push(r);
+    map.set(key, g);
+  }
+  return [...map.values()].map((g) => {
+    const partMarks = g.parts.reduce((n, p) => n + (p.marks ?? 0), 0);
+    const marks = g.stem?.marks ?? (partMarks > 0 ? partMarks : undefined);
+    const title = g.stem?.text || g.parts[0]?.text || g.key;
+    return { ...g, marks, title };
+  });
+}
+
+export interface PrescribedBibliographyEntry {
+  /** "Surname, I." strings, in order. */
+  authors: string[];
+  /** The entry says "et al." after the listed authors. */
+  etAl: boolean;
+  year: number;
+  title: string;
+  /** Journal or proceedings name; for books, the publisher. */
+  venue?: string;
+  publisher?: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
+  doi?: string;
+  isBook: boolean;
+  /** "Arute et al. (2019)" */
+  label: string;
+  raw: string;
+}
+
+const BIB_HEADER = /\b(bibliography|references?|reference\s+list|reading\s+list|prescribed\s+(?:texts?|reading))\b/i;
+const ENTRY_START = /^[\p{Lu}][\p{L}'’\-]+(?:\s[\p{Lu}][\p{L}'’\-]+)?,\s*(?:[\p{Lu}]\.?\s?-?){1,4}/u;
+
+/**
+ * Full entries from a reference list printed in the brief ("PART 6: PRESCRIBED
+ * HARVARD REFERENCING BIBLIOGRAPHY"): authors, year, title, venue, volume,
+ * issue, pages and DOI exactly as the brief gives them.
+ */
+export function parsePrescribedBibliography(briefText: string): PrescribedBibliographyEntry[] {
+  const lines = stripPageFurniture(briefText).split(/\r?\n/).map((l) => l.trim());
+  const start = lines.findIndex((l) => (PART_RE.test(l) || /^[A-Z\s&]+$/.test(l) || l.length < 60) && BIB_HEADER.test(l));
+  if (start < 0) return [];
+  // Join wrapped lines: a new entry starts with "Surname, I."
+  const entries: string[] = [];
+  for (const l of lines.slice(start + 1)) {
+    if (!l) continue;
+    if (PART_RE.test(l)) break;
+    if (ENTRY_START.test(l) && /\(\d{4}[a-z]?\)/.test(l)) entries.push(l);
+    else if (entries.length) entries[entries.length - 1] += ` ${l}`;
+  }
+  const out: PrescribedBibliographyEntry[] = [];
+  for (const raw of entries) {
+    const m = raw.match(/^(.+?)\s*\((\d{4})[a-z]?\)\s*(.+)$/);
+    if (!m) continue;
+    const etAl = /\bet\.?\s*al\.?/i.test(m[1]);
+    const authorPart = m[1].replace(/,?\s*\bet\.?\s*al\.?/i, "").replace(/\s+and\s+|\s*&\s*/g, ", ");
+    const authors = [...authorPart.matchAll(/([\p{Lu}][\p{L}'’\-]+(?:\s[\p{Lu}][\p{L}'’\-]+)?),\s*((?:[\p{Lu}]\.?\s?-?){1,4})/gu)].map(
+      (a) => `${a[1]}, ${a[2].replace(/\s+/g, "").replace(/([A-Z])(?=[A-Z])/g, "$1.").replace(/\.?$/, ".")}`
+    );
+    let rest = m[3].trim();
+    const doiMatch = rest.match(/(?:doi:\s*|https?:\/\/(?:dx\.)?doi\.org\/)(10\.\S+?)\.?\s*$/i);
+    const doi = doiMatch?.[1];
+    if (doiMatch) rest = rest.slice(0, doiMatch.index).trim().replace(/[.,]$/, "");
+    let title = "";
+    let after = "";
+    const quoted = rest.match(/^['‘"“](.+?)['’"”],?\s*(.*)$/);
+    if (quoted) {
+      title = quoted[1];
+      after = quoted[2];
+    } else {
+      const dot = rest.search(/\.\s/);
+      title = dot > 0 ? rest.slice(0, dot) : rest;
+      after = dot > 0 ? rest.slice(dot + 1).trim() : "";
+    }
+    const isBook = !quoted;
+    const venue = isBook ? undefined : after.split(/,\s*(?=\d|pp?\.|vol)/i)[0].replace(/[.,]\s*$/, "").trim() || undefined;
+    const vi = after.match(/\b(\d+)\s*\((\d+)\)/);
+    const volOnly = !vi ? after.match(/,\s*(\d+)\s*,/) : null;
+    const pages = after.match(/\bpp?\.\s*([\d]+(?:\s*[–-]\s*\d+)?)/)?.[1]?.replace(/\s/g, "") ?? after.match(/,\s*(\d{5,7})\b/)?.[1];
+    const publisher = isBook ? after.match(/:\s*([^.:]+?)\.?\s*$/)?.[1]?.trim() : undefined;
+    const year = parseInt(m[2], 10);
+    const fam = (a: string) => a.split(",")[0];
+    const label =
+      etAl || authors.length > 2
+        ? `${fam(authors[0] ?? m[1])} et al. (${year})`
+        : authors.length === 2
+        ? `${fam(authors[0])} and ${fam(authors[1])} (${year})`
+        : `${fam(authors[0] ?? m[1])} (${year})`;
+    out.push({ authors, etAl, year, title: title.trim(), venue, publisher, volume: vi?.[1] ?? volOnly?.[1], issue: vi?.[2], pages, doi, isBook, label, raw });
+  }
+  return out;
 }

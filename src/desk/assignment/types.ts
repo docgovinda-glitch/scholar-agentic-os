@@ -1056,7 +1056,7 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
         sections.push({
           id: s.id,
           // One sub-section means the heading IS the section: never "1.0 X" then "1.1 X".
-          title: h.subheadings.length === 1 ? `${h.number}.0 ${h.title}` : `${s.numberStr} ${s.title}`,
+          title: h.subheadings.length === 1 ? numberedHeading(h) : `${s.numberStr} ${stripSectionNumber(s.title)}`,
           targetWordCount: s.targetWordCount,
           currentWordCount: s.currentWordCount || 0,
           guidance: s.guidance || `Analytical depth for ${s.title}. Notes: ${s.notes || ""}`,
@@ -1083,7 +1083,7 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
       const mergedDraft = (h.subheadings ?? []).map((sub) => sub.draftContent || "").filter((t) => t.trim()).join("\n\n");
       sections.push({
         id: h.id,
-        title: `${h.number}.0 ${h.title}`,
+        title: numberedHeading(h),
         targetWordCount: h.targetWordCount,
         currentWordCount: (h.subheadings ?? []).reduce((n, sub) => n + (sub.currentWordCount || 0), 0),
         guidance: (h.subheadings ?? []).map((sub) => sub.guidance).filter(Boolean).join(" ") || h.notes || `Analysis for ${h.title}`,
@@ -1106,17 +1106,17 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
       });
     }
   });
-  return capSections(sections);
+  // Never merge or drop whole questions: every heading keeps its own section.
+  return sections;
 }
 
-function capSections(sections: AssignmentDraftingSection[]): AssignmentDraftingSection[] {
-  if (sections.length <= MAX_DRAFTING_SECTIONS) return sections;
-  const head = sections.slice(0, MAX_DRAFTING_SECTIONS - 1);
-  const tail = sections.slice(MAX_DRAFTING_SECTIONS - 1);
-  const last = { ...tail[0] };
-  last.targetWordCount = tail.reduce((n, t) => n + (t.targetWordCount || 0), 0);
-  last.keyPoints = tail.flatMap((t) => t.keyPoints || []).slice(0, 6);
-  return [...head, last];
+/** "3.0 3.0 Title" -> "Title": strips any leading section number(s). */
+export function stripSectionNumber(title: string): string {
+  return (title || "").replace(/^\s*(?:\d+(?:\.\d+)*\.?\s+)+/, "").trim();
+}
+
+function numberedHeading(h: { number: number; title: string }): string {
+  return `${h.number}.0 ${stripSectionNumber(h.title)}`;
 }
 
 export type WritingTonePreset =

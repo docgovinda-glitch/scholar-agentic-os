@@ -10,8 +10,8 @@
 
 import type { DiscoveredSource, SourceVerificationStatus } from "../types";
 import { authedJsonFetch } from "../../api";
-import { buildSourceSearchQueries } from "../../../utils/briefSourceQueries";
-import { extractPrescribedReferences, parseBriefQuestions } from "../../../utils/briefQuestions";
+import { buildSourceSearchQueries, briefDomainTerms, anchorQueries, scoreSourceRelevance } from "../../../utils/briefSourceQueries";
+import { extractPrescribedReferences, parseBriefQuestions, parsePrescribedBibliography } from "../../../utils/briefQuestions";
 import { explainSourceFit } from "../../../utils/sourceFit";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -294,7 +294,9 @@ export async function discoverRealScholarlySourcesFromServer(
     return [];
   }
 
-  const queries = buildDiscoveryQueries(question).slice(0, 4);
+  const domainTerms = briefDomainTerms(question);
+  // Every search carries the subject word, so "noisy" never finds Bangla sentiment analysis.
+  const queries = anchorQueries(buildDiscoveryQueries(question).slice(0, 4), domainTerms);
   if (queries.length === 0) return [];
   const perQuery = Math.max(10, Math.ceil(maxResults / queries.length));
 
@@ -322,12 +324,21 @@ export async function discoverRealScholarlySourcesFromServer(
     return [];
   }
   const questionRows = parseBriefQuestions(question);
-  const mapped = drafts.map((draft, idx) => {
-    const src = mapDraftToDiscoveredSource(draft, idx, queries.join(" "));
-    const why = explainSourceFit({ title: draft.title, venue: draft.venue }, questionRows, queries[0]);
-    return why ? { ...src, whyThisSource: why } : src;
-  });
-  return deduplicateSources(mapped).slice(0, maxResults);
+  const scored = drafts
+    .map((draft, idx) => {
+      const src = mapDraftToDiscoveredSource(draft, idx, queries.join(" "));
+      const raw = scoreSourceRelevance({ title: draft.title, venue: draft.venue }, domainTerms, queries);
+      const why = explainSourceFit({ title: draft.title, venue: draft.venue }, questionRows, queries[0]);
+      return { src: why ? { ...src, whyThisSource: why } : src, raw };
+    })
+    // Off-topic papers (no subject word at all) are dropped, not just ranked low.
+    .filter((x) => x.raw > 0);
+  // Scale so the best match reads 95 and the 85%+/90%+ filters show the strongest papers.
+  const top = Math.max(1, ...scored.map((x) => x.raw));
+  const ranked = scored
+    .map((x) => ({ ...x.src, relevanceScore: Math.max(1, Math.round((x.raw / top) * 95)) }))
+    .sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0));
+  return deduplicateSources(ranked).slice(0, maxResults);
 }
 
 /**
@@ -336,8 +347,38 @@ export async function discoverRealScholarlySourcesFromServer(
  * (unverified). They are listed first, marked as prescribed in the brief.
  */
 export async function resolvePrescribedReferences(briefText: string, topicQueries: string[] = []): Promise<DiscoveredSource[]> {
-  const refs = extractPrescribedReferences(briefText);
-  if (refs.length === 0) return [];
+  // 1. Full entries printed in the brief's own reference list: used exactly as given.
+  const bibliography = parsePrescribedBibliography(briefText);
+  const fromBibliography: DiscoveredSource[] = bibliography.map((b, i) => ({
+    id: `prescribed-bib-${i}-${b.year}`,
+    title: b.title,
+    authors: b.etAl ? [...b.authors, "et al."] : b.authors,
+    year: String(b.year),
+    type: b.isBook ? "book" : "journal",
+    journal: b.isBook ? undefined : b.venue,
+    publisher: b.publisher,
+    volume: b.volume,
+    issue: b.issue,
+    pages: b.pages,
+    doi: b.doi,
+    url: b.doi ? `https://doi.org/${b.doi}` : undefined,
+    mainFinding: "",
+    suggestedUse: "Named in your assignment brief.",
+    whyThisSource: "Named in your assignment brief.",
+    citation: b.raw,
+    status: "kept" as const,
+    verificationStatus: b.doi ? ("verified" as const) : ("unverified" as const),
+    isActive: true,
+    relevanceScore: 100,
+    sourceOrigin: "system_found",
+    prescribedInBrief: true,
+  }));
+  const familyYear = (fam: string, year: number | string) => `${fam.toLowerCase()}|${year}`;
+  const covered = new Set(bibliography.map((b) => familyYear((b.authors[0] ?? "").split(",")[0], b.year)));
+
+  // 2. Citations named in the questions but not in a printed list: look them up.
+  const refs = extractPrescribedReferences(briefText).filter((r) => !covered.has(familyYear(r.authors.split(/\s|&|,/)[0], r.year)));
+  if (refs.length === 0) return fromBibliography;
   const topic = (topicQueries[0] || "").split(" ").slice(0, 3).join(" ");
 
   const resolved = await Promise.allSettled(
@@ -353,28 +394,34 @@ export async function resolvePrescribedReferences(briefText: string, topicQuerie
     })
   );
 
-  return refs.map((ref, i) => {
+  const looked = refs.map((ref, i) => {
     const r = resolved[i];
     const hit = r.status === "fulfilled" ? r.value : undefined;
     if (hit) {
-      return { ...mapDraftToDiscoveredSource(hit, i, ref.label), id: `prescribed-${i}-${ref.year}`, prescribedInBrief: true, status: "kept" as const };
+      return { ...mapDraftToDiscoveredSource(hit, i, ref.label), id: `prescribed-${i}-${ref.year}`, prescribedInBrief: true, status: "kept" as const, relevanceScore: 100, whyThisSource: "Named in your assignment brief." };
     }
+    // Unresolved: keep the name as the brief gives it, with "et al." as a flag, never as a surname.
+    const etAl = /\bet\.?\s*al/i.test(ref.authors);
+    const names = ref.authors.replace(/\s*et\.?\s*al\.?/i, "").split(/\s+(?:and|&)\s+/).map((n) => n.trim()).filter(Boolean);
     return {
       id: `prescribed-${i}-${ref.year}`,
-      title: ref.label,
-      authors: [ref.authors],
+      title: `Reference named in your brief: ${ref.label}`,
+      authors: etAl ? [...names, "et al."] : names,
       year: String(ref.year),
       type: "journal",
       mainFinding: "",
       suggestedUse: "Named in your assignment brief.",
+      whyThisSource: "Named in your assignment brief. Add its full details to cite it.",
       citation: ref.label,
       status: "kept" as const,
       verificationStatus: "unverified" as const,
       isActive: true,
+      relevanceScore: 100,
       sourceOrigin: "system_found",
       prescribedInBrief: true,
     } as DiscoveredSource;
   });
+  return [...fromBibliography, ...looked];
 }
 
 /** Prescribed references first, then live discovery from clean phrases built from the brief. */

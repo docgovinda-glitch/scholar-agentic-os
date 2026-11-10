@@ -97,7 +97,8 @@ describe("AskScholar Retrieval-Grounded Architecture & Anti-Hallucination Pipeli
       expect(prompt).toContain("(Baral, 2012)");
       expect(prompt).toContain("STRICT ANTI-HALLUCINATION & CITATION INTEGRITY MANDATE");
       expect(prompt).toContain("EXCLUSIVE CITATION RESTRICTION");
-      expect(prompt).toContain("[Unverified Claim — Vault Citation Required]");
+      expect(prompt).not.toContain("[Unverified Claim — Vault Citation Required]");
+      expect(prompt).toContain("never write placeholder tags");
       expect(prompt).toContain("NO PSEUDO WORD-COUNT DECLARATIONS");
     });
   });
@@ -154,7 +155,7 @@ In conclusion, democratic consolidation remains an ongoing institutional endeavo
       // 2. Blocks fabricated citations: (Shrestha, 2022) and (Dahal & Sharma, 2018)
       expect(result.text).not.toContain("(Shrestha, 2022)");
       expect(result.text).not.toContain("(Dahal & Sharma, 2018)");
-      expect(result.text).toContain("[Unverified Claim — Vault Citation Required]");
+      expect(result.text).not.toContain("Unverified Claim");
 
       // 3. Strips fake static word count line
       expect(result.text).not.toContain("Word count: ≈1,600");

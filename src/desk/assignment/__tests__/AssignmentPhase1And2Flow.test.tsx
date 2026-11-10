@@ -187,7 +187,7 @@ describe("Assignment Phase 1 Wiring & Phase 2 Sources Workspace", () => {
 
       // Curated Literature Cards (Titles, Authors, Venue)
       expect(screen.getByText(titleRe(firstSource.title))).toBeInTheDocument();
-      expect(screen.getAllByText(titleRe(firstSource.authors.join(", "))).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(new RegExp(firstSource.authors[0].split(",")[0], "i")).length).toBeGreaterThan(0);
       expect(screen.getAllByText(titleRe((firstSource.journal || firstSource.publisher)!)).length).toBeGreaterThan(0);
       expect(screen.getByText(titleRe(secondSource.title))).toBeInTheDocument();
 

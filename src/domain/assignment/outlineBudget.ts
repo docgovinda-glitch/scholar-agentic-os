@@ -4,7 +4,7 @@
  * rounding remainder placed on the largest body section so the sections sum to
  * exactly the target word count. Pure; no I/O.
  */
-import { parseBriefQuestions } from "../../utils/briefQuestions";
+import { parseBriefQuestions, groupBriefQuestions } from "../../utils/briefQuestions";
 import type { AssignmentMainHeading, AssignmentStructure, AssignmentSubheading } from "../../desk/assignment/types";
 
 export function cleanWordStep(total: number): number {
@@ -57,17 +57,15 @@ export interface QuestionGroup {
 }
 
 function questionGroups(briefText: string): QuestionGroup[] {
-  const rows = parseBriefQuestions(briefText);
-  const avg = rows.filter((r) => r.marks).reduce((s, r) => s + (r.marks ?? 0), 0) / Math.max(1, rows.filter((r) => r.marks).length);
-  const map = new Map<string, QuestionGroup>();
-  for (const r of rows) {
-    const key = r.label.replace(/[a-z]$/, "");
-    const g = map.get(key) ?? { key, marks: 0, words: new Set<string>() };
-    g.marks += r.marks ?? (avg || 1);
-    for (const w of tokens(r.text)) g.words.add(w);
-    map.set(key, g);
-  }
-  return [...map.values()];
+  // A stem's marks cover its sub-parts: never add both.
+  const groups = groupBriefQuestions(parseBriefQuestions(briefText));
+  const known = groups.filter((g) => g.marks);
+  const avg = known.reduce((n, g) => n + (g.marks ?? 0), 0) / Math.max(1, known.length) || 1;
+  return groups.map((g) => {
+    const words = new Set<string>();
+    for (const r of [g.stem, ...g.parts]) if (r) for (const w of tokens(r.text)) words.add(w);
+    return { key: g.key, marks: g.marks ?? avg, words };
+  });
 }
 
 const headingText = (h: AssignmentMainHeading) =>

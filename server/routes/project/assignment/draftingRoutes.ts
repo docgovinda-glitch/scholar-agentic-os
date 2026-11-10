@@ -263,15 +263,6 @@ ${tutorialOrPeelRules}`;
     effectiveDraft = sanitizeScholarlyText(effectiveDraft, { dialect: "en-GB", stripCliches: true });
     effectiveDraft = normalizeUnicodeNFC(effectiveDraft);
 
-    if (mappedCitationItems.length === 0 && !effectiveDraft.includes("[Unverified Claim — Vault Citation Required]")) {
-      if (/\b(studies show|research indicates|data demonstrates|proven that|empirically established)\b/i.test(effectiveDraft)) {
-        effectiveDraft = effectiveDraft.replace(
-          /\b(studies show|research indicates|data demonstrates|proven that|empirically established)\b/gi,
-          (m) => `${m} [Unverified Claim — Vault Citation Required]`
-        );
-      }
-    }
-
     res.json({ draft: effectiveDraft });
   } catch (err: any) {
     if (err?.message === "RequireFrontendLLMException") return;
@@ -477,15 +468,6 @@ Output ONLY the section text in clean academic Markdown prose.`;
     // Apply Discourse-Level Scholarly Voice Guardrails (cliché suppression, British English, NFC Unicode preservation)
     effectiveDraft = sanitizeScholarlyText(effectiveDraft, { dialect: "en-GB", stripCliches: true });
     effectiveDraft = normalizeUnicodeNFC(effectiveDraft);
-
-    if (mappedSources.length === 0 && !effectiveDraft.includes("[Unverified Claim — Vault Citation Required]")) {
-      if (/\b(studies show|research indicates|data demonstrates|proven that|empirically established)\b/i.test(effectiveDraft)) {
-        effectiveDraft = effectiveDraft.replace(
-          /\b(studies show|research indicates|data demonstrates|proven that|empirically established)\b/gi,
-          (m) => `${m} [Unverified Claim — Vault Citation Required]`
-        );
-      }
-    }
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");

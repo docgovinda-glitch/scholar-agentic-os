@@ -63,7 +63,8 @@ export interface ScrubberOptions {
   checkEntailment?: boolean;
 }
 
-const DEFAULT_UNVERIFIED_PLACEHOLDER = "[Unverified Claim — Link Vault Source]";
+// Unmatched citations are removed silently: no placeholder tag is ever written into student prose.
+const DEFAULT_UNVERIFIED_PLACEHOLDER = "";
 
 const STOPWORDS = new Set([
   "the", "is", "at", "which", "on", "and", "a", "an", "in", "of", "to", "for", "with", "by", "as",
@@ -288,7 +289,7 @@ export function scrubCitations(
     };
   }
 
-  const placeholder = options.unverifiedPlaceholder || DEFAULT_UNVERIFIED_PLACEHOLDER;
+  const placeholder = options.unverifiedPlaceholder ?? DEFAULT_UNVERIFIED_PLACEHOLDER;
   const formatter = new APA7Formatter();
 
   // Normalize ledger into Map and Array
@@ -406,7 +407,7 @@ export function scrubCitations(
     // Unverified narrative citation
     unverifiedClaimsCount += 1;
     strippedCitations.push(`${cleanAuthor} (${cleanYear})`);
-    return `${cleanAuthor} (${cleanYear} ${placeholder})`;
+    return placeholder ? `${cleanAuthor} (${cleanYear} ${placeholder})` : cleanAuthor;
   });
 
   // Pass 4: Parenthetical citations: (Author, Year) or (Author & Author, Year)
@@ -437,6 +438,11 @@ export function scrubCitations(
     const idx = parseInt(idxStr, 10);
     return resolvedTokens[idx] || "";
   });
+  // Tidy the gaps left where an unmatched citation was removed.
+  scrubbedText = scrubbedText
+    .replace(/\(\s*[;,]?\s*\)/g, "")
+    .replace(/[ \t]+([.,;:!?])/g, "$1")
+    .replace(/[ \t]{2,}/g, " ");
 
   // Pass 5: Chronological Anachronisms & Claim Entailment Analysis
   const sentences = scrubbedText

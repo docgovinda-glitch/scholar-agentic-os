@@ -92,3 +92,57 @@ export function buildSourceSearchQueries(briefOrQuestion: string, max = 5): stri
   }
   return queries;
 }
+
+/**
+ * The brief's subject words: content words that recur across its questions
+ * ("quantum", "qubit"). Used to anchor every search and to reject papers from
+ * other fields that merely share a word like "noisy" or "comparative".
+ */
+export function briefDomainTerms(briefOrQuestion: string, max = 5): string[] {
+  const rows = parseBriefQuestions(briefOrQuestion);
+  const texts = rows.length ? rows.map((r) => r.text) : [briefOrQuestion.slice(0, 2000)];
+  const docFreq = new Map<string, number>();
+  for (const t of texts) {
+    for (const w of new Set(contentWords(t).map((x) => x.toLowerCase().replace(/s$/, "")))) {
+      if (w.length < 4 || /^\d/.test(w)) continue;
+      docFreq.set(w, (docFreq.get(w) ?? 0) + 1);
+    }
+  }
+  const minDocs = texts.length >= 4 ? 2 : 1;
+  return [...docFreq.entries()]
+    .filter(([, n]) => n >= minDocs)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, max)
+    .map(([w]) => w);
+}
+
+/** Make sure each search phrase carries the brief's main subject word. */
+export function anchorQueries(queries: string[], domainTerms: string[]): string[] {
+  const anchor = domainTerms[0];
+  if (!anchor) return queries;
+  return queries.map((q) => (q.toLowerCase().includes(anchor) ? q : `${anchor} ${q}`));
+}
+
+/**
+ * 0-100 relevance of a paper to the brief: needs at least one subject word in
+ * its title/venue (else 0, i.e. off-topic), then rises with query-term overlap.
+ */
+export function scoreSourceRelevance(
+  paper: { title: string; venue?: string; abstract?: string },
+  domainTerms: string[],
+  queries: string[]
+): number {
+  const hay = `${paper.title} ${paper.venue ?? ""} ${paper.abstract ?? ""}`.toLowerCase();
+  const words = new Set(hay.replace(/[^a-z0-9\s-]/g, " ").split(/\s+/).map((w) => w.replace(/s$/, "")));
+  const domainHits = domainTerms.filter((d) => words.has(d) || hay.includes(d)).length;
+  if (domainTerms.length > 0 && domainHits === 0) return 0;
+  let best = 0;
+  for (const q of queries) {
+    const terms = contentWords(q).map((w) => w.toLowerCase().replace(/s$/, ""));
+    if (!terms.length) continue;
+    const share = terms.filter((t) => words.has(t) || hay.includes(t)).length / terms.length;
+    best = Math.max(best, share);
+  }
+  const domainShare = domainTerms.length ? Math.min(1, domainHits / Math.min(2, domainTerms.length)) : 1;
+  return Math.round(100 * (0.45 * domainShare + 0.55 * best));
+}

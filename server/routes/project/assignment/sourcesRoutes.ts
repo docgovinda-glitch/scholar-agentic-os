@@ -1,5 +1,5 @@
 import express from "express";
-import { buildSourceSearchQueries } from "../../../../src/utils/briefSourceQueries.ts";
+import { buildSourceSearchQueries, briefDomainTerms, anchorQueries, scoreSourceRelevance } from "../../../../src/utils/briefSourceQueries.ts";
 import { parseBriefQuestions } from "../../../../src/utils/briefQuestions.ts";
 import { explainSourceFit } from "../../../../src/utils/sourceFit.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
@@ -101,7 +101,7 @@ router.post("/research", async (req: express.Request<{ id: string }>, res) => {
     // Query multi-portal discovery (OpenAlex, Crossref, DOAJ, DataCite, arXiv)
     // Never send the raw brief to an index: build clean keyword phrases from it.
     const briefQuestionRows = parseBriefQuestions(effectiveQuery);
-    const phrases = buildSourceSearchQueries(effectiveQuery, 4);
+    const phrases = anchorQueries(buildSourceSearchQueries(effectiveQuery, 4), briefDomainTerms(effectiveQuery));
     const toRun = phrases.length > 0 ? phrases : [effectiveQuery.slice(0, 200)];
     const settled = await Promise.allSettled(toRun.map((q) => discoverMultiPortalSources(q, 15)));
     const seenKeys = new Set<string>();
@@ -117,7 +117,11 @@ router.post("/research", async (req: express.Request<{ id: string }>, res) => {
         discoveredDrafts.push(d);
       }
     }
-    discoveredDrafts = discoveredDrafts.slice(0, 25);
+    // Drop papers from other fields that only share a generic word with a query.
+    const domainTerms = briefDomainTerms(effectiveQuery);
+    discoveredDrafts = discoveredDrafts
+      .filter((d) => scoreSourceRelevance({ title: d.title, venue: d.venue }, domainTerms, toRun) > 0)
+      .slice(0, 25);
 
     let sources: DiscoveredSource[] = [];
 

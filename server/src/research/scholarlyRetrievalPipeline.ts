@@ -472,7 +472,7 @@ ${sources
 STRICT ANTI-HALLUCINATION & CITATION INTEGRITY MANDATE:
 1. EXCLUSIVE CITATION RESTRICTION: You may ONLY cite authors, papers, and works that exist in the Exclusive Citation Ledger above.
 2. ABSOLUTE BAN ON PHANTOM CITATIONS: Never fabricate or hallucinate any (Author, Year) or [N] citation. If a scholar, statistic, or paper is not in the ledger, DO NOT invent a parenthetical citation for it.
-3. EMPIRICAL UNVERIFIED CLAIMS: If you assert an empirical statistic, election figure, historical date, or factual claim that is not directly verified in the ledger, you MUST append: "[Unverified Claim — Vault Citation Required]".
+3. UNSOURCED CLAIMS: If a statistic, date or factual claim is not supported by the ledger, leave it out or state it cautiously without a citation. Never write placeholder tags.
 4. NO PSEUDO WORD-COUNT DECLARATIONS: Do NOT print artificial headers or footers declaring estimated word counts (e.g. "Word count: ≈1,600"). The system calculates true word counts deterministically.
 `.trim();
   } else {
@@ -482,7 +482,7 @@ No external sources were retrieved from OpenAlex/Crossref for this query.
 STRICT ANTI-HALLUCINATION MANDATE:
 1. You MUST NOT invent any parenthetical author citations (e.g., "(Smith, 2020)") or fake literature references.
 2. Formulate your analysis as an analytical, theoretical, and conceptual overview.
-3. Tag any specific unverified factual or empirical statistics with: "[Unverified Claim — Vault Citation Required]".
+3. Do not state specific statistics you cannot source; never write placeholder tags.
 `.trim();
   }
 
@@ -560,9 +560,9 @@ export function sanitizeAndLockScholarResponse(
       return match; // Legitimate citation from ledger
     }
 
-    // HALLUCINATED CITATION: The model fabricated an author not in the ledger!
-    // Replace with explicit provenance warning tag
-    return "[Unverified Claim — Vault Citation Required]";
+    // HALLUCINATED CITATION: the model invented an author not in the ledger.
+    // Remove it; no placeholder tag is written into the prose.
+    return "";
   });
 
   // Also check bracket ID tokens like [src-1], [1]

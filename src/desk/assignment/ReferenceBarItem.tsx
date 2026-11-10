@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { parsePersonName } from "./services/referenceListGenerator";
 import { sourceVenueLabel } from "./services/sourceDisplay";
 import type { DiscoveredSource } from "./types";
 import {
@@ -109,9 +110,13 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
     : typeof rawAuthors === "string" && rawAuthors.trim()
     ? [rawAuthors.trim()]
     : [];
+  const namedAuthors = authorsList.filter((a) => !/^et\.?\s*al\.?$/i.test(String(a).trim()));
+  const hasEtAl = namedAuthors.length < authorsList.length || namedAuthors.some((a) => parsePersonName(String(a)).etAl);
   const authorDisplay =
-    authorsList.length > 0
-      ? authorsList.slice(0, 3).join(", ") + (authorsList.length > 3 ? " et al." : "")
+    namedAuthors.length > 0
+      ? namedAuthors.length === 2 && !hasEtAl
+        ? `${parsePersonName(String(namedAuthors[0])).family} & ${parsePersonName(String(namedAuthors[1])).family}`
+        : `${parsePersonName(String(namedAuthors[0])).family}${namedAuthors.length > 1 || hasEtAl ? " et al." : ""}`
       : source.isUserUploaded
       ? "Course Materials"
       : "Unknown author";
@@ -211,31 +216,33 @@ export const ReferenceBarItem: React.FC<ReferenceBarItemProps> = ({
           </span>
         )}
 
-        {/* Primary Line: [Authors, Year] · [Venue] · [Title] */}
-        <div className="flex items-center gap-1.5 text-xs text-neutral-800 dark:text-neutral-200 truncate min-w-0">
-          <span className="font-semibold shrink-0 text-neutral-900 dark:text-white flex items-center gap-1">
-            <span>{authorDisplay}</span>
-            {source.year ? (
-              <span className="font-normal text-neutral-500 dark:text-neutral-400">
-                (<span className="font-mono">{source.year}</span>)
-              </span>
-            ) : null}
+        {source.prescribedInBrief && (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 shrink-0" data-testid="prescribed-in-brief-badge">
+            Prescribed in Brief
           </span>
-          <span className="text-neutral-400 dark:text-neutral-500 shrink-0">·</span>
-          {venueDisplay && (
-            <>
-              <span className="text-neutral-600 dark:text-neutral-400 shrink-0 italic max-w-[140px] truncate hidden sm:inline">
-                {venueDisplay}
-              </span>
-              <span className="text-neutral-400 dark:text-neutral-500 shrink-0 hidden sm:inline">·</span>
-            </>
-          )}
-          <span
-            className="text-neutral-700 dark:text-neutral-300 font-medium truncate"
-            title={source.title}
-          >
+        )}
+
+        {/* Primary line, title first: Title · Author (Year) · Venue · N% match */}
+        <div className="flex items-center gap-1.5 text-xs text-neutral-800 dark:text-neutral-200 min-w-0">
+          <span className="font-semibold text-neutral-900 dark:text-white truncate min-w-0" title={source.title}>
             {source.title}
           </span>
+          <span className="text-neutral-400 dark:text-neutral-500 shrink-0">·</span>
+          <span className="shrink-0 text-neutral-600 dark:text-neutral-400">
+            {authorDisplay}
+            {source.year ? <> (<span className="font-mono">{source.year}</span>)</> : null}
+          </span>
+          {venueDisplay && (
+            <>
+              <span className="text-neutral-400 dark:text-neutral-500 shrink-0 hidden sm:inline">·</span>
+              <span className="text-neutral-600 dark:text-neutral-400 shrink-0 italic max-w-[160px] truncate hidden sm:inline">{venueDisplay}</span>
+            </>
+          )}
+          {typeof source.relevanceScore === "number" && source.relevanceScore > 0 && (
+            <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+              {Math.round(source.relevanceScore <= 1 ? source.relevanceScore * 100 : source.relevanceScore)}% match
+            </span>
+          )}
         </div>
       </div>
 

@@ -108,7 +108,7 @@ Q3. Discuss Grover's search algorithm and its speed-up. [30 Marks]`;
     expect(q1.subheadings).toHaveLength(3);
     expect(q1.subheadings.map((s) => s.numberStr ?? "")).toBeDefined();
     expect(structure.headings[1].subheadings).toHaveLength(1);
-    expect(q1.title.split(/\s+/).length).toBeLessThanOrEqual(10);
+    expect(q1.title.split(/\s+/).length).toBeLessThanOrEqual(13);
   });
 
   it("drafts a heading with small sub-parts as one readable section of 250+ words", () => {

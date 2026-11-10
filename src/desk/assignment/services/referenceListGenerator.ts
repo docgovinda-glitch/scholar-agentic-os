@@ -19,23 +19,59 @@ import type { CitationAnchor } from "../schemas/sourceSchema";
 // Author Formatting Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface ParsedPersonName {
+  family: string;
+  given: string;
+  /** "F. M." */
+  initials: string;
+  /** The source string said "et al." */
+  etAl: boolean;
+}
+
 /**
- * Format author name for APA style: "Surname, F. M."
+ * Parse one author string from any index: "Family, Given" (Crossref),
+ * "Given Family" (OpenAlex), "Family, G.H." (Harvard) or "Arute et al.".
+ * Never treats "et al." as a name and never swaps family and given names.
+ */
+export function parsePersonName(raw: string): ParsedPersonName {
+  let t = (raw || "").replace(/\s+/g, " ").trim();
+  const etAl = /\bet\.?\s*al\.?/i.test(t);
+  t = t.replace(/,?\s*\bet\.?\s*al\.?/i, "").trim();
+  let family = t;
+  let given = "";
+  if (t.includes(",")) {
+    [family, given] = [t.slice(0, t.indexOf(",")).trim(), t.slice(t.indexOf(",") + 1).trim()];
+  } else {
+    const parts = t.split(" ");
+    const last = parts[parts.length - 1];
+    if (parts.length >= 2 && /^(?:[A-Z]\.?){1,3}$/.test(last)) {
+      // "Smith JA" (Vancouver/PubMed): family first
+      family = parts.slice(0, -1).join(" ");
+      given = last;
+    } else if (parts.length >= 2) {
+      // Keep particles with the family name: "Ludwig van Beethoven" -> "van Beethoven"
+      let i = parts.length - 1;
+      while (i > 1 && /^(?:van|von|de|der|den|da|di|du|la|le|del|dos|bin|al)$/i.test(parts[i - 1])) i--;
+      family = parts.slice(i).join(" ");
+      given = parts.slice(0, i).join(" ");
+    }
+  }
+  const initials = given
+    .split(/[\s.]+|(?<=-)/)
+    .map((g) => g.replace(/[^\p{L}-]/gu, ""))
+    .filter(Boolean)
+    .map((g) => (g.startsWith("-") ? `-${g[1] ?? ""}.` : `${g[0].toUpperCase()}.`))
+    .join(" ")
+    .replace(/ -/g, "-");
+  return { family, given, initials, etAl };
+}
+
+/**
+ * Format author name for APA/Harvard: "Surname, F. M."
  */
 function formatAuthorAPA(author: string): string {
-  const trimmed = author.trim();
-  // Already in "Surname, F. M." format
-  if (/^[A-ZÀ-ÿ][a-zÀ-ÿ]+,\s[A-Z]\./.test(trimmed)) {
-    return trimmed;
-  }
-  // "First Last" → "Last, F."
-  const parts = trimmed.split(/\s+/);
-  if (parts.length >= 2) {
-    const surname = parts[parts.length - 1];
-    const initials = parts.slice(0, -1).map((p) => `${p[0]}.`).join(" ");
-    return `${surname}, ${initials}`;
-  }
-  return trimmed;
+  const p = parsePersonName(author);
+  return p.initials ? `${p.family}, ${p.initials}` : p.family;
 }
 
 /**
@@ -50,14 +86,8 @@ function formatAuthorHarvard(author: string): string {
  * Format author name for IEEE: "F. M. Surname"
  */
 function formatAuthorIEEE(author: string): string {
-  const trimmed = author.trim();
-  const parts = trimmed.split(/\s+/);
-  if (parts.length >= 2) {
-    const surname = parts[parts.length - 1];
-    const initials = parts.slice(0, -1).map((p) => `${p[0]}.`).join(" ");
-    return `${initials} ${surname}`;
-  }
-  return trimmed;
+  const p = parsePersonName(author);
+  return p.initials ? `${p.initials} ${p.family}` : p.family;
 }
 
 /**
@@ -65,16 +95,9 @@ function formatAuthorIEEE(author: string): string {
  * (First author inverted, subsequent authors in natural order)
  */
 function formatAuthorChicago(author: string, isFirst: boolean): string {
-  const trimmed = author.trim();
-  if (isFirst) {
-    const parts = trimmed.split(/\s+/);
-    if (parts.length >= 2) {
-      const surname = parts[parts.length - 1];
-      const given = parts.slice(0, -1).join(" ");
-      return `${surname}, ${given}`;
-    }
-  }
-  return trimmed;
+  const p = parsePersonName(author);
+  if (!p.given) return p.family;
+  return isFirst ? `${p.family}, ${p.given}` : `${p.given} ${p.family}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -83,7 +106,9 @@ function formatAuthorChicago(author: string, isFirst: boolean): string {
 
 function formatAuthorsAPA(authors: string[]): string {
   if (!authors || authors.length === 0) return "Anonymous";
+  const etAl = authors.some((a) => parsePersonName(a).etAl);
   const formatted = authors.map(formatAuthorAPA);
+  if (etAl) return `${formatted.join(", ")}, et al.`;
   if (formatted.length === 1) return formatted[0];
   if (formatted.length === 2) return `${formatted[0]} & ${formatted[1]}`;
   if (formatted.length <= 20) {
@@ -95,7 +120,9 @@ function formatAuthorsAPA(authors: string[]): string {
 
 function formatAuthorsHarvard(authors: string[]): string {
   if (!authors || authors.length === 0) return "Anonymous";
+  const etAl = authors.some((a) => parsePersonName(a).etAl);
   const formatted = authors.map(formatAuthorHarvard);
+  if (etAl) return `${formatted[0]} et al.`;
   if (formatted.length === 1) return formatted[0];
   if (formatted.length === 2) return `${formatted[0]} and ${formatted[1]}`;
   if (formatted.length <= 3) {
@@ -106,7 +133,9 @@ function formatAuthorsHarvard(authors: string[]): string {
 
 function formatAuthorsIEEE(authors: string[]): string {
   if (!authors || authors.length === 0) return "Anonymous";
+  const etAl = authors.some((a) => parsePersonName(a).etAl);
   const formatted = authors.map(formatAuthorIEEE);
+  if (etAl) return `${formatted[0]} et al.`;
   if (formatted.length === 1) return formatted[0];
   if (formatted.length === 2) return `${formatted[0]} and ${formatted[1]}`;
   return formatted.slice(0, -1).join(", ") + ", and " + formatted[formatted.length - 1];
@@ -114,7 +143,9 @@ function formatAuthorsIEEE(authors: string[]): string {
 
 function formatAuthorsChicago(authors: string[]): string {
   if (!authors || authors.length === 0) return "Anonymous";
+  const etAl = authors.some((a) => parsePersonName(a).etAl);
   const formatted = authors.map((a, i) => formatAuthorChicago(a, i === 0));
+  if (etAl) return `${formatted[0]} et al.`;
   if (formatted.length === 1) return formatted[0];
   if (formatted.length === 2) return `${formatted[0]}, and ${formatted[1]}`;
   if (formatted.length <= 10) {
