@@ -590,10 +590,24 @@ export function formatAcademicTopicTitle(raw: string): string {
     ) {
       return w.toLowerCase();
     }
-    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    // Never rewrite what is already deliberately cased: acronyms (QKD, RSA-2048,
+    // NP-complete, ML-KEM), units (mK), names in citations (Preskill), mixed case.
+    if (keepsOwnCasing(w)) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
   });
 
   return formatted.join(" ");
+}
+
+/** True for tokens whose casing carries meaning and must be kept as written. */
+export function keepsOwnCasing(token: string): boolean {
+  const core = token.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+  if (!core) return true;
+  if (/\p{Lu}.*\p{Lu}/u.test(core)) return true; // QKD, NP-complete, ML-KEM, RSA-2048, McKinsey
+  if (/\d/.test(core)) return true; // RSA-2048, 15, 2018
+  if (/^\p{Ll}+\p{Lu}/u.test(core)) return true; // mK, eV, iOS
+  if (/^\(/.test(token)) return true; // parenthetical citations "(Preskill, 2018)"
+  return false;
 }
 
 /** A short (about 8 word) heading from a question: drops the leading command verb. */
@@ -1308,14 +1322,15 @@ export function buildBriefSpecificSpecs(
       const partTotal = partWeights.reduce((t, w) => t + w, 0) || 1;
       return {
         title: `${n}.0 ${heading}`,
-        notes: `Answers ${g.key}${g.parts.length ? ` (${g.parts.map((p) => p.label.slice(-1)).join(", ")})` : ""} from the brief.`,
+        // The full question stem stays with its section (shown as a quiet subtitle, never in the heading).
+        notes: g.stem?.text ?? `Answers ${g.key} from the brief.`,
         // Sub-parts get their own short titles; a single prompt gets one neutral
         // sub-section, never a copy of the parent title.
         subheadings: g.parts.length > 0
           ? g.parts.map((p, k) => ({
               title: `${n}.${k + 1} ${shortHeading(p.text)}`,
               ratio: (weights[i] / totalWeight) * (partWeights[k] / partTotal),
-              guidance: `Focus: ${p.text}`,
+              guidance: `Focus: (${p.label.slice(-1)}) ${p.text}`,
               keyPoints: [] as string[],
             }))
           : [

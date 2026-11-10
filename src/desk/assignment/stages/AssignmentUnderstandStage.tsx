@@ -285,12 +285,10 @@ function generateThesisStances(question: string, briefText?: string): {
 }
 
 const WRITING_VOICE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "formal_academic", label: "Formal Academic" },
+  { value: "natural", label: "Clear & Natural Academic (Default)" },
+  { value: "expository", label: "Simple & Direct" },
   { value: "analytical", label: "Analytical" },
-  { value: "critical", label: "Critical" },
-  { value: "persuasive", label: "Persuasive" },
-  { value: "objective", label: "Objective" },
-  { value: "custom", label: "Custom Style" },
+  { value: "custom", label: "My Own Writing Style" },
 ];
 
 function generateSubQuestions(question: string, briefText?: string): string[] {
@@ -1916,7 +1914,7 @@ export default function AssignmentUnderstandStage({
           {/* Core topic, working angle and writing voice */}
           <section className="bg-white dark:bg-ink-750 rounded-2xl border border-neutral-200/80 dark:border-white/10 p-4 sm:p-5 shadow-xs space-y-3" aria-label="Core topic and working angle">
             <h3 className="text-xs font-semibold text-neutral-900 dark:text-white uppercase tracking-wider">
-              Core Topic &amp; Working Angle
+              Topic &amp; Core Angle
             </h3>
             <p className="text-sm text-neutral-800 dark:text-neutral-200" data-testid="core-topic">
               {coreTopic}
@@ -1971,10 +1969,10 @@ export default function AssignmentUnderstandStage({
               onClickCapture={dispatchToneAssistantSuggestions}
               className="space-y-1.5"
             >
-              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Writing style &amp; tone</span>
-              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Writing style and tone">
+              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Writing style</span>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Writing style">
                 {WRITING_VOICE_OPTIONS.map((opt) => {
-                  const active = localTone === opt.value || (opt.value === "custom" && localTone === "custom");
+                  const active = localTone === opt.value || (opt.value === "natural" && !WRITING_VOICE_OPTIONS.some((o) => o.value === localTone));
                   return (
                     <button
                       key={opt.value}
@@ -1995,7 +1993,7 @@ export default function AssignmentUnderstandStage({
               </div>
               {localTone === "custom" && (
                 <textarea
-                  aria-label="Describe or paste your own writing style"
+                  aria-label="Paste a sample of your own writing"
                   value={localStyle.customSampleText ?? ""}
                   onChange={(e) => {
                     const updated: WritingStyleConfig = { ...localStyle, preset: "custom", customSampleText: e.target.value };
@@ -2004,7 +2002,7 @@ export default function AssignmentUnderstandStage({
                     saveAnswers({ writingStyle: updated, writing_style: updated }).catch(console.warn);
                   }}
                   rows={2}
-                  placeholder="Paste a short sample of your writing, or describe the voice you want…"
+                  placeholder="Paste a paragraph or two of your own writing; Scholar will mirror its voice when drafting."
                   className="w-full bg-transparent border border-neutral-200/80 dark:border-white/10 rounded-xl p-3 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400 resize-y"
                 />
               )}

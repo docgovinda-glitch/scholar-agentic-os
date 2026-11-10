@@ -144,7 +144,41 @@ export function applyQuestionWordTargets(
  * marks in the brief, the AI's own proportions are kept but still rounded clean
  * and summed exactly.
  */
-export function applyMarksBudget(structure: AssignmentStructure, briefText?: string): AssignmentStructure {
+/**
+ * Never drop a question: any main question of the brief that no heading answers
+ * gets its own section appended (e.g. an AI outline that left out Q7).
+ */
+export function ensureEveryQuestionHasSection(structure: AssignmentStructure, briefText?: string): AssignmentStructure {
+  if (!briefText) return structure;
+  const groups = groupBriefQuestions(parseBriefQuestions(briefText));
+  // Only real, marked questions are guaranteed a section; unmarked numbered lists
+  // are often requirements or bullet points, not questions.
+  if (groups.length < 2 || !groups.some((g) => g.marks)) return structure;
+  const matched = matchHeadingsToQuestions(structure, structure.headings.map((_, i) => i), briefText);
+  const answered = new Set([...matched.values()].map((g) => g.key));
+  const missing = groups.filter((g) => !answered.has(g.key));
+  if (missing.length === 0) return structure;
+  const headings = [...structure.headings];
+  for (const g of missing) {
+    const n = headings.length + 1;
+    const id = `heading-${g.key.toLowerCase()}-${n}`;
+    const focus = [g.stem?.text, ...g.parts.map((p) => `(${p.label.slice(-1)}) ${p.text}`)].filter(Boolean).join(" ");
+    headings.push({
+      id,
+      number: n,
+      title: `${n}.0 ${g.stem?.text ?? g.title}`,
+      notes: g.stem?.text,
+      targetWordCount: 100,
+      subheadings: [
+        { id: `${id}-1`, headingId: id, numberStr: `${n}.1`, title: "Key points and evidence", targetWordCount: 100, currentWordCount: 0, guidance: `Focus: ${focus}`, keyPoints: [] },
+      ],
+    } as AssignmentMainHeading);
+  }
+  return { ...structure, headings };
+}
+
+export function applyMarksBudget(structureIn: AssignmentStructure, briefText?: string): AssignmentStructure {
+  const structure = ensureEveryQuestionHasSection(structureIn, briefText);
   const total = Math.round(structure.targetWordCount);
   const live = structure.headings.map((h, i) => ({ h, i })).filter(({ h }) => (h.subheadings ?? []).some((s) => (s.targetWordCount ?? 0) > 0) || (h.targetWordCount ?? 0) > 0);
   if (live.length === 0 || !(total > 0)) return structure;

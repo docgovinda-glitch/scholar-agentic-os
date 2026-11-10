@@ -1,6 +1,7 @@
 import express from "express";
 import { buildSectionScaffold, type ScaffoldSource } from "../../../src/utils/sectionScaffold.ts";
 import { BrowserAiRequiredError, InvalidLlmChallengeError, LocalModelUnreachableError, NoClientAiProviderError } from "../../../src/ai/aiRouteErrors.ts";
+import { buildSectionContract } from "../../../src/utils/sectionContract.ts";
 import { sectionWordRange, trimToSentenceWithinWords } from "../../../src/utils/sectionBudget.ts";
 import { countExactWords } from "../../../src/utils/wordBudgetAllocator.ts";
 import { parseDocument } from "../../../../src/document_intelligence/index.ts";
@@ -291,9 +292,19 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
     evidencePackPrompt,
     guidance: sectionGuidance = "",
     keyPoints: sectionKeyPoints = [],
+    remainingEssayWords,
+    sectionIndex,
+    sectionCount,
+    outlineTitles,
+    previousTail,
+    writingStyle,
   } = req.body || {};
-  // The section's exact budget from the outline; the draft must land within ±10% of it.
-  const targetWordCount = Math.min(3000, Math.max(50, Math.round(Number(allocatedWords ?? requestedTarget) || 500)));
+  // The section's exact budget from the outline (±5%), never more than what the
+  // whole essay still has left, so a 1,000-word paper cannot reach 1,450.
+  const allocated = Math.round(Number(allocatedWords ?? requestedTarget) || 500);
+  const remaining = Number(remainingEssayWords);
+  const capped = Number.isFinite(remaining) && remaining > 0 ? Math.min(allocated, remaining) : allocated;
+  const targetWordCount = Math.min(3000, Math.max(50, capped));
   const budgetRange = sectionWordRange(targetWordCount);
 
   // The event stream starts only once the AI has answered, so a missing AI
@@ -416,9 +427,19 @@ ${existingBlock}
 ${evidencePackPrompt ? evidenceBlock : `BOUND EVIDENCE (Use these sources for in-text citations; do NOT fabricate external sources):\n${evidenceBlock || "Use standard scholarly reasoning."}`}
 ${agentBlock}
 
+${buildSectionContract({
+  prompt: String(sectionGuidance || ""),
+  sectionIndex: Number.isFinite(Number(sectionIndex)) ? Number(sectionIndex) : undefined,
+  sectionCount: Number.isFinite(Number(sectionCount)) ? Number(sectionCount) : undefined,
+  outlineTitles: Array.isArray(outlineTitles) ? outlineTitles.map(String).slice(0, 12) : undefined,
+  previousTail: typeof previousTail === "string" ? previousTail : undefined,
+  sources: mappedSources,
+  writingStyle: writingStyle && typeof writingStyle === "object" ? (writingStyle as { preset?: string; customSampleText?: string }) : undefined,
+})}
+
 ${frameworkGuidelines}
 
-Output ONLY the section text in clean academic Markdown prose.`;
+Output ONLY the section text in clean academic Markdown prose. Do not print a heading for the section.`;
 
     const scholarlyDirectives = buildScholarlyVoiceSystemPrompt({
       discipline: "Academic Coursework",

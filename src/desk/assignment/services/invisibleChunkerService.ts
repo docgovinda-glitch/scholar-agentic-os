@@ -827,6 +827,16 @@ export interface StreamSectionOptions {
   onError?: (err: Error) => void;
   /** Called when the server could not use an AI and sent an offline scaffold instead. */
   onFallback?: (info: { reason: string }) => void;
+  /** Where this section sits in the report, for a cohesive, non-repetitive draft. */
+  report?: {
+    sectionIndex: number;
+    sectionCount: number;
+    outlineTitles: string[];
+    previousTail?: string;
+    /** Words the essay may still use: target minus words already in other sections. */
+    remainingEssayWords?: number;
+  };
+  writingStyle?: { preset?: string; customSampleText?: string };
 }
 
 /**
@@ -850,6 +860,8 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
     onComplete,
     onError,
     onFallback,
+    report,
+    writingStyle,
   } = options;
 
   const relevantSources = approvedSources.filter(
@@ -866,6 +878,16 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
       academicFunction: section.academicFunction,
       targetWordCount: section.targetWordCount,
       allocatedWords: section.targetWordCount,
+      ...(report
+        ? {
+            sectionIndex: report.sectionIndex,
+            sectionCount: report.sectionCount,
+            outlineTitles: report.outlineTitles,
+            previousTail: report.previousTail,
+            remainingEssayWords: report.remainingEssayWords,
+          }
+        : {}),
+      ...(writingStyle ? { writingStyle } : {}),
       academicLevel,
       citationStyle,
       assignmentTopic,

@@ -1086,7 +1086,12 @@ export function structureToInternalSections(structure?: AssignmentStructure | nu
         title: numberedHeading(h),
         targetWordCount: h.targetWordCount,
         currentWordCount: (h.subheadings ?? []).reduce((n, sub) => n + (sub.currentWordCount || 0), 0),
-        guidance: (h.subheadings ?? []).map((sub) => sub.guidance).filter(Boolean).join(" ") || h.notes || `Analysis for ${h.title}`,
+        // The whole question: its stem, then every lettered sub-part, in order.
+        guidance: ((joined) => (joined ? `Focus: ${joined}` : h.notes || `Analysis for ${h.title}`))(
+          [h.notes, ...(h.subheadings ?? []).map((sub) => (sub.guidance || "").replace(/^Focus:\s*/i, ""))]
+            .filter((t): t is string => Boolean(t && t.trim()) && !/^Answers Q\d+/.test(String(t)))
+            .join(" ")
+        ),
         draftContent: mergedDraft,
         status: mergedDraft ? "completed" : "not_started",
         keyPoints: (h.subheadings ?? [])

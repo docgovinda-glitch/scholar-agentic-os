@@ -98,13 +98,21 @@ export function buildSourceSearchQueries(briefOrQuestion: string, max = 5): stri
  * ("quantum", "qubit"). Used to anchor every search and to reject papers from
  * other fields that merely share a word like "noisy" or "comparative".
  */
+/** Common academic words that recur in any brief but say nothing about its subject. */
+const GENERIC = new Set(
+  "physical analysi comparative comparison current approach method model system data case study theory theoretical practical impact effect role factor issue challenge advantage limitation research evidence process structure framework concept application implication strategy development performance level type form state term change problem solution benefit risk example context scale real world noisy modern future past present general specific major key main new".split(" ")
+);
+
 export function briefDomainTerms(briefOrQuestion: string, max = 5): string[] {
   const rows = parseBriefQuestions(briefOrQuestion);
-  const texts = rows.length ? rows.map((r) => r.text) : [briefOrQuestion.slice(0, 2000)];
+  // A subject is only inferred from words that recur across several questions;
+  // a one-line question gives no reliable signal, so nothing is filtered.
+  if (rows.length < 3) return [];
+  const texts = rows.map((r) => r.text);
   const docFreq = new Map<string, number>();
   for (const t of texts) {
     for (const w of new Set(contentWords(t).map((x) => x.toLowerCase().replace(/s$/, "")))) {
-      if (w.length < 4 || /^\d/.test(w)) continue;
+      if (w.length < 4 || /^\d/.test(w) || GENERIC.has(w)) continue;
       docFreq.set(w, (docFreq.get(w) ?? 0) + 1);
     }
   }
@@ -135,7 +143,9 @@ export function scoreSourceRelevance(
   const hay = `${paper.title} ${paper.venue ?? ""} ${paper.abstract ?? ""}`.toLowerCase();
   const words = new Set(hay.replace(/[^a-z0-9\s-]/g, " ").split(/\s+/).map((w) => w.replace(/s$/, "")));
   const domainHits = domainTerms.filter((d) => words.has(d) || hay.includes(d)).length;
-  if (domainTerms.length > 0 && domainHits === 0) return 0;
+  // Must mention one of the brief's core subject words, not just a minor one.
+  const core = domainTerms.slice(0, 3);
+  if (core.length > 0 && !core.some((d) => words.has(d) || hay.includes(d))) return 0;
   let best = 0;
   for (const q of queries) {
     const terms = contentWords(q).map((w) => w.toLowerCase().replace(/s$/, ""));

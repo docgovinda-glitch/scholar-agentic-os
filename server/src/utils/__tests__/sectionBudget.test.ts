@@ -3,8 +3,8 @@ import { sectionWordRange, trimToSentenceWithinWords } from "../sectionBudget";
 import { countExactWords } from "../wordBudgetAllocator";
 
 describe("section word budgets", () => {
-  it("allows ±10% around the allocated words", () => {
-    expect(sectionWordRange(300)).toEqual({ min: 270, max: 330 });
+  it("allows ±5% around the allocated words", () => {
+    expect(sectionWordRange(300)).toEqual({ min: 285, max: 315 });
   });
 
   it("keeps in-budget text unchanged", () => {

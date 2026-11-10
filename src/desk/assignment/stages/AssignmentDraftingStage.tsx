@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { SlideCanvas, extractSlidesFromAcademicText, type SlideDeck } from "../../../features/slides";
 import { ReferencesCard } from "../components/ReferencesCard";
+import { selectCitedSources } from "../services/exportText";
 import { buildFormattedBibliography } from "../services/assignmentExportService";
 import { formatReferenceHtml } from "../services/referenceListGenerator";
 import { validateSectionUniqueness } from "../../../features/drafting/services/sectionDraftingEngine";
@@ -50,6 +51,7 @@ export function AssignmentDraftingStage({
     projectId,
     project,
     saveAnswers,
+    writingStyle,
     setPhase,
     targetWordCount,
     currentWordCount,
@@ -94,7 +96,9 @@ export function AssignmentDraftingStage({
 
   const draftMarkdown = useMemo(() => {
     const body = internalSections.map((sec) => `## ${sec.title}\n\n${sec.draftContent || ""}`).join("\n\n");
-    const refs = buildFormattedBibliography(sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id))), citationStyle || "harvard");
+    const approved = sources.filter((s) => s.status === "kept" || (approvedSourceIds && approvedSourceIds.includes(s.id)));
+    // The compiled draft lists only what the text cites, plus the brief's prescribed references.
+    const refs = buildFormattedBibliography(selectCitedSources(approved, body), citationStyle || "harvard");
     return refs.length ? `${body}\n\n## References\n\n${refs.join("\n\n")}` : body;
   }, [internalSections, sources, approvedSourceIds, citationStyle]);
 
@@ -258,6 +262,18 @@ export function AssignmentDraftingStage({
             setActiveStreamingSectionId(null);
             setGeneratingSection(sec.id, false);
           },
+          report: {
+            sectionIndex,
+            sectionCount: internalSections.length,
+            outlineTitles: internalSections.map((x) => x.title),
+            previousTail: sectionIndex > 0 ? (internalSections[sectionIndex - 1].draftContent || "").slice(-400) : undefined,
+            remainingEssayWords: Math.max(
+              0,
+              (targetWordCount || 0) -
+                internalSections.filter((x) => x.id !== sec.id).reduce((n, x) => n + (x.draftContent ? x.draftContent.trim().split(/\s+/).filter(Boolean).length : 0), 0)
+            ),
+          },
+          writingStyle: writingStyle && typeof writingStyle === "object" ? (writingStyle as { preset?: string; customSampleText?: string }) : undefined,
           onFallback: ({ reason }) => {
             setOfflineNotice(`${reason} Showing a scaffold built from your outline; write the analysis yourself or try again later.`);
           },
@@ -272,6 +288,8 @@ export function AssignmentDraftingStage({
       }
     },
     [
+      writingStyle,
+      targetWordCount,
       activeSection,
       projectId,
       project,
@@ -519,9 +537,9 @@ export function AssignmentDraftingStage({
           />
 
           {/* Live compiled References */}
-          {approvedSources.length > 0 && (
+          {selectCitedSources(approvedSources, internalSections.map((x) => x.draftContent || "").join("\n\n")).length > 0 && (
             <ReferencesCard
-              sources={approvedSources}
+              sources={selectCitedSources(approvedSources, internalSections.map((x) => x.draftContent || "").join("\n\n"))}
               style={citationStyle || "harvard"}
               savedEdit={typeof project?.answers?.["assignment_reference_list_edit"] === "string" ? (project?.answers?.["assignment_reference_list_edit"] as string) : ""}
               onSaveEdit={(text) => {

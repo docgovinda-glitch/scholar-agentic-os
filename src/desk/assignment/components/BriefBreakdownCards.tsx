@@ -205,9 +205,9 @@ export function GradingCriteriaCard({ briefText, rubricText }: { briefText: stri
         <table className="w-full text-xs text-left">
           <thead>
             <tr className="text-[11px] uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-              <th scope="col" className="py-1.5 pr-3 font-semibold">Criterion / Section</th>
-              <th scope="col" className="py-1.5 pr-3 font-semibold whitespace-nowrap">Marks &amp; Weight</th>
-              <th scope="col" className="py-1.5 font-semibold">What you need to show</th>
+              <th scope="col" className="py-1.5 pr-3 font-semibold">Criterion</th>
+              <th scope="col" className="py-1.5 pr-3 font-semibold whitespace-nowrap">Weight % / Marks</th>
+              <th scope="col" className="py-1.5 font-semibold">Plain-English expectation for a 1st</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-white/5 text-neutral-800 dark:text-neutral-200">
@@ -215,7 +215,7 @@ export function GradingCriteriaCard({ briefText, rubricText }: { briefText: stri
               <tr key={i} className="align-top">
                 <td className="py-2 pr-3 font-medium">{r.criterion}</td>
                 <td className="py-2 pr-3 whitespace-nowrap text-neutral-600 dark:text-neutral-400">
-                  {r.marks ? `${r.marks} marks` : ""}{r.marks && r.weightPercent ? " · " : ""}{r.weightPercent ? `${r.weightPercent}%` : ""}
+                  {r.weightPercent ? `${r.weightPercent}%` : ""}{r.marks && r.weightPercent ? " · " : ""}{r.marks ? `${r.marks} marks` : ""}
                 </td>
                 <td className="py-2 text-neutral-600 dark:text-neutral-400">{r.expectation}</td>
               </tr>

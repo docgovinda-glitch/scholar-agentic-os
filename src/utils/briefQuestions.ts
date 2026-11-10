@@ -193,7 +193,12 @@ export function parseMarkingCriteria(briefText: string, questions: BriefQuestion
           criterion: m[1].replace(/[:–\-\s]+$/, ""),
           marks: m[3] === "%" ? undefined : value,
           weightPercent: m[3] === "%" ? value : undefined,
-          expectation: m[4]?.trim() && m[4].trim().length <= 80 ? m[4].trim() : plainExpectation(questions.filter((q) => new RegExp(`\\b${q.label}\\b`, "i").test(m[1]))),
+          expectation:
+            m[4]?.trim() && m[4].trim().length <= 80
+              ? m[4].trim()
+              : /\bQ\d/i.test(m[1])
+              ? plainExpectation(questions.filter((q) => new RegExp(`\\b${q.label}\\b`, "i").test(m[1])))
+              : criterionExpectation(m[1]),
         });
       }
     }
@@ -279,6 +284,21 @@ const VERB_PLAIN: Record<string, string> = {
   identify: "pick out the key points and explain them",
   outline: "set out the main steps or points in order",
 };
+
+const CRITERION_PLAIN: Array<[RegExp, string]> = [
+  [/rigou?r|technical|conceptual|knowledge|understanding|accuracy/i, "Use technical terms precisely and explain each concept correctly."],
+  [/synthes|evaluat|critical|analy|argument/i, "Weigh the evidence and competing views, then reach clear, justified judgements."],
+  [/method|application|apply|problem|calculation/i, "Apply the right models or methods to each question and show your working."],
+  [/referenc|citation|style|harvard|apa|presentation|format/i, "Cite every source correctly in the required style, with a complete reference list."],
+  [/structure|organi[sz]ation|coheren|clarity|writing|communication/i, "Organise each answer logically with clear signposting and concise prose."],
+  [/research|evidence|literature|sources/i, "Support every main point with relevant, credible academic sources."],
+  [/original|insight|creativ/i, "Go beyond summary: offer your own reasoned insight."],
+];
+
+/** One plain-English sentence for a rubric criterion named in the brief. */
+export function criterionExpectation(criterion: string): string {
+  return CRITERION_PLAIN.find(([re]) => re.test(criterion))?.[1] ?? "Meet this criterion fully, with clear reasoning and evidence.";
+}
 
 /** One short, plain-English sentence on how to earn the marks, from the question verbs only. */
 export function plainExpectation(questions: BriefQuestionRow[]): string {

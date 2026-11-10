@@ -34,7 +34,7 @@ describe("Coursework export (.docx)", () => {
   it("contains the student's title, sections and sources", async () => {
     const text = await docxText({
       title: "Triage and Waiting Times", studentName: "Asha Rai", studentId: "S-1042", institution: "Example University", courseName: "Public Health 201",
-      brief, sections: [section("Introduction", longDraft), section("Discussion", longDraft)], sources: [source],
+      brief, sections: [section("Introduction", `${longDraft} Triage reduces waiting (Okafor, 2021).`), section("Discussion", longDraft)], sources: [source],
     });
     expect(text).toContain("Triage and Waiting Times");
     expect(text).toContain("Asha Rai");
@@ -58,5 +58,22 @@ describe("Coursework export (.docx)", () => {
   it("names every academic level, and says nothing when the brief doesn't", () => {
     expect(["high_school", "undergraduate", "postgraduate", "doctoral"].map(academicLevelName)).toEqual(["High school", "Undergraduate", "Postgraduate", "Doctoral"]);
     expect(academicLevelName(undefined)).toBe("—");
+  });
+
+  it("lists only cited (or prescribed) sources, once each, with real italics and no prompt dump", async () => {
+    const uncited: DiscoveredSource = { ...source, id: "s2", title: "Sentiment analysis on noisy Bangla texts", authors: ["Rahman, K."], year: "2020", journal: "Lang Tech" };
+    const duplicate: DiscoveredSource = { ...source, id: "s3" };
+    const text = await docxText({
+      title: "Triage and Waiting Times",
+      brief: { ...brief, rawPrompt: "DEPARTMENT OF NURSING raw prompt text that must not appear" } as AssignmentBriefState,
+      sections: [section("Introduction", `${longDraft} Triage reduces waiting (Okafor, 2021) in *Rural Health* settings.`)],
+      sources: [source, uncited, duplicate],
+    });
+    expect(text).toContain("Nurse-led triage in rural clinics");
+    expect(text.match(/Nurse-led triage in rural clinics/g)?.length).toBe(1);
+    expect(text).not.toContain("Bangla");
+    expect(text).not.toContain("raw prompt text");
+    expect(text).not.toContain("*Rural Health*");
+    expect(text).not.toContain("Assignment Prompt");
   });
 });

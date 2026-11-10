@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo, useRef } from "react";
+import { purgeLegacyTemplateText } from "../../../domain/assignment/legacyPurge";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../../types";
 import {
   getDocument,
@@ -299,7 +300,9 @@ export function AssignmentProvider({
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const proj = await getProject(activeProjectId);
+      const loaded = await getProject(activeProjectId);
+      // Legacy template text from older saves is removed on every load.
+      const proj = { ...loaded, answers: purgeLegacyTemplateText(loaded.answers) } as typeof loaded;
       const [rub, doc] = proj.hasDocument
         ? await Promise.all([getRubric(activeProjectId), getDocument(activeProjectId)])
         : [null, null];
@@ -1250,7 +1253,8 @@ export function AssignmentProvider({
       await saveChainRef.current;
     },
     reload: async () => {
-      const fresh = await getProject(activeProjectId);
+      const loadedFresh = await getProject(activeProjectId);
+      const fresh = { ...loadedFresh, answers: purgeLegacyTemplateText(loadedFresh.answers) } as typeof loadedFresh;
       projectRef.current = fresh;
       setProject(fresh);
       return (fresh.answers ?? {}) as Record<string, unknown>;

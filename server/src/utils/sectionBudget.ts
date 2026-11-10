@@ -1,7 +1,7 @@
 import { countExactWords } from "./wordBudgetAllocator.ts";
 
 /** Words allowed either side of a section's allocated budget. */
-export const SECTION_BUDGET_TOLERANCE = 0.1;
+export const SECTION_BUDGET_TOLERANCE = 0.05;
 
 export function sectionWordRange(allocatedWords: number): { min: number; max: number } {
   const target = Math.max(50, Math.round(allocatedWords));

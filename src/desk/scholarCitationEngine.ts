@@ -506,7 +506,7 @@ export function replaceBracketTokensWithDeterministicCitations(
 
   // Match bracket tokens not followed by '(' (which would indicate a Markdown link [text](url))
   const bracketRegex = /\[([^\[\]\(\)\r\n]+)\](?!\()/g;
-  return cleaned.replace(bracketRegex, (match, innerStr) => {
+  const replaced = cleaned.replace(bracketRegex, (match, innerStr) => {
     const trimmed = innerStr.trim();
 
     // 1. Numeric index tokens: [1], [2], [1, 2]
@@ -568,6 +568,23 @@ export function replaceBracketTokensWithDeterministicCitations(
 
     return match;
   });
+  return style === "ieee" || style === "chicago-notes" || style === "vancouver" ? replaced : mergeAdjacentParentheticalCitations(replaced);
+}
+
+/**
+ * "(Arute et al., 2019) (Kjaergaard et al., 2020)" or "(A, 2019), (B, 2020)" ->
+ * "(Arute et al., 2019; Kjaergaard et al., 2020)", the author-date way.
+ */
+export function mergeAdjacentParentheticalCitations(text: string): string {
+  const cite = /\(([^()]*?\b(?:1[5-9]|20)\d{2}[a-z]?(?:,\s*(?:p|pp)\.\s*[\d–-]+)?)\)/;
+  const pair = new RegExp(`${cite.source}[ \t]*[,;]?[ \t]*${cite.source}`, "g");
+  let prev = "";
+  let out = text;
+  while (prev !== out) {
+    prev = out;
+    out = out.replace(pair, (_m, a: string, b: string) => `(${a}; ${b})`);
+  }
+  return out;
 }
 
 /**
