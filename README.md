@@ -21,7 +21,7 @@ A project's `outputTypeId` decides which workspace opens (`src/desk/DeskApp.tsx`
 
 Highlights per workspace (details in [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md)):
 
-- **Coursework**: Extract, Understand, Sources, Drafting, Submission, all derived from the student's own brief. Marks-weighted word budgets, a 10-point rubric audit, citation reconciliation and `.docx` / PDF export.
+- **Coursework**: Extract, Understand, Sources, Drafting, Submission, all derived from the student's own brief. One section per brief question with marks-weighted word budgets that sum exactly to the target, a prescribed-bibliography parser, on-topic source discovery, cited-only reference lists, a 10-point rubric audit, citation reconciliation and `.docx` / PDF export. The suite has 453 test files and 4,211 tests.
 - **Journal**: 25 stages grouped as Foundation, Evidence, Drafting, Review and Publication, with claim-evidence tracking, a peer-review simulation, rebuttal matrix, cover letter, anonymization and export.
 - **Thesis**: chapter editor, research questions, literature matrix, references and a Viva Voce simulator.
 - **Proposal**: narrative section editor, budget editor and a study-section scorer.

@@ -113,4 +113,4 @@ Database mirrors for the admin panel: `ai_providers`, `ai_models`, seeded by `np
 
 ## 9. Offline scaffold
 
-When every AI provider is out of credit, the coursework `/stream-section` route sends a labelled offline scaffold built only from the section prompt, key points and approved sources (`server/src/utils/sectionScaffold.ts`), and failed revisions never overwrite existing text.
+Coursework drafting never writes `[Unverified Claim]` tags: the citation scrubber removes unmatched citations silently. When every AI provider is out of credit, the coursework `/stream-section` route sends a labelled offline scaffold built only from the section prompt, key points and approved sources (`server/src/utils/sectionScaffold.ts`), and failed revisions never overwrite existing text.
