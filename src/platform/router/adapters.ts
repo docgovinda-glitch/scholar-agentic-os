@@ -24,9 +24,11 @@ async function post(url: string, headers: Record<string, string>, body: unknown,
     let message = text.slice(0, 500);
     let code: string | undefined;
     try {
-      const j = JSON.parse(text) as { error?: { message?: string; code?: string; type?: string; status?: string } };
+      const j = JSON.parse(text) as { error?: { message?: string; code?: string | number; type?: string; status?: string } };
       message = j.error?.message ?? message;
-      code = j.error?.code ?? j.error?.type ?? j.error?.status;
+      // Google sends a numeric code (429) with a string status ("RESOURCE_EXHAUSTED"): keep the string.
+      const raw = typeof j.error?.code === "string" ? j.error.code : j.error?.type ?? j.error?.status ?? j.error?.code;
+      code = raw === undefined || raw === null ? undefined : String(raw);
     } catch { /* not JSON */ }
     const h: Record<string, string> = {};
     res.headers.forEach((v, k) => { h[k.toLowerCase()] = v; });

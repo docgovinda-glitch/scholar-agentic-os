@@ -44,27 +44,45 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
   // Words the student typed in stay as typed; the rest of the budget is shared by marks.
   const [overrides, setOverrides] = useState<Record<string, number>>({});
   const [editingWordsId, setEditingWordsId] = useState<string | null>(null);
+  // Budgets are shared by MAIN questions only: a stem's "[15 Marks]" already
+  // covers its sub-parts, so a sub-part's words are a share of its question's.
   const targets = useMemo(() => {
-    const fixed = rows.filter((r) => overrides[r.id] !== undefined);
-    const free = rows.filter((r) => overrides[r.id] === undefined);
+    const keyOf = (r: BriefQuestionRow) => r.label.replace(/[a-z]$/, "");
+    const stems = new Set(rows.filter((r) => r.label === keyOf(r)).map(keyOf));
+    const isMain = (r: BriefQuestionRow) => r.label === keyOf(r) || !stems.has(keyOf(r));
+    const mains = rows.filter(isMain);
+    const fixed = mains.filter((r) => overrides[r.id] !== undefined);
+    const free = mains.filter((r) => overrides[r.id] === undefined);
     const remaining = Math.max(0, totalWords - fixed.reduce((n, r) => n + overrides[r.id], 0));
     const alloc = free.length
       ? allocateWordsByMarks(free.map((r) => ({ id: r.id, title: r.text, marks: r.marks })), Math.max(100, remaining))
       : null;
-    const out: Record<string, { words: number; pct: number }> = {};
-    for (const r of rows) {
-      if (overrides[r.id] !== undefined) out[r.id] = { words: overrides[r.id], pct: Math.round((overrides[r.id] / Math.max(1, totalWords)) * 100) };
-    }
+    const out: Record<string, { words: number; pct: number; within?: string }> = {};
+    for (const r of fixed) out[r.id] = { words: overrides[r.id], pct: Math.round((overrides[r.id] / Math.max(1, totalWords)) * 100) };
     free.forEach((r, i) => {
       const q = alloc?.questions[i];
       const words = free.length && remaining < 100 ? 0 : q?.targetWords ?? 0;
       out[r.id] = { words, pct: q?.weightPercentage ?? 0 };
     });
+    const mainMarks = mains.reduce((n, r) => n + (r.marks ?? 0), 0);
+    for (const r of rows) {
+      if (isMain(r)) continue;
+      const parent = mains.find((m) => keyOf(m) === keyOf(r));
+      const parentWords = parent ? out[parent.id]?.words ?? 0 : 0;
+      const share = r.marks && parent?.marks ? Math.min(1, r.marks / parent.marks) : 0;
+      out[r.id] = {
+        words: overrides[r.id] ?? Math.round((parentWords * share) / 5) * 5,
+        pct: r.marks && mainMarks ? Math.round((r.marks / mainMarks) * 100) : 0,
+        within: parent?.label,
+      };
+    }
     return out;
   }, [rows, overrides, totalWords]);
 
   useEffect(() => {
-    onWordsChange?.(rows.map((r) => ({ label: r.label, words: targets[r.id]?.words ?? 0 })), Object.keys(overrides).length > 0);
+    // Only main questions carry a budget of their own; sub-part words sit inside them.
+    const mains = rows.filter((r) => !targets[r.id]?.within);
+    onWordsChange?.(mains.map((r) => ({ label: r.label, words: targets[r.id]?.words ?? 0 })), Object.keys(overrides).length > 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- report only when the numbers change
   }, [JSON.stringify(rows.map((r) => [r.id, targets[r.id]?.words]))]);
 
@@ -83,7 +101,7 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
           const budget = targets[row.id];
           const editing = editingId === row.id;
           return (
-            <li key={row.id} className="flex items-center gap-2.5 py-2 text-xs text-neutral-800 dark:text-neutral-200" data-testid="sub-question-row">
+            <li key={row.id} className={`flex items-center gap-2.5 py-2 text-xs text-neutral-800 dark:text-neutral-200 ${budget?.within ? "pl-6" : ""}`} data-testid="sub-question-row">
               <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-neutral-200/70 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 shrink-0">
                 {row.label}
               </span>
@@ -106,7 +124,13 @@ export function SubQuestionsCard({ briefText, fallbackQuestions = [], totalWords
                 <span className="min-w-0 flex-1 truncate font-medium" title={row.text}>{row.text}</span>
               )}
               <span className="shrink-0 text-[11px] text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
-                {typeof row.marks === "number" && row.marks > 0 ? `${row.marks} Marks (${budget?.pct ?? 0}%)` : `${budget?.pct ?? 0}%`}
+                {budget?.within
+                  ? typeof row.marks === "number" && row.marks > 0
+                    ? `${row.marks} Marks · part of ${budget.within}`
+                    : `part of ${budget.within}`
+                  : typeof row.marks === "number" && row.marks > 0
+                  ? `${row.marks} Marks (${budget?.pct ?? 0}%)`
+                  : `${budget?.pct ?? 0}%`}
               </span>
               {editingWordsId === row.id ? (
                 <input

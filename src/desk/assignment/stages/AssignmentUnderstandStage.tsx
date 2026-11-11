@@ -1,6 +1,7 @@
 import { UnderstandAgentPanel } from "../components/AgentPanels";
 import { SubQuestionsCard, GradingCriteriaCard } from "../components/BriefBreakdownCards";
 import { buildBriefSummary, parseBriefQuestions } from "../../../utils/briefQuestions";
+import { briefGroundedStances } from "../../../domain/assignment/briefThesis";
 import { applyQuestionWordTargets } from "../../../domain/assignment/outlineBudget";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import BriefScopePanel from "../components/BriefScopePanel";
@@ -184,82 +185,10 @@ function generateThesisStances(question: string, briefText?: string): {
   statement: string;
   isRecommended?: boolean;
 }[] {
+  // Grounded in the brief's own title and questions; never a subject lookup table.
+  const grounded = briefGroundedStances([briefText, question].filter(Boolean).join("\n"));
+  if (grounded.length) return grounded;
   const topic = cleanTopic(question);
-  const isQuantum = /quantum|qubit|superconducting|trapped-ion|shor|grover|bqp/i.test(`${question} ${briefText}`);
-  const isCbam = /cbam|carbon border|wto|gatt/i.test(`${question} ${briefText}`);
-  const isAiEthics = /ai|algorithm|autonomous|decision|healthcare/i.test(`${question} ${briefText}`);
-
-  if (isCbam) {
-    return [
-      {
-        id: "stance-cbam-balanced",
-        badge: "Recommended",
-        title: "Balanced Governance Stance",
-        statement: "Although the EU CBAM introduces acute regulatory frictions under GATT Article III, its design under Article XX environmental exceptions provides a legitimate, legally defensible framework for global industrial decarbonisation.",
-        isRecommended: true,
-      },
-      {
-        id: "stance-cbam-critical",
-        badge: "Critical Analysis",
-        title: "Structural Critique Stance",
-        statement: "Unilateral implementation of CBAM inherently disadvantages developing exporters and risks WTO retaliatory disputes, demonstrating that unilateral trade measures cannot substitute for inclusive multilateral carbon pricing.",
-      },
-      {
-        id: "stance-cbam-reform",
-        badge: "Pragmatic Reform",
-        title: "Evidence-Led Reform Stance",
-        statement: "Empirical trade analysis proves CBAM's efficacy depends strictly on phased tariff exemptions, targeted clean-technology revenue recycling, and harmonized carbon accounting benchmarks.",
-      },
-    ];
-  }
-
-  if (isQuantum) {
-    return [
-      {
-        id: "stance-quantum-balanced",
-        badge: "Recommended",
-        title: "Hybrid Scalability Stance",
-        statement: "While physical decoherence and gate infidelities constrain current NISQ devices, hybrid quantum-classical algorithms operating with fault-tolerant surface codes offer a viable pathway to demonstrable computational advantage.",
-        isRecommended: true,
-      },
-      {
-        id: "stance-quantum-critical",
-        badge: "Critical Analysis",
-        title: "Physical Limits Stance",
-        statement: "Fundamental physical barriers—specifically exponential qubit overhead for active quantum error correction and cross-talk—render commercial quantum supremacy unachievable within conventional architectural roadmaps.",
-      },
-      {
-        id: "stance-quantum-reform",
-        badge: "Pragmatic Reform",
-        title: "Algorithmic Specialization Stance",
-        statement: "Near-term quantum utility is best realized not through generalized universal computation, but through specialized hardware topologies optimized for molecular simulation and constrained optimization.",
-      },
-    ];
-  }
-
-  if (isAiEthics) {
-    return [
-      {
-        id: "stance-ai-balanced",
-        badge: "Recommended",
-        title: "Balanced Governance Stance",
-        statement: "While autonomous systems deliver unprecedented efficiency, their integration into high-stakes domains requires mandatory human-in-the-loop oversight, epistemic transparency, and rigorous auditability to uphold ethical accountability.",
-        isRecommended: true,
-      },
-      {
-        id: "stance-ai-critical",
-        badge: "Critical Analysis",
-        title: "Structural Critique Stance",
-        statement: "Algorithmic decision-making fundamentally re-encodes historical systemic biases and epistemic opacity, rendering self-regulatory ethical guidelines insufficient without binding statutory liability regimes.",
-      },
-      {
-        id: "stance-ai-reform",
-        badge: "Pragmatic Reform",
-        title: "Evidence-Led Reform Stance",
-        statement: "Empirical evaluations demonstrate that trustworthy AI systems require continuous third-party algorithmic impact assessments, algorithmic grievance mechanisms, and domain-specific regulatory sandboxes.",
-      },
-    ];
-  }
 
   return [
     {
@@ -1068,12 +997,13 @@ export default function AssignmentUnderstandStage({
     return generateThesisStances(localQuestion, localBrief);
   }, [localQuestion, localBrief]);
 
-  // Synchronize active thesis if empty
+  // Synchronize active thesis if empty: the AI's own line of argument first.
   useEffect(() => {
-    if (!activeThesis && thesisStances.length > 0) {
-      setActiveThesis(thesisStances[0].statement);
-    }
-  }, [activeThesis, thesisStances]);
+    if (activeThesis) return;
+    const aiThesis = agent?.understanding?.thesisDirection?.trim();
+    if (aiThesis) setActiveThesis(aiThesis);
+    else if (thesisStances.length > 0) setActiveThesis(thesisStances[0].statement);
+  }, [activeThesis, thesisStances, agent?.understanding?.thesisDirection]);
 
   const handleProceedToSources = async () => {
     if (!canProceedToSources) return;

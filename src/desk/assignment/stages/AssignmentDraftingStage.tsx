@@ -80,6 +80,9 @@ export function AssignmentDraftingStage({
   const [streamingChunk, setStreamingChunk] = useState<string>("");
   const [draftError, setDraftError] = useState<string | null>(null);
   const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
+  // The offline scaffold is a guide shown beside the section, never saved as its text:
+  // it must not count as drafted words or mark the section ready.
+  const [offlineScaffold, setOfflineScaffold] = useState<{ sectionId: string; title: string; text: string } | null>(null);
   const { showError } = useToast();
   const [activeStreamingSectionId, setActiveStreamingSectionId] = useState<string | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
@@ -199,6 +202,7 @@ export function AssignmentDraftingStage({
       setGeneratingSection(sec.id, true);
       setDraftError(null);
       setOfflineNotice(null);
+      setOfflineScaffold(null);
       setStreamingChunk(sec.draftContent || "");
 
       // ── Evidence Pack Construction (Production Spec §4.1–4.3) ──
@@ -251,7 +255,14 @@ export function AssignmentDraftingStage({
           onChunk: (_chunk, aggregated) => {
             setStreamingChunk(aggregated);
           },
-          onComplete: async (fullText) => {
+          onComplete: async (fullText, meta) => {
+            if (meta?.scaffold) {
+              setOfflineScaffold({ sectionId: sec.id, title: sec.title, text: fullText });
+              setStreamingChunk("");
+              setActiveStreamingSectionId(null);
+              setGeneratingSection(sec.id, false);
+              return;
+            }
             await updateSectionContent(sec.id, fullText);
             // Update context continuity state after section completion
             contextContinuityRef.current = updateContextContinuityAfterSection(
@@ -275,7 +286,7 @@ export function AssignmentDraftingStage({
           },
           writingStyle: writingStyle && typeof writingStyle === "object" ? (writingStyle as { preset?: string; customSampleText?: string }) : undefined,
           onFallback: ({ reason }) => {
-            setOfflineNotice(`${reason} Showing a scaffold built from your outline; write the analysis yourself or try again later.`);
+            setOfflineNotice(`${reason} Nothing was written into the section. Below is a scaffold built from your outline: try again, or insert it and write the analysis yourself.`);
           },
         });
       } catch (err) {
@@ -467,9 +478,38 @@ export function AssignmentDraftingStage({
       </header>
 
       {offlineNotice && (
-        <p role="status" className="text-xs text-neutral-600 dark:text-neutral-400 px-1" data-testid="offline-draft-notice">
-          {offlineNotice}
-        </p>
+        <div role="status" className="text-xs text-neutral-600 dark:text-neutral-400 px-1 space-y-2" data-testid="offline-draft-notice">
+          <p>{offlineNotice}</p>
+          {offlineScaffold && (
+            <details className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/70 dark:bg-white/[0.03] px-3 py-2">
+              <summary className="cursor-pointer font-medium text-neutral-800 dark:text-neutral-200">Scaffold for "{offlineScaffold.title}"</summary>
+              <pre className="mt-2 whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-neutral-700 dark:text-neutral-300">{offlineScaffold.text}</pre>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = internalSections.find((x) => x.id === offlineScaffold.sectionId);
+                    if (target) handleStreamSection(target);
+                  }}
+                  className="px-3 py-1 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-medium cursor-pointer"
+                >
+                  Try AI again
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await updateSectionContent(offlineScaffold.sectionId, offlineScaffold.text);
+                    setOfflineScaffold(null);
+                    setOfflineNotice(null);
+                  }}
+                  className="px-3 py-1 rounded-full border border-neutral-300 dark:border-white/15 font-medium cursor-pointer"
+                >
+                  Insert scaffold into section
+                </button>
+              </div>
+            </details>
+          )}
+        </div>
       )}
 
       {draftError && (

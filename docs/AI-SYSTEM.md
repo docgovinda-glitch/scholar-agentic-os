@@ -114,3 +114,6 @@ Database mirrors for the admin panel: `ai_providers`, `ai_models`, seeded by `np
 ## 9. Offline scaffold
 
 Coursework drafting never writes `[Unverified Claim]` tags: the citation scrubber removes unmatched citations silently. When every AI provider is out of credit, the coursework `/stream-section` route sends a labelled offline scaffold built only from the section prompt, key points and approved sources (`server/src/utils/sectionScaffold.ts`), and failed revisions never overwrite existing text.
+
+Provider errors: a numeric error code (Google sends `{"code": 429, "status": "RESOURCE_EXHAUSTED"}`) is kept as its string status and never crashes `classify`. A 429 that names a per-minute/per-day/free-tier window or a retry delay is a per-model `rate_limit` (the router tries the same key's next model; "Please retry in 41.9s" sets `retryAfterMs`), even when the provider words it "You exceeded your current quota"; only real credit signals (`insufficient_quota`, credit balance, payment required) are connection-wide `quota`.
+

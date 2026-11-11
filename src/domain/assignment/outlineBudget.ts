@@ -177,8 +177,53 @@ export function ensureEveryQuestionHasSection(structure: AssignmentStructure, br
   return { ...structure, headings };
 }
 
+const FRAME_HEADING = /\b(introduction|conclusions?|summary|overview|references|bibliography|executive\s+summary)\b/i;
+
+/**
+ * A brief with marked questions gets exactly one section per question, in the
+ * brief's order. An outline grouped some other way (for example by Part, with
+ * the questions then appended) is re-shaped: headings that answer a question
+ * keep their sub-sections, an introduction/conclusion is kept, and any other
+ * heading is dropped unless it already holds the student's text.
+ */
+export function alignOutlineToQuestions(structure: AssignmentStructure, briefText?: string): AssignmentStructure {
+  if (!briefText) return structure;
+  const groups = groupBriefQuestions(parseBriefQuestions(briefText));
+  if (groups.length < 2 || !groups.some((g) => g.marks)) return structure;
+  const withMissing = ensureEveryQuestionHasSection(structure, briefText);
+  const all = withMissing.headings.map((_, i) => i);
+  const matched = matchHeadingsToQuestions(withMissing, all, briefText);
+  const hasText = (h: AssignmentMainHeading) => (h.subheadings ?? []).some((x) => (x.draftContent ?? "").trim().length > 0);
+  const extra = all.filter((i) => !matched.has(i));
+  const aligned = extra.every((i) => FRAME_HEADING.test(withMissing.headings[i].title)) && matched.size === groups.length;
+  const order = new Map(groups.map((g, k) => [g.key, k]));
+  // Already one section per question, in order: nothing to change.
+  const matchedOrder = all.filter((i) => matched.has(i)).map((i) => order.get(matched.get(i)!.key) ?? 0);
+  if (aligned && matchedOrder.every((v, k) => k === 0 || v > matchedOrder[k - 1])) return withMissing;
+
+  const intro = extra.filter((i) => /\b(introduction|overview|executive\s+summary)\b/i.test(withMissing.headings[i].title));
+  const closing = extra.filter((i) => /\b(conclusions?|summary)\b/i.test(withMissing.headings[i].title) && !intro.includes(i));
+  const keptWork = extra.filter((i) => !intro.includes(i) && !closing.includes(i) && hasText(withMissing.headings[i]));
+  const questionIdx = all.filter((i) => matched.has(i)).sort((a, b) => (order.get(matched.get(a)!.key) ?? 0) - (order.get(matched.get(b)!.key) ?? 0));
+  const sequence = [...intro, ...questionIdx, ...closing, ...keptWork];
+  const headings = sequence.map((i, k) => {
+    const h = withMissing.headings[i];
+    const n = k + 1;
+    const q = matched.get(i);
+    const g = q ? groups.find((x) => x.key === q.key) : undefined;
+    const title = g ? `${n}.0 ${g.stem?.text ?? g.title}` : `${n}.0 ${h.title.replace(/^\s*\d+(?:\.\d+)*\.?\s+/, "")}`;
+    return {
+      ...h,
+      number: n,
+      title,
+      subheadings: (h.subheadings ?? []).map((x, j) => ({ ...x, numberStr: `${n}.${j + 1}` })),
+    } as AssignmentMainHeading;
+  });
+  return { ...withMissing, headings };
+}
+
 export function applyMarksBudget(structureIn: AssignmentStructure, briefText?: string): AssignmentStructure {
-  const structure = ensureEveryQuestionHasSection(structureIn, briefText);
+  const structure = alignOutlineToQuestions(structureIn, briefText);
   const total = Math.round(structure.targetWordCount);
   const live = structure.headings.map((h, i) => ({ h, i })).filter(({ h }) => (h.subheadings ?? []).some((s) => (s.targetWordCount ?? 0) > 0) || (h.targetWordCount ?? 0) > 0);
   if (live.length === 0 || !(total > 0)) return structure;

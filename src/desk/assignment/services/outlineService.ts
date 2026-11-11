@@ -36,6 +36,7 @@ import {
 
 import { applyMarksBudget, allocateCleanWords } from "../../../domain/assignment/outlineBudget";
 import { isNonQuestionBriefLine, parseBriefQuestions, groupBriefQuestions } from "../../../utils/briefQuestions";
+import { briefGroundedThesis } from "../../../domain/assignment/briefThesis";
 export function generateAdaptiveDefaultOutline(
   type: AssignmentType,
   question: string,
@@ -2756,7 +2757,11 @@ export function generateDynamicAssignmentStructure(
 
   const headings = sanitizeOutlineHeadings(rawHeadings, question, assignmentType);
   const totalAllocated = headings.reduce((sum, h) => sum + h.targetWordCount, 0);
-  const thesisStatement = generateThesisStatement(question, options.writingTone, academicLevel);
+  // A multi-question brief gets a thesis built from its own title and questions,
+  // never from a regex reading of its first "compare/contrast" sub-part.
+  const thesisStatement =
+    briefGroundedThesis([options.briefText, question].filter(Boolean).join("\n")) ||
+    generateThesisStatement(question, options.writingTone, academicLevel);
 
   // Marks-weighted, clean multiples, exact sum to the target (never 40w + 960w).
   return applyMarksBudget({

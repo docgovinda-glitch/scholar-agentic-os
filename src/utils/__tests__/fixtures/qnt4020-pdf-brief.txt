@@ -1,0 +1,56 @@
+DEPARTMENT OF COMPUTER SCIENCE & QUANTUM INFORMATION SYSTEMS Advanced Assessment: Core Branches of Quantum Computing Honours / Postgraduate Examination Questionnaire & Analytical Framework Module Code:
+QNT-4020 Word Count:
+2,000 words (+10%) Total Assessment:
+90 Marks Referencing Style:
+Harvard Referencing
+PART 1: QUANTUM HARDWARE ARCHITECTURES & PHYSICAL MODALITIES [25 Marks]
+Question 1: Comparative Analysis of Qubit Physical Realisations [
+15 Marks]
+Current Noisy Intermediate-Scale Quantum (NISQ) devices rely on fundamentally divergent physical modalities, each with distinct coherence and control trade-offs (Preskill, 2018).
+a. Contrast the typical coherence times (T1 and T2) and two-qubit gate fidelities of superconducting transmon qubits (e.g., Arute et al., 2019) against trapped-ion architectures. [
+5 Marks]
+Question 2: Emerging Neutral Atom & Photonic Paradigms [
+10 Marks]
+Neutral atom arrays utilising optical tweezers and Rydberg blockades are emerging alongside photonic processors. Formulate a comparative critique addressing the scaling prospects, optical cross-talk mitigation, and operating temperatures of neutral atom arrays utilising optical tweezers and Rydberg blockades, and continuous-variable photonic processors.
+Module QNT-4020 · Core Branches of Quantum Computing Page 1 of 3
+PART 2: QUANTUM ALGORITHMS & COMPUTATIONAL COMPLEXITY [25 Marks]
+Question 3: Complexity Classes and Bounded-Error Quantum Polynomial-Time [
+12 Marks]
+The complexity class BQP defines the problems a quantum computer solves efficiently with bounded error. Critically appraise the theoretical boundaries separating BQP from classical P, NP, and NP-complete classes, explaining why polynomial quantum algorithms for NP-complete problems remain unproven (Nielsen and Chuang, 2010).
+Question 4: Quantum Speedup Mechanisms: Shor vs. Grover [
+13 Marks]
+Quantum algorithms exhibit fundamentally different speedups depending on problem structure.
+a. Deconstruct the role of the Quantum Fourier Transform (QFT) and modular exponentiation in Shor's algorithm (Shor, 1994), detailing how period-finding yields an exponential speedup over the classical General Number Field Sieve (GNFS). [
+7 Marks]
+PART 3: QUANTUM ERROR CORRECTION (QEC) AND FAULT TOLERANCE [20 Marks]
+Question 5: Surface Codes, Syndrome Measurement & Thresholds [
+20 Marks]
+Because quantum information cannot be cloned, error correction must detect errors without measuring the encoded state (Fowler et al., 2012).
+a. Explain how the planar 2D surface code extracts error syndromes via ancilla qubits without collapsing superpositions of data qubits. [
+6 Marks]
+Module QNT-4020 · Core Branches of Quantum Computing Page 2 of 3
+PART 4: QUANTUM CRYPTOGRAPHY, SIMULATION, AND SYNTHESIS [20 Marks]
+Question 6: Quantum Key Distribution (QKD) vs. Post-Quantum Cryptography [
+10 Marks]
+Contrast the security paradigms of QKD using BB84 (Bennett and Brassard, 2014) with NIST ML-KEM post-quantum cryptography, in light of the resource estimates of Gidney and Ekerå (2021) for RSA-2048.
+Question 7: Cross-Branch Applied Case Study [
+10 Marks]
+A biochemical consortium proposes deploying a hybrid Variational Quantum Eigensolver (VQE) on NISQ hardware to model the nitrogenase FeMoco cofactor. Evaluate the proposal against classical CASSCF methods.
+PART 5: STANDARD ASSESSMENT RUBRIC & MARKING CRITERIA
+Criteria & Weight First Class (1st)
+70%+ Upper Second (2:1)
+60-69%
+Technical & Conceptual Rigour (30%) Exceptional command of quantum mechanics and hardware constraints. Strong grasp of key concepts.
+Critical Synthesis & Evaluation (30%) Original synthesis across branches. Clear evaluation.
+Methodological Application (20%) Rigorous application of complexity theory and QEC. Sound application.
+Harvard Referencing & Style (20%) Flawless Harvard referencing. Minor errors.
+PART 6: PRESCRIBED HARVARD REFERENCING BIBLIOGRAPHY CORE ACADEMIC LITERATURE
+Arute, F., Arya, K., Babbush, R., Bacon, D., Bardin, J.C., Barends, R., Biswas, R., Boixo, S., Brandao, F.G., Buell, D.A. and Burkett, B. (2019) 'Quantum supremacy using a programmable superconducting processor', Nature, 574(7779), pp. 505-510.
+Bennett, C.H. and Brassard, G. (2014) 'Quantum cryptography: Public key distribution and coin tossing', Theoretical Computer Science, 560, pp. 7-11.
+Fowler, A.G., Mariantoni, M., Martinis, J.M. and Cleland, A.N. (2012) 'Surface codes: Towards practical large-scale quantum computation', Physical Review A, 86(3), p. 032324.
+Gidney, C. and Ekerå, M. (2021) 'How to factor 2048 bit RSA integers in 8 hours using 20 million noisy qubits', Quantum, 5, p. 433.
+Kjaergaard, M., Schwartz, M.E., Braumüller, J., Krantz, P., Wang, J.I.J., Gustavsson, S. and Oliver, W.D. (2020) 'Superconducting qubits: Current state of play', Annual Review of Condensed Matter Physics, 11, pp. 369-395.
+Nielsen, M.A. and Chuang, I.L. (2010) Quantum Computation and Quantum Information. 10th Anniversary edn. Cambridge: Cambridge University Press.
+Preskill, J. (2018) 'Quantum Computing in the NISQ era and beyond', Quantum, 2, p. 79.
+Shor, P.W. (1994) 'Algorithms for quantum computation: discrete logarithms and factoring', in Proceedings 35th Annual Symposium on Foundations of Computer Science. Santa Fe: IEEE, pp. 124-134.
+Module QNT-4020 · Core Branches of Quantum Computing Page 3 of 3

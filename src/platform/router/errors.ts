@@ -23,6 +23,13 @@ export class TimeoutError extends Error {
 }
 
 const CREDIT_EXHAUSTED = /quota|billing|insufficient|credit balance|out of credits?|no credits?|payment required|balance (is )?(too low|exhausted)|exceeded your current|resource.?exhausted|spend(ing)? limit|usage limit/i;
+const RATE_WINDOW = /per.?minute|per.?day|per.?hour|PerMinute|PerDay|free.?tier|requests per|tokens per|rate.?limit|retry (?:in|after)|retryDelay|\bRPM\b|\bTPM\b|\bRPD\b/i;
+
+/** "Please retry in 41.9s" / "retryDelay": "41s" -> ms. */
+function retryAfterFromMessage(msg: string): number | undefined {
+  const m = msg.match(/retry(?:\s+in|Delay"?\s*[:=]\s*"?)\s*(\d+(?:\.\d+)?)\s*s/i);
+  return m ? Math.round(parseFloat(m[1]) * 1000) : undefined;
+}
 const MODEL_UNAVAILABLE = /model.{0,60}(not found|does not exist|not available|not supported|deprecated|decommissioned|no longer|retired|invalid)|(unknown|invalid|unsupported) model/i;
 
 function retryAfterMs(h: Record<string, string>): number | undefined {
@@ -44,9 +51,14 @@ export function classify(err: unknown, signal: AbortSignal): Failure {
   if (err instanceof ProviderHttpError) {
     const s = err.status;
     const msg = err.message.slice(0, 300);
-    const code = (err.code ?? "").toLowerCase();
+    const code = String(err.code ?? "").toLowerCase();
     if (code.includes("context") || /context.{0,20}(length|window)|too many tokens|maximum context/i.test(msg))
       return f("context_overflow", msg, false, true, { httpStatus: s });
+    // A per-minute / per-day / free-tier request limit is a rate limit on this model, not spent credit,
+    // even when the provider words it "You exceeded your current quota" (Gemini free tier).
+    if (s === 429 && RATE_WINDOW.test(`${err.message} ${code}`) && !/insufficient_quota|credit balance|payment required|out of credits?|billing (?:account )?(?:disabled|not enabled)/i.test(`${err.message} ${code}`)) {
+      return f("rate_limit", msg, true, true, { httpStatus: s, retryAfterMs: retryAfterMs(err.headers) ?? retryAfterFromMessage(err.message) });
+    }
     // Spent credit shows up differently per provider: 402 (OpenRouter, DeepSeek), 429 insufficient_quota
     // (OpenAI), 400 "credit balance is too low" (Anthropic), 403 billing/quota (Google). All mean "use the next AI".
     if (s === 402 || (s !== 401 && s < 500 && CREDIT_EXHAUSTED.test(`${msg} ${code}`))) return f("quota", msg, false, true, { httpStatus: s });

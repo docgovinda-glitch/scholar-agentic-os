@@ -76,6 +76,41 @@ function pullMarks(text: string): { text: string; marks?: number } {
   return { text: text.replace(MARKS_RE_G, " ").replace(/\s{2,}/g, " ").trim(), marks: marks > 0 ? marks : undefined };
 }
 
+const MARKS_WORD = "(?:marks?|pts|points?)";
+
+/**
+ * Undo the line layout PDF/DOCX extraction gives a brief, so every parser sees
+ * one item per line:
+ * - a marks bracket split over two lines ("Title [" / "15 Marks]") is rejoined;
+ * - a bare "[15 Marks]" line is appended to the heading above it;
+ * - "Question 1: Title [15 Marks] Prompt..." on one line becomes heading + prompt;
+ * - an inline "a. Explain ..." sub-part, "Question 2:" or "PART 2:" starts a line.
+ */
+export function normalizeBriefLayout(text: string): string {
+  if (!text) return "";
+  let t = text.replace(/\r\n?/g, "\n");
+  // "Title [\n15 Marks]" / "Title (\n15 marks)"
+  t = t.replace(new RegExp(`([\\[(])[ \\t]*\\n[ \\t]*(\\d{1,3}\\s*${MARKS_WORD}\\s*[\\])])`, "gi"), "$1$2");
+  // A line that is only "[15 Marks]" or "15 Marks]" joins the line above.
+  t = t.replace(new RegExp(`\\n[ \\t]*([\\[(]?\\s*\\d{1,3}\\s*${MARKS_WORD}\\s*[\\])])[ \\t]*(?=\\n|$)`, "gi"), (_m, b: string) => ` ${b.startsWith("[") || b.startsWith("(") ? b : `[${b}`}`);
+  // Inline headings and sub-parts after a sentence or bracket end.
+  t = t.replace(/([.?!\]):])[ \t]+(?=(?:Question|Q)\s*\d{1,2}\s*[:.)\-–])/g, "$1\n");
+  t = t.replace(/([.?!\]])[ \t]+(?=PART\s+\d+\s*[:\-–])/g, "$1\n");
+  t = t.replace(/([.?!\]])[ \t]+(?=\(?[a-h][.)]\s+(?:critically\s+)?[A-Z][a-z]+\b)/g, (m, end: string, offset: number, whole: string) => {
+    const rest = whole.slice(offset + m.length).replace(/^\(?[a-h][.)]\s+/, "");
+    return COMMAND_START.test(rest) ? `${end}\n` : m;
+  });
+  // "Question 1: Title [15 Marks] Current NISQ devices..." -> heading, then prompt.
+  t = t
+    .split("\n")
+    .map((line) => {
+      const m = line.match(new RegExp(`^(\\s*(?:(?:Question|Q)\\s*\\d{1,2}|PART\\s+\\d+)\\b[^\\[\\]]*?\\[\\s*\\d{1,3}\\s*${MARKS_WORD}\\s*\\])\\s+(\\S.*)$`, "i"));
+      return m && m[2].split(/\s+/).length >= 3 ? `${m[1]}\n${m[2]}` : line;
+    })
+    .join("\n");
+  return t;
+}
+
 /** Running page headers/footers that PDF extraction repeats on every page. */
 export function isPageFurnitureLine(line: string): boolean {
   const t = line.trim();
@@ -99,7 +134,7 @@ const NON_QUESTION_PART = /\b(rubric|marking|grading|assessment\s+criteria|bibli
 /** Parts (e.g. "PART 1: QUANTUM HARDWARE ARCHITECTURES 25 MARKS") found in the brief. */
 export function parseBriefParts(briefText: string): BriefPart[] {
   const parts: BriefPart[] = [];
-  for (const raw of briefText.split(/\r?\n/)) {
+  for (const raw of normalizeBriefLayout(briefText).split(/\r?\n/)) {
     const line = raw.trim();
     const m = line.match(PART_RE);
     if (!m || !m[2]) continue;
@@ -118,11 +153,11 @@ export function parseBriefQuestions(briefText: string): BriefQuestionRow[] {
   const rows: BriefQuestionRow[] = [];
   let currentMain: string | undefined;
   let currentPart: string | undefined;
-  const lines = removeCourseCodes(stripPageFurniture(briefText.slice(0, 60000))).split(/\r?\n/);
+  const lines = removeCourseCodes(stripPageFurniture(normalizeBriefLayout(briefText.slice(0, 60000)))).split(/\r?\n/);
 
   const push = (label: string, body: string) => {
     const { text, marks } = pullMarks(body);
-    const clean = firstSentence(text);
+    const clean = firstSentence(text).replace(/\s*[\[(]\s*$/, "").trim();
     if (clean.length < 8 || isNonQuestionBriefLine(clean)) return;
     rows.push({ id: label.toLowerCase(), label, text: clean, marks, part: currentPart });
   };
@@ -175,30 +210,45 @@ export interface MarkingCriterionRow {
  * separate rubric table.
  */
 export function parseMarkingCriteria(briefText: string, questions: BriefQuestionRow[] = parseBriefQuestions(briefText)): MarkingCriterionRow[] {
-  const lines = briefText.split(/\r?\n/).map((l) => l.trim());
+  const lines = normalizeBriefLayout(briefText).split(/\r?\n/).map((l) => l.trim());
   const rows: MarkingCriterionRow[] = [];
-  const startIdx = lines.findIndex((l) => /\b(marking|grading|assessment)\s+(criteria|scheme|rubric)\b|\bcriteria\s*&\s*weight/i.test(l));
+  // The rubric starts at its own heading: a rubric Part, or a "Marking criteria" /
+  // "Criteria & Weight" line. The last such heading wins (a cover-page mention
+  // of "assessment" is not the rubric).
+  const isRubricHeading = (l: string) =>
+    (PART_RE.test(l) && /\b(rubric|marking|grading|criteria)\b/i.test(l)) ||
+    /^(?:standard\s+)?(?:assessment\s+|marking\s+|grading\s+)?(?:criteria|rubric|scheme)\b/i.test(l) ||
+    /\b(marking|grading)\s+(criteria|scheme|rubric)\b|\bcriteria\s*&\s*weight/i.test(l);
+  let startIdx = -1;
+  lines.forEach((l, i) => {
+    if (isRubricHeading(l)) startIdx = i;
+  });
+  // Prefer the first heading of a consecutive run ("PART 5: RUBRIC" then "Criteria & Weight").
+  while (startIdx > 0 && isRubricHeading(lines[startIdx - 1])) startIdx -= 1;
   if (startIdx >= 0) {
-    for (const line of lines.slice(startIdx + 1, startIdx + 16)) {
+    for (const line of lines.slice(startIdx + 1, startIdx + 30)) {
       if (!line) {
         if (rows.length) break;
         continue;
       }
+      if (PART_RE.test(line) && !isRubricHeading(line)) break;
+      // Grade-band headers ("First Class (1st)", "70%+", "60-69%", "2:1") and question rows are not criteria.
+      if (isRubricHeading(line)) continue;
+      if (/^\d{1,3}\s*%\s*\+|^\d{1,3}\s*[-–]\s*\d{1,3}\s*%|\b(first\s+class|upper\s+second|lower\s+second|third\s+class|distinction|merit|pass|fail)\b.*\(\s*(?:1st|2:1|2:2|3rd)\s*\)/i.test(line)) continue;
+      // Question rows ("Question 1: ...", "Q2.", "a. Explain ...") are not criteria; a numbered
+      // rubric row ("1. Technical & Conceptual Rigour (30%)") is.
+      if (/^(?:q(?:uestion)?\s*)\d/i.test(line) || (SUB_RE.test(line) && !/\d\s*%/.test(line))) continue;
       const cells = line.split("|").map((c) => c.trim()).filter(Boolean);
       const src = cells.length >= 2 ? cells.join(" – ") : line;
-      const m = src.match(/^[-*•\d.\)\s]*(.+?)\s*[:–\-]?\s*\(?(\d{1,3})\s*(%|marks?)\)?\s*[:–\-]?\s*(.*)$/i);
-      if (m && m[1].trim().length >= 3) {
+      const m = src.match(/^[-*•\d.\)\s]*([A-Za-z][^%]*?)\s*[:–\-]?\s*\(?(\d{1,3})\s*(%|marks?)\)?\s*[:–\-]?\s*(.*)$/i);
+      if (m && m[1].trim().length >= 3 && m[1].trim().split(/\s+/).length <= 10) {
         const value = parseInt(m[2], 10);
+        const tail = m[4]?.trim() ?? "";
         rows.push({
           criterion: m[1].replace(/[:–\-\s]+$/, ""),
           marks: m[3] === "%" ? undefined : value,
           weightPercent: m[3] === "%" ? value : undefined,
-          expectation:
-            m[4]?.trim() && m[4].trim().length <= 80
-              ? m[4].trim()
-              : /\bQ\d/i.test(m[1])
-              ? plainExpectation(questions.filter((q) => new RegExp(`\\b${q.label}\\b`, "i").test(m[1])))
-              : criterionExpectation(m[1]),
+          expectation: tail && tail.length <= 120 ? firstSentence(tail, 120) + "." : criterionExpectation(m[1]),
         });
       }
     }
@@ -206,7 +256,7 @@ export function parseMarkingCriteria(briefText: string, questions: BriefQuestion
     rows.length = 0;
   }
 
-  const parts = parseBriefParts(briefText).filter((p) => p.marks);
+  const parts = parseBriefParts(briefText).filter((p) => p.marks && !NON_QUESTION_PART.test(p.name));
   if (parts.length >= 2) {
     return finishCriteria(
       parts.map((p) => {
@@ -221,18 +271,13 @@ export function parseMarkingCriteria(briefText: string, questions: BriefQuestion
     );
   }
 
-  const byMain = new Map<string, { marks: number; first: BriefQuestionRow }>();
-  for (const q of questions) {
-    if (!q.marks) continue;
-    const key = q.label.replace(/[a-z]$/, "");
-    const cur = byMain.get(key);
-    byMain.set(key, { marks: (cur?.marks ?? 0) + q.marks, first: cur?.first ?? q });
-  }
-  const grouped = [...byMain.entries()].map(([key, v]) => ({
-    criterion: `${key}: ${v.first.text.slice(0, 60)}`,
-    marks: v.marks,
-    expectation: plainExpectation(questions.filter((q) => q.label.replace(/[a-z]$/, "") === key)),
-  }));
+  const grouped = groupBriefQuestions(questions)
+    .filter((g) => g.marks)
+    .map((g) => ({
+      criterion: `${g.key}: ${g.title.slice(0, 60)}`,
+      marks: g.marks,
+      expectation: plainExpectation([...(g.stem ? [g.stem] : []), ...g.parts]),
+    }));
   return grouped.length ? finishCriteria(grouped, statedTotalMarks(briefText)) : [];
 }
 
@@ -258,6 +303,7 @@ function finishCriteria(rows: MarkingCriterionRow[], statedTotal?: number): Mark
 export function statedTotalMarks(briefText: string): number | undefined {
   const m =
     briefText.match(/\btotal\s*(?:marks?|mark\s*available)?\s*[:=\-–]?\s*(\d{2,4})\s*(?:marks?)?\b/i) ||
+    briefText.match(/\btotal\s+(?:assessment|available|score)\s*[:=\-–]?\s*(\d{2,4})\s*marks?\b/i) ||
     briefText.match(/\b(\d{2,4})\s*marks?\s*(?:in\s*total|total)\b/i);
   const n = m ? parseInt(m[1], 10) : NaN;
   return n >= 10 && n <= 1000 ? n : undefined;
@@ -312,6 +358,42 @@ export function plainExpectation(questions: BriefQuestionRow[]): string {
   return `Answer every part fully${tail}, with evidence.`;
 }
 
+/** Acronyms the brief itself writes in mixed-case prose (NISQ, QEC, BQP, ML-KEM ...). */
+export function briefAcronyms(briefText: string): Set<string> {
+  const out = new Set<string>();
+  for (const line of briefText.split(/\r?\n/)) {
+    const letters = line.replace(/[^A-Za-z]/g, "");
+    if (!letters || letters.replace(/[^A-Z]/g, "").length / letters.length > 0.35) continue; // a banner or heading
+    for (const m of line.matchAll(/\b[A-Z][A-Z0-9]{1,4}(?:-[A-Z0-9]{1,6})*\b/g)) out.add(m[0]);
+  }
+  return out;
+}
+
+/**
+ * An all-caps heading in readable sentence case for prose ("QUANTUM ERROR
+ * CORRECTION (QEC) AND FAULT TOLERANCE" -> "quantum error correction (QEC) and
+ * fault tolerance"); acronyms and mixed-case headings are kept as written.
+ */
+export function readableHeading(heading: string, acronyms: Set<string> = new Set()): string {
+  const h = heading.replace(/\s+/g, " ").trim();
+  const letters = h.replace(/[^A-Za-z]/g, "");
+  if (!letters || letters.replace(/[^A-Z]/g, "").length / letters.length < 0.7) return h;
+  return h.replace(/[A-Za-z0-9][A-Za-z0-9'’\-]*/g, (w) => {
+    if (acronyms.has(w) || /\d/.test(w)) return w;
+    const inParens = new RegExp(`\\(${w}\\)`).test(h);
+    return inParens ? w : w.toLowerCase();
+  });
+}
+
+const STYLE_NAMES: Record<string, string> = {
+  apa: "APA", apa7: "APA 7th", harvard: "Harvard", mla: "MLA", mla9: "MLA 9th", ieee: "IEEE", chicago: "Chicago",
+  "chicago-notes": "Chicago (notes)", vancouver: "Vancouver", oscola: "OSCOLA",
+};
+function citationStyleName(style: string): string {
+  const key = style.trim().toLowerCase().replace(/\s+/g, "");
+  return STYLE_NAMES[key] ?? style.toUpperCase();
+}
+
 export interface BriefSummaryInput {
   briefText: string;
   assignmentType?: string;
@@ -337,7 +419,11 @@ const VERB_FORMS: Record<string, string> = {
  */
 export function buildBriefSummary(input: BriefSummaryInput): string {
   const questions = input.questions ?? parseBriefQuestions(input.briefText);
-  const parts = parseBriefParts(input.briefText);
+  const groups = groupBriefQuestions(questions);
+  const acronyms = briefAcronyms(input.briefText);
+  const parts = parseBriefParts(input.briefText)
+    .filter((p) => !NON_QUESTION_PART.test(p.name))
+    .map((p) => ({ ...p, name: readableHeading(p.name, acronyms) }));
   const type = (input.assignmentType || "assignment").replace(/_/g, " ");
   const level = input.level ? `${input.level} ` : "";
   const sentences: string[] = [];
@@ -347,11 +433,11 @@ export function buildBriefSummary(input: BriefSummaryInput): string {
     if (input.aiApproach) sentences.push(input.aiApproach.replace(/\s+/g, " ").trim().replace(/[.\s]*$/, "."));
   } else {
     const subject = parts.length
-      ? parts.map((p) => p.name.toLowerCase()).slice(0, 3).join(", ")
-      : questions[0]?.text.toLowerCase().slice(0, 90);
+      ? parts.map((p) => p.name).slice(0, 4).join(", ")
+      : groups[0] ? readableHeading(groups[0].title, acronyms).slice(0, 90) : undefined;
     sentences.push(
-      questions.length
-        ? `This ${level}${type} asks you to answer ${questions.length} question${questions.length === 1 ? "" : "s"}${subject ? `, covering ${subject}` : ""}.`
+      groups.length
+        ? `This ${level}${type} asks you to answer ${groups.length} question${groups.length === 1 ? "" : "s"}${subject ? `, covering ${subject}` : ""}.`
         : `This ${level}${type} is assessed on the brief you supplied.`
     );
     const verbs: string[] = [];
@@ -366,10 +452,11 @@ export function buildBriefSummary(input: BriefSummaryInput): string {
     }
   }
 
-  const total = questions.reduce((s, q) => s + (q.marks ?? 0), 0);
+  // A stem's marks already include its sub-parts: never add them twice.
+  const total = statedTotalMarks(input.briefText) ?? groups.reduce((s, g) => s + (g.marks ?? 0), 0);
   const constraints = [
     input.targetWords ? `${input.targetWords.toLocaleString()} words` : "",
-    input.citationStyle ? `${input.citationStyle.toUpperCase()} referencing` : "",
+    input.citationStyle ? `${citationStyleName(input.citationStyle)} referencing` : "",
     total > 0 ? `${total} marks in total` : "",
   ].filter(Boolean);
   if (constraints.length) sentences.push(`It must be ${constraints.join(", ")}.`);
@@ -483,17 +570,32 @@ const ENTRY_START = /^[\p{Lu}][\p{L}'’\-]+(?:\s[\p{Lu}][\p{L}'’\-]+)?,\s*(?:
  * issue, pages and DOI exactly as the brief gives them.
  */
 export function parsePrescribedBibliography(briefText: string): PrescribedBibliographyEntry[] {
-  const lines = stripPageFurniture(briefText).split(/\r?\n/).map((l) => l.trim());
-  const start = lines.findIndex((l) => (PART_RE.test(l) || /^[A-Z\s&]+$/.test(l) || l.length < 60) && BIB_HEADER.test(l));
+  const lines = stripPageFurniture(normalizeBriefLayout(briefText)).split(/\r?\n/).map((l) => l.trim());
+  // The header may carry the first entries on the same line:
+  // "PART 6: PRESCRIBED HARVARD REFERENCING BIBLIOGRAPHY CORE ACADEMIC LITERATURE Arute, F., ..."
+  const headerTail = (l: string) => {
+    const at = l.search(/[\p{Lu}][\p{Ll}][\p{L}'’\-]*,\s*(?:[\p{Lu}]\.\s?-?){1,4}/u);
+    return at > 0 && BIB_HEADER.test(l.slice(0, at)) ? at : -1;
+  };
+  const start = lines.findIndex(
+    (l) => BIB_HEADER.test(l) && (PART_RE.test(l) || /^[A-Z\s&]+$/.test(l) || l.length < 60 || headerTail(l) > 0)
+  );
   if (start < 0) return [];
-  // Join wrapped lines: a new entry starts with "Surname, I."
-  const entries: string[] = [];
+  const body: string[] = [];
+  const tailAt = headerTail(lines[start]);
+  if (tailAt > 0) body.push(lines[start].slice(tailAt));
   for (const l of lines.slice(start + 1)) {
     if (!l) continue;
     if (PART_RE.test(l)) break;
-    if (ENTRY_START.test(l) && /\(\d{4}[a-z]?\)/.test(l)) entries.push(l);
-    else if (entries.length) entries[entries.length - 1] += ` ${l}`;
+    body.push(l);
   }
+  // Join wrapped lines, then split where a new "Surname, I. ... (YEAR)" entry
+  // begins after the previous entry's final full stop.
+  const joined = body.join(" ").replace(/\s+/g, " ");
+  const entries = joined
+    .split(/(?<=\.)\s+(?=[\p{Lu}][\p{L}'’\-]+(?:\s[\p{Lu}][\p{L}'’\-]+)?,\s*(?:[\p{Lu}]\.\s?-?){1,4}[^()]{0,400}?\(\d{4}[a-z]?\))/u)
+    .map((e) => e.trim())
+    .filter((e) => ENTRY_START.test(e) && /\(\d{4}[a-z]?\)/.test(e));
   const out: PrescribedBibliographyEntry[] = [];
   for (const raw of entries) {
     const m = raw.match(/^(.+?)\s*\((\d{4})[a-z]?\)\s*(.+)$/);

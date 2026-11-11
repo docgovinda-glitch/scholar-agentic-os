@@ -53,7 +53,7 @@ describe("brief parsing grounded in the file", () => {
     const summary = buildBriefSummary({ briefText: BRIEF, assignmentType: "coursework", level: "postgraduate", citationStyle: "harvard", targetWords: 2000 });
     expect(summary.split(/(?<=\.)\s/).length).toBeLessThanOrEqual(3);
     expect(summary).toMatch(/2,000 words/);
-    expect(summary).toMatch(/HARVARD/);
+    expect(summary).toMatch(/Harvard referencing/);
     expect(summary).not.toMatch(/DEPARTMENT OF COMPUTER SCIENCE/);
     expect(summary.length).toBeLessThan(500);
   });

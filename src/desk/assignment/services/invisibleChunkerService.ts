@@ -824,7 +824,8 @@ export interface StreamSectionOptions {
   /** Serialized evidence pack prompt block (Production Spec §4.1–4.3) */
   evidencePackPrompt?: string;
   onChunk: (chunk: string, aggregatedText: string) => void;
-  onComplete: (fullText: string) => void;
+  /** `scaffold` is true when no AI could answer and the text is the labelled offline scaffold. */
+  onComplete: (fullText: string, meta?: { scaffold?: boolean }) => void;
   onError?: (err: Error) => void;
   /** Called when the server could not use an AI and sent an offline scaffold instead. */
   onFallback?: (info: { reason: string }) => void;
@@ -869,7 +870,7 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
     (s) => section.boundSourceIds?.includes(s.id) || s.status === "kept"
   );
 
-  const attempt = async (): Promise<string> => {
+  const attempt = async (): Promise<{ finalText: string; scaffold: boolean }> => {
     const { authedJsonFetch } = await import("../../api/client");
     const response = await authedJsonFetch(`/api/projects/${projectId}/assignment/stream-section`, "POST", {
       sectionId: section.id,
@@ -915,6 +916,7 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
     let buffer = "";
     let streamError = "";
     let finalFromServer = false;
+    let scaffold = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -930,7 +932,10 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
         try {
           const parsed = JSON.parse(rawData) as { chunk?: string; fullText?: string; error?: string; recoverable?: boolean; fallback?: { reason?: string } };
           if (parsed.error) streamError = parsed.error;
-          if (parsed.fallback) onFallback?.({ reason: parsed.fallback.reason || "No AI provider could answer right now." });
+          if (parsed.fallback) {
+            scaffold = true;
+            onFallback?.({ reason: parsed.fallback.reason || "No AI provider could answer right now." });
+          }
           if (parsed.chunk) {
             aggregatedText += parsed.chunk;
             onChunk(parsed.chunk, aggregatedText);
@@ -952,20 +957,20 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
     if (!finalText) {
       throw new Error(streamError || "The AI returned no text for this section. Nothing was written. Try again.");
     }
-    return finalText;
+    return { finalText, scaffold };
   };
 
   try {
-    let finalText: string;
+    let result: { finalText: string; scaffold: boolean };
     try {
-      finalText = await attempt();
+      result = await attempt();
     } catch (first) {
       // A dropped socket (TypeError: Failed to fetch) is retried once straight away.
       if (!(first instanceof TypeError)) throw first;
-      finalText = await attempt();
+      result = await attempt();
     }
-    onComplete(finalText);
-    return finalText;
+    onComplete(result.finalText, { scaffold: result.scaffold });
+    return result.finalText;
   } catch (err) {
     // A dropped connection surfaces as TypeError: Failed to fetch; say what it means.
     const error =

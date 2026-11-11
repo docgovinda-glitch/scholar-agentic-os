@@ -34,7 +34,18 @@ export function cleanBriefText(text: string): string {
 }
 
 const BANNER_START = /^(?:department|faculty|school|university|college|institute|centre|center|division)\b/i;
-const METADATA = /^(?:module|course|unit|programme|program|word\s*count|marks?|submission|deadline|due|date|candidate|student|name|id|format|referencing|level|semester|academic\s+year|page|total)\b/i;
+const METADATA = /^(?:module|course|unit|programme|program|word\s*count|marks?|submission|deadline|due|date|candidate|student|name|id|format|referencing|level|semester|academic\s+year|page|total|\d[\d,]*\s*(?:words?|marks?)\b)/i;
+/** Metadata labels that PDF extraction runs onto the end of a title line. */
+const INLINE_METADATA = /\s+(?:(?:module|course|unit)\s+(?:code|title|leader)|word\s*(?:count|limit)|total\s+(?:assessment|marks?)|referencing(?:\s+style)?|submission|deadline|weighting)\s*:.*$/i;
+const LEVEL_TAIL = /\s+(?:honours|undergraduate|postgraduate|masters?|msc|ma|bsc|ba|phd|level\s*\d)\b.*$/i;
+
+/** "DEPARTMENT OF X Advanced Assessment: Topic ..." -> "Advanced Assessment: Topic ...". */
+function dropLeadingBanner(line: string): string {
+  const words = line.split(/\s+/);
+  let i = 0;
+  while (i < words.length && (/^[A-Z0-9&,/()\-–]+$/.test(words[i]) && /[A-Z&]/.test(words[i]))) i += 1;
+  return i >= 3 && i < words.length ? words.slice(i).join(" ") : line;
+}
 const GENERIC_HEADING = /^(?:assignment brief|essay prompt|module handbook|table of contents|contents|abstract|overview|introduction|instructions|part\s*\d+\b.*)$/i;
 
 /** ALL-CAPS department/institution banners are never a presentation title. */
@@ -59,10 +70,19 @@ export function deriveDocumentTitle(text: string, fileName = ""): string {
     .filter(Boolean)
     .slice(0, 25);
   for (const line of lines) {
-    if (isBannerLine(line) || METADATA.test(line) || GENERIC_HEADING.test(line)) continue;
+    if (METADATA.test(line) || GENERIC_HEADING.test(line)) continue;
+    // A banner may carry the real title after it on the same extracted line.
+    const unbannered = dropLeadingBanner(line).replace(INLINE_METADATA, "").trim();
+    if (unbannered !== line && unbannered.length >= 8 && !isBannerLine(unbannered)) {
+      const t = deriveDocumentTitle(unbannered);
+      if (t && !/^untitled/i.test(t)) return t;
+    }
+    if (isBannerLine(line)) continue;
     let candidate = line;
     const colon = candidate.match(/^([^:]{3,60}):\s*(.{4,120})$/);
     if (colon && LABEL_PREFIX.test(colon[1].trim())) candidate = colon[2].trim();
+    const levelCut = candidate.replace(LEVEL_TAIL, "");
+    if (levelCut.split(/\s+/).length >= 3) candidate = levelCut;
     const words = candidate.split(/\s+/);
     if (words.length < 2 || words.length > 16 || candidate.length > 120) continue;
     if (/[.?!]$/.test(candidate) && words.length > 9) continue; // a sentence, not a title
