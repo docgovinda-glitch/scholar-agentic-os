@@ -27,6 +27,7 @@ export const GAMMA_LAYOUTS: Array<{ id: GammaLayout; label: string; hint: string
   { id: 'stats', label: 'Big numbers', hint: 'Metric callouts' },
   { id: 'timeline', label: 'Timeline', hint: 'Process or phases in order' },
   { id: 'comparison', label: 'Comparison', hint: 'Two sides, side by side' },
+  { id: 'table', label: 'Table', hint: 'Rows compared across two columns' },
   { id: 'list', label: 'Key points', hint: 'Numbered rows beside the headline' },
   { id: 'split', label: 'Image + text', hint: 'Visual panel beside the story' },
   { id: 'quote', label: 'Quote', hint: 'Evidence or a citation, large' },
@@ -291,6 +292,7 @@ export function reflowContent(content: CardContent, layout: GammaLayout): CardCo
       }
       break;
     case 'comparison':
+    case 'table':
       if (!next.columns) {
         const items = itemsFrom(content);
         const half = Math.ceil(items.length / 2);

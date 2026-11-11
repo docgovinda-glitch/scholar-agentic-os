@@ -354,6 +354,56 @@ function deckShell(opts: ComposeOptions, title: string, slides: SlideCard[]): Sl
   };
 }
 
+/** Layout for each suggested card type. */
+export const VISUAL_TYPE_LAYOUT: Record<string, GammaLayout> = {
+  'Title Hero': 'title',
+  '2-Column Comparison': 'comparison',
+  '3-Card Grid': 'bento',
+  'Process / Timeline': 'timeline',
+  'Architecture Diagram': 'split',
+  'Evidence & Metrics': 'list',
+  'Key Takeaways': 'list',
+};
+
+/**
+ * Lay the presenter's reviewed outline out as cards. Content is exactly the
+ * outline's own titles and bullets (no figures are added); "Write with AI" or
+ * the server deck writer replaces the plain bullets with assertion-evidence
+ * copy.
+ */
+export function composeDeckFromOutline(
+  outline: Array<{ id?: string; title: string; visualType?: string; bullets: string[] }>,
+  opts: ComposeOptions & { title: string }
+): SlideDeck {
+  const framework = opts.framework || 'Standard-Narrative';
+  const title = clean(stripCourseCodes(opts.title)) || 'Untitled presentation';
+  const slides = outline.map((card, i) => {
+    const layout = VISUAL_TYPE_LAYOUT[card.visualType || ''] ?? (i === 0 ? 'title' : 'bento');
+    const bullets = card.bullets.map((b) => clean(stripCourseCodes(b))).filter(Boolean);
+    const items: CardItem[] = bullets.map((b) => sentenceToItem(b));
+    let content: CardContent;
+    if (layout === 'title') {
+      content = { headline: clean(stripCourseCodes(card.title)) || title, lede: bullets[0], items: [], stats: [] };
+    } else if (layout === 'comparison') {
+      const half = Math.ceil(bullets.length / 2);
+      content = {
+        headline: clean(stripCourseCodes(card.title)),
+        items: [],
+        stats: [],
+        columns: [
+          { title: '', points: bullets.slice(0, half) },
+          { title: '', points: bullets.slice(half) },
+        ],
+      };
+    } else {
+      content = { headline: clean(stripCourseCodes(card.title)), items, stats: [] };
+    }
+    const notes = bullets.length ? `Cover: ${bullets.join('; ')}.` : `Introduce ${clean(card.title)}.`;
+    return makeSlide(i, content, layout, notes, framework);
+  });
+  return { ...deckShell(opts, title, slides), outline: outline.map((c, i) => ({ id: c.id || `ol-${i}`, title: c.title, visualType: c.visualType || '3-Card Grid', bullets: c.bullets })) };
+}
+
 /** Build a deck from the user's own prose or Markdown. */
 export function composeDeckFromText(rawText: string, opts: ComposeOptions = {}): SlideDeck {
   const framework = opts.framework || 'Standard-Narrative';

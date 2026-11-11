@@ -173,6 +173,22 @@ export function buildOutlineFromBrief(text: string, slideCount: number, title?: 
     });
   }
 
+  // A bare topic (no questions or sections to ground in): structural headings only,
+  // with empty bullets for the presenter to fill. No facts are supplied.
+  if (body.length === 0) {
+    const arc: Array<[string, VisualType]> = [
+      [`Why ${docTitle} matters`, "3-Card Grid"],
+      ["The key ideas", "3-Card Grid"],
+      ["How it works", "Process / Timeline"],
+      ["The evidence", "Evidence & Metrics"],
+      ["Competing perspectives", "2-Column Comparison"],
+      ["The system or structure", "Architecture Diagram"],
+      ["Open questions", "3-Card Grid"],
+      ["Implications", "3-Card Grid"],
+    ];
+    body = arc.slice(0, Math.max(1, count - 2)).map(([t, v]) => ({ id: newOutlineId(), title: t, visualType: v, bullets: [] }));
+  }
+
   const cards: OutlineCard[] = [
     { id: newOutlineId(), title: docTitle, visualType: "Title Hero", bullets: [] },
     ...body,

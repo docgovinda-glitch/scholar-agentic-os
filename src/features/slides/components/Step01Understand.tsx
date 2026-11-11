@@ -1,34 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  Upload,
-  FileText,
-  CheckCircle2,
-  AlertCircle,
-  AlertTriangle,
-  Trash2,
-  Sparkles,
-  ChevronDown,
-  Image as ImageIcon,
-  Plus,
-  X,
-} from 'lucide-react';
-import type { SlideDeck, NarrativeFramework, PresentationScopeBoundaries } from '../types/slides';
-import {
-  generateSlideDeck,
-  PRESENTATION_STYLE_PROFILES,
-} from '../services/slideGenerator';
-import { classifyPresentationScope } from '../services/presentationScopeClassifier';
-import { composeDeckFromPlan, composeDeckFromText, legacyDeckToGamma, slidesForMinutes } from '../gamma/composer';
-import { DEFAULT_DECK_THEME_ID, resolveDeckTheme } from '../gamma/theme';
-import { GammaSlide } from '../gamma/GammaCard';
+import React, { useRef, useState } from 'react';
+import { ChevronDown, FileText, Loader2, Sparkles, Trash2, Upload } from 'lucide-react';
+import type { SlideDeck } from '../types/slides';
+import { composeDeckFromOutline } from '../gamma/composer';
+import { DEFAULT_DECK_THEME_ID } from '../gamma/theme';
 import { normalizeDeck } from '../gamma/content';
-
-const AUDIENCE_LABELS: Record<'general' | 'executive' | 'academic', string> = {
-  general: 'General audience',
-  executive: 'Executive briefing',
-  academic: 'Academic seminar',
-};
-import { authedJsonFetch } from '../../../../src/desk/api';
+import { authedJsonFetch } from '../../../desk/api';
+import { stripCourseCodes } from '../../../utils/briefExtractor';
+import { buildOutlineFromBrief, cleanBriefText, deriveDocumentTitle, type OutlineCard } from '../../../shared/presentationBrief';
+import OutlineBuilder from './OutlineBuilder';
 
 export interface Step01UnderstandProps {
   projectId?: string;
@@ -37,1047 +16,345 @@ export interface Step01UnderstandProps {
   onNextStep: () => void;
 }
 
+export const SLIDE_COUNT_OPTIONS = [6, 8, 10, 12, 15] as const;
+
 /** Speaking time per slide, rounded to 15 seconds, as m:ss. */
 export function perSlideTime(minutes: number, slides: number): string {
   const sec = Math.max(15, Math.round((minutes * 60) / Math.max(1, slides) / 15) * 15);
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 }
 
-export default function Step01Understand({
-  projectId,
-  deck,
-  onUpdateDeck,
-  onNextStep,
-}: Step01UnderstandProps) {
-  const [topicInput, setTopicInput] = useState(
-    deck.topic || (deck.title && deck.title !== 'Untitled Presentation' ? deck.title : '') || ''
-  );
-  const [rawTextInput, setRawTextInput] = useState('');
+const signature = (cards: OutlineCard[]) => JSON.stringify(cards.map((c) => [c.title, c.visualType, c.bullets]));
+const nearestCount = (n: number) => SLIDE_COUNT_OPTIONS.reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a));
+
+export default function Step01Understand({ projectId, deck, onUpdateDeck, onNextStep }: Step01UnderstandProps) {
+  const [topic, setTopic] = useState(deck.topic || (deck.title && deck.title !== 'Untitled Presentation' ? deck.title : '') || '');
   const [inputMode, setInputMode] = useState<'topic' | 'upload'>('topic');
-  const [selectedFramework, setSelectedFramework] = useState<NarrativeFramework>(
-    deck.framework || 'Standard-Narrative'
-  );
-  // The talk this deck is for: its length sets the slide budget, and the key
-  // message opens and closes the deck.
-  const [talkMinutes, setTalkMinutes] = useState<number>(deck.talkMinutes || 10);
-  const [keyMessage, setKeyMessage] = useState<string>(deck.keyMessage || '');
-  const [slideCount, setSlideCount] = useState<number>(
-    deck.slides.length >= 3 ? deck.slides.length : slidesForMinutes(deck.talkMinutes || 10)
-  );
-  const [aiNotice, setAiNotice] = useState<string | null>(null);
-  const [audienceLevel, setAudienceLevel] = useState<'general' | 'executive' | 'academic'>('general');
-  const [isDecomposing, setIsDecomposing] = useState(false);
+  const [slideCount, setSlideCount] = useState<number>(nearestCount(deck.outline?.length || deck.slides.length || 10));
+  const [rawText, setRawText] = useState('');
+  const [fileName, setFileName] = useState('');
+  const [fileWords, setFileWords] = useState(0);
+  const [cards, setCards] = useState<OutlineCard[]>(() => (deck.outline ?? []).map((c) => ({ ...c, visualType: c.visualType as OutlineCard['visualType'] })));
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  // File Upload & Drag-and-Drop States
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const [uploadedFileName, setUploadedFileName] = useState<string>('');
-  const [uploadedFileSize, setUploadedFileSize] = useState<string>('');
-  const [uploadedWordCount, setUploadedWordCount] = useState<number>(0);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [isParsingFile, setIsParsingFile] = useState(false);
-  const [previewSnippet, setPreviewSnippet] = useState<string>('');
-  const [showExcerpt, setShowExcerpt] = useState(false);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const outlineTheme = resolveDeckTheme(deck.themeId || DEFAULT_DECK_THEME_ID, deck.customTheme);
-
-  // Green ("What This Covers") & Yellow/Orange ("What to Avoid") Scope State
-  const [scope, setScope] = useState<PresentationScopeBoundaries>(() => {
-    if (deck.talkPoints?.length) {
-      const base = classifyPresentationScope('', '');
-      return { ...base, covers: deck.talkPoints };
-    }
-    return classifyPresentationScope(
-      deck.slides[0]?.speakerNotes || '',
-      deck.topic || (deck.title && deck.title !== 'Untitled Presentation' ? deck.title : '')
-    );
-  });
-  const [newCoverInput, setNewCoverInput] = useState('');
-  const [showAddCover, setShowAddCover] = useState(false);
-  const [newAvoidInput, setNewAvoidInput] = useState('');
-  const [showAddAvoid, setShowAddAvoid] = useState(false);
-
-  const handleRemoveCover = (idxToRemove: number) => {
-    setScope((prev) => ({
-      ...prev,
-      covers: prev.covers.filter((_, idx) => idx !== idxToRemove),
-    }));
+  const persistOutline = (next: OutlineCard[], title = deck.title) => {
+    setCards(next);
+    onUpdateDeck({ ...deck, title, topic: title, outline: next });
   };
 
-  const handleAddCover = (newPoint: string) => {
-    if (!newPoint.trim()) return;
-    setScope((prev) => ({
-      ...prev,
-      covers: [...prev.covers, newPoint.trim()],
-    }));
-  };
-
-  const handleRemoveAvoid = (idxToRemove: number) => {
-    setScope((prev) => ({
-      ...prev,
-      avoids: prev.avoids.filter((_, idx) => idx !== idxToRemove),
-    }));
-  };
-
-  const handleAddAvoid = (newRule: string) => {
-    if (!newRule.trim()) return;
-    setScope((prev) => ({
-      ...prev,
-      avoids: [...prev.avoids, newRule.trim()],
-    }));
-  };
-
-  // Global Screenshot / Image Paste Support (Cmd+V)
-  useEffect(() => {
-    const handlePaste = (e: ClipboardEvent) => {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].type.startsWith('image/')) {
-          const file = items[i].getAsFile();
-          if (file) {
-            setInputMode('upload');
-            processFile(file);
-            break;
-          }
-        }
-      }
-    };
-
-    window.addEventListener('paste', handlePaste);
-    return () => window.removeEventListener('paste', handlePaste);
-  }, [selectedFramework, slideCount]);
-
-  const handleDecompose = (overrideText?: string, overrideTopic?: string) => {
-    setIsDecomposing(true);
-    try {
-      const textToUse = overrideText !== undefined ? overrideText : (rawTextInput || undefined);
-      const topicToUse = overrideTopic !== undefined ? overrideTopic : topicInput;
-
-      const lowerTopic = (topicToUse || '').toLowerCase();
-      const isSwiss =
-        ['bird', 'plover', 'swiss', 'editorial'].some((k) => lowerTopic.includes(k)) || deck.themeId === 'swiss-editorial';
-      // Curated course case study with real, hand-written content.
-      const isCuratedCase = ['zappos', 'schein', 'mn6094ni'].some((k) => lowerTopic.includes(k));
-      // The points list is the presenter's: only uploaded material or a curated
-      // case replaces it.
-      let points = scope.covers;
-      if ((textToUse && textToUse.trim().length > 40) || isCuratedCase) {
-        const nextScope = classifyPresentationScope(textToUse || '', topicToUse || '');
-        if (nextScope.covers.length || isCuratedCase) {
-          setScope(nextScope);
-          points = nextScope.covers;
-        }
-      }
-      const audienceLabel = AUDIENCE_LABELS[audienceLevel];
-      const composeOpts = {
-        topic: topicToUse,
-        slideCount,
-        framework: selectedFramework,
-        audience: audienceLabel,
-        deckId: deck.id,
-      };
-
-      let generatedDeck: SlideDeck;
-      if (textToUse && textToUse.trim().length > 40) {
-        // Build cards from the user's own text; figures only if they are in it.
-        generatedDeck = composeDeckFromText(textToUse, { ...composeOpts, title: topicToUse || undefined });
-      } else if (isCuratedCase) {
-        // The Swiss Editorial look is only a theme (applied below); its old
-        // sample deck (a plover field report with fixed figures) is never used
-        // as the content of someone else's topic.
-        const legacy = generateSlideDeck({ topic: topicToUse, text: textToUse, framework: selectedFramework, slideCount, presentationStyle: selectedFramework, audienceLevel });
-        // Curated decks are trusted content: keep every figure they carry.
-        generatedDeck = legacyDeckToGamma(legacy, JSON.stringify(legacy.slides));
-      } else {
-        generatedDeck = composeDeckFromPlan({
-          title: topicToUse,
-          keyMessage,
-          points,
-          talkMinutes,
-          slideCount,
-          audience: audienceLabel,
-          framework: selectedFramework,
-          deckId: deck.id,
-        });
-      }
-
-      onUpdateDeck({
-        ...generatedDeck,
-        talkMinutes,
-        ...(keyMessage.trim() ? { keyMessage: keyMessage.trim() } : {}),
-        ...(points.length ? { talkPoints: points } : {}),
-        id: deck.id || generatedDeck.id,
-        themeId: isSwiss ? 'swiss-editorial' : deck.themeId || DEFAULT_DECK_THEME_ID,
-        customTheme: deck.customTheme,
-      });
-    } finally {
-      setIsDecomposing(false);
-    }
-  };
-
-  // AI Live Deck Generation from Scoped Project Research
-  const handleLiveAiDeckGeneration = async () => {
-    setAiNotice(null);
-    if (!projectId) {
-      handleDecompose();
-      setAiNotice('AI drafting needs a saved project. This is a starter outline built from your plan.');
+  /** Outline from the server (scholarBrain); a brief-grounded outline when offline or signed out. */
+  const requestOutline = async (opts: { text?: string; title?: string; instruction?: string; file?: string } = {}) => {
+    const material = cleanBriefText(opts.text ?? rawText);
+    const topicNow = stripCourseCodes(opts.title ?? topic).trim();
+    if (!material.trim() && !topicNow) {
+      setError('Add a topic or upload a document first.');
       return;
     }
-    setIsDecomposing(true);
-    let fallbackReason = '';
+    setBusy(true);
+    setError(null);
+    setNotice(null);
     try {
-      const res = await authedJsonFetch(
-        `/api/projects/${encodeURIComponent(projectId)}/presentation/generate-deck`,
-        'POST',
-        {
-          title: topicInput,
-          topic: topicInput,
-          keyMessage: keyMessage || undefined,
-          points: scope.covers,
-          durationMinutes: talkMinutes,
-          framework: selectedFramework,
+      if (projectId) {
+        const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/presentation/outline`, 'POST', {
+          rawText: material || undefined,
+          topic: topicNow || undefined,
+          fileName: opts.file ?? fileName,
           slideCount,
-          audienceLevel,
-          rawText: rawTextInput || undefined,
+          instruction: opts.instruction,
+          current: opts.instruction ? cards.map((c) => ({ title: c.title, bullets: c.bullets })) : undefined,
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { title?: string; slides?: OutlineCard[]; generatedBy?: string };
+          if (Array.isArray(data.slides) && data.slides.length) {
+            const title = data.title || topicNow || deck.title;
+            setTopic(title);
+            persistOutline(data.slides, title);
+            if (data.generatedBy !== 'ai-gateway') {
+              setNotice('No AI answered, so this outline is built from your document\'s own questions and sections. Connect an AI in AI Access for a fully written outline.');
+            }
+            return;
+          }
+        } else if (res.status === 401) {
+          setNotice('Sign in so your AI can write the outline. This outline is built from your document.');
+        } else {
+          const err = (await res.json().catch(() => ({}))) as { error?: string };
+          setNotice(`The AI could not write the outline${err.error ? `: ${err.error}` : ''}. This outline is built from your document.`);
         }
-      );
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.generatedBy === 'ai-gateway' && data.deck && Array.isArray(data.deck.slides) && data.deck.slides.length > 0) {
-          onUpdateDeck({
-            ...normalizeDeck(data.deck as SlideDeck),
-            id: deck.id || data.deck.id,
-            themeId: deck.themeId || DEFAULT_DECK_THEME_ID,
-            customTheme: deck.customTheme,
-            talkMinutes,
-            ...(keyMessage.trim() ? { keyMessage: keyMessage.trim() } : {}),
-            ...(scope.covers.length ? { talkPoints: scope.covers } : {}),
-          });
-          return;
-        }
-        fallbackReason = 'No AI is connected, so this is a starter outline built from your plan. Connect one in AI Access to have the slides drafted.';
-      } else if (res.status === 401) {
-        fallbackReason = 'Sign in so your AI can draft the slides. This is a starter outline built from your plan.';
-      } else {
-        const err = await res.json().catch(() => ({}));
-        const why = (err as { error?: string }).error?.trim().replace(/\.$/, '');
-        fallbackReason = `The AI could not draft the slides${why ? `: ${why}.` : '.'} This is a starter outline built from your plan.`;
       }
+      const local = buildOutlineFromBrief(material || topicNow, slideCount, topicNow || undefined);
+      setTopic(local.title);
+      persistOutline(local.slides, local.title);
     } catch (e) {
-      fallbackReason = `The AI could not draft the slides${e instanceof Error && e.message ? `: ${e.message}` : '.'} This is a starter outline built from your plan.`;
+      setError(e instanceof Error ? e.message : 'Could not build the outline.');
     } finally {
-      setIsDecomposing(false);
+      setBusy(false);
     }
-    handleDecompose();
-    setAiNotice(fallbackReason);
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const processFile = async (file: File) => {
-    if (!file) return;
-
-    setUploadError(null);
-    setIsParsingFile(true);
-    setUploadedFileName(file.name);
-    setUploadedFileSize(formatFileSize(file.size));
-
-    const lowerName = file.name.toLowerCase();
-    const isImageFile = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(lowerName);
-
-    if (isImageFile) {
-      try {
-        const preview = URL.createObjectURL(file);
-        setImagePreviewUrl(preview);
-      } catch (e) {
-        console.warn('Could not generate object URL for image:', e);
-      }
-    } else {
-      setImagePreviewUrl(null);
-    }
-
+    setError(null);
+    setNotice(null);
+    setFileName(file.name);
+    setBusy(true);
     try {
-      let extractedText = '';
-      let derivedTitle = '';
-      let detectedWordCount = 0;
-
-      // Fast-path client reading for plain text and markdown
-      if (lowerName.endsWith('.txt') || lowerName.endsWith('.md') || lowerName.endsWith('.markdown')) {
-        extractedText = await file.text();
-        const words = extractedText.trim().split(/\s+/).filter(Boolean);
-        detectedWordCount = words.length;
-
-        // Extract title candidate
-        const lines = extractedText.split(/\r?\n/).map(l => l.trim().replace(/^#+\s*/, '')).filter(Boolean);
-        derivedTitle = lines.find(l => l.length >= 8 && l.length <= 120) || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+      const lower = file.name.toLowerCase();
+      let text = '';
+      let title = '';
+      if (/\.(txt|md|markdown)$/.test(lower)) {
+        text = await file.text();
+        title = deriveDocumentTitle(text, file.name);
       } else {
-        // Send to backend parse endpoint for PDF / DOCX / PPTX / Images
+        const form = new FormData();
+        form.append('file', file);
+        let authHeader: Record<string, string> = {};
         try {
-          const formData = new FormData();
-          formData.append('file', file);
-
-          const headers: Record<string, string> = {};
-          try {
-            const { isSupabaseConfigured, getSupabaseClient } = await import('../../../services/supabaseClient');
-            if (isSupabaseConfigured()) {
-              const { data } = await getSupabaseClient().auth.getSession();
-              if (data?.session?.access_token) {
-                headers['Authorization'] = `Bearer ${data.session.access_token}`;
-              }
-            }
-          } catch {}
-
-          const res = await fetch('/api/presentations/parse-document', {
-            method: 'POST',
-            ...(Object.keys(headers).length > 0 ? { headers } : {}),
-            body: formData,
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            extractedText = data.text || '';
-            derivedTitle = data.detectedTitle || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-            detectedWordCount = data.wordCount || (extractedText ? extractedText.split(/\s+/).filter(Boolean).length : 0);
-          } else {
-            throw new Error(`Server returned HTTP ${res.status}`);
+          const { isSupabaseConfigured, getSupabaseClient } = await import('../../../services/supabaseClient');
+          if (isSupabaseConfigured()) {
+            const { data } = await getSupabaseClient().auth.getSession();
+            if (data?.session?.access_token) authHeader = { Authorization: `Bearer ${data.session.access_token}` };
           }
-        } catch (serverErr) {
-          // Client-side fallback for images or offline environments
-          if (isImageFile) {
-            const cleanBase = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
-            const isScreen = /screenshot|capture|img/i.test(cleanBase);
-            derivedTitle = isScreen ? 'Visual Presentation Blueprint' : cleanBase;
-            extractedText = `# ${derivedTitle}\n\nKey visual takeaways, data signals, and thematic structures identified from visual presentation slide.`;
-            detectedWordCount = 35;
+        } catch {
+          // signed out or offline: the server decides
+        }
+        const res = await fetch('/api/presentations/parse-document', { method: 'POST', headers: authHeader, body: form });
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(err.error || `The document could not be read (HTTP ${res.status}).`);
+        }
+        const data = (await res.json()) as { text?: string; detectedTitle?: string };
+        text = data.text || '';
+        title = data.detectedTitle || deriveDocumentTitle(text, file.name);
+      }
+      text = cleanBriefText(text);
+      if (!text.trim()) throw new Error('Could not extract readable text from this document.');
+      setRawText(text);
+      setFileWords(text.split(/\s+/).filter(Boolean).length);
+      setTopic(title);
+      setBusy(false);
+      // Uploading is enough: the outline is written straight away.
+      await requestOutline({ text, title, file: file.name });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to process the document.');
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const removeFile = () => {
+    setFileName('');
+    setRawText('');
+    setFileWords(0);
+  };
+
+  /** Turn the reviewed outline into slides (AI-written copy when available), then move on. */
+  const proceed = async () => {
+    const sig = signature(cards);
+    if (deck.slides.length > 0 && deck.outlineBuiltFrom === sig) {
+      onNextStep();
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    let built: SlideDeck | null = null;
+    try {
+      if (projectId) {
+        const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/presentation/generate-deck`, 'POST', {
+          title: deck.title,
+          topic: deck.title,
+          rawText: rawText || undefined,
+          slideCount: cards.length,
+          outline: cards.map((c) => ({ title: c.title, visualType: c.visualType, bullets: c.bullets.filter(Boolean) })),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.generatedBy === 'ai-gateway' && data.deck?.slides?.length >= cards.length) {
+            built = { ...normalizeDeck(data.deck as SlideDeck), id: deck.id || data.deck.id };
           } else {
-            throw serverErr;
+            setNotice('No AI is connected, so the slides use your outline as written. Connect one in AI Access to have the copy written.');
           }
         }
       }
-
-      if (!extractedText.trim()) {
-        throw new Error('Could not extract readable text from document. Please ensure the file contains text.');
-      }
-
-      setRawTextInput(extractedText);
-      setPreviewSnippet(extractedText.slice(0, 500));
-      setUploadedWordCount(detectedWordCount);
-
-      if (derivedTitle) {
-        setTopicInput(derivedTitle);
-      }
-
-      // Automatically generate deck from document / image
-      handleDecompose(extractedText, derivedTitle || topicInput);
-    } catch (err: any) {
-      setUploadError(err.message || 'Failed to process document');
-    } finally {
-      setIsParsingFile(false);
+    } catch {
+      setNotice('The AI could not write the slide copy, so the slides use your outline as written.');
     }
+    if (!built) built = composeDeckFromOutline(cards.map((c) => ({ ...c, bullets: c.bullets.filter(Boolean) })), { title: deck.title, deckId: deck.id });
+    onUpdateDeck({
+      ...built,
+      id: deck.id || built.id,
+      title: deck.title,
+      topic: deck.title,
+      outline: cards,
+      outlineBuiltFrom: sig,
+      themeId: deck.themeId || DEFAULT_DECK_THEME_ID,
+      customTheme: deck.customTheme,
+    });
+    setBusy(false);
+    onNextStep();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      processFile(file);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingOver(false);
-
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      processFile(file);
-    }
-  };
-
-  const handleRemoveFile = () => {
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    setUploadedFileName('');
-    setUploadedFileSize('');
-    setUploadedWordCount(0);
-    setRawTextInput('');
-    setPreviewSnippet('');
-    setImagePreviewUrl(null);
-    setUploadError(null);
-  };
+  const hasOutline = cards.length > 0;
 
   return (
-    <div
-      className="max-w-5xl mx-auto space-y-6 p-4 sm:p-6 text-neutral-900 dark:text-neutral-100 font-sans"
-      data-testid="step-01-understand"
-    >
-      {/* Header Banner - Coursework Aligned (Images 19 & 20) */}
+    <div className="max-w-4xl mx-auto space-y-6 p-4 sm:p-6 text-neutral-900 dark:text-neutral-100 font-sans" data-testid="step-01-understand">
       <div>
-        <div className="flex items-center gap-2 mb-1.5">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200">
-            PHASE 1: UNDERSTAND YOUR TOPIC · Slide Outline
-          </span>
-        </div>
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-          Understand Your Presentation
-        </h1>
-        <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
-          Type your topic, upload a document, or paste a slide screenshot to create a clean, beautiful slide outline.
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-neutral-200">
+          Phase 1 · Understand
+        </span>
+        <h1 className="mt-1.5 text-xl sm:text-2xl font-semibold tracking-tight">Outline your presentation</h1>
+        <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+          Upload your brief or type a topic. Your AI reads it and drafts a slide-by-slide outline you can edit.
         </p>
       </div>
 
-      {/* Unified Setup Card (Matching Coursework Box) */}
-      <div className="bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-2xl p-5 sm:p-7 shadow-xs space-y-5">
-        {/* Segmented Mode Switcher (2 Clean Modes) */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="inline-flex p-1 rounded-xl bg-neutral-100 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 w-fit">
+      <div className="bg-white dark:bg-[#1C1C1E] border border-neutral-200/80 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="inline-flex p-1 rounded-xl bg-neutral-100 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10">
+          {(['topic', 'upload'] as const).map((mode) => (
             <button
+              key={mode}
               type="button"
-              onClick={() => setInputMode('topic')}
-              aria-label="Enter Topic or Question (Academic Topic Prompt)"
-              className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                inputMode === 'topic'
-                  ? 'bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold'
-                  : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
+              onClick={() => setInputMode(mode)}
+              className={`py-1.5 px-3 rounded-lg text-xs font-medium cursor-pointer ${
+                inputMode === mode ? 'bg-white dark:bg-[#2C2C2E] shadow-2xs font-semibold text-neutral-900 dark:text-white' : 'text-neutral-500 dark:text-neutral-400'
               }`}
             >
-              Enter Topic or Question
+              {mode === 'topic' ? 'Enter Topic or Question' : 'Upload Document (.pdf, .docx)'}
             </button>
-            <button
-              type="button"
-              onClick={() => setInputMode('upload')}
-              aria-label="Upload Document (.pdf, .docx, .png)"
-              className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                inputMode === 'upload'
-                  ? 'bg-white dark:bg-[#2C2C2E] text-neutral-900 dark:text-white shadow-2xs font-semibold'
-                  : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
-              }`}
-            >
-              <Upload className="w-3 h-3" />
-              <span>Upload Document (.pdf, .docx)</span>
-            </button>
-          </div>
-
-          {inputMode !== 'upload' && uploadedFileName && (
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-              <FileText className="w-3.5 h-3.5" />
-              <span>{uploadedFileName}</span>
-            </span>
-          )}
+          ))}
         </div>
 
-        {/* Mode 1: the talk plan */}
-        {inputMode === 'topic' && (
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <label htmlFor="topic-input-field" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-                <span>Title</span>
-                <span className="text-rose-500 text-xs">*</span>
-              </label>
-              <input
-                id="topic-input-field"
-                type="text"
-                value={topicInput}
-                onChange={(e) => setTopicInput(e.target.value)}
-                placeholder="A short title, e.g. Real-time decoding for surface codes"
-                className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white"
-              />
+        {inputMode === 'topic' ? (
+          <div className="space-y-1.5">
+            <label htmlFor="presentation-topic" className="text-xs font-semibold">Presentation topic</label>
+            <input
+              id="presentation-topic"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="e.g. Branches of quantum computing"
+              className="w-full h-10 rounded-xl border border-neutral-200 dark:border-white/10 bg-transparent px-3 text-sm"
+            />
+          </div>
+        ) : fileName ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="text-xs font-medium truncate">{fileName}</span>
+              {fileWords > 0 && <span className="text-[11px] text-neutral-500 shrink-0">{fileWords.toLocaleString()} words read</span>}
             </div>
-            <div className="space-y-1">
-              <label htmlFor="key-message-field" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
-                Key message <span className="font-normal text-neutral-500 dark:text-neutral-400">(the one thing your audience should remember)</span>
-              </label>
-              <textarea
-                id="key-message-field"
-                rows={2}
-                value={keyMessage}
-                onChange={(e) => setKeyMessage(e.target.value)}
-                placeholder="One sentence, e.g. A pipelined FPGA decoder keeps up with a surface code in real time."
-                className="w-full bg-neutral-50/70 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10 rounded-xl p-3.5 text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white leading-relaxed resize-y"
-              />
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">It opens your first slide and closes your last. List the points you want to make below; each becomes a slide.</p>
-            </div>
+            <button type="button" onClick={removeFile} aria-label="Remove file" className="text-neutral-400 hover:text-red-500 cursor-pointer">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              const f = e.dataTransfer.files?.[0];
+              if (f) void processFile(f);
+            }}
+            onClick={() => fileRef.current?.click()}
+            className={`cursor-pointer rounded-xl border-2 border-dashed px-4 py-8 text-center ${
+              dragging ? 'border-neutral-900 dark:border-white bg-neutral-50 dark:bg-white/5' : 'border-neutral-200 dark:border-white/10'
+            }`}
+          >
+            <Upload className="w-5 h-5 mx-auto text-neutral-400" />
+            <p className="mt-2 text-xs font-medium">Drop a PDF, DOCX or text file, or click to choose</p>
           </div>
         )}
-
-        {/* Mode 2: Document & Image to PPT Upload Dropzone */}
-        {inputMode === 'upload' && (
-          <div className="space-y-4">
-            {!uploadedFileName ? (
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDraggingOver(true);
-                }}
-                onDragEnter={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDraggingOver(true);
-                }}
-                onDragLeave={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDraggingOver(false);
-                }}
-                onDrop={handleDrop}
-                onClick={() => {
-                  if (!isParsingFile) fileInputRef.current?.click();
-                }}
-                className={`border-2 border-dashed rounded-2xl p-8 transition-all flex flex-col items-center justify-center text-center space-y-3 cursor-pointer ${
-                  isDraggingOver
-                    ? 'border-neutral-900 bg-neutral-50 dark:border-white dark:bg-white/5 scale-[0.99]'
-                    : 'border-neutral-300 dark:border-white/15 bg-neutral-50/50 dark:bg-white/[0.02] hover:border-neutral-400 dark:hover:border-white/30'
-                }`}
-              >
-                <div className="w-12 h-12 rounded-2xl bg-neutral-100 dark:bg-white/10 flex items-center justify-center text-neutral-700 dark:text-neutral-300">
-                  <Upload className="w-6 h-6" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                    Upload your coursework brief, paper, or research draft
-                  </p>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                    Drag and drop your file here, click to browse, or press <kbd className="px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-white/10 font-mono text-[10px]">Cmd+V</kbd> to paste an image
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-neutral-200/60 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-                    PDF
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-neutral-200/60 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-                    DOCX
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                    📸 PNG / JPG (Image to PPT)
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-neutral-200/60 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-                    PPTX
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-neutral-200/60 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-                    TXT / MD
-                  </span>
-                  <span className="text-[11px] text-neutral-400 ml-1">Up to 50MB</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    fileInputRef.current?.click();
-                  }}
-                  disabled={isParsingFile}
-                  className="mt-2 px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 inline-flex items-center gap-2 shadow-xs"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Select Document File</span>
-                </button>
-              </div>
-            ) : (
-              /* Uploaded Document / Image Card */
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 flex items-center justify-between gap-3 shadow-xs">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {imagePreviewUrl ? (
-                      <img
-                        src={imagePreviewUrl}
-                        alt="Screenshot thumbnail"
-                        className="w-12 h-12 rounded-xl object-cover border border-emerald-500/30 shrink-0"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                        <FileText className="w-5 h-5" />
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-neutral-900 dark:text-white truncate">
-                          {uploadedFileName}
-                        </span>
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        {imagePreviewUrl && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                            IMAGE TO PPT
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-                        <span>{uploadedFileSize}</span>
-                        <span>·</span>
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                          {uploadedWordCount.toLocaleString()} words extracted
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowExcerpt(!showExcerpt)}
-                      className="px-2.5 py-1 text-[11px] font-semibold text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200/50 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-                    >
-                      {showExcerpt ? 'Hide Excerpt' : 'View Excerpt'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleRemoveFile}
-                      className="p-1.5 text-neutral-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
-                      title="Remove file"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {showExcerpt && previewSnippet && (
-                  <div className="p-3.5 rounded-xl border border-neutral-200/60 dark:border-white/10 bg-neutral-50/70 dark:bg-black/20 text-xs font-mono text-neutral-700 dark:text-neutral-300 space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">
-                      Extracted Text Preview:
-                    </span>
-                    <p className="line-clamp-4 leading-relaxed">{previewSnippet}...</p>
-                  </div>
-                )}
-
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="derived-topic-field"
-                    className="block text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300"
-                  >
-                    Title
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      id="derived-topic-field"
-                      type="text"
-                      value={topicInput}
-                      onChange={(e) => setTopicInput(e.target.value)}
-                      placeholder="e.g. Why Zappos Pays New Hires to Quit"
-                      className="flex-1 px-4 py-2.5 text-xs sm:text-sm rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-black/20 text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleDecompose(rawTextInput, topicInput)}
-                      disabled={isDecomposing}
-                      className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs cursor-pointer shrink-0 transition-all flex items-center gap-1.5"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Update Outline</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {isParsingFile && (
-              <div className="p-4 rounded-xl border border-neutral-200/80 bg-neutral-50 dark:border-white/10 dark:bg-white/[0.03] text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-3">
-                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" />
-                <span className="font-semibold">
-                  Parsing file and generating clean presentation outline...
-                </span>
-              </div>
-            )}
-
-            {uploadError && (
-              <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs text-amber-800 dark:text-amber-200 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>{uploadError}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Hidden Global File Input */}
         <input
-          ref={fileInputRef}
+          ref={fileRef}
           type="file"
-          accept=".pdf,.docx,.doc,.ppt,.pptx,.txt,.md,.markdown,.png,.jpg,.jpeg,.webp"
-          onChange={handleFileChange}
-          disabled={isParsingFile}
+          accept=".pdf,.docx,.doc,.pptx,.txt,.md,.markdown"
           className="hidden"
           data-testid="presentation-file-input"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void processFile(f);
+          }}
         />
 
-
-        {/* The talk: length, slides, style and audience */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-3 border-t border-neutral-100 dark:border-white/5 items-end">
-          {/* Talk length: sets the slide budget */}
+        <div className="flex flex-wrap items-end gap-3 pt-1">
           <div className="space-y-1">
-            <label htmlFor="talk-length" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">Talk length</label>
-            <div className="relative">
-              <select
-                id="talk-length"
-                value={talkMinutes}
-                onChange={(e) => {
-                  const m = Number(e.target.value);
-                  setTalkMinutes(m);
-                  setSlideCount(slidesForMinutes(m));
-                }}
-                className="w-full h-9 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 text-xs text-neutral-900 dark:text-neutral-100 appearance-none cursor-pointer pr-8 font-medium"
-              >
-                {[5, 10, 15, 20, 30, 45].map((m) => <option key={m} value={m}>{m} minutes</option>)}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400"><ChevronDown className="w-3.5 h-3.5" /></div>
-            </div>
-          </div>
-
-          {/* Slides: suggested from the length, adjustable */}
-          <div className="space-y-1">
-            <label htmlFor="slide-count" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-              <span>Slides</span>
-              <span className="font-normal text-neutral-500 dark:text-neutral-400">(about {perSlideTime(talkMinutes, slideCount)} each)</span>
-            </label>
+            <label htmlFor="slide-count" className="text-xs font-semibold">Slide count</label>
             <div className="relative">
               <select
                 id="slide-count"
+                aria-label="Slide Count"
                 value={slideCount}
                 onChange={(e) => setSlideCount(Number(e.target.value))}
-                aria-label="Slide Count"
-                className="w-full h-9 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 text-xs text-neutral-900 dark:text-neutral-100 appearance-none cursor-pointer pr-8 font-medium"
+                className="h-9 w-36 appearance-none rounded-lg border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] px-3 pr-8 text-xs font-medium cursor-pointer"
               >
-                {Array.from({ length: 12 }, (_, i) => i + 4).map((n) => <option key={n} value={n}>{n} slides</option>)}
+                {SLIDE_COUNT_OPTIONS.map((n) => (
+                  <option key={n} value={n}>{n} slides</option>
+                ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400"><ChevronDown className="w-3.5 h-3.5" /></div>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400" />
             </div>
           </div>
-
-          {/* Presentation Style */}
-          <div className="space-y-1">
-            <label htmlFor="presentation-style" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-              <span>Presentation Style</span>
-              <span className="text-rose-500 text-xs">*</span>
-            </label>
-            <div className="relative">
-              <select
-                id="presentation-style"
-                value={selectedFramework}
-                onChange={(e) => setSelectedFramework(e.target.value as NarrativeFramework)}
-                aria-label="Presentation Style"
-                className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
-              >
-                <option value="WhatIsCouldBe">Academic &amp; Case Study</option>
-                <option value="SCR">Executive Problem &amp; Solution</option>
-                <option value="visual-storytelling">Visual Storytelling</option>
-                <option value="Standard-Narrative">Standard Key Concept</option>
-                <option value="executive-pitch">Executive Pitch</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
-                <ChevronDown className="w-3.5 h-3.5" />
-              </div>
-            </div>
-          </div>
-
-          {/* Audience Level */}
-          <div className="space-y-1">
-            <label htmlFor="audience-level" className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1">
-              <span>Audience Level</span>
-              <span className="text-rose-500 text-xs">*</span>
-            </label>
-            <div className="relative">
-              <select
-                id="audience-level"
-                value={audienceLevel}
-                onChange={(e) => setAudienceLevel(e.target.value as 'general' | 'executive' | 'academic')}
-                aria-label="Audience Level"
-                className="w-full h-8 bg-white dark:bg-[#2C2C2E] border border-neutral-200/80 dark:border-white/10 rounded-lg px-3 py-1 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:focus:ring-white transition-all appearance-none cursor-pointer pr-8 font-medium shadow-2xs"
-              >
-                <option value="general">General Audience</option>
-                <option value="executive">Executive / Leadership</option>
-                <option value="academic">Technical / Academic</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-neutral-400">
-                <ChevronDown className="w-3.5 h-3.5" />
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Build: with the user's AI, or a starter outline from the plan alone */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
           <button
             type="button"
-            onClick={() => void handleLiveAiDeckGeneration()}
-            disabled={isDecomposing || isParsingFile || !topicInput.trim()}
-            className="h-9 rounded-xl px-4 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 font-semibold text-xs disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+            onClick={() => void requestOutline()}
+            disabled={busy || (!topic.trim() && !rawText.trim())}
+            className="h-9 rounded-xl px-4 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-semibold inline-flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
-            {isDecomposing ? (
-              <>
-                <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                <span>Building…</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>{deck.slides.length ? 'Rebuild slides with AI' : 'Build slides with AI'}</span>
-              </>
-            )}
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-amber-400" />}
+            {busy ? 'Working…' : hasOutline ? 'Rebuild outline' : 'Generate outline'}
           </button>
-          <button
-            type="button"
-            onClick={() => { setAiNotice(null); handleDecompose(); }}
-            disabled={isDecomposing || isParsingFile || !topicInput.trim()}
-            aria-label="Starter outline without AI"
-            className="h-9 rounded-xl px-4 border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 font-semibold text-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer"
-          >
-            Starter outline (no AI)
-          </button>
-          {!topicInput.trim() && <span className="text-[11px] text-neutral-500 dark:text-neutral-400">Add a title to start.</span>}
         </div>
-        {aiNotice && (
-          <p role="status" className="text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">{aiNotice}</p>
-        )}
+        {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+        {notice && <p role="status" className="text-xs text-neutral-600 dark:text-neutral-400">{notice}</p>}
       </div>
 
-      {/* Your points (each becomes a slide) and what to leave out. Shown before the first build. */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="presentation-scope-cards">
-        {/* Green Card — What This Presentation Covers */}
-        <div
-          data-testid="presentation-scope-covers-card"
-          className="p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/10 space-y-3 flex flex-col justify-between"
-        >
-          <div className="space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20">
-              <h3 className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span>What This Presentation Covers</span>
-              </h3>
-              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                {scope.covers.length} Key Points · Editable
-              </span>
-            </div>
-
-            {scope.covers.length === 0 && (
-              <p className="text-xs text-emerald-900/80 dark:text-emerald-200/80">
-                List the points you want to make, in order. Each becomes a slide.
-              </p>
-            )}
-            <ul className="space-y-2">
-              {scope.covers.map((item, idx) => (
-                <li
-                  key={idx}
-                  className="text-xs text-emerald-900 dark:text-emerald-200/90 leading-relaxed flex items-start justify-between gap-2 bg-emerald-500/10 dark:bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/15 group"
-                >
-                  <div className="flex items-start gap-2 min-w-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
-                    <span>{item}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveCover(idx)}
-                    className="opacity-0 group-hover:opacity-100 hover:text-red-500 text-neutral-400 transition-opacity p-0.5 shrink-0 cursor-pointer"
-                    title="Remove point"
-                    aria-label={`Remove point ${idx + 1}`}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-
-            {/* Add Key Point */}
-            {showAddCover ? (
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="text"
-                  value={newCoverInput}
-                  onChange={(e) => setNewCoverInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleAddCover(newCoverInput);
-                      setNewCoverInput('');
-                      setShowAddCover(false);
-                    }
-                  }}
-                  placeholder="Add a point you want to make..."
-                  className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-emerald-500/30 bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleAddCover(newCoverInput);
-                    setNewCoverInput('');
-                    setShowAddCover(false);
-                  }}
-                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
-                >
-                  Add
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddCover(false)}
-                  className="p-1 text-neutral-400 hover:text-neutral-600 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowAddCover(true)}
-                className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1 cursor-pointer pt-1"
-              >
-                <Plus className="w-3 h-3" />
-                <span>Add Key Point</span>
-              </button>
-            )}
+      {hasOutline ? (
+        <div className="space-y-5" data-testid="generated-outline-section">
+          <div className="space-y-1.5">
+            <label htmlFor="presentation-title" className="text-xs font-semibold">Presentation title</label>
+            <input
+              id="presentation-title"
+              aria-label="Presentation title"
+              value={deck.title}
+              onChange={(e) => {
+                setTopic(e.target.value);
+                onUpdateDeck({ ...deck, title: e.target.value, topic: e.target.value });
+              }}
+              className="w-full h-11 rounded-xl border border-neutral-200 dark:border-white/10 bg-transparent px-3 text-base font-semibold"
+            />
           </div>
-        </div>
-
-        {/* Yellow/Orange Card — What to Avoid (Out of Scope) */}
-        <div
-          data-testid="presentation-scope-avoids-card"
-          className="p-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 dark:bg-amber-950/10 space-y-3 flex flex-col justify-between"
-        >
-          <div className="space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-amber-500/20">
-              <h3 className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                <span>What to Avoid (Out of Scope)</span>
-              </h3>
-              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
-                {scope.avoids.length} Rules · Editable
-              </span>
-            </div>
-
-            <ul className="space-y-2">
-              {scope.avoids.map((item, idx) => (
-                <li
-                  key={idx}
-                  className="text-xs text-amber-900 dark:text-amber-200/90 leading-relaxed flex items-start justify-between gap-2 bg-amber-500/10 dark:bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/15 group"
-                >
-                  <div className="flex items-start gap-2 min-w-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1.5" />
-                    <span>{item}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveAvoid(idx)}
-                    className="opacity-0 group-hover:opacity-100 hover:text-red-500 text-neutral-400 transition-opacity p-0.5 shrink-0 cursor-pointer"
-                    title="Remove rule"
-                    aria-label={`Remove rule ${idx + 1}`}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-
-            {/* Add Rule */}
-            {showAddAvoid ? (
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="text"
-                  value={newAvoidInput}
-                  onChange={(e) => setNewAvoidInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleAddAvoid(newAvoidInput);
-                      setNewAvoidInput('');
-                      setShowAddAvoid(false);
-                    }
-                  }}
-                  placeholder="Add an out-of-scope rule..."
-                  className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-amber-500/30 bg-white dark:bg-[#1C1C1E] text-neutral-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleAddAvoid(newAvoidInput);
-                    setNewAvoidInput('');
-                    setShowAddAvoid(false);
-                  }}
-                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 cursor-pointer"
-                >
-                  Add
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddAvoid(false)}
-                  className="p-1 text-neutral-400 hover:text-neutral-600 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowAddAvoid(true)}
-                className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-800 flex items-center gap-1 cursor-pointer pt-1"
-              >
-                <Plus className="w-3 h-3" />
-                <span>Add Rule</span>
-              </button>
-            )}
+          <OutlineBuilder
+            cards={cards}
+            onChange={(next) => persistOutline(next)}
+            onRegenerate={(instruction) => void requestOutline({ instruction })}
+            busy={busy}
+          />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => void proceed()}
+              disabled={busy}
+              className="px-6 py-2.5 rounded-xl font-medium text-xs bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-90 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+            >
+              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+              <span>Proceed to Design</span>
+              <span>→</span>
+            </button>
           </div>
-        </div>
-      </div>
-
-      {/* Zero-Ghost State: Empty State when no brief or topic has been outlined */}
-      {deck.slides.length === 0 ? (
-        <div
-          data-testid="zero-ghost-outline-empty-state"
-          className="border-2 border-dashed border-neutral-200/80 dark:border-white/10 rounded-2xl p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-2.5 bg-neutral-50/50 dark:bg-white/[0.02]"
-        >
-          <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-white/5 flex items-center justify-center text-neutral-400 dark:text-neutral-500 mb-0.5">
-            <FileText className="w-5 h-5" />
-          </div>
-          <p className="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-400 max-w-md leading-relaxed">
-            Ready to outline your presentation. Enter a topic or upload your assignment brief above to generate your slides.
-          </p>
         </div>
       ) : (
-        <div className="space-y-6" data-testid="generated-outline-section">
-          {/* Outline: every generated card as a live thumbnail */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200">
-                Generated Presentation Outline ({deck.slides.length} Slides)
-              </h2>
-              <span className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">
-                1 Idea Per Slide
-              </span>
-            </div>
-
-            <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" data-testid="outline-card-grid">
-              {deck.slides.map((slide, idx) => (
-                <li key={slide.id || idx} className="space-y-2" data-testid={`slide-outline-pill-card-${idx + 1}`}>
-                  <GammaSlide slide={slide} index={idx} theme={outlineTheme} />
-                  <div className="flex items-baseline gap-2 px-0.5">
-                    <span className="text-[11px] tabular-nums font-semibold text-neutral-400">{String(idx + 1).padStart(2, '0')}</span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 line-clamp-2">{slide.actionHeadline}</p>
-                      {slide.summary && slide.summary !== slide.actionHeadline && (
-                        <p className="mt-0.5 text-[11px] leading-snug text-neutral-500 dark:text-neutral-400 line-clamp-2">{slide.summary}</p>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ol>
-
-            {/* Stepper Navigation Proceed */}
-            <div className="flex justify-end pt-4">
-              <button
-                type="button"
-                onClick={onNextStep}
-                className="px-6 py-2.5 rounded-xl font-medium text-xs bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-90 shadow-xs transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <span>Proceed to Design</span>
-                <span>→</span>
-              </button>
-            </div>
-          </div>
+        <div data-testid="zero-ghost-outline-empty-state" className="border-2 border-dashed border-neutral-200/80 dark:border-white/10 rounded-2xl p-10 text-center text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
+          Your outline appears here once you add a topic or upload your brief.
         </div>
       )}
     </div>
   );
 }
+

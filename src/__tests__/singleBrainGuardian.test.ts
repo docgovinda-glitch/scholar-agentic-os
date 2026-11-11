@@ -75,4 +75,25 @@ describe("Single-Brain Architecture lock", () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  it("OT-22 (Presentation Studio) runs its AI only through scholarBrain", () => {
+    for (const rel of ["server/routes/project/presentation.ts", "server/routes/presentations.ts"]) {
+      const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
+      expect(text, rel).not.toMatch(/utils\/llm/);
+      expect(text, rel).not.toMatch(/callOpenRouter|streamOpenRouter/);
+    }
+    const route = fs.readFileSync(path.join(ROOT, "server/routes/project/presentation.ts"), "utf8");
+    expect(route).toMatch(/scholarBrain\.presentationOutline/);
+    expect(route).toMatch(/scholarBrain\.writeSlideBlock/);
+    expect(route).toMatch(/scholarBrain\.complete/);
+  });
+
+  it("OT-22 client code has no document-banner or course-code title hacks", () => {
+    const offenders: string[] = [];
+    for (const rel of productionFiles(["src/desk/presentation", "src/features/slides"])) {
+      const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
+      if (/DEPARTMENT\s+OF\s+COMPUTER/i.test(text)) offenders.push(rel);
+    }
+    expect(offenders).toEqual([]);
+  });
 });

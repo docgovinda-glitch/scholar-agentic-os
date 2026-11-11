@@ -721,6 +721,44 @@ function layoutComparison(ctx: Ctx, c: CardContent, n?: number) {
   pageNumber(ctx, n);
 }
 
+function layoutTable(ctx: Ctx, c: CardContent, n?: number) {
+  const { theme } = ctx;
+  const cols = c.columns ?? [{ title: '', points: [] }, { title: '', points: [] }];
+  const top = header(ctx, c, { x: PAD_X, y: TOP, w: CANVAS_W - PAD_X * 2, headlineMax: 44, headlineMin: 30, headlineLines: 2, ledeLines: 2 }) + 32;
+  const w = CANVAS_W - PAD_X * 2;
+  const colW = w / 2;
+  const pad = 22;
+  const rows = Math.max(cols[0].points.length, cols[1].points.length, 1);
+  const rowCount = Math.min(6, rows);
+  const headH = 52;
+  const avail = BOTTOM - top - headH;
+  const rowH = Math.min(86, Math.max(48, Math.floor(avail / rowCount)));
+  const size = rowH >= 70 ? 19 : rowH >= 58 ? 17 : 15;
+
+  cols.forEach((col, ci) => {
+    const x = PAD_X + ci * colW;
+    rect(ctx, { x, y: top, w: colW, h: headH, fill: theme.accent, radius: 0 });
+    text(ctx, {
+      x: x + pad, y: top, w: colW - pad * 2, h: headH, text: col.title || (ci === 0 ? 'Option A' : 'Option B'), path: col.title ? `columns.${ci}.title` : undefined, size: 18, weight: 700,
+      color: theme.onAccent, font: theme.headingFont, align: 'left', valign: 'middle', lineHeight: 1.2,
+    });
+  });
+  for (let ri = 0; ri < rowCount; ri++) {
+    const y = top + headH + ri * rowH;
+    rect(ctx, { x: PAD_X, y, w, h: rowH, fill: ri % 2 === 0 ? theme.surfaceAlt : theme.bg, radius: 0 });
+    cols.forEach((col, ci) => {
+      const point = col.points[ri];
+      if (!point) return;
+      text(ctx, {
+        x: PAD_X + ci * colW + pad, y: y + 8, w: colW - pad * 2, h: rowH - 16, text: point, path: `columns.${ci}.points.${ri}`, size, weight: 400,
+        color: theme.text, font: theme.bodyFont, align: 'left', valign: 'middle', lineHeight: 1.35,
+      });
+    });
+  }
+  line(ctx, { x1: PAD_X + colW, y1: top, x2: PAD_X + colW, y2: top + headH + rowCount * rowH, color: theme.border, width: 1 });
+  pageNumber(ctx, n);
+}
+
 function layoutQuote(ctx: Ctx, c: CardContent, n?: number) {
   const { theme } = ctx;
   const q = c.quote ?? { text: c.headline };
@@ -840,6 +878,9 @@ function buildGeometry(content: CardContent, layout: GammaLayout, theme: DeckThe
       break;
     case 'timeline':
       layoutTimeline(ctx, c, slideNumber);
+      break;
+    case 'table':
+      layoutTable(ctx, c, slideNumber);
       break;
     case 'comparison':
       layoutComparison(ctx, c, slideNumber);

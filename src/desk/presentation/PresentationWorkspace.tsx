@@ -184,7 +184,7 @@ export default function PresentationWorkspace({
           // Initialize cleanly from project's existing research metadata
           const projTitle = a['title'] || project.title || 'Untitled Presentation';
           setDeck((prev) => {
-            if (prev && prev.slides.length > 0) return prev;
+            if (prev && (prev.slides.length > 0 || (prev.outline && prev.outline.length > 0) || (prev.title && prev.title !== 'Untitled Presentation'))) return prev;
             return {
               id: `deck-${projectId}`,
               title: projTitle,
@@ -472,6 +472,7 @@ export default function PresentationWorkspace({
 
             {currentStep === 'studio' && (
                 <Step03EditSlides
+                  projectId={projectId}
                   deck={deck}
                   onUpdateDeck={handleUpdateDeck}
                   onPrevStep={() => setCurrentStep('design')}

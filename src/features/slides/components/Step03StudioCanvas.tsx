@@ -7,6 +7,10 @@
  * drawn by the shared gamma engine, so what you see here is what Present and
  * PowerPoint show.
  */
+import { SlideLayoutSwitcher, AddBlockMenu } from './StudioBlockTools';
+import { addBlock, contentContext, BLOCK_SPECS, type BlockKind, type BlockFill } from '../gamma/blocks';
+import { authedJsonFetch } from '../../../desk/api';
+import { imageFileToDataUrl } from '../gamma/imageFile';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Copy, GripVertical, ImagePlus, ImageOff, Minus, Plus, Redo2, Sparkles, Trash2, Undo2, Wand2 } from 'lucide-react';
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
@@ -32,6 +36,7 @@ import { useDeckHistory } from '../gamma/useDeckHistory';
 import type { DeckTheme } from '../gamma/theme';
 
 export interface Step03StudioCanvasProps {
+  projectId?: string;
   deck: SlideDeck;
   onUpdateDeck: (updated: SlideDeck) => void;
   onPrevStep: () => void;
@@ -83,36 +88,6 @@ function unitCount(content: CardContent, layout: GammaLayout): number {
   return c.items.length;
 }
 
-/**
- * Reads an image file into a downscaled JPEG/PNG data URL. Images live inside
- * the deck (no external hosting), which the app's CSP allows and which the
- * .pptx exporter can embed directly.
- */
-async function imageFileToDataUrl(file: File, maxSide = 1600): Promise<string> {
-  if (!file.type.startsWith('image/')) throw new Error('Please choose an image file.');
-  if (file.size > 15 * 1024 * 1024) throw new Error('That image is larger than 15 MB.');
-  const raw = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('Could not read that image.'));
-    reader.readAsDataURL(file);
-  });
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const el = new Image();
-    el.onload = () => resolve(el);
-    el.onerror = () => reject(new Error('That image format is not supported.'));
-    el.src = raw;
-  });
-  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return raw;
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  const keepAlpha = file.type === 'image/png' || file.type === 'image/gif' || file.type === 'image/webp';
-  return canvas.toDataURL(keepAlpha ? 'image/png' : 'image/jpeg', 0.85);
-}
 
 const UNIT_LIMIT: Partial<Record<GammaLayout, number>> = { bento: 6, stats: 4, timeline: 5, comparison: 6, list: 6, split: 4 };
 
@@ -184,9 +159,11 @@ function SortableThumb({ slide, index, total, active, theme, onSelect, onMove, o
   );
 }
 
-export default function Step03StudioCanvas({ deck, onUpdateDeck, onPrevStep, onNextStep }: Step03StudioCanvasProps) {
+export default function Step03StudioCanvas({ projectId, deck, onUpdateDeck, onPrevStep, onNextStep }: Step03StudioCanvasProps) {
   const [activeIndex, setActiveIndex] = useState(() => Math.min(deck.activeSlideIndex || 0, Math.max(0, deck.slides.length - 1)));
   const [showCopilot, setShowCopilot] = useState(false);
+  const [blockBusy, setBlockBusy] = useState<BlockKind | null>(null);
+  const [blockError, setBlockError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const theme = useMemo(() => resolveDeckTheme(deck.themeId || DEFAULT_DECK_THEME_ID, deck.customTheme), [deck.themeId, deck.customTheme]);
@@ -233,12 +210,6 @@ export default function Step03StudioCanvas({ deck, onUpdateDeck, onPrevStep, onN
     setActiveIndex(ni);
     commit(next, ni);
   };
-
-  // Every layout, rendered with this card's own content.
-  const layoutPreviews = useMemo(
-    () => (slides[index] ? GAMMA_LAYOUTS.map((l) => ({ ...l, slide: { ...slides[index], layoutType: l.id } as SlideCard })) : []),
-    [slides, index],
-  );
 
   const select = (i: number) => {
     setActiveIndex(i);
@@ -308,6 +279,39 @@ export default function Step03StudioCanvas({ deck, onUpdateDeck, onPrevStep, onN
     } catch (err) {
       setImageError(err instanceof Error ? err.message : 'Could not read that image.');
     }
+  };
+  const handleAddBlock = async (kind: BlockKind, withAi: boolean) => {
+    setBlockError(null);
+    let fill: BlockFill = {};
+    if (withAi && projectId) {
+      setBlockBusy(kind);
+      try {
+        const spec = BLOCK_SPECS.find((b) => b.kind === kind);
+        const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/presentation/write-block`, 'POST', {
+          kind: spec?.aiName ?? kind,
+          slideTitle: content.headline,
+          context: contentContext(content),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { title?: string; body?: string };
+          fill = { title: data.title, body: data.body };
+        } else {
+          const err = (await res.json().catch(() => ({}))) as { error?: string };
+          setBlockError(err.error || 'Your AI could not write this block, so a guided placeholder was added.');
+        }
+      } catch {
+        setBlockError('Your AI could not write this block, so a guided placeholder was added.');
+      } finally {
+        setBlockBusy(null);
+      }
+    }
+    const result = addBlock(content, layout, kind, fill);
+    if (!result.added) {
+      setBlockError('This card is full. Remove a point first, or switch layout.');
+      return;
+    }
+    updateSlide(index, (s) => writeCardContent(s, result.content, result.layout));
+    if (result.needsImage) imageInputRef.current?.click();
   };
   const removeImage = () => updateSlide(index, (s) => writeCardContent(s, { ...getCardContent(s), image: undefined }, layout));
 
@@ -416,32 +420,9 @@ export default function Step03StudioCanvas({ deck, onUpdateDeck, onPrevStep, onN
 
         {/* Card + controls */}
         <section className="min-w-0 space-y-4 order-1 lg:order-2">
-          <div role="radiogroup" aria-label="Card layout" className="grid grid-cols-3 sm:grid-cols-5 xl:grid-cols-9 gap-2" data-testid="studio-layout-picker">
-            {layoutPreviews.map((l) => {
-              const active = l.id === layout;
-              return (
-                <button
-                  key={l.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  aria-label={l.label}
-                  title={l.hint}
-                  data-testid={`layout-option-${l.id}`}
-                  onClick={() => handleLayout(l.id)}
-                  className={`group text-left rounded-xl p-1 cursor-pointer transition-all ${
-                    active
-                      ? 'bg-white dark:bg-[#212121] ring-2 ring-neutral-900 dark:ring-neutral-100'
-                      : 'ring-1 ring-neutral-900/[0.07] dark:ring-white/[0.07] hover:bg-white dark:hover:bg-white/[0.04] hover:ring-neutral-900/20 dark:hover:ring-white/20'
-                  }`}
-                >
-                  <span className="block rounded-md overflow-hidden pointer-events-none" aria-hidden>
-                    <GammaSlide slide={l.slide} index={index} theme={theme} rounded={false} showNumber={false} />
-                  </span>
-                  <span className={`block px-0.5 pt-1 text-[11px] font-semibold truncate ${active ? 'text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400'}`}>{l.label}</span>
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <SlideLayoutSwitcher layout={layout} onChange={handleLayout} />
+            <AddBlockMenu onAdd={handleAddBlock} busyKind={blockBusy} canWriteWithAi={Boolean(projectId)} error={blockError} />
           </div>
 
           <GammaSlide slide={slide} index={index} theme={theme} editable onEdit={handleEdit} shadow data-testid="wysiwyg-slide-card" />

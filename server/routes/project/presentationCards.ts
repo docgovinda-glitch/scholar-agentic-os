@@ -9,7 +9,7 @@
  */
 import { z } from "zod";
 
-export const GAMMA_LAYOUT_IDS = ["title", "bento", "stats", "timeline", "comparison", "list", "quote", "split", "statement"] as const;
+export const GAMMA_LAYOUT_IDS = ["title", "bento", "stats", "timeline", "comparison", "list", "quote", "split", "statement", "table"] as const;
 export type GammaLayoutId = (typeof GAMMA_LAYOUT_IDS)[number];
 
 const text = (max: number) => z.string().trim().max(max * 4).transform((s) => s.replace(/\s+/g, " ").slice(0, max));
