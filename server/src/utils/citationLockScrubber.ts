@@ -445,10 +445,13 @@ export function scrubCitations(
     .replace(/[ \t]{2,}/g, " ");
 
   // Pass 5: Chronological Anachronisms & Claim Entailment Analysis
-  const sentences = scrubbedText
-    .split(/(?<=[.?!])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  // Sentences are checked per paragraph so the blank lines between
+  // paragraphs survive the re-join below.
+  const paragraphs = scrubbedText.split(/\n[ \t]*\n+/).map((p) => p.trim()).filter(Boolean);
+  const paragraphSentences = paragraphs.map((p) =>
+    p.split(/(?<=[.?!])\s+/).map((s) => s.trim()).filter((s) => s.length > 0)
+  );
+  const sentences = paragraphSentences.flat();
 
   const allCitedSources = Array.from(citedSourcesSet);
 
@@ -491,7 +494,14 @@ export function scrubCitations(
   });
 
   if (options.checkEntailment !== false) {
-    scrubbedText = processedSentences.join(" ");
+    let cursor = 0;
+    scrubbedText = paragraphSentences
+      .map((group) => {
+        const out = processedSentences.slice(cursor, cursor + group.length).join(" ");
+        cursor += group.length;
+        return out;
+      })
+      .join("\n\n");
   }
 
   return {

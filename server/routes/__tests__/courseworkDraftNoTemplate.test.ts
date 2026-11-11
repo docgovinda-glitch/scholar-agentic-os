@@ -15,6 +15,7 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 vi.mock("../../utils/llm.ts", () => ({
   callOpenRouterJSON: vi.fn(),
   callOpenRouterText: vi.fn(),
+  handOffBeforeStream: vi.fn(async () => false),
   getCandidates: () => [],
   buildAuthorizedPolicy: () => ({}),
   resolveRequestAiConfig: () => ({ candidates: [], isClientConfigured: false }),
@@ -24,7 +25,7 @@ import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
-import { callOpenRouterText } from "../../utils/llm.ts";
+import { callOpenRouterText, handOffBeforeStream } from "../../utils/llm.ts";
 
 process.env.SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_coursework_test";
@@ -52,7 +53,7 @@ async function createProject(): Promise<string> {
 /** What callOpenRouterText does when there is no AI: send the 426 hand-off and throw. */
 function handOffToBrowser() {
   vi.mocked(callOpenRouterText).mockImplementation(async (_req: any, res: any) => {
-    res.status(426).json({ requireFrontendLLM: true, challengeToken: "t", systemPrompt: "s", userPrompt: "u" });
+    if (!res.headersSent) res.status(426).json({ requireFrontendLLM: true, challengeToken: "t", systemPrompt: "s", userPrompt: "u" });
     throw new Error("RequireFrontendLLMException");
   });
 }
@@ -60,6 +61,7 @@ function handOffToBrowser() {
 beforeEach(() => {
   __resetProjectStoreForTests();
   vi.clearAllMocks();
+  vi.mocked(handOffBeforeStream).mockResolvedValue(false);
 });
 
 describe("Coursework stream-section", () => {
@@ -92,26 +94,78 @@ describe("Coursework stream-section", () => {
     const res = await request(app)
       .post(`/api/projects/${id}/assignment/stream-section`)
       .send({ sectionTitle: "Intro", revisionPrompt: "expand", existingContent: "My own words." });
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('"recoverable":true');
+    expect(res.text).not.toContain("fullText");
     expect(res.text).not.toContain("Offline scaffold");
   });
 
-  it("without the user's AI, hands off with a 426 instead of streaming template text", async () => {
+  it("without the user's AI, hands off with a 426 before the stream opens", async () => {
     const id = await createProject();
-    handOffToBrowser();
+    vi.mocked(handOffBeforeStream).mockImplementation(async (_req: any, res: any) => {
+      res.status(426).json({ requireFrontendLLM: true, challengeToken: "t", systemPrompt: "s", userPrompt: "u" });
+      return true;
+    });
     const res = await request(app).post(`/api/projects/${id}/assignment/stream-section`).send({ sectionTitle: "Introduction" });
     expect(res.status).toBe(426);
     expect(res.body.requireFrontendLLM).toBe(true);
+    expect(callOpenRouterText).not.toHaveBeenCalled();
     for (const re of TEMPLATE_MARKERS) expect(res.text).not.toMatch(re);
   });
 
-  it("an empty AI answer is a 502 with no draft", async () => {
+  it("a late hand-off after the stream opened is a recoverable error event", async () => {
+    const id = await createProject();
+    handOffToBrowser();
+    const res = await request(app).post(`/api/projects/${id}/assignment/stream-section`).send({ sectionTitle: "Introduction" });
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('"recoverable":true');
+    expect(res.text).not.toContain("fullText");
+  });
+
+  it("an empty AI answer is a recoverable error event with no draft", async () => {
     const id = await createProject();
     vi.mocked(callOpenRouterText).mockResolvedValue("   ");
     const res = await request(app).post(`/api/projects/${id}/assignment/stream-section`).send({ sectionTitle: "Introduction", targetWordCount: 300 });
-    expect(res.status).toBe(502);
-    expect(res.body.code).toBe("ai_unavailable");
-    expect(res.body.draft).toBeUndefined();
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('"recoverable":true');
+    expect(res.text).toContain("empty answer");
+    expect(res.text).not.toContain("fullText");
+  });
+
+  it("flushes SSE headers before the model answers", async () => {
+    const id = await createProject();
+    vi.mocked(callOpenRouterText).mockResolvedValue("Teams decide together.");
+    const res = await request(app).post(`/api/projects/${id}/assignment/stream-section`).send({ sectionTitle: "Introduction" });
+    expect(res.headers["cache-control"]).toBe("no-cache, no-transform");
+    expect(res.headers["x-accel-buffering"]).toBe("no");
+    expect(res.text.startsWith(": connected")).toBe(true);
+  });
+
+  it("never writes an [Unverified Claim] tag into the streamed prose", async () => {
+    const id = await createProject();
+    vi.mocked(callOpenRouterText).mockResolvedValue("Teams decide by consensus [ev-unknown]. Leaders still shape the outcome [1].");
+    const res = await request(app)
+      .post(`/api/projects/${id}/assignment/stream-section`)
+      .send({ sectionTitle: "Introduction", allocatedWords: 50, boundSources: [{ id: "s1", title: "Group decisions", authors: ["Janis, I."], year: 1982 }] });
+    expect(res.text).not.toMatch(/Unverified Claim/i);
+    expect(res.text).not.toContain("[ev-unknown]");
+  });
+
+  it("keeps the blank lines between paragraphs in the streamed chunks and final text", async () => {
+    const id = await createProject();
+    const p1 = "Groups shape decisions through shared norms. Members anchor on early proposals. This narrows debate quickly.";
+    const p2 = "However, structured dissent widens the options. Teams that assign a critic consider more evidence. The result is a better choice.";
+    vi.mocked(callOpenRouterText).mockResolvedValue(`${p1}\n\n${p2}`);
+    const res = await request(app).post(`/api/projects/${id}/assignment/stream-section`).send({ sectionTitle: "Introduction", allocatedWords: 40 });
+    const events = res.text
+      .split("\n\n")
+      .filter((l) => l.startsWith("data: {"))
+      .map((l) => JSON.parse(l.slice(6)));
+    const streamed = events.filter((e) => typeof e.chunk === "string").map((e) => e.chunk).join("");
+    const full = events.find((e) => typeof e.fullText === "string")?.fullText as string;
+    expect(full).toContain("\n\n");
+    expect(full.split("\n\n")).toHaveLength(2);
+    expect(streamed).toBe(full);
   });
 });
 

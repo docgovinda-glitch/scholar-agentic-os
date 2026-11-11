@@ -11,7 +11,9 @@ import {
   normalizeUnicodeNFC,
 } from "../../../src/utils/scholarlyVoiceGuard.ts";
 import { getProjectStore } from "../../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig } from "../../../src/services/scholarBrain.ts";
+import { callOpenRouterJSON, callOpenRouterText, getCandidates, buildAuthorizedPolicy, resolveRequestAiConfig, handOffBeforeStream } from "../../../src/services/scholarBrain.ts";
+import { ensureParagraphBreaks } from "../../../../src/shared/proseParagraphs.ts";
+import { chunkPreservingWhitespace, openSseStream, paragraphRange, SSE_HEARTBEAT_MS, streamErrorMessage } from "../../../src/utils/sectionStream.ts";
 import { completeWithFailover } from "../../../../src/platform/gateway/gateway.ts";
 import { scholarBrain } from "../../../src/services/scholarBrain.ts";
 import { sendAiFailure, UnusableAiResponseError } from "../../../src/ai/aiRouteErrors.ts";
@@ -307,8 +309,9 @@ router.post("/stream-section", async (req: express.Request<{ id: string }>, res)
   const targetWordCount = Math.min(3000, Math.max(50, capped));
   const budgetRange = sectionWordRange(targetWordCount);
 
-  // The event stream starts only once the AI has answered, so a missing AI
-  // can still be reported as a 426 hand-off or an error status (P0-20).
+  // A missing AI is still a 426 hand-off (checked before the stream opens);
+  // once the stream is open, failures are SSE events (P0-20).
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
   try {
     const mappedSources: WebsiteCitationItem[] = (
       Array.isArray(boundSources) ? boundSources : []
@@ -439,6 +442,8 @@ ${buildSectionContract({
 
 ${frameworkGuidelines}
 
+PARAGRAPH STRUCTURE (mandatory): ${isShortQA ? "write 1-2 paragraphs" : `write ${paragraphRange(targetWordCount)} distinct academic paragraphs`} separated by ONE BLANK LINE (two newline characters). Each paragraph opens with a topic sentence, then explains the technical point, then brings cited evidence, then ends on a transition into the next idea. Never return one long unbroken block and never a single fragment.
+
 Output ONLY the section text in clean academic Markdown prose. Do not print a heading for the section.`;
 
     const scholarlyDirectives = buildScholarlyVoiceSystemPrompt({
@@ -446,20 +451,26 @@ Output ONLY the section text in clean academic Markdown prose. Do not print a he
       dialect: "en-GB",
       requireVaultEvidence: true,
     });
+    const systemPrompt = `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`;
 
-    const draft = await callOpenRouterText(
-      req,
-      res,
-      `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`,
-      prompt,
-      undefined,
-      "drafting"
-    );
+    // No server-side model (or the user's local model goes first): hand off with
+    // a 426 now, while a status can still be sent.
+    if (await handOffBeforeStream(req, res, systemPrompt, prompt, "drafting")) return;
+
+    // Open the event stream BEFORE the model call, and keep it alive while the
+    // model thinks, so proxies (Render, Vite) never drop a silent socket.
+    openSseStream(res);
+    heartbeat = setInterval(() => {
+      if (!res.writableEnded) res.write(": keep-alive\n\n");
+    }, SSE_HEARTBEAT_MS);
+    res.on("close", () => {
+      if (heartbeat) clearInterval(heartbeat);
+    });
+
+    const draft = await callOpenRouterText(req, res, systemPrompt, prompt, undefined, "drafting");
 
     let effectiveDraft = draft?.trim() ?? "";
-    if (!effectiveDraft) {
-      return sendAiFailure(res, new UnusableAiResponseError("section draft"), "Section draft");
-    }
+    if (!effectiveDraft) throw new UnusableAiResponseError("section draft");
 
     // Enforce the budget: ask once for a rewrite when far under, trim to a whole sentence when over.
     if (!revisionPrompt && countExactWords(effectiveDraft) < budgetRange.min) {
@@ -467,8 +478,8 @@ Output ONLY the section text in clean academic Markdown prose. Do not print a he
         const longer = await callOpenRouterText(
           req,
           res,
-          `You are the Scholar Core Grounded Academic Drafting Agent.\n\n${scholarlyDirectives}`,
-          `${prompt}\n\nYOUR PREVIOUS ATTEMPT WAS ${countExactWords(effectiveDraft)} WORDS, BELOW THE BUDGET. Rewrite it fully at ${targetWordCount} words (${budgetRange.min}-${budgetRange.max}), keeping every citation token.\nPREVIOUS ATTEMPT:\n${effectiveDraft}`,
+          systemPrompt,
+          `${prompt}\n\nYOUR PREVIOUS ATTEMPT WAS ${countExactWords(effectiveDraft)} WORDS, BELOW THE BUDGET. Rewrite it fully at ${targetWordCount} words (${budgetRange.min}-${budgetRange.max}) in ${paragraphRange(targetWordCount)} paragraphs separated by blank lines, keeping every citation token.\nPREVIOUS ATTEMPT:\n${effectiveDraft}`,
           undefined,
           "drafting"
         );
@@ -489,31 +500,31 @@ Output ONLY the section text in clean academic Markdown prose. Do not print a he
     // Apply Discourse-Level Scholarly Voice Guardrails (cliché suppression, British English, NFC Unicode preservation)
     effectiveDraft = sanitizeScholarlyText(effectiveDraft, { dialect: "en-GB", stripCliches: true });
     effectiveDraft = normalizeUnicodeNFC(effectiveDraft);
+    // Paragraphs survive every step: blank lines kept, a single wall regrouped.
+    effectiveDraft = ensureParagraphBreaks(effectiveDraft);
 
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders?.();
-
-    const words = effectiveDraft.split(" ");
-    for (let i = 0; i < words.length; i += 5) {
-      const chunk = (i === 0 ? "" : " ") + words.slice(i, i + 5).join(" ");
+    for (const chunk of chunkPreservingWhitespace(effectiveDraft, 5)) {
       res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
     }
     res.write(`data: ${JSON.stringify({ fullText: effectiveDraft })}\n\n`);
     res.write("data: [DONE]\n\n");
     res.end();
   } catch (err: any) {
-    if (err?.message === "RequireFrontendLLMException") return;
-    // Hand-off and configuration errors keep their own status; any other AI failure
-    // (credit/quota exhausted on every provider, 5xx, empty answer) on a first draft
-    // gets a clearly labelled offline scaffold instead of a dropped request.
+    const handedOff = err?.message === "RequireFrontendLLMException";
+    if (handedOff && !res.headersSent) return;
+    if (!res.headersSent) return sendAiFailure(res, err, "Section draft");
+    // The stream is open: every failure becomes an event, never a dropped socket.
+    // Configuration errors keep their own message; any other AI failure
+    // (credit/quota exhausted on every provider, 5xx, timeout) on a first draft
+    // gets a clearly labelled offline scaffold.
     const keepsOwnStatus =
+      handedOff ||
       err instanceof BrowserAiRequiredError ||
       err instanceof InvalidLlmChallengeError ||
       err instanceof LocalModelUnreachableError ||
-      err instanceof NoClientAiProviderError;
-    if (!res.headersSent && !keepsOwnStatus && !revisionPrompt && !String(existingContent || "").trim()) {
+      err instanceof NoClientAiProviderError ||
+      err instanceof UnusableAiResponseError;
+    if (!res.writableEnded && !keepsOwnStatus && !revisionPrompt && !String(existingContent || "").trim()) {
       const scaffold = buildSectionScaffold({
         title: String(sectionTitle || ""),
         prompt: String(sectionGuidance || ""),
@@ -523,21 +534,20 @@ Output ONLY the section text in clean academic Markdown prose. Do not print a he
         targetWords: targetWordCount,
       });
       console.warn("[stream-section] AI unavailable, sending offline scaffold:", err instanceof Error ? err.message : err);
-      res.status(200);
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.flushHeaders?.();
       res.write(`data: ${JSON.stringify({ fallback: { mode: "offline_scaffold", reason: "No AI provider could answer right now." } })}\n\n`);
       res.write(`data: ${JSON.stringify({ fullText: scaffold })}\n\n`);
       res.write("data: [DONE]\n\n");
       res.end();
       return;
     }
-    if (!res.headersSent) return sendAiFailure(res, err, "Section draft");
-    console.error("Stream section error:", err);
-    res.write(`data: ${JSON.stringify({ error: "The section draft stopped before it finished. Try again." })}\n\n`);
-    res.write("data: [DONE]\n\n");
-    res.end();
+    console.error("Stream section error:", err instanceof Error ? err.message : err);
+    if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify({ error: streamErrorMessage(err, handedOff), recoverable: true })}\n\n`);
+      res.write("data: [DONE]\n\n");
+      res.end();
+    }
+  } finally {
+    if (heartbeat) clearInterval(heartbeat);
   }
 });
 

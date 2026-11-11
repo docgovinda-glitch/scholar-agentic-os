@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { showAppToast } from "../../../components/ui/FeedbackSystem";
 import type { AssignmentDraftingSection, DiscoveredSource } from "../types";
+import { splitProseIntoParagraphs } from "../../../shared/proseParagraphs";
 import {
   Sparkles,
   Edit3,
@@ -59,7 +60,8 @@ function renderAcademicProseWithCitations(
 ) {
   if (!prose) return null;
 
-  const paragraphs = prose.split("\n\n");
+  // One <p> per paragraph; a single long block is regrouped every 3-4 sentences.
+  const paragraphs = splitProseIntoParagraphs(prose);
   const citationRegex =
     /(\([A-Z][A-Za-z\s&.,'–-]+,\s*(?:19|20)\d{2}[a-z]?(?:;\s*[A-Z][A-Za-z\s&.,'–-]+,\s*(?:19|20)\d{2}[a-z]?)*\)|\[\d+(?:,\s*\d+)*\])/g;
 
@@ -294,12 +296,30 @@ export function DraftingActiveEditor({
     liveContent
   );
   const hasPointSentence = liveContent.trim().length > 40;
-  const hasLinkConclusion = liveContent.split("\n\n").length > 1;
+  const hasLinkConclusion = splitProseIntoParagraphs(liveContent).length > 1;
 
   const handleManualTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setManualText(val);
     onUpdateContent(val);
+  };
+
+  // Enter starts a new paragraph (a blank line); Shift+Enter is a plain line break.
+  const handleManualKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+    e.preventDefault();
+    const el = e.currentTarget;
+    const { selectionStart, selectionEnd, value } = el;
+    const before = value.slice(0, selectionStart).replace(/[ \t]+$/, "");
+    const after = value.slice(selectionEnd).replace(/^[ \t]+/, "");
+    const sep = before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n";
+    const next = `${before}${sep}${after}`;
+    setManualText(next);
+    onUpdateContent(next);
+    const caret = before.length + sep.length;
+    requestAnimationFrame(() => {
+      el.selectionStart = el.selectionEnd = caret;
+    });
   };
 
   const handleSaveManualEdit = () => {
@@ -494,6 +514,7 @@ export function DraftingActiveEditor({
             ref={textareaRef}
             value={manualText}
             onChange={handleManualTextChange}
+            onKeyDown={handleManualKeyDown}
             onBlur={handleSaveManualEdit}
             placeholder="Start drafting..."
             className="w-full h-full min-h-[60vh] bg-transparent border-none outline-none resize-none text-lg text-neutral-800 dark:text-neutral-200 leading-relaxed font-serif"
@@ -951,6 +972,7 @@ export function DraftingActiveEditor({
               ref={textareaRef}
               value={manualText}
               onChange={handleManualTextChange}
+              onKeyDown={handleManualKeyDown}
               placeholder="Write or refine your academic section prose here..."
               rows={18}
               aria-label="Section text"

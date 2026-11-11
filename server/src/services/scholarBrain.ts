@@ -40,6 +40,7 @@ import {
   getCandidates,
   callOpenRouterJSON as rawCallOpenRouterJSON,
   callOpenRouterText as rawCallOpenRouterText,
+  handOffBeforeStream as rawHandOffBeforeStream,
   streamOpenRouterJSON as rawStreamOpenRouterJSON,
   buildAuthorizedPolicy,
   resolveRequestAiConfig,
@@ -353,6 +354,14 @@ export function callOpenRouterText(...args: Parameters<typeof rawCallOpenRouterT
     const text = await rawCallOpenRouterText(...args);
     return typeof text === "string" ? normalizeUnicodeNFC(text) : text;
   });
+}
+
+/**
+ * Before an SSE route flushes its headers: hand the request to the browser
+ * (426) when no server-side model can answer. True = handed off, stop here.
+ */
+export function handOffBeforeStream(...args: Parameters<typeof rawHandOffBeforeStream>): ReturnType<typeof rawHandOffBeforeStream> {
+  return rawHandOffBeforeStream(...args);
 }
 
 export function streamOpenRouterJSON(...args: Parameters<typeof rawStreamOpenRouterJSON>): ReturnType<typeof rawStreamOpenRouterJSON> {

@@ -38,6 +38,7 @@ import {
   getReferenceListHeading,
 } from "./referenceListGenerator";
 import { isTutorialOrShortQABrief } from "../../../utils/briefExtractor";
+import { splitProseIntoParagraphs } from "../../../shared/proseParagraphs";
 
 const ACADEMIC_LEVEL_NAMES: Record<string, string> = {
   high_school: "High school",
@@ -193,10 +194,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
         })
       );
 
-      const paragraphs = (sec.draftContent || "")
-        .split(/\n\s*\n/)
-        .map((p) => p.trim())
-        .filter((p) => p.length > 0);
+      const paragraphs = splitProseIntoParagraphs(sec.draftContent || "")
 
       paragraphs.forEach((pText) => {
         const cleanP = pText.replace(/^#+\s*/, "");
@@ -379,10 +377,7 @@ export async function generateAssignmentDocx(params: AssignmentExportParams): Pr
     );
 
     // Split content into clean paragraphs
-    const paragraphs = (sec.draftContent || "")
-      .split(/\n\s*\n/)
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0);
+    const paragraphs = splitProseIntoParagraphs(sec.draftContent || "")
 
     if (paragraphs.length === 0) {
       bodyChildren.push(
@@ -603,10 +598,7 @@ export function exportAssignmentToPdf(params: AssignmentExportParams): void {
 
   const sectionsHtml = sections
     .map((s) => {
-      const paras = (s.draftContent || "")
-        .split(/\n\s*\n/)
-        .map((p) => p.trim())
-        .filter(Boolean)
+      const paras = splitProseIntoParagraphs(s.draftContent || "")
         .map((p) => `<p>${inlineMarkdownToHtml(p.replace(/^#+\s*/, ""))}</p>`)
         .join("");
       return `<section class="academic-section"><h2>${s.title}</h2>${paras || "<p><em>[Not drafted yet]</em></p>"}</section>`;

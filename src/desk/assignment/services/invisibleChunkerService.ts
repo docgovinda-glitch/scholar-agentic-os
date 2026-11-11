@@ -5,6 +5,7 @@
  */
 
 import type { DiscoveredSource, AssignmentDraftingSection } from "../types";
+import { ensureParagraphBreaks } from "../../../shared/proseParagraphs";
 
 export interface InternalSectionPlan extends AssignmentDraftingSection {
   sectionType: "intro" | "body" | "conclusion";
@@ -868,7 +869,7 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
     (s) => section.boundSourceIds?.includes(s.id) || s.status === "kept"
   );
 
-  try {
+  const attempt = async (): Promise<string> => {
     const { authedJsonFetch } = await import("../../api/client");
     const response = await authedJsonFetch(`/api/projects/${projectId}/assignment/stream-section`, "POST", {
       sectionId: section.id,
@@ -913,6 +914,7 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
     let aggregatedText = "";
     let buffer = "";
     let streamError = "";
+    let finalFromServer = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -926,23 +928,41 @@ export async function streamSectionGeneration(options: StreamSectionOptions): Pr
         const rawData = line.slice(6).trim();
         if (!rawData || rawData === "[DONE]") continue;
         try {
-          const parsed = JSON.parse(rawData) as { chunk?: string; fullText?: string; error?: string; fallback?: { reason?: string } };
+          const parsed = JSON.parse(rawData) as { chunk?: string; fullText?: string; error?: string; recoverable?: boolean; fallback?: { reason?: string } };
           if (parsed.error) streamError = parsed.error;
           if (parsed.fallback) onFallback?.({ reason: parsed.fallback.reason || "No AI provider could answer right now." });
           if (parsed.chunk) {
             aggregatedText += parsed.chunk;
             onChunk(parsed.chunk, aggregatedText);
           }
-          if (parsed.fullText) aggregatedText = parsed.fullText;
+          if (parsed.fullText) {
+            aggregatedText = parsed.fullText;
+            finalFromServer = true;
+          }
         } catch {
           // ignore a malformed line
         }
       }
     }
 
-    const finalText = aggregatedText.trim();
+    // A failure event (or a stream that ended without its final text) never
+    // overwrites the section with a partial answer.
+    if (streamError && !finalFromServer) throw new Error(streamError);
+    const finalText = ensureParagraphBreaks(aggregatedText.trim());
     if (!finalText) {
       throw new Error(streamError || "The AI returned no text for this section. Nothing was written. Try again.");
+    }
+    return finalText;
+  };
+
+  try {
+    let finalText: string;
+    try {
+      finalText = await attempt();
+    } catch (first) {
+      // A dropped socket (TypeError: Failed to fetch) is retried once straight away.
+      if (!(first instanceof TypeError)) throw first;
+      finalText = await attempt();
     }
     onComplete(finalText);
     return finalText;

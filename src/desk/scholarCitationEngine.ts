@@ -500,7 +500,7 @@ export function replaceBracketTokensWithDeterministicCitations(
 ): string {
   if (!prose) return "";
   const cleaned = stripRawReferencesSection(prose);
-  if (!sources || sources.length === 0) return cleaned;
+  if (!sources || sources.length === 0) return tidyRemovedCitations(cleaned.replace(/\[([^\[\]\(\)\r\n]+)\](?!\()/g, (m, inner: string) => (isCitationToken(inner) ? "" : m)));
 
   const style = normalizeCSLStyle(styleId);
 
@@ -566,9 +566,26 @@ export function replaceBracketTokensWithDeterministicCitations(
       return trimmedCite ? `(${trimmedCite})` : "";
     }
 
-    return match;
+    // An unmatched citation token is removed; other brackets ([sic]) stay.
+    return isCitationToken(trimmed) ? "" : match;
   });
-  return style === "ieee" || style === "chicago-notes" || style === "vancouver" ? replaced : mergeAdjacentParentheticalCitations(replaced);
+  const tidied = tidyRemovedCitations(replaced);
+  return style === "ieee" || style === "chicago-notes" || style === "vancouver" ? tidied : mergeAdjacentParentheticalCitations(tidied);
+}
+
+/** A bracket body that is a citation token: [3], [1, 2], [ev-…], [src-2], a UUID. */
+function isCitationToken(inner: string): boolean {
+  const t = inner.trim();
+  return (
+    /^\d+(?:\s*,\s*\d+)*$/.test(t) ||
+    /^(?:ev|src|source|ref|cite|evidence|vault)[-_][\w-]+$/i.test(t) ||
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t)
+  );
+}
+
+/** Close the gap a removed token leaves ("claim ." -> "claim."), never touching newlines. */
+function tidyRemovedCitations(text: string): string {
+  return text.replace(/[ \t]+([.,;:!?])/g, "$1").replace(/[ \t]{2,}/g, " ");
 }
 
 /**

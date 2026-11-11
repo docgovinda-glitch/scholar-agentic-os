@@ -46,6 +46,16 @@ describe("outline: one section per question, nothing dropped", () => {
     expect(words[1]).toBe(words[5]);
   });
 
+  it("keeps a 2,000-word paper strictly proportional to marks, summing exactly", () => {
+    const marks = [15, 10, 12, 13, 20, 10, 10];
+    const total = sum(marks);
+    const words = structureToInternalSections(build(2000)).map((s) => s.targetWordCount);
+    expect(sum(words)).toBe(2000);
+    words.forEach((w, i) => expect(Math.abs(w - Math.round((marks[i] / total) * 2000))).toBeLessThanOrEqual(10));
+    expect(Math.min(...words)).toBeGreaterThanOrEqual(100);
+    expect(words.every((w) => w % 5 === 0)).toBe(true);
+  });
+
   it("rescales every section when the target changes from 2,000 to 1,000", () => {
     const rescaled = autoBalanceStructure(build(2000), 1000);
     expect(sum(rescaled.headings.map((h) => h.targetWordCount))).toBe(1000);

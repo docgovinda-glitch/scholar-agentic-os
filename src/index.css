@@ -861,6 +861,11 @@ button:disabled {
 .tiptap-editor p {
   @apply text-[color:var(--text-secondary)] leading-relaxed my-2;
 }
+/* Every paragraph in a rich-text editor reads as its own block. */
+.ProseMirror p {
+  margin-bottom: 1rem;
+  line-height: 1.75;
+}
 .tiptap-editor p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: var(--text-muted);

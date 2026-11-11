@@ -352,6 +352,37 @@ export async function callOpenRouterText(
   return routeOrHandOff(req, res, systemPrompt, userPrompt, taskType);
 }
 
+/**
+ * Decide, before an event stream opens, whether this request must be handed to
+ * the browser (no server-reachable model, or the user's local model is first).
+ * Sends the 426 hand-off and returns true in that case; returns false when the
+ * server can answer (or the request already carries a verified browser result),
+ * so the caller can flush SSE headers before the model call starts.
+ */
+export async function handOffBeforeStream(
+  req: LlmRequestLike,
+  res: LlmResponseLike,
+  systemPrompt: string,
+  userPrompt: string,
+  taskType: string = "reasoning"
+): Promise<boolean> {
+  if (req?.body && (req.body as { llmResult?: unknown }).llmResult) return false;
+  const handOff = () => {
+    if (!res.headersSent) {
+      res.status?.(426).json?.({ requireFrontendLLM: true, challengeToken: createChallengeTokenForRequest(req, systemPrompt, userPrompt), systemPrompt, userPrompt, taskType });
+    }
+    return true;
+  };
+  try {
+    const chain = await chainFor(req as never, routerTask(taskType));
+    if (chain[0]?.runsIn === "browser") return handOff();
+  } catch (err) {
+    if (err instanceof NoAiConnectedError) return handOff();
+    throw err;
+  }
+  return false;
+}
+
 async function streamThroughRouter(
   req: LlmRequestLike,
   res: LlmResponseLike,

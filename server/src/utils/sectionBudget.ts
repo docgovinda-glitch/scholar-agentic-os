@@ -11,9 +11,14 @@ export function sectionWordRange(allocatedWords: number): { min: number; max: nu
   };
 }
 
+/** A complete sentence ends here: terminal punctuation plus any closing quote/bracket. */
+export const SENTENCE_END = /[.!?]["'”’)\]]?\s*$/;
+
 /**
  * Cut a draft that overran its budget back to the last complete sentence that
- * fits, so it never ends mid-sentence. Text within budget is returned unchanged.
+ * fits, so it never ends mid-sentence or mid-word, and never at the start of a
+ * paragraph. Paragraph breaks inside the kept text are preserved. Text within
+ * budget is returned unchanged.
  */
 export function trimToSentenceWithinWords(text: string, maxWords: number): string {
   if (countExactWords(text) <= maxWords) return text;
@@ -28,10 +33,17 @@ export function trimToSentenceWithinWords(text: string, maxWords: number): strin
     }
   }
   const head = tokens.slice(0, cutAt).join("").trimEnd();
-  const lastEnd = Math.max(head.lastIndexOf(". "), head.lastIndexOf(".\n"), head.lastIndexOf("? "), head.lastIndexOf("! "), /[.?!][)\]]?$/.test(head) ? head.length - 1 : -1);
-  if (lastEnd > head.length * 0.5) {
-    const end = /[)\]]/.test(head[lastEnd + 1] ?? "") ? lastEnd + 2 : lastEnd + 1;
-    return head.slice(0, end).trimEnd();
+  if (SENTENCE_END.test(head)) return head;
+  // Last sentence end inside the kept words (followed by whitespace).
+  const re = /[.!?]["'”’)\]]?(?=\s)/g;
+  let lastEnd = -1;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(head))) {
+    const before = head.slice(0, m.index + 1);
+    // "et al." / "e.g." / an initial is not a sentence end.
+    if (m[0][0] === "." && /(?:\bet al|\be\.g|\bi\.e|\bcf|\bvs|\bpp?|\b[A-Z])\.$/.test(before)) continue;
+    lastEnd = m.index + m[0].length;
   }
+  if (lastEnd > 0) return head.slice(0, lastEnd).trimEnd();
   return head;
 }
