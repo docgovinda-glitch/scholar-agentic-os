@@ -905,6 +905,57 @@ export const scholarBrain = {
    * 5. Deterministic Mark-Weighted Word Allocator
    * Partitions total word count across questions based on marks, percentages, or subpart complexity.
    */
+  /**
+   * Presentation Studio (OT-22): the card-by-card outline for an uploaded
+   * brief or a topic. Returns the model's JSON (validated by the route).
+   */
+  async presentationOutline(options: {
+    req: ScholarBrainAiRequestLike;
+    material: string;
+    topic?: string;
+    slideCount: number;
+    visualTypes: readonly string[];
+    instruction?: string;
+    current?: Array<{ title: string; bullets: string[] }>;
+  }): Promise<unknown> {
+    const systemPrompt = `You plan presentation outlines in the style of Gamma: one idea per card, each card a visual.
+Write EXACTLY ${options.slideCount} cards for the material, in presentation order: a title card first, a key-takeaways card last.
+
+Rules:
+- "title" of the deck: the real topic of the material (for example "Branches of Quantum Computing: Assessment & Architectural Framework"). Never an institution banner such as "DEPARTMENT OF ...", never a module or course code, never "-4020"-style numbers.
+- Every card: a short assertion or topic title (max 10 words), a "visualType" from this list: ${options.visualTypes.map((v) => `"${v}"`).join(", ")}, and 3-4 "bullets" (max 14 words each) that say what the card covers.
+- Cover every question or section in the material; never drop one. Use only content that is in the material; never invent figures, quotations or citations.
+- Vary visualType across the deck; use "2-Column Comparison" for comparisons and "Process / Timeline" for sequences.
+Output strict JSON only: {"title":"...","slides":[{"title":"...","visualType":"...","bullets":["..."]}]}`;
+    const userPrompt = [
+      options.topic ? `Topic: ${options.topic}` : "",
+      options.instruction ? `Change requested by the presenter: ${options.instruction}` : "",
+      options.current?.length ? `Current outline:\n${options.current.map((c, i) => `${i + 1}. ${c.title}: ${c.bullets.join("; ")}`).join("\n")}` : "",
+      options.material ? `Material:\n${options.material.slice(0, 20000)}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const res = await scholarBrain.complete({ req: options.req, browserFallback: true, taskClass: "verification", systemPrompt, userPrompt, responseFormat: "json" });
+    return res.parsedJson ?? (res.text ? parseAndRepairLLMJson(res.text) : null);
+  },
+
+  /** Write one block of a slide (Presentation Studio "Write with AI"). */
+  async writeSlideBlock(options: {
+    req: ScholarBrainAiRequestLike;
+    kind: string;
+    slideTitle: string;
+    context: string;
+    existing?: string;
+  }): Promise<unknown> {
+    const systemPrompt = `You write one block of a presentation slide using assertion-evidence design.
+Block kind: ${options.kind}. Write a "title" (max 8 words, an assertion not a topic) and a "body" (15-30 words, concrete, scannable, no filler or clichés).
+Use only what the slide context supports; never invent figures, quotations or citations. If the context has no figure, do not write one.
+Output strict JSON only: {"title":"...","body":"..."}`;
+    const userPrompt = `Slide: ${options.slideTitle}\nContext:\n${options.context.slice(0, 4000)}${options.existing ? `\nCurrent text: ${options.existing}` : ""}`;
+    const res = await scholarBrain.complete({ req: options.req, browserFallback: true, taskClass: "verification", systemPrompt, userPrompt, responseFormat: "json" });
+    return res.parsedJson ?? (res.text ? parseAndRepairLLMJson(res.text) : null);
+  },
+
   allocateWordsByMarks(
     questions: Array<BriefQuestionInput | string>,
     totalWordBudget: number

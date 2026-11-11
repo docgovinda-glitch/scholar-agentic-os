@@ -1,3 +1,4 @@
+import { cleanBriefText } from '../../../shared/presentationBrief';
 import type {
   SlideDeck,
   SlideCard,
@@ -359,9 +360,10 @@ function extractCitations(content: string): string[] {
  * - Pre-digested action headlines instead of passive topic labels
  */
 export function extractSlidesFromAcademicText(
-  text: string,
+  rawText: string,
   framework: NarrativeFramework = 'SCR'
 ): SlideDeck {
+  const text = cleanBriefText(rawText || '');
   // Enforce zero ghost sources and zero phantom elements on empty input
   if (!text || !text.trim()) {
     return {

@@ -11,6 +11,8 @@
  * - From a bare topic it produces a structured scaffold whose placeholder text
  *   is clearly an instruction to the author, not a claim.
  */
+import { stripCourseCodes } from '../../../utils/briefExtractor';
+import { cleanBriefText, deriveDocumentTitle } from '../../../shared/presentationBrief';
 import type { CardContent, CardItem, CardStat, GammaLayout, NarrativeFramework, SlideCard, SlideDeck } from '../types/slides';
 import { getCardContent, inferLayout, resolveLayout, writeCardContent } from './content';
 import { DEFAULT_DECK_THEME_ID } from './theme';
@@ -353,10 +355,13 @@ function deckShell(opts: ComposeOptions, title: string, slides: SlideCard[]): Sl
 }
 
 /** Build a deck from the user's own prose or Markdown. */
-export function composeDeckFromText(text: string, opts: ComposeOptions = {}): SlideDeck {
+export function composeDeckFromText(rawText: string, opts: ComposeOptions = {}): SlideDeck {
   const framework = opts.framework || 'Standard-Narrative';
+  // Course codes ("QNT-4020") and page footers never become titles or "-4020" stat cards.
+  const text = cleanBriefText(rawText);
   const { title: mdTitle, intro, sections } = parseSections(text);
-  const title = clean(opts.title || mdTitle || opts.topic || (sections[0]?.heading ?? '') || 'Untitled presentation');
+  const derived = !opts.title && !mdTitle && !opts.topic ? deriveDocumentTitle(text) : '';
+  const title = clean(stripCourseCodes(opts.title || mdTitle || opts.topic || derived || (sections[0]?.heading ?? '') || 'Untitled presentation'));
   const max = Math.max(2, Math.min(15, opts.slideCount ?? 8));
 
   const cards = sections.slice(0, max - 1).map(sectionToCard);
@@ -559,7 +564,7 @@ export interface TalkPlan {
  */
 export function composeDeckFromPlan(plan: TalkPlan): SlideDeck {
   const framework = plan.framework || 'Standard-Narrative';
-  const title = clean(plan.title) || 'Untitled presentation';
+  const title = clean(stripCourseCodes(plan.title || '')) || 'Untitled presentation';
   const key = clean(plan.keyMessage || '');
   const points = (plan.points || []).map(clean).filter(Boolean);
   const count = Math.max(3, Math.min(15, plan.slideCount ?? (plan.talkMinutes ? slidesForMinutes(plan.talkMinutes) : 6)));
