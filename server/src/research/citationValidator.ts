@@ -179,23 +179,17 @@ export function validateAndRefineCitations(
     const styleId = (options.citationStyle || "apa").toLowerCase();
     let referencesBlock = "\n\n## References & Evidence Base\n";
     finalCitationsList.forEach((src, idx) => {
-      const canonicalRef: CanonicalReference = {
-        kind: src.sourceType === "official" ? "GovernmentPublication" : src.sourceType === "scholarly" ? "JournalArticle" : "Website",
-        title: src.title,
-        authors: src.author ? [{ firstName: "", lastName: src.author, order: 1 }] : [{ firstName: "", lastName: src.publisher || src.domain, order: 1 }],
-        source: src.publisher || src.domain || src.title,
-        journal: src.sourceType === "scholarly" ? src.publisher : undefined,
-        publisher: src.publisher,
-        year: src.publishedDate,
-        publicationDate: src.publishedDate ? `${src.publishedDate}-01-01` : undefined,
-        url: src.url,
-      };
+      const canonicalRef = toCanonicalReference(src);
 
       let formattedEntry = "";
       try {
         formattedEntry = CitationFormatterFactory.formatBibliography(styleId, canonicalRef);
       } catch {
         formattedEntry = `${src.title}. ${src.publisher || src.domain}.`;
+      }
+
+      if (src.doi && !formattedEntry.toLowerCase().includes(src.doi.toLowerCase())) {
+        formattedEntry = `${formattedEntry.trim()} https://doi.org/${src.doi.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "")}`;
       }
 
       const badge = src.authorityBadge ? ` **[${src.authorityBadge}]**` : "";
@@ -216,6 +210,41 @@ export function validateAndRefineCitations(
     unverifiedClaimsFlagged: purgedCount > 0,
     peerReviewAudit,
   };
+}
+
+/** Splits "Family, Given" or "Given Family" into name parts; never turns a publisher into a person. */
+function splitAuthor(name: string, order: number): { firstName: string; lastName: string; order: number } {
+  const clean = name.trim();
+  if (clean.includes(",")) {
+    const [family, ...rest] = clean.split(",");
+    return { firstName: rest.join(",").trim(), lastName: family.trim(), order };
+  }
+  const parts = clean.split(/\s+/);
+  return { firstName: parts.slice(0, -1).join(" "), lastName: parts[parts.length - 1] || clean, order };
+}
+
+function toCanonicalReference(src: SearchResultItem): CanonicalReference {
+  const names = (src.authors && src.authors.length > 0 ? src.authors : src.author ? [src.author] : []).filter(Boolean);
+  const yearMatch = String(src.publishedDate ?? src.year ?? "").match(/\b(1[5-9]\d{2}|20\d{2})\b/);
+  const year = yearMatch ? yearMatch[1] : undefined;
+  // A web page with no named author is attributed to its publishing organisation, as the styles do.
+  const authors = names.length > 0
+    ? names.slice(0, 20).map((n, i) => splitAuthor(n, i + 1))
+    : src.publisher || src.domain
+      ? [{ firstName: "", lastName: (src.publisher || src.domain) as string, order: 1 }]
+      : [];
+  return {
+    kind: src.sourceType === "official" ? "GovernmentPublication" : src.sourceType === "scholarly" ? "JournalArticle" : "Website",
+    title: src.title,
+    authors,
+    source: src.venue || src.publisher || src.domain || src.title,
+    journal: src.sourceType === "scholarly" ? src.venue || src.publisher : undefined,
+    publisher: src.publisher,
+    year,
+    publicationDate: src.publishedDate && /^\d{4}-\d{2}-\d{2}/.test(src.publishedDate) ? src.publishedDate.slice(0, 10) : year ? `${year}-01-01` : undefined,
+    doi: src.doi,
+    url: src.url,
+  } as CanonicalReference;
 }
 
 function generatePeerReviewAudit(

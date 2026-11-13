@@ -740,39 +740,6 @@ describe("minimal website assistant", () => {
     expect(sendBtn).toBeDisabled();
   });
 
-  it("responds with website guidance when asked how to configure AI", async () => {
-    listProjects.mockResolvedValue({ items: [] });
-    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
-
-    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
-    fireEvent.click(toggleBtn);
-
-    const input = await screen.findByPlaceholderText(/Ask a research question/i);
-    fireEvent.change(input, { target: { value: "How do I set up AI?" } });
-    fireEvent.click(screen.getByRole("button", { name: "Send question" }));
-
-    // Assistant provides accurate guidance on AI Access and BYOK
-    expect(await screen.findByText(/To configure AI in Scholar Core/i, {}, { timeout: 2000 })).toBeInTheDocument();
-    expect(screen.getByText(/Bring Your Own Key/i)).toBeInTheDocument();
-  });
-
-  it("refuses raw coding tasks and directs user to academic workspaces", async () => {
-    listProjects.mockResolvedValue({ items: [] });
-    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
-
-    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
-    fireEvent.click(toggleBtn);
-
-    const input = screen.getByPlaceholderText(/Ask a research question/i);
-    fireEvent.change(input, { target: { value: "generate code for a python script" } });
-
-    const sendBtn = screen.getByRole("button", { name: "Send question" });
-    expect(sendBtn).toBeEnabled();
-    fireEvent.click(sendBtn);
-
-    expect(await screen.findByText(/I cannot perform raw software programming or script generation/i, {}, { timeout: 2000 })).toBeInTheDocument();
-  });
-
   it("routes essay requests to retrieval-grounded synthesis with 1-click workspace handoff", async () => {
     const onOpen = vi.fn();
     listProjects.mockResolvedValue({ items: [] });

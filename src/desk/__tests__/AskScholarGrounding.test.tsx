@@ -76,7 +76,10 @@ describe("Ask Scholar grounds every answer in a fresh search", () => {
 
     await ask("Does social media increase political polarisation among young voters?");
     await waitFor(() => expect(executeAgenticQuery).toHaveBeenCalled());
-    expect(executeLiveSearch).toHaveBeenCalledWith("Does social media increase political polarisation among young voters?");
+    expect(executeLiveSearch).toHaveBeenCalledWith(
+      "Does social media increase political polarisation among young voters?",
+      expect.objectContaining({ discipline: expect.any(String) })
+    );
     // The search results go to the AI with the question.
     expect(executeAgenticQuery.mock.calls[0][0].systemPrompt).toContain('[1] "Social media and polarization: a review"');
 
@@ -95,7 +98,8 @@ describe("Ask Scholar grounds every answer in a fresh search", () => {
     await ask("What about in Nepal?");
     await waitFor(() => expect(executeAgenticQuery).toHaveBeenCalledTimes(2));
     expect(executeLiveSearch).toHaveBeenLastCalledWith(
-      "Does social media increase political polarisation among young voters? What about in Nepal?"
+      "Does social media increase political polarisation among young voters? What about in Nepal?",
+      expect.objectContaining({ discipline: expect.any(String) })
     );
     expect(await screen.findByTestId("no-live-sources")).toHaveTextContent("No recent sources were found");
   });

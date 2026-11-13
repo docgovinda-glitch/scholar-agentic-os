@@ -216,6 +216,19 @@ In parallel, economic cooperation has expanded into cross-border retail digital 
           })
         )
         .mockResolvedValueOnce(
+          JSON.stringify({
+            consensus: ["The 1950 Treaty institutionalised an open border [1][2]."],
+            contradictions: [],
+            gaps: [],
+            followUpSearches: [],
+            followUpQuestions: [
+              "What were the key recommendations of the Nepal-India Eminent Persons Group (EPG) report?",
+              "How has cross-border hydropower trade reshaped Nepal-India economic interdependence since 2022?",
+              "How do Nepal's transit agreements with China affect its traditional economic reliance on India?",
+            ],
+          })
+        )
+        .mockResolvedValueOnce(
           `## Executive Summary & Core Thesis
 India's strategic engagement with Nepal since the 1950 Treaty of Peace and Friendship has oscillated between Himalayas-based security regionalism and pragmatic economic connectivity [1] [2].
 
@@ -224,15 +237,6 @@ Signed in July 1950, the Treaty institutionalized an open border and mutual secu
 
 ## Competing Interpretations, Border Disputes, and Geo-Economic Pivot
 While Indian strategic planners emphasize shared cultural ties and security sensitivities along the Himalayan frontier [1], Nepali scholarship highlights structural asymmetry, transit vulnerabilities during the 1989 and 2015 disruptions, and recent cartographic disputes over Kalapani-Limpiyadhura [2].`
-        )
-        .mockResolvedValueOnce(
-          JSON.stringify({
-            followUps: [
-              "What were the key recommendations of the Nepal-India Eminent Persons Group (EPG) report?",
-              "How has cross-border hydropower trade reshaped Nepal-India economic interdependence since 2022?",
-              "How do Nepal's transit agreements with China affect its traditional economic reliance on India?",
-            ],
-          })
         );
 
       const res = await request(app)

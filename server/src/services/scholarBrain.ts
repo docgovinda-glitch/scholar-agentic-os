@@ -12,6 +12,7 @@
  * 5. Deterministic Mark-Weighted Word Allocator: Proportional allocation across assignment questions.
  */
 
+import { buildAskGeneralPrompt, buildAskSearchPrompt } from "./askPrompts.ts";
 import { NoAiConnectedError, routedText, RouterHandoffError, toRouterTask } from "../ai/routerBridge.ts";
 import { BrowserAiRequiredError, LocalModelUnreachableError, NoClientAiProviderError } from "../ai/aiRouteErrors.ts";
 import {
@@ -338,6 +339,13 @@ export function getArchetypeModelWeights(): ArchetypeModelWeights {
  * Canonical scholarBrain Orchestrator Object
  */
 export const scholarBrain = {
+  /** System prompt for AskScholar answers (search-grounded or general). One owner for the text, every surface shares it. */
+  askSystemPrompt(opts: { kind: "search"; style: string; length: string } | { kind: "general"; base: string; style: string; length: string }): string {
+    return opts.kind === "search"
+      ? buildAskSearchPrompt({ style: opts.style, length: opts.length })
+      : buildAskGeneralPrompt({ base: opts.base, style: opts.style, length: opts.length });
+  },
+
   callJSON: (...args: Parameters<typeof callOpenRouterJSON>) => callOpenRouterJSON(...args),
   callText: (...args: Parameters<typeof callOpenRouterText>) => callOpenRouterText(...args),
   streamJSON: (...args: Parameters<typeof streamOpenRouterJSON>) => streamOpenRouterJSON(...args),

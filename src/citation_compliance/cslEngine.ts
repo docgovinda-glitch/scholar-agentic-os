@@ -99,6 +99,7 @@ export interface RawSourceInput {
   retractionNotice?: string;
   metadataMismatchWithDoi?: boolean;
   crossrefUpdateTo?: Array<{ type?: string; label?: string }>;
+  citedByCount?: number;
   snippet?: string;
   domain?: string;
 }

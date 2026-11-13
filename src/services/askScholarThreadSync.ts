@@ -2,7 +2,7 @@
  * Cross-Session & Cross-Device Persistence for AskScholar Conversation Threads.
  *
  * Dual-tier storage:
- * 1. Instant local persistence in `localStorage` (`scholar_ask_threads_v1` & user-scoped key).
+ * 1. Instant local persistence in `localStorage` (a per-account key; guests use the unscoped key).
  * 2. Authenticated server synchronization (`/api/ai/threads`) backed by server store / Supabase
  *    so a researcher's multi-turn literature reviews, CSL-JSON references, excluded sources,
  *    and Deep Research plans follow them across sessions and devices.
@@ -11,6 +11,13 @@
 import type { WebsiteAssistantMessage } from "../desk/dashboard/types";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
 
+export interface AskScholarAttachedFile {
+  name: string;
+  type: string;
+  /** Extracted text, so a follow-up or a workspace hand-off never needs the upload again. */
+  text: string;
+}
+
 export interface AskScholarConversationThread {
   id: string;
   title: string;
@@ -18,10 +25,11 @@ export interface AskScholarConversationThread {
   updatedAtIso?: string;
   citationStyle?: string;
   messages: WebsiteAssistantMessage[];
+  files?: AskScholarAttachedFile[];
 }
 
 const BASE_STORAGE_KEY = "scholar_ask_threads_v1";
-const MAX_THREADS = 20;
+const MAX_THREADS = 30;
 
 function getScopedKey(userEmail?: string | null): string {
   const clean = (userEmail || "").trim().toLowerCase();
@@ -32,9 +40,9 @@ export function loadLocalAskScholarThreads(
   userEmail?: string | null
 ): AskScholarConversationThread[] {
   try {
-    const scopedRaw = userEmail ? localStorage.getItem(getScopedKey(userEmail)) : null;
-    const fallbackRaw = localStorage.getItem(BASE_STORAGE_KEY);
-    const raw = scopedRaw || fallbackRaw;
+    // Signed in: only this account's own key. The unscoped key belongs to guest use and is never
+    // shown to (or written by) a signed-in account, so accounts on one browser cannot see each other.
+    const raw = localStorage.getItem(getScopedKey(userEmail));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
@@ -52,11 +60,7 @@ export function saveLocalAskScholarThreads(
 ): void {
   const capped = threads.slice(0, MAX_THREADS);
   try {
-    const serialized = JSON.stringify(capped);
-    localStorage.setItem(BASE_STORAGE_KEY, serialized);
-    if (userEmail) {
-      localStorage.setItem(getScopedKey(userEmail), serialized);
-    }
+    localStorage.setItem(getScopedKey(userEmail), JSON.stringify(capped));
   } catch {
     // ignore quota errors
   }
@@ -75,17 +79,8 @@ export function mergeAskScholarThreads(
       byId.set(t.id, t);
       continue;
     }
-    // Prefer the version with more messages or a newer ISO timestamp
-    const existingCount = existing.messages.length;
-    const incomingCount = t.messages.length;
-    if (incomingCount > existingCount) {
-      byId.set(t.id, t);
-    } else if (
-      incomingCount === existingCount &&
-      (t.updatedAtIso || "") > (existing.updatedAtIso || "")
-    ) {
-      byId.set(t.id, t);
-    }
+    // Newest write wins, so a deleted-then-recreated or edited thread is never overwritten by a stale copy.
+    if ((t.updatedAtIso || "") > (existing.updatedAtIso || "")) byId.set(t.id, t);
   }
 
   return Array.from(byId.values())
@@ -144,7 +139,7 @@ export async function syncAskScholarThreadsToServer(
   userEmail?: string | null,
   options: { allowInTest?: boolean } = {}
 ): Promise<boolean> {
-  if (!userEmail || !Array.isArray(threads) || threads.length === 0) return false;
+  if (!userEmail || !Array.isArray(threads) || threads.length === 0) return false; // deletions use deleteAskScholarThreadOnServer
   if (
     typeof import.meta !== "undefined" &&
     import.meta.env?.MODE === "test" &&
@@ -168,3 +163,43 @@ export async function syncAskScholarThreadsToServer(
   }
 }
 
+
+export async function deleteAskScholarThreadOnServer(
+  threadId: string,
+  userEmail?: string | null,
+  options: { allowInTest?: boolean } = {}
+): Promise<boolean> {
+  if (!userEmail || !threadId) return false;
+  if (typeof import.meta !== "undefined" && import.meta.env?.MODE === "test" && !options.allowInTest) {
+    return false;
+  }
+  try {
+    const headers = await buildAuthHeaders();
+    if (!headers["Authorization"]) return false;
+    const res = await fetch(`/api/ai/threads/${encodeURIComponent(threadId)}`, {
+      method: "DELETE",
+      headers,
+      signal: AbortSignal.timeout(4500),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+const MAX_THREAD_FILES = 8;
+const MAX_FILE_TEXT = 60_000;
+
+/** Adds newly attached documents to a conversation's files (same name replaces); returns the same array when nothing changed. */
+export function mergeThreadFiles(
+  current: AskScholarAttachedFile[],
+  incoming: Array<{ name: string; text: string; type?: string }>
+): AskScholarAttachedFile[] {
+  const fresh = incoming.filter((f) => f && f.name && typeof f.text === "string" && f.text.trim());
+  if (fresh.length === 0) return current;
+  const byName = new Map(current.map((f) => [f.name, f]));
+  for (const f of fresh) {
+    byName.set(f.name, { name: f.name, type: f.type ?? "", text: f.text.slice(0, MAX_FILE_TEXT) });
+  }
+  return [...byName.values()].slice(-MAX_THREAD_FILES);
+}

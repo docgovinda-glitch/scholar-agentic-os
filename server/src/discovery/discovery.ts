@@ -16,6 +16,13 @@
 
 import { getSupabaseRestConfig } from "../supabaseRest";
 import type { AuthorityTier, DiscoveredSource, SourceType } from "../../../src/domain/evidence/types";
+import type { RawSourceInput } from "../../../src/citation_compliance/cslEngine";
+import {
+  searchCrossref,
+  searchOpenAlex,
+  searchSemanticScholar,
+  type ProviderResult,
+} from "../../../src/shared/retrieval/providers";
 
 interface ArxivResult {
   id: string;
@@ -31,24 +38,6 @@ interface WebResult {
   url: string;
   content: string;
   score: number;
-}
-
-interface OpenAlexAuthorship {
-  author?: { display_name?: string };
-}
-
-interface OpenAlexWork {
-  id: string;
-  doi?: string;
-  title?: string;
-  display_name?: string;
-  publication_year?: number;
-  type?: string;
-  authorships?: OpenAlexAuthorship[];
-  primary_location?: {
-    landing_page_url?: string;
-    source?: { display_name?: string; type?: string };
-  };
 }
 
 export type DiscoveredSourceDraft = Omit<DiscoveredSource, "id" | "discoveredAt">;
@@ -116,134 +105,53 @@ export async function discoverWebSources(query: string, domains?: string[]): Pro
   }));
 }
 
-/**
- * A peer-reviewed-journal article indexed by OpenAlex outranks a preprint or
- * repository entry the same way arXiv's own preprints are tiered B above —
- * "A" is only ever assigned when OpenAlex itself reports the work as a
- * journal article (`type: "article"` in a `primary_location.source.type:
- * "journal"`), never guessed from the query or title.
- */
-function openAlexAuthority(work: OpenAlexWork): { sourceType: SourceType; authorityTier: AuthorityTier } {
-  if (work.type === "article" && work.primary_location?.source?.type === "journal") {
-    return { sourceType: "scholarly", authorityTier: "A" };
-  }
-  return { sourceType: "scholarly", authorityTier: "B" };
+/** A provider failure is an error (not "no results"): callers decide whether to swallow it. */
+function unwrapProvider(result: ProviderResult): RawSourceInput[] {
+  if (result.error && result.items.length === 0) throw new Error(`${result.error}`);
+  return result.items;
+}
+
+function rawToDraft(
+  r: RawSourceInput,
+  via: DiscoveredSource["discoveredVia"],
+  tier: AuthorityTier
+): DiscoveredSourceDraft {
+  const authors = Array.isArray(r.authors) ? (r.authors as unknown[]).filter((a): a is string => typeof a === "string") : [];
+  const year = typeof r.year === "number" ? r.year : Number(r.year) || undefined;
+  return {
+    title: r.title || "Untitled",
+    authors,
+    url: r.url || (r.doi ? `https://doi.org/${r.doi}` : undefined),
+    ...(r.doi ? { doi: r.doi } : {}),
+    ...(r.venue ? { venue: r.venue } : {}),
+    ...(year ? { year } : {}),
+    discoveredVia: via,
+    sourceType: "scholarly" as const,
+    authorityTier: tier,
+  };
+}
+
+function polite() {
+  return { mailto: process.env.OPENALEX_MAILTO, openAlexApiKey: process.env.OPENALEX_API_KEY };
 }
 
 /**
- * OpenAlex (https://openalex.org) — a free, fully open scholarly index of
- * ~250M works across every discipline, not just arXiv's preprint corpus.
- * Unlike arxiv-proxy/search-proxy, no Supabase Edge Function or API key is
- * needed: OpenAlex's REST API is public. `OPENALEX_MAILTO`, if set, is sent
- * per OpenAlex's own etiquette guidance for faster, more reliable service
- * ("the polite pool") — never required.
+ * OpenAlex, via the shared provider adapter. "A" is only ever assigned when OpenAlex itself
+ * reports a peer-reviewed journal article, never guessed from the query or title.
  */
 export async function discoverOpenAlexSources(query: string, maxResults = 10): Promise<DiscoveredSourceDraft[]> {
-  const params = new URLSearchParams({ search: query, "per-page": String(maxResults) });
-  const mailto = process.env.OPENALEX_MAILTO;
-  if (mailto) params.set("mailto", mailto);
-
-  let res: Response;
-  try {
-    res = await fetch(`https://api.openalex.org/works?${params.toString()}`, {
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch (err) {
-    throw new Error(`OpenAlex request failed: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  if (!res.ok) {
-    throw new Error(`OpenAlex ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
-  }
-  const parsed = (await res.json()) as { results?: OpenAlexWork[] };
-  return (parsed.results ?? []).map((w) => {
-    const doi = w.doi ? w.doi.replace(/^https?:\/\/doi\.org\//, "") : undefined;
-    const venue = w.primary_location?.source?.display_name;
-    return {
-      title: w.title || w.display_name || "Untitled",
-      authors: (w.authorships ?? []).map((a) => a.author?.display_name).filter((n): n is string => Boolean(n)),
-      url: w.doi ?? w.primary_location?.landing_page_url ?? w.id,
-      ...(doi ? { doi } : {}),
-      ...(venue ? { venue } : {}),
-      ...(w.publication_year ? { year: w.publication_year } : {}),
-      discoveredVia: "openalex" as const,
-      ...openAlexAuthority(w),
-    };
-  });
+  const items = unwrapProvider(await searchOpenAlex(query, maxResults, 1, polite()));
+  return items.map((r) => rawToDraft(r, "openalex", r.sourceType === "peer-reviewed article" ? "A" : "B"));
 }
-export async function discoverCrossrefSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {
-  const params = new URLSearchParams({ query, rows: String(maxResults), sort: "relevance" });
-  let res: Response;
-  try {
-    res = await fetch(`https://api.crossref.org/works?${params.toString()}`, {
-      signal: AbortSignal.timeout(15_000),
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "ScholarCore/2.0 (mailto:scholar-core@users.noreply.github.com)",
-      },
-    });
-  } catch (err) {
-    throw new Error(`CrossRef request failed: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  if (!res.ok) {
-    throw new Error(`CrossRef ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
-  }
-  const parsed = (await res.json()) as { message?: { items?: any[] } };
-  return (parsed.message?.items ?? []).map((item) => {
-    const doi = item.DOI ? item.DOI.replace(/^https?:\/\/doi\.org\//, "") : undefined;
-    const venue = Array.isArray(item["container-title"]) ? item["container-title"][0] : item["container-title"];
-    const title = Array.isArray(item.title) ? item.title[0] : item.title || "Untitled";
-    const authors = Array.isArray(item.author)
-      ? item.author.map((a: any) => (a.given && a.family ? `${a.family}, ${a.given}` : a.name || a.family || "")).filter(Boolean)
-      : [];
-    const year = item.published?.["date-parts"]?.[0]?.[0] || item.created?.["date-parts"]?.[0]?.[0];
 
-    return {
-      title,
-      authors,
-      url: item.URL || (doi ? `https://doi.org/${doi}` : undefined),
-      ...(doi ? { doi } : {}),
-      ...(venue ? { venue } : {}),
-      ...(year ? { year: Number(year) } : {}),
-      discoveredVia: "crossref" as const,
-      sourceType: "scholarly" as const,
-      authorityTier: "A" as const,
-    };
-  });
+export async function discoverCrossrefSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {
+  const items = unwrapProvider(await searchCrossref(query, maxResults, 1, polite()));
+  return items.map((r) => rawToDraft(r, "crossref", "A"));
 }
 
 export async function discoverSemanticScholarSources(query: string, maxResults = 20): Promise<DiscoveredSourceDraft[]> {
-  const params = new URLSearchParams({
-    query,
-    limit: String(Math.min(maxResults, 50)),
-    fields: "title,authors,year,venue,externalIds,url",
-  });
-  let res: Response;
-  try {
-    res = await fetch(`https://api.semanticscholar.org/graph/v1/paper/search?${params.toString()}`, {
-      signal: AbortSignal.timeout(15_000),
-      headers: { Accept: "application/json" },
-    });
-  } catch (err) {
-    throw new Error(`Semantic Scholar request failed: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  if (!res.ok) throw new Error(`Semantic Scholar ${res.status}`);
-  const parsed = (await res.json()) as { data?: any[] };
-  return (parsed.data ?? [])
-    .filter((p) => p?.title)
-    .map((p) => {
-      const doi: string | undefined = p.externalIds?.DOI;
-      return {
-        title: String(p.title),
-        authors: Array.isArray(p.authors) ? p.authors.map((a: any) => a?.name).filter(Boolean) : [],
-        url: p.url || (doi ? `https://doi.org/${doi}` : undefined),
-        ...(doi ? { doi } : {}),
-        ...(p.venue ? { venue: String(p.venue) } : {}),
-        ...(p.year ? { year: Number(p.year) } : {}),
-        discoveredVia: "semantic_scholar" as const,
-        sourceType: "scholarly" as const,
-        authorityTier: "A" as const,
-      };
-    });
+  const items = unwrapProvider(await searchSemanticScholar(query, Math.min(maxResults, 50), polite()));
+  return items.map((r) => rawToDraft(r, "semantic_scholar", "A"));
 }
 
 export async function discoverDoajSources(query: string, maxResults = 25): Promise<DiscoveredSourceDraft[]> {

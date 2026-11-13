@@ -16,12 +16,16 @@ import {
   type ResearchStageTelemetry,
 } from "./api";
 import { addManualSource, addClaim, bindEvidence } from "./api/claimEvidenceApi";
+import { buildWorkspaceHandoff } from "../domain/handoff/workspaceHandoff";
 import {
   loadLocalAskScholarThreads,
   saveLocalAskScholarThreads,
   mergeAskScholarThreads,
   fetchAskScholarThreadsFromServer,
   syncAskScholarThreadsToServer,
+  deleteAskScholarThreadOnServer,
+  mergeThreadFiles,
+  type AskScholarAttachedFile,
   type AskScholarConversationThread,
 } from "../services/askScholarThreadSync";
 import {
@@ -137,8 +141,8 @@ import CitationStylePicker from "./components/CitationStylePicker";
 import LiveSourcesDrawer from "./components/LiveSourcesDrawer";
 import {
   classifyResearchPrompt,
-  loadAskScholarUserSettings,
-  saveAskScholarUserSettings,
+  loadAskScholarSettings,
+  saveAskScholarSettings,
   type AskScholarUserSettings,
 } from "../config/askScholarConfig";
 import {
@@ -165,12 +169,9 @@ import {
   STAGE_BREAKDOWNS,
   WEBSITE_ASSISTANT_FAQS,
   getFormatTileTheme,
-  getAssistantActionAndFollowUps,
   CodeBlockWithCopy,
   InlineCitationBadge,
   renderFormattedGuideText,
-  isPlatformQuery,
-  answerWebsiteQuestion,
   FormatIcon,
   ChooseOutputType,
   extractSeedClaimsFromSynthesis,
@@ -187,12 +188,9 @@ export {
   STAGE_BREAKDOWNS,
   WEBSITE_ASSISTANT_FAQS,
   getFormatTileTheme,
-  getAssistantActionAndFollowUps,
   CodeBlockWithCopy,
   InlineCitationBadge,
   renderFormattedGuideText,
-  isPlatformQuery,
-  answerWebsiteQuestion,
   FormatIcon,
   ChooseOutputType,
 };
@@ -783,18 +781,11 @@ export default function ProjectListScreen({
   const [isSidebarUploadingAttachment, setIsSidebarUploadingAttachment] = useState<boolean>(false);
   const [sidebarAiMode, setSidebarAiMode] = useState<PromptMode>("auto");
   const [askUserSettings, setAskUserSettings] = useState<AskScholarUserSettings>(() =>
-    loadAskScholarUserSettings()
+    loadAskScholarSettings()
   );
   const [askCitationStyle, setAskCitationStyle] = useState<AskCitationStyleId>(() => {
-    try {
-      const saved = localStorage.getItem("scholar_ask_citation_style");
-      if (saved && ASK_SCHOLAR_CITATION_STYLES.some((s) => s.id === saved)) {
-        return saved as AskCitationStyleId;
-      }
-    } catch {
-      // ignore
-    }
-    return "apa";
+    const saved = loadAskScholarSettings().preferredCitationStyle;
+    return ASK_SCHOLAR_CITATION_STYLES.some((st) => st.id === saved) ? (saved as AskCitationStyleId) : "apa";
   });
   const [storedToVaultMessageIds, setStoredToVaultMessageIds] = useState<Record<string, boolean>>({});
   const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([]);
@@ -811,16 +802,20 @@ export default function ProjectListScreen({
 
   const handleUpdateCitationStyle = useCallback((newStyle: AskCitationStyleId) => {
     setAskCitationStyle(newStyle);
-    setAskUserSettings(saveAskScholarUserSettings({ preferredCitationStyle: newStyle }));
-    try {
-      localStorage.setItem("scholar_ask_citation_style", newStyle);
-    } catch {
-      // ignore
-    }
+    setAskUserSettings(saveAskScholarSettings({ preferredCitationStyle: newStyle }));
     setGuideMessages((prev) =>
       prev.map((m) => (m.sender === "assistant" ? { ...m, citationStyle: newStyle } : m))
     );
   }, []);
+  const handleAskSettingsUpdate = useCallback(
+    (partial: Partial<AskScholarUserSettings>) => {
+      setAskUserSettings(saveAskScholarSettings(partial));
+      if (partial.preferredCitationStyle && ASK_SCHOLAR_CITATION_STYLES.some((st) => st.id === partial.preferredCitationStyle)) {
+        handleUpdateCitationStyle(partial.preferredCitationStyle as AskCitationStyleId);
+      }
+    },
+    [handleUpdateCitationStyle]
+  );
   const isLandingPage = activeView === "projects" && !choosing;
   const hasStartedChatting = guideMessages.some((m) => m.sender === "user") || isGuideThinking;
   const [expandedPlanIds, setExpandedPlanIds] = useState<Record<string, boolean>>({});
@@ -830,9 +825,9 @@ export default function ProjectListScreen({
   const [editingUserMsgText, setEditingUserMsgText] = useState("");
   const [activeAskThreadId, setActiveAskThreadId] = useState<string>(() => `thread-${Date.now()}`);
   const [isAskHistoryOpen, setIsAskHistoryOpen] = useState(false);
-  const [askThreads, setAskThreads] = useState<
-    Array<{ id: string; title: string; updatedAt: string; messages: WebsiteAssistantMessage[] }>
-  >(() => loadLocalAskScholarThreads(userEmail));
+  // Documents attached anywhere in this conversation: kept for every follow-up and handed to workspaces.
+  const [askThreadFiles, setAskThreadFiles] = useState<AskScholarAttachedFile[]>([]);
+  const [askThreads, setAskThreads] = useState<AskScholarConversationThread[]>(() => loadLocalAskScholarThreads(userEmail));
   const [messageActiveTab, setMessageActiveTab] = useState<Record<string, "synthesis" | "matrix" | "graph" | "consensus">>({});
   const [selectedGraphNodeId, setSelectedGraphNodeId] = useState<string | null>(null);
   const [userVaultItems, setUserVaultItems] = useState<VaultItem[]>([]);
@@ -962,16 +957,16 @@ export default function ProjectListScreen({
     setAskThreads((prev) => {
       const filtered = prev.filter((t) => t.id !== activeAskThreadId);
       const next: AskScholarConversationThread[] = [
-        { id: activeAskThreadId, title, updatedAt, updatedAtIso, messages: guideMessages },
+        { id: activeAskThreadId, title, updatedAt, updatedAtIso, messages: guideMessages, files: askThreadFiles },
         ...filtered,
-      ].slice(0, 15);
+      ].slice(0, 30);
       saveLocalAskScholarThreads(next, userEmail);
       if (userEmail) {
-        void syncAskScholarThreadsToServer(next, userEmail);
+        void syncAskScholarThreadsToServer([next[0]], userEmail);
       }
       return next;
     });
-  }, [guideMessages, activeAskThreadId, userEmail]);
+  }, [guideMessages, activeAskThreadId, userEmail, askThreadFiles]);
 
   // Step through Deep Research stages while Deep Research is actively running
   useEffect(() => {
@@ -1194,6 +1189,7 @@ export default function ProjectListScreen({
     setDeepResearchActiveStage(0);
     setEditingUserMsgId(null);
     setActiveAskThreadId(`thread-${Date.now()}`);
+    setAskThreadFiles([]);
     setGuideMessages([]);
     setIsAskHistoryOpen(false);
     // On a phone an empty full-screen chat is a second, different landing page. Go back to the real one.
@@ -1605,6 +1601,13 @@ export default function ProjectListScreen({
 
     const query = rawQuery || (currentAttachments.some((a) => a.isImage) ? "Describe and analyze this image." : "Summarize this document.");
 
+    // Documents stay with the conversation: new uploads join the ones already attached.
+    const threadFiles = mergeThreadFiles(
+      askThreadFiles,
+      currentAttachments.filter((a) => a.fileData).map((a) => a.fileData!)
+    );
+    if (threadFiles !== askThreadFiles) setAskThreadFiles(threadFiles);
+
     const userAttachmentsDisplay = currentAttachments.map((a) => ({
       name: a.name,
       isImage: a.isImage,
@@ -1634,26 +1637,12 @@ export default function ProjectListScreen({
     let sourcesFound: LiveSearchResult[] = [];
 
     try {
-      if (isPlatformQuery(query) && currentAttachments.length === 0) {
-        // Fast, deterministic platform answer
-        const answer = answerWebsiteQuestion(query);
-        const meta = getAssistantActionAndFollowUps(query);
-        const assistantMsg: WebsiteAssistantMessage = {
-          id: `assistant-${Date.now()}`,
-          sender: "assistant",
-          text: answer,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          action: meta.action,
-          followUps: meta.followUps,
-          kind: "help",
-        };
-        setGuideMessages((prev) => [...prev, assistantMsg]);
-      } else if (!userEmail && !aiStatus?.connected) {
+      if (!userEmail && !aiStatus?.connected) {
         // Guest mode with no AI operational
         const assistantMsg: WebsiteAssistantMessage = {
           id: `assistant-${Date.now()}`,
           sender: "assistant",
-          text: "Open-ended scholarly inquiries require signing in to Scholar Core. Please log in and configure your AI provider in AI Access to ask general research questions.\n\nWhile browsing as a guest, Ask Scholar can assist with platform guidance, workspace formats, Knowledge Vault provenance, and AI configuration.",
+          text: "Open-ended scholarly inquiries require signing in to Scholar Core. Please log in and configure your AI provider in AI Access to use Ask Scholar.",
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           action: { type: "auth", label: "Sign In / Register to Use AI ↗" },
           followUps: ["How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?"],
@@ -1672,7 +1661,7 @@ export default function ProjectListScreen({
 
         let agentResponse: (AgenticQueryResponse & { ok?: boolean }) | undefined;
         const styleInfo = getCitationStyleInfo(askCitationStyle);
-        const styleAwareGuide = buildStyleAwareAnswerGuide(askCitationStyle, askUserSettings.answerLength);
+        const styleAwareGuide = buildStyleAwareAnswerGuide(askCitationStyle, askUserSettings.answerLengthPreference);
         const systemPrompt = `You are AskScholar (Scholar Core AI Research Assistant), a scholarly research assistant for students, researchers, and professionals across STEM, management and business, social sciences, humanities, health, law, and education. Ground your answer in authentic scholarly and open-web sources, format every citation in ${styleInfo.name}, ignore any retrieved snippet that is off-topic to the user's question, and never fabricate sources, DOIs, or placeholder metadata ("Unknown Author", "n.d.").\n\n${styleAwareGuide}`;
 
         // Smart auto-grounding:
@@ -1705,7 +1694,7 @@ export default function ProjectListScreen({
           });
           try {
             const previousQuestions = priorThreadMessages.filter((m) => m.sender === "user").map((m) => m.text);
-            liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions));
+            liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { discipline: askUserSettings.preferredDiscipline });
             sourcesFound = liveRetrievedSources;
           } catch {
             // The answer still comes, marked as not based on a search.
@@ -1753,7 +1742,7 @@ export default function ProjectListScreen({
             query.toLowerCase().includes("search the web") ||
             /\b(?:essay|paper|coursework|thesis|dissertation|proposal|review|analysis|history|nepal|congress|study|clinical)\b/i.test(query));
 
-        if (currentAttachments.length === 0 && targetMode === "normal" && !isAcademicOrDeliverable) {
+        if (currentAttachments.length === 0 && threadFiles.length === 0 && targetMode === "normal" && !isAcademicOrDeliverable) {
           // Standard text generation — streams tokens live via executeAgenticLLM
           try {
             const txt = await executeAgenticLLM(effectiveSystemPrompt, query, "simple", (chunk) => {
@@ -1770,7 +1759,7 @@ export default function ProjectListScreen({
               systemPrompt: effectiveSystemPrompt,
               mode: targetMode,
               citationStyle: askCitationStyle,
-              answerLength: askUserSettings.answerLength,
+              answerLength: askUserSettings.answerLengthPreference,
               preRetrievedSources: liveRetrievedSources,
               history,
               vaultSources: selectedVaultSources,
@@ -1802,10 +1791,10 @@ export default function ProjectListScreen({
               systemPrompt: effectiveSystemPrompt,
               mode: targetMode,
               citationStyle: askCitationStyle,
-              answerLength: askUserSettings.answerLength,
+              answerLength: askUserSettings.answerLengthPreference,
               approvedSubQuestions: approvedSubQuestionsOverride,
               preRetrievedSources: liveRetrievedSources,
-              files: currentAttachments.filter((a) => a.fileData).map((a) => a.fileData!),
+              files: threadFiles,
               images: currentAttachments.filter((a) => a.imageData).map((a) => a.imageData!),
               history,
               vaultSources: selectedVaultSources,
@@ -1833,7 +1822,7 @@ export default function ProjectListScreen({
             if (!shouldRunClientPreSearch && !isExplicitChatOnly && liveRetrievedSources.length === 0) {
               try {
                 const previousQuestions = priorThreadMessages.filter((m) => m.sender === "user").map((m) => m.text);
-                liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions));
+                liveRetrievedSources = await executeLiveSearch(buildRetrievalQuery(query, previousQuestions), { discipline: askUserSettings.preferredDiscipline });
                 sourcesFound = liveRetrievedSources;
                 if (liveRetrievedSources.length > 0) {
                   effectiveSystemPrompt = injectLiveGroundingToSystemPrompt(systemPrompt, liveRetrievedSources);
@@ -1922,7 +1911,7 @@ export default function ProjectListScreen({
           const readCount = Math.max(candidateCitations.length, citedCount);
           const searchedCount =
             candidateCitations.length > 0
-              ? Math.max(classification.budget.candidatesMin, readCount + excludedRecords.length)
+              ? Math.max(classification.sourceBudget.minCandidates, readCount + excludedRecords.length)
               : 0;
           const isDeepMode =
             targetMode === "deep-research" || agentResponse.mode === "deep-research";
@@ -2038,60 +2027,26 @@ export default function ProjectListScreen({
 
       try {
         const currentIdx = guideMessages.findIndex((m) => m.id === researchMessage.id);
-        const priorUserMsg =
-          currentIdx > 0
-            ? guideMessages.slice(0, currentIdx).filter((m) => m.sender === "user").slice(-1)[0]
-            : undefined;
+        const conversation = (currentIdx >= 0 ? guideMessages.slice(0, currentIdx + 1) : guideMessages).filter(
+          (m) => m.id !== "init" && m.id !== "reset-assistant" && !m.error
+        );
+        const priorUserMsg = conversation.filter((m) => m.sender === "user").slice(-1)[0];
 
-        const topic =
-          handoff?.topic ||
-          priorUserMsg?.text ||
-          researchMessage.text.split("\n")[0].replace(/^#+\s*/, "").slice(0, 80) ||
-          "Synthesized Research Project";
-        const cleanTitle =
-          handoff?.suggestedTitle ||
-          (topic.length > 60 ? `${topic.slice(0, 57)}...` : topic);
+        const handoffPackage = buildWorkspaceHandoff({
+          targetFormatId,
+          messages: conversation.map((m) => ({ sender: m.sender, text: m.text })),
+          answerText: researchMessage.text,
+          question: handoff?.topic || researchMessage.originatingQuestion || priorUserMsg?.text,
+          files: askThreadFiles,
+          sources: handoff?.retrievedSources || researchMessage.citations || liveSourcesAsCitations(researchMessage.liveSources) || [],
+          citationStyle: askCitationStyle,
+          suggestedTitle: handoff?.suggestedTitle,
+          wordCountTarget: handoff?.wordCountTarget,
+        });
+        const structuredSources = handoffPackage.sources;
+        const intake = handoffPackage.intake;
 
         const project = await createProject(targetFormatId);
-
-        const sourcesToAttach =
-          handoff?.retrievedSources ||
-          researchMessage.citations ||
-          liveSourcesAsCitations(researchMessage.liveSources) ||
-          [];
-        const structuredSources = sourcesToAttach.map((c: any, i: number) => ({
-          id: c.id || c.sourceId || `ask-src-${i + 1}`,
-          title: c.title || `Source ${i + 1}`,
-          authors: Array.isArray(c.authors) ? c.authors : c.author ? [String(c.author)] : [],
-          year: c.year,
-          venue: c.venue || c.journal || c.publisher || "",
-          doi: c.doi,
-          url: c.url,
-          snippet: c.snippet || c.evidenceSnippet || "",
-        }));
-        const citationNotes =
-          structuredSources.length > 0
-            ? structuredSources
-              .map(
-                (c, i) =>
-                  `[${i + 1}] ${c.title}${c.venue ? ` (${c.venue})` : ""}\nAuthors: ${c.authors.join(", ")}\nDOI: ${c.doi || "N/A"}\nURL: ${c.url || "N/A"}`
-              )
-              .join("\n\n")
-            : "";
-
-        const intake = {
-          title: cleanTitle,
-          working_title: cleanTitle,
-          researchQuestion: topic,
-          research_question: topic,
-          assignment_question: topic,
-          research_topic: topic,
-          citation_style: askCitationStyle,
-          targetWordCount: handoff?.wordCountTarget || 1500,
-          backgroundNotes: `Executive Scholarly Synthesis & Verified Literature Brief:\n\n${researchMessage.text}`,
-          preliminaryEvidence: citationNotes,
-          discovered_sources: JSON.stringify(structuredSources),
-        };
 
         await Promise.resolve(saveIntakeAnswers(project.projectId, intake)).catch(() => { });
 
@@ -2140,7 +2095,7 @@ export default function ProjectListScreen({
         setCreatingFormatId(null);
       }
     },
-    [userEmail, creating, openAuth, guideMessages, onOpen]
+    [userEmail, creating, openAuth, guideMessages, onOpen, askThreadFiles, askCitationStyle]
   );
 
   const handledNewFormatRef = useRef<string | null>(null);
@@ -2375,6 +2330,7 @@ export default function ProjectListScreen({
           title: askThreads[0].title,
           open: () => {
             setActiveAskThreadId(askThreads[0].id);
+            setAskThreadFiles(askThreads[0].files ?? []);
             setGuideMessages(askThreads[0].messages);
             setIsAiSidebarOpen(true);
           },
@@ -2561,16 +2517,7 @@ export default function ProjectListScreen({
               <AskScholarSettingsPopover
                 settings={askUserSettings}
                 direction="up"
-                onUpdateSettings={(partial) => {
-                  const updated = saveAskScholarUserSettings(partial);
-                  setAskUserSettings(updated);
-                  if (
-                    partial.preferredCitationStyle &&
-                    ASK_SCHOLAR_CITATION_STYLES.some((s) => s.id === partial.preferredCitationStyle)
-                  ) {
-                    handleUpdateCitationStyle(partial.preferredCitationStyle as AskCitationStyleId);
-                  }
-                }}
+                onUpdateSettings={handleAskSettingsUpdate}
                 onImportReferences={handleImportVaultReferences}
               />
             </>
@@ -3678,16 +3625,7 @@ export default function ProjectListScreen({
                       <AskScholarSettingsPopover
                         settings={askUserSettings}
                         direction="down"
-                        onUpdateSettings={(partial) => {
-                          const updated = saveAskScholarUserSettings(partial);
-                          setAskUserSettings(updated);
-                          if (
-                            partial.preferredCitationStyle &&
-                            ASK_SCHOLAR_CITATION_STYLES.some((s) => s.id === partial.preferredCitationStyle)
-                          ) {
-                            handleUpdateCitationStyle(partial.preferredCitationStyle as AskCitationStyleId);
-                          }
-                        }}
+                        onUpdateSettings={handleAskSettingsUpdate}
                         onImportReferences={handleImportVaultReferences}
                       />
                     </>
@@ -3734,6 +3672,7 @@ export default function ProjectListScreen({
                                   type="button"
                                   onClick={() => {
                                     setActiveAskThreadId(t.id);
+                                    setAskThreadFiles(t.files ?? []);
                                     setGuideMessages(t.messages);
                                     setIsAskHistoryOpen(false);
                                   }}
@@ -3753,11 +3692,9 @@ export default function ProjectListScreen({
                                     setAskThreads((prev) => {
                                       const next = prev.filter((item) => item.id !== t.id);
                                       saveLocalAskScholarThreads(next, userEmail);
-                                      if (userEmail) {
-                                        void syncAskScholarThreadsToServer(next, userEmail);
-                                      }
                                       return next;
                                     });
+                                    void deleteAskScholarThreadOnServer(t.id, userEmail);
                                   }}
                                   className="p-1 rounded text-neutral-400 hover:text-red-500 hover:bg-neutral-200/60 dark:hover:bg-white/10 cursor-pointer shrink-0"
                                   title="Delete conversation"
@@ -5170,16 +5107,7 @@ export default function ProjectListScreen({
                             <AskScholarSettingsPopover
                               settings={askUserSettings}
                               direction="up"
-                              onUpdateSettings={(partial) => {
-                                const updated = saveAskScholarUserSettings(partial);
-                                setAskUserSettings(updated);
-                                if (
-                                  partial.preferredCitationStyle &&
-                                  ASK_SCHOLAR_CITATION_STYLES.some((s) => s.id === partial.preferredCitationStyle)
-                                ) {
-                                  handleUpdateCitationStyle(partial.preferredCitationStyle as AskCitationStyleId);
-                                }
-                              }}
+                              onUpdateSettings={handleAskSettingsUpdate}
                               onImportReferences={handleImportVaultReferences}
                             />
                           </>

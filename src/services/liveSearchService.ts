@@ -15,8 +15,7 @@ import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
 import {
   classifyResearchPrompt,
   resolveSourceBudget,
-  generateQueryVariations,
-  type RequestComplexityType,
+  type AskScholarRequestType,
   type AcademicDiscipline,
 } from "../config/askScholarConfig";
 import {
@@ -61,6 +60,8 @@ export interface LiveSearchResult {
 export interface LiveSearchOptions {
   limit?: number;
   mode?: "all" | "scholarly" | "web" | "deep_research";
+  /** The reader's chosen discipline ("auto" lets the question decide). */
+  discipline?: AcademicDiscipline;
   signal?: AbortSignal;
 }
 
@@ -69,7 +70,7 @@ export interface LiveSearchTelemetryResult {
   excludedSources: ExcludedSourceRecord[];
   searchedCount: number;
   readCount: number;
-  complexity: RequestComplexityType;
+  complexity: AskScholarRequestType;
   discipline: AcademicDiscipline;
   queriesExecuted: string[];
 }
@@ -159,709 +160,152 @@ export function onLiveSearchGroundingChange(callback: (enabled: boolean) => void
   return () => window.removeEventListener("scholar:live-search-grounding-toggled", handler);
 }
 
-function cleanHtmlTags(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, "")
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, "&")
-    .replace(/&#039;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-const CLIENT_STOPWORDS = new Set([
-  "why", "what", "how", "when", "where", "who", "which", "whom", "whose",
-  "did", "does", "do", "is", "are", "was", "were", "be", "been", "being",
-  "have", "has", "had", "can", "could", "would", "should", "will", "shall",
-  "the", "and", "for", "with", "from", "into", "about", "that", "this",
-  "these", "those", "their", "there", "than", "then", "between", "among",
-  "explain", "analyze", "describe", "tell", "give", "discuss", "overview",
-]);
-
-function cleanClientTopic(query: string): string {
-  const stripped = query
-    .replace(/^(?:why|what|how|when|where|who|which|did|does|do|is|are|was|were|can|could|would|should|please|tell me about|explain|analyze|describe|search for)\s+/gi, "")
-    .replace(/^(?:did|does|do|is|are|was|were|the)\s+/gi, "")
-    .replace(/[?.,!;:]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return stripped.length >= 3 ? stripped : query.replace(/[?.,!;:]+/g, " ").trim();
-}
-
-function scoreClientRelevance(
-  query: string,
-  title: string,
-  snippet: string,
-  citedByCount = 0,
-  year?: number
-): number {
-  const keywords = cleanClientTopic(query)
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((w) => w.length >= 3 && !CLIENT_STOPWORDS.has(w));
-  if (keywords.length === 0) return 50;
-
-  const lowerTitle = (title || "").toLowerCase();
-  const lowerCombined = `${lowerTitle} ${(snippet || "").toLowerCase()}`;
-  let titleMatches = 0;
-  let totalMatches = 0;
-  for (const kw of keywords) {
-    const stem = kw.length > 5 ? kw.slice(0, -1) : kw;
-    if (lowerTitle.includes(stem)) titleMatches++;
-    if (lowerCombined.includes(stem)) totalMatches++;
-  }
-  const ratio = totalMatches / keywords.length;
-  const citationBoost = citedByCount > 0 ? Math.min(20, Math.round(Math.log10(citedByCount + 1) * 6)) : 0;
-  const currentYear = new Date().getFullYear();
-  const recencyBoost = year && year >= currentYear - 4 ? 8 : year && year >= currentYear - 10 ? 4 : 0;
-  return Math.round(ratio * 100) + titleMatches * 18 + citationBoost + recencyBoost;
-}
-
 /**
- * Provider 1: OpenAlex REST API (supports pagination and open-access PDF links).
- */
-async function searchOpenAlexClient(
-  query: string,
-  perPage = 15,
-  page = 1,
-  signal?: AbortSignal
-): Promise<RawSourceInput[]> {
-  try {
-    const topic = cleanClientTopic(query);
-    const params = new URLSearchParams({
-      search: topic,
-      "per-page": String(Math.min(50, Math.max(perPage, 10))),
-      page: String(page),
-    });
-    const res = await fetch(`https://api.openalex.org/works?${params.toString()}`, { signal });
-    if (!res.ok) return [];
-    const data = (await res.json()) as {
-      results?: Array<{
-        title?: string;
-        display_name?: string;
-        doi?: string;
-        id?: string;
-        publication_year?: number;
-        publication_date?: string;
-        cited_by_count?: number;
-        is_retracted?: boolean;
-        type?: string;
-        biblio?: { volume?: string; issue?: string; first_page?: string; last_page?: string };
-        open_access?: { oa_url?: string };
-        authorships?: Array<{ author?: { display_name?: string } }>;
-        abstract_inverted_index?: Record<string, number[]>;
-        primary_location?: {
-          landing_page_url?: string;
-          pdf_url?: string;
-          source?: { display_name?: string };
-        };
-      }>;
-    };
-
-    return (data.results ?? []).map((w) => {
-      const doi = w.doi ? w.doi.replace(/^https?:\/\/doi\.org\//i, "") : undefined;
-      const url = w.doi ?? w.primary_location?.landing_page_url ?? w.id ?? "";
-      const authors = (w.authorships ?? [])
-        .map((a) => a.author?.display_name)
-        .filter((n): n is string => Boolean(n));
-
-      let snippet = "";
-      if (w.abstract_inverted_index) {
-        const words: Array<[number, string]> = [];
-        for (const [word, positions] of Object.entries(w.abstract_inverted_index)) {
-          if (Array.isArray(positions)) {
-            for (const pos of positions) words.push([pos, word]);
-          }
-        }
-        words.sort((a, b) => a[0] - b[0]);
-        snippet = words.map((p) => p[1]).join(" ").slice(0, 1800);
-      }
-      const venue = w.primary_location?.source?.display_name;
-      if (!snippet && venue) {
-        snippet = `Published in ${venue} (${w.publication_year || ""}).`;
-      }
-
-      const pages =
-        w.biblio?.first_page && w.biblio?.last_page
-          ? `${w.biblio.first_page}-${w.biblio.last_page}`
-          : w.biblio?.first_page;
-
-      return {
-        title: w.title || w.display_name || "",
-        url,
-        doi,
-        snippet,
-        year: w.publication_year,
-        publicationDate: w.publication_date,
-        authors,
-        venue,
-        journal: venue,
-        volume: w.biblio?.volume,
-        issue: w.biblio?.issue,
-        pages,
-        openAccessUrl: w.open_access?.oa_url || w.primary_location?.pdf_url,
-        isRetracted: w.is_retracted === true,
-        sourceType: w.type === "preprint" ? "preprint" : "peer-reviewed article",
-      };
-    });
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Provider 2: Crossref REST API (includes retraction `update-to` metadata and multi-page offset pagination).
- */
-async function searchCrossrefClient(
-  query: string,
-  rows = 15,
-  page = 1,
-  signal?: AbortSignal
-): Promise<RawSourceInput[]> {
-  try {
-    const topic = cleanClientTopic(query);
-    const effectiveRows = Math.min(50, Math.max(rows, 10));
-    const offset = Math.max(0, (page - 1) * effectiveRows);
-    const params = new URLSearchParams({
-      query: topic,
-      rows: String(effectiveRows),
-      ...(offset > 0 ? { offset: String(offset) } : {}),
-    });
-    const res = await fetch(`https://api.crossref.org/works?${params.toString()}`, { signal });
-    if (!res.ok) return [];
-    const data = (await res.json()) as {
-      message?: {
-        items?: Array<{
-          DOI?: string;
-          URL?: string;
-          title?: string[];
-          abstract?: string;
-          author?: Array<{ given?: string; family?: string; name?: string }>;
-          "container-title"?: string[];
-          volume?: string;
-          issue?: string;
-          page?: string;
-          publisher?: string;
-          type?: string;
-          "update-to"?: Array<{ type?: string; label?: string }>;
-          published?: { "date-parts"?: number[][] };
-          "published-print"?: { "date-parts"?: number[][] };
-          "published-online"?: { "date-parts"?: number[][] };
-        }>;
-      };
-    };
-
-    return (data.message?.items ?? []).map((item) => {
-      const title = Array.isArray(item.title) ? cleanHtmlTags(item.title[0] || "") : "";
-      const doi = item.DOI;
-      const url = item.URL || (doi ? `https://doi.org/${doi}` : "");
-      const authors = (item.author ?? [])
-        .map((a) => (a.family && a.given ? `${a.family}, ${a.given}` : a.name || a.family || ""))
-        .filter(Boolean);
-      const venue = Array.isArray(item["container-title"]) ? item["container-title"][0] : undefined;
-      const dateParts =
-        item.published?.["date-parts"]?.[0] ||
-        item["published-print"]?.["date-parts"]?.[0] ||
-        item["published-online"]?.["date-parts"]?.[0];
-      const year = dateParts?.[0];
-      const snippet = item.abstract
-        ? cleanHtmlTags(item.abstract).slice(0, 1800)
-        : venue
-          ? `Published in ${venue}.`
-          : "";
-
-      return {
-        title,
-        url,
-        doi,
-        snippet,
-        year,
-        authors,
-        venue,
-        journal: venue,
-        volume: item.volume,
-        issue: item.issue,
-        pages: item.page,
-        publisher: item.publisher,
-        crossrefUpdateTo: item["update-to"],
-        sourceType: item.type === "proceedings-article" ? "conference paper" : "peer-reviewed article",
-      };
-    });
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Provider 3: Europe PMC / PubMed REST API (biomedical, health, and life sciences).
- */
-async function searchEuropePmcClient(
-  query: string,
-  pageSize = 12,
-  signal?: AbortSignal
-): Promise<RawSourceInput[]> {
-  try {
-    const topic = cleanClientTopic(query);
-    const params = new URLSearchParams({
-      query: topic,
-      format: "json",
-      pageSize: String(Math.min(50, Math.max(pageSize, 8))),
-      resultType: "core",
-    });
-    const res = await fetch(
-      `https://www.ebi.ac.uk/europepmc/webservices/rest/search?${params.toString()}`,
-      { signal }
-    );
-    if (!res.ok) return [];
-    const data = (await res.json()) as {
-      resultList?: {
-        result?: Array<{
-          title?: string;
-          doi?: string;
-          pmid?: string;
-          pmcid?: string;
-          authorString?: string;
-          pubYear?: string;
-          journalTitle?: string;
-          journalVolume?: string;
-          issue?: string;
-          pageInfo?: string;
-          abstractText?: string;
-          isOpenAccess?: string;
-        }>;
-      };
-    };
-
-    return (data.resultList?.result ?? []).map((r) => {
-      const authors = r.authorString
-        ? r.authorString
-            .replace(/\.$/, "")
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [];
-      const url = r.doi
-        ? `https://doi.org/${r.doi}`
-        : r.pmid
-          ? `https://pubmed.ncbi.nlm.nih.gov/${r.pmid}/`
-          : "";
-      const openAccessUrl =
-        r.isOpenAccess === "Y" && r.pmcid
-          ? `https://europepmc.org/articles/${r.pmcid}?pdf=render`
-          : undefined;
-
-      return {
-        title: cleanHtmlTags(r.title || ""),
-        url,
-        doi: r.doi,
-        snippet: r.abstractText ? cleanHtmlTags(r.abstractText).slice(0, 1800) : "",
-        year: r.pubYear,
-        authors,
-        venue: r.journalTitle,
-        journal: r.journalTitle,
-        volume: r.journalVolume,
-        issue: r.issue,
-        pages: r.pageInfo,
-        openAccessUrl,
-        sourceType: "peer-reviewed article",
-      };
-    });
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Provider 4: ERIC REST API (Education Resources Information Center — Education & Social Sciences).
- */
-async function searchEricClient(
-  query: string,
-  rows = 12,
-  signal?: AbortSignal
-): Promise<RawSourceInput[]> {
-  try {
-    const topic = cleanClientTopic(query);
-    const params = new URLSearchParams({
-      search: topic,
-      format: "json",
-      rows: String(Math.min(50, Math.max(rows, 8))),
-    });
-    const res = await fetch(`https://api.ies.ed.gov/eric/?${params.toString()}`, { signal });
-    if (!res.ok) return [];
-    const data = (await res.json()) as {
-      response?: {
-        docs?: Array<{
-          id?: string;
-          title?: string;
-          author?: string[];
-          publicationdateyear?: number | string;
-          description?: string;
-          source?: string;
-          url?: string;
-          peerreviewed?: string | boolean;
-        }>;
-      };
-    };
-
-    return (data.response?.docs ?? []).map((doc) => {
-      const ericId = doc.id || "";
-      const url = doc.url || (ericId ? `https://eric.ed.gov/?id=${encodeURIComponent(ericId)}` : "");
-      return {
-        title: cleanHtmlTags(doc.title || ""),
-        url,
-        snippet: doc.description ? cleanHtmlTags(doc.description).slice(0, 1800) : "",
-        year: doc.publicationdateyear,
-        authors: Array.isArray(doc.author) ? doc.author.filter(Boolean) : [],
-        venue: doc.source || "ERIC (U.S. Department of Education)",
-        journal: doc.source,
-        publisher: "Institute of Education Sciences (ERIC)",
-        sourceType:
-          doc.peerreviewed === "T" || doc.peerreviewed === true
-            ? "peer-reviewed article"
-            : "institutional report",
-      };
-    });
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Provider 5: SSRN / RePEc / NBER Working Papers & Repository Index via OpenAlex filter
- * (Management & Business, Economics, Social Sciences, and Law).
- */
-async function searchWorkingPapersClient(
-  query: string,
-  perPage = 12,
-  signal?: AbortSignal
-): Promise<RawSourceInput[]> {
-  try {
-    const topic = cleanClientTopic(query);
-    const params = new URLSearchParams({
-      search: topic,
-      filter: "primary_location.source.type:repository",
-      "per-page": String(Math.min(50, Math.max(perPage, 8))),
-    });
-    const res = await fetch(`https://api.openalex.org/works?${params.toString()}`, { signal });
-    if (!res.ok) return [];
-    const data = (await res.json()) as {
-      results?: Array<{
-        id?: string;
-        doi?: string;
-        title?: string;
-        display_name?: string;
-        publication_year?: number;
-        publication_date?: string;
-        is_retracted?: boolean;
-        open_access?: { oa_url?: string };
-        authorships?: Array<{ author?: { display_name?: string } }>;
-        abstract_inverted_index?: Record<string, number[]>;
-        primary_location?: {
-          landing_page_url?: string;
-          pdf_url?: string;
-          source?: { display_name?: string };
-        };
-      }>;
-    };
-
-    return (data.results ?? []).map((w) => {
-      const doi = w.doi ? w.doi.replace(/^https?:\/\/doi\.org\//i, "") : undefined;
-      const url = w.doi ?? w.primary_location?.landing_page_url ?? w.id ?? "";
-      const authors = (w.authorships ?? [])
-        .map((a) => a.author?.display_name)
-        .filter((n): n is string => Boolean(n));
-      let snippet = "";
-      if (w.abstract_inverted_index) {
-        const words: Array<[number, string]> = [];
-        for (const [word, positions] of Object.entries(w.abstract_inverted_index)) {
-          if (Array.isArray(positions)) {
-            for (const pos of positions) words.push([pos, word]);
-          }
-        }
-        words.sort((a, b) => a[0] - b[0]);
-        snippet = words.map((p) => p[1]).join(" ").slice(0, 1800);
-      }
-      const venue = w.primary_location?.source?.display_name || "Working Paper Repository";
-      return {
-        title: w.title || w.display_name || "",
-        url,
-        doi,
-        snippet: snippet || `Working paper published in ${venue} (${w.publication_year || ""}).`,
-        year: w.publication_year,
-        publicationDate: w.publication_date,
-        authors,
-        venue,
-        journal: venue,
-        openAccessUrl: w.open_access?.oa_url || w.primary_location?.pdf_url,
-        isRetracted: w.is_retracted === true,
-        sourceType: "working paper",
-      };
-    });
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Executes a multi-provider search with dynamic source budgets, query variations,
- * deduplication (DOI -> title + first author), retraction checks, and strict CSL-JSON verification.
+ * Runs one live search through the server RetrievalService (`/api/search/live`), then verifies
+ * every record with the shared CSL engine: DOI metadata and retraction checks, placeholder-author
+ * rejection, de-duplication. There is no browser-side provider fallback: the server is the only
+ * retrieval path, so every workspace sees the same sources.
  */
 export async function executeLiveSearchWithTelemetry(
   query: string,
   options: LiveSearchOptions = {}
 ): Promise<LiveSearchTelemetryResult> {
   const cleanQuery = query.trim();
-  const classification = classifyResearchPrompt(
-    cleanQuery,
-    options.mode === "deep_research" ? "deep_research" : "chat"
-  );
-  const budget = resolveSourceBudget(classification.complexity);
-  const queryVariations = generateQueryVariations(cleanQuery, classification);
+  const classification = classifyResearchPrompt(cleanQuery, {
+    isDeepResearch: options.mode === "deep_research",
+    preferredDiscipline: options.discipline,
+  });
+  const budget = resolveSourceBudget(classification.requestType);
+  const baseTelemetry = {
+    complexity: classification.requestType,
+    discipline: classification.discipline,
+  };
+  const emptyTelemetry = (queriesExecuted: string[]): LiveSearchTelemetryResult => ({
+    results: [],
+    excludedSources: [],
+    searchedCount: 0,
+    readCount: 0,
+    ...baseTelemetry,
+    queriesExecuted,
+  });
 
-  if (!cleanQuery) {
-    return {
-      results: [],
-      excludedSources: [],
-      searchedCount: 0,
-      readCount: 0,
-      complexity: classification.complexity,
-      discipline: classification.discipline,
-      queriesExecuted: [],
-    };
-  }
+  if (!cleanQuery) return emptyTelemetry([]);
 
-  if (
-    typeof import.meta !== "undefined" &&
-    import.meta.env?.MODE === "test" &&
-    !(globalThis.fetch as { mock?: unknown })?.mock
-  ) {
-    const emptyTelemetry: LiveSearchTelemetryResult = {
-      results: [],
-      excludedSources: [],
-      searchedCount: 0,
-      readCount: 0,
-      complexity: classification.complexity,
-      discipline: classification.discipline,
-      queriesExecuted: queryVariations,
-    };
-    lastSearchTelemetry = emptyTelemetry;
-    return emptyTelemetry;
-  }
-
-  // Respect explicit caller limit if provided and larger than 6, otherwise use dynamic budget
   const requestedLimit =
-    options.limit && options.limit > 6 ? options.limit : budget.targetCitedMax;
-  const candidateTarget = Math.max(budget.candidatesMin, requestedLimit * 2);
+    options.limit && options.limit > 6 ? options.limit : budget.maxCited;
+  const candidateTarget = Math.max(budget.minCandidates, requestedLimit * 2);
 
   emitLiveSearchProgress({
     stage: "searching",
-    detail: `Searching OpenAlex, Crossref, PubMed, Semantic Scholar, arXiv & DOAJ (${queryVariations.length} query variations)…`,
+    detail: "Searching scholarly indexes (OpenAlex, Crossref, Semantic Scholar, Europe PMC) and the live web…",
     candidatesFound: 0,
   });
 
-  // 1. Try local server backend proxy first
-  try {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await getSupabaseClient().auth.getSession();
-        const token = data?.session?.access_token?.replace(/[^\x20-\x7E]/g, "").trim();
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-      } catch {
-        // Ignore session retrieval error and proceed
-      }
-    }
-
-    const res = await fetch("/api/search/live", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        query: cleanQuery,
-        limit: requestedLimit,
-        candidateBudget: candidateTarget,
-        discipline: classification.discipline,
-        mode: options.mode === "deep_research" ? "all" : options.mode ?? "all",
-      }),
-      signal: options.signal,
-    });
-    if (res.ok) {
-      const data = (await res.json()) as {
-        results?: RawSourceInput[];
-        excludedSources?: ExcludedSourceRecord[];
-        searchedCount?: number;
-      };
-      if (Array.isArray(data.results) && data.results.length > 0) {
-        emitLiveSearchProgress({
-          stage: "ranking",
-          detail: `Retrieved ${data.searchedCount ?? data.results.length} candidates · Deduplicating by DOI & verifying CSL metadata…`,
-          candidatesFound: data.searchedCount ?? data.results.length,
-        });
-        const enrichedServerResults = await verifyAndEnrichDOIMetadataBatch(data.results, {
-          signal: options.signal,
-          maxLookups: 5,
-        });
-        const { verified, verifiedRaw, excluded } = verifyAndDeduplicateSources(enrichedServerResults);
-        const allExcluded = [...(data.excludedSources ?? []), ...excluded];
-        const finalResults: LiveSearchResult[] = verifiedRaw
-          .slice(0, requestedLimit)
-          .map((r, idx) => ({
-            id: verified[idx].id,
-            title: verified[idx].title,
-            url: verified[idx].URL || (verified[idx].DOI ? `https://doi.org/${verified[idx].DOI}` : ""),
-            snippet: r.snippet || `Verified scholarly publication in ${verified[idx]["container-title"] || "academic literature"}.`,
-            publicationDate: String(verified[idx].issued["date-parts"][0][0]),
-            year: verified[idx].issued["date-parts"][0][0],
-            authors: (r.authors as string[]) || [],
-            venue: verified[idx]["container-title"],
-            journal: verified[idx]["container-title"],
-            volume: verified[idx].volume,
-            issue: verified[idx].issue,
-            pages: verified[idx].page,
-            publisher: verified[idx].publisher,
-            doi: verified[idx].DOI,
-            openAccessUrl: verified[idx].openAccessUrl,
-            source: (r as { source?: LiveSearchResult["source"] }).source || "openalex",
-            sourceType: verified[idx].sourceTypeLabel,
-            credibilityLevel: verified[idx].credibilityLevel,
-            csl: verified[idx],
-          }));
-
-        emitLiveSearchProgress({
-          stage: "verifying",
-          detail: `Verified ${finalResults.length} sources · Checked retractions & full-text passages…`,
-          candidatesFound: Math.max(data.searchedCount ?? data.results.length, finalResults.length + allExcluded.length),
-          verifiedCount: finalResults.length,
-          excludedCount: allExcluded.length,
-        });
-
-        const telemetry: LiveSearchTelemetryResult = {
-          results: finalResults,
-          excludedSources: allExcluded,
-          searchedCount: Math.max(data.searchedCount ?? data.results.length, finalResults.length + allExcluded.length),
-          readCount: finalResults.length,
-          complexity: classification.complexity,
-          discipline: classification.discipline,
-          queriesExecuted: queryVariations,
-        };
-        lastSearchTelemetry = telemetry;
-        return telemetry;
-      }
-    }
-  } catch {
-    // Server proxy unreachable; proceed to direct parallel browser queries
-  }
-
-  // 2. Direct parallel multi-provider queries across query variations with multi-page pagination
-  const perProviderLimit = Math.max(10, Math.ceil(candidateTarget / (queryVariations.length * 2)));
-  const maxPages = candidateTarget > 50 ? 2 : 1;
-  const providerPromises: Array<Promise<RawSourceInput[]>> = [];
-
-  for (const qVar of queryVariations.slice(0, 2)) {
-    for (let page = 1; page <= maxPages; page++) {
-      providerPromises.push(searchOpenAlexClient(qVar, perProviderLimit, page, options.signal));
-      providerPromises.push(searchCrossrefClient(qVar, perProviderLimit, page, options.signal));
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (isSupabaseConfigured()) {
+    try {
+      const { data } = await getSupabaseClient().auth.getSession();
+      const token = data?.session?.access_token?.replace(/[^\x20-\x7E]/g, "").trim();
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+    } catch {
+      // continue unauthenticated; the server answers 401 if it requires a session
     }
   }
-  providerPromises.push(searchEuropePmcClient(queryVariations[0], perProviderLimit, options.signal));
 
-  // Discipline-specific providers (Section 7)
-  if (classification.discipline === "education") {
-    providerPromises.push(searchEricClient(queryVariations[0], perProviderLimit, options.signal));
-  } else if (
-    classification.discipline === "management_business" ||
-    classification.discipline === "social_sciences" ||
-    classification.discipline === "law"
-  ) {
-    providerPromises.push(searchWorkingPapersClient(queryVariations[0], perProviderLimit, options.signal));
+  const res = await fetch("/api/search/live", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      query: cleanQuery,
+      limit: requestedLimit,
+      candidateBudget: candidateTarget,
+      discipline: classification.discipline,
+      mode: options.mode ?? "all",
+    }),
+    signal: options.signal,
+  });
+  if (!res.ok) {
+    throw new Error(`Live search failed (${res.status}).`);
   }
-
-  const settled = await Promise.allSettled(providerPromises);
-  const rawCandidates: RawSourceInput[] = [];
-  for (const s of settled) {
-    if (s.status === "fulfilled" && Array.isArray(s.value)) {
-      rawCandidates.push(...s.value);
-    }
-  }
+  const data = (await res.json()) as {
+    results?: RawSourceInput[];
+    searchedCount?: number;
+    queriesExecuted?: string[];
+  };
+  const raw = Array.isArray(data.results) ? data.results : [];
+  const searchedCount = data.searchedCount ?? raw.length;
 
   emitLiveSearchProgress({
     stage: "ranking",
-    detail: `Retrieved ${rawCandidates.length} candidates · Deduplicating by DOI & ranking by relevance…`,
-    candidatesFound: rawCandidates.length,
+    detail: `Retrieved ${searchedCount} candidates · Deduplicating by DOI and verifying metadata…`,
+    candidatesFound: searchedCount,
   });
 
-  // Rank candidates by topical relevance, citation impact, and recency before deduplication
-  const scoredCandidates = rawCandidates
-    .map((c) => ({
-      cand: c,
-      score: scoreClientRelevance(
-        cleanQuery,
-        c.title || "",
-        c.snippet || "",
-        0,
-        typeof c.year === "number" ? c.year : undefined
-      ),
-    }))
-    .sort((a, b) => b.score - a.score)
-    .map((x) => x.cand);
+  const enriched = await verifyAndEnrichDOIMetadataBatch(raw, { signal: options.signal, maxLookups: 5 });
+  const { verified, verifiedRaw, excluded } = verifyAndDeduplicateSources(enriched);
 
-  // Live Crossref DOI metadata verification & retraction check pass (Section 6)
-  const enrichedCandidates = await verifyAndEnrichDOIMetadataBatch(scoredCandidates, {
-    signal: options.signal,
-    maxLookups: 5,
-  });
-
-  // Strict verification, retraction filtering, and deduplication (by DOI -> title + first author)
-  const { verified, verifiedRaw, excluded } = verifyAndDeduplicateSources(enrichedCandidates);
-
-  const finalResults: LiveSearchResult[] = verifiedRaw
-    .slice(0, requestedLimit)
-    .map((r, idx) => ({
-      id: verified[idx].id,
-      title: verified[idx].title,
-      url: verified[idx].URL || (verified[idx].DOI ? `https://doi.org/${verified[idx].DOI}` : ""),
-      snippet:
-        r.snippet ||
-        `Verified scholarly publication in ${verified[idx]["container-title"] || "peer-reviewed literature"} (${verified[idx].issued["date-parts"][0][0]}).`,
-      publicationDate: String(verified[idx].issued["date-parts"][0][0]),
-      year: verified[idx].issued["date-parts"][0][0],
+  const results: LiveSearchResult[] = verifiedRaw.slice(0, requestedLimit).map((r, idx) => {
+    const csl = verified[idx];
+    const provider = (r as { provider?: string }).provider;
+    return {
+      id: csl.id,
+      title: csl.title,
+      url: csl.URL || (csl.DOI ? `https://doi.org/${csl.DOI}` : ""),
+      snippet: r.snippet || "",
+      publicationDate: r.publicationDate || String(csl.issued["date-parts"][0][0]),
+      year: csl.issued["date-parts"][0][0],
       authors: (r.authors as string[]) || [],
-      venue: verified[idx]["container-title"],
-      journal: verified[idx]["container-title"],
-      volume: verified[idx].volume,
-      issue: verified[idx].issue,
-      pages: verified[idx].page,
-      publisher: verified[idx].publisher,
-      doi: verified[idx].DOI,
-      openAccessUrl: verified[idx].openAccessUrl,
-      source: "openalex",
-      sourceType: verified[idx].sourceTypeLabel,
-      credibilityLevel: verified[idx].credibilityLevel,
-      csl: verified[idx],
-    }));
+      venue: csl["container-title"],
+      journal: csl["container-title"],
+      volume: csl.volume,
+      issue: csl.issue,
+      pages: csl.page,
+      publisher: csl.publisher,
+      doi: csl.DOI,
+      openAccessUrl: csl.openAccessUrl,
+      source: toLiveSource(provider),
+      sourceType: csl.sourceTypeLabel,
+      credibilityLevel: csl.credibilityLevel,
+      csl,
+    };
+  });
 
   emitLiveSearchProgress({
     stage: "verifying",
-    detail: `Verified ${finalResults.length} sources · Checked retractions & CSL metadata…`,
-    candidatesFound: rawCandidates.length,
-    verifiedCount: finalResults.length,
+    detail: `Verified ${results.length} sources · Checked retractions and bibliographic metadata…`,
+    candidatesFound: searchedCount,
+    verifiedCount: results.length,
     excludedCount: excluded.length,
   });
 
   const telemetry: LiveSearchTelemetryResult = {
-    results: finalResults,
+    results,
     excludedSources: excluded,
-    searchedCount: rawCandidates.length,
-    readCount: finalResults.length,
-    complexity: classification.complexity,
-    discipline: classification.discipline,
-    queriesExecuted: queryVariations,
+    searchedCount: Math.max(searchedCount, results.length + excluded.length),
+    readCount: results.length,
+    ...baseTelemetry,
+    queriesExecuted: data.queriesExecuted ?? [],
   };
   lastSearchTelemetry = telemetry;
   return telemetry;
+}
+
+function toLiveSource(provider?: string): LiveSearchResult["source"] {
+  switch (provider) {
+    case "openalex":
+    case "crossref":
+    case "semantic_scholar":
+    case "arxiv":
+    case "doaj":
+    case "web":
+      return provider;
+    case "europe_pmc":
+      return "pubmed";
+    case "repository":
+      return "openalex";
+    default:
+      return undefined;
+  }
 }
 
 /**

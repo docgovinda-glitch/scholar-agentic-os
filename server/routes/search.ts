@@ -1,4 +1,5 @@
-import express from "express";
+import express, { type Response } from "express";
+import { z } from "zod";
 import { getProjectStore } from "../../src/services/store/projectStore.ts";
 import { currentUserId, asyncRoute } from "./project.ts";
 import { requireAuth } from "../src/middleware/auth.ts";
@@ -61,45 +62,43 @@ export function registerSearchRoutes(app: express.Application) {
     });
   }));
 
-  // Live Web & Scholarly Search Route (OpenAlex, Crossref, ERIC, Proxy)
-  router.post("/live", asyncRoute(async (req, res) => {
-    const { query, limit = 20, candidateBudget, discipline, mode = "all" } = req.body || {};
-    const effectiveQuery = typeof query === "string" ? query.trim() : "";
-    if (!effectiveQuery) {
-      return res.status(400).json({ error: "Missing required query parameter" });
-    }
+  // Live web + scholarly retrieval: the one RetrievalService used by AskScholar and every workspace.
+  const liveSearchBody = z.object({
+    query: z.string().trim().min(1).max(2000),
+    limit: z.coerce.number().int().min(1).max(120).optional(),
+    candidateBudget: z.coerce.number().int().min(1).max(600).optional(),
+    discipline: z.string().max(40).optional(),
+    mode: z.enum(["all", "scholarly", "web", "deep_research"]).optional(),
+  });
 
+  const runLiveSearch = async (input: unknown, res: Response) => {
+    const parsed = liveSearchBody.safeParse(input);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "A non-empty query is required." });
+    }
     try {
-      const { executeLiveSearch } = await import("../src/discovery/liveSearch.ts");
-      const results = await executeLiveSearch(effectiveQuery, {
-        limit: Number(limit) || 20,
-        candidateBudget: Number(candidateBudget) || undefined,
-        discipline: typeof discipline === "string" ? discipline : undefined,
-        mode: mode === "scholarly" || mode === "web" ? mode : "all",
+      const { retrieveSources } = await import("../src/retrieval/retrievalService.ts");
+      const out = await retrieveSources(parsed.data);
+      res.json({
+        success: true,
+        count: out.results.length,
+        searchedCount: out.searchedCount,
+        results: out.results,
+        queriesExecuted: out.queriesExecuted,
+        providers: out.providers,
+        complexity: out.complexity,
+        discipline: out.discipline,
+        retrievedAt: out.retrievedAt,
       });
-      res.json({ success: true, count: results.length, searchedCount: results.length, results });
     } catch (err) {
       res.status(502).json({ error: `Live search failed: ${err instanceof Error ? err.message : String(err)}` });
     }
-  }));
+  };
 
-  router.get("/live", asyncRoute(async (req, res) => {
-    const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
-    const limit = Number(req.query.limit) || 20;
-    const mode = req.query.mode === "scholarly" || req.query.mode === "web" ? req.query.mode : "all";
-
-    if (!query) {
-      return res.status(400).json({ error: "Missing required q query parameter" });
-    }
-
-    try {
-      const { executeLiveSearch } = await import("../src/discovery/liveSearch.ts");
-      const results = await executeLiveSearch(query, { limit, mode });
-      res.json({ success: true, count: results.length, searchedCount: results.length, results });
-    } catch (err) {
-      res.status(502).json({ error: `Live search failed: ${err instanceof Error ? err.message : String(err)}` });
-    }
-  }));
+  router.post("/live", asyncRoute(async (req, res) => runLiveSearch(req.body, res)));
+  router.get("/live", asyncRoute(async (req, res) =>
+    runLiveSearch({ query: req.query.q, limit: req.query.limit, mode: req.query.mode, discipline: req.query.discipline }, res)
+  ));
 
   // Multi-Portal Scholarly Harvester Route (harvests across OpenAlex, CrossRef, DOAJ, DataCite, arXiv)
   router.post("/multi-portal", asyncRoute(async (req, res) => {

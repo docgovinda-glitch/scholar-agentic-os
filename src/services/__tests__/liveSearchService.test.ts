@@ -13,10 +13,6 @@ import {
   executeLiveSearchWithTelemetry,
   type LiveSearchResult,
 } from "../liveSearchService";
-import {
-  stripHtml,
-  reconstructOpenAlexAbstract,
-} from "../../../server/src/discovery/liveSearch";
 
 describe("Live Web & Scholarly Search Service (Multi-Provider & CSL-JSON Verified)", () => {
   beforeEach(() => {
@@ -189,68 +185,11 @@ describe("Live Web & Scholarly Search Service (Multi-Provider & CSL-JSON Verifie
       expect(telemetry.searchedCount).toBe(42);
     });
 
-    it("falls back to parallel multi-provider scholarly APIs if backend server returns an error", async () => {
-      vi.spyOn(globalThis, "fetch")
-        // First call (server) fails with 500
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 500,
-        } as Response)
-        // Subsequent parallel provider calls (OpenAlex, Crossref, EuropePMC)
-        .mockResolvedValue({
-          ok: true,
-          json: async () => ({
-            results: [
-              {
-                id: "https://openalex.org/W12345",
-                doi: "https://doi.org/10.1038/s41586-024-09999-z",
-                title: "Fallback OpenAlex Quantum Paper",
-                publication_year: 2024,
-                authorships: [{ author: { display_name: "Elena Rostova" } }],
-                primary_location: { source: { display_name: "Nature" } },
-              },
-            ],
-            message: {
-              items: [
-                {
-                  DOI: "10.1126/science.2024.111",
-                  title: ["Crossref Verified Quantum Study"],
-                  author: [{ given: "Alan", family: "Turing" }],
-                  published: { "date-parts": [[2024]] },
-                  "container-title": ["Science"],
-                },
-              ],
-            },
-            resultList: { result: [] },
-          }),
-        } as Response);
-
-      const results = await executeLiveSearch("quantum computing error correction");
-      expect(results.length).toBeGreaterThanOrEqual(2);
-      expect(results.some((r) => r.title === "Fallback OpenAlex Quantum Paper")).toBe(true);
-      expect(results.some((r) => r.title === "Crossref Verified Quantum Study")).toBe(true);
-    });
-  });
-
-  describe("liveSearch Server Utilities", () => {
-    it("stripHtml removes tags, unescapes entities, and collapses spaces", () => {
-      const raw = `<p>This is &quot;<b>bold</b>&quot; &amp; &#039;quoted&#039; &lt;text&gt;.</p>`;
-      expect(stripHtml(raw)).toBe(`This is "bold" & 'quoted' <text>.`);
-    });
-
-    it("reconstructOpenAlexAbstract accurately reconstructs inverted word index", () => {
-      const inverted = {
-        Quantum: [0],
-        computing: [1],
-        accelerates: [2],
-        discovery: [3],
-      };
-      expect(reconstructOpenAlexAbstract(inverted)).toBe("Quantum computing accelerates discovery");
-    });
-
-    it("reconstructOpenAlexAbstract handles empty or invalid inputs", () => {
-      expect(reconstructOpenAlexAbstract(undefined)).toBe("");
-      expect(reconstructOpenAlexAbstract({} as Record<string, number[]>)).toBe("");
+    it("has no browser-side provider fallback: a server failure surfaces and nothing else is called", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: false, status: 500 } as Response);
+      await expect(executeLiveSearch("quantum computing error correction")).rejects.toThrow(/Live search failed/);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy.mock.calls[0][0]).toBe("/api/search/live");
     });
   });
 

@@ -11,8 +11,6 @@ export type AskScholarRequestType =
   | "literature_review"
   | "deep_research";
 
-export type RequestComplexityType = AskScholarRequestType;
-
 export type AskScholarQuestionType =
   | "empirical"
   | "theoretical"
@@ -35,8 +33,6 @@ export type AskScholarDisciplineId =
 export type AcademicDiscipline = AskScholarDisciplineId | "auto";
 
 export type AnswerLengthPreference = "concise" | "standard" | "detailed";
-
-export type DefaultExportFormat = "docx" | "bibtex" | "ris" | "pdf";
 
 export type ScholarlyProviderId =
   | "openalex"
@@ -104,10 +100,6 @@ export interface ResolvedSourceBudget {
   targetCited: number;
   minCited: number;
   maxCited: number;
-  candidatesMin: number;
-  candidatesMax: number;
-  targetCitedMin: number;
-  targetCitedMax: number;
 }
 
 /**
@@ -143,10 +135,6 @@ export function resolveSourceBudget(
     targetCited,
     minCited: cfg.sourcesReadAndCited.min,
     maxCited: cfg.sourcesReadAndCited.max,
-    candidatesMin: cfg.candidatesRetrieved.min,
-    candidatesMax: cfg.candidatesRetrieved.max,
-    targetCitedMin: cfg.sourcesReadAndCited.min,
-    targetCitedMax: cfg.sourcesReadAndCited.max,
   };
 }
 
@@ -357,37 +345,13 @@ export const SOURCE_TYPE_PRIORITY_WEIGHTS: Record<string, number> = {
   "preprint": 62,
 };
 
-/**
- * Domains blocked per Section 7 (content farms, unattributed blogs, forums, AI-generated sites).
- */
-export const EXCLUDED_LOW_CREDIBILITY_DOMAINS = [
-  "medium.com",
-  "quora.com",
-  "reddit.com",
-  "blogspot.com",
-  "wordpress.com",
-  "tumblr.com",
-  "ehow.com",
-  "wikihow.com",
-  "Vocal.media",
-  "hubpages.com",
-  "buzzfeed.com",
-  "scribd.com",
-  "coursehero.com",
-  "studocu.com",
-  "chegg.com",
-  "brainly.com",
-];
-
 export interface PromptClassification {
   discipline: AskScholarDisciplineId;
   disciplineProfile: DisciplineProfile;
   questionType: AskScholarQuestionType;
   requestType: AskScholarRequestType;
-  complexity: AskScholarRequestType;
   requiresRetrieval: boolean;
   sourceBudget: ResolvedSourceBudget;
-  budget: ResolvedSourceBudget;
 }
 
 /**
@@ -464,7 +428,7 @@ export function classifyResearchPrompt(
     ) {
       discipline = "humanities";
     } else if (
-      /\b(?:gdp|inflation|monetary policy|fiscal|democratization|geopolitics|electoral|sociology|inequality|migration|demography|macroeconomic|microeconomic|governance|diplomacy|foreign policy|nepal|voter|polarisation|polarization)\b/i.test(
+      /\b(?:gdp|inflation|monetary policy|fiscal|democratization|geopolitics|electoral|sociology|inequality|migration|demography|macroeconomic|microeconomic|governance|diplomacy|foreign policy|voter|polarisation|polarization)\b/i.test(
         lower
       )
     ) {
@@ -534,10 +498,8 @@ export function classifyResearchPrompt(
     disciplineProfile,
     questionType,
     requestType,
-    complexity: requestType,
     requiresRetrieval: !isPureGreeting && clean.length >= 3,
     sourceBudget,
-    budget: sourceBudget,
   };
 }
 
@@ -605,9 +567,7 @@ export function generateQueryVariations(
 export interface AskScholarUserSettings {
   preferredCitationStyle: "apa" | "mla" | "chicago" | "chicago-notes" | "harvard" | "ieee" | "vancouver";
   preferredDiscipline: AcademicDiscipline;
-  defaultExportFormat: DefaultExportFormat;
   answerLengthPreference: AnswerLengthPreference;
-  answerLength?: AnswerLengthPreference;
 }
 
 const SETTINGS_STORAGE_KEY = "scholar_ask_user_settings_v1";
@@ -615,77 +575,36 @@ const SETTINGS_STORAGE_KEY = "scholar_ask_user_settings_v1";
 export const DEFAULT_ASK_SCHOLAR_SETTINGS: AskScholarUserSettings = {
   preferredCitationStyle: "apa",
   preferredDiscipline: "general",
-  defaultExportFormat: "docx",
   answerLengthPreference: "standard",
-  answerLength: "standard",
 };
 
 export function loadAskScholarSettings(): AskScholarUserSettings {
   try {
     if (typeof localStorage !== "undefined") {
       const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      const legacyStyle = localStorage.getItem("scholar_ask_citation_style");
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<AskScholarUserSettings>;
-        const resolvedLength =
-          parsed.answerLengthPreference ||
-          parsed.answerLength ||
-          DEFAULT_ASK_SCHOLAR_SETTINGS.answerLengthPreference;
         return {
-          preferredCitationStyle:
-            parsed.preferredCitationStyle ||
-            (legacyStyle as AskScholarUserSettings["preferredCitationStyle"]) ||
-            DEFAULT_ASK_SCHOLAR_SETTINGS.preferredCitationStyle,
-          preferredDiscipline:
-            parsed.preferredDiscipline || DEFAULT_ASK_SCHOLAR_SETTINGS.preferredDiscipline,
-          defaultExportFormat:
-            parsed.defaultExportFormat || DEFAULT_ASK_SCHOLAR_SETTINGS.defaultExportFormat,
-          answerLengthPreference: resolvedLength,
-          answerLength: resolvedLength,
-        };
-      }
-      if (legacyStyle) {
-        return {
-          ...DEFAULT_ASK_SCHOLAR_SETTINGS,
-          preferredCitationStyle: legacyStyle as AskScholarUserSettings["preferredCitationStyle"],
+          preferredCitationStyle: parsed.preferredCitationStyle || DEFAULT_ASK_SCHOLAR_SETTINGS.preferredCitationStyle,
+          preferredDiscipline: parsed.preferredDiscipline || DEFAULT_ASK_SCHOLAR_SETTINGS.preferredDiscipline,
+          answerLengthPreference: parsed.answerLengthPreference || DEFAULT_ASK_SCHOLAR_SETTINGS.answerLengthPreference,
         };
       }
     }
   } catch {
-    // Fallback to defaults
+    // Fall back to defaults
   }
   return { ...DEFAULT_ASK_SCHOLAR_SETTINGS };
 }
 
-export function saveAskScholarSettings(
-  updates: Partial<AskScholarUserSettings>
-): AskScholarUserSettings {
-  const current = loadAskScholarSettings();
-  const resolvedLength =
-    updates.answerLengthPreference ||
-    updates.answerLength ||
-    current.answerLengthPreference;
-  const next: AskScholarUserSettings = {
-    ...current,
-    ...updates,
-    answerLengthPreference: resolvedLength,
-    answerLength: resolvedLength,
-  };
+export function saveAskScholarSettings(updates: Partial<AskScholarUserSettings>): AskScholarUserSettings {
+  const next: AskScholarUserSettings = { ...loadAskScholarSettings(), ...updates };
   try {
     if (typeof localStorage !== "undefined") {
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(next));
-      if (updates.preferredCitationStyle) {
-        localStorage.setItem("scholar_ask_citation_style", updates.preferredCitationStyle);
-      }
-    }
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("scholar:ask-settings-updated", { detail: next }));
     }
   } catch {
-    // Ignore storage error
+    // Ignore storage errors: the in-memory value is still returned
   }
   return next;
 }
-
-export const loadAskScholarUserSettings = loadAskScholarSettings;
-export const saveAskScholarUserSettings = saveAskScholarSettings;

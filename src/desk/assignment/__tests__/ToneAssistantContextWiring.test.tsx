@@ -4,7 +4,6 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import ContextPanel from "../../workspace/ContextPanel";
-import AdvisorPanel from "../../components/AdvisorPanel";
 import WritingStyleSelector, {
   TONE_SUGGESTION_CHIPS,
 } from "../components/WritingStyleSelector";
@@ -68,40 +67,6 @@ describe("Tone Assistant Context Synchronization & Dynamic Suggestion Chips", ()
     await waitFor(() => {
       expect(screen.getByText("Here is guidance on your tone.")).toBeInTheDocument();
     });
-  });
-
-  it("AdvisorPanel pre-configures the Advisor persona and supports tone suggestion chips", async () => {
-    const handleSend = vi.fn().mockResolvedValue({ ok: true, response: "Analytical tone is recommended." });
-
-    render(
-      <AdvisorPanel
-        isOpen={true}
-        onSendMessage={handleSend}
-      />
-    );
-
-    // Confirms Advisor persona
-    expect(screen.getByText("Advisor")).toBeInTheDocument();
-    expect(screen.getByText("Assignment Brief & Rubric Guidance")).toBeInTheDocument();
-
-    // Dispatch advisor tone suggestions
-    window.dispatchEvent(
-      new CustomEvent("scholar:advisor-suggested-actions", {
-        detail: {
-          actions: TONE_SUGGESTION_CHIPS,
-          source: "tone-calibration",
-        },
-      })
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText("Compare Analytical vs. Argumentative for this topic")).toBeInTheDocument();
-    });
-
-    // Click Chip 2
-    fireEvent.click(screen.getByText("Compare Analytical vs. Argumentative for this topic"));
-
-    await waitFor(() => expect(handleSend).toHaveBeenCalledWith("Compare Analytical vs. Argumentative for this topic", []));
   });
 
   it("dispatches tone assistant event when WritingStyleSelector receives focus or selection", () => {

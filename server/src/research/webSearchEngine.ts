@@ -11,7 +11,12 @@
  */
 
 import { safeFetchHtml } from "../../utils/ssrfGuard.ts";
-import { discoverOpenAlexSources } from "../discovery/discovery.ts";
+import { isLowCredibilityDomain } from "../../../src/shared/retrieval/credibility.ts";
+import type { RawSourceInput } from "../../../src/citation_compliance/cslEngine.ts";
+import {
+  searchCrossref as searchCrossrefProvider,
+  searchOpenAlex as searchOpenAlexProvider,
+} from "../../../src/shared/retrieval/providers.ts";
 
 export type SourceAuthorityTier = "A" | "B" | "C" | "D";
 
@@ -463,14 +468,7 @@ export function evaluateSourceAuthority(
   }
 
   // TIER D: Low Authority / Content Farms / Unverified Forums
-  const isLowAuthority = [
-    "quora.com",
-    "reddit.com",
-    "pinterest.com",
-    "answers.com",
-    "yahoo.com",
-    "medium.com",
-  ].some((d) => domain === d || domain.endsWith("." + d));
+  const isLowAuthority = isLowCredibilityDomain(domain);
 
   if (isLowAuthority) {
     return {
@@ -678,117 +676,69 @@ function computeWebQueryRelevance(
  * Search CrossRef API for peer-reviewed academic journal publications.
  */
 export async function searchCrossRef(query: string, maxResults = 4): Promise<SearchResultItem[]> {
-  try {
-    const clean = query
-      .replace(/^(what|who|when|where|why|how|can you|please|search for|tell me about)\s+/i, "")
-      .replace(/[?.,!]/g, "")
-      .trim();
-    const effective = clean.length > 2 ? clean : query;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
-    const fetchRows = Math.max(maxResults * 2, 6);
-
-    const res = await fetch(
-      `https://api.crossref.org/works?query=${encodeURIComponent(effective)}&rows=${fetchRows}&mailto=researcher@scholarcore.org`,
-      { signal: controller.signal }
-    ).finally(() => clearTimeout(timer));
-
-    if (!res.ok) return [];
-    const data = (await res.json()) as any;
-    const items = data.message?.items || [];
-
-    const mapped = items.map((item: any) => {
-      const title = Array.isArray(item.title) ? item.title[0] : item.title || "Scholarly Paper";
-      const author = item.author?.[0] ? `${item.author[0].family || ""} ${item.author[0].given || ""}`.trim() : undefined;
-      const year = item.created?.["date-parts"]?.[0]?.[0] || item.published?.["date-parts"]?.[0]?.[0];
-      const url = item.URL || (item.DOI ? `https://doi.org/${item.DOI}` : "https://crossref.org");
-      const venue = item["container-title"]?.[0] || "";
-      const snippet = `${author ? `${author} ` : ""}${year ? `(${year})` : ""}${venue ? ` — ${venue}` : ""}. DOI: ${item.DOI || "N/A"}`.trim();
-      const auth = evaluateSourceAuthority(url, title, snippet, year);
-      const rel = computeWebQueryRelevance(effective, title, snippet);
-
-      return {
-        item: {
-          title,
-          url,
-          snippet,
-          domain: auth.domain,
-          publisher: venue || auth.publisher,
-          sourceType: "scholarly" as const,
-          authorityTier: "A" as const,
-          authorityBadge: "DOI-registered publication",
-          score: Math.min(90, 74 + Math.round(rel.ratio * 14) + rel.titleMatches * 2),
-          isPrimary: true,
-          publishedDate: year ? String(year) : undefined,
-          author,
-        },
-        rel,
-      };
-    });
-
-    return mapped
-      .filter(({ rel }: { rel: ReturnType<typeof computeWebQueryRelevance> }) => {
-        if (rel.keywordCount === 0) return true;
-        if (rel.titleMatches < 1) return false;
-        if (rel.keywordCount >= 2 && rel.ratio < 0.45) return false;
-        if (rel.keywordCount >= 3 && rel.titleMatches < 2) return false;
-        return true;
-      })
-      .map(({ item }: { item: SearchResultItem }) => item)
-      .slice(0, maxResults);
-  } catch {
-    return [];
-  }
+  const { items } = await searchCrossrefProvider(query, Math.max(maxResults * 2, 6), 1, { timeoutMs: 6000, mailto: process.env.OPENALEX_MAILTO });
+  return scholarlyRecordsToItems(query, items, "DOI-registered publication", maxResults);
 }
 
 /**
  * Search scholarly sources via OpenAlex as complementary academic web search.
  */
 export async function searchScholarlySources(query: string, maxResults = 4): Promise<SearchResultItem[]> {
-  try {
-    const results = await discoverOpenAlexSources(query, Math.max(maxResults * 2, 6)).catch(() => []);
-    const mapped = results.map((r) => {
-      const url = r.url || (r.doi ? `https://doi.org/${r.doi}` : `https://openalex.org`);
-      const snippet = `${r.authors?.slice(0, 3).join(", ") || r.venue || ""}${r.year ? ` (${r.year})` : ""}${r.venue ? ` — ${r.venue}` : ""}`.trim();
-      const auth = evaluateSourceAuthority(url, r.title, snippet, r.year);
-      const rel = computeWebQueryRelevance(query, r.title, snippet);
+  const { items } = await searchOpenAlexProvider(query, Math.max(maxResults * 2, 6), 1, {
+    mailto: process.env.OPENALEX_MAILTO,
+    openAlexApiKey: process.env.OPENALEX_API_KEY,
+  });
+  return scholarlyRecordsToItems(query, items, "Scholarly index (OpenAlex)", maxResults);
+}
 
-      return {
-        item: {
-          title: r.title,
-          url,
-          snippet,
-          domain: auth.domain,
-          publisher: r.venue || auth.publisher,
-          venue: r.venue,
-          doi: r.doi,
-          year: r.year,
-          authors: r.authors,
-          sourceType: "scholarly" as const,
-          authorityTier: "A" as const,
-          authorityBadge: "Scholarly index (OpenAlex)",
-          score: Math.min(90, 74 + Math.round(rel.ratio * 14) + rel.titleMatches * 2),
-          isPrimary: true,
-          publishedDate: r.year ? String(r.year) : undefined,
-          author: r.authors?.[0],
-        },
-        rel,
+/** Maps shared-provider scholarly records into ranked web-search items (title-relevance gated, real fields only). */
+function scholarlyRecordsToItems(
+  query: string,
+  records: RawSourceInput[],
+  badge: string,
+  maxResults: number
+): SearchResultItem[] {
+  const mapped = records
+    .filter((r) => r.title && (r.url || r.doi))
+    .map((r) => {
+      const url = r.url || `https://doi.org/${r.doi}`;
+      const authors = Array.isArray(r.authors) ? (r.authors as string[]).filter((a) => typeof a === "string") : [];
+      const venue = r.venue;
+      const meta = `${authors.slice(0, 3).join(", ")}${r.year ? ` (${r.year})` : ""}${venue ? ` — ${venue}` : ""}`.trim();
+      const snippet = r.snippet || meta;
+      const auth = evaluateSourceAuthority(url, r.title as string, snippet, r.year);
+      const rel = computeWebQueryRelevance(query, r.title as string, snippet);
+      const item: SearchResultItem = {
+        title: r.title as string,
+        url,
+        snippet,
+        domain: auth.domain,
+        publisher: venue || auth.publisher,
+        venue,
+        doi: r.doi,
+        year: r.year,
+        authors,
+        sourceType: "scholarly",
+        authorityTier: "A",
+        authorityBadge: badge,
+        score: Math.min(90, 74 + Math.round(rel.ratio * 14) + rel.titleMatches * 2),
+        isPrimary: true,
+        publishedDate: r.publicationDate || (r.year ? String(r.year) : undefined),
+        author: authors[0],
       };
+      return { item, rel };
     });
 
-    return mapped
-      .filter(({ rel }) => {
-        if (rel.keywordCount === 0) return true;
-        if (rel.titleMatches < 1) return false;
-        if (rel.keywordCount >= 2 && rel.ratio < 0.45) return false;
-        if (rel.keywordCount >= 3 && rel.titleMatches < 2) return false;
-        return true;
-      })
-      .map(({ item }) => item)
-      .slice(0, maxResults);
-  } catch {
-    return [];
-  }
+  return mapped
+    .filter(({ rel }) => {
+      if (rel.keywordCount === 0) return true;
+      if (rel.titleMatches < 1) return false;
+      if (rel.keywordCount >= 2 && rel.ratio < 0.45) return false;
+      if (rel.keywordCount >= 3 && rel.titleMatches < 2) return false;
+      return true;
+    })
+    .map(({ item }) => item)
+    .slice(0, maxResults);
 }
 
 /**
@@ -1054,7 +1004,13 @@ export function computeAdaptiveSourceTarget(query: string, mode?: "search" | "de
  */
 export async function executeWebSearch(
   query: string,
-  options: { maxResults?: number; fetchFullContent?: boolean; mode?: "search" | "deep-research" | "chat" } = {}
+  options: {
+    maxResults?: number;
+    fetchFullContent?: boolean;
+    mode?: "search" | "deep-research" | "chat";
+    /** false = web/news/official sources only (the RetrievalService supplies scholarly records itself). */
+    includeScholarly?: boolean;
+  } = {}
 ): Promise<WebSearchResponse> {
   const maxResults = options.maxResults ?? computeAdaptiveSourceTarget(query, options.mode);
   const effectiveQuery = query.trim();
@@ -1069,8 +1025,9 @@ export async function executeWebSearch(
     ...multiQueries.map((q) => searchDuckDuckGo(q, subQueryMax)),
     searchGoogleNewsRss(effectiveQuery, Math.max(6, Math.floor(maxResults / 3))),
     searchWikipedia(effectiveQuery, Math.max(4, Math.floor(maxResults / 4))),
-    searchCrossRef(effectiveQuery, scholarlyMax),
-    searchScholarlySources(effectiveQuery, scholarlyMax),
+    ...(options.includeScholarly === false
+      ? []
+      : [searchCrossRef(effectiveQuery, scholarlyMax), searchScholarlySources(effectiveQuery, scholarlyMax)]),
   ];
 
   const allBatchResults = await Promise.all(searchPromises);
