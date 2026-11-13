@@ -6,8 +6,10 @@ import JSZip from "jszip";
 
 async function buildDeck(page: import("@playwright/test").Page) {
   await page.goto("/presentation");
-  await page.getByLabel(/^Title/).fill("Climate migration in South Asia");
-  await page.getByRole("button", { name: "Starter outline without AI" }).click();
+  // Step 01 drafts an outline from the topic (offline here: no AI is configured), then Design, then the studio.
+  await page.getByPlaceholder(/Branches of quantum computing/).fill("Climate migration in South Asia");
+  await page.getByRole("button", { name: "Generate outline" }).click();
+  await page.getByRole("button", { name: /Proceed to Design/ }).click();
   await page.getByRole("button", { name: /03 Edit Slides/ }).first().click();
   await expect(page.getByTestId("wysiwyg-slide-card")).toBeVisible();
 }

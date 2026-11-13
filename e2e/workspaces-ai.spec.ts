@@ -4,14 +4,14 @@ import { AUTH_FILES } from "./authFiles";
 // B5: the drafting step of each workspace runs through the app's real
 // server-side AI path and keeps what it wrote. The AI is the CI stand-in
 // (e2e/stub-ai/server.mjs) on LM Studio's default address, selected per
-// request with the same x-ai-* headers the app sends for a user's own AI.
+// request with the same x-ai-keyring header the app sends for a user's own AI.
 const A = { email: process.env.E2E_A_EMAIL, password: process.env.E2E_A_PASSWORD };
 const STUB_AI_URL = process.env.E2E_STUB_AI_URL; // e.g. http://localhost:1234
 test.skip(!A.email || !A.password, "E2E_A_* test account not configured");
 test.skip(!STUB_AI_URL, "E2E_STUB_AI_URL not set (start e2e/stub-ai/server.mjs)");
 
 const MARKER = "E2E-STUB-DRAFT";
-const AI_HEADERS = { "x-ai-provider": "lmstudio", "x-ai-model": "e2e-stub" };
+const AI_HEADERS = { "x-ai-keyring": Buffer.from(JSON.stringify([{ provider: "lmstudio", model: "e2e-stub" }])).toString("base64url") };
 
 async function api(page: Page, method: string, path: string, body?: unknown, extraHeaders: Record<string, string> = {}) {
   return page.evaluate(
