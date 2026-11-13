@@ -145,9 +145,9 @@ describe("Ask Scholar Advanced Features: Scite Stance, Citation Graph, and Peer 
     await ask("How does RL perform in financial markets?");
 
     const matrixTabBtn = await screen.findByRole("button", { name: /Evidence Matrix/i });
-    expect(screen.getByRole("button", { name: /^Synthesis/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Answer/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Citation Graph/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Peer Review & Rigor/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Review$/i })).toBeInTheDocument();
 
     // Switch to Evidence Matrix tab
     fireEvent.click(matrixTabBtn);
@@ -184,7 +184,7 @@ describe("Ask Scholar Advanced Features: Scite Stance, Citation Graph, and Peer 
     open();
     await ask("How does RL perform in financial markets?");
 
-    const peerReviewTabBtn = await screen.findByRole("button", { name: /Peer Review & Rigor/i });
+    const peerReviewTabBtn = await screen.findByRole("button", { name: /^Review$/i });
     fireEvent.click(peerReviewTabBtn);
 
     await waitFor(() => {

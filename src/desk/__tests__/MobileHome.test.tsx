@@ -207,7 +207,7 @@ describe("phone home: Ask Scholar first", () => {
       expect(screen.queryByText("Ask Scholar Copilot Active")).toBeNull();
     });
 
-    it("shows research progress as one line with Details and Stop while answering", async () => {
+    it("shows research progress as one line with Details, and Stop lives in the prompt box, while answering", async () => {
       vi.mocked(api.executeAgenticLLM).mockImplementation(() => new Promise(() => {}) as never);
       vi.mocked(api.executeAgenticQuery).mockImplementation(() => new Promise(() => {}) as never);
       startChat("What is a literature review?");
@@ -215,10 +215,11 @@ describe("phone home: Ask Scholar first", () => {
       expect(within(progress).getByRole("status")).toHaveTextContent(/Searching scholarly sources|Writing your answer/);
       const details = within(progress).getByRole("button", { name: "Details" });
       expect(details).toHaveAttribute("aria-expanded", "false");
-      expect(within(progress).getByRole("button", { name: "Stop" })).toBeInTheDocument();
+      expect(within(progress).queryByRole("button", { name: "Stop" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Stop generating" })).toBeInTheDocument();
       fireEvent.click(details);
       expect(within(progress).getByRole("button", { name: "Hide details" })).toHaveAttribute("aria-expanded", "true");
-      fireEvent.click(within(progress).getByRole("button", { name: "Stop" }));
+      fireEvent.click(screen.getByRole("button", { name: "Stop generating" }));
       await waitFor(() => expect(screen.queryByTestId("mobile-ask-progress")).toBeNull());
     });
 

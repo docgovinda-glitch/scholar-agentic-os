@@ -120,10 +120,10 @@ export function AskPromptBox({
         setDragging(false);
         if (e.dataTransfer.files?.length) onAttachFiles(Array.from(e.dataTransfer.files));
       }}
-      className={`relative flex w-full flex-col rounded-3xl border bg-white p-3 shadow-sm transition-all duration-200 dark:bg-ink-750 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--accent)] focus-within:shadow-md ${
+      className={`relative flex w-full flex-col rounded-3xl border bg-white p-3 shadow-sm transition-all duration-200 dark:bg-ink-750 focus-within:shadow-md ${
         dragging
           ? "border-blue-500 bg-blue-50/10 ring-2 ring-blue-500/20 dark:bg-blue-950/20"
-          : "border-neutral-200/90 focus-within:border-neutral-400 dark:border-white/10 dark:focus-within:border-white/25"
+          : "border-neutral-200/90 focus-within:border-neutral-300 dark:border-white/10 dark:focus-within:border-white/20"
       } ${className}`}
     >
       {(attachments.length > 0 || isUploading) && (

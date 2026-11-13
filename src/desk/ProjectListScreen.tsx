@@ -902,19 +902,43 @@ export default function ProjectListScreen({
     else el.scrollTop = el.scrollHeight;
   }, []);
 
-  // Follow the answer: smooth for a new message, instant while tokens stream (a smooth
-  // animation restarted on every token makes the page shudder).
+  // Reading position. A new question goes to the top of the view, an answer is read from its
+  // beginning (never thrown to its end), and while one is being written the view follows it only
+  // until its first line would leave the screen.
   const lastScrolledCountRef = useRef(0);
+  const scrollMessageToTop = useCallback((selector: string, smooth: boolean) => {
+    const canvas = chatCanvasRef.current;
+    const target = canvas?.querySelector<HTMLElement>(selector);
+    if (!canvas || !target) return false;
+    const top = canvas.scrollTop + (target.getBoundingClientRect().top - canvas.getBoundingClientRect().top) - 12;
+    if (typeof canvas.scrollTo === "function") canvas.scrollTo({ top: Math.max(0, top), behavior: smooth ? "smooth" : "auto" });
+    else canvas.scrollTop = Math.max(0, top);
+    return true;
+  }, []);
   useEffect(() => {
-    // Sending a message always brings the reader back to the bottom.
-    if (guideMessages[guideMessages.length - 1]?.sender === "user") stickToBottomRef.current = true;
-    const el = chatCanvasRef.current;
-    if (!el || !stickToBottomRef.current) return;
-    const newMessage = guideMessages.length !== lastScrolledCountRef.current;
+    const canvas = chatCanvasRef.current;
+    if (!canvas) return;
+    const last = guideMessages[guideMessages.length - 1];
+    const countChanged = guideMessages.length !== lastScrolledCountRef.current;
     lastScrolledCountRef.current = guideMessages.length;
-    if (typeof el.scrollTo === "function") el.scrollTo({ top: el.scrollHeight, behavior: newMessage ? "smooth" : "auto" });
-    else el.scrollTop = el.scrollHeight;
-  }, [streamingGuideText, isGuideThinking, askPhase?.step, askPhase?.detail, guideMessages.length]);
+
+    if (countChanged && last) {
+      stickToBottomRef.current = last.sender === "user";
+      if (!scrollMessageToTop(`[data-message-id="${last.id}"]`, true)) {
+        canvas.scrollTop = canvas.scrollHeight;
+      }
+      return;
+    }
+    if (!stickToBottomRef.current) return;
+    const bottom = canvas.scrollHeight - canvas.clientHeight;
+    const answer = canvas.querySelector<HTMLElement>("[data-streaming-answer]");
+    const answerTop = answer
+      ? canvas.scrollTop + (answer.getBoundingClientRect().top - canvas.getBoundingClientRect().top) - 12
+      : bottom;
+    const next = Math.max(0, Math.min(bottom, answerTop));
+    if (typeof canvas.scrollTo === "function") canvas.scrollTo({ top: next, behavior: "auto" });
+    else canvas.scrollTop = next;
+  }, [streamingGuideText, isGuideThinking, askPhase?.step, askPhase?.detail, guideMessages.length, scrollMessageToTop]);
 
   // Handle outside clicks to close the mobile academic workspace dropdown
   useEffect(() => {
@@ -3497,15 +3521,13 @@ export default function ProjectListScreen({
                       <button
                         type="button"
                         onClick={() => setIsAskHistoryOpen((prev) => !prev)}
-                        className="inline-flex items-center justify-center gap-1 px-2.5 py-1 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/[0.06] hover:bg-neutral-200 dark:hover:bg-white/10 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer"
+                        className="inline-flex min-h-10 min-w-10 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
                         title="Recent Ask Scholar conversations"
                         aria-label="Recent Chats"
                       >
                         <Clock className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">History</span>
-                        <span className="text-[10px] font-mono px-1 rounded bg-neutral-200/80 dark:bg-white/10">
-                          {askThreads.length}
-                        </span>
+                        <span className="text-[11px] tabular-nums opacity-70">{askThreads.length}</span>
                       </button>
 
                       {isAskHistoryOpen && (
@@ -3575,7 +3597,7 @@ export default function ProjectListScreen({
                     <button
                       type="button"
                       onClick={handleStartNewAskThread}
-                      className="inline-flex items-center justify-center gap-1 px-2.5 py-1 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-white/[0.06] hover:bg-neutral-200 dark:hover:bg-white/10 border border-neutral-200/80 dark:border-white/10 transition-colors cursor-pointer"
+                      className="inline-flex min-h-10 min-w-10 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white sm:min-h-8 sm:min-w-8"
                       title="Start a new chat and show deliverable workspaces"
                       aria-label="New Chat"
                     >
@@ -3700,59 +3722,32 @@ export default function ProjectListScreen({
                     {guideMessages.map((msg) => (
                       <div
                         key={msg.id}
-                        className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
+                        data-message-id={msg.id}
+                        data-message-sender={msg.sender}
+                        className={`group flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
                       >
-                        <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-neutral-500">
-                          {msg.sender === "assistant" ? (
-                            <>
-                              <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
-                                <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
-                              </div>
-                              <span className="font-semibold text-neutral-700 dark:text-neutral-300">Scholar Core</span>
-                              {msg.mode === "deep-research" && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 font-medium">
-                                  🔬 Deep Research
-                                </span>
-                              )}
-                              {!msg.error && (
-                                <span className="hidden sm:inline px-1.5 py-0.5 rounded text-[9px] bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 font-mono font-medium">
-                                  {msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words
-                                </span>
-                              )}
-                              {msg.provider && (
-                                <span className="hidden sm:inline px-1.5 py-0.5 rounded text-[9px] bg-neutral-500/10 text-neutral-700 dark:text-neutral-300 font-medium">
-                                  ⚡ {msg.provider}
-                                </span>
-                              )}
-
-                            </>
-                          ) : (
-                            <span>You</span>
-                          )}
-                          <span>•</span>
-                          <span>{msg.timestamp}</span>
-                          {msg.sender === "user" && !isGuideThinking && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingUserMsgId(msg.id);
-                                setEditingUserMsgText(msg.text);
-                              }}
-                              className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
-                              title="Edit and resubmit message"
-                            >
-                              <Pencil className="w-2.5 h-2.5" />
-                              <span>Edit</span>
-                            </button>
-                          )}
-                        </div>
+                        {msg.sender === "user" && !isGuideThinking && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingUserMsgId(msg.id);
+                              setEditingUserMsgText(msg.text);
+                            }}
+                            className="mb-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-neutral-400 opacity-0 transition-opacity hover:text-neutral-700 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 dark:hover:text-neutral-200"
+                            title="Edit and resubmit message"
+                            aria-label="Edit message"
+                          >
+                            <Pencil className="h-2.5 w-2.5" aria-hidden="true" />
+                            <span>Edit</span>
+                          </button>
+                        )}
 
                         <div
-                          className={`rounded-2xl px-4 py-3 ${msg.sender === "user" ? "max-w-[88%]" : "max-w-full sm:max-w-[88%]"} leading-relaxed ${isPhone ? "text-[15px]" : ""} ${msg.sender === "user"
-                            ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-sm rounded-tr-xs"
+                          className={`leading-relaxed ${isPhone ? "text-[15px]" : "text-sm"} ${msg.sender === "user"
+                            ? "max-w-[88%] rounded-3xl rounded-br-lg bg-neutral-100 px-4 py-2.5 text-neutral-900 dark:bg-white/10 dark:text-neutral-100"
                             : msg.error
-                              ? "bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 text-neutral-900 dark:text-neutral-200 rounded-tl-xs shadow-2xs"
-                              : "bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 rounded-tl-xs shadow-2xs"
+                              ? "w-full rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-neutral-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-neutral-200"
+                              : "w-full px-0.5 text-neutral-900 dark:text-neutral-100"
                             }`}
                         >
                           {/* User Attachments Display */}
@@ -3761,7 +3756,7 @@ export default function ProjectListScreen({
                               {msg.attachments.map((att, aIdx) => (
                                 <div
                                   key={aIdx}
-                                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/20 dark:bg-white/20 text-xs text-white"
+                                  className="flex items-center gap-1.5 rounded-lg bg-black/5 px-2 py-1 text-xs text-neutral-700 dark:bg-white/10 dark:text-neutral-200"
                                 >
                                   {att.isImage ? (
                                     att.previewUrl ? (
@@ -3778,40 +3773,20 @@ export default function ProjectListScreen({
                             </div>
                           )}
 
-                          {msg.sender === "assistant" && !msg.error && (
-                            <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {((msg.verifiedSourcesCount !== undefined && msg.verifiedSourcesCount > 0) || (msg.citations && msg.citations.length > 0)) && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                                    <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                                    <span>{msg.verifiedSourcesCount ?? msg.citations?.length ?? 0} Verified Sources</span>
-                                  </span>
-                                )}
-                                {msg.citations && msg.citations.some((c) => c.sourceType === "vault" || (c.authorityBadge || "").toLowerCase().includes("vault")) && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30">
-                                    <Database className="w-3 h-3 text-amber-500" />
-                                    <span>Knowledge Vault Grounded</span>
-                                  </span>
-                                )}
-                                {msg.model && (
-                                  <span className="text-[10px] text-neutral-400 font-mono">
-                                    {msg.model}
-                                  </span>
-                                )}
-                              </div>
-
+                          {msg.sender === "assistant" && !msg.error && ((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
+                            <div className="mb-3">
                               {/* Merged Single-Line Non-Wrapping View Switcher (Section 13) */}
                               {((msg.citations && msg.citations.length > 0) || (msg.liveSources && msg.liveSources.length > 0)) && (
                                 <div
                                   data-testid="response-primary-tabs"
-                                  className="flex items-center gap-1 flex-nowrap overflow-x-auto whitespace-nowrap no-scrollbar w-full bg-neutral-100 dark:bg-white/[0.06] p-0.5 rounded-lg border border-neutral-200/60 dark:border-white/10 text-[10.5px]"
+                                  className="no-scrollbar flex w-full flex-nowrap items-center gap-4 overflow-x-auto whitespace-nowrap border-b border-neutral-200/70 text-xs dark:border-white/10"
                                 >
                                   {([
-                                    { id: "synthesis", label: "Synthesis", title: "Synthesized prose response with inline citations", Icon: FileText, tone: "text-sky-500" },
-                                    { id: "matrix", label: `Evidence Matrix (${(msg.citations || msg.liveSources || []).length})`, title: "Structured Evidence Matrix & Forest Plot Synthesis", Icon: Table, tone: "text-emerald-500" },
-                                    { id: "graph", label: "Citation Graph", title: "Interactive Citation Graph & Literature Discovery", Icon: Network, tone: "text-indigo-500" },
-                                    { id: "consensus", label: "Peer Review & Rigor", title: "Peer Review & Methodological Rigor Audit", Icon: AlertTriangle, tone: "text-amber-500" },
-                                  ] as const).map(({ id, label, title, Icon, tone }) => {
+                                    { id: "synthesis", label: "Answer", title: "Synthesized prose response with inline citations" },
+                                    { id: "matrix", label: `Evidence Matrix (${(msg.citations || msg.liveSources || []).length})`, title: "Structured Evidence Matrix & Forest Plot Synthesis" },
+                                    { id: "graph", label: "Citation Graph", title: "Interactive Citation Graph & Literature Discovery" },
+                                    { id: "consensus", label: "Review", title: "Peer Review & Methodological Rigor Audit" },
+                                  ] as const).map(({ id, label, title }) => {
                                     const active = (messageActiveTab[msg.id] ?? "synthesis") === id;
                                     return (
                                       <button
@@ -3819,13 +3794,12 @@ export default function ProjectListScreen({
                                         type="button"
                                         aria-pressed={active}
                                         onClick={() => setMessageActiveTab((prev) => ({ ...prev, [msg.id]: id }))}
-                                        className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ${active
-                                          ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-2xs font-semibold"
-                                          : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                                        className={`-mb-px inline-flex shrink-0 cursor-pointer items-center whitespace-nowrap border-b-2 py-1.5 transition-colors ${active
+                                          ? "border-neutral-900 font-semibold text-neutral-900 dark:border-white dark:text-white"
+                                          : "border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                                           }`}
                                         title={title}
                                       >
-                                        <Icon className={`w-3 h-3 ${tone} shrink-0`} aria-hidden="true" />
                                         <span>{label}</span>
                                       </button>
                                     );
@@ -3839,11 +3813,10 @@ export default function ProjectListScreen({
                                       );
                                       handleOpenResearchExport(items, msg.text?.slice(0, 100));
                                     }}
-                                    className="px-2 py-0.5 rounded-md font-medium text-neutral-600 dark:text-neutral-300 hover:bg-white dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 whitespace-nowrap ml-auto"
+                                    className="-mb-px ml-auto inline-flex shrink-0 cursor-pointer items-center whitespace-nowrap py-1.5 text-neutral-500 transition-colors hover:text-neutral-900 dark:hover:text-white"
                                     title="Open Research Export Workspace (LaTeX & Overleaf Package)"
                                   >
-                                    <FileCode className="w-3 h-3 text-sky-500 shrink-0" />
-                                    <span>LaTeX / Overleaf</span>
+                                    <span>LaTeX</span>
                                   </button>
                                 </div>
                               )}
@@ -4539,7 +4512,7 @@ export default function ProjectListScreen({
                           )}
 
                           {/* Retrieved Live Sources Drawer */}
-                          {msg.liveSources && msg.liveSources.length > 0 && (
+                          {msg.liveSources && msg.liveSources.length > 0 && !(msg.citations && msg.citations.length > 0) && (
                             <LiveSourcesDrawer
                               sources={msg.liveSources}
                               searchedAt={msg.searchedAt}
@@ -4576,22 +4549,15 @@ export default function ProjectListScreen({
                             )}
 
                           {/* Recommended Workspace Handoff Callout when explicitly recommended by server */}
-                          {msg.sender === "assistant" && msg.recommendedWorkspaceHandoff && (
-                            <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/40 flex items-center justify-between gap-2 flex-wrap">
-                              <span className="text-[11px] font-medium text-emerald-900 dark:text-emerald-200">
-                                Suggested next step: {msg.recommendedWorkspaceHandoff.formatLabel}
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => void handleBootProjectFromResearch(msg, msg.recommendedWorkspaceHandoff!.targetFormatId)}
-                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
-                                >
-                                  <span>Continue in {msg.recommendedWorkspaceHandoff.formatLabel}</span>
-                                  <ArrowRight className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </div>
+                          {msg.sender === "assistant" && !msg.error && msg.recommendedWorkspaceHandoff && (
+                            <button
+                              type="button"
+                              onClick={() => void handleBootProjectFromResearch(msg, msg.recommendedWorkspaceHandoff!.targetFormatId)}
+                              className="mt-3 inline-flex cursor-pointer items-center gap-1 text-[13px] font-medium text-neutral-900 underline-offset-4 hover:underline dark:text-neutral-100"
+                            >
+                              <span>Continue in {msg.recommendedWorkspaceHandoff.formatLabel}</span>
+                              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                            </button>
                           )}
 
                           {/* Exact 6 Post-Response Actions in Single Non-Wrapping Row (Sections 8, 11, 13) */}
@@ -4647,6 +4613,18 @@ export default function ProjectListScreen({
                             />
                           )}
 
+                          {msg.sender === "assistant" && !msg.error && msg.kind !== "help" && msg.id !== "init" && msg.id !== "reset-assistant" && (
+                            <p className="mt-1.5 hidden px-1 text-[11px] text-neutral-400 sm:block">
+                              {[
+                                msg.mode === "deep-research" ? "Deep research" : null,
+                                `${msg.wordCount || msg.text.trim().split(/\s+/).filter(Boolean).length} words`,
+                                msg.provider || null,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                          )}
+
                           {/* Quick Action Deep-Links */}
                           {msg.action && (
                             <div className="mt-3 pt-2.5 border-t border-neutral-200 dark:border-white/10">
@@ -4660,32 +4638,30 @@ export default function ProjectListScreen({
                             </div>
                           )}
 
-                          {/* Dynamic Follow-Up Questions ("Related Inquiries") */}
+                          {/* Related questions: plain tappable lines, no boxes */}
                           {msg.sender === "assistant" && !msg.error && msg.followUps && msg.followUps.length > 0 && (
-                            <div className="mt-3 pt-2.5 border-t border-neutral-200/60 dark:border-white/10 space-y-1.5">
-                              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                                <Lightbulb className="w-3 h-3 text-amber-500" />
-                                <span>Related Inquiries</span>
-                              </div>
-                              <div className="flex flex-wrap gap-1.5">
+                            <div className="mt-4">
+                              <p className="mb-1 px-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">Related Inquiries</p>
+                              <ul className="divide-y divide-neutral-200/70 dark:divide-white/10">
                                 {msg.followUps.map((fu, fuIdx) => (
-                                  <button
-                                    key={fuIdx}
-                                    type="button"
-                                    onClick={() =>
+                                  <li key={fuIdx}>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
                                       handleSendGuideMessage(
                                         fu,
                                         undefined,
                                         msg.mode === "deep-research" ? "deep-research" : msg.mode === "search" ? "search" : "normal"
                                       )
                                     }
-                                    className="text-xs sm:text-[11px] text-left px-3 sm:px-2.5 py-2 sm:py-1 min-h-9 sm:min-h-0 rounded-lg bg-neutral-100 dark:bg-white/[0.06] hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:border-sky-300 dark:hover:border-sky-500/30 border border-neutral-200/60 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors cursor-pointer inline-flex items-center gap-1 group"
-                                  >
-                                    <span>{fu}</span>
-                                    <ArrowRight className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity text-sky-500 shrink-0" />
-                                  </button>
+                                      className="group flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 px-1 py-2 text-left text-[14px] text-neutral-800 transition-colors hover:text-neutral-950 dark:text-neutral-200 dark:hover:text-white sm:min-h-9 sm:text-[13px]"
+                                    >
+                                      <span>{fu}</span>
+                                      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-neutral-400 opacity-60 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+                                    </button>
+                                  </li>
                                 ))}
-                              </div>
+                              </ul>
                             </div>
                           )}
                         </div>
@@ -4699,7 +4675,7 @@ export default function ProjectListScreen({
                             data-testid="mobile-ask-progress"
                             className="flex items-center gap-2 px-1 min-h-10 text-[13px] font-medium text-neutral-700 dark:text-neutral-200"
                           >
-                            <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-sky-500" aria-hidden="true" />
+                            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-neutral-400" aria-hidden="true" />
                             <span role="status" aria-live="polite" className="min-w-0 flex-1 truncate">
                               {askPhase?.step === "writing"
                                 ? "Writing your answer…"
@@ -4711,16 +4687,9 @@ export default function ProjectListScreen({
                               type="button"
                               onClick={() => setShowProgressDetails((v) => !v)}
                               aria-expanded={showProgressDetails}
-                              className="shrink-0 min-h-9 px-2.5 rounded-full text-xs text-sky-700 dark:text-sky-300 cursor-pointer focus-visible:outline-2 focus-visible:outline-sky-500"
+                              className="shrink-0 min-h-9 cursor-pointer rounded-full px-2.5 text-xs text-neutral-500 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-sky-500 dark:hover:text-white"
                             >
                               {showProgressDetails ? "Hide details" : "Details"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleStopGuideGeneration}
-                              className="shrink-0 min-h-9 px-3 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold cursor-pointer active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
-                            >
-                              Stop
                             </button>
                           </div>
                         )}
@@ -4738,17 +4707,8 @@ export default function ProjectListScreen({
                         )}
                         {/* Live Token Streaming Bubble when tokens are arriving */}
                         {streamingGuideText && (
-                          <div className="flex flex-col items-start">
-                            <div className="flex items-center gap-1.5 mb-1 px-1 text-[10px] font-medium text-neutral-400">
-                              <ScholarCoreLogo size="sm" withText={false} className="scale-75 -mx-1" />
-                              <span>Scholar Core</span>
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-sky-500/10 text-sky-600 dark:text-sky-400">
-                                Streaming…
-                              </span>
-                            </div>
-                            <div className="rounded-2xl px-4 py-3 max-w-[88%] leading-relaxed bg-white dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 rounded-tl-xs shadow-2xs">
-                              {renderFormattedGuideText(streamingGuideText, undefined, askCitationStyle)}
-                            </div>
+                          <div data-streaming-answer className="w-full px-0.5 leading-relaxed text-neutral-900 dark:text-neutral-100">
+                            {renderFormattedGuideText(streamingGuideText, undefined, askCitationStyle)}
                           </div>
                         )}
                       </div>
@@ -4760,10 +4720,11 @@ export default function ProjectListScreen({
                     <button
                       type="button"
                       onClick={jumpToLatest}
-                      className="pointer-events-auto -translate-y-11 inline-flex items-center gap-1.5 min-h-10 px-4 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold shadow-lg cursor-pointer active:scale-95 transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+                      aria-label="Jump to latest"
+                      title="Jump to latest"
+                      className="pointer-events-auto -translate-y-11 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-neutral-200 bg-white/95 text-neutral-700 shadow-md backdrop-blur transition-transform active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-white/15 dark:bg-ink-800/95 dark:text-neutral-100"
                     >
-                      <ArrowDown className="w-3.5 h-3.5" aria-hidden="true" />
-                      {isGuideThinking ? "Jump to latest" : "Latest"}
+                      <ArrowDown className="h-4 w-4" aria-hidden="true" />
                     </button>
                   </div>
                 )}
@@ -4848,9 +4809,9 @@ export default function ProjectListScreen({
                           }}
                           aria-pressed={Boolean(isVaultGroundingActive && userEmail)}
                           aria-label="Vault Grounding"
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 min-h-11 sm:min-h-0 rounded-full text-[11px] font-medium border transition-all cursor-pointer ${isVaultGroundingActive && userEmail
-                            ? "bg-amber-500/10 text-amber-800 dark:text-amber-200 border-amber-500/30 shadow-2xs font-semibold"
-                            : "bg-transparent text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 border-neutral-200/60 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20"
+                          className={`${"inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-500 sm:min-h-8"} ${isVaultGroundingActive && userEmail
+                            ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                            : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white"
                             }`}
                           title={
                             userEmail
@@ -4860,10 +4821,10 @@ export default function ProjectListScreen({
                               : "Sign in to ground answers in your personal Knowledge Vault"
                           }
                         >
-                          <Database className={`w-3 h-3 ${isVaultGroundingActive && userEmail ? "text-amber-500" : ""}`} />
+                          <Database className="h-3.5 w-3.5" aria-hidden="true" />
                           <span className="hidden sm:inline">Vault Grounding</span>
-                          {userEmail && (
-                            <span className={`text-[9px] font-mono px-1 rounded-full ${isVaultGroundingActive ? "bg-amber-500/20 text-amber-800 dark:text-amber-200" : "bg-neutral-200/60 dark:bg-white/10 text-neutral-500"}`}>
+                          {userEmail && userVaultItems.length > 0 && (
+                            <span className="text-[11px] tabular-nums opacity-70">
                               {userVaultItems.length}
                             </span>
                           )}

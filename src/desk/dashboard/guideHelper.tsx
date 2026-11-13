@@ -1,5 +1,5 @@
 import React, { useState, Fragment } from "react";
-import { Copy, Check, Scale, Info, BarChart3, Network, ExternalLink, ListTree } from "lucide-react";
+import { Copy, Check, Scale, Info, BarChart3, Network, ExternalLink, ChevronRight as ChevronRightIcon } from "lucide-react";
 import type { WebsiteAssistantMessage, WebsiteCitationItem } from "./types";
 import {
   formatAskScholarInText,
@@ -282,7 +282,7 @@ export function InlineCitationBadge({
           e.stopPropagation();
           scrollToReferenceEntry(num, messageId);
         }}
-        className="inline-flex items-center px-1.5 py-0.2 rounded-md font-medium text-[0.92em] bg-blue-50/90 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors cursor-pointer no-underline"
+        className="cursor-pointer font-medium text-[0.92em] text-blue-700 no-underline decoration-blue-300 underline-offset-2 transition-colors hover:underline dark:text-blue-300"
         title={
           citation?.title
             ? `Source ${displayLabel}: ${citation.title}`
@@ -817,38 +817,33 @@ export function renderFormattedGuideText(
     <div className="max-w-[75ch] space-y-2 text-[13.5px] leading-[1.68] text-inherit">
       {/* Automatic Table of Contents for answers with 3 or more headings (Section 10) */}
       {headingBlocks.length >= 3 && (
-        <nav
-          aria-label="Table of contents"
-          data-testid="response-toc"
-          className="mb-3 p-3 rounded-xl bg-neutral-50/90 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/10"
-        >
-          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1.5">
-            <ListTree className="w-3.5 h-3.5 text-indigo-500" />
-            <span>Contents</span>
-          </div>
-          <ol className="space-y-1 text-xs">
-            {headingBlocks.map((h, hIdx) => (
-              <li
-                key={h.id}
-                className={h.level >= 3 ? "pl-3" : ""}
-              >
-                <a
-                  href={`#${h.id}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    const target = document.getElementById(h.id);
-                    if (target && typeof target.scrollIntoView === "function") {
-                      target.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }
-                  }}
-                  className="text-neutral-700 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-flex items-center gap-1.5"
-                >
-                  <span className="font-mono text-[10px] text-neutral-400">{hIdx + 1}.</span>
-                  <span>{h.content}</span>
-                </a>
-              </li>
-            ))}
-          </ol>
+        <nav aria-label="Table of contents" data-testid="response-toc" className="mb-3">
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-neutral-500 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white [&::-webkit-details-marker]:hidden">
+              <ChevronRightIcon className="h-3 w-3 transition-transform group-open:rotate-90" aria-hidden="true" />
+              <span>Contents</span>
+            </summary>
+            <ol className="mt-1.5 space-y-1 border-l border-neutral-200 pl-3 text-[13px] dark:border-white/10">
+              {headingBlocks.map((h, hIdx) => (
+                <li key={h.id} className={h.level >= 3 ? "pl-3" : ""}>
+                  <a
+                    href={`#${h.id}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const target = document.getElementById(h.id);
+                      if (target && typeof target.scrollIntoView === "function") {
+                        target.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }
+                    }}
+                    className="inline-flex min-h-8 items-center gap-1.5 text-neutral-700 transition-colors hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white"
+                  >
+                    <span className="text-[11px] tabular-nums text-neutral-400">{hIdx + 1}</span>
+                    <span>{h.content}</span>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </details>
         </nav>
       )}
 
